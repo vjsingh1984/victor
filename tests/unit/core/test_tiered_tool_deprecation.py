@@ -20,7 +20,9 @@ class TestTieredToolConfigDeprecation:
             warnings.simplefilter("always")
             TieredToolConfig(semantic_pool={"tool_a", "tool_b"})
 
-        deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+        deprecation_warnings = [
+            x for x in w if issubclass(x.category, DeprecationWarning)
+        ]
         assert len(deprecation_warnings) == 1
         assert "semantic_pool" in str(deprecation_warnings[0].message)
 
@@ -30,7 +32,9 @@ class TestTieredToolConfigDeprecation:
             warnings.simplefilter("always")
             TieredToolConfig(stage_tools={"INITIAL": {"read"}})
 
-        deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+        deprecation_warnings = [
+            x for x in w if issubclass(x.category, DeprecationWarning)
+        ]
         assert len(deprecation_warnings) == 1
         assert "stage_tools" in str(deprecation_warnings[0].message)
 
@@ -40,7 +44,9 @@ class TestTieredToolConfigDeprecation:
             warnings.simplefilter("always")
             TieredToolConfig(mandatory={"read"})
 
-        deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+        deprecation_warnings = [
+            x for x in w if issubclass(x.category, DeprecationWarning)
+        ]
         assert len(deprecation_warnings) == 0
 
     def test_warn_once_behavior(self):
@@ -50,7 +56,9 @@ class TestTieredToolConfigDeprecation:
             TieredToolConfig(semantic_pool={"a"})
             TieredToolConfig(semantic_pool={"b"})
 
-        deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+        deprecation_warnings = [
+            x for x in w if issubclass(x.category, DeprecationWarning)
+        ]
         assert len(deprecation_warnings) == 1
 
     def test_reset_allows_rewarn(self):
@@ -65,5 +73,7 @@ class TestTieredToolConfigDeprecation:
             warnings.simplefilter("always")
             TieredToolConfig(semantic_pool={"b"})
 
-        deprecation_warnings = [x for x in w2 if issubclass(x.category, DeprecationWarning)]
+        deprecation_warnings = [
+            x for x in w2 if issubclass(x.category, DeprecationWarning)
+        ]
         assert len(deprecation_warnings) == 1

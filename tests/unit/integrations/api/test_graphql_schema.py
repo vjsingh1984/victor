@@ -33,7 +33,9 @@ def mock_server():
     mock_orchestrator.provider.name = "anthropic"
     mock_orchestrator.provider.model = "claude-3-sonnet"
     mock_orchestrator.adaptive_controller = None
-    mock_orchestrator.chat = AsyncMock(return_value=MagicMock(content="Hello!", tool_calls=[]))
+    mock_orchestrator.chat = AsyncMock(
+        return_value=MagicMock(content="Hello!", tool_calls=[])
+    )
     mock_orchestrator.reset_conversation = MagicMock()
     server._get_orchestrator = AsyncMock(return_value=mock_orchestrator)
 
@@ -98,7 +100,9 @@ class TestStatusQuery:
     @pytest.mark.asyncio
     async def test_status_query(self, schema):
         """Status query should return server status."""
-        result = await schema.execute("{ status { connected mode provider model workspace } }")
+        result = await schema.execute(
+            "{ status { connected mode provider model workspace } }"
+        )
         assert result.errors is None
         data = result.data["status"]
         assert data["connected"] is True
@@ -204,7 +208,9 @@ class TestGraphQLDisabledWithoutStrawberry:
 
     def test_graphql_disabled_without_strawberry(self):
         """Server should start without GraphQL when strawberry is unavailable."""
-        with patch.dict("sys.modules", {"strawberry": None, "strawberry.fastapi": None}):
+        with patch.dict(
+            "sys.modules", {"strawberry": None, "strawberry.fastapi": None}
+        ):
             # The import guard in fastapi_server.py catches ImportError
             # so the server should still initialize. We verify the pattern.
             try:

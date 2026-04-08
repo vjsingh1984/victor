@@ -75,7 +75,9 @@ def test_security_keyword_tool_selection_with_mocked_registry():
     mock_scan_tool.description = "Security scan tool"
     mock_scan_tool.parameters = {}
 
-    scan_tool_def = ToolDefinition(name="scan", description="Security scan tool", parameters={})
+    scan_tool_def = ToolDefinition(
+        name="scan", description="Security scan tool", parameters={}
+    )
 
     with (
         patch(
@@ -88,8 +90,12 @@ def test_security_keyword_tool_selection_with_mocked_registry():
             # Clear any vertical-set enabled_tools so we hit the fallback path
             orch.tool_selector._enabled_tools = set()
             # Inject our mock tool into the tool registry
-            orch.tool_selector.tools.list_tools = MagicMock(return_value=[mock_scan_tool])
-            tools = orch.tool_selector.select_keywords("run a security scan of the repo")
+            orch.tool_selector.tools.list_tools = MagicMock(
+                return_value=[mock_scan_tool]
+            )
+            tools = orch.tool_selector.select_keywords(
+                "run a security scan of the repo"
+            )
             names = [t.name for t in tools]
             assert "scan" in names
         finally:
@@ -120,8 +126,12 @@ def test_metrics_keyword_tool_selection_with_mocked_registry():
         orch = _orch()
         try:
             orch.tool_selector._enabled_tools = set()
-            orch.tool_selector.tools.list_tools = MagicMock(return_value=[mock_metrics_tool])
-            tools = orch.tool_selector.select_keywords("analyze code complexity and metrics")
+            orch.tool_selector.tools.list_tools = MagicMock(
+                return_value=[mock_metrics_tool]
+            )
+            tools = orch.tool_selector.select_keywords(
+                "analyze code complexity and metrics"
+            )
             names = [t.name for t in tools]
             assert "metrics" in names
         finally:

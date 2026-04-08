@@ -219,7 +219,9 @@ class TestToolSelectorLearner:
     def test_get_recommendation(self, learner: ToolSelectorLearner) -> None:
         """Test get_recommendation returns correct values."""
         # Record some outcomes
-        _record_tool_outcome(learner, tool_name="read", task_type="analysis", success=True)
+        _record_tool_outcome(
+            learner, tool_name="read", task_type="analysis", success=True
+        )
 
         # Get recommendation (provider param overloaded as tool_name)
         rec = learner.get_recommendation(
@@ -286,10 +288,18 @@ class TestToolSelectorLearner:
         """Test blended Q-value calculation (70% task-specific + 30% global)."""
         # Record outcomes for same tool with different task types
         _record_tool_outcome(
-            learner, tool_name="edit", task_type="action", success=True, quality_score=1.0
+            learner,
+            tool_name="edit",
+            task_type="action",
+            success=True,
+            quality_score=1.0,
         )
         _record_tool_outcome(
-            learner, tool_name="edit", task_type="analysis", success=False, quality_score=0.0
+            learner,
+            tool_name="edit",
+            task_type="analysis",
+            success=False,
+            quality_score=0.0,
         )
 
         # Blended value should be weighted mix
@@ -381,7 +391,9 @@ class TestToolSelectorLearner:
         assert rec.confidence < 0.5  # Below high-confidence threshold
         assert "Low confidence" in rec.reason
 
-    def test_high_confidence_after_many_samples(self, learner: ToolSelectorLearner) -> None:
+    def test_high_confidence_after_many_samples(
+        self, learner: ToolSelectorLearner
+    ) -> None:
         """Test confidence increases with more samples."""
         for _ in range(25):  # Above MIN_SAMPLES_FOR_CONFIDENCE (20)
             _record_tool_outcome(learner, tool_name="mature_tool")

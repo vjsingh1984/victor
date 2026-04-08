@@ -20,7 +20,10 @@ class TestFeatureFlagIntegration:
         assert FeatureFlag.USE_SERVICE_LAYER.value == "use_service_layer"
 
     def test_flag_env_var_name(self):
-        assert FeatureFlag.USE_SERVICE_LAYER.get_env_var_name() == "VICTOR_USE_SERVICE_LAYER"
+        assert (
+            FeatureFlag.USE_SERVICE_LAYER.get_env_var_name()
+            == "VICTOR_USE_SERVICE_LAYER"
+        )
 
     def test_flag_enabled_by_default(self):
         manager = FeatureFlagManager(FeatureFlagConfig())

@@ -55,7 +55,9 @@ class TestTaskCompletionDetector:
 
     def test_analyze_intent_plan_request(self, detector):
         """Test intent analysis for planning requests."""
-        deliverables = detector.analyze_intent("Plan the implementation of a retry decorator")
+        deliverables = detector.analyze_intent(
+            "Plan the implementation of a retry decorator"
+        )
 
         from victor.agent.task_completion import DeliverableType
 
@@ -648,7 +650,9 @@ class TestModeCompletionCriteria:
         config2 = criteria.get_criteria("explore")
         config3 = criteria.get_criteria("Explore")
 
-        assert config1.max_iterations == config2.max_iterations == config3.max_iterations
+        assert (
+            config1.max_iterations == config2.max_iterations == config3.max_iterations
+        )
 
     def test_unknown_mode_returns_default(self, criteria):
         """Test unknown mode returns default criteria."""
@@ -825,7 +829,9 @@ class TestExtendedBudgetManager:
         manager.set_mode("BUILD")
         manager.record_file_write()
 
-        should_exit, reason = manager.should_early_exit("The file has been created successfully.")
+        should_exit, reason = manager.should_early_exit(
+            "The file has been created successfully."
+        )
 
         assert should_exit
 

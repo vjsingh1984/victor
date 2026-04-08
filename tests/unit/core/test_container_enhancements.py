@@ -293,7 +293,9 @@ class TestHealthChecks:
                 return True
 
         container.register(
-            IHealthyService, lambda c: CountingHealthyService(), ServiceLifetime.SINGLETON
+            IHealthyService,
+            lambda c: CountingHealthyService(),
+            ServiceLifetime.SINGLETON,
         )
 
         # First call creates instance
@@ -467,7 +469,9 @@ class TestThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        threads = [threading.Thread(target=register_service, args=(i,)) for i in range(10)]
+        threads = [
+            threading.Thread(target=register_service, args=(i,)) for i in range(10)
+        ]
 
         for t in threads:
             t.start()

@@ -230,7 +230,9 @@ class TestRLProvider:
         assert hasattr(
             RLProvider, "get_rl_config_provider"
         ), "RLProvider must define get_rl_config_provider method"
-        assert hasattr(RLProvider, "get_rl_hooks"), "RLProvider must define get_rl_hooks method"
+        assert hasattr(
+            RLProvider, "get_rl_hooks"
+        ), "RLProvider must define get_rl_hooks method"
 
     def test_rl_provider_isinstance_check(self):
         """Verify isinstance() works with RLProvider."""
@@ -318,7 +320,9 @@ class TestToolProvider:
         """ToolProvider must define required methods."""
         from victor.core.verticals.protocols.providers import ToolProvider
 
-        assert hasattr(ToolProvider, "get_tools"), "ToolProvider must define get_tools method"
+        assert hasattr(
+            ToolProvider, "get_tools"
+        ), "ToolProvider must define get_tools method"
         assert hasattr(
             ToolProvider, "get_tool_graph"
         ), "ToolProvider must define get_tool_graph method"
@@ -496,7 +500,9 @@ class TestPromptContributorProvider:
         try:
             isinstance(DummyClass(), PromptContributorProvider)
         except TypeError:
-            pytest.fail("PromptContributorProvider must be decorated with @runtime_checkable")
+            pytest.fail(
+                "PromptContributorProvider must be decorated with @runtime_checkable"
+            )
 
     def test_prompt_contributor_provider_has_required_methods(self):
         """PromptContributorProvider must define required methods."""
@@ -546,7 +552,9 @@ class TestToolDependencyProvider:
         try:
             isinstance(DummyClass(), ToolDependencyProvider)
         except TypeError:
-            pytest.fail("ToolDependencyProvider must be decorated with @runtime_checkable")
+            pytest.fail(
+                "ToolDependencyProvider must be decorated with @runtime_checkable"
+            )
 
     def test_tool_dependency_provider_has_required_method(self):
         """ToolDependencyProvider must define get_tool_dependency_provider method."""
@@ -589,7 +597,9 @@ class TestTieredToolConfigProvider:
         try:
             isinstance(DummyClass(), TieredToolConfigProvider)
         except TypeError:
-            pytest.fail("TieredToolConfigProvider must be decorated with @runtime_checkable")
+            pytest.fail(
+                "TieredToolConfigProvider must be decorated with @runtime_checkable"
+            )
 
     def test_tiered_tool_config_provider_has_required_method(self):
         """TieredToolConfigProvider must define get_tiered_tool_config method."""

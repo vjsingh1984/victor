@@ -236,8 +236,12 @@ class TestDataAnalysisWorkflowE2E:
 
     def test_escape_hatches_registered(self):
         """Test escape hatches are available in config."""
-        CONDITIONS = _load_vertical_attr("victor_dataanalysis.escape_hatches", "CONDITIONS")
-        TRANSFORMS = _load_vertical_attr("victor_dataanalysis.escape_hatches", "TRANSFORMS")
+        CONDITIONS = _load_vertical_attr(
+            "victor_dataanalysis.escape_hatches", "CONDITIONS"
+        )
+        TRANSFORMS = _load_vertical_attr(
+            "victor_dataanalysis.escape_hatches", "TRANSFORMS"
+        )
 
         # Verify conditions
         assert "should_retry_cleaning" in CONDITIONS
@@ -305,8 +309,12 @@ class TestCrossVerticalConsistency:
 
         for provider in providers:
             config = provider._get_config()
-            assert hasattr(config, "condition_registry"), f"{provider} missing condition_registry"
-            assert hasattr(config, "transform_registry"), f"{provider} missing transform_registry"
+            assert hasattr(
+                config, "condition_registry"
+            ), f"{provider} missing condition_registry"
+            assert hasattr(
+                config, "transform_registry"
+            ), f"{provider} missing transform_registry"
 
     def test_all_providers_have_canonical_streaming_methods(self):
         """Test all providers support streaming via canonical API."""
@@ -330,7 +338,9 @@ class TestCrossVerticalConsistency:
         ]
 
         for provider in providers:
-            assert hasattr(provider, "compile_workflow"), f"{provider} missing compile_workflow"
+            assert hasattr(
+                provider, "compile_workflow"
+            ), f"{provider} missing compile_workflow"
             assert hasattr(
                 provider, "stream_compiled_workflow"
             ), f"{provider} missing stream_compiled_workflow"
@@ -377,7 +387,9 @@ class TestCrossVerticalConsistency:
 
         for vertical, module in modules.items():
             module_file = getattr(module, "__file__", None)
-            assert module_file and Path(module_file).exists(), f"{vertical}/handlers.py missing"
+            assert (
+                module_file and Path(module_file).exists()
+            ), f"{vertical}/handlers.py missing"
 
 
 class TestWorkflowNodeTypes:
@@ -396,7 +408,11 @@ class TestWorkflowNodeTypes:
         hitl_found = False
         for workflow in workflows.values():
             # Handle both list and dict node containers
-            nodes = workflow.nodes.values() if isinstance(workflow.nodes, dict) else workflow.nodes
+            nodes = (
+                workflow.nodes.values()
+                if isinstance(workflow.nodes, dict)
+                else workflow.nodes
+            )
             for node in nodes:
                 node_type = getattr(node, "__class__", None)
                 if node_type and "hitl" in node_type.__name__.lower():
@@ -420,7 +436,11 @@ class TestWorkflowNodeTypes:
         condition_found = False
         for workflow in workflows.values():
             # Handle both list and dict node containers
-            nodes = workflow.nodes.values() if isinstance(workflow.nodes, dict) else workflow.nodes
+            nodes = (
+                workflow.nodes.values()
+                if isinstance(workflow.nodes, dict)
+                else workflow.nodes
+            )
             for node in nodes:
                 node_type = getattr(node, "__class__", None)
                 if node_type and "condition" in node_type.__name__.lower():

@@ -255,7 +255,9 @@ class TestEvaluationOrchestrator:
             with patch.object(orchestrator, "_init_components"):
                 # Mock loader
                 orchestrator._loader = MagicMock()
-                orchestrator._loader.load_instances_from_file.return_value = [test_instance]
+                orchestrator._loader.load_instances_from_file.return_value = [
+                    test_instance
+                ]
 
                 # Mock workspace manager
                 mock_workspace = Path(tmpdir) / "workspace"
@@ -324,13 +326,21 @@ class TestEvaluationOrchestrator:
                     end_time=10.0,
                     turns=3,
                     tool_calls=[
-                        EvalToolCall(name="file_read", arguments={"path": "test.py"}, success=True),
                         EvalToolCall(
-                            name="file_write", arguments={"path": "test.py"}, success=True
+                            name="file_read",
+                            arguments={"path": "test.py"},
+                            success=True,
+                        ),
+                        EvalToolCall(
+                            name="file_write",
+                            arguments={"path": "test.py"},
+                            success=True,
                         ),
                     ],
                     file_edits=[
-                        FileEdit(path="test.py", action="modify", after_content="new content"),
+                        FileEdit(
+                            path="test.py", action="modify", after_content="new content"
+                        ),
                     ],
                     generated_patch="--- a/test.py\n+++ b/test.py\n@@ -1 +1 @@\n-old\n+new",
                 )
@@ -353,7 +363,9 @@ class TestEvaluationOrchestrator:
 
                         # Run single task
                         orchestrator._tasks = [test_instance]
-                        orchestrator._progress["test-001"] = TaskProgress(instance_id="test-001")
+                        orchestrator._progress["test-001"] = TaskProgress(
+                            instance_id="test-001"
+                        )
 
                         await orchestrator._run_single_task(test_instance)
 
@@ -392,7 +404,9 @@ class TestEvaluationOrchestrator:
                     )
                 )
 
-                orchestrator._progress["test-001"] = TaskProgress(instance_id="test-001")
+                orchestrator._progress["test-001"] = TaskProgress(
+                    instance_id="test-001"
+                )
 
                 with pytest.raises(RuntimeError, match="Environment setup failed"):
                     await orchestrator._run_single_task(test_instance)
@@ -422,7 +436,9 @@ class TestEvaluationOrchestrator:
                 # Mock environment setup success
                 orchestrator._env_setup = MagicMock()
                 orchestrator._env_setup.setup_environment = AsyncMock(
-                    return_value=SetupResult(success=True, strategy=SetupStrategy.SYSTEM)
+                    return_value=SetupResult(
+                        success=True, strategy=SetupStrategy.SYSTEM
+                    )
                 )
 
                 # Mock baseline validator to return invalid baseline
@@ -440,7 +456,9 @@ class TestEvaluationOrchestrator:
                     return_value=mock_baseline
                 )
 
-                orchestrator._progress["test-001"] = TaskProgress(instance_id="test-001")
+                orchestrator._progress["test-001"] = TaskProgress(
+                    instance_id="test-001"
+                )
 
                 with pytest.raises(RuntimeError, match="Baseline invalid"):
                     await orchestrator._run_single_task(test_instance)
@@ -469,7 +487,9 @@ class TestEvaluationOrchestrator:
                 # Mock environment setup success
                 orchestrator._env_setup = MagicMock()
                 orchestrator._env_setup.setup_environment = AsyncMock(
-                    return_value=SetupResult(success=True, strategy=SetupStrategy.SYSTEM)
+                    return_value=SetupResult(
+                        success=True, strategy=SetupStrategy.SYSTEM
+                    )
                 )
 
                 # Mock baseline validator
@@ -497,7 +517,9 @@ class TestEvaluationOrchestrator:
                     mock_adapter.execute_task = slow_execute
                     MockAdapter.from_profile.return_value = mock_adapter
 
-                    orchestrator._progress["test-001"] = TaskProgress(instance_id="test-001")
+                    orchestrator._progress["test-001"] = TaskProgress(
+                        instance_id="test-001"
+                    )
 
                     with pytest.raises(asyncio.TimeoutError):
                         await orchestrator._run_single_task(test_instance)
@@ -537,7 +559,9 @@ class TestEvaluationOrchestrator:
                     completed_at=datetime.now(),
                 )
 
-            with patch.object(orchestrator, "_run_single_task", side_effect=mock_run_single):
+            with patch.object(
+                orchestrator, "_run_single_task", side_effect=mock_run_single
+            ):
                 for task in instances:
                     orchestrator._progress[task.instance_id] = TaskProgress(
                         instance_id=task.instance_id
@@ -576,7 +600,9 @@ class TestEvaluationOrchestrator:
                     stage=EvaluationStage.COMPLETED,
                 )
 
-            with patch.object(orchestrator, "_run_single_task", side_effect=mock_run_single):
+            with patch.object(
+                orchestrator, "_run_single_task", side_effect=mock_run_single
+            ):
                 for task in instances:
                     orchestrator._progress[task.instance_id] = TaskProgress(
                         instance_id=task.instance_id

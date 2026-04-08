@@ -101,7 +101,10 @@ class TestFireworksProviderModels:
 
     def test_qwen_coder_model_defined(self):
         """Test Qwen3 Coder is defined."""
-        assert "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct" in FIREWORKS_MODELS
+        assert (
+            "accounts/fireworks/models/qwen3-coder-480b-a35b-instruct"
+            in FIREWORKS_MODELS
+        )
 
     def test_deepseek_model_defined(self):
         """Test DeepSeek V3.2 is defined."""
@@ -110,7 +113,9 @@ class TestFireworksProviderModels:
     def test_all_models_support_tools(self):
         """Test all defined models support tools."""
         for model_id, model_info in FIREWORKS_MODELS.items():
-            assert model_info.get("supports_tools") is True, f"{model_id} should support tools"
+            assert (
+                model_info.get("supports_tools") is True
+            ), f"{model_id} should support tools"
 
 
 class TestFireworksProviderRequestPayload:
@@ -146,7 +151,10 @@ class TestFireworksProviderRequestPayload:
             ToolDefinition(
                 name="code_search",
                 description="Search for code patterns",
-                parameters={"type": "object", "properties": {"query": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}},
+                },
             )
         ]
 
@@ -271,12 +279,18 @@ class TestFireworksProviderResponseParsing:
                             {
                                 "id": "call_1",
                                 "type": "function",
-                                "function": {"name": "read_file", "arguments": '{"path": "a.py"}'},
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": '{"path": "a.py"}',
+                                },
                             },
                             {
                                 "id": "call_2",
                                 "type": "function",
-                                "function": {"name": "read_file", "arguments": '{"path": "b.py"}'},
+                                "function": {
+                                    "name": "read_file",
+                                    "arguments": '{"path": "b.py"}',
+                                },
                             },
                         ],
                     },
@@ -431,6 +445,8 @@ class TestFireworksProviderCleanup:
         """Test provider cleanup."""
         provider = FireworksProvider(api_key="test-key")
 
-        with patch.object(provider.client, "aclose", new_callable=AsyncMock) as mock_close:
+        with patch.object(
+            provider.client, "aclose", new_callable=AsyncMock
+        ) as mock_close:
             await provider.close()
             mock_close.assert_called_once()

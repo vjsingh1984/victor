@@ -118,7 +118,9 @@ class TestToolCatalogLoaderLoad:
         settings.load_tool_config.return_value = {}
         return settings
 
-    def test_load_registers_tools_from_shared_registry(self, mock_registry, mock_settings):
+    def test_load_registers_tools_from_shared_registry(
+        self, mock_registry, mock_settings
+    ):
         """Test that load() registers tools from SharedToolRegistry."""
         loader = ToolCatalogLoader(registry=mock_registry, settings=mock_settings)
 
@@ -135,12 +137,16 @@ class TestToolCatalogLoaderLoad:
 
         assert result.tools_loaded == 5
         assert loader.is_loaded is True
-        mock_shared.get_all_tools_for_registration.assert_called_once_with(airgapped_mode=False)
+        mock_shared.get_all_tools_for_registration.assert_called_once_with(
+            airgapped_mode=False
+        )
 
     def test_load_respects_airgapped_mode(self, mock_registry, mock_settings):
         """Test that load() passes airgapped_mode to SharedToolRegistry."""
         config = ToolCatalogConfig(airgapped_mode=True)
-        loader = ToolCatalogLoader(registry=mock_registry, settings=mock_settings, config=config)
+        loader = ToolCatalogLoader(
+            registry=mock_registry, settings=mock_settings, config=config
+        )
 
         mock_shared = MagicMock()
         mock_shared.get_all_tools_for_registration.return_value = []
@@ -151,14 +157,20 @@ class TestToolCatalogLoaderLoad:
         ):
             loader.load()
 
-        mock_shared.get_all_tools_for_registration.assert_called_once_with(airgapped_mode=True)
+        mock_shared.get_all_tools_for_registration.assert_called_once_with(
+            airgapped_mode=True
+        )
 
     def test_load_handles_registration_errors(self, mock_registry, mock_settings):
         """Test that load() handles tool registration errors gracefully."""
         loader = ToolCatalogLoader(registry=mock_registry, settings=mock_settings)
 
         # Make registry.register raise an exception for some tools
-        mock_registry.register.side_effect = [None, Exception("Registration failed"), None]
+        mock_registry.register.side_effect = [
+            None,
+            Exception("Registration failed"),
+            None,
+        ]
 
         mock_shared = MagicMock()
         mock_tools = [MagicMock() for _ in range(3)]
@@ -178,7 +190,9 @@ class TestToolCatalogLoaderLoad:
         loader = ToolCatalogLoader(registry=mock_registry, settings=mock_settings)
 
         mock_shared = MagicMock()
-        mock_shared.get_all_tools_for_registration.return_value = [MagicMock() for _ in range(3)]
+        mock_shared.get_all_tools_for_registration.return_value = [
+            MagicMock() for _ in range(3)
+        ]
 
         with patch(
             "victor.agent.shared_tool_registry.SharedToolRegistry.get_instance",

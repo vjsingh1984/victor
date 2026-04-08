@@ -252,7 +252,9 @@ class TestApprovalFlowEndToEnd:
         controller = HITLController()
 
         # Register callbacks
-        controller.on_approval_request(lambda req: events.append(("request_created", req.id)))
+        controller.on_approval_request(
+            lambda req: events.append(("request_created", req.id))
+        )
 
         # Create request
         request = controller.request_approval(

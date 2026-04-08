@@ -244,13 +244,19 @@ class TestChainRegistryListing:
         """Registry should list all chain metadata."""
         registry = ChainRegistry()
         registry.register("chain1", MagicMock(), description="First")
-        registry.register("chain2", MagicMock(), vertical="coding", description="Second")
+        registry.register(
+            "chain2", MagicMock(), vertical="coding", description="Second"
+        )
 
         metadata_list = registry.list_metadata()
 
         assert len(metadata_list) == 2
-        assert any(m.name == "chain1" and m.description == "First" for m in metadata_list)
-        assert any(m.name == "chain2" and m.description == "Second" for m in metadata_list)
+        assert any(
+            m.name == "chain1" and m.description == "First" for m in metadata_list
+        )
+        assert any(
+            m.name == "chain2" and m.description == "Second" for m in metadata_list
+        )
 
     def test_registry_list_metadata_by_vertical(self):
         """Registry should list metadata filtered by vertical."""

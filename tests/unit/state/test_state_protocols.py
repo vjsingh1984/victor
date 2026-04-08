@@ -216,7 +216,9 @@ class TestIStateManagerProtocol:
 
         # Mock observer
         class MockObserver:
-            async def on_state_changed(self, scope, key, old_value, new_value, metadata=None):
+            async def on_state_changed(
+                self, scope, key, old_value, new_value, metadata=None
+            ):
                 pass
 
         observer = MockObserver()

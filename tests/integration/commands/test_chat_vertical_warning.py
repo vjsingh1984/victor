@@ -62,7 +62,9 @@ def test_chat_missing_coding_vertical_emits_capability_warning(monkeypatch):
     emitted_events: List[Tuple[str, Dict[str, Any], str]] = []
 
     class StubObservabilityBus:
-        def emit_sync(self, topic: str, data: Dict[str, Any], source: str | None = None) -> None:
+        def emit_sync(
+            self, topic: str, data: Dict[str, Any], source: str | None = None
+        ) -> None:
             emitted_events.append((topic, data, source or ""))
 
     monkeypatch.setattr(
@@ -73,14 +75,21 @@ def test_chat_missing_coding_vertical_emits_capability_warning(monkeypatch):
     from victor.core import bootstrap as bootstrap_module
     from victor.core.plugins.registry import PluginRegistry
     from victor.core.verticals.base import VerticalRegistry
-    from victor.core.verticals.vertical_loader import VerticalLoader, get_vertical_loader
+    from victor.core.verticals.vertical_loader import (
+        VerticalLoader,
+        get_vertical_loader,
+    )
 
     original_discover = VerticalLoader.discover_verticals
     original_plugin_discover = PluginRegistry.discover
     original_list_names = VerticalRegistry.list_names
 
-    def discover_without_coding(self, force_refresh: bool = False, emit_event: bool = True):
-        discovered = original_discover(self, force_refresh=force_refresh, emit_event=emit_event)
+    def discover_without_coding(
+        self, force_refresh: bool = False, emit_event: bool = True
+    ):
+        discovered = original_discover(
+            self, force_refresh=force_refresh, emit_event=emit_event
+        )
         if "coding" in discovered:
             discovered = dict(discovered)
             discovered.pop("coding", None)
@@ -94,7 +103,9 @@ def test_chat_missing_coding_vertical_emits_capability_warning(monkeypatch):
 
     def discover_plugins_without_coding(self, force: bool = False):
         discovered = original_plugin_discover(self, force=force)
-        filtered = [plugin for plugin in discovered if getattr(plugin, "name", None) != "coding"]
+        filtered = [
+            plugin for plugin in discovered if getattr(plugin, "name", None) != "coding"
+        ]
         self._plugins = {plugin.name: plugin for plugin in filtered}
         return filtered
 
@@ -103,7 +114,9 @@ def test_chat_missing_coding_vertical_emits_capability_warning(monkeypatch):
 
     monkeypatch.setattr(VerticalLoader, "discover_verticals", discover_without_coding)
     monkeypatch.setattr(PluginRegistry, "discover", discover_plugins_without_coding)
-    monkeypatch.setattr(VerticalRegistry, "list_names", classmethod(list_names_without_coding))
+    monkeypatch.setattr(
+        VerticalRegistry, "list_names", classmethod(list_names_without_coding)
+    )
     loader = get_vertical_loader()
     loader._discovered_verticals = None
     plugin_registry = PluginRegistry.get_instance()

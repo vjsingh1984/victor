@@ -61,7 +61,9 @@ class TestEventBus:
     without the full complexity of the production EventBus.
     """
 
-    subscribers: Dict[str, List[Callable]] = field(default_factory=lambda: defaultdict(list))
+    subscribers: Dict[str, List[Callable]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
     all_events: List[Dict[str, Any]] = field(default_factory=list)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
@@ -274,7 +276,8 @@ class TestConcurrentAgentEvents:
         await event_bus.subscribe("agent.execution.*", subscriber.on_event)
 
         agents = [
-            ObservableAgent(id=f"agent_{i}", event_bus=event_bus, delay=0.05) for i in range(3)
+            ObservableAgent(id=f"agent_{i}", event_bus=event_bus, delay=0.05)
+            for i in range(3)
         ]
 
         # Act: Execute all agents concurrently
@@ -288,7 +291,9 @@ class TestConcurrentAgentEvents:
         # Assert: Each agent has start before complete
         for i in range(3):
             agent_events = [
-                e for e in subscriber.events if e["data"].get("agent_id") == f"agent_{i}"
+                e
+                for e in subscriber.events
+                if e["data"].get("agent_id") == f"agent_{i}"
             ]
             assert len(agent_events) == 2
             assert agent_events[0]["type"] == "agent.execution.started"
@@ -363,7 +368,8 @@ class TestTeamExecutionEvents:
 
         # Create observable agents
         agents = [
-            ObservableAgent(id=f"member_{i}", event_bus=event_bus, delay=0.01) for i in range(2)
+            ObservableAgent(id=f"member_{i}", event_bus=event_bus, delay=0.01)
+            for i in range(2)
         ]
 
         # Use lightweight coordinator for testing
@@ -463,7 +469,8 @@ class TestWebSocketIntegration:
             await event_bus.subscribe("agent.*", bridge)
 
         agents = [
-            ObservableAgent(id=f"concurrent_{i}", event_bus=event_bus, delay=0.02) for i in range(2)
+            ObservableAgent(id=f"concurrent_{i}", event_bus=event_bus, delay=0.02)
+            for i in range(2)
         ]
 
         # Act: Execute agents concurrently
@@ -530,7 +537,8 @@ class TestEventAggregation:
         await event_bus.subscribe("agent.execution.*", aggregate_progress)
 
         agents = [
-            ObservableAgent(id=f"prog_{i}", event_bus=event_bus, delay=0.01) for i in range(5)
+            ObservableAgent(id=f"prog_{i}", event_bus=event_bus, delay=0.01)
+            for i in range(5)
         ]
 
         # Act

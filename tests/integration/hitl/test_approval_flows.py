@@ -74,7 +74,9 @@ class TestApprovalRequestLifecycle:
 
         assert request.id.startswith("req_")
         assert request.title == "Database Migration"
-        assert request.description == "Migrate production database schema with user data"
+        assert (
+            request.description == "Migrate production database schema with user data"
+        )
         assert request.context == context
         assert request.timeout_seconds == 600
         assert request.status == ApprovalStatus.PENDING
@@ -225,9 +227,17 @@ class TestCustomApprovalHandlers:
             risk_level = request.context.get("risk_level", "unknown")
 
             if risk_level == "low":
-                return ApprovalStatus.APPROVED, "Auto-approved (low risk)", "policy-engine"
+                return (
+                    ApprovalStatus.APPROVED,
+                    "Auto-approved (low risk)",
+                    "policy-engine",
+                )
             elif risk_level == "high":
-                return ApprovalStatus.REJECTED, "High risk requires manual review", "policy-engine"
+                return (
+                    ApprovalStatus.REJECTED,
+                    "High risk requires manual review",
+                    "policy-engine",
+                )
             else:
                 return ApprovalStatus.PENDING, None, None
 
@@ -367,7 +377,9 @@ class TestRejectionFlowWithReasonPropagation:
                 reasons.append("Production environment requires additional approval")
 
             if request.context.get("changes_count", 0) > 100:
-                reasons.append(f"Large change set ({request.context.get('changes_count')} files)")
+                reasons.append(
+                    f"Large change set ({request.context.get('changes_count')} files)"
+                )
 
             if not request.context.get("tests_passed", False):
                 reasons.append("Tests must pass before approval")

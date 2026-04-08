@@ -359,7 +359,9 @@ class TestInMemoryEventBackend:
 
         task = asyncio.create_task(_free_space())
         try:
-            result = await backend.publish(MessagingEvent(topic="test.after_wait", data={}))
+            result = await backend.publish(
+                MessagingEvent(topic="test.after_wait", data={})
+            )
         finally:
             await task
         assert result is True
@@ -387,7 +389,9 @@ class TestInMemoryEventBackend:
         backend._is_connected = True
 
         assert await backend.publish(MessagingEvent(topic="test.keep", data={})) is True
-        assert await backend.publish(MessagingEvent(topic="test.drop", data={})) is False
+        assert (
+            await backend.publish(MessagingEvent(topic="test.drop", data={})) is False
+        )
 
         assert sink_records == [("test.drop", "drop_newest")]
         pressure = backend.get_queue_pressure_stats()
@@ -406,9 +410,14 @@ class TestInMemoryEventBackend:
         backend = InMemoryEventBackend(config=config, queue_maxsize=1)
         backend._is_connected = True
 
-        assert await backend.publish(MessagingEvent(topic="noncritical.full", data={})) is True
+        assert (
+            await backend.publish(MessagingEvent(topic="noncritical.full", data={}))
+            is True
+        )
         t0 = time.perf_counter()
-        result = await backend.publish(MessagingEvent(topic="critical.timeout", data={}))
+        result = await backend.publish(
+            MessagingEvent(topic="critical.timeout", data={})
+        )
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
         assert result is False
@@ -429,8 +438,14 @@ class TestInMemoryEventBackend:
         backend = InMemoryEventBackend(config=config, queue_maxsize=1)
         backend._is_connected = True
 
-        assert await backend.publish(MessagingEvent(topic="baseline.keep", data={"v": 1})) is True
-        assert await backend.publish(MessagingEvent(topic="critical.new", data={"v": 2})) is True
+        assert (
+            await backend.publish(MessagingEvent(topic="baseline.keep", data={"v": 1}))
+            is True
+        )
+        assert (
+            await backend.publish(MessagingEvent(topic="critical.new", data={"v": 2}))
+            is True
+        )
 
         queued = backend._event_queue.get_nowait()
         assert queued.topic == "critical.new"
@@ -834,7 +849,9 @@ class TestBackendFactory:
             constructed += 1
             return MockRedisBackend()
 
-        monkeypatch.setitem(backends_module._backend_factories, BackendType.REDIS, factory)
+        monkeypatch.setitem(
+            backends_module._backend_factories, BackendType.REDIS, factory
+        )
 
         backend = create_event_backend(backend_type=BackendType.REDIS, lazy_init=True)
         assert isinstance(backend, LazyInitEventBackend)
@@ -892,8 +909,12 @@ class TestBackendConfig:
         assert config.extra["queue_maxsize"] == 64
         assert config.extra["queue_overflow_policy"] == "drop_oldest"
         assert config.extra["queue_overflow_block_timeout_ms"] == 12.5
-        assert config.extra["queue_overflow_topic_policies"] == {"critical.*": "block_with_timeout"}
-        assert config.extra["queue_overflow_topic_block_timeout_ms"] == {"critical.*": 90.0}
+        assert config.extra["queue_overflow_topic_policies"] == {
+            "critical.*": "block_with_timeout"
+        }
+        assert config.extra["queue_overflow_topic_block_timeout_ms"] == {
+            "critical.*": 90.0
+        }
 
 
 # =============================================================================

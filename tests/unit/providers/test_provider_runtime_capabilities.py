@@ -69,9 +69,13 @@ class _FailingDiscoverProvider(_DummyProvider):
 @pytest.mark.asyncio
 async def test_provider_manager_caches_discovery_capabilities() -> None:
     provider = _DummyProvider()
-    manager = ProviderManager(settings=None, initial_provider=provider, initial_model="model-x")
+    manager = ProviderManager(
+        settings=None, initial_provider=provider, initial_model="model-x"
+    )
 
-    caps = await manager._discover_and_cache_capabilities()  # private but intentional for test
+    caps = (
+        await manager._discover_and_cache_capabilities()
+    )  # private but intentional for test
     assert caps.context_window == 999
     assert manager.get_context_window() == 999
     info = manager.get_info()
@@ -81,8 +85,12 @@ async def test_provider_manager_caches_discovery_capabilities() -> None:
 @pytest.mark.asyncio
 async def test_provider_manager_falls_back_to_config_on_discovery_error() -> None:
     provider = _FailingDiscoverProvider()
-    manager = ProviderManager(settings=None, initial_provider=provider, initial_model="model-y")
+    manager = ProviderManager(
+        settings=None, initial_provider=provider, initial_model="model-y"
+    )
 
-    caps = await manager._discover_and_cache_capabilities()  # falls back to config limits
+    caps = (
+        await manager._discover_and_cache_capabilities()
+    )  # falls back to config limits
     assert caps.context_window > 0
     assert manager.get_context_window() == caps.context_window

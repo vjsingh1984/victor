@@ -25,7 +25,9 @@ def test_streaming_does_not_force_scroll_when_auto_scroll_disabled() -> None:
     """Streaming updates should not jump viewport when user scrolled away from bottom."""
     with (
         patch.object(EnhancedConversationLog, "mount", autospec=True),
-        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch.object(
+            EnhancedConversationLog, "scroll_end", autospec=True
+        ) as scroll_end,
     ):
         log = EnhancedConversationLog()
 
@@ -45,7 +47,9 @@ def test_streaming_scrolls_when_auto_scroll_enabled() -> None:
     """Streaming should follow output with guaranteed start/end anchoring."""
     with (
         patch.object(EnhancedConversationLog, "mount", autospec=True),
-        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch.object(
+            EnhancedConversationLog, "scroll_end", autospec=True
+        ) as scroll_end,
     ):
         log = EnhancedConversationLog()
 
@@ -63,7 +67,9 @@ def test_user_message_reenables_auto_scroll() -> None:
     """Submitting a user message should bring focus back to latest context."""
     with (
         patch.object(EnhancedConversationLog, "mount", autospec=True),
-        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch.object(
+            EnhancedConversationLog, "scroll_end", autospec=True
+        ) as scroll_end,
     ):
         log = EnhancedConversationLog()
         log.disable_auto_scroll()
@@ -78,7 +84,9 @@ def test_system_message_follows_when_auto_scroll_enabled() -> None:
     """System messages should follow transcript when auto-follow is active."""
     with (
         patch.object(EnhancedConversationLog, "mount", autospec=True),
-        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch.object(
+            EnhancedConversationLog, "scroll_end", autospec=True
+        ) as scroll_end,
         patch("victor.ui.tui.widgets.time.monotonic", side_effect=[1.0, 1.1]),
     ):
         log = EnhancedConversationLog()
@@ -323,7 +331,9 @@ def test_add_history_message_does_not_scroll_or_increment_unread() -> None:
     """History replay should mount messages without follow/unread side effects."""
     with (
         patch.object(EnhancedConversationLog, "mount", autospec=True) as mount,
-        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch.object(
+            EnhancedConversationLog, "scroll_end", autospec=True
+        ) as scroll_end,
     ):
         log = EnhancedConversationLog(show_unread_separator=True)
         log.disable_auto_scroll()
@@ -500,7 +510,9 @@ def test_follow_pause_is_sticky_across_messages() -> None:
     """Sticky follow pause should prevent auto-follow for new messages."""
     with (
         patch.object(EnhancedConversationLog, "mount", autospec=True),
-        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch.object(
+            EnhancedConversationLog, "scroll_end", autospec=True
+        ) as scroll_end,
     ):
         log = EnhancedConversationLog()
         log.set_follow_paused(True)
@@ -518,7 +530,9 @@ def test_resuming_follow_clears_unread_and_jumps_to_bottom() -> None:
     """Resuming follow should clear unread state and jump once when requested."""
     with (
         patch.object(EnhancedConversationLog, "mount", autospec=True),
-        patch.object(EnhancedConversationLog, "scroll_end", autospec=True) as scroll_end,
+        patch.object(
+            EnhancedConversationLog, "scroll_end", autospec=True
+        ) as scroll_end,
     ):
         log = EnhancedConversationLog()
         log.set_follow_paused(True)

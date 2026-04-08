@@ -499,7 +499,9 @@ class TestPromptBuilderContributor:
         # Mock a contributor
         contributor = MagicMock()
         contributor.get_priority.return_value = 5
-        contributor.get_system_prompt_section.return_value = "Contributor section content"
+        contributor.get_system_prompt_section.return_value = (
+            "Contributor section content"
+        )
         contributor.get_grounding_rules.return_value = None
         contributor.get_task_type_hints.return_value = {}
 
@@ -613,7 +615,9 @@ class TestPromptSectionsImports:
     def test_devops_identity_content(self):
         """Test DEVOPS_IDENTITY has expected content."""
         assert "Victor" in DEVOPS_IDENTITY
-        assert any(term in DEVOPS_IDENTITY for term in ["DevOps", "infrastructure", "Docker"])
+        assert any(
+            term in DEVOPS_IDENTITY for term in ["DevOps", "infrastructure", "Docker"]
+        )
 
     def test_research_identity_content(self):
         """Test RESEARCH_IDENTITY has expected content."""

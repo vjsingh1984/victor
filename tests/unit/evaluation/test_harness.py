@@ -151,7 +151,9 @@ class TestFilterTasks:
     def test_filter_by_max_tasks(self, sample_tasks):
         """Filter tasks by max_tasks limit."""
         runner = MockBenchmarkRunner()
-        config = EvaluationConfig(benchmark=BenchmarkType.HUMAN_EVAL, model="test", max_tasks=2)
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.HUMAN_EVAL, model="test", max_tasks=2
+        )
 
         filtered = runner._filter_tasks(sample_tasks, config)
 

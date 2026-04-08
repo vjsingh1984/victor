@@ -61,7 +61,9 @@ class TestWorkflowsNotebook:
         graph.set_entry_point("analyze")
 
         app = graph.compile()
-        result = await app.invoke(ProcessState(input="Hello Victor!", analysis="", summary=""))
+        result = await app.invoke(
+            ProcessState(input="Hello Victor!", analysis="", summary="")
+        )
 
         assert result.success is True
         assert "Analyzed:" in result.state["analysis"]
@@ -155,7 +157,9 @@ class TestWorkflowsNotebook:
 
         app = graph.compile()
 
-        result = await app.invoke(ParallelState(task1_result="", task2_result="", task3_result=""))
+        result = await app.invoke(
+            ParallelState(task1_result="", task2_result="", task3_result="")
+        )
 
         assert result.success is True
         assert result.state["task1_result"] == "done1"

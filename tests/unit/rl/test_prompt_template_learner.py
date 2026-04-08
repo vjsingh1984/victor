@@ -230,7 +230,9 @@ class TestPromptTemplateLearner:
         assert rec.sample_size == 0
         assert "value" in rec.value or isinstance(rec.value, dict)
 
-    def test_get_recommendation_returns_template(self, learner: PromptTemplateLearner) -> None:
+    def test_get_recommendation_returns_template(
+        self, learner: PromptTemplateLearner
+    ) -> None:
         """Test recommendation returns valid template."""
         rec = learner.get_recommendation(
             provider="anthropic",
@@ -243,7 +245,9 @@ class TestPromptTemplateLearner:
         assert template.style in PromptStyle
         assert all(e in PromptElement for e in template.elements)
 
-    def test_record_outcome_updates_posteriors(self, learner: PromptTemplateLearner) -> None:
+    def test_record_outcome_updates_posteriors(
+        self, learner: PromptTemplateLearner
+    ) -> None:
         """Test recording outcome updates posteriors."""
         # First, get a recommendation to establish context
         learner.get_recommendation(
@@ -309,7 +313,11 @@ class TestPromptTemplateLearner:
                 task_type="analysis",
                 success=True,
                 quality_score=0.8,
-                metadata={"template_used": PromptTemplate(style=PromptStyle.STRUCTURED).to_dict()},
+                metadata={
+                    "template_used": PromptTemplate(
+                        style=PromptStyle.STRUCTURED
+                    ).to_dict()
+                },
             )
             learner.record_outcome(outcome)
 
@@ -477,7 +485,9 @@ class TestThompsonSampling:
 
         # COT should be selected most often (relaxed threshold for stochastic test)
         cot_count = sum(1 for s in recommendations if s == PromptStyle.COT)
-        assert cot_count >= 6  # At least 60% should be COT (was 70%, relaxed for stability)
+        assert (
+            cot_count >= 6
+        )  # At least 60% should be COT (was 70%, relaxed for stability)
 
     def test_exploration_with_high_rate(self, db_connection) -> None:
         """Test exploration with high exploration rate."""

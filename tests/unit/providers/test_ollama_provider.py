@@ -241,7 +241,10 @@ async def test_chat_with_tools(ollama_provider):
             ToolDefinition(
                 name="get_weather",
                 description="Get weather for a location",
-                parameters={"type": "object", "properties": {"location": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                },
             )
         ]
 
@@ -290,7 +293,9 @@ async def test_stream_basic(ollama_provider):
 async def test_stream_timeout_error(ollama_provider):
     """Test stream timeout error handling."""
     mock_response = MagicMock()
-    mock_response.__aenter__ = AsyncMock(side_effect=httpx.TimeoutException("Stream timed out"))
+    mock_response.__aenter__ = AsyncMock(
+        side_effect=httpx.TimeoutException("Stream timed out")
+    )
     mock_response.__aexit__ = AsyncMock()
 
     with patch.object(ollama_provider.client, "stream", return_value=mock_response):
@@ -572,18 +577,24 @@ class TestEndpointDiscovery:
     def test_select_base_url_from_env(self):
         """Test _select_base_url prioritizes OLLAMA_ENDPOINTS env var (covers lines 121-123)."""
         with patch.dict(
-            "os.environ", {"OLLAMA_ENDPOINTS": "http://server1:11434,http://server2:11434"}
+            "os.environ",
+            {"OLLAMA_ENDPOINTS": "http://server1:11434,http://server2:11434"},
         ):
             with patch("httpx.Client") as mock_client:
                 # Make first endpoint fail
                 mock_instance = MagicMock()
                 mock_instance.__enter__ = MagicMock(return_value=mock_instance)
                 mock_instance.__exit__ = MagicMock()
-                mock_instance.get.side_effect = [Exception("Not reachable"), MagicMock()]
+                mock_instance.get.side_effect = [
+                    Exception("Not reachable"),
+                    MagicMock(),
+                ]
                 mock_client.return_value = mock_instance
 
                 # Use skip_discovery since we're testing _select_base_url directly
-                provider = OllamaProvider(base_url="http://localhost:11434", _skip_discovery=True)
+                provider = OllamaProvider(
+                    base_url="http://localhost:11434", _skip_discovery=True
+                )
                 # Now test _select_base_url directly
                 result = provider._select_base_url("http://ignored:11434", 10)
 
@@ -678,7 +689,9 @@ class TestStreamRetryWithoutTools:
 
             # First call with tools should fail
             if call_count == 1 and "tools" in payload and payload["tools"]:
-                return create_mock_response(400, '{"error":"model does not support tools"}')
+                return create_mock_response(
+                    400, '{"error":"model does not support tools"}'
+                )
             # Second call without tools should succeed
             return create_mock_response(200)
 

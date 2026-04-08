@@ -64,7 +64,9 @@ class TestHttpRequest:
         mock_response.reason_phrase = "OK"
         mock_response.headers = {}
         mock_response.url = "https://api.example.com"
-        mock_response.json.side_effect = ValueError("Not JSON")  # ValueError, not Exception
+        mock_response.json.side_effect = ValueError(
+            "Not JSON"
+        )  # ValueError, not Exception
         mock_response.text = "Plain text response"
 
         with patch("victor.tools.http_tool.httpx.AsyncClient") as mock_client:
@@ -75,7 +77,9 @@ class TestHttpRequest:
             mock_client.return_value = mock_instance
 
             headers = {"X-Custom-Header": "value"}
-            result = await http(method="GET", url="https://api.example.com", headers=headers)
+            result = await http(
+                method="GET", url="https://api.example.com", headers=headers
+            )
 
             assert result["success"] is True
             assert result["body"] == "Plain text response"
@@ -97,7 +101,9 @@ class TestHttpRequest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http(method="GET", url="https://api.example.com", auth="Bearer token123")
+            result = await http(
+                method="GET", url="https://api.example.com", auth="Bearer token123"
+            )
 
             assert result["success"] is True
             mock_instance.request.assert_called_once()
@@ -112,7 +118,9 @@ class TestHttpRequest:
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             # __aexit__ should return False to propagate exceptions
             mock_instance.__aexit__ = AsyncMock(return_value=False)
-            mock_instance.request = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
+            mock_instance.request = AsyncMock(
+                side_effect=httpx.TimeoutException("Timeout")
+            )
             mock_client.return_value = mock_instance
 
             result = await http(method="GET", url="https://api.example.com")
@@ -154,7 +162,9 @@ class TestHttpRequest:
             mock_client.return_value = mock_instance
 
             json_data = {"name": "test item"}
-            result = await http(method="POST", url="https://api.example.com/items", json=json_data)
+            result = await http(
+                method="POST", url="https://api.example.com/items", json=json_data
+            )
 
             assert result["success"] is True
             assert result["status_code"] == 201
@@ -178,7 +188,10 @@ class TestHttpTest:
             mock_client.return_value = mock_instance
 
             result = await http(
-                method="GET", url="https://api.example.com", mode="test", expected_status=200
+                method="GET",
+                url="https://api.example.com",
+                mode="test",
+                expected_status=200,
             )
 
             assert result["success"] is True
@@ -209,7 +222,10 @@ class TestHttpTest:
             mock_client.return_value = mock_instance
 
             result = await http(
-                method="GET", url="https://api.example.com", mode="test", expected_status=200
+                method="GET",
+                url="https://api.example.com",
+                mode="test",
+                expected_status=200,
             )
 
             assert result["success"] is False
@@ -232,7 +248,9 @@ class TestHttpTest:
             mock_instance.request = AsyncMock(return_value=mock_response)
             mock_client.return_value = mock_instance
 
-            result = await http(method="GET", url="https://api.example.com", auth="Bearer token123")
+            result = await http(
+                method="GET", url="https://api.example.com", auth="Bearer token123"
+            )
 
             assert result["success"] is True
             mock_instance.request.assert_called_once()
@@ -246,7 +264,9 @@ class TestHttpTest:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock(return_value=False)
-            mock_instance.request = AsyncMock(side_effect=httpx.TimeoutException("Timeout"))
+            mock_instance.request = AsyncMock(
+                side_effect=httpx.TimeoutException("Timeout")
+            )
             mock_client.return_value = mock_instance
 
             result = await http(method="GET", url="https://api.example.com")
@@ -261,7 +281,9 @@ class TestHttpTest:
             mock_instance = AsyncMock()
             mock_instance.__aenter__ = AsyncMock(return_value=mock_instance)
             mock_instance.__aexit__ = AsyncMock()
-            mock_instance.request = AsyncMock(side_effect=RuntimeError("Connection error"))
+            mock_instance.request = AsyncMock(
+                side_effect=RuntimeError("Connection error")
+            )
             mock_client.return_value = mock_instance
 
             result = await http(method="GET", url="https://api.example.com")

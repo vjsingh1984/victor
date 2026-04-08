@@ -46,7 +46,9 @@ async def test_anthropic_stream_emits_tool_calls(monkeypatch):
         ),
         SimpleNamespace(
             type="content_block_delta",
-            delta=SimpleNamespace(type="input_json_delta", partial_json='{"echo": "hi"}'),
+            delta=SimpleNamespace(
+                type="input_json_delta", partial_json='{"echo": "hi"}'
+            ),
             index=0,
         ),
         SimpleNamespace(type="content_block_stop", index=0),
@@ -64,7 +66,11 @@ async def test_anthropic_stream_emits_tool_calls(monkeypatch):
     async for chunk in provider.stream(
         messages=[Message(role="user", content="hi")],
         model="claude-3-5-sonnet-20241022",
-        tools=[ToolDefinition(name="dummy_tool", description="d", parameters={"type": "object"})],
+        tools=[
+            ToolDefinition(
+                name="dummy_tool", description="d", parameters={"type": "object"}
+            )
+        ],
     ):
         chunks.append(chunk)
 

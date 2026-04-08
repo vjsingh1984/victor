@@ -120,7 +120,13 @@ class TestFormatWebResults:
 
     def test_single_result_formats_correctly(self):
         """Test single result is formatted correctly."""
-        results = [{"title": "Test Title", "snippet": "Test snippet", "url": "https://test.com"}]
+        results = [
+            {
+                "title": "Test Title",
+                "snippet": "Test snippet",
+                "url": "https://test.com",
+            }
+        ]
         result = format_web_results(results)
         assert "Test Title" in result
         assert "Test snippet" in result
@@ -141,7 +147,11 @@ class TestFormatWebResults:
     def test_max_results_limits_output(self):
         """Test max_results limits number of results."""
         results = [
-            {"title": f"Title {i}", "snippet": f"Snippet {i}", "url": f"https://{i}.com"}
+            {
+                "title": f"Title {i}",
+                "snippet": f"Snippet {i}",
+                "url": f"https://{i}.com",
+            }
             for i in range(10)
         ]
         result = format_web_results(results, max_results=3)
@@ -179,7 +189,9 @@ class TestFormatWebResults:
     def test_truncates_long_snippets(self):
         """Test long snippets are truncated."""
         long_snippet = "x" * 500
-        results = [{"title": "Test", "snippet": long_snippet, "url": "https://test.com"}]
+        results = [
+            {"title": "Test", "snippet": long_snippet, "url": "https://test.com"}
+        ]
         result = format_web_results(results, max_snippet_length=100)
         assert "..." in result
         assert len(result) < 600
@@ -202,7 +214,11 @@ class TestFormatWebResults:
         result = format_web_results(results, include_urls=True)
         assert "Test" in result
         # Should not have Source: line for empty URL
-        assert "Source: " not in result or "Source: \n" in result or result.count("Source:") == 0
+        assert (
+            "Source: " not in result
+            or "Source: \n" in result
+            or result.count("Source:") == 0
+        )
 
     def test_handles_empty_result_dict(self):
         """Test handles empty result dict."""
@@ -222,7 +238,11 @@ class TestFormatWebResults:
     def test_numbering_format(self):
         """Test results are numbered correctly."""
         results = [
-            {"title": f"Title {i}", "snippet": f"Snippet {i}", "url": f"https://{i}.com"}
+            {
+                "title": f"Title {i}",
+                "snippet": f"Snippet {i}",
+                "url": f"https://{i}.com",
+            }
             for i in range(5)
         ]
         result = format_web_results(results, max_results=5)
@@ -282,7 +302,11 @@ class TestWebSearchFormatter:
         """Test format respects max_results setting."""
         formatter = WebSearchFormatter(max_results=2)
         results = [
-            {"title": f"Title {i}", "snippet": f"Snippet {i}", "url": f"https://{i}.com"}
+            {
+                "title": f"Title {i}",
+                "snippet": f"Snippet {i}",
+                "url": f"https://{i}.com",
+            }
             for i in range(5)
         ]
         result = formatter.format(results)
@@ -333,7 +357,11 @@ class TestWebSearchFormatter:
         """Test format_for_citation respects max_results."""
         formatter = WebSearchFormatter(max_results=2)
         results = [
-            {"title": f"Title {i}", "snippet": f"Snippet {i}", "url": f"https://{i}.com"}
+            {
+                "title": f"Title {i}",
+                "snippet": f"Snippet {i}",
+                "url": f"https://{i}.com",
+            }
             for i in range(5)
         ]
         result = formatter.format_for_citation(results)
@@ -394,7 +422,11 @@ class TestEdgeCases:
     def test_special_characters_in_url(self):
         """Test handling of special characters in URL."""
         results = [
-            {"title": "Test", "snippet": "Test", "url": "https://test.com/path?query=value&other=1"}
+            {
+                "title": "Test",
+                "snippet": "Test",
+                "url": "https://test.com/path?query=value&other=1",
+            }
         ]
         result = format_web_results(results)
         assert "query=value" in result
@@ -414,7 +446,11 @@ class TestEdgeCases:
     def test_newlines_in_snippet(self):
         """Test handling of newlines in snippet."""
         results = [
-            {"title": "Test", "snippet": "Line 1\nLine 2\nLine 3", "url": "https://test.com"}
+            {
+                "title": "Test",
+                "snippet": "Line 1\nLine 2\nLine 3",
+                "url": "https://test.com",
+            }
         ]
         result = format_web_results(results)
         assert "Line 1" in result
@@ -445,7 +481,11 @@ class TestEdgeCases:
         results = [
             {"title": "Valid", "snippet": "Valid snippet", "url": "https://valid.com"},
             {},
-            {"title": "Also Valid", "snippet": "Also snippet", "url": "https://also.com"},
+            {
+                "title": "Also Valid",
+                "snippet": "Also snippet",
+                "url": "https://also.com",
+            },
         ]
         result = format_web_results(results)
         assert "Valid" in result
@@ -473,7 +513,10 @@ class TestIntegration:
     def test_full_workflow(self):
         """Test complete formatting workflow."""
         formatter = WebSearchFormatter(
-            max_results=3, max_snippet_length=100, include_urls=True, header="Search Results:"
+            max_results=3,
+            max_snippet_length=100,
+            include_urls=True,
+            header="Search Results:",
         )
 
         results = [
@@ -504,7 +547,9 @@ class TestIntegration:
     def test_citation_roundtrip(self):
         """Test that format_for_citation produces usable data."""
         formatter = WebSearchFormatter()
-        results = [{"title": "Test", "snippet": "Test content", "url": "https://test.com"}]
+        results = [
+            {"title": "Test", "snippet": "Test content", "url": "https://test.com"}
+        ]
 
         citations = formatter.format_for_citation(results)
 

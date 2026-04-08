@@ -153,7 +153,9 @@ class TestProfileYAMLGeneration:
     def test_apply_configuration(self, mock_install):
         """Applying configuration calls install_profile."""
         wizard = OnboardingWizard()
-        wizard.state["selected_profile"] = MagicMock(name="test", display_name="Test Profile")
+        wizard.state["selected_profile"] = MagicMock(
+            name="test", display_name="Test Profile"
+        )
         wizard.state["provider"] = "ollama"
         wizard.state["model"] = "qwen2.5-coder:7b"
 
@@ -254,7 +256,8 @@ class TestRunOnboarding:
         mock_run.assert_called_once()
 
     @patch(
-        "victor.ui.commands.onboarding.OnboardingWizard.run", side_effect=Exception("Test error")
+        "victor.ui.commands.onboarding.OnboardingWizard.run",
+        side_effect=Exception("Test error"),
     )
     def test_run_onboarding_handles_exception(self, mock_run):
         """run_onboarding handles exceptions."""
@@ -265,7 +268,10 @@ class TestRunOnboarding:
         assert exit_code == 1
         mock_run.assert_called_once()
 
-    @patch("victor.ui.commands.onboarding.OnboardingWizard", side_effect=Exception("Init error"))
+    @patch(
+        "victor.ui.commands.onboarding.OnboardingWizard",
+        side_effect=Exception("Init error"),
+    )
     def test_run_onboarding_handles_wizard_init_exception(self, mock_wizard):
         """run_onboarding handles wizard initialization exceptions."""
         from victor.ui.commands.onboarding import run_onboarding

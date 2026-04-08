@@ -26,7 +26,9 @@ class TestToolParameter:
 
     def test_tool_parameter_creation(self):
         """Test creating a tool parameter."""
-        param = ToolParameter(name="test_param", type="string", description="A test parameter")
+        param = ToolParameter(
+            name="test_param", type="string", description="A test parameter"
+        )
         assert param.name == "test_param"
         assert param.type == "string"
         assert param.description == "A test parameter"
@@ -42,14 +44,20 @@ class TestToolParameter:
     def test_tool_parameter_required(self):
         """Test tool parameter required flag."""
         param = ToolParameter(
-            name="required_param", type="string", description="Required parameter", required=True
+            name="required_param",
+            type="string",
+            description="Required parameter",
+            required=True,
         )
         assert param.required is True
 
     def test_tool_parameter_not_required(self):
         """Test tool parameter not required."""
         param = ToolParameter(
-            name="optional_param", type="string", description="Optional parameter", required=False
+            name="optional_param",
+            type="string",
+            description="Optional parameter",
+            required=False,
         )
         assert param.required is False
 
@@ -66,20 +74,27 @@ class TestToolParameter:
 
     def test_tool_parameter_with_min_max(self):
         """Test tool parameter with min/max constraints."""
-        param = ToolParameter(name="number_param", type="number", description="Number parameter")
+        param = ToolParameter(
+            name="number_param", type="number", description="Number parameter"
+        )
         # ToolParameter may not have explicit min/max fields
         assert param.type == "number"
 
     def test_tool_parameter_with_pattern(self):
         """Test tool parameter with regex pattern."""
-        param = ToolParameter(name="email_param", type="string", description="Email parameter")
+        param = ToolParameter(
+            name="email_param", type="string", description="Email parameter"
+        )
         # ToolParameter may not have explicit pattern field
         assert param.type == "string"
 
     def test_tool_parameter_to_schema(self):
         """Test converting tool parameter to JSON schema."""
         param = ToolParameter(
-            name="test_param", type="string", description="Test parameter", required=True
+            name="test_param",
+            type="string",
+            description="Test parameter",
+            required=True,
         )
         # Tool parameters should be convertible to schema format
         assert param.name == "test_param"
@@ -241,7 +256,9 @@ class TestConcreteToolImplementation:
             parameters = {"properties": {}}
 
             async def execute(self, _exec_ctx, **kwargs):
-                return ToolResult(output="", success=False, error="Tool failed as expected")
+                return ToolResult(
+                    output="", success=False, error="Tool failed as expected"
+                )
 
         tool = FailingTool()
         result = await tool.execute({})
@@ -375,7 +392,9 @@ class TestToolParameterSchema:
 
     def test_object_parameter_schema(self):
         """Test object parameter schema."""
-        param = ToolParameter(name="config", type="object", description="Configuration object")
+        param = ToolParameter(
+            name="config", type="object", description="Configuration object"
+        )
         assert param.type == "object"
 
 
@@ -446,7 +465,11 @@ class TestConvertParametersToSchema:
         """Test conversion with empty parameters list."""
         schema = BaseTool.convert_parameters_to_schema([])
         # additionalProperties: False rejects hallucinated arguments
-        assert schema == {"type": "object", "properties": {}, "additionalProperties": False}
+        assert schema == {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        }
 
     def test_single_required_parameter(self):
         """Test conversion with single required parameter."""
@@ -486,9 +509,15 @@ class TestConvertParametersToSchema:
     def test_multiple_parameters_mixed_required(self):
         """Test conversion with multiple parameters, some required."""
         params = [
-            ToolParameter(name="file", type="string", description="File", required=True),
-            ToolParameter(name="mode", type="string", description="Mode", required=True),
-            ToolParameter(name="encoding", type="string", description="Encoding", required=False),
+            ToolParameter(
+                name="file", type="string", description="File", required=True
+            ),
+            ToolParameter(
+                name="mode", type="string", description="Mode", required=True
+            ),
+            ToolParameter(
+                name="encoding", type="string", description="Encoding", required=False
+            ),
         ]
         schema = BaseTool.convert_parameters_to_schema(params)
 

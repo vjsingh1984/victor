@@ -450,7 +450,9 @@ class TestSafetyCoordinator:
         """Test force push to non-main branch requires confirmation."""
         coordinator = SafetyCoordinator(enable_default_rules=True)
 
-        result = coordinator.check_safety("git", ["push", "--force", "origin", "feature"])
+        result = coordinator.check_safety(
+            "git", ["push", "--force", "origin", "feature"]
+        )
 
         # Should require confirmation (not block)
         assert result.is_safe is False

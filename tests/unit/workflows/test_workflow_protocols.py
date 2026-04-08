@@ -116,7 +116,9 @@ class TestIWorkflowNode:
         """IWorkflowNode should be runtime checkable."""
         from typing import runtime_checkable, Protocol
 
-        assert hasattr(IWorkflowNode, "__protocol_attrs__") or isinstance(IWorkflowNode, type)
+        assert hasattr(IWorkflowNode, "__protocol_attrs__") or isinstance(
+            IWorkflowNode, type
+        )
 
     def test_compliant_class_is_instance(self):
         """A compliant class should pass isinstance check."""
@@ -216,7 +218,9 @@ class TestIWorkflowGraph:
             def get_entry_node(self) -> Optional[IWorkflowNode]:
                 return None
 
-            def get_next_nodes(self, node_id: str, state: Dict[str, Any]) -> List[IWorkflowNode]:
+            def get_next_nodes(
+                self, node_id: str, state: Dict[str, Any]
+            ) -> List[IWorkflowNode]:
                 return []
 
             def validate(self) -> List[str]:
@@ -242,7 +246,9 @@ class TestICheckpointStore:
             ) -> None:
                 pass
 
-            async def load(self, workflow_id: str, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+            async def load(
+                self, workflow_id: str, checkpoint_id: str
+            ) -> Optional[Dict[str, Any]]:
                 return None
 
             async def list_checkpoints(self, workflow_id: str) -> List[str]:

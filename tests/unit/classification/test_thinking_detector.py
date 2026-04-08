@@ -210,7 +210,9 @@ class TestRecordThinking:
         # Record same content 3 times (default threshold)
         detector.record_thinking("Analyzing the authentication module")
         detector.record_thinking("Analyzing the authentication module")
-        is_loop, guidance = detector.record_thinking("Analyzing the authentication module")
+        is_loop, guidance = detector.record_thinking(
+            "Analyzing the authentication module"
+        )
 
         assert is_loop
         assert "LOOP DETECTED" in guidance

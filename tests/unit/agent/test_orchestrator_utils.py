@@ -85,7 +85,9 @@ def mock_provider_limits():
 class TestCalculateMaxContextChars:
     """Tests for calculate_max_context_chars function."""
 
-    def test_settings_override_takes_precedence(self, mock_settings_with_override, mock_provider):
+    def test_settings_override_takes_precedence(
+        self, mock_settings_with_override, mock_provider
+    ):
         """Test that settings.max_context_chars override takes precedence."""
         result = calculate_max_context_chars(
             settings=mock_settings_with_override,
@@ -99,7 +101,9 @@ class TestCalculateMaxContextChars:
         settings = MagicMock()
         settings.max_context_chars = 0
 
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000
             mock_get_limits.return_value = mock_limits
@@ -117,7 +121,9 @@ class TestCalculateMaxContextChars:
         settings = MagicMock()
         settings.max_context_chars = -100
 
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000
             mock_get_limits.return_value = mock_limits
@@ -129,9 +135,13 @@ class TestCalculateMaxContextChars:
             # Should use YAML config
             assert result == int(128000 * 3.5 * 0.8)
 
-    def test_uses_yaml_config_when_no_settings_override(self, mock_settings, mock_provider):
+    def test_uses_yaml_config_when_no_settings_override(
+        self, mock_settings, mock_provider
+    ):
         """Test that YAML config is used when no settings override."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 200000
             mock_get_limits.return_value = mock_limits
@@ -149,7 +159,9 @@ class TestCalculateMaxContextChars:
         provider = MagicMock()
         provider.name = "ANTHROPIC"
 
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000
             mock_get_limits.return_value = mock_limits
@@ -160,9 +172,13 @@ class TestCalculateMaxContextChars:
 
             mock_get_limits.assert_called_once_with("anthropic", "test-model")
 
-    def test_provider_without_name_attribute(self, mock_settings, mock_provider_unnamed):
+    def test_provider_without_name_attribute(
+        self, mock_settings, mock_provider_unnamed
+    ):
         """Test handling provider without name attribute."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000
             mock_get_limits.return_value = mock_limits
@@ -177,7 +193,9 @@ class TestCalculateMaxContextChars:
 
     def test_fallback_on_config_load_error(self, mock_settings, mock_provider):
         """Test fallback to default when config loading fails."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_get_limits.side_effect = Exception("Config file not found")
 
             result = calculate_max_context_chars(
@@ -189,7 +207,9 @@ class TestCalculateMaxContextChars:
 
     def test_non_numeric_context_tokens_fallback(self, mock_settings, mock_provider):
         """Test fallback when context_window returns non-numeric value."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = "invalid"  # Non-numeric
             mock_get_limits.return_value = mock_limits
@@ -203,7 +223,9 @@ class TestCalculateMaxContextChars:
 
     def test_string_numeric_context_tokens(self, mock_settings, mock_provider):
         """Test handling of string numeric context token values."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = "150000"  # String numeric
             mock_get_limits.return_value = mock_limits
@@ -217,7 +239,9 @@ class TestCalculateMaxContextChars:
 
     def test_float_context_tokens(self, mock_settings, mock_provider):
         """Test handling of float context token values."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000.5
             mock_get_limits.return_value = mock_limits
@@ -230,7 +254,9 @@ class TestCalculateMaxContextChars:
 
     def test_calculation_formula(self, mock_settings, mock_provider):
         """Test the exact calculation formula: tokens * 3.5 * 0.8."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 100000
             mock_get_limits.return_value = mock_limits
@@ -253,7 +279,9 @@ class TestCalculateMaxContextChars:
             ("ollama", "llama2"),
         ]
 
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000
             mock_get_limits.return_value = mock_limits
@@ -432,7 +460,9 @@ class TestGetToolStatusMessage:
 
     def test_execute_bash_no_command(self):
         """Test execute_bash without command key falls back to default."""
-        result = get_tool_status_message("execute_bash", {}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "execute_bash", {}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running execute_bash..."
 
     def test_list_directory_with_path(self):
@@ -444,7 +474,9 @@ class TestGetToolStatusMessage:
 
     def test_list_directory_without_path(self):
         """Test list_directory defaults to '.' when no path."""
-        result = get_tool_status_message("list_directory", {}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "list_directory", {}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Listing directory: ."
 
     def test_read_with_path(self):
@@ -462,7 +494,9 @@ class TestGetToolStatusMessage:
     def test_edit_files_single_file(self):
         """Test status message for edit_files with single file."""
         result = get_tool_status_message(
-            "edit_files", {"files": [{"path": "main.py"}]}, presentation=self.presentation
+            "edit_files",
+            {"files": [{"path": "main.py"}]},
+            presentation=self.presentation,
         )
         assert result == f"{self.ICON_PREFIX} Editing: main.py"
 
@@ -497,7 +531,9 @@ class TestGetToolStatusMessage:
 
     def test_edit_files_no_files_key(self):
         """Test edit_files without files key."""
-        result = get_tool_status_message("edit_files", {}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", {}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Running edit_files..."
 
     def test_edit_files_non_list_files(self):
@@ -561,7 +597,9 @@ class TestGetToolStatusMessage:
 
     def test_code_search_no_query(self):
         """Test code_search without query key."""
-        result = get_tool_status_message("code_search", {}, presentation=self.presentation)
+        result = get_tool_status_message(
+            "code_search", {}, presentation=self.presentation
+        )
         assert result == f"{self.ICON_PREFIX} Searching: "
 
     def test_unknown_tool_default_message(self):
@@ -611,7 +649,9 @@ class TestGetToolStatusMessage:
             ("unknown", {}),
         ]
         for tool_name, args in test_cases:
-            result = get_tool_status_message(tool_name, args, presentation=self.presentation)
+            result = get_tool_status_message(
+                tool_name, args, presentation=self.presentation
+            )
             assert result.startswith(self.ICON_PREFIX), f"Failed for {tool_name}"
 
 
@@ -630,13 +670,19 @@ class TestBackwardCompatibilityAliases:
 
     def test_calculate_max_context_chars_alias(self, mock_settings, mock_provider):
         """Test _calculate_max_context_chars alias."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000
             mock_get_limits.return_value = mock_limits
 
-            result1 = calculate_max_context_chars(mock_settings, mock_provider, "test-model")
-            result2 = _calculate_max_context_chars(mock_settings, mock_provider, "test-model")
+            result1 = calculate_max_context_chars(
+                mock_settings, mock_provider, "test-model"
+            )
+            result2 = _calculate_max_context_chars(
+                mock_settings, mock_provider, "test-model"
+            )
 
             assert result1 == result2
 
@@ -651,7 +697,9 @@ class TestBackwardCompatibilityAliases:
 
     def test_get_tool_status_message_alias(self):
         """Test _get_tool_status_message alias."""
-        result1 = get_tool_status_message("read", {"path": "/test"}, presentation=self.presentation)
+        result1 = get_tool_status_message(
+            "read", {"path": "/test"}, presentation=self.presentation
+        )
         result2 = _get_tool_status_message(
             "read", {"path": "/test"}, presentation=self.presentation
         )
@@ -677,7 +725,9 @@ class TestOrchestratorIntegrationPatterns:
 
     def test_context_calculation_flow(self, mock_settings, mock_provider):
         """Test typical context calculation flow in orchestrator."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 200000
             mock_get_limits.return_value = mock_limits
@@ -722,7 +772,9 @@ class TestOrchestratorIntegrationPatterns:
         ]
 
         for tool_name, tool_args in tool_executions:
-            message = get_tool_status_message(tool_name, tool_args, presentation=self.presentation)
+            message = get_tool_status_message(
+                tool_name, tool_args, presentation=self.presentation
+            )
 
             # All messages should start with emoji
             assert message.startswith(self.ICON_PREFIX)
@@ -734,7 +786,9 @@ class TestOrchestratorIntegrationPatterns:
 
     def test_large_scale_context_handling(self, mock_settings, mock_provider):
         """Test handling of large context values."""
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             # Test with very large context window (like Claude 3's 200k)
             mock_limits = MagicMock()
             mock_limits.context_window = 200000
@@ -758,6 +812,8 @@ class TestOrchestratorIntegrationPatterns:
             "options": {"recursive": True},
         }
 
-        result = get_tool_status_message("edit_files", complex_args, presentation=self.presentation)
+        result = get_tool_status_message(
+            "edit_files", complex_args, presentation=self.presentation
+        )
         assert "a.py" in result
         assert "b.py" in result

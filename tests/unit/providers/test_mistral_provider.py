@@ -124,7 +124,12 @@ class TestMistralModels:
 
     def test_models_have_required_fields(self):
         """Test that all models have required fields."""
-        required_fields = ["description", "context_window", "max_output", "supports_tools"]
+        required_fields = [
+            "description",
+            "context_window",
+            "max_output",
+            "supports_tools",
+        ]
         for model_id, model_info in MISTRAL_MODELS.items():
             for field in required_fields:
                 assert field in model_info, f"Model {model_id} missing field {field}"
@@ -164,7 +169,9 @@ class TestMistralRequestPayload:
         assert len(payload["messages"]) == 1
         assert payload["messages"][0]["role"] == "user"
 
-    def test_build_payload_with_tools(self, mistral_provider, sample_messages, sample_tools):
+    def test_build_payload_with_tools(
+        self, mistral_provider, sample_messages, sample_tools
+    ):
         """Test payload building with tools."""
         payload = mistral_provider._build_request_payload(
             messages=sample_messages,
@@ -231,7 +238,9 @@ class TestMistralResponseParsing:
             },
         }
 
-        response = mistral_provider._parse_response(raw_response, "mistral-small-latest")
+        response = mistral_provider._parse_response(
+            raw_response, "mistral-small-latest"
+        )
         assert response.content == "4"
         assert response.role == "assistant"
         assert response.stop_reason == "stop"
@@ -265,7 +274,9 @@ class TestMistralResponseParsing:
             ],
         }
 
-        response = mistral_provider._parse_response(raw_response, "mistral-large-latest")
+        response = mistral_provider._parse_response(
+            raw_response, "mistral-large-latest"
+        )
         assert response.tool_calls is not None
         assert len(response.tool_calls) == 1
         assert response.tool_calls[0]["name"] == "calculator"

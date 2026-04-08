@@ -7,7 +7,12 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from typing import List, Dict, Any, AsyncIterator
 
 from victor.providers.ollama_provider import OllamaProvider
-from victor.providers.base import Message, ProviderError, ProviderTimeoutError, ToolDefinition
+from victor.providers.base import (
+    Message,
+    ProviderError,
+    ProviderTimeoutError,
+    ToolDefinition,
+)
 
 
 # Helper for async generator
@@ -41,7 +46,9 @@ def mock_async_client():
         mock_instance = AsyncMock()
 
         # Default mock response object for get/post, with non-awaitable json and awaitable aread
-        mock_response_obj = MagicMock()  # Changed to MagicMock for json() to be non-awaitable
+        mock_response_obj = (
+            MagicMock()
+        )  # Changed to MagicMock for json() to be non-awaitable
         mock_response_obj.json.return_value = {}  # json() is synchronous in httpx
         mock_response_obj.raise_for_status = MagicMock()
         mock_response_obj.status_code = 200
@@ -51,7 +58,9 @@ def mock_async_client():
         mock_instance.post.return_value = mock_response_obj
 
         # Mock the stream method return value (an async context manager)
-        mock_stream_response_obj = MagicMock()  # This is the 'response' object inside async with
+        mock_stream_response_obj = (
+            MagicMock()
+        )  # This is the 'response' object inside async with
         mock_stream_response_obj.aiter_lines.return_value = async_line_generator(
             []
         )  # Default empty async iterator
@@ -59,7 +68,9 @@ def mock_async_client():
         mock_stream_response_obj.status_code = 200
         mock_stream_response_obj.aread = AsyncMock(return_value=b"")
 
-        mock_stream_context_manager = AsyncMock()  # This acts as the async context manager itself
+        mock_stream_context_manager = (
+            AsyncMock()
+        )  # This acts as the async context manager itself
         mock_stream_context_manager.__aenter__.return_value = mock_stream_response_obj
         mock_instance.stream = MagicMock(
             return_value=mock_stream_context_manager
@@ -93,7 +104,9 @@ class TestOllamaProviderInit:
         mock_async_client.assert_called_once()
         assert mock_async_client.call_args[1]["base_url"] == "http://host1:11434"
 
-    @patch.dict(os.environ, {"OLLAMA_ENDPOINTS": "http://env_host:11434,http://env_host2:11434"})
+    @patch.dict(
+        os.environ, {"OLLAMA_ENDPOINTS": "http://env_host:11434,http://env_host2:11434"}
+    )
     def test_init_env_var_precedence(self, mock_async_client):
         OllamaProvider(base_url="http://explicit:11434")
         mock_async_client.assert_called_once()
@@ -129,7 +142,9 @@ class TestOllamaProviderInit:
         window = provider.get_context_window("test-model")
         assert window == 16384
         mock_get_provider_limits_fixture.assert_called_once_with("ollama", "test-model")
-        assert provider._context_window_cache["http://localhost:11434:test-model"] == 16384
+        assert (
+            provider._context_window_cache["http://localhost:11434:test-model"] == 16384
+        )
 
 
 class TestOllamaProviderAsyncFactory:
@@ -182,7 +197,9 @@ class TestOllamaProviderCapabilities:
         assert caps.context_window == 8192
         assert caps.supports_tools is True
         assert caps.source == "discovered"
-        assert provider._context_window_cache["http://localhost:11434:test-model"] == 8192
+        assert (
+            provider._context_window_cache["http://localhost:11434:test-model"] == 8192
+        )
 
     @pytest.mark.asyncio
     async def test_discover_capabilities_api_failure_fallback_to_config(
@@ -194,7 +211,9 @@ class TestOllamaProviderCapabilities:
 
         caps = await provider.discover_capabilities("test-model")
         assert caps.context_window == 4096
-        assert caps.supports_tools is True  # Default optimistic for OllamaProvider itself
+        assert (
+            caps.supports_tools is True
+        )  # Default optimistic for OllamaProvider itself
         assert caps.source == "config"
 
     def test_parse_context_window_num_ctx(self):
@@ -234,7 +253,8 @@ class TestOllamaProviderCapabilities:
         template = "This model does not support tools."
         # Temporarily patch TOOL_SUPPORT_PATTERNS to something that won't match
         with patch(
-            "victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS", ["non_matching_pattern"]
+            "victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS",
+            ["non_matching_pattern"],
         ):
             assert provider._detect_tool_support(template) is False
 
@@ -277,10 +297,14 @@ class TestOllamaProviderChat:
         provider = OllamaProvider()
         # Mock _execute_with_circuit_breaker to raise the specific error
         with patch.object(
-            provider, "_execute_with_circuit_breaker", side_effect=httpx.TimeoutException("Timeout")
+            provider,
+            "_execute_with_circuit_breaker",
+            side_effect=httpx.TimeoutException("Timeout"),
         ) as mock_breaker:
             with pytest.raises(ProviderTimeoutError):
-                await provider.chat([Message(role="user", content="Hi")], model="test-model")
+                await provider.chat(
+                    [Message(role="user", content="Hi")], model="test-model"
+                )
             mock_breaker.assert_called_once()
 
     @pytest.mark.asyncio
@@ -292,10 +316,14 @@ class TestOllamaProviderChat:
         with patch.object(
             provider,
             "_execute_with_circuit_breaker",
-            side_effect=httpx.HTTPStatusError("Error", request=MagicMock(), response=mock_response),
+            side_effect=httpx.HTTPStatusError(
+                "Error", request=MagicMock(), response=mock_response
+            ),
         ) as mock_breaker:
             with pytest.raises(ProviderError) as exc_info:
-                await provider.chat([Message(role="user", content="Hi")], model="test-model")
+                await provider.chat(
+                    [Message(role="user", content="Hi")], model="test-model"
+                )
             assert exc_info.value.status_code == 500
             mock_breaker.assert_called_once()
 
@@ -306,7 +334,9 @@ class TestOllamaProviderChat:
         tools = [ToolDefinition(name="test_tool", description="desc", parameters={})]
 
         # First call fails due to tools not supported
-        mock_response_400 = MagicMock(status_code=400, text="model does not support tools")
+        mock_response_400 = MagicMock(
+            status_code=400, text="model does not support tools"
+        )
         mock_error_400 = httpx.HTTPStatusError(
             "Error", request=MagicMock(), response=mock_response_400
         )
@@ -332,7 +362,9 @@ class TestOllamaProviderChat:
         ) as mock_breaker:
             response = await provider.chat(messages, model="test-model", tools=tools)
             assert response.content == "Fallback response"
-            assert "test-model" in provider._models_without_tools  # Model should be cached
+            assert (
+                "test-model" in provider._models_without_tools
+            )  # Model should be cached
             assert mock_breaker.call_count == 2
             # Check that the second call had tools=None
             # _execute_with_circuit_breaker is called as: (callable, path, json=payload)
@@ -345,7 +377,9 @@ class TestOllamaProviderChat:
         mock_async_client.return_value.post.return_value = MagicMock(
             json=MagicMock(
                 return_value={
-                    "message": {"content": '{"name": "test_tool", "arguments": {"a": 1}}'},
+                    "message": {
+                        "content": '{"name": "test_tool", "arguments": {"a": 1}}'
+                    },
                     "done_reason": "tool_code",
                     "prompt_eval_count": 1,
                     "eval_count": 1,
@@ -377,7 +411,9 @@ class TestOllamaProviderStream:
         )
 
         messages = [Message(role="user", content="Hi")]
-        chunks = [chunk async for chunk in provider.stream(messages, model="test-model")]
+        chunks = [
+            chunk async for chunk in provider.stream(messages, model="test-model")
+        ]
         assert len(chunks) == 2
         assert chunks[0].content == "Hello "
         assert chunks[1].content == "world"
@@ -386,7 +422,9 @@ class TestOllamaProviderStream:
     @pytest.mark.asyncio
     async def test_stream_timeout(self, mock_async_client):
         provider = OllamaProvider()
-        mock_async_client.return_value.stream.side_effect = httpx.TimeoutException("Stream Timeout")
+        mock_async_client.return_value.stream.side_effect = httpx.TimeoutException(
+            "Stream Timeout"
+        )
 
         messages = [Message(role="user", content="Hi")]
         with pytest.raises(ProviderTimeoutError):
@@ -418,7 +456,9 @@ class TestOllamaProviderStream:
 
         # Mock responses for the side_effect sequence
         mock_error_response_400 = MagicMock(status_code=400)
-        mock_error_response_400.aread = AsyncMock(return_value=b"model does not support tools")
+        mock_error_response_400.aread = AsyncMock(
+            return_value=b"model does not support tools"
+        )
         mock_error_response_400.raise_for_status.side_effect = httpx.HTTPStatusError(
             "Tools unsupported", request=MagicMock(), response=mock_error_response_400
         )
@@ -438,13 +478,18 @@ class TestOllamaProviderStream:
         ]
 
         chunks = [
-            chunk async for chunk in provider.stream(messages, model="test-model", tools=tools)
+            chunk
+            async for chunk in provider.stream(
+                messages, model="test-model", tools=tools
+            )
         ]
         assert chunks[0].content == "Retry success"
         assert "test-model" in provider._models_without_tools
 
         assert mock_async_client.return_value.stream.call_count == 2
-        second_call_kwargs = mock_async_client.return_value.stream.call_args_list[1].kwargs
+        second_call_kwargs = mock_async_client.return_value.stream.call_args_list[
+            1
+        ].kwargs
         # When tools=None, the key may not be present at all, or it may be None
         assert second_call_kwargs["json"].get("tools") is None
 
@@ -463,7 +508,9 @@ class TestOllamaProviderStream:
         )
 
         messages = [Message(role="user", content="Hi")]
-        chunks = [chunk async for chunk in provider.stream(messages, model="test-model")]
+        chunks = [
+            chunk async for chunk in provider.stream(messages, model="test-model")
+        ]
         assert len(chunks) == 2
         assert chunks[0].content == "Hello "
         assert chunks[1].content == "world"
@@ -482,7 +529,9 @@ class TestOllamaProviderStream:
             ]
         )
         messages = [Message(role="user", content="Hi")]
-        chunks = [chunk async for chunk in provider.stream(messages, model="test-model")]
+        chunks = [
+            chunk async for chunk in provider.stream(messages, model="test-model")
+        ]
         assert len(chunks) == 2  # First is empty, second is tool call
         assert chunks[1].content == ""  # Content cleared
         assert chunks[1].tool_calls[0]["name"] == "test_tool"
@@ -506,7 +555,11 @@ class TestOllamaProviderUtilityMethods:
     def test_build_request_payload_with_tools(self):
         provider = OllamaProvider()
         messages = [Message(role="user", content="Test message")]
-        tools = [ToolDefinition(name="get_weather", description="Weather tool", parameters={})]
+        tools = [
+            ToolDefinition(
+                name="get_weather", description="Weather tool", parameters={}
+            )
+        ]
         payload = provider._build_request_payload(
             messages=messages,
             model="test-model",

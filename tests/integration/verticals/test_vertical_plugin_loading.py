@@ -203,8 +203,12 @@ def test_vertical_loader_load_activates_sdk_vertical_through_adapter(monkeypatch
 
     activated = []
     monkeypatch.setattr(loader, "_negotiate_manifest", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(loader, "_validate_dependencies", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(loader, "_activate", lambda vertical: activated.append(vertical))
+    monkeypatch.setattr(
+        loader, "_validate_dependencies", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(
+        loader, "_activate", lambda vertical: activated.append(vertical)
+    )
 
     resolved = loader.load("sdk_external")
 
@@ -214,7 +218,9 @@ def test_vertical_loader_load_activates_sdk_vertical_through_adapter(monkeypatch
 
 
 @pytest.mark.integration
-def test_legacy_vertical_registry_discovery_still_supports_victor_verticals(monkeypatch):
+def test_legacy_vertical_registry_discovery_still_supports_victor_verticals(
+    monkeypatch,
+):
     """Legacy raw-vertical discovery should remain available for compatibility."""
 
     class _LegacyEntryPoint:

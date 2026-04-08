@@ -112,7 +112,11 @@ class MockOrchestrator(ChatOrchestratorProtocol):
         return {}
 
     async def _handle_recovery_with_integration(
-        self, stream_ctx: Any, full_content: str, tool_calls: Any, mentioned_tools: Any = None
+        self,
+        stream_ctx: Any,
+        full_content: str,
+        tool_calls: Any,
+        mentioned_tools: Any = None,
     ) -> Any:
         return {}
 
@@ -214,7 +218,9 @@ class TestChatCoordinatorProtocolInjection:
         # Verify execution_coordinator is a property on the class
         # (It's lazily created when first accessed, but requires setup_streaming_pipeline first)
         assert "execution_coordinator" in dir(ChatCoordinator)
-        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)
+        assert isinstance(
+            getattr(ChatCoordinator, "execution_coordinator", None), property
+        )
 
     @pytest.mark.asyncio
     async def test_chat_coordinator_with_mock_provider_response(self):
@@ -400,4 +406,6 @@ class TestProtocolBasedInjectionBenefits:
         # Verify execution_coordinator exists as a property on the class
         # (lazy initialization requires set_streaming_pipeline to be called first)
         assert "execution_coordinator" in dir(ChatCoordinator)
-        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)
+        assert isinstance(
+            getattr(ChatCoordinator, "execution_coordinator", None), property
+        )

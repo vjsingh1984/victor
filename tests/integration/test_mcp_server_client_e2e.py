@@ -359,7 +359,9 @@ class TestMCPServerClientE2E:
             assert result is not None
             assert result.success is False
             assert result.error is not None
-            assert "unknown" in result.error.lower() or "not found" in result.error.lower()
+            assert (
+                "unknown" in result.error.lower() or "not found" in result.error.lower()
+            )
 
         finally:
             await client.cleanup()

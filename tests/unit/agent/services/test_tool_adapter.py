@@ -58,7 +58,9 @@ async def test_execute_tool_with_retry(tool_adapter, mock_tool_coordinator):
 
 
 def test_parse_and_validate_tool_calls(tool_adapter, mock_tool_coordinator):
-    result = tool_adapter.parse_and_validate_tool_calls([{"name": "read"}], "content", MagicMock())
+    result = tool_adapter.parse_and_validate_tool_calls(
+        [{"name": "read"}], "content", MagicMock()
+    )
     mock_tool_coordinator.parse_and_validate_tool_calls.assert_called_once()
     assert result == ([{"name": "read"}], "")
 

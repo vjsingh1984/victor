@@ -434,7 +434,10 @@ class TestComplianceAction:
             "report_period_days": 30,
             "violations": 3,
             "violation_details": [
-                {"violation_type": "missing_encryption", "message": "PHI not encrypted"},
+                {
+                    "violation_type": "missing_encryption",
+                    "message": "PHI not encrypted",
+                },
             ],
         }
 
@@ -717,7 +720,9 @@ class TestIntegrationStyle:
             assert report_result.metadata is not None
 
             # Step 3: Check compliance
-            compliance_result = await tool.execute(action="compliance", framework="soc2")
+            compliance_result = await tool.execute(
+                action="compliance", framework="soc2"
+            )
             assert compliance_result.success is True
 
     @pytest.mark.asyncio

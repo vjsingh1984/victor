@@ -102,7 +102,9 @@ class TestFormatterRenderer:
             follow_up_suggestions=None,
         )
 
-    def test_on_tool_result_forwards_follow_up_suggestions(self, renderer, mock_formatter):
+    def test_on_tool_result_forwards_follow_up_suggestions(
+        self, renderer, mock_formatter
+    ):
         """Test on_tool_result() forwards follow-up suggestions to formatter."""
         follow_ups = [
             {
@@ -191,7 +193,9 @@ class TestFormatterRenderer:
         call_args = mock_console.print.call_args
         assert call_args[1].get("end") == ""  # No newline
 
-    def test_on_thinking_start_shows_indicator(self, renderer, mock_formatter, mock_console):
+    def test_on_thinking_start_shows_indicator(
+        self, renderer, mock_formatter, mock_console
+    ):
         """Test on_thinking_start() shows thinking indicator."""
         renderer.on_thinking_start()
 
@@ -201,7 +205,9 @@ class TestFormatterRenderer:
         call_text = str(mock_console.print.call_args[0][0])
         assert "Thinking" in call_text
 
-    def test_on_thinking_end_resumes_streaming(self, renderer, mock_formatter, mock_console):
+    def test_on_thinking_end_resumes_streaming(
+        self, renderer, mock_formatter, mock_console
+    ):
         """Test on_thinking_end() resumes streaming."""
         renderer.on_thinking_end()
 
@@ -209,7 +215,9 @@ class TestFormatterRenderer:
         mock_console.print.assert_called_once()
         mock_formatter.start_streaming.assert_called_once()
 
-    def test_thinking_content_not_in_buffer(self, renderer, mock_formatter, mock_console):
+    def test_thinking_content_not_in_buffer(
+        self, renderer, mock_formatter, mock_console
+    ):
         """Test thinking content is not accumulated in buffer."""
         renderer.on_content("Normal content")
         renderer.on_thinking_content("Thinking content")
@@ -279,7 +287,9 @@ class TestLiveDisplayRenderer:
         mock_live.stop.assert_called_once()
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_resume_creates_new_live_display(self, mock_live_class, renderer, mock_console):
+    def test_resume_creates_new_live_display(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test resume() creates a new Live display with current content when paused."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -295,7 +305,9 @@ class TestLiveDisplayRenderer:
         assert mock_live.start.call_count == 2
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_start_stores_pending_tool(self, mock_live_class, renderer, mock_console):
+    def test_on_tool_start_stores_pending_tool(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test on_tool_start() stores pending tool for consolidated output."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -309,7 +321,9 @@ class TestLiveDisplayRenderer:
         assert renderer._pending_tool["arguments"] == {"path": "/test.py"}
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_result_success_prints_checkmark(self, mock_live_class, renderer, mock_console):
+    def test_on_tool_result_success_prints_checkmark(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test on_tool_result() prints green checkmark for success."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -328,7 +342,9 @@ class TestLiveDisplayRenderer:
         assert "✓" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_tool_result_failure_prints_x(self, mock_live_class, renderer, mock_console):
+    def test_on_tool_result_failure_prints_x(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test on_tool_result() prints red X for failure."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -369,10 +385,13 @@ class TestLiveDisplayRenderer:
             ],
         )
 
-        printed_calls = [str(call_args) for call_args in mock_console.print.call_args_list]
+        printed_calls = [
+            str(call_args) for call_args in mock_console.print.call_args_list
+        ]
         assert any("next:" in call_str for call_str in printed_calls)
         assert any(
-            'graph(mode="trace", node="main", depth=3)' in call_str for call_str in printed_calls
+            'graph(mode="trace", node="main", depth=3)' in call_str
+            for call_str in printed_calls
         )
 
     @patch("victor.ui.rendering.live_renderer.Live")
@@ -390,7 +409,9 @@ class TestLiveDisplayRenderer:
         assert "Thinking" in call_str
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_content_updates_live_display(self, mock_live_class, renderer, mock_console):
+    def test_on_content_updates_live_display(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test on_content() updates the Live display."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -403,7 +424,9 @@ class TestLiveDisplayRenderer:
         assert renderer._content_buffer == "Hello World"
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_finalize_returns_content_and_cleans_up(self, mock_live_class, renderer, mock_console):
+    def test_finalize_returns_content_and_cleans_up(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test finalize() returns content and stops Live display."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -416,7 +439,9 @@ class TestLiveDisplayRenderer:
         mock_live.stop.assert_called()
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_cleanup_stops_live_if_running(self, mock_live_class, renderer, mock_console):
+    def test_cleanup_stops_live_if_running(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test cleanup() stops Live display if it exists."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -432,7 +457,9 @@ class TestLiveDisplayRenderer:
         renderer.cleanup()  # Should not raise
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_thinking_content_buffers_text(self, mock_live_class, renderer, mock_console):
+    def test_on_thinking_content_buffers_text(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test on_thinking_content() accumulates text to buffer for later rendering."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -443,7 +470,10 @@ class TestLiveDisplayRenderer:
         renderer.on_thinking_content(" More reasoning...")
 
         # Should accumulate to buffer, not print each chunk
-        assert renderer._thinking_buffer == "Reasoning about the problem... More reasoning..."
+        assert (
+            renderer._thinking_buffer
+            == "Reasoning about the problem... More reasoning..."
+        )
 
         # Content prints on thinking_end
         renderer.on_thinking_end()
@@ -451,7 +481,9 @@ class TestLiveDisplayRenderer:
         assert mock_console.print.call_count >= 2  # At least indicator + content
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_thinking_start_shows_indicator(self, mock_live_class, renderer, mock_console):
+    def test_on_thinking_start_shows_indicator(
+        self, mock_live_class, renderer, mock_console
+    ):
         """Test on_thinking_start() shows thinking indicator."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
@@ -569,7 +601,9 @@ class TestStreamResponse:
         )
 
     @pytest.mark.asyncio
-    async def test_processes_tool_result_event_with_follow_ups(self, mock_agent, mock_renderer):
+    async def test_processes_tool_result_event_with_follow_ups(
+        self, mock_agent, mock_renderer
+    ):
         """Test stream_response forwards tool follow-up suggestions."""
 
         async def mock_stream():
@@ -841,11 +875,15 @@ class TestStreamResponse:
         """Test suppress_thinking parameter hides thinking content."""
 
         async def mock_stream():
-            yield StreamChunk(content="<think>Hidden thinking</think>Visible", metadata=None)
+            yield StreamChunk(
+                content="<think>Hidden thinking</think>Visible", metadata=None
+            )
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
 
-        await stream_response(mock_agent, "test message", mock_renderer, suppress_thinking=True)
+        await stream_response(
+            mock_agent, "test message", mock_renderer, suppress_thinking=True
+        )
 
         # Should still call lifecycle methods
         mock_renderer.start.assert_called()

@@ -78,7 +78,9 @@ async def test_code_search_bug_mode_uses_provider_capability(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(tmp_path) -> None:
+async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(
+    tmp_path,
+) -> None:
     """Bug mode should degrade to semantic search when provider support is absent."""
     mock_index = SimpleNamespace(
         find_similar_bugs=AsyncMock(
@@ -124,7 +126,9 @@ async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(tmp_
 
 
 @pytest.mark.asyncio
-async def test_code_search_semantic_mode_adds_graph_follow_up_for_entrypoint(tmp_path) -> None:
+async def test_code_search_semantic_mode_adds_graph_follow_up_for_entrypoint(
+    tmp_path,
+) -> None:
     """Semantic results that identify an entrypoint should suggest graph follow-ups."""
     mock_index = SimpleNamespace(
         semantic_search=AsyncMock(

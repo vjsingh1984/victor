@@ -27,7 +27,8 @@ class TestCliPromptSession:
         from victor.ui.commands.chat import _create_cli_prompt_session
 
         with patch(
-            "victor.config.settings.get_project_paths", side_effect=RuntimeError("no paths")
+            "victor.config.settings.get_project_paths",
+            side_effect=RuntimeError("no paths"),
         ):
             # Should not raise — falls back to InMemoryHistory
             session = _create_cli_prompt_session()
@@ -64,4 +65,6 @@ class TestPlanningWiring:
         mock_coordinator.chat.return_value = MagicMock(content="response")
 
         result = await mock_coordinator.chat("test message", use_planning=False)
-        mock_coordinator.chat.assert_called_once_with("test message", use_planning=False)
+        mock_coordinator.chat.assert_called_once_with(
+            "test message", use_planning=False
+        )

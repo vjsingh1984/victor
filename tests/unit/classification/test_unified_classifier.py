@@ -44,14 +44,18 @@ class TestKeywordMatching:
 
     def test_find_action_keywords(self):
         """Test finding action keywords in message."""
-        matches = _find_keywords_with_positions("Run the tests and deploy", ACTION_KEYWORDS)
+        matches = _find_keywords_with_positions(
+            "Run the tests and deploy", ACTION_KEYWORDS
+        )
         keywords = [m.keyword for m in matches]
         assert "run" in keywords
         assert "deploy" in keywords
 
     def test_find_analysis_keywords(self):
         """Test finding analysis keywords in message."""
-        matches = _find_keywords_with_positions("Analyze the codebase", ANALYSIS_KEYWORDS)
+        matches = _find_keywords_with_positions(
+            "Analyze the codebase", ANALYSIS_KEYWORDS
+        )
         keywords = [m.keyword for m in matches]
         assert "analyze" in keywords
 
@@ -64,7 +68,9 @@ class TestKeywordMatching:
     def test_word_boundary_matching(self):
         """Test that keywords match on word boundaries."""
         # "creation" should not match "create"
-        matches = _find_keywords_with_positions("The creation of the file", [("create", 1.0)])
+        matches = _find_keywords_with_positions(
+            "The creation of the file", [("create", 1.0)]
+        )
         assert len(matches) == 0
 
         # "create" should match

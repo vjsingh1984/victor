@@ -64,9 +64,13 @@ def mock_learner() -> MagicMock:
 
 
 @pytest.fixture
-def manager(mock_coordinator: MagicMock, checkpoint_store: CheckpointStore) -> PolicyManager:
+def manager(
+    mock_coordinator: MagicMock, checkpoint_store: CheckpointStore
+) -> PolicyManager:
     """Fixture for PolicyManager."""
-    return PolicyManager(coordinator=mock_coordinator, checkpoint_store=checkpoint_store)
+    return PolicyManager(
+        coordinator=mock_coordinator, checkpoint_store=checkpoint_store
+    )
 
 
 class TestPolicyState:
@@ -194,7 +198,10 @@ class TestPolicyManager:
         assert state.last_checkpoint_outcomes == 2
 
     def test_auto_checkpoint_triggered(
-        self, manager: PolicyManager, mock_coordinator: MagicMock, mock_learner: MagicMock
+        self,
+        manager: PolicyManager,
+        mock_coordinator: MagicMock,
+        mock_learner: MagicMock,
     ) -> None:
         """Test auto-checkpoint is triggered at threshold."""
         mock_coordinator.get_learner.return_value = mock_learner
@@ -209,7 +216,10 @@ class TestPolicyManager:
         assert len(checkpoints) >= 1
 
     def test_auto_checkpoint_resets_counter(
-        self, manager: PolicyManager, mock_coordinator: MagicMock, mock_learner: MagicMock
+        self,
+        manager: PolicyManager,
+        mock_coordinator: MagicMock,
+        mock_learner: MagicMock,
     ) -> None:
         """Test auto-checkpoint resets outcome counter."""
         mock_coordinator.get_learner.return_value = mock_learner
@@ -228,7 +238,9 @@ class TestPolicyManager:
 
         assert manager.should_rollback("learner") is False
 
-    def test_should_rollback_with_baseline_degradation(self, manager: PolicyManager) -> None:
+    def test_should_rollback_with_baseline_degradation(
+        self, manager: PolicyManager
+    ) -> None:
         """Test rollback triggered by baseline degradation."""
         manager.set_performance_baseline("learner", success_rate=0.8, quality_score=0.8)
 
@@ -238,7 +250,9 @@ class TestPolicyManager:
 
         assert manager.should_rollback("learner") is True
 
-    def test_should_rollback_with_recent_degradation(self, manager: PolicyManager) -> None:
+    def test_should_rollback_with_recent_degradation(
+        self, manager: PolicyManager
+    ) -> None:
         """Test rollback triggered by recent degradation."""
         # Good early performance
         for _ in range(50):
@@ -257,7 +271,10 @@ class TestPolicyManager:
         assert manager.should_rollback("learner") is False
 
     def test_rollback(
-        self, manager: PolicyManager, mock_coordinator: MagicMock, mock_learner: MagicMock
+        self,
+        manager: PolicyManager,
+        mock_coordinator: MagicMock,
+        mock_learner: MagicMock,
     ) -> None:
         """Test manual rollback."""
         mock_coordinator.get_learner.return_value = mock_learner
@@ -281,7 +298,10 @@ class TestPolicyManager:
         assert len(manager._rollback_history) == 1
 
     def test_rollback_to_previous(
-        self, manager: PolicyManager, mock_coordinator: MagicMock, mock_learner: MagicMock
+        self,
+        manager: PolicyManager,
+        mock_coordinator: MagicMock,
+        mock_learner: MagicMock,
     ) -> None:
         """Test rollback to previous version."""
         mock_coordinator.get_learner.return_value = mock_learner
@@ -303,7 +323,10 @@ class TestPolicyManager:
         assert result is False
 
     def test_rollback_records_event(
-        self, manager: PolicyManager, mock_coordinator: MagicMock, mock_learner: MagicMock
+        self,
+        manager: PolicyManager,
+        mock_coordinator: MagicMock,
+        mock_learner: MagicMock,
     ) -> None:
         """Test rollback records event."""
         mock_coordinator.get_learner.return_value = mock_learner
@@ -323,7 +346,10 @@ class TestPolicyManager:
         assert events[0].metrics_before["success_rate"] == 0.4
 
     def test_auto_rollback_on_degradation(
-        self, manager: PolicyManager, mock_coordinator: MagicMock, mock_learner: MagicMock
+        self,
+        manager: PolicyManager,
+        mock_coordinator: MagicMock,
+        mock_learner: MagicMock,
     ) -> None:
         """Test auto-rollback when degradation detected."""
         mock_coordinator.get_learner.return_value = mock_learner
@@ -435,7 +461,9 @@ class TestPolicyManager:
 
     def test_set_performance_baseline(self, manager: PolicyManager) -> None:
         """Test setting performance baseline."""
-        manager.set_performance_baseline("learner", success_rate=0.85, quality_score=0.9)
+        manager.set_performance_baseline(
+            "learner", success_rate=0.85, quality_score=0.9
+        )
 
         state = manager.get_policy_state("learner")
         assert state.performance_baseline["success_rate"] == 0.85

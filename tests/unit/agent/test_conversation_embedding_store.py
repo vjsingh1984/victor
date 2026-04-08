@@ -94,7 +94,9 @@ class TestConversationEmbeddingSearchResult:
 
     def test_creation(self):
         """Test creating a search result."""
-        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import (
+            ConversationEmbeddingSearchResult,
+        )
 
         result = ConversationEmbeddingSearchResult(
             message_id="msg_123",
@@ -109,7 +111,9 @@ class TestConversationEmbeddingSearchResult:
 
     def test_repr(self):
         """Test string representation."""
-        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import (
+            ConversationEmbeddingSearchResult,
+        )
 
         result = ConversationEmbeddingSearchResult(
             message_id="msg_123",

@@ -39,7 +39,9 @@ class TestDockerTool:
     @pytest.mark.asyncio
     async def test_docker_invalid_operation(self):
         """Test docker with invalid operation."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="invalid_op")
             assert result["success"] is False
             assert "Unknown operation" in result["error"]
@@ -54,7 +56,9 @@ class TestDockerTool:
                 "",
             )
         )
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="ps")
                 assert result["success"] is True
@@ -69,7 +73,9 @@ class TestDockerTool:
                 "",
             )
         )
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="images")
                 assert result["success"] is True
@@ -77,7 +83,9 @@ class TestDockerTool:
     @pytest.mark.asyncio
     async def test_docker_not_available(self):
         """Test docker when Docker is not available."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=False):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=False
+        ):
             result = await docker(operation="ps")
             assert result["success"] is False
             assert "Docker" in result["error"]
@@ -90,7 +98,9 @@ class TestDockerOperations:
     async def test_docker_stats(self):
         """Test docker stats operation."""
         mock_run = AsyncMock(return_value=(True, "CONTAINER CPU% MEM", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="stats")
                 assert result["success"] is True
@@ -99,7 +109,9 @@ class TestDockerOperations:
     async def test_docker_inspect(self):
         """Test docker inspect operation."""
         mock_run = AsyncMock(return_value=(True, '[{"Id":"abc123"}]', ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="inspect", resource_id="test")
                 assert result["success"] is True
@@ -109,8 +121,12 @@ class TestDockerOperations:
         """Test docker rmi operation."""
         mock_run = AsyncMock(return_value=(True, "Deleted: sha256:abc", ""))
         with _allow_dangerous_docker():
-            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+            with patch(
+                "victor.tools.docker_tool.check_docker_available", return_value=True
+            ):
+                with patch(
+                    "victor.tools.docker_tool._run_docker_command_async", mock_run
+                ):
                     result = await docker(operation="rmi", resource_id="test:latest")
                     assert result["success"] is True
 
@@ -118,7 +134,9 @@ class TestDockerOperations:
     async def test_docker_networks(self):
         """Test docker networks operation."""
         mock_run = AsyncMock(return_value=(True, "bridge host none", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="networks")
                 assert result["success"] is True
@@ -127,7 +145,9 @@ class TestDockerOperations:
     async def test_docker_volumes(self):
         """Test docker volumes operation."""
         mock_run = AsyncMock(return_value=(True, "volume1 volume2", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="volumes")
                 assert result["success"] is True
@@ -136,7 +156,9 @@ class TestDockerOperations:
     async def test_docker_logs(self):
         """Test docker logs operation."""
         mock_run = AsyncMock(return_value=(True, "container logs here", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="logs", resource_id="container-id")
                 assert result["success"] is True
@@ -144,7 +166,9 @@ class TestDockerOperations:
     @pytest.mark.asyncio
     async def test_docker_logs_missing_container(self):
         """Test docker logs without resource_id."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="logs")
             assert result["success"] is False
 
@@ -153,8 +177,12 @@ class TestDockerOperations:
         """Test docker run operation - uses options dict."""
         mock_run = AsyncMock(return_value=(True, "container-id", ""))
         with _allow_dangerous_docker():
-            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+            with patch(
+                "victor.tools.docker_tool.check_docker_available", return_value=True
+            ):
+                with patch(
+                    "victor.tools.docker_tool._run_docker_command_async", mock_run
+                ):
                     result = await docker(
                         operation="run",
                         options={"image": "alpine", "command": "echo test"},
@@ -173,7 +201,9 @@ class TestDockerOperations:
     async def test_docker_ps_with_options(self):
         """Test docker ps with options."""
         mock_run = AsyncMock(return_value=(True, '[{"ID":"abc"}]', ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="ps", options={"all": True})
                 assert result["success"] is True
@@ -182,7 +212,9 @@ class TestDockerOperations:
     async def test_docker_stop(self):
         """Test docker stop operation."""
         mock_run = AsyncMock(return_value=(True, "container-id", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="stop", resource_id="container-id")
                 assert result["success"] is True
@@ -190,7 +222,9 @@ class TestDockerOperations:
     @pytest.mark.asyncio
     async def test_docker_stop_missing_container(self):
         """Test docker stop without resource_id."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="stop")
             assert result["success"] is False
 
@@ -199,15 +233,21 @@ class TestDockerOperations:
         """Test docker rm operation."""
         mock_run = AsyncMock(return_value=(True, "container-id", ""))
         with _allow_dangerous_docker():
-            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+            with patch(
+                "victor.tools.docker_tool.check_docker_available", return_value=True
+            ):
+                with patch(
+                    "victor.tools.docker_tool._run_docker_command_async", mock_run
+                ):
                     result = await docker(operation="rm", resource_id="container-id")
                     assert result["success"] is True
 
     @pytest.mark.asyncio
     async def test_docker_rm_missing_container(self):
         """Test docker rm without resource_id."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="rm")
             assert result["success"] is False
 
@@ -216,8 +256,12 @@ class TestDockerOperations:
         """Test docker pull operation."""
         mock_run = AsyncMock(return_value=(True, "Downloaded image", ""))
         with _allow_dangerous_docker():
-            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+            with patch(
+                "victor.tools.docker_tool.check_docker_available", return_value=True
+            ):
+                with patch(
+                    "victor.tools.docker_tool._run_docker_command_async", mock_run
+                ):
                     result = await docker(
                         operation="pull",
                         resource_id="alpine:latest",
@@ -228,21 +272,27 @@ class TestDockerOperations:
     @pytest.mark.asyncio
     async def test_docker_pull_missing_image(self):
         """Test docker pull without resource_id."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="pull", resource_type="image")
             assert result["success"] is False
 
     @pytest.mark.asyncio
     async def test_docker_rmi_missing_image(self):
         """Test docker rmi without resource_id."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="rmi")
             assert result["success"] is False
 
     @pytest.mark.asyncio
     async def test_docker_inspect_missing_resource(self):
         """Test docker inspect without resource_id."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="inspect")
             assert result["success"] is False
 
@@ -251,8 +301,12 @@ class TestDockerOperations:
         """Test docker exec operation."""
         mock_run = AsyncMock(return_value=(True, "output", ""))
         with _allow_dangerous_docker():
-            with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
-                with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
+            with patch(
+                "victor.tools.docker_tool.check_docker_available", return_value=True
+            ):
+                with patch(
+                    "victor.tools.docker_tool._run_docker_command_async", mock_run
+                ):
                     result = await docker(
                         operation="exec",
                         resource_id="container-id",
@@ -263,14 +317,18 @@ class TestDockerOperations:
     @pytest.mark.asyncio
     async def test_docker_exec_missing_resource(self):
         """Test docker exec without resource_id."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="exec", options={"command": "ls"})
             assert result["success"] is False
 
     @pytest.mark.asyncio
     async def test_docker_exec_missing_command(self):
         """Test docker exec without command in options."""
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             result = await docker(operation="exec", resource_id="container-id")
             assert result["success"] is False
 
@@ -278,7 +336,9 @@ class TestDockerOperations:
     async def test_docker_ps_failure(self):
         """Test docker ps when command fails."""
         mock_run = AsyncMock(return_value=(False, "", "error"))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="ps")
                 assert result["success"] is False
@@ -287,7 +347,9 @@ class TestDockerOperations:
     async def test_docker_start(self):
         """Test docker start operation."""
         mock_run = AsyncMock(return_value=(True, "container-id", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="start", resource_id="container-id")
                 assert result["success"] is True
@@ -296,7 +358,9 @@ class TestDockerOperations:
     async def test_docker_restart(self):
         """Test docker restart operation."""
         mock_run = AsyncMock(return_value=(True, "container-id", ""))
-        with patch("victor.tools.docker_tool.check_docker_available", return_value=True):
+        with patch(
+            "victor.tools.docker_tool.check_docker_available", return_value=True
+        ):
             with patch("victor.tools.docker_tool._run_docker_command_async", mock_run):
                 result = await docker(operation="restart", resource_id="container-id")
                 assert result["success"] is True

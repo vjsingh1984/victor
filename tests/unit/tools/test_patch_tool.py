@@ -193,7 +193,12 @@ class TestApplyPatchToContent:
                 old_count=3,
                 new_start=1,
                 new_count=3,
-                lines=[" line1", "-line2", "+line2_modified", " line3"],  # line1 doesn't match
+                lines=[
+                    " line1",
+                    "-line2",
+                    "+line2_modified",
+                    " line3",
+                ],  # line1 doesn't match
             )
         ]
 
@@ -281,7 +286,9 @@ class TestApplyPatch:
 +    print('Hello, World!')
 +    return True
 """
-            result = await patch(patch_content=diff_content, file_path=test_file, backup=False)
+            result = await patch(
+                patch_content=diff_content, file_path=test_file, backup=False
+            )
 
             assert result["success"] is True
             # Path may be resolved differently on macOS (/var vs /private/var)
@@ -308,7 +315,9 @@ class TestApplyPatch:
 -old content
 +new content
 """
-            result = await patch(patch_content=diff_content, file_path=test_file, dry_run=True)
+            result = await patch(
+                patch_content=diff_content, file_path=test_file, dry_run=True
+            )
 
             assert "preview" in result
 

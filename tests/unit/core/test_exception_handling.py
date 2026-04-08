@@ -85,7 +85,9 @@ class TestProviderErrorHandling:
 
     def test_provider_timeout_error(self, caplog):
         """Verify ProviderTimeoutError includes timeout value."""
-        error = ProviderTimeoutError("Request timeout", provider="test_provider", timeout=30)
+        error = ProviderTimeoutError(
+            "Request timeout", provider="test_provider", timeout=30
+        )
 
         assert "Request timeout" in str(error)
         assert error.timeout == 30
@@ -94,7 +96,8 @@ class TestProviderErrorHandling:
     def test_provider_not_found_error(self, caplog):
         """Verify ProviderNotFoundError lists available providers."""
         error = ProviderNotFoundError(
-            provider="unknown_provider", available_providers=["anthropic", "openai", "google"]
+            provider="unknown_provider",
+            available_providers=["anthropic", "openai", "google"],
         )
 
         assert "unknown_provider" in str(error)
@@ -104,7 +107,9 @@ class TestProviderErrorHandling:
         """Verify ProviderInvalidResponseError captures response data."""
         response_data = {"status": "error", "code": 500}
         error = ProviderInvalidResponseError(
-            "Invalid response format", provider="test_provider", response_data=response_data
+            "Invalid response format",
+            provider="test_provider",
+            response_data=response_data,
         )
 
         assert "Invalid response format" in str(error)
@@ -275,7 +280,9 @@ class TestErrorSerialization:
 
     def test_error_to_dict(self):
         """Verify VictorError serializes to dict correctly."""
-        error = ProviderError("Test error", provider="test_provider", model="test_model")
+        error = ProviderError(
+            "Test error", provider="test_provider", model="test_model"
+        )
 
         error_dict = error.to_dict()
 
@@ -353,7 +360,9 @@ class TestLoggingPatterns:
 
         error = ToolExecutionError("Execution failed", tool_name="test_tool")
         handler = ErrorHandler()
-        error_info = handler.handle(error, context={"operation": "test_operation", "attempt": 1})
+        error_info = handler.handle(
+            error, context={"operation": "test_operation", "attempt": 1}
+        )
 
         assert error_info.details["operation"] == "test_operation"
         assert error_info.details["attempt"] == 1

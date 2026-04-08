@@ -383,7 +383,9 @@ class TestFindWorkflow:
         assert result1 is not None
 
         # With preference - returns preferred vertical
-        result2 = fresh_registry.find_workflow("analyze code", preferred_vertical="devops")
+        result2 = fresh_registry.find_workflow(
+            "analyze code", preferred_vertical="devops"
+        )
         assert result2 == ("devops_analysis", "devops")
 
     def test_find_workflow_priority_beats_preference(self, fresh_registry):
@@ -404,7 +406,9 @@ class TestFindWorkflow:
         fresh_registry.register(low_prio_preferred)
         fresh_registry.register(high_prio_other)
 
-        result = fresh_registry.find_workflow("run tests", preferred_vertical="preferred")
+        result = fresh_registry.find_workflow(
+            "run tests", preferred_vertical="preferred"
+        )
 
         assert result == ("high_priority_workflow", "other")
 
@@ -511,7 +515,9 @@ class TestGetTriggers:
         assert len(coding_triggers) == 1
         assert coding_triggers[0].workflow_name == "code_review"
 
-    def test_get_triggers_for_nonexistent_vertical(self, fresh_registry, sample_trigger):
+    def test_get_triggers_for_nonexistent_vertical(
+        self, fresh_registry, sample_trigger
+    ):
         """Test getting triggers for non-existent vertical."""
         fresh_registry.register(sample_trigger)
 
@@ -620,7 +626,9 @@ class TestToAutoWorkflows:
         assert (r"pattern1", "workflow1") in result
         assert (r"pattern2", "workflow2") in result
 
-    def test_to_auto_workflows_nonexistent_vertical(self, fresh_registry, sample_trigger):
+    def test_to_auto_workflows_nonexistent_vertical(
+        self, fresh_registry, sample_trigger
+    ):
         """Test to_auto_workflows for non-existent vertical."""
         fresh_registry.register(sample_trigger)
 

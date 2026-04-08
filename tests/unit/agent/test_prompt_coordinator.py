@@ -101,7 +101,9 @@ class TestPromptCoordinator:
     @pytest.fixture
     def coordinator_with_identity(self):
         """Create coordinator with base identity."""
-        return PromptCoordinator(base_identity="You are Victor, an AI coding assistant.")
+        return PromptCoordinator(
+            base_identity="You are Victor, an AI coding assistant."
+        )
 
     def test_init_default(self, coordinator):
         """Test default initialization."""
@@ -111,7 +113,10 @@ class TestPromptCoordinator:
 
     def test_init_with_identity(self, coordinator_with_identity):
         """Test initialization with base identity."""
-        assert coordinator_with_identity._base_identity == "You are Victor, an AI coding assistant."
+        assert (
+            coordinator_with_identity._base_identity
+            == "You are Victor, an AI coding assistant."
+        )
 
     def test_build_system_prompt_empty(self, coordinator):
         """Test building empty prompt."""
@@ -320,7 +325,9 @@ class TestCreatePromptCoordinator:
 
     def test_create_with_identity(self):
         """Test factory creation with base identity."""
-        coordinator = create_prompt_coordinator(base_identity="You are a helpful assistant.")
+        coordinator = create_prompt_coordinator(
+            base_identity="You are a helpful assistant."
+        )
 
         assert coordinator._base_identity == "You are a helpful assistant."
 

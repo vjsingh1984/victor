@@ -616,7 +616,9 @@ class TestOutputFormatterResponseModes:
         config = OutputConfig(mode=OutputMode.JSON, stdout=stdout)
         formatter = OutputFormatter(config)
         formatter.tool_result("tool1", True)
-        formatter.response(content="Test", tool_calls=[{"tool": "tool2", "success": True}])
+        formatter.response(
+            content="Test", tool_calls=[{"tool": "tool2", "success": True}]
+        )
         result = json.loads(stdout.getvalue())
         assert len(result["tool_calls"]) == 2
 

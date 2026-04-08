@@ -56,7 +56,9 @@ class TestListProviders:
         assert result.exit_code == 0
         # Should mention features like Tool calling, Streaming
         output_lower = result.stdout.lower()
-        assert any(x in output_lower for x in ["tool", "streaming", "features", "model"])
+        assert any(
+            x in output_lower for x in ["tool", "streaming", "features", "model"]
+        )
 
     def test_list_providers_shows_help_message(self):
         """Test that help message for profiles is shown."""
@@ -68,7 +70,10 @@ class TestListProviders:
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_list_providers_with_mocked_registry(self, mock_registry):
         """Test list_providers with mocked registry."""
-        mock_registry.list_providers.return_value = ["test_provider", "another_provider"]
+        mock_registry.list_providers.return_value = [
+            "test_provider",
+            "another_provider",
+        ]
 
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0
@@ -92,7 +97,10 @@ class TestListProviders:
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0
         # Unknown providers should still be listed
-        assert "unknown_custom_provider" in result.stdout.lower() or "Unknown" in result.stdout
+        assert (
+            "unknown_custom_provider" in result.stdout.lower()
+            or "Unknown" in result.stdout
+        )
 
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_list_providers_sorted_output(self, mock_registry):
@@ -272,7 +280,10 @@ class TestEdgeCases:
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_unicode_in_provider_name(self, mock_registry):
         """Test handling of unicode in provider names."""
-        mock_registry.list_providers.return_value = ["provider_日本語", "provider_emoji_🚀"]
+        mock_registry.list_providers.return_value = [
+            "provider_日本語",
+            "provider_emoji_🚀",
+        ]
 
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0

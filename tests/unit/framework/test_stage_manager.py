@@ -366,14 +366,22 @@ class TestStandardStageDefinitions:
 
     def test_stages_have_keywords(self):
         """Test that all stages have keywords defined."""
-        for get_stages in [get_coding_stages, get_data_analysis_stages, get_research_stages]:
+        for get_stages in [
+            get_coding_stages,
+            get_data_analysis_stages,
+            get_research_stages,
+        ]:
             stages = get_stages()
             for name, defn in stages.items():
                 assert len(defn.keywords) > 0, f"Stage {name} has no keywords"
 
     def test_stages_have_tools(self):
         """Test that most stages have tools defined."""
-        for get_stages in [get_coding_stages, get_data_analysis_stages, get_research_stages]:
+        for get_stages in [
+            get_coding_stages,
+            get_data_analysis_stages,
+            get_research_stages,
+        ]:
             stages = get_stages()
             stages_with_tools = sum(1 for defn in stages.values() if defn.tools)
             # At least half should have tools

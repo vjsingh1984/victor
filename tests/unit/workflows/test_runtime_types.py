@@ -24,7 +24,9 @@ from victor.workflows.executors.registry import (
 )
 from victor.workflows.runtime_types import GraphNodeResult, WorkflowState
 from victor.workflows.runtime_types import create_initial_workflow_state
-from victor.workflows.unified_compiler import NodeExecutionResult as UnifiedNodeExecutionResult
+from victor.workflows.unified_compiler import (
+    NodeExecutionResult as UnifiedNodeExecutionResult,
+)
 from victor.workflows.yaml_to_graph_compiler import (
     GraphNodeResult as YAMLGraphNodeResult,
     WorkflowState as YAMLWorkflowState,
@@ -49,7 +51,10 @@ def test_executor_package_reexports_workflow_node_executor_registry_helpers() ->
     assert ExecutorWorkflowNodeExecutorRegistration is WorkflowNodeExecutorRegistration
     assert ExecutorWorkflowNodeExecutorRegistry is WorkflowNodeExecutorRegistry
     assert executor_register_workflow_node_executor is register_workflow_node_executor
-    assert executor_get_workflow_node_executor_registry is get_workflow_node_executor_registry
+    assert (
+        executor_get_workflow_node_executor_registry
+        is get_workflow_node_executor_registry
+    )
     assert (
         executor_clear_registered_workflow_node_executors
         is clear_registered_workflow_node_executors
@@ -60,9 +65,13 @@ def test_workflows_package_reexports_workflow_node_executor_registry_helpers() -
     assert PublicWorkflowNodeExecutorRegistration is WorkflowNodeExecutorRegistration
     assert PublicWorkflowNodeExecutorRegistry is WorkflowNodeExecutorRegistry
     assert public_register_workflow_node_executor is register_workflow_node_executor
-    assert public_get_workflow_node_executor_registry is get_workflow_node_executor_registry
     assert (
-        public_clear_registered_workflow_node_executors is clear_registered_workflow_node_executors
+        public_get_workflow_node_executor_registry
+        is get_workflow_node_executor_registry
+    )
+    assert (
+        public_clear_registered_workflow_node_executors
+        is clear_registered_workflow_node_executors
     )
 
 

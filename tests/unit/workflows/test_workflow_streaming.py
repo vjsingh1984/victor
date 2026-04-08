@@ -183,7 +183,9 @@ class TestWorkflowStreamChunk:
 
         assert isinstance(stream_chunk, StreamChunk)
         assert stream_chunk.content == "Hello, world!"
-        assert stream_chunk.tool_calls == [{"name": "search", "args": {"query": "test"}}]
+        assert stream_chunk.tool_calls == [
+            {"name": "search", "args": {"query": "test"}}
+        ]
         assert stream_chunk.is_final is True
         # Metadata should include workflow info
         assert stream_chunk.metadata is not None

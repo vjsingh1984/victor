@@ -59,10 +59,17 @@ async def test_aws_provider_start_msk_uses_to_thread() -> None:
 async def test_aws_provider_start_sqs_uses_to_thread_for_create_queue() -> None:
     sqs = MagicMock()
     sqs.get_queue_url.side_effect = aws_module.ClientError(
-        {"Error": {"Code": "AWS.SimpleQueueService.NonExistentQueue", "Message": "missing"}},
+        {
+            "Error": {
+                "Code": "AWS.SimpleQueueService.NonExistentQueue",
+                "Message": "missing",
+            }
+        },
         "GetQueueUrl",
     )
-    sqs.create_queue.return_value = {"QueueUrl": "https://sqs.us-east-1.amazonaws.com/123/test"}
+    sqs.create_queue.return_value = {
+        "QueueUrl": "https://sqs.us-east-1.amazonaws.com/123/test"
+    }
 
     session = MagicMock()
     session.client.return_value = sqs
@@ -81,7 +88,10 @@ async def test_aws_provider_start_sqs_uses_to_thread_for_create_queue() -> None:
         handle = await provider._start_sqs(config)
 
     assert handle.metadata["queue_name"] == "test-queue"
-    assert handle.connection_info["SQS_QUEUE_URL"] == "https://sqs.us-east-1.amazonaws.com/123/test"
+    assert (
+        handle.connection_info["SQS_QUEUE_URL"]
+        == "https://sqs.us-east-1.amazonaws.com/123/test"
+    )
     assert handle.connection_info["SQS_QUEUE_NAME"] == "test-queue"
     assert mock_to_thread.await_count == 2
     first = mock_to_thread.await_args_list[0]

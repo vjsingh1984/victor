@@ -80,7 +80,9 @@ class TestOutputDeduplicator:
 
     def test_process_no_duplicates(self, dedup):
         """Test processing content without duplicates."""
-        content = "First paragraph with unique content.\n\nSecond paragraph also unique."
+        content = (
+            "First paragraph with unique content.\n\nSecond paragraph also unique."
+        )
         result = dedup.process(content)
 
         assert "First paragraph" in result
@@ -232,7 +234,9 @@ class TestStreamingDeduplicator:
 
     def test_add_chunk_with_boundary(self, dedup):
         """Test adding chunk with paragraph boundary."""
-        result = dedup.add_chunk("First paragraph with content.\n\nSecond paragraph here.")
+        result = dedup.add_chunk(
+            "First paragraph with content.\n\nSecond paragraph here."
+        )
         # Should return processed content
         assert result is None or isinstance(result, str)
 

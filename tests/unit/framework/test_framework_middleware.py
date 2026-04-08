@@ -79,7 +79,9 @@ class TestLoggingMiddleware:
         await middleware.before_tool_call("test_tool", args)
 
         with caplog.at_level(logging.DEBUG, logger="victor.framework.middleware"):
-            result = await middleware.after_tool_call("test_tool", args, "result", success=True)
+            result = await middleware.after_tool_call(
+                "test_tool", args, "result", success=True
+            )
 
         assert result is None  # No modification
         assert "Tool success: test_tool" in caplog.text
@@ -151,7 +153,9 @@ class TestSecretMaskingMiddleware:
     @pytest.mark.asyncio
     async def test_before_tool_call_masks_arguments_when_enabled(self):
         """SecretMaskingMiddleware should mask arguments when enabled."""
-        middleware = SecretMaskingMiddleware(replacement="[MASKED]", mask_in_arguments=True)
+        middleware = SecretMaskingMiddleware(
+            replacement="[MASKED]", mask_in_arguments=True
+        )
 
         result = await middleware.before_tool_call(
             "test_tool", {"token": "ghp_1234567890abcdefghijklmnopqrstuvwxyz"}
@@ -166,7 +170,9 @@ class TestSecretMaskingMiddleware:
         """SecretMaskingMiddleware should mask secrets in result."""
         result_with_secret = "Found token: ghp_1234567890abcdefghijklmnopqrstuvwxyz"
 
-        masked = await middleware.after_tool_call("test_tool", {}, result_with_secret, success=True)
+        masked = await middleware.after_tool_call(
+            "test_tool", {}, result_with_secret, success=True
+        )
 
         assert masked is not None
         assert "[MASKED]" in masked
@@ -177,7 +183,9 @@ class TestSecretMaskingMiddleware:
         """SecretMaskingMiddleware should mask AWS keys."""
         result_with_key = "AWS key: AKIAIOSFODNN7EXAMPLE"
 
-        masked = await middleware.after_tool_call("test_tool", {}, result_with_key, success=True)
+        masked = await middleware.after_tool_call(
+            "test_tool", {}, result_with_key, success=True
+        )
 
         assert masked is not None
         assert "[MASKED]" in masked
@@ -188,7 +196,9 @@ class TestSecretMaskingMiddleware:
         """SecretMaskingMiddleware should return None when no secrets found."""
         clean_result = "This is a normal response without secrets."
 
-        masked = await middleware.after_tool_call("test_tool", {}, clean_result, success=True)
+        masked = await middleware.after_tool_call(
+            "test_tool", {}, clean_result, success=True
+        )
 
         assert masked is None  # No modification needed
 
@@ -200,7 +210,9 @@ class TestSecretMaskingMiddleware:
             "status": "ok",
         }
 
-        masked = await middleware.after_tool_call("test_tool", {}, result_dict, success=True)
+        masked = await middleware.after_tool_call(
+            "test_tool", {}, result_dict, success=True
+        )
 
         assert masked is not None
         assert "[MASKED]" in masked["output"]
@@ -374,30 +386,40 @@ class TestGitSafetyMiddleware:
     @pytest.mark.asyncio
     async def test_blocks_force_push_short_flag(self, middleware):
         """GitSafetyMiddleware should block force push with -f flag."""
-        result = await middleware.before_tool_call("git", {"command": "git push -f origin main"})
+        result = await middleware.before_tool_call(
+            "git", {"command": "git push -f origin main"}
+        )
 
         assert result.proceed is False
         # Message may say "push -f" or "force" depending on which pattern matched
-        assert "push -f" in result.error_message or "force" in result.error_message.lower()
+        assert (
+            "push -f" in result.error_message or "force" in result.error_message.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_blocks_hard_reset(self, middleware):
         """GitSafetyMiddleware should block hard reset."""
-        result = await middleware.before_tool_call("bash", {"command": "git reset --hard HEAD~3"})
+        result = await middleware.before_tool_call(
+            "bash", {"command": "git reset --hard HEAD~3"}
+        )
 
         assert result.proceed is False
 
     @pytest.mark.asyncio
     async def test_blocks_clean_fd(self, middleware):
         """GitSafetyMiddleware should block git clean -fd."""
-        result = await middleware.before_tool_call("shell", {"command": "git clean -fd"})
+        result = await middleware.before_tool_call(
+            "shell", {"command": "git clean -fd"}
+        )
 
         assert result.proceed is False
 
     @pytest.mark.asyncio
     async def test_warns_on_risky_operations(self, middleware):
         """GitSafetyMiddleware should warn on risky operations."""
-        result = await middleware.before_tool_call("execute_bash", {"command": "git rebase main"})
+        result = await middleware.before_tool_call(
+            "execute_bash", {"command": "git rebase main"}
+        )
 
         assert result.proceed is True
         assert "git_warning" in result.metadata
@@ -415,7 +437,9 @@ class TestGitSafetyMiddleware:
     @pytest.mark.asyncio
     async def test_allows_safe_operations(self, middleware):
         """GitSafetyMiddleware should allow safe git operations."""
-        result = await middleware.before_tool_call("execute_bash", {"command": "git status"})
+        result = await middleware.before_tool_call(
+            "execute_bash", {"command": "git status"}
+        )
 
         assert result.proceed is True
         assert not result.error_message
@@ -432,7 +456,9 @@ class TestGitSafetyMiddleware:
     @pytest.mark.asyncio
     async def test_ignores_non_git_commands(self, middleware):
         """GitSafetyMiddleware should ignore non-git commands."""
-        result = await middleware.before_tool_call("execute_bash", {"command": "ls -la"})
+        result = await middleware.before_tool_call(
+            "execute_bash", {"command": "ls -la"}
+        )
 
         assert result.proceed is True
 
@@ -662,11 +688,15 @@ class TestOutputValidationMiddleware:
         )
 
         # Applicable tool - should validate
-        result = await middleware.before_tool_call("write_json", {"content": '{"valid": true}'})
+        result = await middleware.before_tool_call(
+            "write_json", {"content": '{"valid": true}'}
+        )
         assert result.metadata.get("validation_performed") is True
 
         # Non-applicable tool - should skip
-        result = await middleware.before_tool_call("other_tool", {"content": "not json"})
+        result = await middleware.before_tool_call(
+            "other_tool", {"content": "not json"}
+        )
         assert middleware.get_applicable_tools() == {"write_json"}
 
     @pytest.mark.asyncio
@@ -786,7 +816,9 @@ class TestValidationTypes:
             issues=[
                 ValidationIssue(message="Error 1", severity=ValidationSeverity.ERROR),
                 ValidationIssue(message="Warning", severity=ValidationSeverity.WARNING),
-                ValidationIssue(message="Critical", severity=ValidationSeverity.CRITICAL),
+                ValidationIssue(
+                    message="Critical", severity=ValidationSeverity.CRITICAL
+                ),
                 ValidationIssue(message="Info", severity=ValidationSeverity.INFO),
             ],
         )
@@ -870,7 +902,9 @@ class TestMiddlewareIntegration:
     async def test_devops_middleware_configuration(self):
         """DevOps vertical should configure middleware correctly."""
         try:
-            DevOpsAssistant = _load_vertical_attr("victor.devops.assistant", "DevOpsAssistant")
+            DevOpsAssistant = _load_vertical_attr(
+                "victor.devops.assistant", "DevOpsAssistant"
+            )
         except ImportError:
             pytest.skip(
                 "DevOps vertical not installed (contrib removed, external package required)"

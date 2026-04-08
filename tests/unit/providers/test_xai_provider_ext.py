@@ -100,7 +100,9 @@ async def test_chat_server_error(xai_provider):
 
     # Mock raise_for_status to raise HTTPStatusError
     def raise_status_error():
-        raise httpx.HTTPStatusError("Server error", request=MagicMock(), response=mock_response)
+        raise httpx.HTTPStatusError(
+            "Server error", request=MagicMock(), response=mock_response
+        )
 
     mock_response.raise_for_status = raise_status_error
 
@@ -177,7 +179,9 @@ async def test_chat_with_max_tokens(xai_provider):
 
     with patch.object(xai_provider.client, "post", return_value=mock_response):
         messages = [Message(role="user", content="Hello")]
-        response = await xai_provider.chat(messages=messages, model="grok-beta", max_tokens=10)
+        response = await xai_provider.chat(
+            messages=messages, model="grok-beta", max_tokens=10
+        )
 
         assert response.content == "Short"
         assert response.stop_reason == "length"
@@ -218,10 +222,15 @@ async def test_chat_with_tools(xai_provider):
             ToolDefinition(
                 name="get_weather",
                 description="Get weather for a location",
-                parameters={"type": "object", "properties": {"location": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                },
             )
         ]
-        response = await xai_provider.chat(messages=messages, model="grok-beta", tools=tools)
+        response = await xai_provider.chat(
+            messages=messages, model="grok-beta", tools=tools
+        )
 
         assert response.tool_calls is not None
         assert len(response.tool_calls) == 1
@@ -236,7 +245,9 @@ async def test_chat_authentication_error(xai_provider):
     mock_response.status_code = 401
     mock_response.text = "Invalid API key"
 
-    error = httpx.HTTPStatusError("Auth failed", request=MagicMock(), response=mock_response)
+    error = httpx.HTTPStatusError(
+        "Auth failed", request=MagicMock(), response=mock_response
+    )
 
     with patch.object(xai_provider.client, "post", side_effect=error):
         messages = [Message(role="user", content="Hello")]
@@ -252,7 +263,9 @@ async def test_chat_rate_limit_error(xai_provider):
     mock_response.status_code = 429
     mock_response.text = "Rate limit exceeded"
 
-    error = httpx.HTTPStatusError("Rate limited", request=MagicMock(), response=mock_response)
+    error = httpx.HTTPStatusError(
+        "Rate limited", request=MagicMock(), response=mock_response
+    )
 
     with patch.object(xai_provider.client, "post", side_effect=error):
         messages = [Message(role="user", content="Hello")]
@@ -321,7 +334,9 @@ async def test_stream_with_tools(xai_provider):
         ]
 
         chunks = []
-        async for chunk in xai_provider.stream(messages=messages, model="grok-beta", tools=tools):
+        async for chunk in xai_provider.stream(
+            messages=messages, model="grok-beta", tools=tools
+        ):
             chunks.append(chunk)
 
         # Should get 2 chunks: content chunk + final [DONE] chunk
@@ -360,6 +375,8 @@ async def test_stream_error(xai_provider):
 @pytest.mark.asyncio
 async def test_close(xai_provider):
     """Test closing the provider."""
-    with patch.object(xai_provider.client, "aclose", new_callable=AsyncMock) as mock_aclose:
+    with patch.object(
+        xai_provider.client, "aclose", new_callable=AsyncMock
+    ) as mock_aclose:
         await xai_provider.close()
         mock_aclose.assert_called_once()

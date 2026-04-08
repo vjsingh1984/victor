@@ -27,7 +27,9 @@ class FakeStreamChunk:
 
 
 class FakeProvider:
-    def __init__(self, *, stream_chunks: List[FakeStreamChunk], supports_tools: bool = True):
+    def __init__(
+        self, *, stream_chunks: List[FakeStreamChunk], supports_tools: bool = True
+    ):
         self._stream_chunks = stream_chunks
         self._supports_tools = supports_tools
         self.called_chat = False
@@ -119,7 +121,10 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
 @pytest.mark.asyncio
 async def test_streaming_basic_passes_through_chunks():
     provider = FakeProvider(
-        stream_chunks=[FakeStreamChunk(content="hello"), FakeStreamChunk(content=" world")]
+        stream_chunks=[
+            FakeStreamChunk(content="hello"),
+            FakeStreamChunk(content=" world"),
+        ]
     )
     orchestrator = _make_orchestrator(provider)
 

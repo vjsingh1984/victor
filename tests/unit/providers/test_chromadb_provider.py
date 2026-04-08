@@ -56,7 +56,9 @@ def mock_chromadb():
 
     # Patch chromadb.Client directly instead of through module
     with patch("chromadb.Client") as mock_client_class:
-        with patch("victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
+        with patch(
+            "victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True
+        ):
             mock_client = MagicMock()
             mock_collection = MagicMock()
             mock_collection.name = "test_collection"
@@ -71,7 +73,9 @@ class TestChromaDBProvider:
 
     def test_initialization(self, chroma_config):
         """Test provider initialization."""
-        with patch("victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True):
+        with patch(
+            "victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", True
+        ):
             provider = ChromaDBProvider(chroma_config)
 
             assert provider.config == chroma_config
@@ -82,7 +86,9 @@ class TestChromaDBProvider:
 
     def test_initialization_chromadb_not_available(self, chroma_config):
         """Test initialization when ChromaDB not available."""
-        with patch("victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", False):
+        with patch(
+            "victor.storage.vector_stores.chromadb_provider.CHROMADB_AVAILABLE", False
+        ):
             with pytest.raises(ImportError, match="ChromaDB not available"):
                 ChromaDBProvider(chroma_config)
 
@@ -311,7 +317,9 @@ class TestChromaDBProvider:
             await provider.clear_index()
 
             # Verify collection was deleted and recreated
-            mock_client.delete_collection.assert_called_once_with(name="test_collection")
+            mock_client.delete_collection.assert_called_once_with(
+                name="test_collection"
+            )
             mock_client.create_collection.assert_called()
 
     @pytest.mark.asyncio

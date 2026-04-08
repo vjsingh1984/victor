@@ -64,7 +64,9 @@ class TestLedgerPersistence:
 
         # auth.py should not be duplicated (same category + key)
         auth_entries = [
-            e for e in populated_ledger.entries if e.category == "file_read" and e.key == "auth.py"
+            e
+            for e in populated_ledger.entries
+            if e.category == "file_read" and e.key == "auth.py"
         ]
         assert len(auth_entries) == 1
 

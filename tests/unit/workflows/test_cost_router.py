@@ -772,7 +772,9 @@ class TestDefaultModels:
     def test_default_models_include_anthropic(self):
         """Test that default models include Anthropic models."""
         router = CostAwareRouter()
-        anthropic_models = [m for m in router._models.values() if m.provider == "anthropic"]
+        anthropic_models = [
+            m for m in router._models.values() if m.provider == "anthropic"
+        ]
         assert len(anthropic_models) >= 3  # opus, sonnet, haiku
 
     def test_default_models_include_openai(self):

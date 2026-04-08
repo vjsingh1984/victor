@@ -83,7 +83,9 @@ class TestAsyncWrappers:
     ) -> None:
         """Test record_outcome_async offloads to thread pool."""
         # Should not block event loop
-        await coordinator.record_outcome_async("continuation_patience", sample_outcome, "coding")
+        await coordinator.record_outcome_async(
+            "continuation_patience", sample_outcome, "coding"
+        )
 
         # Verify outcome was recorded by checking stats
         stats = coordinator.get_stats()
@@ -110,7 +112,9 @@ class TestAsyncWrappers:
         assert rec is None or isinstance(rec, RLRecommendation)
 
     @pytest.mark.asyncio
-    async def test_get_all_recommendations_async(self, coordinator: RLCoordinator) -> None:
+    async def test_get_all_recommendations_async(
+        self, coordinator: RLCoordinator
+    ) -> None:
         """Test get_all_recommendations_async offloads to thread pool."""
         recommendations = await coordinator.get_all_recommendations_async(
             "anthropic", "claude-3-opus", "analysis"
@@ -266,7 +270,9 @@ class TestEventLoopNonBlocking:
         assert other_task_ran
 
     @pytest.mark.asyncio
-    async def test_export_metrics_allows_concurrent_tasks(self, coordinator: RLCoordinator) -> None:
+    async def test_export_metrics_allows_concurrent_tasks(
+        self, coordinator: RLCoordinator
+    ) -> None:
         """Test export_metrics_async allows other tasks to run."""
         counter = 0
 
@@ -293,7 +299,9 @@ class TestActiveLearners:
         """Test that get_active_learner_names() returns None by default."""
         assert coordinator.get_active_learner_names() is None
 
-    def test_set_active_learners_restricts_creation(self, coordinator: RLCoordinator) -> None:
+    def test_set_active_learners_restricts_creation(
+        self, coordinator: RLCoordinator
+    ) -> None:
         """Test that unlisted learner returns None after set_active_learners."""
         coordinator.set_active_learners(["continuation_patience"])
 
@@ -305,7 +313,9 @@ class TestActiveLearners:
         learner = coordinator.get_learner("model_selector")
         assert learner is None
 
-    def test_already_created_learners_still_accessible(self, coordinator: RLCoordinator) -> None:
+    def test_already_created_learners_still_accessible(
+        self, coordinator: RLCoordinator
+    ) -> None:
         """Test that pre-existing learners survive restriction."""
         # Create learner before setting restriction
         learner = coordinator.get_learner("continuation_patience")

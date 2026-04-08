@@ -1,8 +1,24 @@
 from __future__ import annotations
 
+import importlib.util
+import sys
 from pathlib import Path
 
-from scripts.ci.verify_vertical_classes import candidate_import_roots, verify_vertical_class
+# scripts/ is not a Python package (no __init__.py), so import the module directly
+_SCRIPT_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "scripts"
+    / "ci"
+    / "verify_vertical_classes.py"
+)
+_spec = importlib.util.spec_from_file_location(
+    "scripts.ci.verify_vertical_classes", _SCRIPT_PATH
+)
+_mod = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = _mod
+_spec.loader.exec_module(_mod)
+candidate_import_roots = _mod.candidate_import_roots
+verify_vertical_class = _mod.verify_vertical_class
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXAMPLE_DIR = REPO_ROOT / "examples" / "external_vertical"

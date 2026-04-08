@@ -336,8 +336,12 @@ class TestState:
         mock_orchestrator.get_iteration_count.return_value = 0
         mock_orchestrator.get_max_iterations.return_value = 25
         mock_orchestrator.is_streaming.return_value = False
-        type(mock_orchestrator).current_provider = PropertyMock(return_value="anthropic")
-        type(mock_orchestrator).current_model = PropertyMock(return_value="claude-sonnet")
+        type(mock_orchestrator).current_provider = PropertyMock(
+            return_value="anthropic"
+        )
+        type(mock_orchestrator).current_model = PropertyMock(
+            return_value="claude-sonnet"
+        )
 
         state = State(mock_orchestrator)
         assert state.tool_calls_used == 5
@@ -364,8 +368,12 @@ class TestState:
         mock_orchestrator.get_iteration_count.return_value = 0
         mock_orchestrator.get_max_iterations.return_value = 25
         mock_orchestrator.is_streaming.return_value = False
-        type(mock_orchestrator).current_provider = PropertyMock(return_value="anthropic")
-        type(mock_orchestrator).current_model = PropertyMock(return_value="claude-sonnet")
+        type(mock_orchestrator).current_provider = PropertyMock(
+            return_value="anthropic"
+        )
+        type(mock_orchestrator).current_model = PropertyMock(
+            return_value="claude-sonnet"
+        )
 
         state = State(mock_orchestrator)
         d = state.to_dict()

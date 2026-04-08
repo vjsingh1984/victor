@@ -7,7 +7,9 @@ import pytest
 import victor.core.utils.coding_support as coding_support
 
 
-def test_analyzer_loader_prefers_extracted_victor_coding(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_analyzer_loader_prefers_extracted_victor_coding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     preferred_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
 
     monkeypatch.setattr(
@@ -36,7 +38,9 @@ def test_analyzer_loader_prefers_extracted_victor_coding(monkeypatch: pytest.Mon
     assert coding_support.load_codebase_analyzer_module() is preferred_module
 
 
-def test_analyzer_loader_falls_back_to_legacy_module(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_analyzer_loader_falls_back_to_legacy_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     legacy_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
 
     monkeypatch.setattr(
@@ -95,14 +99,18 @@ def test_analyzer_attr_loader_raises_clear_error_for_missing_symbol(
     module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
     monkeypatch.setattr(coding_support, "load_codebase_analyzer_module", lambda: module)
 
-    with pytest.raises(ImportError, match="required symbol 'generate_enhanced_init_md'"):
+    with pytest.raises(
+        ImportError, match="required symbol 'generate_enhanced_init_md'"
+    ):
         coding_support.load_codebase_analyzer_attr("generate_enhanced_init_md")
 
 
 def test_tree_sitter_loader_prefers_extracted_victor_coding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    preferred_module = types.SimpleNamespace(get_parser=lambda language: f"parser:{language}")
+    preferred_module = types.SimpleNamespace(
+        get_parser=lambda language: f"parser:{language}"
+    )
 
     monkeypatch.setattr(
         coding_support,
@@ -132,13 +140,19 @@ def test_tree_sitter_loader_prefers_extracted_victor_coding(
     assert get_parser("python") == "parser:python"
 
 
-def test_tree_sitter_loader_falls_back_to_legacy_module(monkeypatch: pytest.MonkeyPatch) -> None:
-    legacy_module = types.SimpleNamespace(get_parser=lambda language: f"legacy:{language}")
+def test_tree_sitter_loader_falls_back_to_legacy_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    legacy_module = types.SimpleNamespace(
+        get_parser=lambda language: f"legacy:{language}"
+    )
 
     monkeypatch.setattr(
         coding_support,
         "_load_extracted_tree_sitter_manager",
-        lambda: (_ for _ in ()).throw(ImportError("victor_coding.codebase.tree_sitter_manager")),
+        lambda: (_ for _ in ()).throw(
+            ImportError("victor_coding.codebase.tree_sitter_manager")
+        ),
     )
     monkeypatch.setattr(
         coding_support,
@@ -165,7 +179,9 @@ def test_tree_sitter_loader_raises_clear_error_when_unavailable(
     monkeypatch.setattr(
         coding_support,
         "_load_extracted_tree_sitter_manager",
-        lambda: (_ for _ in ()).throw(ImportError("victor_coding.codebase.tree_sitter_manager")),
+        lambda: (_ for _ in ()).throw(
+            ImportError("victor_coding.codebase.tree_sitter_manager")
+        ),
     )
     monkeypatch.setattr(
         coding_support,
@@ -183,7 +199,9 @@ def test_tree_sitter_loader_raises_clear_error_when_unavailable(
         ),
     )
 
-    with pytest.raises(ImportError, match="tree_sitter_manager requires the victor-coding"):
+    with pytest.raises(
+        ImportError, match="tree_sitter_manager requires the victor-coding"
+    ):
         coding_support.load_tree_sitter_get_parser()
 
 
@@ -199,7 +217,9 @@ def test_analyze_command_loader_prefers_extracted_victor_coding(
     def fail_if_legacy_called() -> object:
         raise AssertionError("legacy analyze command path should not be loaded")
 
-    monkeypatch.setattr(coding_support, "_load_legacy_analyze_command_app", fail_if_legacy_called)
+    monkeypatch.setattr(
+        coding_support, "_load_legacy_analyze_command_app", fail_if_legacy_called
+    )
     monkeypatch.setattr(
         coding_support,
         "_ANALYZE_COMMAND_APP_LOADERS",
@@ -222,7 +242,9 @@ def test_analyze_command_loader_falls_back_to_legacy_module(
         "_load_extracted_analyze_command_app",
         lambda: (_ for _ in ()).throw(ImportError("victor_coding.commands.analyze")),
     )
-    monkeypatch.setattr(coding_support, "_load_legacy_analyze_command_app", lambda: legacy_app)
+    monkeypatch.setattr(
+        coding_support, "_load_legacy_analyze_command_app", lambda: legacy_app
+    )
     monkeypatch.setattr(
         coding_support,
         "_ANALYZE_COMMAND_APP_LOADERS",

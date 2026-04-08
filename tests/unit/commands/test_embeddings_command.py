@@ -29,7 +29,9 @@ class TestEmbeddingsCommand:
         mock_async = Mock(return_value=coro)
 
         with (
-            patch.object(embeddings_cmd, "_rebuild_conversation_embeddings_async", mock_async),
+            patch.object(
+                embeddings_cmd, "_rebuild_conversation_embeddings_async", mock_async
+            ),
             patch.object(embeddings_cmd, "run_sync", return_value=11) as mock_run_sync,
         ):
             result = embeddings_cmd._rebuild_conversation_embeddings_sync()
@@ -57,7 +59,9 @@ class TestEmbeddingsCommand:
         selector.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_rebuild_conversation_embeddings_async_closes_store_on_error(self) -> None:
+    async def test_rebuild_conversation_embeddings_async_closes_store_on_error(
+        self,
+    ) -> None:
         store = MagicMock()
         store.initialize = AsyncMock(side_effect=RuntimeError("boom"))
         store.rebuild = AsyncMock()

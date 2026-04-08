@@ -202,7 +202,9 @@ class TestOpenAIAdapter:
         async def mock_stream():
             yield MockChunk(choices=[MockChoice(delta=MockDelta(content="hello"))])
             yield MockChunk(
-                choices=[MockChoice(delta=MockDelta(content=" world"), finish_reason="stop")]
+                choices=[
+                    MockChoice(delta=MockDelta(content=" world"), finish_reason="stop")
+                ]
             )
 
         results = []
@@ -250,7 +252,9 @@ class TestOpenAIAdapter:
 
         async def mock_stream():
             yield MockChunk(
-                choices=[MockChoice(delta=MockDelta(content="", tool_calls=[MockToolCall()]))]
+                choices=[
+                    MockChoice(delta=MockDelta(content="", tool_calls=[MockToolCall()]))
+                ]
             )
 
         results = []
@@ -359,7 +363,9 @@ class TestAnthropicAdapter:
             input: Optional[dict] = None
 
         async def mock_stream():
-            yield MockEvent(type="tool_use", name="read_file", input={"path": "test.py"})
+            yield MockEvent(
+                type="tool_use", name="read_file", input={"path": "test.py"}
+            )
 
         results = []
         async for c in adapter.adapt_stream(mock_stream()):
@@ -515,7 +521,12 @@ class TestOllamaAdapter:
                 "message": {
                     "content": "",
                     "tool_calls": [
-                        {"function": {"name": "read_file", "arguments": {"path": "test.py"}}}
+                        {
+                            "function": {
+                                "name": "read_file",
+                                "arguments": {"path": "test.py"},
+                            }
+                        }
                     ],
                 },
                 "done": False,
@@ -890,7 +901,9 @@ class TestUnifiedStreamAdapter:
         assert response.model == "test"
 
     @pytest.mark.asyncio
-    async def test_collect_to_response_with_tool_calls(self, mock_provider, sample_messages):
+    async def test_collect_to_response_with_tool_calls(
+        self, mock_provider, sample_messages
+    ):
         """Test collecting stream with tool calls."""
         chunks = [
             StreamChunk(

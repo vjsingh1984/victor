@@ -128,7 +128,9 @@ class TestDashboardReport:
     def test_to_dict(self):
         """Test converting report to dictionary."""
         report = DashboardReport(
-            circuit_breakers={"test": CircuitBreakerMetrics(name="test", state="closed")}
+            circuit_breakers={
+                "test": CircuitBreakerMetrics(name="test", state="closed")
+            }
         )
 
         d = report.to_dict()
@@ -274,7 +276,11 @@ class TestResilienceMetricsExporter:
         assert metrics["main"].primary_successes == 480
 
     def test_generate_report(
-        self, exporter, mock_circuit_breaker, mock_health_checker, mock_resilient_provider
+        self,
+        exporter,
+        mock_circuit_breaker,
+        mock_health_checker,
+        mock_resilient_provider,
     ):
         """Test generating complete report."""
         exporter.register_circuit_breaker("cb_test", mock_circuit_breaker)
@@ -289,7 +295,11 @@ class TestResilienceMetricsExporter:
         assert "timestamp" in report.to_dict()
 
     def test_generate_summary(
-        self, exporter, mock_circuit_breaker, mock_health_checker, mock_resilient_provider
+        self,
+        exporter,
+        mock_circuit_breaker,
+        mock_health_checker,
+        mock_resilient_provider,
     ):
         """Test summary generation."""
         exporter.register_circuit_breaker("cb_test", mock_circuit_breaker)

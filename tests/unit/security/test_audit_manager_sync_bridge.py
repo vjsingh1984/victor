@@ -27,9 +27,13 @@ class TestAuditManagerSyncBridge:
                 audit_manager_module, "create_event", return_value=event
             ) as mock_create_event,
             patch.object(
-                audit_manager_module.asyncio, "get_running_loop", side_effect=RuntimeError
+                audit_manager_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
             ),
-            patch.object(audit_manager_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                audit_manager_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             manager.log_event(
                 AuditEventType.SECURITY_SCAN,
@@ -59,7 +63,9 @@ class TestAuditManagerSyncBridge:
 
         with (
             patch.object(audit_manager_module, "create_event", return_value=event),
-            patch.object(audit_manager_module.asyncio, "get_running_loop", return_value=loop),
+            patch.object(
+                audit_manager_module.asyncio, "get_running_loop", return_value=loop
+            ),
             patch.object(audit_manager_module, "run_sync") as mock_run_sync,
         ):
             manager.log_event(AuditEventType.TOOL_EXECUTION, "ran tool")

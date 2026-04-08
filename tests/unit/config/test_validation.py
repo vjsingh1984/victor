@@ -183,7 +183,9 @@ class TestValidatePerformanceSettings:
             settings.framework_preload_enabled = False
 
             result = validate_performance_settings(settings)
-            has_warning = any(error.error_code == "PRELOAD_DISABLED" for error in result.errors)
+            has_warning = any(
+                error.error_code == "PRELOAD_DISABLED" for error in result.errors
+            )
             assert has_warning
 
 

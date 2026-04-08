@@ -30,8 +30,12 @@ def test_reset_discovery_clears_loader_and_entry_point_caches() -> None:
     tool_dep_cache_clear = Mock()
     provider_cache_clear = Mock(return_value=0)
 
-    with patch("victor.core.verticals.vertical_loader.get_vertical_loader", return_value=loader):
-        with patch("victor.framework.module_loader.get_entry_point_cache", return_value=cache):
+    with patch(
+        "victor.core.verticals.vertical_loader.get_vertical_loader", return_value=loader
+    ):
+        with patch(
+            "victor.framework.module_loader.get_entry_point_cache", return_value=cache
+        ):
             with patch(
                 "victor.framework.entry_point_loader.clear_entry_point_loader_cache",
                 framework_cache_clear,

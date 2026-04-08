@@ -30,7 +30,9 @@ try:
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import TreeSitterParserProtocol
 
-    _has_victor_coding = CapabilityRegistry.get_instance().is_enhanced(TreeSitterParserProtocol)
+    _has_victor_coding = CapabilityRegistry.get_instance().is_enhanced(
+        TreeSitterParserProtocol
+    )
 except Exception:
     _has_victor_coding = False
 
@@ -204,7 +206,9 @@ def some_function():
     pass
 """)
 
-        result = await refs(symbol_name="nonexistent_function", search_path=str(tmp_path))
+        result = await refs(
+            symbol_name="nonexistent_function", search_path=str(tmp_path)
+        )
 
         assert isinstance(result, list)
         # Empty list or minimal results expected

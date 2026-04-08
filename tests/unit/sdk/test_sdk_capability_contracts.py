@@ -186,7 +186,10 @@ def test_core_tiered_tool_config_populates_sdk_alias_fields() -> None:
     assert config.advanced_tools == ["grep"]
     assert config.get_tools_for_tier("basic") == ["ls", "read"]
     assert config.get_tools_for_tier("standard") == ["ls", "read", "write"]
-    assert config.get_max_tier_for_tools(["read", "ls", "write", "grep"]).value == "advanced"
+    assert (
+        config.get_max_tier_for_tools(["read", "ls", "write", "grep"]).value
+        == "advanced"
+    )
 
 
 def test_core_tiered_tool_config_accepts_sdk_tier_shape() -> None:
@@ -214,7 +217,9 @@ def test_core_vertical_config_exposes_sdk_compatible_helpers() -> None:
         description="Coding assistant",
         tools=ToolSet.from_tools(["read", "write"]),
         system_prompt="You are an expert engineer.",
-        stages={"EXECUTION": StageDefinition(name="EXECUTION", tools={"read", "write"})},
+        stages={
+            "EXECUTION": StageDefinition(name="EXECUTION", tools={"read", "write"})
+        },
     )
 
     assert config.get_tool_names() == ["read", "write"]

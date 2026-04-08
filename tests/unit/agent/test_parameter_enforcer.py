@@ -99,7 +99,11 @@ class TestParameterEnforcer:
                 required=True,
                 description="Path to the file to analyze",
                 inference_strategy=InferenceStrategy.FROM_PREVIOUS_ARGS,
-                inference_keys=["path", "file_path", "file"],  # Keys to search in previous args
+                inference_keys=[
+                    "path",
+                    "file_path",
+                    "file",
+                ],  # Keys to search in previous args
             ),
             ParameterSpec(
                 name="symbol_name",
@@ -495,7 +499,9 @@ class TestDeepSeekScenarios:
         assert enforced2["file_path"] == "/src/main.py"
         assert enforced2["symbol_name"] == "ClassB"
 
-    def test_multiple_previous_reads_uses_most_recent(self, symbol_enforcer_with_inference):
+    def test_multiple_previous_reads_uses_most_recent(
+        self, symbol_enforcer_with_inference
+    ):
         """Test that most recent read path is used for inference."""
         context = {
             "previous_tool_args": {

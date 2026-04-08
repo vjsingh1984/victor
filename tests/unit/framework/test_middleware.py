@@ -157,7 +157,9 @@ class TestMiddlewareComposer:
 
     def test_fluent_chaining(self) -> None:
         """Test that all methods return self for chaining."""
-        composer = MiddlewareComposer().git_safety().secret_masking().logging().metrics()
+        composer = (
+            MiddlewareComposer().git_safety().secret_masking().logging().metrics()
+        )
         middleware = composer.build()
         assert len(middleware) == 4
 

@@ -42,7 +42,9 @@ class TestSessionRecoveryIntegration:
         store._sessions = {}  # In-memory session storage
         store._messages = {}  # In-memory message storage per session
 
-        def create_session(session_id=None, project_path=None, provider=None, model=None):
+        def create_session(
+            session_id=None, project_path=None, provider=None, model=None
+        ):
             """Create a new session."""
             if session_id is None:
                 import uuid
@@ -128,9 +130,13 @@ class TestSessionRecoveryIntegration:
 
         # Add some messages
         msg1 = manager1.add_user_message("Hello, I need help with Python")
-        msg2 = manager1.add_assistant_message("I'd be happy to help with Python! What do you need?")
+        msg2 = manager1.add_assistant_message(
+            "I'd be happy to help with Python! What do you need?"
+        )
         msg3 = manager1.add_user_message("How do I read a file?")
-        msg4 = manager1.add_assistant_message("You can use the built-in open() function")
+        msg4 = manager1.add_assistant_message(
+            "You can use the built-in open() function"
+        )
 
         # Manually persist messages to mock store (simulating what a real store would do)
         mock_persistent_store.add_message(session_id, msg1)
@@ -163,7 +169,9 @@ class TestSessionRecoveryIntegration:
         recovered_messages = manager2.messages
         assert len(recovered_messages) == 4
         assert recovered_messages[0].content == "Hello, I need help with Python"
-        assert recovered_messages[3].content == "You can use the built-in open() function"
+        assert (
+            recovered_messages[3].content == "You can use the built-in open() function"
+        )
 
         # Phase 3: Add new messages to recovered session
         # Note: PromptNormalizer normalizes "show" → "read", "view" → "read", etc.
@@ -205,12 +213,19 @@ class TestSessionRecoveryIntegration:
                 {
                     "id": "call_1",
                     "type": "function",
-                    "function": {"name": "read_file", "arguments": '{"path": "app.py"}'},
+                    "function": {
+                        "name": "read_file",
+                        "arguments": '{"path": "app.py"}',
+                    },
                 }
             ],
         )
-        msg3 = manager1.add_tool_result(tool_call_id="call_1", content="File contents here...")
-        msg4 = manager1.add_assistant_message("I see the issue. You're missing a import statement.")
+        msg3 = manager1.add_tool_result(
+            tool_call_id="call_1", content="File contents here..."
+        )
+        msg4 = manager1.add_assistant_message(
+            "I see the issue. You're missing a import statement."
+        )
 
         # Manually persist messages
         for msg in [msg1, msg2, msg3, msg4]:
@@ -230,7 +245,9 @@ class TestSessionRecoveryIntegration:
         assert manager2.message_count() == 4
 
         # Check tool calls are preserved
-        last_assistant_message = [m for m in manager2.messages if m.role == "assistant"][-2]
+        last_assistant_message = [
+            m for m in manager2.messages if m.role == "assistant"
+        ][-2]
         assert last_assistant_message.tool_calls is not None
         assert len(last_assistant_message.tool_calls) == 1
         assert last_assistant_message.tool_calls[0]["function"]["name"] == "read_file"
@@ -256,7 +273,9 @@ class TestSessionRecoveryIntegration:
         session_id = manager1.session_id
 
         msg1 = manager1.add_user_message("What's Python?")
-        msg2 = manager1.add_assistant_message("Python is a high-level programming language.")
+        msg2 = manager1.add_assistant_message(
+            "Python is a high-level programming language."
+        )
 
         # Manually persist messages
         mock_persistent_store.add_message(session_id, msg1)
@@ -353,7 +372,9 @@ class TestSessionRecoveryIntegration:
             store=mock_persistent_store,
             provider="anthropic",
             model="claude-3-sonnet",
-            config=ConversationManagerConfig(enable_persistence=True, max_context_chars=1000),
+            config=ConversationManagerConfig(
+                enable_persistence=True, max_context_chars=1000
+            ),
         )
 
         session_id = manager1.session_id
@@ -375,7 +396,9 @@ class TestSessionRecoveryIntegration:
             store=mock_persistent_store,
             provider="anthropic",
             model="claude-3-sonnet",
-            config=ConversationManagerConfig(enable_persistence=True, max_context_chars=1000),
+            config=ConversationManagerConfig(
+                enable_persistence=True, max_context_chars=1000
+            ),
         )
 
         manager2.recover_session(session_id)

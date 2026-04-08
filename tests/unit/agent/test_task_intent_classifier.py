@@ -90,13 +90,19 @@ class TestRegexIntentFallback:
         assert DeliverableType.FILE_MODIFIED in self._classify("Fix the bug in auth.py")
 
     def test_create_intent(self):
-        assert DeliverableType.FILE_CREATED in self._classify("Create a new cache_manager.py")
+        assert DeliverableType.FILE_CREATED in self._classify(
+            "Create a new cache_manager.py"
+        )
 
     def test_analyze_intent(self):
-        assert DeliverableType.ANALYSIS_PROVIDED in self._classify("Analyze the architecture")
+        assert DeliverableType.ANALYSIS_PROVIDED in self._classify(
+            "Analyze the architecture"
+        )
 
     def test_explain_intent(self):
-        assert DeliverableType.ANSWER_PROVIDED in self._classify("Explain how providers work")
+        assert DeliverableType.ANSWER_PROVIDED in self._classify(
+            "Explain how providers work"
+        )
 
     def test_test_intent(self):
         assert DeliverableType.CODE_EXECUTED in self._classify("Run the unit tests")
@@ -140,7 +146,9 @@ class TestLLMIntentClassification:
 
     def test_action_sets_file_modified(self):
         service = _mock_decision_service(
-            TaskTypeDecision(task_type="action", confidence=0.9, deliverables=["file_modified"])
+            TaskTypeDecision(
+                task_type="action", confidence=0.9, deliverables=["file_modified"]
+            )
         )
         detector = TaskCompletionDetector(decision_service=service)
         result = detector.analyze_intent("Fix the separability_matrix bug")
@@ -149,7 +157,9 @@ class TestLLMIntentClassification:
     def test_analysis_sets_analysis_provided(self):
         service = _mock_decision_service(
             TaskTypeDecision(
-                task_type="analysis", confidence=0.85, deliverables=["analysis_provided"]
+                task_type="analysis",
+                confidence=0.85,
+                deliverables=["analysis_provided"],
             )
         )
         detector = TaskCompletionDetector(decision_service=service)
@@ -158,7 +168,9 @@ class TestLLMIntentClassification:
 
     def test_generation_sets_file_created(self):
         service = _mock_decision_service(
-            TaskTypeDecision(task_type="generation", confidence=0.8, deliverables=["file_created"])
+            TaskTypeDecision(
+                task_type="generation", confidence=0.8, deliverables=["file_created"]
+            )
         )
         detector = TaskCompletionDetector(decision_service=service)
         result = detector.analyze_intent("Create a new cache manager")
@@ -166,7 +178,9 @@ class TestLLMIntentClassification:
 
     def test_search_sets_answer_provided(self):
         service = _mock_decision_service(
-            TaskTypeDecision(task_type="search", confidence=0.85, deliverables=["answer_provided"])
+            TaskTypeDecision(
+                task_type="search", confidence=0.85, deliverables=["answer_provided"]
+            )
         )
         detector = TaskCompletionDetector(decision_service=service)
         result = detector.analyze_intent("Find where auth tokens are stored")
@@ -174,7 +188,9 @@ class TestLLMIntentClassification:
 
     def test_edit_sets_file_modified(self):
         service = _mock_decision_service(
-            TaskTypeDecision(task_type="edit", confidence=0.9, deliverables=["file_modified"])
+            TaskTypeDecision(
+                task_type="edit", confidence=0.9, deliverables=["file_modified"]
+            )
         )
         detector = TaskCompletionDetector(decision_service=service)
         result = detector.analyze_intent("Refactor the provider layer")
@@ -240,7 +256,9 @@ class TestLLMIntentClassification:
     def test_swe_bench_issue_classified_correctly(self):
         """Complex SWE-bench issue → LLM classifies as action with file_modified."""
         service = _mock_decision_service(
-            TaskTypeDecision(task_type="action", confidence=0.92, deliverables=["file_modified"])
+            TaskTypeDecision(
+                task_type="action", confidence=0.92, deliverables=["file_modified"]
+            )
         )
         detector = TaskCompletionDetector(decision_service=service)
         issue = (
@@ -277,7 +295,9 @@ class TestCompletionWithClassification:
     def test_fix_stops_after_file_edit(self):
         detector = TaskCompletionDetector()
         detector._state.expected_deliverables = [DeliverableType.FILE_MODIFIED]
-        detector._state.completed_deliverables.append(MagicMock(type=DeliverableType.FILE_MODIFIED))
+        detector._state.completed_deliverables.append(
+            MagicMock(type=DeliverableType.FILE_MODIFIED)
+        )
         assert detector.should_stop() is True
 
     def test_explain_stops_on_answer(self):
@@ -301,8 +321,18 @@ class TestCompletionWithClassification:
         #       analysis/search → ANALYSIS_PROVIDED
         from victor.agent.task_completion import _infer_deliverables_from_task_type
 
-        assert DeliverableType.FILE_MODIFIED in _infer_deliverables_from_task_type("action")
-        assert DeliverableType.FILE_MODIFIED in _infer_deliverables_from_task_type("edit")
-        assert DeliverableType.FILE_CREATED in _infer_deliverables_from_task_type("generation")
-        assert DeliverableType.ANALYSIS_PROVIDED in _infer_deliverables_from_task_type("analysis")
-        assert DeliverableType.ANSWER_PROVIDED in _infer_deliverables_from_task_type("search")
+        assert DeliverableType.FILE_MODIFIED in _infer_deliverables_from_task_type(
+            "action"
+        )
+        assert DeliverableType.FILE_MODIFIED in _infer_deliverables_from_task_type(
+            "edit"
+        )
+        assert DeliverableType.FILE_CREATED in _infer_deliverables_from_task_type(
+            "generation"
+        )
+        assert DeliverableType.ANALYSIS_PROVIDED in _infer_deliverables_from_task_type(
+            "analysis"
+        )
+        assert DeliverableType.ANSWER_PROVIDED in _infer_deliverables_from_task_type(
+            "search"
+        )

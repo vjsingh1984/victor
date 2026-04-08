@@ -95,7 +95,9 @@ class TestPythonCallExtractor:
     def test_valid_tool_names_filter(self):
         """Test filtering by valid tool names."""
         content = "I'll call read(path='foo.py') and unknown_function(arg=1)"
-        result = self.extractor.extract_from_text(content, valid_tool_names={"read", "write"})
+        result = self.extractor.extract_from_text(
+            content, valid_tool_names={"read", "write"}
+        )
 
         assert result.success
         assert len(result.tool_calls) == 1
@@ -236,7 +238,10 @@ class TestFallbackParsingMixinIntegration:
 
     def test_parse_python_call_from_content(self):
         """Test the mixin method for Python call parsing."""
-        from victor.agent.tool_calling.base import FallbackParsingMixin, ToolCallParseResult
+        from victor.agent.tool_calling.base import (
+            FallbackParsingMixin,
+            ToolCallParseResult,
+        )
 
         # Create a class that uses the mixin
         class TestMixin(FallbackParsingMixin):

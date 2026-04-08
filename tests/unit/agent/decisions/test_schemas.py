@@ -118,7 +118,12 @@ class TestContinuationDecision:
     """Tests for ContinuationDecision schema."""
 
     def test_valid_actions(self):
-        for action in ("finish", "prompt_tool_call", "request_summary", "return_to_user"):
+        for action in (
+            "finish",
+            "prompt_tool_call",
+            "request_summary",
+            "return_to_user",
+        ):
             d = ContinuationDecision(action=action, reason="test reason")
             assert d.action == action
 

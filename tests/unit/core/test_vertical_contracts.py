@@ -94,7 +94,9 @@ class TestStageGraphConnectivity:
         for name, stage in stages.items():
             if stage.next_stages:
                 invalid = stage.next_stages - stage_names
-                assert not invalid, f"Stage '{name}' references invalid next stages: {invalid}"
+                assert (
+                    not invalid
+                ), f"Stage '{name}' references invalid next stages: {invalid}"
 
     def test_stages_have_terminal(self, concrete_vertical):
         """At least one stage should have no next_stages (terminal)."""

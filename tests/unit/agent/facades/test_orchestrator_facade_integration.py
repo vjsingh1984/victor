@@ -94,7 +94,10 @@ class TestChatFacadeDelegation:
 
     def test_chat_facade_has_conversation_state(self, orchestrator):
         """ChatFacade exposes the conversation state machine."""
-        assert orchestrator._chat_facade.conversation_state is orchestrator.conversation_state
+        assert (
+            orchestrator._chat_facade.conversation_state
+            is orchestrator.conversation_state
+        )
 
     def test_chat_facade_has_memory_manager(self, orchestrator):
         """ChatFacade exposes the memory manager."""
@@ -102,11 +105,16 @@ class TestChatFacadeDelegation:
 
     def test_chat_facade_has_intent_classifier(self, orchestrator):
         """ChatFacade exposes the intent classifier."""
-        assert orchestrator._chat_facade.intent_classifier is orchestrator.intent_classifier
+        assert (
+            orchestrator._chat_facade.intent_classifier
+            is orchestrator.intent_classifier
+        )
 
     def test_chat_facade_has_reminder_manager(self, orchestrator):
         """ChatFacade exposes the reminder manager."""
-        assert orchestrator._chat_facade.reminder_manager is orchestrator.reminder_manager
+        assert (
+            orchestrator._chat_facade.reminder_manager is orchestrator.reminder_manager
+        )
 
 
 class TestToolFacadeDelegation:
@@ -174,7 +182,10 @@ class TestToolFacadeDelegation:
 
     def test_tool_facade_has_semantic_selector(self, orchestrator):
         """ToolFacade exposes the semantic selector."""
-        assert orchestrator._tool_facade.semantic_selector is orchestrator.semantic_selector
+        assert (
+            orchestrator._tool_facade.semantic_selector
+            is orchestrator.semantic_selector
+        )
 
 
 class TestBackwardCompatibility:

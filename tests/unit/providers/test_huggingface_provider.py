@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from victor.providers.huggingface_provider import HuggingFaceProvider, HUGGINGFACE_MODELS
+from victor.providers.huggingface_provider import (
+    HuggingFaceProvider,
+    HUGGINGFACE_MODELS,
+)
 
 
 class TestHuggingFaceProviderInitialization:
@@ -22,13 +25,17 @@ class TestHuggingFaceProviderInitialization:
 
     def test_initialization_from_hf_token_env(self):
         """Test API key loading from HF_TOKEN environment variable."""
-        with patch.dict("os.environ", {"HF_TOKEN": "hf_env_token", "HUGGINGFACE_API_KEY": ""}):
+        with patch.dict(
+            "os.environ", {"HF_TOKEN": "hf_env_token", "HUGGINGFACE_API_KEY": ""}
+        ):
             provider = HuggingFaceProvider()
             assert provider._api_key == "hf_env_token"
 
     def test_initialization_from_huggingface_api_key_env(self):
         """Test API key loading from HUGGINGFACE_API_KEY environment variable."""
-        with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": "hf_api_key"}):
+        with patch.dict(
+            "os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": "hf_api_key"}
+        ):
             provider = HuggingFaceProvider()
             assert provider._api_key == "hf_api_key"
 
@@ -37,7 +44,9 @@ class TestHuggingFaceProviderInitialization:
     )
     def test_initialization_from_keyring(self):
         """Test API key loading from keyring when env var not set."""
-        with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False):
+        with patch.dict(
+            "os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False
+        ):
             # Mock the keyring source in unified resolver
             with patch(
                 "victor.providers.resolution._get_key_from_keyring",
@@ -50,7 +59,9 @@ class TestHuggingFaceProviderInitialization:
         """Test APIKeyNotFoundError is raised when no API key provided."""
         from victor.providers.resolution import APIKeyNotFoundError
 
-        with patch.dict("os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False):
+        with patch.dict(
+            "os.environ", {"HF_TOKEN": "", "HUGGINGFACE_API_KEY": ""}, clear=False
+        ):
             # Mock all sources to return None
             with patch(
                 "victor.providers.resolution._get_key_from_keyring",
@@ -64,7 +75,8 @@ class TestHuggingFaceProviderInitialization:
     def test_hf_token_priority_over_huggingface_api_key(self):
         """Test HF_TOKEN takes priority over HUGGINGFACE_API_KEY."""
         with patch.dict(
-            "os.environ", {"HF_TOKEN": "primary_token", "HUGGINGFACE_API_KEY": "secondary_key"}
+            "os.environ",
+            {"HF_TOKEN": "primary_token", "HUGGINGFACE_API_KEY": "secondary_key"},
         ):
             provider = HuggingFaceProvider()
             assert provider._api_key == "primary_token"
@@ -110,14 +122,22 @@ class TestHuggingFaceProviderModels:
     def test_model_api_type(self):
         """Test models have correct API type."""
         for model_id, model_info in HUGGINGFACE_MODELS.items():
-            assert model_info.get("api_type") == "chat", f"{model_id} should have chat API type"
+            assert (
+                model_info.get("api_type") == "chat"
+            ), f"{model_id} should have chat API type"
 
     def test_tool_support_varies_by_model(self):
         """Test that tool support varies by model."""
         # Llama models support tools
-        assert HUGGINGFACE_MODELS["meta-llama/Llama-3.3-70B-Instruct"]["supports_tools"] is True
+        assert (
+            HUGGINGFACE_MODELS["meta-llama/Llama-3.3-70B-Instruct"]["supports_tools"]
+            is True
+        )
         # Mistral 7B doesn't
-        assert HUGGINGFACE_MODELS["mistralai/Mistral-7B-Instruct-v0.3"]["supports_tools"] is False
+        assert (
+            HUGGINGFACE_MODELS["mistralai/Mistral-7B-Instruct-v0.3"]["supports_tools"]
+            is False
+        )
 
 
 class TestHuggingFaceProviderRequestPayload:
@@ -403,6 +423,8 @@ class TestHuggingFaceProviderCleanup:
         """Test provider cleanup."""
         provider = HuggingFaceProvider(api_key="test-key")
 
-        with patch.object(provider.client, "aclose", new_callable=AsyncMock) as mock_close:
+        with patch.object(
+            provider.client, "aclose", new_callable=AsyncMock
+        ) as mock_close:
             await provider.close()
             mock_close.assert_called_once()

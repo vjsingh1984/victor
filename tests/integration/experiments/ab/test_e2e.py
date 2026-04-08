@@ -138,9 +138,13 @@ class TestABTestManager:
         # Total should be 100
         assert sum(allocations.values()) == 100
 
-    async def test_sticky_allocation_consistency(self, temp_db, sample_experiment_config):
+    async def test_sticky_allocation_consistency(
+        self, temp_db, sample_experiment_config
+    ):
         """Test that sticky allocation is consistent."""
-        manager = ABTestManager(storage_path=temp_db, allocation_strategy=AllocationStrategy.STICKY)
+        manager = ABTestManager(
+            storage_path=temp_db, allocation_strategy=AllocationStrategy.STICKY
+        )
 
         # Create and start experiment
         experiment_id = await manager.create_experiment(sample_experiment_config)
@@ -187,7 +191,9 @@ class TestABTestManager:
 class TestMetricsCollector:
     """Integration tests for MetricsCollector."""
 
-    async def test_collect_and_aggregate_metrics(self, temp_db, sample_experiment_config):
+    async def test_collect_and_aggregate_metrics(
+        self, temp_db, sample_experiment_config
+    ):
         """Test collecting and aggregating metrics."""
         manager = ABTestManager(storage_path=temp_db)
         collector = MetricsCollector(storage_path=temp_db)
@@ -214,7 +220,9 @@ class TestMetricsCollector:
 
         # Get aggregated metrics
         control_metrics = await collector.get_variant_metrics(experiment_id, "control")
-        treatment_metrics = await collector.get_variant_metrics(experiment_id, "treatment")
+        treatment_metrics = await collector.get_variant_metrics(
+            experiment_id, "treatment"
+        )
 
         # Check control metrics
         assert control_metrics is not None
@@ -278,7 +286,9 @@ class TestStatisticalAnalysis:
 
         # Get metrics
         control_metrics = await collector.get_variant_metrics(experiment_id, "control")
-        treatment_metrics = await collector.get_variant_metrics(experiment_id, "treatment")
+        treatment_metrics = await collector.get_variant_metrics(
+            experiment_id, "treatment"
+        )
 
         # Perform statistical test
         control_data = [10.0 + random.gauss(0, 1.0) for _ in range(25)]

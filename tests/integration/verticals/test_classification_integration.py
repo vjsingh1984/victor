@@ -37,7 +37,9 @@ def is_ollama_available() -> bool:
 
 def requires_ollama():
     """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
+    return pytest.mark.skipif(
+        not is_ollama_available(), reason="Ollama server not available"
+    )
 
 
 from victor.classification import (
@@ -47,7 +49,11 @@ from victor.classification import (
     match_first_pattern,
 )
 from victor.classification.nudge_engine import reset_singletons
-from victor.agent.prompt_normalizer import PromptNormalizer, get_prompt_normalizer, reset_normalizer
+from victor.agent.prompt_normalizer import (
+    PromptNormalizer,
+    get_prompt_normalizer,
+    reset_normalizer,
+)
 from victor.framework.task.protocols import TaskComplexity
 
 
@@ -265,7 +271,11 @@ Create a phased rollout plan.
         matcher = PatternMatcher()
         result = matcher.match(prompt)
         assert result is not None
-        assert result.task_type in [TaskType.ARCHITECTURE, TaskType.REFACTOR, TaskType.PLAN]
+        assert result.task_type in [
+            TaskType.ARCHITECTURE,
+            TaskType.REFACTOR,
+            TaskType.PLAN,
+        ]
 
     @requires_ollama()
     def test_security_vulnerability_request(self):
@@ -298,7 +308,9 @@ class TestComplexityMappingIntegration:
     def test_refactor_maps_to_complex(self):
         """Test that REFACTOR maps to COMPLEX complexity."""
         matcher = PatternMatcher()
-        result = matcher.match("refactor the authentication module using SOLID principles")
+        result = matcher.match(
+            "refactor the authentication module using SOLID principles"
+        )
         assert result is not None
         assert result.task_type == TaskType.REFACTOR
         assert result.complexity == TaskComplexity.COMPLEX

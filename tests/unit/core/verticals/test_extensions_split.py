@@ -235,7 +235,9 @@ class TestPromptExtensions:
         strategy = MagicMock()
 
         ext1 = PromptExtensions(prompt_contributors=[contrib1])
-        ext2 = PromptExtensions(prompt_contributors=[contrib2], enrichment_strategy=strategy)
+        ext2 = PromptExtensions(
+            prompt_contributors=[contrib2], enrichment_strategy=strategy
+        )
 
         merged = ext1.merge(ext2)
 
@@ -270,8 +272,12 @@ class TestSafetyExtensions:
     def test_get_all_patterns(self):
         """Test getting all patterns."""
         patterns = [
-            SafetyPattern(pattern="p1", description="D1", risk_level="LOW", category="c1"),
-            SafetyPattern(pattern="p2", description="D2", risk_level="HIGH", category="c2"),
+            SafetyPattern(
+                pattern="p1", description="D1", risk_level="LOW", category="c1"
+            ),
+            SafetyPattern(
+                pattern="p2", description="D2", risk_level="HIGH", category="c2"
+            ),
         ]
         ext = SafetyExtensions(safety_patterns=patterns)
 
@@ -280,9 +286,15 @@ class TestSafetyExtensions:
     def test_get_patterns_by_category(self):
         """Test filtering patterns by category."""
         patterns = [
-            SafetyPattern(pattern="p1", description="D1", risk_level="HIGH", category="git"),
-            SafetyPattern(pattern="p2", description="D2", risk_level="HIGH", category="bash"),
-            SafetyPattern(pattern="p3", description="D3", risk_level="HIGH", category="git"),
+            SafetyPattern(
+                pattern="p1", description="D1", risk_level="HIGH", category="git"
+            ),
+            SafetyPattern(
+                pattern="p2", description="D2", risk_level="HIGH", category="bash"
+            ),
+            SafetyPattern(
+                pattern="p3", description="D3", risk_level="HIGH", category="git"
+            ),
         ]
         ext = SafetyExtensions(safety_patterns=patterns)
 
@@ -292,9 +304,15 @@ class TestSafetyExtensions:
     def test_get_patterns_by_risk(self):
         """Test filtering patterns by risk level."""
         patterns = [
-            SafetyPattern(pattern="p1", description="D1", risk_level="LOW", category="c1"),
-            SafetyPattern(pattern="p2", description="D2", risk_level="HIGH", category="c2"),
-            SafetyPattern(pattern="p3", description="D3", risk_level="HIGH", category="c3"),
+            SafetyPattern(
+                pattern="p1", description="D1", risk_level="LOW", category="c1"
+            ),
+            SafetyPattern(
+                pattern="p2", description="D2", risk_level="HIGH", category="c2"
+            ),
+            SafetyPattern(
+                pattern="p3", description="D3", risk_level="HIGH", category="c3"
+            ),
         ]
         ext = SafetyExtensions(safety_patterns=patterns)
 
@@ -304,9 +322,15 @@ class TestSafetyExtensions:
     def test_get_categories(self):
         """Test getting unique categories."""
         patterns = [
-            SafetyPattern(pattern="p1", description="D1", risk_level="HIGH", category="git"),
-            SafetyPattern(pattern="p2", description="D2", risk_level="HIGH", category="bash"),
-            SafetyPattern(pattern="p3", description="D3", risk_level="HIGH", category="git"),
+            SafetyPattern(
+                pattern="p1", description="D1", risk_level="HIGH", category="git"
+            ),
+            SafetyPattern(
+                pattern="p2", description="D2", risk_level="HIGH", category="bash"
+            ),
+            SafetyPattern(
+                pattern="p3", description="D3", risk_level="HIGH", category="git"
+            ),
         ]
         ext = SafetyExtensions(safety_patterns=patterns)
 
@@ -347,8 +371,12 @@ class TestSafetyExtensions:
 
     def test_merge(self):
         """Test merging safety extensions."""
-        p1 = SafetyPattern(pattern="p1", description="D1", risk_level="HIGH", category="c1")
-        p2 = SafetyPattern(pattern="p2", description="D2", risk_level="HIGH", category="c2")
+        p1 = SafetyPattern(
+            pattern="p1", description="D1", risk_level="HIGH", category="c1"
+        )
+        p2 = SafetyPattern(
+            pattern="p2", description="D2", risk_level="HIGH", category="c2"
+        )
         v1 = MagicMock()
         v2 = MagicMock()
 
@@ -440,7 +468,9 @@ class TestConfigExtensions:
     def test_get_quality_thresholds(self):
         """Test getting quality thresholds."""
         mock_rl = MagicMock()
-        mock_rl.get_rl_config.return_value = {"quality_thresholds": {"edit": 0.8, "analyze": 0.7}}
+        mock_rl.get_rl_config.return_value = {
+            "quality_thresholds": {"edit": 0.8, "analyze": 0.7}
+        }
 
         ext = ConfigExtensions(rl_config=mock_rl)
         thresholds = ext.get_quality_thresholds()

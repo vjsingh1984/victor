@@ -71,14 +71,16 @@ class YAMLWorkflowBenchmark:
 
         try:
             # Load workflow
-            workflow_def = self.loader.loads(yaml_content)
+            workflow_def = self.loader.load(yaml_content)
 
             # Get metrics
             elapsed = time.perf_counter() - start_time
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-            node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
+            node_count = (
+                len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
+            )
 
             return BenchmarkResult(
                 name="compilation",
@@ -277,7 +279,7 @@ class TestYAMLWorkflowCompilation:
 
 
 @pytest.mark.benchmark
-@pytest.mark.skipif(not YAML_WORKFROKS_AVAILABLE, reason="YAML workflows not available")
+@pytest.mark.skipif(not YAML_WORKFLOWS_AVAILABLE, reason="YAML workflows not available")
 class TestYAMLWorkflowScaling:
     """Scaling benchmarks for YAML workflows."""
 
@@ -300,7 +302,9 @@ class TestYAMLWorkflowScaling:
                 f"Nodes: {count:3d} | Time: {result.time_ms:6.2f}ms | Memory: {result.memory_peak_mb:5.2f}MB"
             )
 
-            assert result.success, f"Compilation failed for {count} nodes: {result.error}"
+            assert (
+                result.success
+            ), f"Compilation failed for {count} nodes: {result.error}"
 
         # Check that time scales roughly linearly (allowing for overhead)
         # Each 2x nodes should take < 2.5x time (allowing for constant overhead)
@@ -314,7 +318,7 @@ class TestYAMLWorkflowScaling:
 
 
 @pytest.mark.correctness
-@pytest.mark.skipif(not YAML_WORKFROKS_AVAILABLE, reason="YAML workflows not available")
+@pytest.mark.skipif(not YAML_WORKFLOWS_AVAILABLE, reason="YAML workflows not available")
 class TestYAMLWorkflowCorrectness:
     """Correctness tests for YAML workflow parsing."""
 
@@ -352,12 +356,12 @@ workflows:
 
         if not result.success:
             assert (
-                "empty" in result.error.lower() or "nodes" in result.error.lower()
-            ), f"Error should mention empty/nodes, got: {result.error}"
+                "empty" in result.error.lower() or "node" in result.error.lower()
+            ), f"Error should mention empty/node, got: {result.error}"
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not YAML_WORKFROKS_AVAILABLE, reason="YAML workflows not available")
+@pytest.mark.skipif(not YAML_WORKFLOWS_AVAILABLE, reason="YAML workflows not available")
 class TestYAMLWorkflowIntegration:
     """Integration tests for YAML workflow system."""
 

@@ -165,7 +165,9 @@ class TestDualDelegation:
 
     async def test_chat_with_planning_falls_back(self):
         obj = self._make_orchestrator_stub(use_service_layer=False)
-        obj._chat_coordinator.chat_with_planning = AsyncMock(return_value="coord_planned")
+        obj._chat_coordinator.chat_with_planning = AsyncMock(
+            return_value="coord_planned"
+        )
 
         result = await obj.chat_with_planning("complex task")
         assert result == "coord_planned"

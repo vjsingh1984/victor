@@ -297,7 +297,11 @@ Please create a migration plan with:
         matcher = PatternMatcher()
         result = matcher.match(prompt)
         assert result is not None
-        assert result.task_type in [TaskType.REFACTOR, TaskType.ARCHITECTURE, TaskType.PLAN]
+        assert result.task_type in [
+            TaskType.REFACTOR,
+            TaskType.ARCHITECTURE,
+            TaskType.PLAN,
+        ]
 
     def test_performance_investigation(self):
         """Complex performance investigation request."""
@@ -368,7 +372,11 @@ Follow the existing pattern in api/users.py
         matcher = PatternMatcher()
         result = matcher.match(prompt)
         assert result is not None
-        assert result.task_type in [TaskType.IMPLEMENT, TaskType.EDIT, TaskType.CODE_GENERATION]
+        assert result.task_type in [
+            TaskType.IMPLEMENT,
+            TaskType.EDIT,
+            TaskType.CODE_GENERATION,
+        ]
 
     def test_add_validation(self):
         """Add input validation request."""
@@ -509,7 +517,9 @@ class TestComplexityMapping:
     def test_refactor_is_complex_complexity(self):
         """REFACTOR should map to COMPLEX complexity."""
         matcher = PatternMatcher()
-        result = matcher.match("refactor the authentication module using SOLID principles")
+        result = matcher.match(
+            "refactor the authentication module using SOLID principles"
+        )
         assert result is not None
         assert result.complexity == TaskComplexity.COMPLEX
 

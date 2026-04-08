@@ -33,7 +33,9 @@ class TestCapabilityMetadata:
 
     def test_create_with_required_fields(self):
         """CapabilityMetadata can be created with only required fields."""
-        metadata = CapabilityMetadata(name="test_capability", description="A test capability")
+        metadata = CapabilityMetadata(
+            name="test_capability", description="A test capability"
+        )
         assert metadata.name == "test_capability"
         assert metadata.description == "A test capability"
         assert metadata.version == "1.0"
@@ -75,10 +77,18 @@ class TestCapabilityMetadata:
     def test_metadata_equality(self):
         """Two CapabilityMetadata with same values should be equal."""
         metadata1 = CapabilityMetadata(
-            name="test", description="Test", version="1.0", dependencies=["dep1"], tags=["tag1"]
+            name="test",
+            description="Test",
+            version="1.0",
+            dependencies=["dep1"],
+            tags=["tag1"],
         )
         metadata2 = CapabilityMetadata(
-            name="test", description="Test", version="1.0", dependencies=["dep1"], tags=["tag1"]
+            name="test",
+            description="Test",
+            version="1.0",
+            dependencies=["dep1"],
+            tags=["tag1"],
         )
         assert metadata1 == metadata2
 
@@ -129,7 +139,10 @@ class TestCapabilityProvider(BaseCapabilityProvider[MockCapability]):
         }
         self._metadata: Dict[str, CapabilityMetadata] = {
             "read": CapabilityMetadata(
-                name="read", description="Read files and data", version="1.0", tags=["io", "safe"]
+                name="read",
+                description="Read files and data",
+                version="1.0",
+                tags=["io", "safe"],
             ),
             "write": CapabilityMetadata(
                 name="write",
@@ -190,7 +203,9 @@ class TestBaseCapabilityProvider:
         assert "write" in capabilities
         assert "execute" in capabilities
 
-    def test_get_capabilities_returns_correct_types(self, provider: TestCapabilityProvider):
+    def test_get_capabilities_returns_correct_types(
+        self, provider: TestCapabilityProvider
+    ):
         """get_capabilities should return MockCapability instances."""
         capabilities = provider.get_capabilities()
         for cap in capabilities.values():
@@ -227,7 +242,9 @@ class TestBaseCapabilityProvider:
         names = provider.list_capabilities()
         assert isinstance(names, list)
 
-    def test_list_capabilities_empty_provider(self, empty_provider: EmptyCapabilityProvider):
+    def test_list_capabilities_empty_provider(
+        self, empty_provider: EmptyCapabilityProvider
+    ):
         """list_capabilities should return empty list for empty provider."""
         names = empty_provider.list_capabilities()
         assert names == []
@@ -248,12 +265,16 @@ class TestBaseCapabilityProvider:
         """has_capability should return False for empty string."""
         assert provider.has_capability("") is False
 
-    def test_has_capability_empty_provider(self, empty_provider: EmptyCapabilityProvider):
+    def test_has_capability_empty_provider(
+        self, empty_provider: EmptyCapabilityProvider
+    ):
         """has_capability should return False for all names in empty provider."""
         assert empty_provider.has_capability("read") is False
         assert empty_provider.has_capability("anything") is False
 
-    def test_get_capability_metadata_returns_all(self, provider: TestCapabilityProvider):
+    def test_get_capability_metadata_returns_all(
+        self, provider: TestCapabilityProvider
+    ):
         """get_capability_metadata should return metadata for all capabilities."""
         metadata = provider.get_capability_metadata()
         assert len(metadata) == 3
@@ -261,7 +282,9 @@ class TestBaseCapabilityProvider:
         assert "write" in metadata
         assert "execute" in metadata
 
-    def test_get_capability_metadata_correct_types(self, provider: TestCapabilityProvider):
+    def test_get_capability_metadata_correct_types(
+        self, provider: TestCapabilityProvider
+    ):
         """get_capability_metadata should return CapabilityMetadata instances."""
         metadata = provider.get_capability_metadata()
         for meta in metadata.values():

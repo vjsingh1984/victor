@@ -363,7 +363,11 @@ class TestWorkflowDecorator:
 
         @workflow("test_decorated", "A test workflow")
         def test_workflow():
-            return WorkflowBuilder("test_decorated").add_agent("a", "executor", "A").build()
+            return (
+                WorkflowBuilder("test_decorated")
+                .add_agent("a", "executor", "A")
+                .build()
+            )
 
         # Should be in registered workflows
         registered = get_registered_workflows()
@@ -712,11 +716,15 @@ class TestWorkflowContext:
         """get_outputs returns successful outputs."""
         ctx = WorkflowContext()
         ctx.add_result(
-            NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="A output")
+            NodeResult(
+                node_id="a", status=ExecutorNodeStatus.COMPLETED, output="A output"
+            )
         )
         ctx.add_result(NodeResult(node_id="b", status=ExecutorNodeStatus.FAILED))
         ctx.add_result(
-            NodeResult(node_id="c", status=ExecutorNodeStatus.COMPLETED, output="C output")
+            NodeResult(
+                node_id="c", status=ExecutorNodeStatus.COMPLETED, output="C output"
+            )
         )
 
         outputs = ctx.get_outputs()
@@ -729,7 +737,9 @@ class TestWorkflowResult:
     def test_success_result(self):
         """Create successful result."""
         ctx = WorkflowContext()
-        ctx.add_result(NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Done"))
+        ctx.add_result(
+            NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Done")
+        )
 
         result = WorkflowResult(
             workflow_name="test",
@@ -786,7 +796,9 @@ class TestWorkflowExecutor:
         executor._sub_agents = mock_sub_agents
 
         workflow = (
-            WorkflowBuilder("test").add_agent("analyze", "researcher", "Analyze code").build()
+            WorkflowBuilder("test")
+            .add_agent("analyze", "researcher", "Analyze code")
+            .build()
         )
 
         result = await executor.execute(workflow, {"files": ["main.py"]})
@@ -810,7 +822,9 @@ class TestWorkflowExecutor:
         mock_sub_agents.spawn = slow_spawn
         executor._sub_agents = mock_sub_agents
 
-        workflow = WorkflowBuilder("test").add_agent("slow", "executor", "Slow task").build()
+        workflow = (
+            WorkflowBuilder("test").add_agent("slow", "executor", "Slow task").build()
+        )
 
         result = await executor.execute(workflow, timeout=0.1)
 
@@ -876,7 +890,9 @@ class TestWorkflowExecutorExtended:
         assert "no start node" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_execute_missing_node_warning(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_missing_node_warning(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute logs warning for missing node and continues."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -897,7 +913,9 @@ class TestWorkflowExecutorExtended:
         assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_execute_continues_on_failure_when_configured(self, mock_orchestrator):
+    async def test_execute_continues_on_failure_when_configured(
+        self, mock_orchestrator
+    ):
         """Execute continues after failure when continue_on_failure is set."""
         executor = WorkflowExecutor(mock_orchestrator)
 
@@ -1032,7 +1050,9 @@ class TestWorkflowExecutorExtended:
         assert result.context.get("research_results") == "Task completed successfully"
 
     @pytest.mark.asyncio
-    async def test_execute_condition_node(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_condition_node(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute condition node evaluates condition and picks branch."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1092,7 +1112,9 @@ class TestWorkflowExecutorExtended:
         assert "Condition evaluation failed" in condition_result.error
 
     @pytest.mark.asyncio
-    async def test_execute_transform_node(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_transform_node(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute transform node updates context data."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1105,7 +1127,10 @@ class TestWorkflowExecutorExtended:
                 "transform": TransformNode(
                     id="transform",
                     name="Transform",
-                    transform=lambda ctx: {"processed": True, "count": ctx.get("count", 0) * 2},
+                    transform=lambda ctx: {
+                        "processed": True,
+                        "count": ctx.get("count", 0) * 2,
+                    },
                     next_nodes=["agent"],
                 ),
                 "agent": AgentNode(id="agent", name="Agent"),
@@ -1260,7 +1285,9 @@ class TestWorkflowExecutorExtended:
         assert custom_result.status == ExecutorNodeStatus.SKIPPED
 
     @pytest.mark.asyncio
-    async def test_execute_by_name_success(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_by_name_success(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """execute_by_name retrieves workflow from registry."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1275,7 +1302,9 @@ class TestWorkflowExecutorExtended:
             start_node="start",
         )
 
-        with patch("victor.workflows.registry.get_global_registry") as mock_get_registry:
+        with patch(
+            "victor.workflows.registry.get_global_registry"
+        ) as mock_get_registry:
             mock_registry = MagicMock()
             mock_registry.get.return_value = workflow
             mock_get_registry.return_value = mock_registry
@@ -1290,7 +1319,9 @@ class TestWorkflowExecutorExtended:
         """execute_by_name returns error for unknown workflow."""
         executor = WorkflowExecutor(mock_orchestrator)
 
-        with patch("victor.workflows.registry.get_global_registry") as mock_get_registry:
+        with patch(
+            "victor.workflows.registry.get_global_registry"
+        ) as mock_get_registry:
             mock_registry = MagicMock()
             mock_registry.get.return_value = None
             mock_get_registry.return_value = mock_registry
@@ -1435,7 +1466,9 @@ class TestWorkflowExecutorExtended:
         assert "Unexpected error" in node_result.error
 
     @pytest.mark.asyncio
-    async def test_execute_loop_prevention(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_loop_prevention(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute prevents infinite loops from cyclic references."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1460,7 +1493,9 @@ class TestWorkflowExecutorExtended:
         assert mock_sub_agents.spawn.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_execute_with_initial_context(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_with_initial_context(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute accepts initial context data."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1480,7 +1515,9 @@ class TestWorkflowExecutorExtended:
         assert result.context.get("custom_key") == "custom_value"
 
     @pytest.mark.asyncio
-    async def test_execute_preserves_metadata(self, mock_orchestrator, mock_sub_agent_result):
+    async def test_execute_preserves_metadata(
+        self, mock_orchestrator, mock_sub_agent_result
+    ):
         """Execute preserves workflow metadata in context."""
         executor = WorkflowExecutor(mock_orchestrator)
         mock_sub_agents = MagicMock()
@@ -1567,7 +1604,9 @@ class TestWorkflowResultExtended:
         """to_dict includes node outputs."""
         ctx = WorkflowContext()
         ctx.add_result(
-            NodeResult(node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Output A")
+            NodeResult(
+                node_id="a", status=ExecutorNodeStatus.COMPLETED, output="Output A"
+            )
         )
 
         result = WorkflowResult(

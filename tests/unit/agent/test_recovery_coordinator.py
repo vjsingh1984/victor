@@ -23,7 +23,10 @@ import pytest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from typing import Any, Dict, List, Optional
 
-from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator, StreamingRecoveryContext
+from victor.agent.recovery_coordinator import (
+    StreamingRecoveryCoordinator,
+    StreamingRecoveryContext,
+)
 from victor.providers.base import StreamChunk
 
 
@@ -87,7 +90,9 @@ def mock_unified_tracker():
     mock.is_blocked_after_warning = Mock(return_value=False)
     mock.should_force_action = Mock(return_value=(False, None))
     mock.increment_turn = Mock()
-    mock.should_stop = Mock(return_value=Mock(should_stop=False, reason="none", hint=""))
+    mock.should_stop = Mock(
+        return_value=Mock(should_stop=False, reason="none", hint="")
+    )
     mock.unique_resources = set()
     return mock
 
@@ -247,7 +252,9 @@ class TestConditionChecking:
         recovery_context.tool_calls_used = 5
         recovery_context.tool_budget = 15
 
-        result = recovery_coordinator.check_tool_budget(recovery_context, warning_threshold=250)
+        result = recovery_coordinator.check_tool_budget(
+            recovery_context, warning_threshold=250
+        )
 
         assert result is None  # No warning when far from limit
 
@@ -258,7 +265,9 @@ class TestConditionChecking:
         recovery_context.tool_calls_used = 250  # At warning threshold
         recovery_context.tool_budget = 300  # Still have remaining budget
 
-        result = recovery_coordinator.check_tool_budget(recovery_context, warning_threshold=250)
+        result = recovery_coordinator.check_tool_budget(
+            recovery_context, warning_threshold=250
+        )
 
         # Returns a warning chunk when at or above warning_threshold
         assert result is not None
@@ -280,7 +289,9 @@ class TestConditionChecking:
     ):
         """Test check_progress when making progress."""
         # Mock the unified_tracker.should_stop() to return not stuck
-        recovery_coordinator.unified_tracker.should_stop.return_value = Mock(should_stop=False)
+        recovery_coordinator.unified_tracker.should_stop.return_value = Mock(
+            should_stop=False
+        )
 
         result = recovery_coordinator.check_progress(recovery_context)
 
@@ -291,7 +302,9 @@ class TestConditionChecking:
     ):
         """Test check_progress when stuck."""
         # Mock the unified_tracker.should_stop() to return stuck
-        recovery_coordinator.unified_tracker.should_stop.return_value = Mock(should_stop=True)
+        recovery_coordinator.unified_tracker.should_stop.return_value = Mock(
+            should_stop=True
+        )
 
         result = recovery_coordinator.check_progress(recovery_context)
 
@@ -303,7 +316,9 @@ class TestConditionChecking:
         """Test check_blocked_threshold when threshold not exceeded."""
         mock_streaming_handler.check_blocked_threshold.return_value = None
 
-        result = recovery_coordinator.check_blocked_threshold(recovery_context, all_blocked=False)
+        result = recovery_coordinator.check_blocked_threshold(
+            recovery_context, all_blocked=False
+        )
 
         assert result is None
 
@@ -316,7 +331,9 @@ class TestConditionChecking:
         mock_result.clear_tool_calls = True
         mock_streaming_handler.check_blocked_threshold.return_value = mock_result
 
-        result = recovery_coordinator.check_blocked_threshold(recovery_context, all_blocked=True)
+        result = recovery_coordinator.check_blocked_threshold(
+            recovery_context, all_blocked=True
+        )
 
         assert result is not None
         chunk, clear_tools = result
@@ -354,13 +371,19 @@ class TestActionHandling:
         """Test handle_empty_response below threshold."""
         mock_streaming_handler.handle_empty_response.return_value = None
 
-        chunk, should_force = recovery_coordinator.handle_empty_response(recovery_context)
+        chunk, should_force = recovery_coordinator.handle_empty_response(
+            recovery_context
+        )
 
         assert chunk is None
         assert should_force is False
 
     def test_handle_empty_response_threshold_exceeded(
-        self, recovery_coordinator, recovery_context, mock_streaming_handler, mock_streaming_context
+        self,
+        recovery_coordinator,
+        recovery_context,
+        mock_streaming_handler,
+        mock_streaming_context,
     ):
         """Test handle_empty_response when threshold exceeded."""
         mock_result = Mock()
@@ -368,7 +391,9 @@ class TestActionHandling:
         mock_streaming_handler.handle_empty_response.return_value = mock_result
         mock_streaming_context.force_completion = True
 
-        chunk, should_force = recovery_coordinator.handle_empty_response(recovery_context)
+        chunk, should_force = recovery_coordinator.handle_empty_response(
+            recovery_context
+        )
 
         assert chunk is not None
         assert chunk.content == "empty threshold"
@@ -404,12 +429,16 @@ class TestActionHandling:
             settings=Mock(),
         )
 
-        should_execute, chunks = coordinator.handle_force_tool_execution(recovery_context)
+        should_execute, chunks = coordinator.handle_force_tool_execution(
+            recovery_context
+        )
 
         assert should_execute is False
         assert chunks is None
 
-    def test_handle_force_completion_not_forced(self, recovery_coordinator, recovery_context):
+    def test_handle_force_completion_not_forced(
+        self, recovery_coordinator, recovery_context
+    ):
         """Test handle_force_completion when not forced."""
         result = recovery_coordinator.handle_force_completion(recovery_context)
 
@@ -492,7 +521,9 @@ class TestActionHandling:
         assert result.action == "retry"
         mock_recovery_integration.handle_response.assert_called_once()
 
-    def test_apply_recovery_action_continue(self, recovery_coordinator, recovery_context):
+    def test_apply_recovery_action_continue(
+        self, recovery_coordinator, recovery_context
+    ):
         """Test apply_recovery_action with continue action."""
         from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
@@ -543,8 +574,15 @@ class TestFilteringAndTruncation:
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):
         """Test filter_blocked_tool_calls when none blocked."""
-        tool_calls = [{"name": "tool1", "arguments": {}}, {"name": "tool2", "arguments": {}}]
-        mock_streaming_handler.filter_blocked_tool_calls.return_value = (tool_calls, [], 0)
+        tool_calls = [
+            {"name": "tool1", "arguments": {}},
+            {"name": "tool2", "arguments": {}},
+        ]
+        mock_streaming_handler.filter_blocked_tool_calls.return_value = (
+            tool_calls,
+            [],
+            0,
+        )
 
         filtered, chunks, count = recovery_coordinator.filter_blocked_tool_calls(
             recovery_context, tool_calls
@@ -558,7 +596,10 @@ class TestFilteringAndTruncation:
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):
         """Test filter_blocked_tool_calls when some blocked."""
-        tool_calls = [{"name": "tool1", "arguments": {}}, {"name": "blocked_tool", "arguments": {}}]
+        tool_calls = [
+            {"name": "tool1", "arguments": {}},
+            {"name": "blocked_tool", "arguments": {}},
+        ]
         mock_streaming_handler.filter_blocked_tool_calls.return_value = (
             [tool_calls[0]],
             [StreamChunk(content="blocked", is_final=False)],
@@ -573,7 +614,9 @@ class TestFilteringAndTruncation:
         assert len(chunks) == 1
         assert count == 1
 
-    def test_truncate_tool_calls_within_budget(self, recovery_coordinator, recovery_context):
+    def test_truncate_tool_calls_within_budget(
+        self, recovery_coordinator, recovery_context
+    ):
         """Test truncate_tool_calls when within budget."""
         tool_calls = [{"name": "tool1"}, {"name": "tool2"}]
 
@@ -584,7 +627,9 @@ class TestFilteringAndTruncation:
         assert len(truncated) == 2
         assert was_truncated is False
 
-    def test_truncate_tool_calls_exceeds_budget(self, recovery_coordinator, recovery_context):
+    def test_truncate_tool_calls_exceeds_budget(
+        self, recovery_coordinator, recovery_context
+    ):
         """Test truncate_tool_calls when exceeds budget."""
         tool_calls = [{"name": f"tool{i}"} for i in range(10)]
 
@@ -688,7 +733,9 @@ class TestMetricsAndFormatting:
         """Test generate_tool_result_chunks returns list of chunks."""
         results = [{"status": "success", "output": "result"}]
 
-        result = recovery_coordinator.generate_tool_result_chunks(results, recovery_context)
+        result = recovery_coordinator.generate_tool_result_chunks(
+            results, recovery_context
+        )
 
         assert isinstance(result, list)  # Returns list of StreamChunk
 

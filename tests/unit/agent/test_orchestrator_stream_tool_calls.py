@@ -112,7 +112,9 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     # Bypass heavy semantic selector; return just our dummy tool definition
     orch._select_tools = lambda *args, **kwargs: [
         ToolDefinition(
-            name="dummy_tool", description="d", parameters={"type": "object", "properties": {}}
+            name="dummy_tool",
+            description="d",
+            parameters={"type": "object", "properties": {}},
         )
     ]
 

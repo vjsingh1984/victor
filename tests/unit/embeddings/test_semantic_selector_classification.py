@@ -234,7 +234,9 @@ class TestClassificationAwareSelection:
             mock_tool_list.append(tool)
 
         tools.list_tools.return_value = mock_tool_list
-        tools.get.side_effect = lambda n: next((t for t in mock_tool_list if t.name == n), None)
+        tools.get.side_effect = lambda n: next(
+            (t for t in mock_tool_list if t.name == n), None
+        )
         tools.is_tool_enabled.return_value = True
         tools.get_tool_cost.return_value = None
 
@@ -243,7 +245,10 @@ class TestClassificationAwareSelection:
     @pytest.fixture
     def mock_classification_result(self):
         """Create mock classification result."""
-        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
+        from victor.agent.unified_classifier import (
+            ClassifierTaskType,
+            ClassificationResult,
+        )
 
         return ClassificationResult(
             task_type=ClassifierTaskType.ANALYSIS,
@@ -259,7 +264,9 @@ class TestClassificationAwareSelection:
         self, selector, mock_tools, mock_classification_result
     ):
         """Test that analysis classification selects analysis-related tools."""
-        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
+        with patch.object(
+            selector, "_get_embedding", new_callable=AsyncMock
+        ) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(
@@ -288,7 +295,9 @@ class TestClassificationAwareSelection:
             matched_keywords=[],
         )
 
-        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
+        with patch.object(
+            selector, "_get_embedding", new_callable=AsyncMock
+        ) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(
@@ -304,7 +313,10 @@ class TestClassificationAwareSelection:
     @pytest.mark.asyncio
     async def test_high_confidence_stricter_selection(self, selector, mock_tools):
         """Test that high confidence leads to stricter selection."""
-        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
+        from victor.agent.unified_classifier import (
+            ClassifierTaskType,
+            ClassificationResult,
+        )
 
         result = ClassificationResult(
             task_type=ClassifierTaskType.ANALYSIS,
@@ -314,7 +326,9 @@ class TestClassificationAwareSelection:
             matched_keywords=[],
         )
 
-        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
+        with patch.object(
+            selector, "_get_embedding", new_callable=AsyncMock
+        ) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(
@@ -329,7 +343,10 @@ class TestClassificationAwareSelection:
     @pytest.mark.asyncio
     async def test_low_confidence_broader_selection(self, selector, mock_tools):
         """Test that low confidence leads to broader selection."""
-        from victor.agent.unified_classifier import ClassifierTaskType, ClassificationResult
+        from victor.agent.unified_classifier import (
+            ClassifierTaskType,
+            ClassificationResult,
+        )
 
         result = ClassificationResult(
             task_type=ClassifierTaskType.DEFAULT,
@@ -338,7 +355,9 @@ class TestClassificationAwareSelection:
             matched_keywords=[],
         )
 
-        with patch.object(selector, "_get_embedding", new_callable=AsyncMock) as mock_embed:
+        with patch.object(
+            selector, "_get_embedding", new_callable=AsyncMock
+        ) as mock_embed:
             mock_embed.return_value = np.random.randn(384).astype(np.float32)
 
             tools = await selector.select_tools_with_classification(

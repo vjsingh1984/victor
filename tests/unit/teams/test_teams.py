@@ -199,7 +199,11 @@ class TestTeamConfig:
         """get_manager returns the manager."""
         members = [
             TeamMember(
-                id="mgr", role=SubAgentRole.PLANNER, name="Mgr", goal="Manage", is_manager=True
+                id="mgr",
+                role=SubAgentRole.PLANNER,
+                name="Mgr",
+                goal="Manage",
+                is_manager=True,
             ),
             TeamMember(id="w1", role=SubAgentRole.EXECUTOR, name="W1", goal="Work"),
         ]
@@ -218,7 +222,11 @@ class TestTeamConfig:
         """get_workers returns non-manager members."""
         members = [
             TeamMember(
-                id="mgr", role=SubAgentRole.PLANNER, name="Mgr", goal="Manage", is_manager=True
+                id="mgr",
+                role=SubAgentRole.PLANNER,
+                name="Mgr",
+                goal="Manage",
+                is_manager=True,
             ),
             TeamMember(id="w1", role=SubAgentRole.EXECUTOR, name="W1", goal="Work1"),
             TeamMember(id="w2", role=SubAgentRole.EXECUTOR, name="W2", goal="Work2"),

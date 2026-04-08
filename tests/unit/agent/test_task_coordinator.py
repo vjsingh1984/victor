@@ -118,7 +118,9 @@ class TestTaskPreparation:
         assert classification is not None
         assert isinstance(budget, int)
 
-    def test_prepare_task_with_task_hint(self, task_coordinator, mock_conversation_controller):
+    def test_prepare_task_with_task_hint(
+        self, task_coordinator, mock_conversation_controller
+    ):
         """Test task preparation with task hint injection."""
         from unittest.mock import patch
 
@@ -129,7 +131,9 @@ class TestTaskPreparation:
             "victor.agent.prompt_builder.get_task_type_hint",
             return_value="Test task hint",
         ):
-            task_coordinator.prepare_task(message, unified_type, mock_conversation_controller)
+            task_coordinator.prepare_task(
+                message, unified_type, mock_conversation_controller
+            )
 
             # Verify hint was injected
             mock_conversation_controller.add_message.assert_called()
@@ -241,7 +245,9 @@ class TestTaskGuidance:
         # Verify system messages were added
         assert mock_conversation_controller.add_message.call_count >= 2
 
-    def test_apply_task_guidance_action_task(self, task_coordinator, mock_conversation_controller):
+    def test_apply_task_guidance_action_task(
+        self, task_coordinator, mock_conversation_controller
+    ):
         """Test task guidance for action tasks."""
         unified_type = Mock(value="create")
         message = "Create a new script"
@@ -315,7 +321,9 @@ class TestTaskCoordinatorProperties:
         intent_result.prompt_guard = "Guard"
         mock_task_analyzer.detect_intent.return_value = intent_result
 
-        task_coordinator.apply_intent_guard("test message", mock_conversation_controller)
+        task_coordinator.apply_intent_guard(
+            "test message", mock_conversation_controller
+        )
 
         assert task_coordinator.current_intent == ActionIntent.READ_ONLY
 

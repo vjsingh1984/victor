@@ -45,7 +45,8 @@ def _check_ollama_available():
 
 
 pytestmark = pytest.mark.skipif(
-    not _check_ollama_available(), reason="Ollama server not available at localhost:11434"
+    not _check_ollama_available(),
+    reason="Ollama server not available at localhost:11434",
 )
 
 # These imports are intentionally after pytestmark to avoid loading if Ollama unavailable
@@ -362,11 +363,13 @@ IMPORTANT: You must call the write_file tool to save the file."""
 
     if has_error:
         # Phase 3: Ask agent to fix the error
-        response3 = await agent.chat(f"""The script at {script_path} produced this error:
+        response3 = await agent.chat(
+            f"""The script at {script_path} produced this error:
 {result.stderr}
 
 Please read the file, fix the bug by adding proper error handling for division by zero,
-and write the corrected version.""")
+and write the corrected version."""
+        )
 
         print(f"Agent response: {response3.content[:200]}...")
 
@@ -375,7 +378,8 @@ and write the corrected version.""")
 
         # Check for error handling
         assert any(
-            keyword in fixed_content.lower() for keyword in ["try", "except", "if", "zerodivision"]
+            keyword in fixed_content.lower()
+            for keyword in ["try", "except", "if", "zerodivision"]
         ), "No error handling added"
 
         print(f"\n✓ Bug fixed ({len(fixed_content)} chars)")
@@ -402,7 +406,9 @@ and write the corrected version.""")
         print("✅ BUG FIX LIFECYCLE TEST COMPLETED SUCCESSFULLY")
         print("=" * 70)
     else:
-        print("\n⚠️  Script didn't error (agent may have added error handling proactively)")
+        print(
+            "\n⚠️  Script didn't error (agent may have added error handling proactively)"
+        )
         print("This is actually good behavior!")
 
 
@@ -505,7 +511,9 @@ Write the enhanced version back to the same file.""")
         else:
             print(f"\n⚠️  Enhanced code has errors: {result2.stderr}")
     else:
-        print("\n⚠️  Agent didn't add the requested function (may need better prompting)")
+        print(
+            "\n⚠️  Agent didn't add the requested function (may need better prompting)"
+        )
 
     # Cleanup
     await agent.shutdown()

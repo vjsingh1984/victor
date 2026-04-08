@@ -92,9 +92,15 @@ class TestUnifiedEventType:
 
     def test_from_string_valid(self):
         """from_string should parse valid event type strings."""
-        assert UnifiedEventType.from_string("workflow.start") == UnifiedEventType.WORKFLOW_START
+        assert (
+            UnifiedEventType.from_string("workflow.start")
+            == UnifiedEventType.WORKFLOW_START
+        )
         assert UnifiedEventType.from_string("tool.call") == UnifiedEventType.TOOL_CALL
-        assert UnifiedEventType.from_string("agent.thinking") == UnifiedEventType.AGENT_THINKING
+        assert (
+            UnifiedEventType.from_string("agent.thinking")
+            == UnifiedEventType.AGENT_THINKING
+        )
 
     def test_from_string_invalid(self):
         """from_string should return UNKNOWN for invalid strings."""

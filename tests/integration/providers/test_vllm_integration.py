@@ -31,9 +31,9 @@ import sys
 import platform
 
 # Early skip for ARM CPUs (vLLM has known compatibility issues)
-_is_arm = platform.processor().startswith(("arm", "aarch64")) or platform.machine().startswith(
+_is_arm = platform.processor().startswith(
     ("arm", "aarch64")
-)
+) or platform.machine().startswith(("arm", "aarch64"))
 if _is_arm:
     pytestmark = pytest.mark.skipif(
         True,
@@ -67,7 +67,9 @@ def vllm_server():
     is_ci = os.environ.get("CI") == "true" or os.environ.get("GITHUB_ACTIONS") == "true"
 
     if is_ci:
-        pytest.skip("Skipping vLLM tests in CI environment (requires local model download)")
+        pytest.skip(
+            "Skipping vLLM tests in CI environment (requires local model download)"
+        )
 
     # Check if vllm is installed
     try:
@@ -131,7 +133,9 @@ def vllm_server():
                     import urllib.request
                     import urllib.error
 
-                    req = urllib.request.urlopen(f"http://{host}:{port}/health", timeout=2)
+                    req = urllib.request.urlopen(
+                        f"http://{host}:{port}/health", timeout=2
+                    )
                     if req.status == 200:
                         server_ready = True
                         print(f"✅ vLLM server is ready at http://{host}:{port}")
@@ -176,7 +180,9 @@ def vllm_server():
                 )
 
         if not server_ready and startup_attempt >= max_startup_attempts:
-            pytest.skip(f"vLLM server did not start after {max_startup_attempts} attempts")
+            pytest.skip(
+                f"vLLM server did not start after {max_startup_attempts} attempts"
+            )
 
     # Yield control to tests
     try:
@@ -270,7 +276,8 @@ async def test_vllm_code_generation(vllm_provider):
     messages = [
         Message(role="system", content="You are an expert Python programmer."),
         Message(
-            role="user", content="Write a Python function to calculate factorial. Keep it simple."
+            role="user",
+            content="Write a Python function to calculate factorial. Keep it simple.",
         ),
     ]
 
@@ -366,7 +373,9 @@ async def test_vllm_tool_calling(vllm_provider):
 async def test_vllm_multi_turn_conversation(vllm_provider):
     """Test multi-turn conversation with vLLM."""
     # Turn 1
-    messages = [Message(role="user", content="My favorite programming language is Python.")]
+    messages = [
+        Message(role="user", content="My favorite programming language is Python.")
+    ]
 
     response1 = await vllm_provider.chat(
         messages=messages,
@@ -377,7 +386,9 @@ async def test_vllm_multi_turn_conversation(vllm_provider):
 
     # Turn 2
     messages.append(Message(role="assistant", content=response1.content))
-    messages.append(Message(role="user", content="What is my favorite programming language?"))
+    messages.append(
+        Message(role="user", content="What is my favorite programming language?")
+    )
 
     response2 = await vllm_provider.chat(
         messages=messages,
@@ -397,7 +408,9 @@ async def test_vllm_multi_turn_conversation(vllm_provider):
 async def test_vllm_with_custom_parameters(vllm_provider):
     """Test vLLM with custom sampling parameters."""
     messages = [
-        Message(role="user", content="Write a one-line Python function to square a number.")
+        Message(
+            role="user", content="Write a one-line Python function to square a number."
+        )
     ]
 
     response = await vllm_provider.chat(
@@ -425,9 +438,14 @@ async def test_vllm_large_context(vllm_provider):
     # Add several exchanges
     for i in range(5):
         messages.append(
-            Message(role="user", content=f"Tell me about Python feature {i+1} in one sentence.")
+            Message(
+                role="user",
+                content=f"Tell me about Python feature {i+1} in one sentence.",
+            )
         )
-        messages.append(Message(role="assistant", content=f"Python feature {i+1} is important."))
+        messages.append(
+            Message(role="assistant", content=f"Python feature {i+1} is important.")
+        )
 
     messages.append(
         Message(role="user", content="Now summarize what we discussed in one sentence.")
@@ -449,8 +467,12 @@ async def test_vllm_large_context(vllm_provider):
 async def test_vllm_system_message(vllm_provider):
     """Test vLLM with system messages."""
     messages = [
-        Message(role="system", content="You are a Python expert who gives concise answers."),
-        Message(role="user", content="What is a list comprehension? One sentence only."),
+        Message(
+            role="system", content="You are a Python expert who gives concise answers."
+        ),
+        Message(
+            role="user", content="What is a list comprehension? One sentence only."
+        ),
     ]
 
     response = await vllm_provider.chat(

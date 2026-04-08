@@ -144,7 +144,9 @@ class TestConfigMigrator:
         assert migrator.detect_old_config()
         assert not migrator.detect_new_config()
 
-    def test_detect_old_config_both(self, migrator, old_profiles_file, old_api_keys_file):
+    def test_detect_old_config_both(
+        self, migrator, old_profiles_file, old_api_keys_file
+    ):
         """Test detecting old config with both files."""
         assert migrator.detect_old_config()
         assert not migrator.detect_new_config()
@@ -208,7 +210,9 @@ class TestConfigMigrator:
         assert "accounts" in new_config
         assert "defaults" in new_config
 
-    def test_migrate_with_new_config_exists(self, migrator, old_profiles_file, temp_victor_dir):
+    def test_migrate_with_new_config_exists(
+        self, migrator, old_profiles_file, temp_victor_dir
+    ):
         """Test migration when new config already exists."""
         # Create existing new config
         new_config = temp_victor_dir / "config.yaml"
@@ -219,7 +223,9 @@ class TestConfigMigrator:
         assert not result.success
         assert len(result.errors) > 0
 
-    def test_migrate_force_overwrite(self, migrator, old_profiles_file, temp_victor_dir):
+    def test_migrate_force_overwrite(
+        self, migrator, old_profiles_file, temp_victor_dir
+    ):
         """Test migration with force flag."""
         # Create existing new config
         new_config = temp_victor_dir / "config.yaml"
@@ -230,7 +236,9 @@ class TestConfigMigrator:
         assert result.success
         assert migrator.new_config_file.exists()
 
-    def test_migrate_dry_run(self, migrator, old_profiles_file, old_api_keys_file, temp_victor_dir):
+    def test_migrate_dry_run(
+        self, migrator, old_profiles_file, old_api_keys_file, temp_victor_dir
+    ):
         """Test dry run migration."""
         # Create migrator with dry_run=True
         dry_run_migrator = ConfigMigrator(victor_dir=temp_victor_dir, dry_run=True)
@@ -344,7 +352,9 @@ class TestMigrationConversion:
 class TestMigrationIntegration:
     """Integration tests for migration functionality."""
 
-    def test_full_migration_workflow(self, migrator, old_profiles_file, old_api_keys_file):
+    def test_full_migration_workflow(
+        self, migrator, old_profiles_file, old_api_keys_file
+    ):
         """Test complete migration workflow."""
         # Initial state
         assert migrator.detect_old_config()

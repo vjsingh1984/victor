@@ -339,7 +339,10 @@ class TestScheduleYAMLParsing:
     @pytest.mark.asyncio
     async def test_parse_schedule_from_yaml(self):
         """Test parsing schedule configuration from YAML."""
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowConfig
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowConfig,
+        )
 
         yaml_content = """
 workflows:

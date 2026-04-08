@@ -175,7 +175,9 @@ class TestCircuitBreaker:
 
     def test_excluded_exceptions_not_counted(self):
         """Excluded exceptions should not count as failures."""
-        config = CircuitBreakerConfig(failure_threshold=2, exclude_exceptions=(ValueError,))
+        config = CircuitBreakerConfig(
+            failure_threshold=2, exclude_exceptions=(ValueError,)
+        )
         breaker = CircuitBreaker(config)
 
         # Record excluded exception
@@ -398,7 +400,9 @@ class TestResilientExecutor:
     async def test_execute_uses_fallback_on_failure(self):
         """Should use fallback when primary fails and retries exhausted."""
         retry = RetryHandler(
-            AgentRetryConfig(max_retries=1, base_delay=0.01, retryable_exceptions=(ValueError,))
+            AgentRetryConfig(
+                max_retries=1, base_delay=0.01, retryable_exceptions=(ValueError,)
+            )
         )
         executor = ResilientExecutor(retry_handler=retry)
 

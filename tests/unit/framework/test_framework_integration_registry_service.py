@@ -57,7 +57,8 @@ def test_register_handlers_uses_vertical_registry() -> None:
     handler = object()
 
     with patch(
-        "victor.framework.handler_registry.get_handler_registry", return_value=mock_registry
+        "victor.framework.handler_registry.get_handler_registry",
+        return_value=mock_registry,
     ):
         count = service.register_handlers("coding", {"lint": handler}, replace=True)
 
@@ -84,7 +85,9 @@ def test_register_workflows_skips_replay_and_tracks_metrics() -> None:
         create=True,
     ):
         first = service.register_workflows("coding", {"review": workflow}, replace=True)
-        second = service.register_workflows("coding", {"review": workflow}, replace=True)
+        second = service.register_workflows(
+            "coding", {"review": workflow}, replace=True
+        )
 
     assert first == 1
     assert second == 0

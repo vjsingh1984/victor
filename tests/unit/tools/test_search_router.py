@@ -299,7 +299,11 @@ class TestRealWorldQueries:
         result = router.route("find all classes that inherit from BaseTool")
 
         # "class" is keyword signal, but "find all" and conceptual query makes it semantic
-        assert result.search_type in (SearchType.KEYWORD, SearchType.SEMANTIC, SearchType.HYBRID)
+        assert result.search_type in (
+            SearchType.KEYWORD,
+            SearchType.SEMANTIC,
+            SearchType.HYBRID,
+        )
 
     def test_specific_function_search(self):
         """Test specific function search routes to KEYWORD."""
@@ -340,7 +344,11 @@ class TestRealWorldQueries:
 
         assert result.search_type == SearchType.SEMANTIC
         assert result.tool_name == "graph"
-        assert result.tool_arguments == {"mode": "callers", "node": "parse_json", "depth": 2}
+        assert result.tool_arguments == {
+            "mode": "callers",
+            "node": "parse_json",
+            "depth": 2,
+        }
         assert result.transformed_query == "parse_json"
         assert "who_calls" in result.matched_patterns
 

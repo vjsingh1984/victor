@@ -450,8 +450,12 @@ class TestFullStackIntegration:
         lifecycle_events = []
         hooks = SessionLifecycleHooks(
             on_start=lambda s: lifecycle_events.append("session_started"),
-            on_turn_end=lambda s, r: lifecycle_events.append(f"turn_complete:{r.tool_count}"),
-            on_close=lambda s, m: lifecycle_events.append(f"session_closed:{m.total_turns}"),
+            on_turn_end=lambda s, r: lifecycle_events.append(
+                f"turn_complete:{r.tool_count}"
+            ),
+            on_close=lambda s, m: lifecycle_events.append(
+                f"session_closed:{m.total_turns}"
+            ),
         )
 
         # Create session

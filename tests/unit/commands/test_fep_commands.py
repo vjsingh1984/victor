@@ -276,7 +276,9 @@ A summary that is long enough to meet the minimum word count requirements for va
             result = validator.validate_file(fep_path)
 
             assert not result.is_valid
-            assert any("Missing required section" in error.message for error in result.errors)
+            assert any(
+                "Missing required section" in error.message for error in result.errors
+            )
         finally:
             fep_path.unlink()
 
@@ -343,7 +345,9 @@ No references.
 
             # Should have warnings for short sections
             assert len(result.warnings) > 0
-            assert any("too short" in warning.message.lower() for warning in result.warnings)
+            assert any(
+                "too short" in warning.message.lower() for warning in result.warnings
+            )
         finally:
             fep_path.unlink()
 
@@ -359,7 +363,9 @@ class TestFEPListCommand:
             # Create sample FEP files
             (feps_dir / "fep-0001-test.md").write_text(sample_fep_content)
             (feps_dir / "fep-0002-another.md").write_text(
-                sample_fep_content.replace("fep: 1", "fep: 2").replace("Test FEP", "Another FEP")
+                sample_fep_content.replace("fep: 1", "fep: 2").replace(
+                    "Test FEP", "Another FEP"
+                )
             )
 
             with patch("victor.ui.commands.fep._get_feps_dir", return_value=feps_dir):
@@ -512,7 +518,10 @@ Template summary.
             output_path = Path(tmpdir) / "fep-XXXX-test.md"
 
             with patch("victor.ui.commands.fep._get_feps_dir", return_value=feps_dir):
-                with patch("victor.ui.commands.fep._get_template_path", return_value=template_path):
+                with patch(
+                    "victor.ui.commands.fep._get_template_path",
+                    return_value=template_path,
+                ):
                     result = runner.invoke(
                         fep_app,
                         [
@@ -551,7 +560,10 @@ Template summary.
             template_path.write_text("# Template")
 
             with patch("victor.ui.commands.fep._get_feps_dir", return_value=feps_dir):
-                with patch("victor.ui.commands.fep._get_template_path", return_value=template_path):
+                with patch(
+                    "victor.ui.commands.fep._get_template_path",
+                    return_value=template_path,
+                ):
                     with patch("subprocess.run", side_effect=FileNotFoundError):
                         result = runner.invoke(
                             fep_app,

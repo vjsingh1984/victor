@@ -228,7 +228,10 @@ class TestEventBusAdapterCompatibility:
 
         assert len(event_bus.subscriptions) == len(adapter.EVENT_MAPPING)
         assert len(adapter._subscriptions) == len(adapter.EVENT_MAPPING)
-        assert all(asyncio.iscoroutinefunction(handler) for _, handler in event_bus.subscriptions)
+        assert all(
+            asyncio.iscoroutinefunction(handler)
+            for _, handler in event_bus.subscriptions
+        )
 
         adapter.disconnect()
         await asyncio.sleep(0.01)
@@ -305,7 +308,8 @@ class TestEventBridgeReliability:
 
         await wait_for(lambda: bridge._broadcaster._running)
         await wait_for(
-            lambda: backend.get_subscription_count() >= len(bridge._adapter.EVENT_MAPPING)
+            lambda: backend.get_subscription_count()
+            >= len(bridge._adapter.EVENT_MAPPING)
         )
 
         total_events = 25
@@ -356,7 +360,11 @@ class TestEventBridgeReliability:
     async def test_reliability_dashboard_tracks_delivery_and_slos(self):
         """Dashboard should track success/failure counts, p95 latency, and SLO status."""
         from victor.core.events import InMemoryEventBackend, ObservabilityBus
-        from victor.integrations.api.event_bridge import BridgeEvent, BridgeEventType, EventBridge
+        from victor.integrations.api.event_bridge import (
+            BridgeEvent,
+            BridgeEventType,
+            EventBridge,
+        )
 
         backend = InMemoryEventBackend()
         bus = ObservabilityBus(backend=backend)
@@ -466,7 +474,9 @@ class TestEventBridgeFiltering:
         ]
 
         for type_name in expected_types:
-            assert hasattr(BridgeEventType, type_name), f"Missing event type: {type_name}"
+            assert hasattr(
+                BridgeEventType, type_name
+            ), f"Missing event type: {type_name}"
 
     @pytest.mark.asyncio
     async def test_broadcaster_filters_events_by_correlation_id(self):
@@ -513,7 +523,9 @@ class TestEventBridgeFiltering:
         broadcaster._clients.clear()
 
     @pytest.mark.asyncio
-    async def test_websocket_handler_subscribe_supports_categories_and_correlation_id(self):
+    async def test_websocket_handler_subscribe_supports_categories_and_correlation_id(
+        self,
+    ):
         """Subscribe messages should normalize categories and preserve correlation filters."""
         from victor.integrations.api.event_bridge import WebSocketEventHandler
 
@@ -531,7 +543,9 @@ class TestEventBridgeFiltering:
             ),
         )
 
-        broadcaster.normalize_subscriptions.assert_called_once_with(["tool.complete", "tool.error"])
+        broadcaster.normalize_subscriptions.assert_called_once_with(
+            ["tool.complete", "tool.error"]
+        )
         broadcaster.update_subscriptions.assert_called_once_with(
             "client-1",
             broadcaster.normalize_subscriptions.return_value,
@@ -851,7 +865,9 @@ class TestEventBroadcasterLoopIsolation:
             for task in pending:
                 task.cancel()
             if pending:
-                old_loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                old_loop.run_until_complete(
+                    asyncio.gather(*pending, return_exceptions=True)
+                )
             old_loop.close()
 
 
@@ -866,9 +882,15 @@ class TestEventBridgeSyncBridge:
         mock_async = MagicMock(return_value=coro)
 
         with (
-            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(
+                event_bridge_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
+            ),
             patch.object(adapter, "connect_async", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             adapter.connect(event_bus)
 
@@ -884,16 +906,24 @@ class TestEventBridgeSyncBridge:
         mock_async = MagicMock(return_value=coro)
 
         with (
-            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(
+                event_bridge_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
+            ),
             patch.object(adapter, "disconnect_async", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             adapter.disconnect()
 
         mock_async.assert_called_once_with()
         mock_run_sync.assert_called_once_with(coro)
 
-    def test_adapter_run_async_operation_uses_shared_sync_bridge_without_running_loop(self):
+    def test_adapter_run_async_operation_uses_shared_sync_bridge_without_running_loop(
+        self,
+    ):
         """Internal adapter bridge helper should delegate to run_sync."""
         from victor.integrations.api import event_bridge as event_bridge_module
 
@@ -902,10 +932,18 @@ class TestEventBridgeSyncBridge:
         on_success = MagicMock()
 
         with (
-            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
-            patch.object(event_bridge_module, "run_sync", return_value="done") as mock_run_sync,
+            patch.object(
+                event_bridge_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
+            ),
+            patch.object(
+                event_bridge_module, "run_sync", return_value="done"
+            ) as mock_run_sync,
         ):
-            adapter._run_async_operation(awaitable, description="connect", on_success=on_success)
+            adapter._run_async_operation(
+                awaitable, description="connect", on_success=on_success
+            )
 
         mock_run_sync.assert_called_once_with(awaitable)
         on_success.assert_called_once_with("done")
@@ -919,9 +957,15 @@ class TestEventBridgeSyncBridge:
         mock_async = MagicMock(return_value=coro)
 
         with (
-            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(
+                event_bridge_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
+            ),
             patch.object(bridge, "_start_and_set_flag", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             bridge.start()
 
@@ -938,16 +982,24 @@ class TestEventBridgeSyncBridge:
         mock_async = MagicMock(return_value=coro)
 
         with (
-            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(
+                event_bridge_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
+            ),
             patch.object(bridge, "_stop_and_cleanup", mock_async),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             bridge.stop()
 
         mock_async.assert_called_once_with()
         mock_run_sync.assert_called_once_with(coro)
 
-    def test_bridge_run_async_operation_uses_shared_sync_bridge_without_running_loop(self):
+    def test_bridge_run_async_operation_uses_shared_sync_bridge_without_running_loop(
+        self,
+    ):
         """EventBridge lifecycle helper should delegate to run_sync."""
         from victor.integrations.api import event_bridge as event_bridge_module
 
@@ -955,8 +1007,14 @@ class TestEventBridgeSyncBridge:
         awaitable = object()
 
         with (
-            patch.object(event_bridge_module.asyncio, "get_running_loop", side_effect=RuntimeError),
-            patch.object(event_bridge_module, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                event_bridge_module.asyncio,
+                "get_running_loop",
+                side_effect=RuntimeError,
+            ),
+            patch.object(
+                event_bridge_module, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             bridge._run_async_operation(awaitable, description="start")
 

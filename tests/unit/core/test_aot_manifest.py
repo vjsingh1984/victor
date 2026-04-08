@@ -66,7 +66,11 @@ class TestAOTManifest:
 
     def test_manifest_creation(self):
         """AOTManifest should store version, hash, and entries."""
-        entries = {"victor.verticals": [EntryPointEntry("sec", "mod", "attr", "victor.verticals")]}
+        entries = {
+            "victor.verticals": [
+                EntryPointEntry("sec", "mod", "attr", "victor.verticals")
+            ]
+        }
         manifest = AOTManifest(
             version="1.0",
             env_hash="abc123",
@@ -99,10 +103,20 @@ class TestAOTManifest:
             "env_hash": "hash456",
             "entries": {
                 "group1": [
-                    {"name": "entry1", "module": "mod1", "attr": "Attr1", "group": "group1"}
+                    {
+                        "name": "entry1",
+                        "module": "mod1",
+                        "attr": "Attr1",
+                        "group": "group1",
+                    }
                 ],
                 "group2": [
-                    {"name": "entry2", "module": "mod2", "attr": "Attr2", "group": "group2"}
+                    {
+                        "name": "entry2",
+                        "module": "mod2",
+                        "attr": "Attr2",
+                        "group": "group2",
+                    }
                 ],
             },
         }
@@ -123,7 +137,9 @@ class TestAOTManifest:
                 EntryPointEntry("ml", "ml.mod", "MLClass", "victor.verticals"),
             ],
             "victor.providers": [
-                EntryPointEntry("custom", "custom.prov", "Provider", "victor.providers"),
+                EntryPointEntry(
+                    "custom", "custom.prov", "Provider", "victor.providers"
+                ),
             ],
         }
         original = AOTManifest("1.0", "original_hash", original_entries)
@@ -177,7 +193,9 @@ class TestAOTManifestManagerComputeEnvHash:
         """compute_env_hash should return 'unknown' if distributions fails."""
         manager = AOTManifestManager(cache_dir=tmp_path)
 
-        with patch("victor.core.aot_manifest.AOTManifestManager.compute_env_hash") as mock_compute:
+        with patch(
+            "victor.core.aot_manifest.AOTManifestManager.compute_env_hash"
+        ) as mock_compute:
             # Simulate internal error
             mock_compute.return_value = "unknown"
             result = manager.compute_env_hash()
@@ -254,7 +272,11 @@ class TestAOTManifestManagerSaveLoad:
         # Write manifest with wrong version directly
         with open(manager.manifest_path, "w") as f:
             json.dump(
-                {"version": "0.1", "env_hash": manager.compute_env_hash(), "entries": {}},
+                {
+                    "version": "0.1",
+                    "env_hash": manager.compute_env_hash(),
+                    "entries": {},
+                },
                 f,
             )
 

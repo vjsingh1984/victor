@@ -117,7 +117,9 @@ def test_render_message_replay_uses_history_path() -> None:
 
     app._render_message("assistant", "from history", replay=True)
 
-    app._conversation_log.add_history_message.assert_called_once_with("assistant", "from history")
+    app._conversation_log.add_history_message.assert_called_once_with(
+        "assistant", "from history"
+    )
     app._conversation_log.add_assistant_message.assert_not_called()
     app._conversation_log.add_user_message.assert_not_called()
     app._conversation_log.add_system_message.assert_not_called()
@@ -138,7 +140,9 @@ def test_replay_transcript_batches_and_reanchors_once() -> None:
         call("assistant", "one"),
         call("user", "two"),
     ]
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
 
 
 def test_replay_transcript_async_uses_sync_path_for_small_histories() -> None:
@@ -166,11 +170,15 @@ def test_replay_transcript_async_chunks_large_histories() -> None:
 
     sleep_mock = AsyncMock()
     with patch("victor.ui.tui.app.asyncio.sleep", sleep_mock):
-        asyncio.run(app._replay_transcript_async(messages, status_label="Loading session"))
+        asyncio.run(
+            app._replay_transcript_async(messages, status_label="Loading session")
+        )
 
     app._conversation_log.clear.assert_called_once_with()
     assert app._conversation_log.add_history_message.call_count == len(messages)
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
     assert app.batch_update.call_count >= 4
     assert sleep_mock.await_count >= 1
     assert any(
@@ -227,7 +235,9 @@ def test_load_session_async_uses_async_replay_path() -> None:
     manager = MagicMock()
     with (
         patch("victor.ui.tui.session.SessionManager", return_value=manager),
-        patch("victor.ui.tui.app.asyncio.to_thread", AsyncMock(return_value=session)) as to_thread,
+        patch(
+            "victor.ui.tui.app.asyncio.to_thread", AsyncMock(return_value=session)
+        ) as to_thread,
     ):
         asyncio.run(app._load_session_async("session-12345678"))
 
@@ -237,7 +247,9 @@ def test_load_session_async_uses_async_replay_path() -> None:
         status_label="Loading session",
     )
     app._restore_agent_conversation.assert_called_once_with(session.messages)
-    app._add_system_message.assert_called_once_with("Session loaded: Replay Test (3 messages)")
+    app._add_system_message.assert_called_once_with(
+        "Session loaded: Replay Test (3 messages)"
+    )
 
 
 def test_load_project_session_async_uses_to_thread() -> None:
@@ -258,10 +270,18 @@ def test_load_project_session_async_uses_to_thread() -> None:
             "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
             return_value=persistence,
         ),
-        patch("victor.agent.message_history.MessageHistory.from_dict", return_value=history),
+        patch(
+            "victor.agent.message_history.MessageHistory.from_dict",
+            return_value=history,
+        ),
         patch(
             "victor.ui.tui.app.asyncio.to_thread",
-            AsyncMock(return_value={"conversation": {"messages": []}, "metadata": {"title": "P"}}),
+            AsyncMock(
+                return_value={
+                    "conversation": {"messages": []},
+                    "metadata": {"title": "P"},
+                }
+            ),
         ) as to_thread,
     ):
         asyncio.run(app._load_project_session_async("project-session-1"))
@@ -302,7 +322,9 @@ def test_load_session_uses_status_and_single_completion_message() -> None:
     app._replay_transcript.assert_called_once_with(
         [(msg.role, msg.content) for msg in session.messages]
     )
-    app._add_system_message.assert_called_once_with("Session loaded: Replay Test (60 messages)")
+    app._add_system_message.assert_called_once_with(
+        "Session loaded: Replay Test (60 messages)"
+    )
 
 
 def test_input_submit_resumes_follow_when_paused() -> None:
@@ -318,7 +340,9 @@ def test_input_submit_resumes_follow_when_paused() -> None:
 
     asyncio.run(app.on_input_widget_submitted(event))
 
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
     app._add_user_message.assert_called_once_with("hello")
     app._process_message_async.assert_awaited_once_with("hello")
 
@@ -355,7 +379,9 @@ def test_follow_up_selection_prefills_input() -> None:
     app = VictorTUI()
     app._input_widget = MagicMock()
     app._add_system_message = MagicMock()
-    event = ToolCallWidget.FollowUpSelected('graph(mode="callers", node="parse_json", depth=1)')
+    event = ToolCallWidget.FollowUpSelected(
+        'graph(mode="callers", node="parse_json", depth=1)'
+    )
 
     app.on_tool_call_widget_follow_up_selected(event)
 
@@ -543,7 +569,9 @@ def test_action_scroll_bottom_resumes_follow_when_paused() -> None:
 
     app.action_scroll_bottom()
 
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
     app._conversation_log.scroll_to_bottom.assert_not_called()
     app._update_jump_to_bottom.assert_called_once()
 
@@ -644,7 +672,9 @@ def test_action_jump_unread_resumes_follow_when_paused_and_no_marker() -> None:
 
     app.action_jump_unread()
 
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
     app._conversation_log.scroll_to_bottom.assert_not_called()
     app._update_jump_to_bottom.assert_called_once()
 
@@ -713,7 +743,9 @@ def test_action_toggle_follow_mode_pauses_follow() -> None:
 
     app.action_toggle_follow_mode()
 
-    app._conversation_log.set_follow_paused.assert_called_once_with(True, jump_to_bottom=False)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        True, jump_to_bottom=False
+    )
     app._update_jump_to_bottom.assert_called_once()
 
 
@@ -727,7 +759,9 @@ def test_action_toggle_follow_mode_resumes_follow() -> None:
 
     app.action_toggle_follow_mode()
 
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
     app._update_jump_to_bottom.assert_called_once()
 
 
@@ -741,7 +775,9 @@ def test_action_toggle_follow_mode_resumes_when_user_scrolled() -> None:
 
     app.action_toggle_follow_mode()
 
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
     app._update_jump_to_bottom.assert_called_once()
 
 
@@ -758,6 +794,8 @@ def test_jump_button_resumes_follow_when_paused() -> None:
 
     app.on_button_pressed(event)
 
-    app._conversation_log.set_follow_paused.assert_called_once_with(False, jump_to_bottom=True)
+    app._conversation_log.set_follow_paused.assert_called_once_with(
+        False, jump_to_bottom=True
+    )
     app._conversation_log.scroll_to_bottom.assert_not_called()
     app._update_jump_to_bottom.assert_called_once()

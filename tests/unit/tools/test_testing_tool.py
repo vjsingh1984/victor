@@ -70,8 +70,8 @@ class TestRunTests:
             patch("pathlib.Path.unlink"),
         ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
-                report_data
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                json.dumps(report_data)
             )
 
             result = await test()
@@ -113,8 +113,8 @@ class TestRunTests:
             patch("pathlib.Path.unlink"),
         ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
-                report_data
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                json.dumps(report_data)
             )
 
             result = await test(path="tests/unit")
@@ -155,8 +155,8 @@ class TestRunTests:
             patch("pathlib.Path.unlink"),
         ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
-                report_data
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                json.dumps(report_data)
             )
 
             await test(pytest_args=["-v", "-x"])
@@ -257,7 +257,9 @@ class TestRunTests:
             patch("pathlib.Path.unlink"),
         ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = "invalid json"
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                "invalid json"
+            )
 
             result = await test()
 
@@ -302,8 +304,8 @@ class TestRunTests:
             patch("pathlib.Path.unlink"),
         ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
-                report_data
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                json.dumps(report_data)
             )
 
             result = await test()
@@ -345,8 +347,8 @@ class TestRunTests:
             patch("pathlib.Path.unlink"),
         ):
 
-            mock_open.return_value.__enter__.return_value.read.return_value = json.dumps(
-                report_data
+            mock_open.return_value.__enter__.return_value.read.return_value = (
+                json.dumps(report_data)
             )
 
             result = await test()
@@ -516,5 +518,11 @@ class TestSummarizeReport:
         result = _summarize_report(report)
 
         assert len(result["failures"]) == 1
-        assert result["failures"][0]["error_message"] == "Error representation was not a string."
-        assert result["failures"][0]["full_error"] == {"error": "Some error", "line": 42}
+        assert (
+            result["failures"][0]["error_message"]
+            == "Error representation was not a string."
+        )
+        assert result["failures"][0]["full_error"] == {
+            "error": "Some error",
+            "line": 42,
+        }

@@ -45,8 +45,14 @@ class TestNormalizeForGitBranch:
 
     def test_with_prefix(self):
         """Test normalization with prefix."""
-        assert normalize_for_git_branch("User Auth", prefix="feature/") == "feature/user-auth"
-        assert normalize_for_git_branch("Memory Leak", prefix="bugfix/") == "bugfix/memory-leak"
+        assert (
+            normalize_for_git_branch("User Auth", prefix="feature/")
+            == "feature/user-auth"
+        )
+        assert (
+            normalize_for_git_branch("Memory Leak", prefix="bugfix/")
+            == "bugfix/memory-leak"
+        )
         assert normalize_for_git_branch("Hot Fix", prefix="hotfix/") == "hotfix/hot-fix"
 
     def test_prefix_without_trailing_slash(self):
@@ -59,7 +65,9 @@ class TestNormalizeForGitBranch:
     def test_whitespace_normalization(self):
         """Test that multiple spaces get collapsed to single hyphen."""
         assert normalize_for_git_branch("  Multiple   Spaces  ") == "multiple-spaces"
-        assert normalize_for_git_branch("One  Two   Three    Four") == "one-two-three-four"
+        assert (
+            normalize_for_git_branch("One  Two   Three    Four") == "one-two-three-four"
+        )
 
     def test_special_character_removal(self):
         """Test that special characters are removed."""
@@ -110,7 +118,8 @@ class TestNormalizeForGitBranch:
     def test_real_world_examples(self):
         """Test with real-world feature names."""
         assert (
-            normalize_for_git_branch("User Authentication System") == "user-authentication-system"
+            normalize_for_git_branch("User Authentication System")
+            == "user-authentication-system"
         )
         assert normalize_for_git_branch("Add OAuth2 Support") == "add-oauth2-support"
         assert normalize_for_git_branch("Fix Memory Leak") == "fix-memory-leak"
@@ -127,7 +136,10 @@ class TestNormalizeForFilename:
 
     def test_with_extension(self):
         """Test normalization with file extension."""
-        assert normalize_for_filename("Data Processor", extension=".py") == "data_processor.py"
+        assert (
+            normalize_for_filename("Data Processor", extension=".py")
+            == "data_processor.py"
+        )
         assert normalize_for_filename("Test File", extension=".txt") == "test_file.txt"
 
     def test_extension_without_dot(self):
@@ -198,7 +210,10 @@ class TestSlugify:
         """Test slug generation with custom delimiter."""
         assert slugify("API Controller", delimiter="_") == "api_controller"
         assert slugify("Test Name Here", delimiter="_") == "test_name_here"
-        assert slugify("Multiple Words Together", delimiter="_") == "multiple_words_together"
+        assert (
+            slugify("Multiple Words Together", delimiter="_")
+            == "multiple_words_together"
+        )
 
     def test_default_delimiter(self):
         """Test that default delimiter is hyphen."""
@@ -256,7 +271,10 @@ class TestSanitizeClassName:
 
     def test_hyphen_to_pascalcase(self):
         """Test that hyphens are handled correctly."""
-        assert sanitize_class_name("user-authentication-module") == "UserAuthenticationModule"
+        assert (
+            sanitize_class_name("user-authentication-module")
+            == "UserAuthenticationModule"
+        )
         # Acronyms are preserved correctly
         assert sanitize_class_name("API-controller") == "APIController"
 
@@ -311,7 +329,10 @@ class TestNormalizeForTestFilename:
 
     def test_basic_normalization(self):
         """Test basic test filename generation."""
-        assert normalize_for_test_filename("User Authentication") == "test_user_authentication.py"
+        assert (
+            normalize_for_test_filename("User Authentication")
+            == "test_user_authentication.py"
+        )
         assert normalize_for_test_filename("Data Processor") == "test_data_processor.py"
 
     def test_always_has_test_prefix(self):
@@ -332,11 +353,17 @@ class TestNormalizeForTestFilename:
 
     def test_special_character_handling(self):
         """Test that special characters are handled correctly."""
-        assert normalize_for_test_filename("Special@#$Characters") == "test_specialcharacters.py"
+        assert (
+            normalize_for_test_filename("Special@#$Characters")
+            == "test_specialcharacters.py"
+        )
 
     def test_whitespace_normalization(self):
         """Test that whitespace becomes underscores."""
-        assert normalize_for_test_filename("  Multiple   Spaces  ") == "test_multiple_spaces.py"
+        assert (
+            normalize_for_test_filename("  Multiple   Spaces  ")
+            == "test_multiple_spaces.py"
+        )
 
     def test_empty_string_raises_error(self):
         """Test that empty string raises ValueError."""
@@ -350,7 +377,8 @@ class TestNormalizeForTestFilename:
             == "test_user_authentication_module.py"
         )
         assert (
-            normalize_for_test_filename("OAuth2 Implementation") == "test_oauth2_implementation.py"
+            normalize_for_test_filename("OAuth2 Implementation")
+            == "test_oauth2_implementation.py"
         )
 
 
@@ -370,24 +398,42 @@ class TestTextNormalizationPresets:
 
     def test_git_bugfix_branch(self):
         """Test git_bugfix_branch preset."""
-        assert TextNormalizationPresets.git_bugfix_branch("Memory Leak") == "bugfix/memory-leak"
-        assert TextNormalizationPresets.git_bugfix_branch("Crash Fix") == "bugfix/crash-fix"
+        assert (
+            TextNormalizationPresets.git_bugfix_branch("Memory Leak")
+            == "bugfix/memory-leak"
+        )
+        assert (
+            TextNormalizationPresets.git_bugfix_branch("Crash Fix")
+            == "bugfix/crash-fix"
+        )
 
     def test_python_source_file(self):
         """Test python_source_file preset."""
-        assert TextNormalizationPresets.python_source_file("Data Processor") == "data_processor.py"
-        assert TextNormalizationPresets.python_source_file("User Auth") == "user_auth.py"
+        assert (
+            TextNormalizationPresets.python_source_file("Data Processor")
+            == "data_processor.py"
+        )
+        assert (
+            TextNormalizationPresets.python_source_file("User Auth") == "user_auth.py"
+        )
 
     def test_python_test_file(self):
         """Test python_test_file preset."""
-        assert TextNormalizationPresets.python_test_file("User Auth") == "test_user_auth.py"
         assert (
-            TextNormalizationPresets.python_test_file("Data Processor") == "test_data_processor.py"
+            TextNormalizationPresets.python_test_file("User Auth")
+            == "test_user_auth.py"
+        )
+        assert (
+            TextNormalizationPresets.python_test_file("Data Processor")
+            == "test_data_processor.py"
         )
 
     def test_url_slug(self):
         """Test url_slug preset."""
-        assert TextNormalizationPresets.url_slug("How to Use Victor") == "how-to-use-victor"
+        assert (
+            TextNormalizationPresets.url_slug("How to Use Victor")
+            == "how-to-use-victor"
+        )
         assert TextNormalizationPresets.url_slug("Getting Started") == "getting-started"
 
 

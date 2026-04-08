@@ -64,7 +64,10 @@ async def test_compute_executor_uses_input_mapping_and_output_key() -> None:
 
     result = await executor.execute(node, {"value": "AAPL"})
 
-    assert result["computed"] == {"status": "no_tools_executed", "params": {"symbol": "AAPL"}}
+    assert result["computed"] == {
+        "status": "no_tools_executed",
+        "params": {"symbol": "AAPL"},
+    }
     node_result = result["_node_results"]["compute"]
     assert isinstance(node_result, GraphNodeResult)
     assert node_result.success is True
@@ -90,7 +93,9 @@ async def test_condition_executor_records_passthrough_output() -> None:
 
 
 @pytest.mark.asyncio
-async def test_parallel_executor_records_failure_with_runtime_graph_node_result() -> None:
+async def test_parallel_executor_records_failure_with_runtime_graph_node_result() -> (
+    None
+):
     executor = ParallelNodeExecutor(context=None)
     node = ParallelNode(
         id="parallel",
@@ -121,9 +126,13 @@ async def test_parallel_executor_records_failure_with_runtime_graph_node_result(
 
 
 @pytest.mark.asyncio
-async def test_agent_executor_uses_output_key_and_runtime_graph_node_result(monkeypatch) -> None:
+async def test_agent_executor_uses_output_key_and_runtime_graph_node_result(
+    monkeypatch,
+) -> None:
     executor = AgentNodeExecutor(context=None)
-    fake_result = SimpleNamespace(summary="done", success=True, tool_calls_used=2, error=None)
+    fake_result = SimpleNamespace(
+        summary="done", success=True, tool_calls_used=2, error=None
+    )
 
     class FakeSubAgentOrchestrator:
         def __init__(self, orchestrator):
@@ -257,7 +266,9 @@ def test_adapter_workflow_state_alias_remains_available() -> None:
     assert AdapterWorkflowStateAlias is AdapterWorkflowState
 
 
-def test_adapter_execution_handler_uses_shared_sync_bridge_without_running_loop() -> None:
+def test_adapter_execution_handler_uses_shared_sync_bridge_without_running_loop() -> (
+    None
+):
     adapter = WorkflowToGraphAdapter()
     executor = SimpleNamespace()
 
@@ -340,7 +351,9 @@ def test_node_executor_factory_raises_for_unregistered_node_types() -> None:
     factory = NodeExecutorFactory()
     unknown_node = SimpleNamespace(node_type=SimpleNamespace(value="custom_unknown"))
 
-    with pytest.raises(ValueError, match="Unsupported workflow node type 'custom_unknown'"):
+    with pytest.raises(
+        ValueError, match="Unsupported workflow node type 'custom_unknown'"
+    ):
         factory.create_executor(unknown_node)
 
 

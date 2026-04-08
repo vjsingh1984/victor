@@ -54,7 +54,9 @@ class TestPromptCategory:
 
     def test_algorithm_implementation(self):
         """Test algorithm implementation category."""
-        assert PromptCategory.ALGORITHM_IMPLEMENTATION.value == "algorithm_implementation"
+        assert (
+            PromptCategory.ALGORITHM_IMPLEMENTATION.value == "algorithm_implementation"
+        )
 
     def test_data_structure(self):
         """Test data structure category."""
@@ -591,7 +593,9 @@ class TestPromptCorpusRegistryWithMockEmbeddings:
                 cache_dir=Path(tmpdir),
             )
 
-            category, confidence = registry.get_category_for_prompt("Fix this bug in my code")
+            category, confidence = registry.get_category_for_prompt(
+                "Fix this bug in my code"
+            )
 
             assert isinstance(category, PromptCategory)
             assert 0 <= confidence <= 1.0

@@ -113,7 +113,9 @@ class TestVerticalConfigRegistry:
     def test_register_custom_evaluation_criteria(self):
         """Test registering custom evaluation criteria."""
         custom_criteria = ["Custom criterion 1", "Custom criterion 2"]
-        VerticalConfigRegistry.register_evaluation_criteria("custom_eval", custom_criteria)
+        VerticalConfigRegistry.register_evaluation_criteria(
+            "custom_eval", custom_criteria
+        )
         criteria = VerticalConfigRegistry.get_evaluation_criteria("custom_eval")
         assert criteria == custom_criteria
 
@@ -131,4 +133,7 @@ class TestVerticalConfigRegistry:
         criteria2 = VerticalConfigRegistry.get_evaluation_criteria("coding")
         criteria1.append("Custom criterion")
         assert "Custom criterion" not in criteria2
-        assert "Custom criterion" not in VerticalConfigRegistry._evaluation_criteria["coding"]
+        assert (
+            "Custom criterion"
+            not in VerticalConfigRegistry._evaluation_criteria["coding"]
+        )

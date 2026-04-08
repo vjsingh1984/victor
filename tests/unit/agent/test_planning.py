@@ -49,7 +49,14 @@ class TestStepStatus:
 
     def test_all_statuses_defined(self):
         """Verify all expected statuses exist."""
-        expected = {"PENDING", "IN_PROGRESS", "COMPLETED", "FAILED", "SKIPPED", "BLOCKED"}
+        expected = {
+            "PENDING",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "FAILED",
+            "SKIPPED",
+            "BLOCKED",
+        }
         actual = {s.name for s in StepStatus}
         assert actual == expected
 
@@ -70,7 +77,14 @@ class TestStepType:
 
     def test_all_types_defined(self):
         """Verify all expected types exist."""
-        expected = {"RESEARCH", "PLANNING", "IMPLEMENTATION", "TESTING", "REVIEW", "DEPLOYMENT"}
+        expected = {
+            "RESEARCH",
+            "PLANNING",
+            "IMPLEMENTATION",
+            "TESTING",
+            "REVIEW",
+            "DEPLOYMENT",
+        }
         actual = {t.name for t in StepType}
         assert actual == expected
 
@@ -412,7 +426,9 @@ class TestAutonomousPlanner:
             approvals.append(msg)
             return True
 
-        planner = AutonomousPlanner(mock_orchestrator, approval_callback=custom_approval)
+        planner = AutonomousPlanner(
+            mock_orchestrator, approval_callback=custom_approval
+        )
         result = planner.approval_callback("Approve this?")
         assert result is True
         assert "Approve this?" in approvals
@@ -555,9 +571,19 @@ class TestPlanningIntegration:
             goal="Build feature",
             steps=[
                 PlanStep(id="a", description="Research", step_type=StepType.RESEARCH),
-                PlanStep(id="b", description="Plan", depends_on=["a"], step_type=StepType.PLANNING),
+                PlanStep(
+                    id="b",
+                    description="Plan",
+                    depends_on=["a"],
+                    step_type=StepType.PLANNING,
+                ),
                 PlanStep(id="c", description="Build", depends_on=["b"]),
-                PlanStep(id="d", description="Test", depends_on=["c"], step_type=StepType.TESTING),
+                PlanStep(
+                    id="d",
+                    description="Test",
+                    depends_on=["c"],
+                    step_type=StepType.TESTING,
+                ),
             ],
         )
 
@@ -586,7 +612,9 @@ class TestPlanningIntegration:
                 PlanStep(id="setup", description="Setup"),
                 PlanStep(id="task_a", description="Task A", depends_on=["setup"]),
                 PlanStep(id="task_b", description="Task B", depends_on=["setup"]),
-                PlanStep(id="merge", description="Merge", depends_on=["task_a", "task_b"]),
+                PlanStep(
+                    id="merge", description="Merge", depends_on=["task_a", "task_b"]
+                ),
             ],
         )
 

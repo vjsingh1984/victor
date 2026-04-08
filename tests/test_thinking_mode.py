@@ -23,6 +23,7 @@ def create_mock_settings():
     mock_settings.analytics_enabled = False
     mock_settings.show_cost_metrics = False
     mock_settings.load_tool_config.return_value = {}
+    mock_settings.unified_embedding_model = None
     return mock_settings
 
 
@@ -52,7 +53,9 @@ def test_orchestrator_thinking_defaults_to_false():
     mock_provider.supports_tools.return_value = True
 
     orchestrator = AgentOrchestrator(
-        settings=mock_settings, provider=mock_provider, model="claude-3-5-sonnet-20241022"
+        settings=mock_settings,
+        provider=mock_provider,
+        model="claude-3-5-sonnet-20241022",
     )
 
     assert orchestrator.thinking is False
@@ -67,7 +70,10 @@ async def test_from_settings_passes_thinking_parameter():
 
     # Mock profile
     mock_profile = ProfileConfig(
-        provider="anthropic", model="claude-3-5-sonnet-20241022", temperature=0.7, max_tokens=4096
+        provider="anthropic",
+        model="claude-3-5-sonnet-20241022",
+        temperature=0.7,
+        max_tokens=4096,
     )
 
     mock_settings.load_profiles.return_value = {"default": mock_profile}
@@ -78,7 +84,9 @@ async def test_from_settings_passes_thinking_parameter():
     mock_provider.supports_tools.return_value = True
     mock_provider.supports_streaming.return_value = True
 
-    with patch("victor.agent.orchestrator.ProviderRegistry.create", return_value=mock_provider):
+    with patch(
+        "victor.agent.orchestrator.ProviderRegistry.create", return_value=mock_provider
+    ):
         orchestrator = await AgentOrchestrator.from_settings(
             settings=mock_settings, profile_name="default", thinking=True
         )

@@ -135,7 +135,9 @@ class TestResearcherTemplate:
 
         # Check content makes sense for research
         focus_lower = extensions["focus"].lower()
-        assert any(term in focus_lower for term in ["research", "comprehensive", "sources"])
+        assert any(
+            term in focus_lower for term in ["research", "comprehensive", "sources"]
+        )
 
     def test_is_immutable(self):
         """Template should be a new instance each time."""
@@ -182,7 +184,10 @@ class TestPlannerTemplate:
 
         assert template.description is not None
         assert len(template.description) > 0
-        assert "planning" in template.description.lower() or "plan" in template.description.lower()
+        assert (
+            "planning" in template.description.lower()
+            or "plan" in template.description.lower()
+        )
 
     def test_has_planning_strengths(self):
         """Should have planning-related strengths."""
@@ -294,7 +299,10 @@ class TestExecutorTemplate:
         assert len(template.description) > 0
         # Description should mention implementation or efficiency
         desc_lower = template.description.lower()
-        assert any(term in desc_lower for term in ["implement", "solution", "efficient", "correct"])
+        assert any(
+            term in desc_lower
+            for term in ["implement", "solution", "efficient", "correct"]
+        )
 
     def test_has_execution_strengths(self):
         """Should have execution-related strengths."""
@@ -357,7 +365,9 @@ class TestExecutorTemplate:
 
         # Check content makes sense for execution
         focus_lower = extensions["focus"].lower()
-        assert any(term in focus_lower for term in ["implement", "correct", "efficient"])
+        assert any(
+            term in focus_lower for term in ["implement", "correct", "efficient"]
+        )
 
     def test_is_immutable(self):
         """Template should be a new instance each time."""
@@ -404,7 +414,10 @@ class TestReviewerTemplate:
 
         assert template.description is not None
         assert len(template.description) > 0
-        assert "review" in template.description.lower() or "evaluat" in template.description.lower()
+        assert (
+            "review" in template.description.lower()
+            or "evaluat" in template.description.lower()
+        )
 
     def test_has_review_strengths(self):
         """Should have review-related strengths."""
@@ -500,7 +513,9 @@ class TestPersonaTemplateRegistry:
     def test_all_templates_are_persona_traits(self):
         """All templates in registry should be PersonaTraits instances."""
         for name, template in PERSONA_TEMPLATES.items():
-            assert isinstance(template, PersonaTraits), f"{name} is not a PersonaTraits instance"
+            assert isinstance(
+                template, PersonaTraits
+            ), f"{name} is not a PersonaTraits instance"
 
     def test_researcher_template_matches(self):
         """Registry researcher template should match get_researcher_template()."""
@@ -834,7 +849,9 @@ class TestTemplateConsistency:
 
         for name, template in templates.items():
             actual_keys = set(template.custom_traits["prompt_extensions"].keys())
-            assert actual_keys == expected_keys, f"{name} has unexpected keys: {actual_keys}"
+            assert (
+                actual_keys == expected_keys
+            ), f"{name} has unexpected keys: {actual_keys}"
 
     def test_template_descriptions_are_meaningful(self):
         """All template descriptions should be meaningful."""
@@ -848,8 +865,12 @@ class TestTemplateConsistency:
         for name, template in templates.items():
             assert len(template.description) > 20, f"{name} description too short"
             # Should not be generic placeholder text
-            assert "TODO" not in template.description, f"{name} has placeholder description"
-            assert "Lorem ipsum" not in template.description, f"{name} has placeholder description"
+            assert (
+                "TODO" not in template.description
+            ), f"{name} has placeholder description"
+            assert (
+                "Lorem ipsum" not in template.description
+            ), f"{name} has placeholder description"
 
     def test_all_templates_have_valid_communication_styles(self):
         """All templates should have valid CommunicationStyle enum values."""

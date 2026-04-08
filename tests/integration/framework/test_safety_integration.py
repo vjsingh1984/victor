@@ -15,7 +15,9 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     """Resolve vertical safety symbols using external-first import fallbacks."""
     module, _resolved = import_module_with_fallback(module_path)
     if module is None:
-        pytest.skip(f"Vertical module not available: {module_path}", allow_module_level=True)
+        pytest.skip(
+            f"Vertical module not available: {module_path}", allow_module_level=True
+        )
     if not hasattr(module, attr_name):
         pytest.skip(
             f"Missing attribute '{attr_name}' in module '{module_path}'",
@@ -80,7 +82,9 @@ class TestSafetyIntegration:
                     allowed is True
                 ), f"Safe operation should be allowed: {operation}. Reason: {reason}"
             else:
-                assert allowed is False, f"Dangerous operation should be blocked: {operation}"
+                assert (
+                    allowed is False
+                ), f"Dangerous operation should be blocked: {operation}"
 
     def test_research_workflow_with_safety(self):
         """Research workflow should block low-credibility sources and fabricated content."""
@@ -108,7 +112,9 @@ class TestSafetyIntegration:
                     allowed is True
                 ), f"Safe operation should be allowed: {operation}. Reason: {reason}"
             else:
-                assert allowed is False, f"Dangerous operation should be blocked: {operation}"
+                assert (
+                    allowed is False
+                ), f"Dangerous operation should be blocked: {operation}"
 
     def test_dataanalysis_workflow_with_safety(self):
         """DataAnalysis workflow should block PII exports and external uploads."""
@@ -163,7 +169,10 @@ class TestSafetyIntegration:
         # Format: (operation, should_be_allowed)
         test_cases = [
             ("git push --force origin main", False),  # Coding - should be blocked
-            ("kubectl delete deployment -n production app", False),  # DevOps - should be blocked
+            (
+                "kubectl delete deployment -n production app",
+                False,
+            ),  # DevOps - should be blocked
             ("rag_delete --all", False),  # RAG - should be blocked
             ("cite fake-blog.blogspot.com", False),  # Research - should be blocked
             ("export data with SSN", False),  # DataAnalysis - should be blocked
@@ -252,7 +261,9 @@ class TestSafetyIntegration:
 
         for operation, description in high_priority_ops:
             allowed, _ = enforcer.check_operation(operation)
-            assert allowed is False, f"{description} should be blocked at {safety_level} level"
+            assert (
+                allowed is False
+            ), f"{description} should be blocked at {safety_level} level"
 
     def test_benchmark_workflow_with_safety(self):
         """Benchmark workflow should block production repo access and data leaks."""
@@ -397,4 +408,6 @@ class TestSafetyIntegration:
 
         for operation in safe_operations:
             allowed, reason = enforcer.check_operation(operation)
-            assert allowed is True, f"Should allow safe operation: {operation}. Reason: {reason}"
+            assert (
+                allowed is True
+            ), f"Should allow safe operation: {operation}. Reason: {reason}"

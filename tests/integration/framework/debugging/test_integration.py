@@ -70,7 +70,9 @@ class TestWorkflowDebugging:
     async def test_step_through_workflow(self, sample_workflow, debug_session):
         """Test stepping through workflow execution."""
         # Set breakpoint
-        debug_session.set_breakpoint(node_id="analyze", position=BreakpointPosition.AFTER)
+        debug_session.set_breakpoint(
+            node_id="analyze", position=BreakpointPosition.AFTER
+        )
 
         hook = debug_session.create_hook()
 
@@ -187,7 +189,9 @@ class TestWorkflowDebugging:
         except asyncio.TimeoutError:
             # If still hanging, stop session and fail gracefully
             await session.stop()
-            pytest.fail("Workflow did not complete after resuming from exception breakpoint")
+            pytest.fail(
+                "Workflow did not complete after resuming from exception breakpoint"
+            )
 
     async def test_multiple_breakpoints(self, sample_workflow, debug_session):
         """Test multiple breakpoints on different nodes."""

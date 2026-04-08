@@ -88,7 +88,9 @@ class TestWriteAllowedIntent:
         from victor.agent.action_authorizer import IntentDetector, ActionIntent
 
         detector = IntentDetector()
-        result = detector.detect("Create a file called helpers.py with the sorting function")
+        result = detector.detect(
+            "Create a file called helpers.py with the sorting function"
+        )
 
         assert result.intent == ActionIntent.WRITE_ALLOWED
         assert "create_file" in result.matched_signals
@@ -101,7 +103,10 @@ class TestWriteAllowedIntent:
         result = detector.detect("Add this into utils.py")
 
         assert result.intent == ActionIntent.WRITE_ALLOWED
-        assert "add_into_file" in result.matched_signals or "add_to_file" in result.matched_signals
+        assert (
+            "add_into_file" in result.matched_signals
+            or "add_to_file" in result.matched_signals
+        )
 
     def test_update_file(self):
         """Test that 'update the file' is classified as WRITE_ALLOWED."""

@@ -362,7 +362,9 @@ class TestSampleSizeCalculations:
             from statsmodels.stats.power import tt_ind_solve_power
 
             # With 100 samples per variant
-            mde = analyzer.minimum_detectable_effect(sample_size=100, alpha=0.05, power=0.8)
+            mde = analyzer.minimum_detectable_effect(
+                sample_size=100, alpha=0.05, power=0.8
+            )
 
             # Should be positive
             assert mde > 0

@@ -165,7 +165,9 @@ class TestFrameworkStrategy:
             result = await strategy.create_agent(mock_context)
 
         # Verify overrides were applied
-        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(100, user_override=True)
+        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(
+            100, user_override=True
+        )
         mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
             50, user_override=True
         )
@@ -183,7 +185,9 @@ class TestFrameworkStrategy:
         mock_context.mode = "plan"
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
-            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
+            with patch(
+                "victor.agent.mode_controller.get_mode_controller"
+            ) as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_get_controller.return_value = mock_controller
 
@@ -229,7 +233,9 @@ class TestLegacyStrategy:
         mock_agent = MagicMock()
         mock_agent.unified_tracker = MagicMock()
 
-        with patch("victor.agent.orchestrator.AgentOrchestrator") as mock_orchestrator_class:
+        with patch(
+            "victor.agent.orchestrator.AgentOrchestrator"
+        ) as mock_orchestrator_class:
             mock_orchestrator_class.from_settings = AsyncMock(return_value=mock_agent)
 
             result = await strategy.create_agent(mock_context)
@@ -289,7 +295,9 @@ class TestAgentCreationFactory:
         strategy = LegacyStrategy()
         mock_agent = MagicMock()
 
-        with patch("victor.agent.orchestrator.AgentOrchestrator") as mock_orchestrator_class:
+        with patch(
+            "victor.agent.orchestrator.AgentOrchestrator"
+        ) as mock_orchestrator_class:
             mock_orchestrator_class.from_settings = AsyncMock(return_value=mock_agent)
 
             result = await factory.create_agent(mock_context, strategy=strategy)

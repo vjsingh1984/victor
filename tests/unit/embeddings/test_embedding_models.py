@@ -277,7 +277,9 @@ class TestSentenceTransformerModel:
             "get_instance",
             side_effect=ImportError("sentence-transformers not installed"),
         ):
-            with pytest.raises(ImportError, match="sentence-transformers not installed"):
+            with pytest.raises(
+                ImportError, match="sentence-transformers not installed"
+            ):
                 await model.initialize()
 
     def test_get_dimension_with_service(self, sentence_transformer_config):

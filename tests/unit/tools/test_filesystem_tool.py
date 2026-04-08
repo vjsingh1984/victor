@@ -265,7 +265,9 @@ async def test_list_directory_recursive():
         paths = [item["path"] for item in items]
         assert "subdir" in paths
         assert "file1.txt" in paths
-        assert os.path.join("subdir", "file2.txt") in paths or "subdir/file2.txt" in paths
+        assert (
+            os.path.join("subdir", "file2.txt") in paths or "subdir/file2.txt" in paths
+        )
 
 
 @pytest.mark.asyncio

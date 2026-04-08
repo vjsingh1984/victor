@@ -151,7 +151,11 @@ class TestRunCommand:
 
         assert result.success is False
         # Error could be in stdout or stderr depending on shell
-        assert result.stderr != "" or "No such file" in result.stdout or result.return_code != 0
+        assert (
+            result.stderr != ""
+            or "No such file" in result.stdout
+            or result.return_code != 0
+        )
 
     def test_run_command_with_timeout(self):
         """Test command with timeout."""
@@ -169,7 +173,9 @@ class TestRunCommand:
 
     def test_run_command_with_env(self):
         """Test running command with custom environment."""
-        result = run_command("echo $TEST_VAR", env={"TEST_VAR": "test_value"}, shell=True)
+        result = run_command(
+            "echo $TEST_VAR", env={"TEST_VAR": "test_value"}, shell=True
+        )
 
         assert result.success is True
 

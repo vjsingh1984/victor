@@ -137,7 +137,9 @@ class TestSessionsCommand:
         assert isinstance(sessions, list)
         # Filter to only sessions created by sample_persistence fixture
         sample_sessions = [
-            s for s in sessions if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
+            s
+            for s in sessions
+            if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
         ]
         assert (
             len(sample_sessions) == 2
@@ -184,13 +186,19 @@ class TestSessionsCommand:
         result = runner_with_db.invoke(sessions_app, ["show", "myproj-9Kx7Z2"])
         assert result.exit_code == 0
         # Check session details (may be in different formats)
-        assert "CI/CD" in result.stdout and "Pipeline" in result.stdout and "Setup" in result.stdout
+        assert (
+            "CI/CD" in result.stdout
+            and "Pipeline" in result.stdout
+            and "Setup" in result.stdout
+        )
         assert "anthropic" in result.stdout
         assert "2" in result.stdout  # Message count
 
     def test_sessions_show_json(self, runner_with_db, sample_persistence):
         """Test 'victor sessions show --json'."""
-        result = runner_with_db.invoke(sessions_app, ["show", "myproj-9Kx7Z2", "--json"])
+        result = runner_with_db.invoke(
+            sessions_app, ["show", "myproj-9Kx7Z2", "--json"]
+        )
         assert result.exit_code == 0
 
         # Strip ANSI codes before parsing JSON
@@ -209,7 +217,9 @@ class TestSessionsCommand:
     def test_sessions_delete(self, runner_with_db, sample_persistence):
         """Test 'victor sessions delete <session_id>'."""
         # Delete session
-        result = runner_with_db.invoke(sessions_app, ["delete", "myproj-9Kx7Z2", "--yes"])
+        result = runner_with_db.invoke(
+            sessions_app, ["delete", "myproj-9Kx7Z2", "--yes"]
+        )
         assert result.exit_code == 0
         assert "deleted" in result.stdout.lower()
 
@@ -220,7 +230,9 @@ class TestSessionsCommand:
     def test_sessions_export(self, runner_with_db, sample_persistence, tmp_path):
         """Test 'victor sessions export'."""
         export_file = tmp_path / "sessions.json"
-        result = runner_with_db.invoke(sessions_app, ["export", "--output", str(export_file)])
+        result = runner_with_db.invoke(
+            sessions_app, ["export", "--output", str(export_file)]
+        )
         assert result.exit_code == 0
         assert export_file.exists()
 
@@ -239,7 +251,10 @@ class TestSessionsCommand:
         ), f"Expected 2 sample sessions but found {len(sample_exported)}. Total exported: {len(exported)}"
 
         # Check metadata structure
-        assert sample_exported[0]["metadata"]["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
+        assert sample_exported[0]["metadata"]["session_id"] in [
+            "myproj-9Kx7Z2",
+            "myproj-9Kx8A3B",
+        ]
 
 
 class TestSessionsChatFlags:
@@ -266,7 +281,11 @@ class TestSessionsClearCommand:
         sessions_before = persistence.list_sessions(limit=100)
         # Filter to sample sessions
         sample_count = len(
-            [s for s in sessions_before if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]]
+            [
+                s
+                for s in sessions_before
+                if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
+            ]
         )
         assert sample_count == 2
 
@@ -281,7 +300,9 @@ class TestSessionsClearCommand:
         sessions_after = persistence.list_sessions(limit=100)
         # Filter to check if sample sessions are gone
         sample_after = [
-            s for s in sessions_after if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
+            s
+            for s in sessions_after
+            if s["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
         ]
         assert len(sample_after) == 0
 

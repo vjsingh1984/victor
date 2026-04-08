@@ -56,7 +56,9 @@ class TestToolAlias:
         def custom_resolver(name: str) -> str:
             return "resolved_" + name
 
-        alias = ToolAlias(canonical_name="custom", aliases=["alt"], resolver=custom_resolver)
+        alias = ToolAlias(
+            canonical_name="custom", aliases=["alt"], resolver=custom_resolver
+        )
         assert alias.canonical_name == "custom"
         assert alias.aliases == ["alt"]
         assert alias.resolver is custom_resolver

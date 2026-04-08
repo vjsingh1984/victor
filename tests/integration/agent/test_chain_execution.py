@@ -382,7 +382,9 @@ class TestYAMLWorkflowChainReferences:
         # Register a chain
         @chain("coding:analyze_imports")
         def analyze_imports_factory():
-            return RunnableLambda(lambda x: {"imports": ["os", "sys"], "code": x.get("code", "")})
+            return RunnableLambda(
+                lambda x: {"imports": ["os", "sys"], "code": x.get("code", "")}
+            )
 
         # The handler string for YAML workflow would be: "chain:coding:analyze_imports"
         handler = f"{CHAIN_HANDLER_PREFIX}coding:analyze_imports"
@@ -408,12 +410,17 @@ class TestYAMLWorkflowChainReferences:
         # Register chains that would be referenced from YAML workflows
         @chain("dataanalysis:preprocess")
         def preprocess_factory():
-            return RunnableLambda(lambda x: {"preprocessed": True, "rows": len(x.get("data", []))})
+            return RunnableLambda(
+                lambda x: {"preprocessed": True, "rows": len(x.get("data", []))}
+            )
 
         @chain("dataanalysis:analyze")
         def analyze_factory():
             return RunnableLambda(
-                lambda x: {"analyzed": True, "result": f"Analyzed {x.get('rows', 0)} rows"}
+                lambda x: {
+                    "analyzed": True,
+                    "result": f"Analyzed {x.get('rows', 0)} rows",
+                }
             )
 
         # Simulate what the workflow executor does when resolving chain handlers
@@ -454,14 +461,18 @@ class TestYAMLWorkflowChainReferences:
         # Register chains that simulate a workflow pipeline
         @chain("research:gather")
         def gather_factory():
-            return RunnableLambda(lambda x: {**x, "sources": ["source1", "source2", "source3"]})
+            return RunnableLambda(
+                lambda x: {**x, "sources": ["source1", "source2", "source3"]}
+            )
 
         @chain("research:filter")
         def filter_factory():
             return RunnableLambda(
                 lambda x: {
                     **x,
-                    "filtered_sources": [s for s in x.get("sources", []) if "1" in s or "2" in s],
+                    "filtered_sources": [
+                        s for s in x.get("sources", []) if "1" in s or "2" in s
+                    ],
                 }
             )
 
@@ -503,7 +514,9 @@ class TestEndToEndChainExecution:
 
         @chain("e2e:simple", description="Simple end-to-end chain")
         def simple_chain():
-            return RunnableLambda(lambda x: {"greeting": f"Hello, {x.get('name', 'World')}!"})
+            return RunnableLambda(
+                lambda x: {"greeting": f"Hello, {x.get('name', 'World')}!"}
+            )
 
         # Create and execute
         runnable = create_chain("e2e:simple")
@@ -517,7 +530,9 @@ class TestEndToEndChainExecution:
 
         @chain("e2e:multi_step", description="Multi-step processing")
         def multi_step_chain():
-            normalize = RunnableLambda(lambda x: {"text": x.get("raw", "").strip().lower()})
+            normalize = RunnableLambda(
+                lambda x: {"text": x.get("raw", "").strip().lower()}
+            )
             tokenize = RunnableLambda(lambda x: {"tokens": x.get("text", "").split()})
             count = RunnableLambda(lambda x: {"word_count": len(x.get("tokens", []))})
             return normalize | tokenize | count
@@ -557,15 +572,21 @@ class TestEndToEndChainExecution:
             return RunnableBranch(
                 (
                     lambda x: x.get("ext") == ".py",
-                    RunnableLambda(lambda x: {"processor": "python", "syntax": "valid"}),
+                    RunnableLambda(
+                        lambda x: {"processor": "python", "syntax": "valid"}
+                    ),
                 ),
                 (
                     lambda x: x.get("ext") == ".js",
-                    RunnableLambda(lambda x: {"processor": "javascript", "syntax": "valid"}),
+                    RunnableLambda(
+                        lambda x: {"processor": "javascript", "syntax": "valid"}
+                    ),
                 ),
                 (
                     lambda x: x.get("ext") == ".md",
-                    RunnableLambda(lambda x: {"processor": "markdown", "rendered": True}),
+                    RunnableLambda(
+                        lambda x: {"processor": "markdown", "rendered": True}
+                    ),
                 ),
                 default=RunnableLambda(lambda x: {"processor": "text", "raw": True}),
             )
@@ -934,7 +955,8 @@ class TestConcurrentChainAccess:
 
         # Register from multiple threads
         threads = [
-            threading.Thread(target=register_chains, args=(f"thread{t}", 20)) for t in range(3)
+            threading.Thread(target=register_chains, args=(f"thread{t}", 20))
+            for t in range(3)
         ]
 
         for t in threads:
@@ -995,7 +1017,9 @@ class TestChainErrorHandling:
         def partial_parallel_factory():
             return RunnableParallel(
                 success=RunnableLambda(lambda x: {"status": "ok"}),
-                failure=RunnableLambda(lambda x: (_ for _ in ()).throw(ValueError("Oops"))),
+                failure=RunnableLambda(
+                    lambda x: (_ for _ in ()).throw(ValueError("Oops"))
+                ),
             )
 
         runnable = create_chain("errors:partial_parallel")

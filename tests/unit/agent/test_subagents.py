@@ -208,7 +208,11 @@ class TestRolePrompts:
     def test_executor_prompt_allows_modifications(self):
         """Verify executor prompt mentions code modification."""
         prompt = get_role_prompt(SubAgentRole.EXECUTOR)
-        assert "modif" in prompt.lower() or "write" in prompt.lower() or "edit" in prompt.lower()
+        assert (
+            "modif" in prompt.lower()
+            or "write" in prompt.lower()
+            or "edit" in prompt.lower()
+        )
 
     def test_tester_prompt_mentions_tests(self):
         """Verify tester prompt mentions test creation."""
@@ -326,7 +330,9 @@ class TestSubAgent:
         prompt = subagent._get_role_prompt()
         assert prompt == "Custom prompt for this task"
 
-    def test_get_role_prompt_uses_default(self, sample_config, mock_parent_orchestrator):
+    def test_get_role_prompt_uses_default(
+        self, sample_config, mock_parent_orchestrator
+    ):
         """Test default role prompt is used when no override."""
         subagent = SubAgent(sample_config, mock_parent_orchestrator)
         prompt = subagent._get_role_prompt()
@@ -562,7 +568,10 @@ class TestOrchestratorSubAgentIntegration:
         # Check for lazy initialization pattern
         assert "_intelligent_pipeline_enabled" in source
         assert "_intelligent_integration is None" in source
-        assert "from victor.agent.orchestrator_integration import OrchestratorIntegration" in source
+        assert (
+            "from victor.agent.orchestrator_integration import OrchestratorIntegration"
+            in source
+        )
 
     def test_subagent_orchestrator_returns_none_when_disabled(self):
         """Test that property returns None when subagent orchestration is disabled."""

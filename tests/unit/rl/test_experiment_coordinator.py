@@ -107,7 +107,9 @@ class TestExperimentCoordinator:
 
         assert result is True
         assert sample_config.experiment_id in coordinator._experiments
-        assert coordinator._status[sample_config.experiment_id] == ExperimentStatus.DRAFT
+        assert (
+            coordinator._status[sample_config.experiment_id] == ExperimentStatus.DRAFT
+        )
 
     def test_create_duplicate_experiment_fails(
         self, coordinator: ExperimentCoordinator, sample_config: ExperimentConfig
@@ -126,9 +128,13 @@ class TestExperimentCoordinator:
         result = coordinator.start_experiment(sample_config.experiment_id)
 
         assert result is True
-        assert coordinator._status[sample_config.experiment_id] == ExperimentStatus.RUNNING
+        assert (
+            coordinator._status[sample_config.experiment_id] == ExperimentStatus.RUNNING
+        )
 
-    def test_start_nonexistent_experiment_fails(self, coordinator: ExperimentCoordinator) -> None:
+    def test_start_nonexistent_experiment_fails(
+        self, coordinator: ExperimentCoordinator
+    ) -> None:
         """Test starting nonexistent experiment fails."""
         result = coordinator.start_experiment("nonexistent")
         assert result is False
@@ -142,7 +148,9 @@ class TestExperimentCoordinator:
         result = coordinator.pause_experiment(sample_config.experiment_id)
 
         assert result is True
-        assert coordinator._status[sample_config.experiment_id] == ExperimentStatus.PAUSED
+        assert (
+            coordinator._status[sample_config.experiment_id] == ExperimentStatus.PAUSED
+        )
 
     def test_assign_variant_not_running_returns_none(
         self, coordinator: ExperimentCoordinator, sample_config: ExperimentConfig
@@ -176,7 +184,9 @@ class TestExperimentCoordinator:
         treatment_count = 0
 
         for i in range(100):
-            variant = coordinator.assign_variant(sample_config.experiment_id, f"session_{i}")
+            variant = coordinator.assign_variant(
+                sample_config.experiment_id, f"session_{i}"
+            )
             if variant == sample_config.control.name:
                 control_count += 1
             else:
@@ -219,7 +229,9 @@ class TestExperimentCoordinator:
         for i in range(5):
             session_id = f"session_{i}"
             coordinator.assign_variant(sample_config.experiment_id, session_id)
-            coordinator.record_outcome(sample_config.experiment_id, session_id, success=True)
+            coordinator.record_outcome(
+                sample_config.experiment_id, session_id, success=True
+            )
 
         result = coordinator.analyze_experiment(sample_config.experiment_id)
 
@@ -276,7 +288,10 @@ class TestExperimentCoordinator:
         result = coordinator.rollout_treatment(sample_config.experiment_id)
 
         assert result is True
-        assert coordinator._status[sample_config.experiment_id] == ExperimentStatus.ROLLED_OUT
+        assert (
+            coordinator._status[sample_config.experiment_id]
+            == ExperimentStatus.ROLLED_OUT
+        )
 
     def test_rollback_experiment(
         self, coordinator: ExperimentCoordinator, sample_config: ExperimentConfig
@@ -287,7 +302,10 @@ class TestExperimentCoordinator:
         result = coordinator.rollback_experiment(sample_config.experiment_id)
 
         assert result is True
-        assert coordinator._status[sample_config.experiment_id] == ExperimentStatus.ROLLED_BACK
+        assert (
+            coordinator._status[sample_config.experiment_id]
+            == ExperimentStatus.ROLLED_BACK
+        )
 
     def test_get_experiment_status(
         self, coordinator: ExperimentCoordinator, sample_config: ExperimentConfig
@@ -360,6 +378,8 @@ class TestExperimentCoordinator:
             custom_metrics={"tool_count": 5, "tokens_used": 1000},
         )
 
-        metrics = coordinator._metrics[sample_config.experiment_id][sample_config.control.name]
+        metrics = coordinator._metrics[sample_config.experiment_id][
+            sample_config.control.name
+        ]
         assert metrics.metric_sums.get("tool_count") == 5
         assert metrics.metric_sums.get("tokens_used") == 1000

@@ -52,7 +52,9 @@ class MockResponse:
 def _provider_returning(response_json: dict) -> MagicMock:
     """Create a mock provider that returns a specific JSON response."""
     provider = MagicMock()
-    provider.chat = AsyncMock(return_value=MockResponse(content=json.dumps(response_json)))
+    provider.chat = AsyncMock(
+        return_value=MockResponse(content=json.dumps(response_json))
+    )
     return provider
 
 
@@ -60,7 +62,9 @@ class TestAllDecisionTypes:
     """Verify each decision type can be called end-to-end."""
 
     async def test_task_completion_e2e(self):
-        provider = _provider_returning({"is_complete": True, "confidence": 0.95, "phase": "done"})
+        provider = _provider_returning(
+            {"is_complete": True, "confidence": 0.95, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -101,7 +105,9 @@ class TestAllDecisionTypes:
 
         result = await service.decide(
             DecisionType.TASK_TYPE_CLASSIFICATION,
-            context={"message_excerpt": "Review the authentication module for security issues"},
+            context={
+                "message_excerpt": "Review the authentication module for security issues"
+            },
             heuristic_confidence=0.4,
         )
 
@@ -109,7 +115,9 @@ class TestAllDecisionTypes:
         assert result.result.task_type == "analysis"
 
     async def test_question_classification_e2e(self):
-        provider = _provider_returning({"question_type": "rhetorical", "confidence": 0.8})
+        provider = _provider_returning(
+            {"question_type": "rhetorical", "confidence": 0.8}
+        )
         service = LLMDecisionService(provider=provider, model="test")
 
         result = await service.decide(
@@ -211,7 +219,9 @@ class TestFullPipelineWithTaskCompletion:
 
     def test_detector_with_service_full_flow(self):
         """Simulate a complete flow: ambiguous response -> LLM augments -> completion detected."""
-        provider = _provider_returning({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _provider_returning(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         service = LLMDecisionService(provider=provider, model="test")
         detector = TaskCompletionDetector(decision_service=service)
 
@@ -232,19 +242,29 @@ class TestFullPipelineWithTaskCompletion:
 
     async def test_service_budget_across_multiple_detectors(self):
         """Budget is shared when the same service instance is used."""
-        provider = _provider_returning({"is_complete": True, "confidence": 0.9, "phase": "done"})
+        provider = _provider_returning(
+            {"is_complete": True, "confidence": 0.9, "phase": "done"}
+        )
         config = LLMDecisionServiceConfig(micro_budget=2)
         service = LLMDecisionService(provider=provider, model="test", config=config)
 
         # Use direct service calls with unique contexts to consume budget
         await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "unique_a", "deliverable_count": 0, "signal_count": 0},
+            context={
+                "response_tail": "unique_a",
+                "deliverable_count": 0,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.1,
         )
         await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "unique_b", "deliverable_count": 0, "signal_count": 0},
+            context={
+                "response_tail": "unique_b",
+                "deliverable_count": 0,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.1,
         )
         assert service.budget_remaining == 0
@@ -252,7 +272,11 @@ class TestFullPipelineWithTaskCompletion:
         # Next call with new context should hit budget exhaustion
         result = await service.decide(
             DecisionType.TASK_COMPLETION,
-            context={"response_tail": "unique_c", "deliverable_count": 0, "signal_count": 0},
+            context={
+                "response_tail": "unique_c",
+                "deliverable_count": 0,
+                "signal_count": 0,
+            },
             heuristic_confidence=0.1,
         )
         assert result.source == "budget_exhausted"
@@ -270,14 +294,22 @@ class TestFullPipelineWithTaskCompletion:
         asyncio.run(
             service.decide(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "a", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "a",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_confidence=0.1,
             )
         )
         asyncio.run(
             service.decide(
                 DecisionType.TASK_COMPLETION,
-                context={"response_tail": "b", "deliverable_count": 0, "signal_count": 0},
+                context={
+                    "response_tail": "b",
+                    "deliverable_count": 0,
+                    "signal_count": 0,
+                },
                 heuristic_confidence=0.1,
             )
         )

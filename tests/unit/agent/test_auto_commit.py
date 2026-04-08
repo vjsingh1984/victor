@@ -37,14 +37,20 @@ def temp_git_repo():
         # Initialize git repo
         subprocess.run(["git", "init"], cwd=repo, capture_output=True)
         subprocess.run(
-            ["git", "config", "user.email", "test@test.com"], cwd=repo, capture_output=True
+            ["git", "config", "user.email", "test@test.com"],
+            cwd=repo,
+            capture_output=True,
         )
-        subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"], cwd=repo, capture_output=True
+        )
 
         # Create initial commit
         (repo / "README.md").write_text("# Test\n")
         subprocess.run(["git", "add", "."], cwd=repo, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=repo, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"], cwd=repo, capture_output=True
+        )
 
         yield repo
 

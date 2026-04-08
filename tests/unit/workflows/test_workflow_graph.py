@@ -253,9 +253,9 @@ class TestBasicWorkflowGraph:
 
         graph.add_node(node1).add_node(node2).add_node(node3)
 
-        result = graph.add_edge(WorkflowEdge(source_id="node1", target_id="node2")).add_edge(
-            WorkflowEdge(source_id="node2", target_id="node3")
-        )
+        result = graph.add_edge(
+            WorkflowEdge(source_id="node1", target_id="node2")
+        ).add_edge(WorkflowEdge(source_id="node2", target_id="node3"))
 
         assert result is graph
 
@@ -298,10 +298,14 @@ class TestBasicWorkflowGraph:
             .add_node(node2)
             .add_node(node3)
             .add_edge(
-                ConditionalEdge(source_id="check", target_id="success", condition=success_condition)
+                ConditionalEdge(
+                    source_id="check", target_id="success", condition=success_condition
+                )
             )
             .add_edge(
-                ConditionalEdge(source_id="check", target_id="failure", condition=failure_condition)
+                ConditionalEdge(
+                    source_id="check", target_id="failure", condition=failure_condition
+                )
             )
         )
 

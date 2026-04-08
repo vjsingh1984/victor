@@ -68,7 +68,9 @@ def test_create_provider_runtime_components_provider_coordinator_lazy():
 
     assert runtime.provider_coordinator.initialized is False
 
-    with patch("victor.agent.provider_coordinator.ProviderCoordinator") as coordinator_cls:
+    with patch(
+        "victor.agent.provider_coordinator.ProviderCoordinator"
+    ) as coordinator_cls:
         coordinator_instance = MagicMock()
         coordinator_cls.return_value = coordinator_instance
 

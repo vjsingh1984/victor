@@ -30,7 +30,10 @@ from victor.coordination.formations.multi_level_hierarchy import (
     MultiLevelHierarchyFormation,
     HierarchyNode,
 )
-from victor.coordination.formations.adaptive import AdaptiveFormation, AdaptationStrategy
+from victor.coordination.formations.adaptive import (
+    AdaptiveFormation,
+    AdaptationStrategy,
+)
 from victor.coordination.formations.base import TeamContext
 from victor.teams.types import AgentMessage, MessageType
 
@@ -58,7 +61,9 @@ def mock_critic():
     """Create a mock critic agent for reflection formation."""
     agent = MagicMock()
     agent.id = "critic"
-    agent.execute = AsyncMock(side_effect=["Needs improvement", "Better but fix X", "Good!"])
+    agent.execute = AsyncMock(
+        side_effect=["Needs improvement", "Better but fix X", "Good!"]
+    )
     return agent
 
 
@@ -121,7 +126,9 @@ class TestReflectionFormation:
     ):
         """Test custom satisfaction keywords."""
         # Use custom keyword that won't appear in critic responses
-        formation = ReflectionFormation(max_iterations=3, satisfaction_keywords=["perfect"])
+        formation = ReflectionFormation(
+            max_iterations=3, satisfaction_keywords=["perfect"]
+        )
 
         team_context.set("generator", mock_generator)
         team_context.set("critic", mock_critic)
@@ -137,7 +144,9 @@ class TestReflectionFormation:
         assert results[0].metadata["satisfied"] is False
 
     @pytest.mark.asyncio
-    async def test_reflection_formation_missing_generator(self, team_context, mock_critic):
+    async def test_reflection_formation_missing_generator(
+        self, team_context, mock_critic
+    ):
         """Test error handling when generator is missing."""
         formation = ReflectionFormation()
 
@@ -273,7 +282,9 @@ class TestDynamicRouterFormation:
 
         # Task with 'analyze' keyword
         task = AgentMessage(
-            sender_id="test", content="Analyze the data trends", message_type=MessageType.TASK
+            sender_id="test",
+            content="Analyze the data trends",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -283,7 +294,9 @@ class TestDynamicRouterFormation:
         assert results[0].metadata["routing_method"] == "keyword"
 
     @pytest.mark.asyncio
-    async def test_dynamic_router_custom_mappings(self, team_context, mock_coder, mock_researcher):
+    async def test_dynamic_router_custom_mappings(
+        self, team_context, mock_coder, mock_researcher
+    ):
         """Test custom category and keyword mappings."""
         formation = DynamicRouterFormation(
             category_to_role={"custom": "coder"},
@@ -295,7 +308,9 @@ class TestDynamicRouterFormation:
 
         # Task with custom keyword
         task = AgentMessage(
-            sender_id="test", content="Use custom_keyword to process", message_type=MessageType.TASK
+            sender_id="test",
+            content="Use custom_keyword to process",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -312,7 +327,9 @@ class TestDynamicRouterFormation:
 
         # Task without clear routing signals
         task = AgentMessage(
-            sender_id="test", content="Do something generic", message_type=MessageType.TASK
+            sender_id="test",
+            content="Do something generic",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -321,7 +338,9 @@ class TestDynamicRouterFormation:
         assert results[0].success is True
 
     @pytest.mark.asyncio
-    async def test_dynamic_router_agent_failure(self, team_context, mock_coder, mock_researcher):
+    async def test_dynamic_router_agent_failure(
+        self, team_context, mock_coder, mock_researcher
+    ):
         """Test error handling when selected agent fails."""
         formation = DynamicRouterFormation()
 
@@ -331,7 +350,9 @@ class TestDynamicRouterFormation:
         mock_coder.execute.side_effect = Exception("Execution failed")
 
         task = AgentMessage(
-            sender_id="test", content="Implement a function", message_type=MessageType.TASK
+            sender_id="test",
+            content="Implement a function",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -368,7 +389,9 @@ class TestMultiLevelHierarchyFormation:
         formation = MultiLevelHierarchyFormation(hierarchy=leaf)
 
         task = AgentMessage(
-            sender_id="test", content="Complete this task", message_type=MessageType.TASK
+            sender_id="test",
+            content="Complete this task",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -402,7 +425,9 @@ class TestMultiLevelHierarchyFormation:
         formation = MultiLevelHierarchyFormation(hierarchy=lead)
 
         task = AgentMessage(
-            sender_id="test", content="Complete this task", message_type=MessageType.TASK
+            sender_id="test",
+            content="Complete this task",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -442,7 +467,9 @@ class TestMultiLevelHierarchyFormation:
         formation = MultiLevelHierarchyFormation(hierarchy=coordinator_node)
 
         task = AgentMessage(
-            sender_id="test", content="Complete complex task", message_type=MessageType.TASK
+            sender_id="test",
+            content="Complete complex task",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -510,7 +537,9 @@ class TestMultiLevelHierarchyFormation:
         leaf2 = HierarchyNode(agent=worker2)
         lead_node = HierarchyNode(agent=lead, children=[leaf1, leaf2])
 
-        formation = MultiLevelHierarchyFormation(hierarchy=lead_node, split_strategy="line")
+        formation = MultiLevelHierarchyFormation(
+            hierarchy=lead_node, split_strategy="line"
+        )
 
         # Multi-line task
         task = AgentMessage(
@@ -576,7 +605,9 @@ class TestAdaptiveFormation:
         return agents
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_initial_selection(self, team_context, mock_agents):
+    async def test_adaptive_formation_initial_selection(
+        self, team_context, mock_agents
+    ):
         """Test initial formation selection based on task size."""
         formation = AdaptiveFormation(adaptation_strategy="performance")
 
@@ -632,7 +663,9 @@ class TestAdaptiveFormation:
             )
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -652,7 +685,9 @@ class TestAdaptiveFormation:
             agent.execute = AsyncMock(return_value=f"Result {i}")
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -671,7 +706,9 @@ class TestAdaptiveFormation:
             agent.execute = AsyncMock(return_value=f"Result {i}")
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -679,14 +716,18 @@ class TestAdaptiveFormation:
         assert results[0].metadata["formation_switches"] <= 1
 
     @pytest.mark.asyncio
-    async def test_adaptive_formation_formation_history_tracking(self, team_context, mock_agents):
+    async def test_adaptive_formation_formation_history_tracking(
+        self, team_context, mock_agents
+    ):
         """Test that formation history is tracked correctly."""
         formation = AdaptiveFormation(adaptation_strategy="performance")
 
         for agent in mock_agents:
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 
@@ -737,7 +778,9 @@ class TestAdaptiveFormation:
             agent.execute = AsyncMock(return_value=f"Result {i}")
             team_context.set(agent.id, agent)
 
-        task = AgentMessage(sender_id="test", content="Test task", message_type=MessageType.TASK)
+        task = AgentMessage(
+            sender_id="test", content="Test task", message_type=MessageType.TASK
+        )
 
         results = await formation.execute([], team_context, task)
 

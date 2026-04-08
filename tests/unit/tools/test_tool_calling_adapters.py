@@ -46,7 +46,9 @@ class TestAnthropicAdapter:
     def test_parse_tool_calls_native(self):
         """Test parsing native Anthropic tool calls."""
         adapter = AnthropicToolCallingAdapter(model="claude-3-sonnet")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "test_func"
@@ -91,7 +93,9 @@ class TestOpenAIAdapter:
     def test_parse_tool_calls_native(self):
         """Test parsing native OpenAI tool calls."""
         adapter = OpenAIToolCallingAdapter(model="gpt-4")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": '{"arg": "value"}'}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": '{"arg": "value"}'}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "test_func"
@@ -135,7 +139,9 @@ class TestOllamaAdapter:
     def test_parse_tool_calls_native(self):
         """Test parsing native Ollama tool calls."""
         adapter = OllamaToolCallingAdapter(model="llama3.1:8b")
-        raw_tool_calls = [{"function": {"name": "test_func", "arguments": {"arg": "value"}}}]
+        raw_tool_calls = [
+            {"function": {"name": "test_func", "arguments": {"arg": "value"}}}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
 
@@ -163,12 +169,16 @@ class TestOpenAICompatAdapter:
 
     def test_provider_name_lmstudio(self):
         """Test provider name for LMStudio."""
-        adapter = OpenAICompatToolCallingAdapter(model="local-model", provider_variant="lmstudio")
+        adapter = OpenAICompatToolCallingAdapter(
+            model="local-model", provider_variant="lmstudio"
+        )
         assert adapter.provider_name == "lmstudio"
 
     def test_provider_name_vllm(self):
         """Test provider name for vLLM."""
-        adapter = OpenAICompatToolCallingAdapter(model="local-model", provider_variant="vllm")
+        adapter = OpenAICompatToolCallingAdapter(
+            model="local-model", provider_variant="vllm"
+        )
         assert adapter.provider_name == "vllm"
 
     def test_convert_tools(self):
@@ -219,7 +229,9 @@ class TestAnthropicAdapterEdgeCases:
         """Test parsing tool calls with dict arguments."""
         adapter = AnthropicToolCallingAdapter(model="claude-3-sonnet")
         # Anthropic API returns arguments as dicts, not JSON strings
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].arguments == {"arg": "value"}
@@ -250,14 +262,18 @@ class TestOpenAIAdapterEdgeCases:
     def test_parse_dict_arguments(self):
         """Test parsing tool calls with dict arguments."""
         adapter = OpenAIToolCallingAdapter(model="gpt-4")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
 
     def test_parse_invalid_json_arguments(self):
         """Test parsing tool calls with invalid JSON arguments."""
         adapter = OpenAIToolCallingAdapter(model="gpt-4")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": "invalid json {{"}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": "invalid json {{"}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert len(result.warnings) > 0
@@ -289,9 +305,7 @@ class TestOllamaAdapterEdgeCases:
     def test_parse_tool_call_xml_format(self):
         """Test parsing <tool_call> XML format."""
         adapter = OllamaToolCallingAdapter(model="qwen2.5:7b")
-        content = (
-            '<tool_call><name>test_func</name><arguments>{"arg": "val"}</arguments></tool_call>'
-        )
+        content = '<tool_call><name>test_func</name><arguments>{"arg": "val"}</arguments></tool_call>'
         result = adapter.parse_tool_calls(content, None)
         assert result is not None
 
@@ -312,7 +326,9 @@ class TestOpenAICompatAdapterEdgeCases:
 
     def test_parse_tool_calls(self):
         """Test parsing tool calls."""
-        adapter = OpenAICompatToolCallingAdapter(model="llama3.1:8b", provider_variant="vllm")
+        adapter = OpenAICompatToolCallingAdapter(
+            model="llama3.1:8b", provider_variant="vllm"
+        )
         raw_tool_calls = [{"id": "call_123", "name": "test", "arguments": {"x": 1}}]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
@@ -376,7 +392,10 @@ class TestBedrockAdapter:
             ToolDefinition(
                 name="test_tool",
                 description="A test tool",
-                parameters={"type": "object", "properties": {"arg": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"arg": {"type": "string"}},
+                },
             )
         ]
         result = adapter.convert_tools(tools)
@@ -402,7 +421,9 @@ class TestBedrockAdapter:
     def test_bedrock_parse_tool_calls(self):
         """Test parsing Bedrock tool calls where arguments are already parsed as dict."""
         adapter = BedrockToolCallingAdapter(model="anthropic.claude-3-sonnet")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "test_func"
@@ -449,7 +470,9 @@ class TestBedrockAdapterEdgeCases:
     def test_bedrock_parse_string_arguments_fallback(self):
         """Test that string arguments are parsed as JSON."""
         adapter = BedrockToolCallingAdapter(model="anthropic.claude-3-sonnet")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": '{"arg": "value"}'}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": '{"arg": "value"}'}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].arguments == {"arg": "value"}
@@ -541,7 +564,9 @@ class TestAzureOpenAIAdapter:
     def test_azure_parse_tool_calls_native(self):
         """Test parsing native Azure OpenAI tool calls."""
         adapter = AzureOpenAIToolCallingAdapter(model="gpt-4o")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": '{"arg": "value"}'}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": '{"arg": "value"}'}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "test_func"
@@ -600,7 +625,9 @@ class TestAzureOpenAIAdapterEdgeCases:
     def test_azure_parse_invalid_json_arguments(self):
         """Test parsing tool calls with invalid JSON arguments."""
         adapter = AzureOpenAIToolCallingAdapter(model="gpt-4o")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": "invalid json {{"}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": "invalid json {{"}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.warnings and len(result.warnings) > 0
@@ -608,7 +635,9 @@ class TestAzureOpenAIAdapterEdgeCases:
     def test_azure_parse_dict_arguments(self):
         """Test parsing tool calls with dict arguments (already parsed)."""
         adapter = AzureOpenAIToolCallingAdapter(model="gpt-4o")
-        raw_tool_calls = [{"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}]
+        raw_tool_calls = [
+            {"id": "call_123", "name": "test_func", "arguments": {"arg": "value"}}
+        ]
         result = adapter.parse_tool_calls("", raw_tool_calls)
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].arguments == {"arg": "value"}

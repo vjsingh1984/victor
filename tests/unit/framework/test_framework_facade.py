@@ -33,21 +33,27 @@ class TestResilienceFacade:
     def test_circuit_breaker_reexport_identity(self):
         """Verify CircuitBreaker is same object from both modules."""
         from victor.framework.resilience import CircuitBreaker as FacadeCircuitBreaker
-        from victor.providers.circuit_breaker import CircuitBreaker as OriginalCircuitBreaker
+        from victor.providers.circuit_breaker import (
+            CircuitBreaker as OriginalCircuitBreaker,
+        )
 
         assert FacadeCircuitBreaker is OriginalCircuitBreaker
 
     def test_circuit_breaker_error_reexport_identity(self):
         """Verify CircuitBreakerError is same object from both modules."""
         from victor.framework.resilience import CircuitBreakerError as FacadeError
-        from victor.providers.circuit_breaker import CircuitBreakerError as OriginalError
+        from victor.providers.circuit_breaker import (
+            CircuitBreakerError as OriginalError,
+        )
 
         assert FacadeError is OriginalError
 
     def test_circuit_breaker_registry_reexport_identity(self):
         """Verify CircuitBreakerRegistry is same object from both modules."""
         from victor.framework.resilience import CircuitBreakerRegistry as FacadeRegistry
-        from victor.providers.circuit_breaker import CircuitBreakerRegistry as OriginalRegistry
+        from victor.providers.circuit_breaker import (
+            CircuitBreakerRegistry as OriginalRegistry,
+        )
 
         assert FacadeRegistry is OriginalRegistry
 
@@ -567,7 +573,9 @@ class TestFrameworkMainExports:
         assert (
             len(_RESILIENCE_EXPORTS) == 26
         ), f"Expected 26 resilience exports, got {len(_RESILIENCE_EXPORTS)}"
-        assert len(_HEALTH_EXPORTS) == 19, f"Expected 19 health exports, got {len(_HEALTH_EXPORTS)}"
+        assert (
+            len(_HEALTH_EXPORTS) == 19
+        ), f"Expected 19 health exports, got {len(_HEALTH_EXPORTS)}"
         assert (
             len(_METRICS_EXPORTS) == 13
         ), f"Expected 13 metrics exports, got {len(_METRICS_EXPORTS)}"

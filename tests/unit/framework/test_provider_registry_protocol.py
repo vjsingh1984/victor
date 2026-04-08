@@ -6,7 +6,10 @@ import warnings
 
 import pytest
 
-from victor.framework.providers.protocol import ProviderRegistry, _WARNED_LEGACY_PROVIDER_GROUPS
+from victor.framework.providers.protocol import (
+    ProviderRegistry,
+    _WARNED_LEGACY_PROVIDER_GROUPS,
+)
 
 
 def test_provider_registry_prefers_canonical_team_provider_group(monkeypatch) -> None:

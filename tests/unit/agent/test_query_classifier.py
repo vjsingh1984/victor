@@ -4,7 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.query_classifier import QueryClassification, QueryClassifier, QueryType
+from victor.agent.query_classifier import (
+    QueryClassification,
+    QueryClassifier,
+    QueryType,
+)
 from victor.framework.task.protocols import TaskClassification, TaskComplexity
 
 
@@ -60,7 +64,9 @@ class TestPlanningDecision:
                 confidence=0.9,
                 matched_patterns=["explore"],
             )
-            result = classifier.classify("Explore all API endpoints across the codebase")
+            result = classifier.classify(
+                "Explore all API endpoints across the codebase"
+            )
             assert result.should_use_subagents is True
 
     def test_simple_query_no_subagents(self, classifier):

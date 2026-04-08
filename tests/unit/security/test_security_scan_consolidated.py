@@ -28,7 +28,8 @@ async def test_security_scan_secrets():
         # Create a test file with a secret
         test_file = Path(tmpdir) / "test.py"
         test_file.write_text(
-            'api_key = "sk-1234567890abcdef1234567890abcdef"\n' 'password = "SuperSecret123"\n'
+            'api_key = "sk-1234567890abcdef1234567890abcdef"\n'
+            'password = "SuperSecret123"\n'
         )
 
         # Run secrets scan
@@ -48,7 +49,9 @@ async def test_security_scan_config():
         # Create a test file with config issues
         test_file = Path(tmpdir) / "config.py"
         test_file.write_text(
-            "DEBUG = True\n" 'API_URL = "http://insecure-api.com"\n' 'SERVER_IP = "192.168.1.100"\n'
+            "DEBUG = True\n"
+            'API_URL = "http://insecure-api.com"\n'
+            'SERVER_IP = "192.168.1.100"\n'
         )
 
         # Run config scan

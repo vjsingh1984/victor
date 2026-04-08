@@ -190,7 +190,9 @@ class TestAdditionalCommandSyncBridges:
 
         with (
             patch.object(test_provider_cmd, "test_provider_async", mock_async),
-            patch.object(test_provider_cmd, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                test_provider_cmd, "run_sync", return_value=None
+            ) as mock_run_sync,
             patch.object(test_provider_cmd.console, "print"),
         ):
             test_provider_cmd.test_provider(
@@ -234,7 +236,11 @@ class TestABTestingSyncBridge:
     @pytest.mark.parametrize(
         ("command", "helper_name", "args"),
         [
-            ("create_experiment", "_create_experiment_async", (Path("experiment.yaml"),)),
+            (
+                "create_experiment",
+                "_create_experiment_async",
+                (Path("experiment.yaml"),),
+            ),
             ("start_experiment", "_start_experiment_async", ("exp_123",)),
             ("stop_experiment", "_stop_experiment_async", ("exp_123",)),
             ("show_status", "_show_status_async", ("exp_123",)),
@@ -252,7 +258,9 @@ class TestABTestingSyncBridge:
 
         with (
             patch.object(ab_testing_cmd, helper_name, mock_async),
-            patch.object(ab_testing_cmd, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                ab_testing_cmd, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             getattr(ab_testing_cmd, command)(*args)
 
@@ -273,7 +281,9 @@ class TestOptimizationSyncBridge:
 
         with (
             patch.object(optimization_cmd, "_profile_async", mock_async),
-            patch.object(optimization_cmd, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                optimization_cmd, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             optimization_cmd.profile.callback("workflow-a", 5, "profile.json")
 
@@ -286,9 +296,13 @@ class TestOptimizationSyncBridge:
 
         with (
             patch.object(optimization_cmd, "_suggest_async", mock_async),
-            patch.object(optimization_cmd, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                optimization_cmd, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
-            optimization_cmd.suggest.callback("workflow-a", 4, 8, 0.7, 0.2, "suggestions.json")
+            optimization_cmd.suggest.callback(
+                "workflow-a", 4, 8, 0.7, 0.2, "suggestions.json"
+            )
 
         mock_async.assert_called_once_with(
             workflow_id="workflow-a",
@@ -306,7 +320,9 @@ class TestOptimizationSyncBridge:
 
         with (
             patch.object(optimization_cmd, "_optimize_async", mock_async),
-            patch.object(optimization_cmd, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                optimization_cmd, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
             optimization_cmd.optimize.callback(
                 "workflow-a",
@@ -333,9 +349,13 @@ class TestOptimizationSyncBridge:
 
         with (
             patch.object(optimization_cmd, "_validate_async", mock_async),
-            patch.object(optimization_cmd, "run_sync", return_value=None) as mock_run_sync,
+            patch.object(
+                optimization_cmd, "run_sync", return_value=None
+            ) as mock_run_sync,
         ):
-            optimization_cmd.validate.callback("variant.json", "workflow-a", "tests.json")
+            optimization_cmd.validate.callback(
+                "variant.json", "workflow-a", "tests.json"
+            )
 
         mock_async.assert_called_once_with("variant.json", "workflow-a", "tests.json")
         mock_run_sync.assert_called_once_with(coro)
@@ -348,7 +368,9 @@ class TestConfigSyncBridge:
     ) -> None:
         config_dir = tmp_path / ".victor"
         config_dir.mkdir()
-        (config_dir / "profiles.yaml").write_text("profiles:\n  default:\n    provider: ollama\n")
+        (config_dir / "profiles.yaml").write_text(
+            "profiles:\n  default:\n    provider: ollama\n"
+        )
 
         settings = MagicMock()
         settings.get_config_dir.return_value = config_dir
@@ -374,7 +396,8 @@ class TestConfigSyncBridge:
             ),
             patch.object(config_cmd, "format_validation_result", return_value="ok"),
             patch(
-                "victor.providers.registry.ProviderRegistry.list_providers", return_value=["ollama"]
+                "victor.providers.registry.ProviderRegistry.list_providers",
+                return_value=["ollama"],
             ),
             patch.object(config_cmd, "_check_connectivity", mock_async),
             patch.object(config_cmd, "run_sync", return_value=None) as mock_run_sync,
@@ -383,7 +406,9 @@ class TestConfigSyncBridge:
         ):
             config_cmd.config_validate(verbose=True, check_connectivity=True, fix=False)
 
-        mock_async.assert_called_once_with(settings, settings.load_profiles.return_value, True)
+        mock_async.assert_called_once_with(
+            settings, settings.load_profiles.return_value, True
+        )
         mock_run_sync.assert_called_once_with(coro)
 
 
@@ -431,10 +456,15 @@ class TestBenchmarkSyncBridge:
 
         with (
             patch.object(benchmark_cmd, "_configure_log_level"),
-            patch("victor.evaluation.benchmarks.HumanEvalRunner", Mock(return_value=runner)),
+            patch(
+                "victor.evaluation.benchmarks.HumanEvalRunner",
+                Mock(return_value=runner),
+            ),
             patch("victor.evaluation.protocol.EvaluationConfig", return_value=config),
             patch.object(benchmark_cmd, "_run_benchmark_async", mock_async),
-            patch.object(benchmark_cmd, "run_sync", return_value=result) as mock_run_sync,
+            patch.object(
+                benchmark_cmd, "run_sync", return_value=result
+            ) as mock_run_sync,
             patch.object(benchmark_cmd.console, "print"),
         ):
             benchmark_cmd.run_benchmark(
@@ -483,7 +513,9 @@ class TestDashboardSyncBridge:
                 log_level="DEBUG",
             )
 
-        mock_async.assert_called_once_with(log_file="events.jsonl", live=False, demo=True)
+        mock_async.assert_called_once_with(
+            log_file="events.jsonl", live=False, demo=True
+        )
         mock_run_sync.assert_called_once_with(coro)
 
 
@@ -782,5 +814,7 @@ class TestChatSyncBridge:
         ):
             chat_cmd._run_default_interactive()
 
-        mock_async.assert_called_once_with(settings, "default", True, False, use_tui=False)
+        mock_async.assert_called_once_with(
+            settings, "default", True, False, use_tui=False
+        )
         mock_run_sync.assert_called_once_with(coro)

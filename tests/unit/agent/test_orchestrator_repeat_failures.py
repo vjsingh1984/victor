@@ -54,7 +54,9 @@ class AlwaysFailTool(BaseTool):
 
 
 @pytest.mark.asyncio
-async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch, tmp_path):
+async def test_repeated_failing_call_is_skipped_after_first_failure(
+    monkeypatch, tmp_path
+):
     """Orchestrator should skip identical failing tool calls to break loops."""
     settings = Settings(
         analytics_enabled=False,
@@ -100,7 +102,9 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch,
     # First call executed once (no retries for explicit ToolResult failures)
     # Second call skipped due to repeat signature (silent skip, no result added)
     # Note: ToolExecutor only retries on exceptions, not on explicit failures via ToolResult.success=False
-    assert failing_tool.attempts == 1  # First call only, no retries for explicit failures
+    assert (
+        failing_tool.attempts == 1
+    )  # First call only, no retries for explicit failures
     assert orch.executed_tools.count("always_fail") == 1
     # Second call is silently skipped (no result added for repeated failures)
     assert len(results) == 1  # Only first call returns a result

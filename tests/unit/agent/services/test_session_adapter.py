@@ -45,7 +45,9 @@ def test_get_session_stats(session_adapter, mock_session_coordinator):
 
 def test_get_memory_context(session_adapter, mock_session_coordinator):
     ctx = session_adapter.get_memory_context(max_tokens=100, messages=[])
-    mock_session_coordinator.get_memory_context.assert_called_once_with(max_tokens=100, messages=[])
+    mock_session_coordinator.get_memory_context.assert_called_once_with(
+        max_tokens=100, messages=[]
+    )
     assert len(ctx) == 1
 
 

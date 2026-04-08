@@ -157,11 +157,16 @@ class TestListProfiles:
         mock_profile.level = ProfileLevel.BASIC
         mock_profile.description = "Test profile"
 
-        with patch("victor.ui.commands.profiles.list_profiles", return_value=[mock_profile]):
+        with patch(
+            "victor.ui.commands.profiles.list_profiles", return_value=[mock_profile]
+        ):
             result = runner.invoke(profiles_app, ["list"])
 
         assert result.exit_code == 0
-        assert "Default" in result.stdout or "Available Configuration Profiles" in result.stdout
+        assert (
+            "Default" in result.stdout
+            or "Available Configuration Profiles" in result.stdout
+        )
 
 
 class TestCreateProfile:
@@ -195,7 +200,9 @@ class TestCreateProfile:
     def test_create_profile_already_exists(self, tmp_path):
         """Test creating a profile that already exists shows error."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {"profiles": {"existing": {"provider": "ollama", "model": "llama2"}}}
+        existing_data = {
+            "profiles": {"existing": {"provider": "ollama", "model": "llama2"}}
+        }
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
@@ -268,7 +275,14 @@ class TestEditProfile:
 
         result = runner.invoke(
             profiles_app,
-            ["edit", "nonexistent", "--temperature", "0.5", "--config-dir", str(tmp_path)],
+            [
+                "edit",
+                "nonexistent",
+                "--temperature",
+                "0.5",
+                "--config-dir",
+                str(tmp_path),
+            ],
         )
 
         assert "not found" in result.stdout
@@ -276,11 +290,15 @@ class TestEditProfile:
     def test_edit_no_changes(self, tmp_path):
         """Test editing with no changes specified."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {"profiles": {"no_change": {"provider": "ollama", "model": "llama2"}}}
+        existing_data = {
+            "profiles": {"no_change": {"provider": "ollama", "model": "llama2"}}
+        }
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
-        result = runner.invoke(profiles_app, ["edit", "no_change", "--config-dir", str(tmp_path)])
+        result = runner.invoke(
+            profiles_app, ["edit", "no_change", "--config-dir", str(tmp_path)]
+        )
 
         assert "No changes specified" in result.stdout
 
@@ -330,12 +348,15 @@ class TestDeleteProfile:
     def test_delete_with_force(self, tmp_path):
         """Test deleting a profile with --force flag."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {"profiles": {"delete_me": {"provider": "ollama", "model": "llama2"}}}
+        existing_data = {
+            "profiles": {"delete_me": {"provider": "ollama", "model": "llama2"}}
+        }
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
         result = runner.invoke(
-            profiles_app, ["delete", "delete_me", "--force", "--config-dir", str(tmp_path)]
+            profiles_app,
+            ["delete", "delete_me", "--force", "--config-dir", str(tmp_path)],
         )
 
         assert result.exit_code == 0
@@ -347,7 +368,8 @@ class TestDeleteProfile:
         profiles_file.touch()
 
         result = runner.invoke(
-            profiles_app, ["delete", "nonexistent", "--force", "--config-dir", str(tmp_path)]
+            profiles_app,
+            ["delete", "nonexistent", "--force", "--config-dir", str(tmp_path)],
         )
 
         assert "not found" in result.stdout
@@ -355,7 +377,9 @@ class TestDeleteProfile:
     def test_delete_with_confirmation_yes(self, tmp_path):
         """Test deleting a profile with confirmation."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {"profiles": {"confirm_delete": {"provider": "ollama", "model": "llama2"}}}
+        existing_data = {
+            "profiles": {"confirm_delete": {"provider": "ollama", "model": "llama2"}}
+        }
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
@@ -370,7 +394,9 @@ class TestDeleteProfile:
     def test_delete_with_confirmation_no(self, tmp_path):
         """Test cancelling profile deletion."""
         profiles_file = tmp_path / "profiles.yaml"
-        existing_data = {"profiles": {"keep_me": {"provider": "ollama", "model": "llama2"}}}
+        existing_data = {
+            "profiles": {"keep_me": {"provider": "ollama", "model": "llama2"}}
+        }
         with open(profiles_file, "w") as f:
             yaml.safe_dump(existing_data, f)
 
@@ -395,7 +421,9 @@ class TestShowProfile:
         mock_profile.description = "Test profile"
         mock_profile.settings = {"provider": "ollama", "model": "llama2"}
 
-        with patch("victor.ui.commands.profiles.get_profile", return_value=mock_profile):
+        with patch(
+            "victor.ui.commands.profiles.get_profile", return_value=mock_profile
+        ):
             result = runner.invoke(profiles_app, ["show", "default"])
 
         assert result.exit_code == 0
@@ -422,7 +450,9 @@ class TestShowProfile:
             "tool_selection": "semantic",
         }
 
-        with patch("victor.ui.commands.profiles.get_profile", return_value=mock_profile):
+        with patch(
+            "victor.ui.commands.profiles.get_profile", return_value=mock_profile
+        ):
             result = runner.invoke(profiles_app, ["show", "with_tools"])
 
         assert result.exit_code == 0

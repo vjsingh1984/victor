@@ -109,7 +109,9 @@ class TestCodeValidationResult:
     def test_failure_factory(self):
         """Test failure factory method."""
         result = CodeValidationResult.failure(
-            ["Error 1", "Error 2"], Language.PYTHON, syntax_error="SyntaxError: invalid syntax"
+            ["Error 1", "Error 2"],
+            Language.PYTHON,
+            syntax_error="SyntaxError: invalid syntax",
         )
         assert result.valid is False
         assert result.language == Language.PYTHON
@@ -152,21 +154,27 @@ class TestCorrectionFeedback:
 
     def test_to_prompt_with_syntax_error(self):
         """Test to_prompt with syntax feedback."""
-        feedback = CorrectionFeedback(has_issues=True, syntax_feedback="Line 5: SyntaxError")
+        feedback = CorrectionFeedback(
+            has_issues=True, syntax_feedback="Line 5: SyntaxError"
+        )
         prompt = feedback.to_prompt()
         assert "SYNTAX ERROR" in prompt
         assert "Line 5: SyntaxError" in prompt
 
     def test_to_prompt_with_import_feedback(self):
         """Test to_prompt with import feedback."""
-        feedback = CorrectionFeedback(has_issues=True, import_feedback="Missing import: os")
+        feedback = CorrectionFeedback(
+            has_issues=True, import_feedback="Missing import: os"
+        )
         prompt = feedback.to_prompt()
         assert "IMPORT ISSUES" in prompt
         assert "Missing import: os" in prompt
 
     def test_to_prompt_with_test_feedback(self):
         """Test to_prompt with test feedback."""
-        feedback = CorrectionFeedback(has_issues=True, test_feedback="Tests: 3/10 passed")
+        feedback = CorrectionFeedback(
+            has_issues=True, test_feedback="Tests: 3/10 passed"
+        )
         prompt = feedback.to_prompt()
         assert "TEST FAILURES" in prompt
         assert "3/10 passed" in prompt
@@ -519,7 +527,9 @@ class TestRetryPromptBuilder:
     def test_build_retry_prompt(self):
         """Test building a retry prompt."""
         feedback = CorrectionFeedback(
-            has_issues=True, language=Language.PYTHON, syntax_feedback="Line 5 has syntax error"
+            has_issues=True,
+            language=Language.PYTHON,
+            syntax_feedback="Line 5 has syntax error",
         )
         prompt = self.builder.build(
             original_prompt="Write a function",
@@ -603,13 +613,18 @@ class TestSelfCorrector:
         """Test should_retry when tests fail."""
         corrector = SelfCorrector()
         validation = CodeValidationResult.success()
-        assert corrector.should_retry(0, validation, test_passed=3, test_total=10) is True
+        assert (
+            corrector.should_retry(0, validation, test_passed=3, test_total=10) is True
+        )
 
     def test_should_retry_tests_passed(self):
         """Test should_retry when all tests pass."""
         corrector = SelfCorrector()
         validation = CodeValidationResult.success()
-        assert corrector.should_retry(0, validation, test_passed=10, test_total=10) is False
+        assert (
+            corrector.should_retry(0, validation, test_passed=10, test_total=10)
+            is False
+        )
 
     def test_generate_feedback(self):
         """Test generate_feedback method."""
@@ -628,7 +643,10 @@ class TestSelfCorrector:
             has_issues=True, language=Language.PYTHON, syntax_feedback="Error on line 5"
         )
         prompt = corrector.build_retry_prompt(
-            original_prompt="Write code", previous_code="def foo()", feedback=feedback, iteration=1
+            original_prompt="Write code",
+            previous_code="def foo()",
+            feedback=feedback,
+            iteration=1,
         )
         assert "Write code" in prompt
         assert "def foo()" in prompt

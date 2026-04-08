@@ -73,7 +73,11 @@ class TestBenchmarkRun:
         result = runner.invoke(benchmark_app, ["run", "--help"])
         assert result.exit_code == 0
         # Options may be truncated by Rich formatting, check for key parts
-        assert "max-tasks" in result.stdout or "max_tasks" in result.stdout or "-n" in result.stdout
+        assert (
+            "max-tasks" in result.stdout
+            or "max_tasks" in result.stdout
+            or "-n" in result.stdout
+        )
         assert "timeout" in result.stdout
         assert "profile" in result.stdout
 
@@ -99,7 +103,9 @@ class TestBenchmarkLeaderboard:
 
     def test_leaderboard_swe_bench(self):
         """Test showing SWE-bench leaderboard."""
-        result = runner.invoke(benchmark_app, ["leaderboard", "--benchmark", "swe-bench"])
+        result = runner.invoke(
+            benchmark_app, ["leaderboard", "--benchmark", "swe-bench"]
+        )
         assert result.exit_code == 0
         assert "Leaderboard" in result.stdout
         assert "Rank" in result.stdout
@@ -139,7 +145,8 @@ class TestBenchmarkHelp:
 
 
 @pytest.mark.skipif(
-    not is_ollama_available(), reason="Ollama not available - skipping benchmark execution tests"
+    not is_ollama_available(),
+    reason="Ollama not available - skipping benchmark execution tests",
 )
 class TestBenchmarkExecution:
     """Integration tests for actually running benchmarks.
@@ -153,7 +160,16 @@ class TestBenchmarkExecution:
         # Use default profile which should use Ollama if available
         result = runner.invoke(
             benchmark_app,
-            ["run", "humaneval", "--max-tasks", "1", "--timeout", "60", "--profile", "default"],
+            [
+                "run",
+                "humaneval",
+                "--max-tasks",
+                "1",
+                "--timeout",
+                "60",
+                "--profile",
+                "default",
+            ],
         )
         # Should start running or fail gracefully if model unavailable
         # We don't assert success since the model might not be loaded
@@ -167,6 +183,19 @@ class TestBenchmarkExecution:
         """Test running MBPP with Ollama (limited tasks)."""
         result = runner.invoke(
             benchmark_app,
-            ["run", "mbpp", "--max-tasks", "1", "--timeout", "60", "--profile", "default"],
+            [
+                "run",
+                "mbpp",
+                "--max-tasks",
+                "1",
+                "--timeout",
+                "60",
+                "--profile",
+                "default",
+            ],
         )
-        assert "MBPP" in result.stdout or "mbpp" in result.stdout or result.exit_code in (0, 1)
+        assert (
+            "MBPP" in result.stdout
+            or "mbpp" in result.stdout
+            or result.exit_code in (0, 1)
+        )

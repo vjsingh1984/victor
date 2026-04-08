@@ -49,7 +49,9 @@ def test_project_context_loader_uses_native_tokenizer(monkeypatch):
         calls.append(text)
         return 17
 
-    monkeypatch.setattr("victor.processing.native.tokenizer.count_tokens", fake_count_tokens)
+    monkeypatch.setattr(
+        "victor.processing.native.tokenizer.count_tokens", fake_count_tokens
+    )
 
     loader = ProjectContextLoader()
 

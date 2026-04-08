@@ -41,7 +41,9 @@ class TestHybridSearchIntegration:
         engine = create_hybrid_search_engine(semantic_weight=0.6, keyword_weight=0.4)
 
         # Act
-        results = engine.combine_results(semantic_results, keyword_results, max_results=10)
+        results = engine.combine_results(
+            semantic_results, keyword_results, max_results=10
+        )
 
         # Assert
         assert len(results) > 0
@@ -74,7 +76,9 @@ class TestHybridSearchIntegration:
         engine = create_hybrid_search_engine()
 
         # Act
-        results = engine.combine_results(semantic_results, keyword_results, max_results=10)
+        results = engine.combine_results(
+            semantic_results, keyword_results, max_results=10
+        )
 
         # Assert
         assert len(results) == 1

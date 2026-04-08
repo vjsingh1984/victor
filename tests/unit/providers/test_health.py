@@ -98,10 +98,12 @@ class TestProviderHealthChecker:
         checker = ProviderHealthChecker()
 
         with patch(
-            "victor.providers.health.ProviderRegistry.list_providers", return_value=["ollama"]
+            "victor.providers.health.ProviderRegistry.list_providers",
+            return_value=["ollama"],
         ):
             with patch(
-                "victor.providers.health.ProviderRegistry.get", side_effect=Exception("Not found")
+                "victor.providers.health.ProviderRegistry.get",
+                side_effect=Exception("Not found"),
             ):
 
                 async def run_check():
@@ -117,21 +119,28 @@ class TestProviderHealthChecker:
         checker = ProviderHealthChecker()
 
         with patch.dict("os.environ", {}, clear=True):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await checker.check_provider("deepseek", "deepseek-chat")
 
                 result = asyncio.run(run_check())
                 assert result.healthy is False
-                assert any("API key" in issue or "not found" in issue for issue in result.issues)
+                assert any(
+                    "API key" in issue or "not found" in issue
+                    for issue in result.issues
+                )
 
     def test_api_key_from_environment(self):
         """Test API key from environment passes health check."""
         checker = ProviderHealthChecker()
 
         with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "sk-test123456789"}):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await checker.check_provider("deepseek", "deepseek-chat")
@@ -146,7 +155,9 @@ class TestProviderHealthChecker:
         checker = ProviderHealthChecker()
 
         with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "invalid-format"}):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await checker.check_provider("deepseek", "deepseek-chat")
@@ -161,7 +172,9 @@ class TestProviderHealthChecker:
         checker = ProviderHealthChecker()
 
         with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "sk-1234567890abcdef"}):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await checker.check_provider("deepseek", "deepseek-chat")
@@ -177,7 +190,9 @@ class TestProviderHealthChecker:
         # Anthropic keys: sk-ant- followed by 95+ characters
         valid_key = "sk-ant-" + "a" * 95
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": valid_key}):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await checker.check_provider("anthropic", "claude-3-5-haiku")
@@ -211,7 +226,9 @@ class TestProviderHealthChecker:
 
         # Patch the resolver's get_api_key to return our mock result
         with patch.object(checker.resolver, "get_api_key", return_value=mock_result):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await checker.check_provider("deepseek", "deepseek-chat")
@@ -248,7 +265,9 @@ class TestCheckProviderHealth:
     def test_convenience_function(self):
         """Test the convenience function works correctly."""
         with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "sk-test123"}):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await check_provider_health("deepseek", "deepseek-chat")
@@ -261,7 +280,9 @@ class TestCheckProviderHealth:
     def test_passes_kwargs(self):
         """Test that kwargs are passed through."""
         with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "sk-test"}):
-            with patch("victor.providers.health.ProviderRegistry.get", return_value=MagicMock()):
+            with patch(
+                "victor.providers.health.ProviderRegistry.get", return_value=MagicMock()
+            ):
 
                 async def run_check():
                     return await check_provider_health(

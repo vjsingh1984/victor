@@ -665,7 +665,9 @@ class ConcreteProtocol(VictorProtocol):
     async def semantic_search(self, query, max_results=10):
         return []
 
-    async def code_search(self, query, regex=False, case_sensitive=False, file_pattern=None):
+    async def code_search(
+        self, query, regex=False, case_sensitive=False, file_pattern=None
+    ):
         return []
 
     async def switch_model(self, provider, model):

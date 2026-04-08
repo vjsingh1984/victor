@@ -7,7 +7,9 @@ from pathlib import Path
 
 from victor.framework.rl.base import RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import RLCoordinator
-from victor.framework.rl.learners.continuation_patience import ContinuationPatienceLearner
+from victor.framework.rl.learners.continuation_patience import (
+    ContinuationPatienceLearner,
+)
 from victor.core.database import reset_database, get_database
 from victor.core.schema import Tables
 
@@ -156,7 +158,9 @@ class TestContinuationPatienceLearner:
         assert rec.reason.startswith("Insufficient data")
         assert rec.sample_size == 1
 
-    def test_get_recommendation_with_baseline(self, learner: ContinuationPatienceLearner) -> None:
+    def test_get_recommendation_with_baseline(
+        self, learner: ContinuationPatienceLearner
+    ) -> None:
         """Should return baseline if no data, and provider adapter is mocked."""
         # Mock provider adapter to return a baseline patience
         mock_adapter = MagicMock()

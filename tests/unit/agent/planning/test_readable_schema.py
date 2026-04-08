@@ -85,7 +85,10 @@ class TestReadableTaskPlan:
             name="Feature X",
             complexity=TaskComplexity.MODERATE,
             desc="Implement feature X",
-            steps=[[1, "feature", "Create module", "write"], [2, "test", "Test", "pytest", [1]]],
+            steps=[
+                [1, "feature", "Create module", "write"],
+                [2, "test", "Test", "pytest", [1]],
+            ],
         )
 
         exec_plan = plan.to_execution_plan()
@@ -190,7 +193,9 @@ class TestReadableTaskPlan:
                 steps=[[1, type_str, "Test step"]],
             )
             exec_plan = plan.to_execution_plan()
-            assert exec_plan.steps[0].step_type == expected_type, f"Failed for {type_str}"
+            assert (
+                exec_plan.steps[0].step_type == expected_type
+            ), f"Failed for {type_str}"
 
     def test_token_efficiency(self):
         """Test that readable schema uses fewer tokens than verbose JSON."""
@@ -325,7 +330,10 @@ class TestHelperFunctions:
             name="Feature X",
             complexity=TaskComplexity.MODERATE,
             desc="Implement feature X",
-            steps=[[1, "feature", "Create module", "write"], [2, "test", "Test", "pytest", [1]]],
+            steps=[
+                [1, "feature", "Create module", "write"],
+                [2, "test", "Test", "pytest", [1]],
+            ],
         )
 
         yaml_str = plan_to_workflow_yaml(plan)
@@ -388,7 +396,9 @@ class TestHelperFunctions:
     def test_invalid_step_data(self):
         """Test that invalid step data is rejected."""
         # Step data too short (needs at least 3 elements: id, type, desc)
-        invalid_json = '{"name":"test","complexity":"simple","desc":"test","steps":[[1]]}'
+        invalid_json = (
+            '{"name":"test","complexity":"simple","desc":"test","steps":[[1]]}'
+        )
 
         with pytest.raises(ValueError):
             ReadableTaskPlan.model_validate_json(invalid_json)

@@ -339,7 +339,10 @@ class TestToolLoopDetectorDeepSeekScenario:
             # Symbol lookup (different resource)
             detector.record_tool_call(
                 "symbol",
-                {"file_path": "utils/web_search_client.py", "symbol": "WebSearchClient"},
+                {
+                    "file_path": "utils/web_search_client.py",
+                    "symbol": "WebSearchClient",
+                },
             )
 
         # Should still detect resource contention on the file
@@ -587,7 +590,9 @@ class TestProgressiveParameterNormalization:
         detector.record_tool_call("read", {"file": "utils/client.py", "start_line": 1})
         detector.record_tool_call("read", {"path": "utils/client.py", "offset": 1})
         detector.record_tool_call("read", {"filepath": "utils/client.py", "begin": 1})
-        result = detector.record_tool_call("read", {"file_path": "utils/client.py", "start": 1})
+        result = detector.record_tool_call(
+            "read", {"file_path": "utils/client.py", "start": 1}
+        )
 
         # Should detect - all semantically identical
         assert result.loop_detected is True
@@ -599,7 +604,9 @@ class TestProgressiveParameterNormalization:
         detector.record_tool_call("read_file", {"path": "foo.py"})
         detector.record_tool_call("code_search", {"file": "foo.py", "query": "def"})
         detector.record_tool_call("list_directory", {"filepath": "foo.py"})
-        result = detector.record_tool_call("symbol", {"file_path": "foo.py", "name": "Bar"})
+        result = detector.record_tool_call(
+            "symbol", {"file_path": "foo.py", "name": "Bar"}
+        )
 
         # Should detect resource contention on foo.py
         assert result.loop_detected is True
@@ -614,13 +621,21 @@ class TestProgressiveParameterNormalization:
         warnings = []
 
         # First call with 'path'
-        warnings.append(detector.record_tool_call("read", {"path": file_path, "start_line": 200}))
+        warnings.append(
+            detector.record_tool_call("read", {"path": file_path, "start_line": 200})
+        )
         # Second call with 'file'
-        warnings.append(detector.record_tool_call("read", {"file": file_path, "start": 200}))
+        warnings.append(
+            detector.record_tool_call("read", {"file": file_path, "start": 200})
+        )
         # Third call with 'filepath'
-        warnings.append(detector.record_tool_call("read", {"filepath": file_path, "offset": 200}))
+        warnings.append(
+            detector.record_tool_call("read", {"filepath": file_path, "offset": 200})
+        )
         # Fourth call with 'file_path'
-        warnings.append(detector.record_tool_call("read", {"file_path": file_path, "begin": 200}))
+        warnings.append(
+            detector.record_tool_call("read", {"file_path": file_path, "begin": 200})
+        )
 
         # Should detect loop by the 3rd or 4th call
         detected = [w for w in warnings if w.loop_detected]

@@ -227,7 +227,9 @@ class TestBuilderConfiguration:
 
     def test_set_name_multiple_calls(self):
         """Multiple set_name() calls should use last value."""
-        profile = MiddlewareProfileBuilder().set_name("first").set_name("second").build()
+        profile = (
+            MiddlewareProfileBuilder().set_name("first").set_name("second").build()
+        )
 
         assert profile.name == "second"
 
@@ -305,7 +307,9 @@ class TestBuilderMiddlewareManagement:
         )
 
         assert len(profile.middlewares) == 2
-        assert not any(isinstance(m, SecretMaskingMiddleware) for m in profile.middlewares)
+        assert not any(
+            isinstance(m, SecretMaskingMiddleware) for m in profile.middlewares
+        )
 
     def test_remove_middleware_removes_all_of_type(self):
         """remove_middleware() should remove all middlewares of type."""
@@ -602,11 +606,15 @@ class TestBuilderIntegration:
         assert len(profile.middlewares) == 2
         assert profile.priority == 40
 
-        logging_mw = next(m for m in profile.middlewares if isinstance(m, LoggingMiddleware))
+        logging_mw = next(
+            m for m in profile.middlewares if isinstance(m, LoggingMiddleware)
+        )
         assert logging_mw._log_level == logging.INFO
         assert logging_mw._sanitize_arguments is False
 
-        secret_mw = next(m for m in profile.middlewares if isinstance(m, SecretMaskingMiddleware))
+        secret_mw = next(
+            m for m in profile.middlewares if isinstance(m, SecretMaskingMiddleware)
+        )
         assert secret_mw._replacement == "[XXX]"
 
 

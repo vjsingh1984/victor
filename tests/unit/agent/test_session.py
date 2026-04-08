@@ -170,7 +170,9 @@ class TestSessionPersistence:
         assert session is not None
         assert session.metadata.model == "claude-sonnet-4-20250514"
         assert session.metadata.provider == "anthropic"
-        assert session.metadata.message_count == 4  # 4 messages (system prompt added lazily)
+        assert (
+            session.metadata.message_count == 4
+        )  # 4 messages (system prompt added lazily)
 
     def test_load_nonexistent_session(self, session_manager):
         """load_session should return None for missing sessions."""
@@ -213,7 +215,9 @@ class TestSessionPersistence:
         sessions = session_manager.list_sessions(limit=3)
         assert len(sessions) == 3
 
-    def test_list_sessions_with_provider_filter(self, session_manager, sample_conversation):
+    def test_list_sessions_with_provider_filter(
+        self, session_manager, sample_conversation
+    ):
         """list_sessions should filter by provider."""
         session_manager.save_session(
             conversation=sample_conversation,

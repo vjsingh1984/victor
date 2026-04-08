@@ -629,7 +629,9 @@ The Singleton approach works well here.
 
         names = {e.name.lower() for e in result.entities}
         # Should extract pattern names
-        assert any("observer" in n for n in names) or any("singleton" in n for n in names)
+        assert any("observer" in n for n in names) or any(
+            "singleton" in n for n in names
+        )
 
 
 class TestCompositeExtractor:

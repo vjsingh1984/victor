@@ -180,7 +180,9 @@ class TestCustomMergeStrategy:
                 return f"{graph_val}+{team_val}"
             return team_val
 
-        strategy = CustomMergeStrategy(conflict_resolver=resolve_conflict, mode=MergeMode.TEAM_WINS)
+        strategy = CustomMergeStrategy(
+            conflict_resolver=resolve_conflict, mode=MergeMode.TEAM_WINS
+        )
         merged = strategy.merge(graph_state, team_state)
 
         assert merged["key"] == "graph+team"
@@ -211,7 +213,9 @@ class TestCustomMergeStrategy:
                 return "custom"
             return None
 
-        strategy = CustomMergeStrategy(conflict_resolver=resolve_conflict, mode=MergeMode.TEAM_WINS)
+        strategy = CustomMergeStrategy(
+            conflict_resolver=resolve_conflict, mode=MergeMode.TEAM_WINS
+        )
         merged = strategy.merge(graph_state, team_state)
 
         # Nested dict should still be merged recursively
@@ -228,7 +232,9 @@ class TestSelectiveMergeStrategy:
         graph_state = {"key1": "value1", "key2": "value2", "key3": "value3"}
         team_state = {"key1": "new1", "key2": "new2", "key3": "new3"}
 
-        strategy = SelectiveMergeStrategy(keys_to_merge=["key1", "key2"], mode=MergeMode.TEAM_WINS)
+        strategy = SelectiveMergeStrategy(
+            keys_to_merge=["key1", "key2"], mode=MergeMode.TEAM_WINS
+        )
         merged = strategy.merge(graph_state, team_state)
 
         assert merged["key1"] == "new1"
@@ -240,7 +246,9 @@ class TestSelectiveMergeStrategy:
         graph_state = {"key1": "value1", "key2": "value2"}
         team_state = {"key2": "new2"}  # key1 missing
 
-        strategy = SelectiveMergeStrategy(keys_to_merge=["key1", "key2"], mode=MergeMode.TEAM_WINS)
+        strategy = SelectiveMergeStrategy(
+            keys_to_merge=["key1", "key2"], mode=MergeMode.TEAM_WINS
+        )
         merged = strategy.merge(graph_state, team_state)
 
         assert merged["key1"] == "value1"  # Unchanged
@@ -300,7 +308,9 @@ class TestValidateMergedState:
         merged_state = {"count": 5}
 
         # Should pass
-        assert validate_merged_state(merged_state, validators={"count": lambda x: x > 0})
+        assert validate_merged_state(
+            merged_state, validators={"count": lambda x: x > 0}
+        )
 
     def test_validate_custom_validator_fails(self):
         """Test validation fails with custom validator."""

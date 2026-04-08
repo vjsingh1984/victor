@@ -54,7 +54,11 @@ class TestShouldDeduplicate:
 
 class TestDeduplicateInPlace:
     def _make_read_msg(self, path, content_size=600):
-        content = f'<TOOL_OUTPUT tool="read" path="{path}">' + "x" * content_size + "</TOOL_OUTPUT>"
+        content = (
+            f'<TOOL_OUTPUT tool="read" path="{path}">'
+            + "x" * content_size
+            + "</TOOL_OUTPUT>"
+        )
         return Message(role="user", content=content)
 
     def test_single_dup(self):

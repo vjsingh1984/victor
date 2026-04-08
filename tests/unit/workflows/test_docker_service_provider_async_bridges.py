@@ -53,7 +53,9 @@ async def test_docker_provider_run_command_uses_to_thread() -> None:
     handle.container_id = "container-456"
 
     container = MagicMock()
-    container.exec_run.return_value = SimpleNamespace(exit_code=0, output=(b"ok\n", b""))
+    container.exec_run.return_value = SimpleNamespace(
+        exit_code=0, output=(b"ok\n", b"")
+    )
     provider._client.containers.get.return_value = container
 
     async def call_to_thread(func, *args, **kwargs):

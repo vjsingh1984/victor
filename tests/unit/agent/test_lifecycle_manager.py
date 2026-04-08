@@ -204,7 +204,9 @@ class TestLifecycleManager:
     ):
         """Test graceful shutdown when analytics flush fails."""
         # Mock flush_analytics that fails
-        lifecycle_manager._flush_analytics = MagicMock(return_value={"analytics": False})
+        lifecycle_manager._flush_analytics = MagicMock(
+            return_value={"analytics": False}
+        )
 
         # Mock stop_health_monitoring
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
@@ -302,7 +304,9 @@ class TestLifecycleManager:
     def test_get_session_stats(self, lifecycle_manager):
         """Test getting session statistics."""
         # Setup conversation controller
-        lifecycle_manager._conversation_controller.message_count = MagicMock(return_value=42)
+        lifecycle_manager._conversation_controller.message_count = MagicMock(
+            return_value=42
+        )
 
         # Get stats
         stats = lifecycle_manager.get_session_stats()
@@ -317,7 +321,9 @@ class TestLifecycleManager:
         memory_manager = MagicMock()
         session = MagicMock()
         session.session_id = "test-session-123"
-        session.messages = [MagicMock(role="user", content="Hello", to_provider_format=MagicMock())]
+        session.messages = [
+            MagicMock(role="user", content="Hello", to_provider_format=MagicMock())
+        ]
 
         memory_manager.get_session = MagicMock(return_value=session)
 
@@ -454,7 +460,9 @@ class TestLifecycleManagerErrorHandling:
     async def test_graceful_shutdown_handles_exception(self, lifecycle_manager):
         """Test that graceful shutdown exceptions are handled gracefully."""
         # Mock flush that raises exception
-        lifecycle_manager._flush_analytics = MagicMock(side_effect=RuntimeError("Flush failed"))
+        lifecycle_manager._flush_analytics = MagicMock(
+            side_effect=RuntimeError("Flush failed")
+        )
         lifecycle_manager._stop_health_monitoring = AsyncMock(return_value=True)
 
         # Shutdown should handle exception

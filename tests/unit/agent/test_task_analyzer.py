@@ -189,7 +189,9 @@ class TestTaskAnalyzer:
     def test_analyze_complex_query(self):
         """Test analyzing a complex query."""
         analyzer = TaskAnalyzer()
-        result = analyzer.analyze("Refactor the authentication system to use JWT tokens")
+        result = analyzer.analyze(
+            "Refactor the authentication system to use JWT tokens"
+        )
 
         assert isinstance(result, TaskAnalysis)
         # Complex tasks should have higher budget
@@ -201,7 +203,10 @@ class TestTaskAnalyzer:
         result = analyzer.analyze("Create a new file called hello.py")
 
         assert isinstance(result, TaskAnalysis)
-        assert result.action_intent in [ActionIntent.WRITE_ALLOWED, ActionIntent.AMBIGUOUS]
+        assert result.action_intent in [
+            ActionIntent.WRITE_ALLOWED,
+            ActionIntent.AMBIGUOUS,
+        ]
 
     def test_analyze_display_request(self):
         """Test analyzing a display-only request."""
@@ -228,11 +233,15 @@ class TestTaskAnalyzer:
         analyzer = TaskAnalyzer()
 
         # Explicit write request with file path
-        result = analyzer.check_write_authorization("Create and save a new file at hello.py")
+        result = analyzer.check_write_authorization(
+            "Create and save a new file at hello.py"
+        )
         assert isinstance(result, bool)
 
         # Display request - should not authorize writes
-        result2 = analyzer.check_write_authorization("Show me the contents of README.md")
+        result2 = analyzer.check_write_authorization(
+            "Show me the contents of README.md"
+        )
         assert isinstance(result2, bool)
 
     def test_is_simple_query(self):

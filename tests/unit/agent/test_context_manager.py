@@ -189,7 +189,9 @@ class TestContextManagerContextWindow:
             conversation_controller=mock_controller,
         )
 
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 200000
             mock_get_limits.return_value = mock_limits
@@ -197,9 +199,13 @@ class TestContextManagerContextWindow:
             result = manager.get_model_context_window()
 
             assert result == 200000
-            mock_get_limits.assert_called_once_with("anthropic", "claude-sonnet-4-20250514")
+            mock_get_limits.assert_called_once_with(
+                "anthropic", "claude-sonnet-4-20250514"
+            )
 
-    def test_get_model_context_window_fallback_on_exception(self, config, mock_controller):
+    def test_get_model_context_window_fallback_on_exception(
+        self, config, mock_controller
+    ):
         """Test fallback to default on provider limits exception."""
         manager = ContextManager(
             config=config,
@@ -330,7 +336,9 @@ class TestContextManagerMaxContextChars:
             conversation_controller=mock_controller,
         )
 
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 100000
             mock_get_limits.return_value = mock_limits
@@ -351,7 +359,9 @@ class TestContextManagerMaxContextChars:
             conversation_controller=mock_controller,
         )
 
-        with patch("victor.config.config_loaders.get_provider_limits") as mock_get_limits:
+        with patch(
+            "victor.config.config_loaders.get_provider_limits"
+        ) as mock_get_limits:
             mock_limits = MagicMock()
             mock_limits.context_window = 128000
             mock_get_limits.return_value = mock_limits
@@ -502,7 +512,9 @@ class TestContextManagerOverflowDetection:
         result = manager.check_context_overflow()
         assert result is False
 
-    def test_check_context_overflow_logs_warning_on_risk(self, config, mock_controller, caplog):
+    def test_check_context_overflow_logs_warning_on_risk(
+        self, config, mock_controller, caplog
+    ):
         """Test that overflow risk logs a warning."""
         mock_controller.get_context_metrics.return_value = ContextMetrics(
             char_count=195000,
@@ -575,9 +587,13 @@ class TestContextManagerCompaction:
         result = manager.handle_compaction("test query")
 
         assert result is None
-        mock_compactor.check_and_compact.assert_called_once_with(current_query="test query")
+        mock_compactor.check_and_compact.assert_called_once_with(
+            current_query="test query"
+        )
 
-    def test_handle_compaction_action_taken_no_messages_removed(self, config, mock_controller):
+    def test_handle_compaction_action_taken_no_messages_removed(
+        self, config, mock_controller
+    ):
         """Test handle_compaction when action taken but no messages removed."""
         mock_compactor = MagicMock()
         mock_action = MagicMock()

@@ -187,7 +187,9 @@ def test_external_vertical_import_boundaries(package_name: str):
         for filepath, file_violations in sorted(new_violations.items()):
             for imp, reason in file_violations:
                 lines.append(f"  {filepath}: {reason}")
-        lines.append("\nFix: import from victor.framework.extensions instead of internal modules.")
+        lines.append(
+            "\nFix: import from victor.framework.extensions instead of internal modules."
+        )
         lines.append("Or add to KNOWN_VIOLATIONS baseline if migration is deferred.")
         pytest.fail("\n".join(lines))
 
@@ -210,7 +212,9 @@ def test_external_vertical_known_violations_not_stale(package_name: str):
         for imp, _ in file_violations:
             actual_violation_prefixes.add(imp)
 
-    stale = {k for k in known if not any(a.startswith(k) for a in actual_violation_prefixes)}
+    stale = {
+        k for k in known if not any(a.startswith(k) for a in actual_violation_prefixes)
+    }
     if stale:
         pytest.fail(
             f"{package_name} has stale KNOWN_VIOLATIONS entries (violations fixed!):\n"
@@ -338,7 +342,12 @@ def test_framework_extensions_lazy_import():
 def test_framework_extensions_uses_sdk_vertical_contracts():
     """Public extension-layer vertical symbols should resolve to SDK contracts."""
     from victor.framework import extensions
-    from victor_sdk import StageDefinition, VerticalBase, VerticalConfig, VerticalExtensions
+    from victor_sdk import (
+        StageDefinition,
+        VerticalBase,
+        VerticalConfig,
+        VerticalExtensions,
+    )
     from victor_sdk import register_vertical
 
     assert extensions.register_vertical is register_vertical

@@ -280,7 +280,10 @@ class TestSlashCommandHandlerExecute:
         result = await handler.execute("/nonexistent")
         # Unknown commands are still "handled" (error message shown)
         assert result is True
-        assert "unknown" in stdout.getvalue().lower() or "nonexistent" in stdout.getvalue().lower()
+        assert (
+            "unknown" in stdout.getvalue().lower()
+            or "nonexistent" in stdout.getvalue().lower()
+        )
 
     @pytest.mark.asyncio
     async def test_execute_command_by_alias(self):
@@ -533,7 +536,9 @@ class TestAllCommandsRegistered:
         handler = SlashCommandHandler(console=console, settings=settings)
 
         for cmd_name in self.EXPECTED_COMMANDS:
-            assert handler.registry.has(cmd_name), f"Command '{cmd_name}' not registered"
+            assert handler.registry.has(
+                cmd_name
+            ), f"Command '{cmd_name}' not registered"
 
     def test_all_aliases_registered(self):
         """Test that all expected aliases are registered."""
@@ -554,7 +559,9 @@ class TestAllCommandsRegistered:
         handler = SlashCommandHandler(console=console, settings=settings)
 
         command_count = len(list(handler.registry.list_commands()))
-        assert command_count >= 40, f"Expected at least 40 commands, got {command_count}"
+        assert (
+            command_count >= 40
+        ), f"Expected at least 40 commands, got {command_count}"
 
     def test_each_command_has_description(self):
         """Test that each command has a non-empty description."""
@@ -565,7 +572,9 @@ class TestAllCommandsRegistered:
         for cmd_name in self.EXPECTED_COMMANDS:
             cmd = handler.registry.get(cmd_name)
             assert cmd is not None, f"Command '{cmd_name}' not found"
-            assert cmd.metadata.description, f"Command '{cmd_name}' has empty description"
+            assert (
+                cmd.metadata.description
+            ), f"Command '{cmd_name}' has empty description"
 
 
 class TestSlashCommandCategories:
@@ -1034,7 +1043,9 @@ class TestCheckpointCommands:
 
         await CheckpointCommand().execute(ctx)
 
-        checkpoint_manager.list_checkpoints.assert_awaited_once_with("session-123", limit=5)
+        checkpoint_manager.list_checkpoints.assert_awaited_once_with(
+            "session-123", limit=5
+        )
         assert "Checkpoints" in stdout.getvalue()
 
 

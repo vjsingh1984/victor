@@ -131,7 +131,13 @@ def test_docs_keyword_matching_with_mock_registry():
 def test_registry_keyword_lookup():
     """Test that ToolMetadataRegistry correctly looks up tools by keywords."""
     from victor.tools.metadata_registry import ToolMetadataRegistry, ToolMetadataEntry
-    from victor.tools.base import Priority, AccessMode, DangerLevel, CostTier, ExecutionCategory
+    from victor.tools.base import (
+        Priority,
+        AccessMode,
+        DangerLevel,
+        CostTier,
+        ExecutionCategory,
+    )
 
     # Create a mock tool with keywords
     mock_tool = MagicMock()
@@ -162,7 +168,13 @@ def test_registry_keyword_lookup():
 def test_registry_keyword_lookup_case_insensitive():
     """Test that keyword lookup is case-insensitive."""
     from victor.tools.metadata_registry import ToolMetadataRegistry
-    from victor.tools.base import Priority, AccessMode, DangerLevel, CostTier, ExecutionCategory
+    from victor.tools.base import (
+        Priority,
+        AccessMode,
+        DangerLevel,
+        CostTier,
+        ExecutionCategory,
+    )
 
     mock_tool = MagicMock()
     mock_tool.name = "review_tool"

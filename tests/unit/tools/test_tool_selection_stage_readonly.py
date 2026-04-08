@@ -56,7 +56,9 @@ def mock_non_build_mode():
     mock_controller.config.allowed_tools = set()
     mock_controller.config.disallowed_tools = set()
 
-    with patch("victor.agent.mode_controller.get_mode_controller", return_value=mock_controller):
+    with patch(
+        "victor.agent.mode_controller.get_mode_controller", return_value=mock_controller
+    ):
         yield mock_controller
     metadata_registry._global_registry = None
 
@@ -113,7 +115,9 @@ class StubTool(BaseTool):
     def is_critical(self) -> bool:
         return self._metadata.priority == Priority.CRITICAL
 
-    async def execute(self, _exec_ctx, **kwargs):  # pragma: no cover - not exercised here
+    async def execute(
+        self, _exec_ctx, **kwargs
+    ):  # pragma: no cover - not exercised here
         return ToolResult(success=True, output=None)
 
 
@@ -220,7 +224,9 @@ def test_core_readonly_config_override(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_semantic_selection_for_analysis_forces_readonly_core(monkeypatch, tmp_path):
+async def test_semantic_selection_for_analysis_forces_readonly_core(
+    monkeypatch, tmp_path
+):
     """Semantic selector should always inject core read-only tools for analysis queries."""
     # Avoid real embeddings by stubbing _get_embedding
     monkeypatch.setattr(

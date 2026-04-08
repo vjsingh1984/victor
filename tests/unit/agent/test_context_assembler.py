@@ -36,7 +36,11 @@ class TestContextAssemblerConfig:
 class TestAssembleBasic:
     def test_short_conversation_passes_through(self):
         assembler = TurnBoundaryContextAssembler()
-        msgs = [_msg("system", "You are helpful"), _msg("user", "hello"), _msg("assistant", "hi")]
+        msgs = [
+            _msg("system", "You are helpful"),
+            _msg("user", "hello"),
+            _msg("assistant", "hi"),
+        ]
         result = assembler.assemble(msgs, max_context_chars=100000)
         # No ledger/score_fn = passthrough
         assert len(result) == 3
@@ -106,7 +110,9 @@ class TestAssembleOlderMessageSelection:
             return [(msg, 1.0 / (i + 1)) for i, msg in enumerate(messages)]
 
         ledger = SessionLedger()
-        assembler = TurnBoundaryContextAssembler(session_ledger=ledger, score_fn=score_fn)
+        assembler = TurnBoundaryContextAssembler(
+            session_ledger=ledger, score_fn=score_fn
+        )
         msgs = [_msg("system", "sys")]
         for i in range(10):
             msgs.append(_msg("user", f"q{i}"))

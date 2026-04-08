@@ -301,7 +301,9 @@ class TestSessionLayer:
     def test_get_allowed_tools(self):
         """Test get_allowed_tools filters correctly."""
         layer = SessionLayer()
-        context = ToolAccessContext(session_enabled_tools={"read_file", "list_directory"})
+        context = ToolAccessContext(
+            session_enabled_tools={"read_file", "list_directory"}
+        )
         all_tools = {"read_file", "shell", "write_file", "list_directory"}
         allowed = layer.get_allowed_tools(all_tools, context)
         assert allowed == {"read_file", "list_directory"}

@@ -11,7 +11,11 @@ Focuses on modules that are 90%+ covered and just need a few more tests:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.error_recovery import ErrorRecoveryHandler, RecoveryResult, RecoveryAction
+from victor.agent.error_recovery import (
+    ErrorRecoveryHandler,
+    RecoveryResult,
+    RecoveryAction,
+)
 from victor.agent.output_deduplicator import OutputDeduplicator, StreamingDeduplicator
 from victor.providers.base import StreamChunk
 
@@ -32,7 +36,9 @@ class TestErrorRecoveryHandler:
 
     def test_recovery_result_with_message(self):
         """Test recovery result with message."""
-        result = RecoveryResult(action=RecoveryAction.ABORT, user_message="Could not recover")
+        result = RecoveryResult(
+            action=RecoveryAction.ABORT, user_message="Could not recover"
+        )
         assert result.action == RecoveryAction.ABORT
         assert "Could not recover" in result.user_message
 

@@ -275,7 +275,9 @@ class TestGetSystemPromptAddition:
         with tempfile.TemporaryDirectory() as tmpdir:
             victor_dir = Path(tmpdir) / VICTOR_DIR_NAME
             victor_dir.mkdir()
-            (victor_dir / VICTOR_CONTEXT_FILE).write_text("# My Project\nSome instructions.")
+            (victor_dir / VICTOR_CONTEXT_FILE).write_text(
+                "# My Project\nSome instructions."
+            )
             pc = ProjectContext(tmpdir)
             pc.load()
 
@@ -551,7 +553,9 @@ class TestInitVictorMd:
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(Path, "write_text", side_effect=PermissionError("No access")):
+            with patch.object(
+                Path, "write_text", side_effect=PermissionError("No access")
+            ):
                 result = init_victor_md(tmpdir)
                 assert result is None
 
@@ -570,6 +574,8 @@ class TestLoadError:
             context_file.write_text("content")
 
             pc = ProjectContext(tmpdir)
-            with patch.object(Path, "read_text", side_effect=PermissionError("No access")):
+            with patch.object(
+                Path, "read_text", side_effect=PermissionError("No access")
+            ):
                 result = pc.load()
                 assert result is False

@@ -198,7 +198,9 @@ class TestAccountManagementIntegration:
         clean_account_manager.save_account(account2)
 
         # Resolve by provider + model
-        account = clean_account_manager.get_account(provider="anthropic", model="claude-sonnet-4-5")
+        account = clean_account_manager.get_account(
+            provider="anthropic", model="claude-sonnet-4-5"
+        )
         assert account is not None
         assert account.name == "claude-default"
 
@@ -269,7 +271,8 @@ class TestConnectionValidationIntegration:
                 auth_validations = [
                     v
                     for v in result.validations
-                    if "auth" in str(v.message).lower() or "api key" in str(v.message).lower()
+                    if "auth" in str(v.message).lower()
+                    or "api key" in str(v.message).lower()
                 ]
                 assert len(auth_validations) > 0
 
@@ -286,13 +289,16 @@ class TestConnectionValidationIntegration:
         validator = ConnectionValidator()
 
         # Mock OAuth client_id retrieval
-        with patch.object(validator, "_get_oauth_client_id", return_value="test-client-id"):
+        with patch.object(
+            validator, "_get_oauth_client_id", return_value="test-client-id"
+        ):
             # Mock auth validation which internally calls _get_oauth_client_id
             with patch.object(
                 validator,
                 "_validate_auth",
                 return_value=ValidationResult(
-                    status=ValidationStatus.SUCCESS, message="OAuth client_id configured"
+                    status=ValidationStatus.SUCCESS,
+                    message="OAuth client_id configured",
                 ),
             ):
                 result = await validator.test_account(account)
@@ -301,7 +307,8 @@ class TestConnectionValidationIntegration:
                 oauth_validations = [
                     v
                     for v in result.validations
-                    if "oauth" in str(v.message).lower() or "client_id" in str(v.message).lower()
+                    if "oauth" in str(v.message).lower()
+                    or "client_id" in str(v.message).lower()
                 ]
                 assert len(oauth_validations) > 0
 
@@ -541,7 +548,9 @@ class TestAccountResolutionIntegration:
 
         # Mock keyring retrieval
         with patch.object(
-            clean_account_manager, "_get_api_key_from_keyring", return_value="sk-ant-keyring-key"
+            clean_account_manager,
+            "_get_api_key_from_keyring",
+            return_value="sk-ant-keyring-key",
         ):
             config = clean_account_manager.resolve_provider_config(account)
 

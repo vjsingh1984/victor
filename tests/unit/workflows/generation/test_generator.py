@@ -164,7 +164,9 @@ class TestWorkflowGeneratorInitialization:
 class TestRequirementValidation:
     """Tests for requirement validation before generation."""
 
-    def test_validate_requirements_success(self, mock_orchestrator, sample_requirements):
+    def test_validate_requirements_success(
+        self, mock_orchestrator, sample_requirements
+    ):
         """Test validation of valid requirements."""
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
@@ -344,7 +346,9 @@ class TestMultiStageGeneration:
     """Tests for multi-stage generation strategy."""
 
     @pytest.mark.asyncio
-    async def test_generate_multi_stage_success(self, mock_orchestrator, sample_requirements):
+    async def test_generate_multi_stage_success(
+        self, mock_orchestrator, sample_requirements
+    ):
         """Test successful multi-stage generation."""
         generator = WorkflowGenerator(
             mock_orchestrator,
@@ -359,14 +363,18 @@ class TestMultiStageGeneration:
             '{"workflow_name": "test", "nodes": [{"id": "analyze", "type": "agent", "role": "executor", "goal": "Analyze"}], "edges": [{"source": "analyze", "target": "__end__", "type": "normal"}], "entry_point": "analyze"}',
         ]
 
-        schema, metadata = await generator._generate_multi_stage(sample_requirements, attempt=1)
+        schema, metadata = await generator._generate_multi_stage(
+            sample_requirements, attempt=1
+        )
 
         assert metadata.strategy == GenerationStrategy.LLM_MULTI_STAGE
         assert metadata.iterations == 3
         assert schema is not None
 
     @pytest.mark.asyncio
-    async def test_generate_multi_stage_llm_failure(self, mock_orchestrator, sample_requirements):
+    async def test_generate_multi_stage_llm_failure(
+        self, mock_orchestrator, sample_requirements
+    ):
         """Test multi-stage generation handles LLM failures."""
         generator = WorkflowGenerator(
             mock_orchestrator,
@@ -390,7 +398,9 @@ class TestTemplateGeneration:
     """Tests for template-based generation."""
 
     @pytest.mark.asyncio
-    async def test_generate_from_template_success(self, mock_orchestrator, sample_requirements):
+    async def test_generate_from_template_success(
+        self, mock_orchestrator, sample_requirements
+    ):
         """Test successful template-based generation."""
         generator = WorkflowGenerator(
             mock_orchestrator,
@@ -406,7 +416,9 @@ class TestTemplateGeneration:
         assert "entry_point" in schema
 
     @pytest.mark.asyncio
-    async def test_generate_from_template_no_match(self, mock_orchestrator, sample_requirements):
+    async def test_generate_from_template_no_match(
+        self, mock_orchestrator, sample_requirements
+    ):
         """Test template generation fails when no template matches."""
         generator = WorkflowGenerator(
             mock_orchestrator,
@@ -426,7 +438,9 @@ class TestSchemaRefinement:
     """Tests for schema refinement."""
 
     @pytest.mark.asyncio
-    async def test_refine_schema_success(self, mock_orchestrator, sample_workflow_schema):
+    async def test_refine_schema_success(
+        self, mock_orchestrator, sample_workflow_schema
+    ):
         """Test successful schema refinement."""
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
@@ -443,7 +457,10 @@ class TestSchemaRefinement:
         self, mock_orchestrator, sample_workflow_schema
     ):
         """Test refinement with validation error context."""
-        from victor.workflows.generation.types import WorkflowValidationError, ErrorCategory
+        from victor.workflows.generation.types import (
+            WorkflowValidationError,
+            ErrorCategory,
+        )
 
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
@@ -458,12 +475,16 @@ class TestSchemaRefinement:
 
         mock_orchestrator.chat.return_value = """{"workflow_name": "refined", "nodes": [{"id": "start", "type": "agent", "role": "planner", "goal": "Start workflow", "tool_budget": 5, "output_key": "result"}], "edges": [{"source": "start", "target": "__end__", "type": "normal"}], "entry_point": "start"}"""
 
-        refined = await generator.refine_schema(sample_workflow_schema, "Fix errors", errors)
+        refined = await generator.refine_schema(
+            sample_workflow_schema, "Fix errors", errors
+        )
 
         assert "nodes" in refined
 
     @pytest.mark.asyncio
-    async def test_refine_schema_llm_failure(self, mock_orchestrator, sample_workflow_schema):
+    async def test_refine_schema_llm_failure(
+        self, mock_orchestrator, sample_workflow_schema
+    ):
         """Test refinement handles LLM failures."""
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
@@ -482,7 +503,9 @@ class TestFullGeneration:
     """Tests for full generation workflow."""
 
     @pytest.mark.asyncio
-    async def test_generate_from_requirements_success(self, mock_orchestrator, sample_requirements):
+    async def test_generate_from_requirements_success(
+        self, mock_orchestrator, sample_requirements
+    ):
         """Test successful generation from requirements."""
         generator = WorkflowGenerator(
             mock_orchestrator,
@@ -493,7 +516,9 @@ class TestFullGeneration:
         # Mock LLM response
         mock_orchestrator.chat.return_value = '{"workflow_name": "test", "nodes": [{"id": "n1", "type": "agent", "role": "executor", "goal": "Test"}], "edges": [{"source": "n1", "target": "__end__", "type": "normal"}], "entry_point": "n1"}'
 
-        schema, metadata = await generator.generate_from_requirements(sample_requirements)
+        schema, metadata = await generator.generate_from_requirements(
+            sample_requirements
+        )
 
         assert schema is not None
         assert metadata is not None
@@ -567,7 +592,9 @@ class TestRefinementPromptBuilding:
         """Test building refinement prompt with string feedback."""
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
-        prompt = generator._build_refinement_prompt(sample_workflow_schema, "Add more validation")
+        prompt = generator._build_refinement_prompt(
+            sample_workflow_schema, "Add more validation"
+        )
 
         assert "Add more validation" in prompt
         assert "Current Schema" in prompt
@@ -579,7 +606,9 @@ class TestRefinementPromptBuilding:
         """Test building refinement prompt with list feedback."""
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
-        prompt = generator._build_refinement_prompt(sample_workflow_schema, ["Error 1", "Error 2"])
+        prompt = generator._build_refinement_prompt(
+            sample_workflow_schema, ["Error 1", "Error 2"]
+        )
 
         assert "- Error 1" in prompt
         assert "- Error 2" in prompt
@@ -588,7 +617,10 @@ class TestRefinementPromptBuilding:
         self, mock_orchestrator, sample_workflow_schema
     ):
         """Test building refinement prompt with validation errors."""
-        from victor.workflows.generation.types import WorkflowValidationError, ErrorCategory
+        from victor.workflows.generation.types import (
+            WorkflowValidationError,
+            ErrorCategory,
+        )
 
         generator = WorkflowGenerator(mock_orchestrator, vertical="coding")
 
@@ -601,7 +633,9 @@ class TestRefinementPromptBuilding:
             )
         ]
 
-        prompt = generator._build_refinement_prompt(sample_workflow_schema, "Fix errors", errors)
+        prompt = generator._build_refinement_prompt(
+            sample_workflow_schema, "Fix errors", errors
+        )
 
         assert "Validation Errors" in prompt
         assert "[schema]" in prompt

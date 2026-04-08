@@ -65,7 +65,9 @@ def _clear_shared_caches() -> None:
     EscapeHatchRegistry.reset_instance()
 
 
-def test_capability_configs_prefer_runtime_module(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_capability_configs_prefer_runtime_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Capability configs should resolve from ``runtime.capabilities`` first."""
     _register_package(monkeypatch, "victor_research")
     _register_package(monkeypatch, "victor_research.runtime")
@@ -83,7 +85,9 @@ def test_capability_configs_prefer_runtime_module(monkeypatch: pytest.MonkeyPatc
     assert ResearchAssistant.get_capability_configs() == {"source": "runtime"}
 
 
-def test_capability_provider_prefers_runtime_module(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_capability_provider_prefers_runtime_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Capability providers should resolve from ``runtime.capabilities`` first."""
 
     class RuntimeResearchCapabilityProvider:
@@ -119,7 +123,9 @@ def test_capability_provider_prefers_runtime_module(monkeypatch: pytest.MonkeyPa
     assert isinstance(provider, RuntimeResearchCapabilityProvider)
 
 
-def test_safety_extension_prefers_runtime_module(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_safety_extension_prefers_runtime_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Safety extensions should resolve from ``runtime.safety`` before root shims."""
 
     class ResearchSafetyExtension:
@@ -151,7 +157,9 @@ def test_safety_extension_prefers_runtime_module(monkeypatch: pytest.MonkeyPatch
     assert isinstance(safety, ResearchSafetyExtension)
 
 
-def test_escape_hatch_registry_prefers_runtime_module(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_escape_hatch_registry_prefers_runtime_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Escape hatch discovery should prefer runtime modules during migration."""
     _register_package(monkeypatch, "victor_research")
     _register_package(monkeypatch, "victor_research.runtime")

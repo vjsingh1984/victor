@@ -135,7 +135,9 @@ class TestSWEBenchRunnerLoadTasks:
         """Load tasks returns cached tasks when available."""
         runner = SWEBenchRunner()
         runner._tasks_cache = []
-        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=10)
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=10
+        )
 
         tasks = await runner.load_tasks(config)
         assert tasks == []
@@ -158,7 +160,9 @@ class TestSWEBenchRunnerLoadTasks:
 
         runner = SWEBenchRunner()
         runner._tasks_cache = [mock_task1, mock_task2]
-        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1)
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.SWE_BENCH, model="test", max_tasks=1
+        )
 
         tasks = await runner.load_tasks(config)
         assert len(tasks) == 1
@@ -288,7 +292,9 @@ class TestRunTaskErrorHandling:
         task.repo = None
 
         agent_output = "diff --git a/file.py b/file.py\n--- a/file.py\n+++ b/file.py\n@@ -1,1 +1,1 @@\n-old\n+new"
-        config = EvaluationConfig(benchmark=BenchmarkType.SWE_BENCH, model="test", use_docker=False)
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.SWE_BENCH, model="test", use_docker=False
+        )
 
         # Mock TaskEnvironment to raise exception on setup
         with patch("victor.evaluation.benchmarks.swe_bench.TaskEnvironment") as MockEnv:

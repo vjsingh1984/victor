@@ -152,7 +152,10 @@ class TestGraphStructureValidator:
                 {"id": "start", "type": "agent", "role": "executor", "goal": "Start"},
                 {"id": "end", "type": "agent", "role": "executor", "goal": "End"},
             ],
-            "edges": [{"source": "start", "target": "end"}, {"source": "end", "target": "__end__"}],
+            "edges": [
+                {"source": "start", "target": "end"},
+                {"source": "end", "target": "__end__"},
+            ],
             "entry_point": "start",
         }
 
@@ -181,7 +184,9 @@ class TestGraphStructureValidator:
         validator = GraphStructureValidator()
 
         workflow = {
-            "nodes": [{"id": "start", "type": "agent", "role": "executor", "goal": "Start"}],
+            "nodes": [
+                {"id": "start", "type": "agent", "role": "executor", "goal": "Start"}
+            ],
             "edges": [{"source": "start", "target": "nonexistent"}],
             "entry_point": "start",
         }
@@ -271,7 +276,9 @@ class TestSemanticValidator:
                     return {"name": "valid_tool"}
                 return None
 
-        validator = SemanticValidator(tool_registry=MockToolRegistry(), strict_mode=True)
+        validator = SemanticValidator(
+            tool_registry=MockToolRegistry(), strict_mode=True
+        )
 
         workflow = {
             "nodes": [
@@ -295,7 +302,11 @@ class TestSemanticValidator:
 
         workflow = {
             "nodes": [
-                {"id": "cond1", "type": "condition", "branches": "not_a_dict"}  # Invalid type
+                {
+                    "id": "cond1",
+                    "type": "condition",
+                    "branches": "not_a_dict",
+                }  # Invalid type
             ]
         }
 
@@ -390,7 +401,8 @@ class TestSecurityValidator:
         errors = validator.validate(workflow)
         assert len(errors) > 0
         assert any(
-            "airgapped" in e.message.lower() or "network" in e.message.lower() for e in errors
+            "airgapped" in e.message.lower() or "network" in e.message.lower()
+            for e in errors
         )
 
 
@@ -583,7 +595,10 @@ class TestValidationIntegration:
                 {
                     "id": "check_quality",
                     "type": "condition",
-                    "branches": {"good_quality": "generate_report", "needs_work": "fetch_data"},
+                    "branches": {
+                        "good_quality": "generate_report",
+                        "needs_work": "fetch_data",
+                    },
                 },
                 {
                     "id": "generate_report",
@@ -598,7 +613,10 @@ class TestValidationIntegration:
                 {"source": "analyze", "target": "check_quality"},
                 {
                     "source": "check_quality",
-                    "target": {"good_quality": "generate_report", "needs_work": "fetch_data"},
+                    "target": {
+                        "good_quality": "generate_report",
+                        "needs_work": "fetch_data",
+                    },
                 },
                 {"source": "generate_report", "target": "__end__"},
             ],

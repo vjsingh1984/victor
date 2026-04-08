@@ -47,7 +47,9 @@ def test_create_graph_store_memory():
     assert isinstance(store, MemoryGraphStore)
 
 
-@pytest.mark.skipif(DuckDBGraphStore is None or not DUCKDB_AVAILABLE, reason="duckdb not installed")
+@pytest.mark.skipif(
+    DuckDBGraphStore is None or not DUCKDB_AVAILABLE, reason="duckdb not installed"
+)
 def test_create_graph_store_duckdb(tmp_path: Path):
     db_path = tmp_path / "graph.db"
     store = create_graph_store("duckdb", db_path)

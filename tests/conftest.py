@@ -22,7 +22,8 @@ import pytest
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(
-        "markers", "requires_victor_coding: marks tests that require victor-coding package"
+        "markers",
+        "requires_victor_coding: marks tests that require victor-coding package",
     )
 
 
@@ -53,6 +54,7 @@ def pytest_collection_modifyitems(config, items):
             ):
                 item.add_marker(
                     pytest.mark.skipif(
-                        not victor_coding_available, reason="victor-coding package not installed"
+                        not victor_coding_available,
+                        reason="victor-coding package not installed",
                     )
                 )

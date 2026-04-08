@@ -127,7 +127,9 @@ def _pip_install(venv_dir: Path, env: dict[str, str], *artifacts: Path) -> None:
     _run(args, cwd=REPO_ROOT, env=env)
 
 
-def _build_wheel(venv_dir: Path, env: dict[str, str], package_dir: Path, output_dir: Path) -> Path:
+def _build_wheel(
+    venv_dir: Path, env: dict[str, str], package_dir: Path, output_dir: Path
+) -> Path:
     """Build a wheel for a local package without reaching out to PyPI."""
 
     output_dir.mkdir(parents=True, exist_ok=True)

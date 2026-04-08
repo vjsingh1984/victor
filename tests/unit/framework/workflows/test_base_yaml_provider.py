@@ -51,7 +51,9 @@ class ConcreteYAMLWorkflowProvider:
     def __init__(self, workflows_dir: Optional[Path] = None):
         self._workflows_dir = workflows_dir
         # Import here to avoid circular imports in fixture scope
-        from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
+        from victor.framework.workflows.base_yaml_provider import (
+            BaseYAMLWorkflowProvider,
+        )
 
         # Create a concrete subclass dynamically
         class TestProvider(BaseYAMLWorkflowProvider):
@@ -98,7 +100,9 @@ def yaml_workflow_file(sample_yaml_content: str, tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def test_provider(tmp_path: Path, yaml_workflow_file: Path) -> "ConcreteYAMLWorkflowProvider":
+def test_provider(
+    tmp_path: Path, yaml_workflow_file: Path
+) -> "ConcreteYAMLWorkflowProvider":
     """Create a test provider with a temporary workflow directory."""
     return ConcreteYAMLWorkflowProvider(workflows_dir=tmp_path)
 
@@ -159,7 +163,9 @@ class TestCompileWorkflow:
         # The test provider needs a workflow to compile
         # For this test, we'll patch the _get_workflow_path method
         with patch.object(
-            test_provider.provider, "_get_workflow_path", return_value=yaml_workflow_file
+            test_provider.provider,
+            "_get_workflow_path",
+            return_value=yaml_workflow_file,
         ):
             with patch.object(
                 test_provider.provider, "_load_escape_hatches", return_value=({}, {})
@@ -167,10 +173,14 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert isinstance(compiled, CachedCompiledGraph)
 
-    def test_compile_workflow_has_workflow_name(self, test_provider, yaml_workflow_file):
+    def test_compile_workflow_has_workflow_name(
+        self, test_provider, yaml_workflow_file
+    ):
         """Test that compiled workflow has correct workflow_name."""
         with patch.object(
-            test_provider.provider, "_get_workflow_path", return_value=yaml_workflow_file
+            test_provider.provider,
+            "_get_workflow_path",
+            return_value=yaml_workflow_file,
         ):
             with patch.object(
                 test_provider.provider, "_load_escape_hatches", return_value=({}, {})
@@ -178,7 +188,9 @@ class TestCompileWorkflow:
                 compiled = test_provider.provider.compile_workflow("test_workflow")
                 assert compiled.workflow_name == "test_workflow"
 
-    def test_compile_workflow_raises_for_unknown_workflow(self, test_provider, tmp_path):
+    def test_compile_workflow_raises_for_unknown_workflow(
+        self, test_provider, tmp_path
+    ):
         """Test that compile_workflow raises ValueError for unknown workflow."""
         with pytest.raises(ValueError, match="Workflow not found"):
             test_provider.provider.compile_workflow("nonexistent_workflow")
@@ -373,6 +385,8 @@ class TestModuleStructure:
 
     def test_base_yaml_provider_imports_without_error(self):
         """Test that BaseYAMLWorkflowProvider can be imported."""
-        from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
+        from victor.framework.workflows.base_yaml_provider import (
+            BaseYAMLWorkflowProvider,
+        )
 
         assert BaseYAMLWorkflowProvider is not None

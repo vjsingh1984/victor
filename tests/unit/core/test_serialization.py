@@ -297,7 +297,9 @@ class TestAdaptiveSerializer:
         serializer = AdaptiveSerializer()
         data = [{"a": 1}, {"a": 2}]
 
-        result = serializer.serialize(data, format_override=SerializationFormat.JSON_MINIFIED)
+        result = serializer.serialize(
+            data, format_override=SerializationFormat.JSON_MINIFIED
+        )
 
         assert result.format == SerializationFormat.JSON_MINIFIED
 
@@ -370,7 +372,10 @@ class TestTokenSavings:
     def test_toon_saves_tokens(self):
         """Test that TOON format saves tokens."""
         serializer = AdaptiveSerializer()
-        data = [{"id": i, "name": f"user_{i}", "email": f"user{i}@example.com"} for i in range(20)]
+        data = [
+            {"id": i, "name": f"user_{i}", "email": f"user{i}@example.com"}
+            for i in range(20)
+        ]
 
         _result = serializer.serialize(data, format_override=SerializationFormat.TOON)
         metrics = serializer.get_last_metrics()
@@ -398,7 +403,9 @@ class TestTokenSavings:
         serializer = AdaptiveSerializer()
         data = {"key1": "value1", "key2": "value2", "key3": "value3"}
 
-        _result = serializer.serialize(data, format_override=SerializationFormat.JSON_MINIFIED)
+        _result = serializer.serialize(
+            data, format_override=SerializationFormat.JSON_MINIFIED
+        )
         metrics = serializer.get_last_metrics()
 
         # Minified should save at least a small percentage

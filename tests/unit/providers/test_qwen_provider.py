@@ -39,7 +39,10 @@ class TestQwenConstants:
     """Test Qwen provider constants."""
 
     def test_base_urls(self):
-        assert QWEN_BASE_URLS["standard"] == "https://dashscope.aliyuncs.com/compatible-mode/v1/"
+        assert (
+            QWEN_BASE_URLS["standard"]
+            == "https://dashscope.aliyuncs.com/compatible-mode/v1/"
+        )
         assert QWEN_BASE_URLS["portal"] == "https://portal.qwen.ai/v1/"
 
     def test_oauth_config(self):
@@ -47,7 +50,11 @@ class TestQwenConstants:
         assert QWEN_OAUTH_CONFIG["api_base_url"] == "https://portal.qwen.ai/v1/"
 
     def test_models_defined(self):
-        assert "qwen3-coder-plus" in QWEN_MODELS or "qwen3.5" in QWEN_MODELS or len(QWEN_MODELS) > 0
+        assert (
+            "qwen3-coder-plus" in QWEN_MODELS
+            or "qwen3.5" in QWEN_MODELS
+            or len(QWEN_MODELS) > 0
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -267,7 +274,10 @@ class TestQwenChat:
             ToolDefinition(
                 name="get_weather",
                 description="Get weather",
-                parameters={"type": "object", "properties": {"city": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"city": {"type": "string"}},
+                },
             )
         ]
         result = await provider.chat(messages=messages, model="qwen3.5", tools=tools)
@@ -378,7 +388,9 @@ class TestQwenStream:
     async def test_stream_error(self, provider):
         from victor.providers.base import ProviderError
 
-        provider.client.chat.completions.create = AsyncMock(side_effect=Exception("stream failed"))
+        provider.client.chat.completions.create = AsyncMock(
+            side_effect=Exception("stream failed")
+        )
         messages = [Message(role="user", content="Hi")]
         with pytest.raises(ProviderError):
             async for _ in provider.stream(messages=messages):
@@ -398,7 +410,9 @@ class TestQwenStream:
         provider.client.chat.completions.create = AsyncMock(return_value=mock_stream())
         messages = [Message(role="user", content="Do it")]
         tools = [
-            ToolDefinition(name="test_tool", description="Test", parameters={"type": "object"})
+            ToolDefinition(
+                name="test_tool", description="Test", parameters={"type": "object"}
+            )
         ]
         chunks = []
         async for c in provider.stream(messages=messages, tools=tools):

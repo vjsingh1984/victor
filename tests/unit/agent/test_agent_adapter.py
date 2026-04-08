@@ -187,7 +187,9 @@ class TestVictorAgentAdapter:
         """Test combined patch generation."""
         adapter._file_edits = [
             FileEdit(
-                path="a.py", action="modify", diff="--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new"
+                path="a.py",
+                action="modify",
+                diff="--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new",
             ),
             FileEdit(
                 path="b.py",
@@ -264,7 +266,9 @@ class TestCreateVictorAgentCallback:
         mock_orchestrator._on_tool_start_callback = None
         mock_orchestrator._on_tool_complete_callback = None
         mock_orchestrator.reset_conversation = MagicMock()
-        mock_orchestrator.chat = AsyncMock(return_value=MagicMock(content="TASK COMPLETE"))
+        mock_orchestrator.chat = AsyncMock(
+            return_value=MagicMock(content="TASK COMPLETE")
+        )
 
         adapter = VictorAgentAdapter(mock_orchestrator)
         callback = create_victor_agent_callback(adapter)

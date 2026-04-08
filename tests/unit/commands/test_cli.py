@@ -277,7 +277,9 @@ class TestCliConfirmationCallback:
             arguments={"param": "value"},
         )
 
-        with patch("victor.ui.commands.utils.Confirm.ask", return_value=True) as mock_ask:
+        with patch(
+            "victor.ui.commands.utils.Confirm.ask", return_value=True
+        ) as mock_ask:
             result = await cli_confirmation_callback(request)
             assert result is True
             mock_ask.assert_called_once()
@@ -314,7 +316,9 @@ class TestCliConfirmationCallback:
             arguments={},
         )
 
-        with patch("victor.ui.commands.utils.Confirm.ask", side_effect=KeyboardInterrupt):
+        with patch(
+            "victor.ui.commands.utils.Confirm.ask", side_effect=KeyboardInterrupt
+        ):
             result = await cli_confirmation_callback(request)
             assert result is False
 
@@ -467,7 +471,9 @@ class TestCheckCodebaseIndex:
 
         with patch.dict("sys.modules", {"victor_coding.codebase.indexer": MagicMock()}):
             with patch(
-                "victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True
+                "victor.ui.commands.utils.CodebaseIndex",
+                return_value=mock_index,
+                create=True,
             ):
                 # Should not raise
                 await check_codebase_index("/tmp", mock_console)
@@ -491,7 +497,9 @@ class TestCheckCodebaseIndex:
                 "victor.ui.commands.utils.CodebaseIndexFactoryProtocol",
                 new=MagicMock(),
             ),
-            patch("victor.ui.commands.utils.get_container", return_value=mock_container),
+            patch(
+                "victor.ui.commands.utils.get_container", return_value=mock_container
+            ),
         ):
             await check_codebase_index("/tmp", mock_console, silent=True)
             # No output expected when not stale and silent
@@ -506,7 +514,9 @@ class TestPreloadSemanticIndex:
     """Tests for _preload_semantic_index async function."""
 
     @pytest.mark.asyncio
-    async def test_preload_semantic_index_import_error(self, mock_console, mock_settings):
+    async def test_preload_semantic_index_import_error(
+        self, mock_console, mock_settings
+    ):
         """Test handling of ImportError."""
         from victor.ui.commands.utils import preload_semantic_index
 
@@ -518,7 +528,9 @@ class TestPreloadSemanticIndex:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_preload_semantic_index_generic_error(self, mock_console, mock_settings):
+    async def test_preload_semantic_index_generic_error(
+        self, mock_console, mock_settings
+    ):
         """Test handling of generic errors."""
         from victor.ui.commands.utils import preload_semantic_index
 

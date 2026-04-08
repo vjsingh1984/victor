@@ -420,7 +420,9 @@ class TestAdaptiveModeControllerInit:
         assert controller._current_action is None
         assert controller._total_reward == 0.0
 
-    def test_initialization_with_provider(self, controller_with_provider: AdaptiveModeController):
+    def test_initialization_with_provider(
+        self, controller_with_provider: AdaptiveModeController
+    ):
         """Test controller initialization with provider."""
         assert controller_with_provider._provider_name == "anthropic"
         assert controller_with_provider._model_name == "claude-3-sonnet"
@@ -457,7 +459,9 @@ class TestProviderNormalization:
     def test_normalize_provider_deepseek(self, controller: AdaptiveModeController):
         """Test DeepSeek provider normalization."""
         assert controller._normalize_provider_name("deepseek") == "deepseek"
-        assert controller._normalize_provider_name("deepseek:deepseek-chat") == "deepseek"
+        assert (
+            controller._normalize_provider_name("deepseek:deepseek-chat") == "deepseek"
+        )
 
     def test_normalize_provider_local(self, controller: AdaptiveModeController):
         """Test local provider normalization."""
@@ -585,7 +589,9 @@ class TestGetRecommendedAction:
         assert action.target_mode in AgentMode
         assert isinstance(action.should_continue, bool)
 
-    def test_get_recommended_action_invalid_mode(self, controller: AdaptiveModeController):
+    def test_get_recommended_action_invalid_mode(
+        self, controller: AdaptiveModeController
+    ):
         """Test handling of invalid mode string."""
         action = controller.get_recommended_action(
             current_mode="invalid_mode",
@@ -597,7 +603,9 @@ class TestGetRecommendedAction:
         # Should default to EXPLORE
         assert isinstance(action, ModeAction)
 
-    def test_get_recommended_action_updates_current_state(self, controller: AdaptiveModeController):
+    def test_get_recommended_action_updates_current_state(
+        self, controller: AdaptiveModeController
+    ):
         """Test that get_recommended_action updates internal state."""
         controller.get_recommended_action(
             current_mode="explore",
@@ -629,7 +637,9 @@ class TestGetRecommendedAction:
         # Should suggest completion or stay based on Q-values
         assert isinstance(action, ModeAction)
 
-    def test_get_recommended_action_budget_exhausted(self, controller: AdaptiveModeController):
+    def test_get_recommended_action_budget_exhausted(
+        self, controller: AdaptiveModeController
+    ):
         """Test that budget exhaustion affects recommendations."""
         controller._q_store.exploration_rate = 0.0
 
@@ -784,7 +794,9 @@ class TestShouldContinue:
         assert should_continue is True
         assert reason == "Continue processing"
 
-    def test_should_continue_tool_budget_exhausted(self, controller: AdaptiveModeController):
+    def test_should_continue_tool_budget_exhausted(
+        self, controller: AdaptiveModeController
+    ):
         """Test stopping when tool budget exhausted."""
         should_continue, reason = controller.should_continue(
             tool_calls_made=10,
@@ -797,7 +809,9 @@ class TestShouldContinue:
         assert should_continue is False
         assert "Tool budget exhausted" in reason
 
-    def test_should_continue_iteration_budget_exhausted(self, controller: AdaptiveModeController):
+    def test_should_continue_iteration_budget_exhausted(
+        self, controller: AdaptiveModeController
+    ):
         """Test stopping when iteration budget exhausted."""
         should_continue, reason = controller.should_continue(
             tool_calls_made=5,
@@ -855,7 +869,9 @@ class TestLoopDetection:
             assert is_stuck is True
             assert "loop" in reason.lower()
 
-    def test_check_loop_detection_resets_on_tool_call(self, controller: AdaptiveModeController):
+    def test_check_loop_detection_resets_on_tool_call(
+        self, controller: AdaptiveModeController
+    ):
         """Test loop detection resets when tool calls made."""
         # Simulate no-tool iterations
         controller.check_loop_detection(iteration_count=5, current_tool_calls=0)
@@ -1114,7 +1130,9 @@ class TestQToConfidence:
 class TestHeuristicBonus:
     """Tests for heuristic bonus calculation."""
 
-    def test_heuristic_bonus_complete_high_quality(self, controller: AdaptiveModeController):
+    def test_heuristic_bonus_complete_high_quality(
+        self, controller: AdaptiveModeController
+    ):
         """Test heuristic bonus for completion with high quality."""
         controller.get_recommended_action(
             current_mode="build",
@@ -1129,7 +1147,9 @@ class TestHeuristicBonus:
 
         assert bonus > 0  # Should have bonus for completing with high quality
 
-    def test_heuristic_bonus_early_mode_switch(self, controller: AdaptiveModeController):
+    def test_heuristic_bonus_early_mode_switch(
+        self, controller: AdaptiveModeController
+    ):
         """Test heuristic penalty for early mode switch."""
         controller.get_recommended_action(
             current_mode="explore",

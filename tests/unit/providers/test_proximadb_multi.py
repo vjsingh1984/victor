@@ -17,7 +17,9 @@ if importlib.util.find_spec("proximadb_sdk") is None:
     pytest.skip("proximadb_sdk not installed", allow_module_level=True)
 
 
-def test_proximadb_sdk_top_level_imports(monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+def test_proximadb_sdk_top_level_imports(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
     """Smoke test the ProximaDB SDK imports Victor depends on."""
 
     monkeypatch.setenv("DSP_CACHEBOOL", "false")
@@ -90,7 +92,9 @@ class FakeProximaClient:
         self.traversal_rows: Dict[str, Dict[str, Any]] = {}
         self.sql_rows: List[Dict[str, Any]] = []
 
-    def create_collection(self, name: str, config: Any = None, **kwargs: Any) -> Dict[str, Any]:
+    def create_collection(
+        self, name: str, config: Any = None, **kwargs: Any
+    ) -> Dict[str, Any]:
         if name not in self.created_collections:
             self.created_collections.append(name)
         self.collections.setdefault(name, [])
@@ -103,7 +107,9 @@ class FakeProximaClient:
         self.deleted_collections.append(name)
         self.collections.pop(name, None)
 
-    def insert_vectors(self, collection: str, records: List[Any], **kwargs: Any) -> None:
+    def insert_vectors(
+        self, collection: str, records: List[Any], **kwargs: Any
+    ) -> None:
         self.collections[collection].extend(records)
 
     def search(
@@ -197,7 +203,9 @@ class FakeProximaClient:
         node_id = node_id or kwargs.get("id")
         labels = list(labels or kwargs.get("labels", []))
         properties = dict(properties or kwargs.get("properties", {}))
-        self.graph_nodes.append({"id": node_id, "labels": labels, "properties": properties})
+        self.graph_nodes.append(
+            {"id": node_id, "labels": labels, "properties": properties}
+        )
         return self.graph_nodes[-1]
 
     def create_edge(
@@ -326,7 +334,9 @@ def parse_json(data):
             return_value=stub_model,
         ):
             provider = ProximaDBMultiModelProvider(provider_config, client=fake_client)
-            result = await provider.index_code_file("src/main.py", code, language="python")
+            result = await provider.index_code_file(
+                "src/main.py", code, language="python"
+            )
 
         assert result["vectors"] >= 1
         assert result["document"] is True
@@ -336,7 +346,9 @@ def parse_json(data):
         assert result["timeseries"] >= 4
 
         assert any("Module" in node["labels"] for node in fake_client.graph_nodes)
-        assert any(node["properties"].get("name") == "main" for node in fake_client.graph_nodes)
+        assert any(
+            node["properties"].get("name") == "main" for node in fake_client.graph_nodes
+        )
         assert any(edge["edge_type"] == "CALLS" for edge in fake_client.graph_edges)
         assert len(fake_client.collections["victor_test_repo_documents"]) == 1
         assert len(fake_client.collections["victor_test_repo_metrics"]) >= 4
@@ -740,8 +752,12 @@ def parse_json(data):
             document_filter={"language": "python"},
             top_k=5,
         )
-        provider.find_callers.assert_awaited_once_with("parse_json", file_path="src/main.py")
-        provider.find_callees.assert_awaited_once_with("parse_json", file_path="src/main.py")
+        provider.find_callers.assert_awaited_once_with(
+            "parse_json", file_path="src/main.py"
+        )
+        provider.find_callees.assert_awaited_once_with(
+            "parse_json", file_path="src/main.py"
+        )
         assert results == [
             {
                 "id": "hit:1",

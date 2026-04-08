@@ -92,9 +92,14 @@ async def test_queue_overflow_block_timeout_default_under_sustained_pressure():
     )
     backend._is_connected = True
 
-    assert await backend.publish(MessagingEvent(topic="stress.full", data={"i": 1})) is True
+    assert (
+        await backend.publish(MessagingEvent(topic="stress.full", data={"i": 1}))
+        is True
+    )
     t0 = time.perf_counter()
-    result = await backend.publish(MessagingEvent(topic="stress.timeout", data={"i": 2}))
+    result = await backend.publish(
+        MessagingEvent(topic="stress.timeout", data={"i": 2})
+    )
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
     assert result is False
@@ -113,7 +118,9 @@ async def test_queue_overflow_topic_defaults_apply_blocking_only_to_critical_top
         config=BackendConfig(
             extra={
                 "queue_overflow_policy": "drop_newest",
-                "queue_overflow_topic_policies": {"vertical.applied": "block_with_timeout"},
+                "queue_overflow_topic_policies": {
+                    "vertical.applied": "block_with_timeout"
+                },
                 "queue_overflow_topic_block_timeout_ms": {"vertical.applied": 30.0},
             }
         ),
@@ -121,14 +128,21 @@ async def test_queue_overflow_topic_defaults_apply_blocking_only_to_critical_top
     )
     backend._is_connected = True
 
-    assert await backend.publish(MessagingEvent(topic="metric.latency", data={"i": 1})) is True
+    assert (
+        await backend.publish(MessagingEvent(topic="metric.latency", data={"i": 1}))
+        is True
+    )
 
     t0 = time.perf_counter()
-    critical_result = await backend.publish(MessagingEvent(topic="vertical.applied", data={"i": 2}))
+    critical_result = await backend.publish(
+        MessagingEvent(topic="vertical.applied", data={"i": 2})
+    )
     critical_elapsed_ms = (time.perf_counter() - t0) * 1000.0
 
     t1 = time.perf_counter()
-    telemetry_result = await backend.publish(MessagingEvent(topic="metric.latency", data={"i": 3}))
+    telemetry_result = await backend.publish(
+        MessagingEvent(topic="metric.latency", data={"i": 3})
+    )
     telemetry_elapsed_ms = (time.perf_counter() - t1) * 1000.0
 
     assert critical_result is False

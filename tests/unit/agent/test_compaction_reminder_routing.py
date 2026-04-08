@@ -56,10 +56,14 @@ class TestCompactionReminderRouting:
         assert result is True
         # Should have inserted a direct message
         msgs = controller_without_manager.messages
-        reminders = [m for m in msgs if m.role == "assistant" and "Context reminder" in m.content]
+        reminders = [
+            m for m in msgs if m.role == "assistant" and "Context reminder" in m.content
+        ]
         assert len(reminders) == 1
 
-    def test_compaction_summary_updates_state(self, controller_with_manager, mock_reminder_manager):
+    def test_compaction_summary_updates_state(
+        self, controller_with_manager, mock_reminder_manager
+    ):
         controller_with_manager._compaction_summaries = ["S1", "S2", "S3"]
         controller_with_manager.inject_compaction_context()
 
@@ -71,11 +75,15 @@ class TestCompactionReminderRouting:
         result = controller_with_manager.inject_compaction_context()
         assert result is False
 
-    def test_reminder_manager_none_uses_direct_injection(self, controller_without_manager):
+    def test_reminder_manager_none_uses_direct_injection(
+        self, controller_without_manager
+    ):
         controller_without_manager._compaction_summaries = ["Test summary"]
         result = controller_without_manager.inject_compaction_context()
 
         assert result is True
         msgs = controller_without_manager.messages
         # Direct injection: assistant message with [Context reminder: ...]
-        assert any("Context reminder" in m.content for m in msgs if m.role == "assistant")
+        assert any(
+            "Context reminder" in m.content for m in msgs if m.role == "assistant"
+        )
