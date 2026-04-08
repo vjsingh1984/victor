@@ -928,9 +928,9 @@ class TestStageThrashingDampener:
     def _make_sm():
         sm = ConversationStateMachine()
         sm.TRANSITION_COOLDOWN_SECONDS = 0.0
-        sm.THRASHING_COOLDOWN_SECONDS = 30.0
+        sm.THRASHING_COOLDOWN_SECONDS = 10.0
         sm.THRASHING_WINDOW_SECONDS = 120.0
-        sm.MAX_TRANSITIONS_PER_WINDOW = 6
+        sm.MAX_TRANSITIONS_PER_WINDOW = 8
         return sm
 
     def test_thrashing_detected_on_oscillation(self):
@@ -938,8 +938,8 @@ class TestStageThrashingDampener:
         import time
 
         sm = self._make_sm()
-        # Simulate 8 rapid transitions (above MAX_TRANSITIONS_PER_WINDOW=6)
-        for i in range(4):
+        # Simulate 10 rapid transitions (above MAX_TRANSITIONS_PER_WINDOW=8)
+        for i in range(5):
             sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
             sm._transition_to(ConversationStage.READING, confidence=0.7)
 
@@ -948,8 +948,8 @@ class TestStageThrashingDampener:
     def test_thrashing_dampener_blocks(self):
         """After thrashing detected, transitions are blocked for cooldown."""
         sm = self._make_sm()
-        # Trigger thrashing
-        for i in range(4):
+        # Trigger thrashing (>8 transitions)
+        for i in range(5):
             sm._transition_to(ConversationStage.EXECUTION, confidence=0.9)
             sm._transition_to(ConversationStage.READING, confidence=0.7)
 

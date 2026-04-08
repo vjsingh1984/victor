@@ -274,10 +274,12 @@ class ConversationStateMachine:
     # while still preventing thrashing
     TRANSITION_COOLDOWN_SECONDS: float = 2.0
 
-    # Thrashing detection: if >MAX transitions in WINDOW seconds, apply longer cooldown
-    MAX_TRANSITIONS_PER_WINDOW: int = 6
+    # Thrashing detection: if >MAX transitions in WINDOW seconds, apply longer cooldown.
+    # Tuned conservatively — natural EXECUTION↔READING cycling (read-edit-read) is
+    # expected in agentic workflows. Only flag true oscillation (>8 in 2 min).
+    MAX_TRANSITIONS_PER_WINDOW: int = 8
     THRASHING_WINDOW_SECONDS: float = 120.0  # 2 min window
-    THRASHING_COOLDOWN_SECONDS: float = 30.0  # Lock stage for 30s on thrashing
+    THRASHING_COOLDOWN_SECONDS: float = 10.0  # Brief pause, not hard lock
 
     # Minimum tools required to trigger stage transition
     MIN_TOOLS_FOR_TRANSITION: int = 3
@@ -817,8 +819,8 @@ class ConversationStateMachine:
             # Check for thrashing (rapid oscillation)
             if self._is_thrashing():
                 if time_since_last < self.THRASHING_COOLDOWN_SECONDS:
-                    logger.warning(
-                        "Stage thrashing detected, blocking %s->%s for %ds",
+                    logger.debug(
+                        "Stage thrashing dampened: %s->%s (cooldown %ds)",
                         old_stage.name,
                         new_stage.name,
                         int(self.THRASHING_COOLDOWN_SECONDS),
