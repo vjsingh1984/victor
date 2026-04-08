@@ -149,7 +149,9 @@ def compute_task_metrics(
     """
     n = len(runs)
     durations = [r.get("duration_ms", 0) for r in runs]
-    qualities = [r.get("output_quality", 0) for r in runs if r.get("output_quality") is not None]
+    qualities = [
+        r.get("output_quality", 0) for r in runs if r.get("output_quality") is not None
+    ]
     memories = [r.get("memory_mb", 0) for r in runs]
     successes = sum(1 for r in runs if r.get("success", False))
 
@@ -159,7 +161,11 @@ def compute_task_metrics(
 
     qual_mean = compute_mean(qualities) if qualities else 0.0
     qual_std = compute_std_dev(qualities, qual_mean) if qualities else 0.0
-    qual_ci = compute_confidence_interval(qual_mean, qual_std, len(qualities)) if qualities else (0.0, 0.0)
+    qual_ci = (
+        compute_confidence_interval(qual_mean, qual_std, len(qualities))
+        if qualities
+        else (0.0, 0.0)
+    )
 
     mem_mean = compute_mean(memories)
     mem_std = compute_std_dev(memories, mem_mean)
@@ -269,9 +275,7 @@ def compute_composite_score(
 
     # 5. Reliability (10%) — based on error rate across all runs
     total_runs = sum(m["runs"] for m in task_metrics.values())
-    total_successes = sum(
-        m["success_rate"] * m["runs"] for m in task_metrics.values()
-    )
+    total_successes = sum(m["success_rate"] * m["runs"] for m in task_metrics.values())
     error_rate = 1 - (total_successes / total_runs) if total_runs > 0 else 1.0
     reliability_score = (1 - error_rate) * 10
 
@@ -326,8 +330,16 @@ def find_statistical_ties(
             metrics_b = framework_task_metrics[fw_b]
 
             # Compute overall score CI from per-task quality CIs
-            scores_a = [m["output_quality"]["mean"] for m in metrics_a.values() if m["output_quality"]["mean"] > 0]
-            scores_b = [m["output_quality"]["mean"] for m in metrics_b.values() if m["output_quality"]["mean"] > 0]
+            scores_a = [
+                m["output_quality"]["mean"]
+                for m in metrics_a.values()
+                if m["output_quality"]["mean"] > 0
+            ]
+            scores_b = [
+                m["output_quality"]["mean"]
+                for m in metrics_b.values()
+                if m["output_quality"]["mean"] > 0
+            ]
 
             if not scores_a or not scores_b:
                 continue
@@ -342,13 +354,15 @@ def find_statistical_ties(
 
             # Check overlap
             if ci_a[0] <= ci_b[1] and ci_b[0] <= ci_a[1]:
-                ties.append({
-                    "frameworks": [fw_a, fw_b],
-                    "dimension": "output_quality",
-                    "ci_a": [round(ci_a[0], 2), round(ci_a[1], 2)],
-                    "ci_b": [round(ci_b[0], 2), round(ci_b[1], 2)],
-                    "verdict": "statistically_tied",
-                })
+                ties.append(
+                    {
+                        "frameworks": [fw_a, fw_b],
+                        "dimension": "output_quality",
+                        "ci_a": [round(ci_a[0], 2), round(ci_a[1], 2)],
+                        "ci_b": [round(ci_b[0], 2), round(ci_b[1], 2)],
+                        "verdict": "statistically_tied",
+                    }
+                )
 
             # Also check duration CIs
             durs_a = [m["duration_ms"]["mean"] for m in metrics_a.values()]
@@ -357,20 +371,26 @@ def find_statistical_ties(
             if durs_a and durs_b:
                 dur_mean_a = compute_mean(durs_a)
                 dur_std_a = compute_std_dev(durs_a, dur_mean_a)
-                dur_ci_a = compute_confidence_interval(dur_mean_a, dur_std_a, len(durs_a))
+                dur_ci_a = compute_confidence_interval(
+                    dur_mean_a, dur_std_a, len(durs_a)
+                )
 
                 dur_mean_b = compute_mean(durs_b)
                 dur_std_b = compute_std_dev(durs_b, dur_mean_b)
-                dur_ci_b = compute_confidence_interval(dur_mean_b, dur_std_b, len(durs_b))
+                dur_ci_b = compute_confidence_interval(
+                    dur_mean_b, dur_std_b, len(durs_b)
+                )
 
                 if dur_ci_a[0] <= dur_ci_b[1] and dur_ci_b[0] <= dur_ci_a[1]:
-                    ties.append({
-                        "frameworks": [fw_a, fw_b],
-                        "dimension": "execution_speed",
-                        "ci_a": [round(dur_ci_a[0], 2), round(dur_ci_a[1], 2)],
-                        "ci_b": [round(dur_ci_b[0], 2), round(dur_ci_b[1], 2)],
-                        "verdict": "statistically_tied",
-                    })
+                    ties.append(
+                        {
+                            "frameworks": [fw_a, fw_b],
+                            "dimension": "execution_speed",
+                            "ci_a": [round(dur_ci_a[0], 2), round(dur_ci_a[1], 2)],
+                            "ci_b": [round(dur_ci_b[0], 2), round(dur_ci_b[1], 2)],
+                            "verdict": "statistically_tied",
+                        }
+                    )
 
     return ties
 
@@ -392,13 +412,15 @@ def collect_high_variance_flags(
             for metric_name in ("duration_ms", "output_quality", "memory_mb"):
                 metric = metrics.get(metric_name, {})
                 if metric.get("high_variance", False):
-                    flags.append({
-                        "framework": fw,
-                        "task_id": task_id,
-                        "metric": metric_name,
-                        "mean": metric.get("mean", 0),
-                        "std_dev": metric.get("std_dev", 0),
-                    })
+                    flags.append(
+                        {
+                            "framework": fw,
+                            "task_id": task_id,
+                            "metric": metric_name,
+                            "mean": metric.get("mean", 0),
+                            "std_dev": metric.get("std_dev", 0),
+                        }
+                    )
     return flags
 
 
@@ -424,11 +446,15 @@ def print_summary_report(
 
     # Overall scores table
     print("\n## Overall Composite Scores\n")
-    print(f"{'Framework':<15} {'Overall':>8} {'Success':>8} {'Quality':>8} "
-          f"{'Speed':>8} {'Resource':>8} {'Reliab.':>8} {'DX':>8}")
+    print(
+        f"{'Framework':<15} {'Overall':>8} {'Success':>8} {'Quality':>8} "
+        f"{'Speed':>8} {'Resource':>8} {'Reliab.':>8} {'DX':>8}"
+    )
     print("-" * 83)
 
-    for fw in sorted(framework_scores, key=lambda x: framework_scores[x]["overall"], reverse=True):
+    for fw in sorted(
+        framework_scores, key=lambda x: framework_scores[x]["overall"], reverse=True
+    ):
         s = framework_scores[fw]
         d = s["dimensions"]
         print(
@@ -467,18 +493,24 @@ def print_summary_report(
         print("\n## Per-Task Breakdown\n")
         for fw in sorted(framework_task_metrics):
             print(f"\n### {fw}\n")
-            print(f"  {'Task':<8} {'Runs':>5} {'Success':>8} "
-                  f"{'Dur(ms)':>10} {'Quality':>8} {'Mem(MB)':>8}")
+            print(
+                f"  {'Task':<8} {'Runs':>5} {'Success':>8} "
+                f"{'Dur(ms)':>10} {'Quality':>8} {'Mem(MB)':>8}"
+            )
             print("  " + "-" * 55)
             for task_id in sorted(framework_task_metrics[fw]):
                 m = framework_task_metrics[fw][task_id]
                 dur = m["duration_ms"]["mean"]
                 qual = m["output_quality"]["mean"]
                 mem = m["memory_mb"]["mean"]
-                hv = " !" if any(
-                    m[k].get("high_variance", False)
-                    for k in ("duration_ms", "output_quality", "memory_mb")
-                ) else ""
+                hv = (
+                    " !"
+                    if any(
+                        m[k].get("high_variance", False)
+                        for k in ("duration_ms", "output_quality", "memory_mb")
+                    )
+                    else ""
+                )
                 print(
                     f"  {task_id:<8} {m['runs']:>5} "
                     f"{m['success_rate']:>8.1%} "
@@ -489,8 +521,12 @@ def print_summary_report(
     for fw, tasks in framework_task_metrics.items():
         low_run_tasks = [tid for tid, m in tasks.items() if m["runs"] < 3]
         if low_run_tasks:
-            print(f"\n  Warning: {fw} has < 3 runs for tasks: {', '.join(low_run_tasks)}")
-            print("  Minimum 3 runs per task required for reliable statistical analysis.")
+            print(
+                f"\n  Warning: {fw} has < 3 runs for tasks: {', '.join(low_run_tasks)}"
+            )
+            print(
+                "  Minimum 3 runs per task required for reliable statistical analysis."
+            )
 
     print("\n" + "=" * 70)
 
@@ -588,13 +624,15 @@ def main():
         help="Framework names to analyze (default: auto-discover from results/)",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=str,
         default=None,
         help="Save JSON report to file",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Show per-task breakdown",
     )
@@ -604,7 +642,9 @@ def main():
     frameworks = args.frameworks or discover_frameworks()
     if not frameworks:
         print("No frameworks specified and no results found in", RESULTS_DIR)
-        print("\nUsage: python docs/benchmarking/analyze_results.py --frameworks victor langgraph crewai")
+        print(
+            "\nUsage: python docs/benchmarking/analyze_results.py --frameworks victor langgraph crewai"
+        )
         sys.exit(1)
 
     print(f"Analyzing frameworks: {', '.join(frameworks)}")

@@ -90,7 +90,8 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
     ),
     DecisionType.QUESTION_CLASSIFICATION: DecisionPrompt(
         system=(
-            "You are a question type classifier. " "Respond ONLY with a JSON object, no other text."
+            "You are a question type classifier. "
+            "Respond ONLY with a JSON object, no other text."
         ),
         user_template=(
             "Classify this question from an AI assistant:\n\n"
@@ -118,7 +119,10 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
         max_tokens=20,
     ),
     DecisionType.ERROR_CLASSIFICATION: DecisionPrompt(
-        system=("You are an error classifier. " "Respond ONLY with a JSON object, no other text."),
+        system=(
+            "You are an error classifier. "
+            "Respond ONLY with a JSON object, no other text."
+        ),
         user_template=(
             "Classify this error:\n\n"
             "{error_message}\n\n"
@@ -173,7 +177,10 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
     DecisionType.STAGE_DETECTION: DecisionPrompt(
         system="You classify conversation stages. Respond ONLY with JSON.",
         user_template=(
-            "What stage is this request in?\n\n"
+            "What stage is this conversation in?\n\n"
+            "Current stage: {current_stage}\n"
+            "Recent tools: {last_tools}\n"
+            "Heuristic guess: {detected_stage_heuristic}\n"
             "Request: {message_excerpt}\n\n"
             "Stages: initial, planning, reading, analysis, execution, verification\n\n"
             'JSON: {{"stage": "...", "confidence": 0.0-1.0}}'

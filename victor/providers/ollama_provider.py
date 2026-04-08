@@ -156,7 +156,9 @@ class OllamaProvider(BaseProvider):
             Initialized OllamaProvider with best available endpoint
         """
         chosen_base = await cls._select_base_url_async(base_url, timeout)
-        return cls(base_url=chosen_base, timeout=timeout, _skip_discovery=True, **kwargs)
+        return cls(
+            base_url=chosen_base, timeout=timeout, _skip_discovery=True, **kwargs
+        )
 
     @property
     def name(self) -> str:
@@ -260,7 +262,9 @@ class OllamaProvider(BaseProvider):
 
         return False
 
-    def _select_base_url(self, base_url: Union[str, List[str], None], timeout: int) -> str:
+    def _select_base_url(
+        self, base_url: Union[str, List[str], None], timeout: int
+    ) -> str:
         """Pick the first reachable Ollama endpoint from a tiered list.
 
         Priority:
@@ -300,7 +304,9 @@ class OllamaProvider(BaseProvider):
                 with httpx.Client(base_url=url, timeout=httpx.Timeout(2)) as client:
                     resp = client.get("/api/tags")
                     resp.raise_for_status()
-                    self._provider_logger.logger.info(f"Ollama base URL selected: {url}")
+                    self._provider_logger.logger.info(
+                        f"Ollama base URL selected: {url}"
+                    )
                     return url
             except Exception as exc:
                 self._provider_logger.logger.warning(
@@ -355,7 +361,9 @@ class OllamaProvider(BaseProvider):
 
         for url in candidates:
             try:
-                async with httpx.AsyncClient(base_url=url, timeout=httpx.Timeout(2)) as client:
+                async with httpx.AsyncClient(
+                    base_url=url, timeout=httpx.Timeout(2)
+                ) as client:
                     resp = await client.get("/api/tags")
                     resp.raise_for_status()
                     provider_logger.info(f"Ollama base URL selected (async): {url}")
@@ -420,7 +428,9 @@ class OllamaProvider(BaseProvider):
 
                 # Log the endpoint URL being used for connection
                 endpoint_url = f"{self.base_url}/api/chat"
-                self._provider_logger.logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
+                self._provider_logger.logger.debug(
+                    f"Connecting to Ollama endpoint: {endpoint_url}"
+                )
 
                 # Make API call with circuit breaker protection
                 response = await self._execute_with_circuit_breaker(
@@ -601,14 +611,20 @@ class OllamaProvider(BaseProvider):
 
             # Log the endpoint URL being used for connection
             endpoint_url = f"{self.base_url}/api/chat"
-            self._provider_logger.logger.debug(f"Connecting to Ollama endpoint: {endpoint_url}")
+            self._provider_logger.logger.debug(
+                f"Connecting to Ollama endpoint: {endpoint_url}"
+            )
 
-            async with self._get_client().stream("POST", "/api/chat", json=payload) as response:
+            async with self._get_client().stream(
+                "POST", "/api/chat", json=payload
+            ) as response:
                 # Check for HTTP 400 "does not support tools" error
                 if response.status_code == 400 and tools and retry_without_tools:
                     error_body = await response.aread()
                     error_text = error_body.decode()
-                    self._provider_logger.logger.debug(f"Ollama error response (400): {error_text}")
+                    self._provider_logger.logger.debug(
+                        f"Ollama error response (400): {error_text}"
+                    )
 
                     if "does not support tools" in error_text.lower():
                         self._provider_logger.logger.warning(
@@ -798,7 +814,10 @@ class OllamaProvider(BaseProvider):
                 # OpenAI format
                 function = call.get("function", {})
                 normalized.append(
-                    {"name": function.get("name"), "arguments": function.get("arguments", {})}
+                    {
+                        "name": function.get("name"),
+                        "arguments": function.get("arguments", {}),
+                    }
                 )
             elif isinstance(call, dict) and "name" in call:
                 # Already normalized
@@ -809,7 +828,9 @@ class OllamaProvider(BaseProvider):
 
         return normalized if normalized else None
 
-    def _parse_json_tool_call_from_content(self, content: str) -> Optional[List[Dict[str, Any]]]:
+    def _parse_json_tool_call_from_content(
+        self, content: str
+    ) -> Optional[List[Dict[str, Any]]]:
         """Parse tool calls from JSON text in content (fallback for models without native support).
 
         Some Ollama models (like qwen2.5-coder, llama3.1) return tool calls as JSON in content
@@ -870,6 +891,12 @@ class OllamaProvider(BaseProvider):
         """
         message = result.get("message", {})
         content = message.get("content", "")
+
+        # Some models (e.g., gemma3/4) put output in a "thinking" field with empty content.
+        # Use thinking as fallback content so responses aren't silently dropped.
+        if not content and message.get("thinking"):
+            content = message["thinking"]
+
         tool_calls = self._normalize_tool_calls(message.get("tool_calls"))
 
         # Fallback: Check if content contains JSON tool call (for models without native support)
@@ -889,7 +916,8 @@ class OllamaProvider(BaseProvider):
             usage = {
                 "prompt_tokens": result.get("prompt_eval_count", 0),
                 "completion_tokens": result.get("eval_count", 0),
-                "total_tokens": result.get("prompt_eval_count", 0) + result.get("eval_count", 0),
+                "total_tokens": result.get("prompt_eval_count", 0)
+                + result.get("eval_count", 0),
             }
 
         return CompletionResponse(
@@ -972,7 +1000,9 @@ class OllamaProvider(BaseProvider):
         try:
             payload = {"name": model, "stream": True}
 
-            async with self._get_client().stream("POST", "/api/pull", json=payload) as response:
+            async with self._get_client().stream(
+                "POST", "/api/pull", json=payload
+            ) as response:
                 response.raise_for_status()
 
                 async for line in response.aiter_lines():

@@ -199,8 +199,23 @@ def get_category_to_tools_map(
 # The registry-based approach dynamically builds categories from @tool(keywords=[...])
 # decorators and is preferred. This static list is only used when registry is None.
 _FALLBACK_CATEGORY_KEYWORDS: Dict[str, Set[str]] = {
-    "security": {"security", "vulnerability", "scan", "audit", "cve", "exploit", "owasp"},
-    "metrics": {"metrics", "complexity", "coverage", "analyze", "statistics", "cyclomatic"},
+    "security": {
+        "security",
+        "vulnerability",
+        "scan",
+        "audit",
+        "cve",
+        "exploit",
+        "owasp",
+    },
+    "metrics": {
+        "metrics",
+        "complexity",
+        "coverage",
+        "analyze",
+        "statistics",
+        "cyclomatic",
+    },
     "testing": {"test", "unittest", "pytest", "spec", "coverage", "mock"},
     "git": {"git", "commit", "branch", "merge", "push", "pull", "rebase"},
     "docker": {"docker", "container", "dockerfile", "compose", "image"},
@@ -474,7 +489,9 @@ def get_tools_from_message_scored(
         )
         scored_tools = [(r.tool_name, r.total_score) for r in results]
         if scored_tools:
-            logger.debug(f"Scored keyword match: {[(t, f'{s:.2f}') for t, s in scored_tools[:5]]}")
+            logger.debug(
+                f"Scored keyword match: {[(t, f'{s:.2f}') for t, s in scored_tools[:5]]}"
+            )
         return scored_tools
     except Exception as e:
         logger.debug(f"Registry unavailable for scored matching: {e}")
@@ -907,7 +924,9 @@ class ToolSelector(ModeAwareMixin):
                 # Check tool description keywords
                 if not should_include:
                     desc_words = tool.description.lower().split()[:10]
-                    if any(word in message_lower for word in desc_words if len(word) > 4):
+                    if any(
+                        word in message_lower for word in desc_words if len(word) > 4
+                    ):
                         should_include = True
 
                 if should_include:
@@ -1082,7 +1101,11 @@ class ToolSelector(ModeAwareMixin):
         preserved_tools.update(STAGE_PRESERVED_TOOLS)
 
         # Filter to readonly tools, but always keep vertical core tools
-        filtered = [t for t in tools if self._is_readonly_tool(t.name) or t.name in preserved_tools]
+        filtered = [
+            t
+            for t in tools
+            if self._is_readonly_tool(t.name) or t.name in preserved_tools
+        ]
 
         if filtered:
             if preserved_tools:
@@ -1101,7 +1124,9 @@ class ToolSelector(ModeAwareMixin):
 
                 fallback.append(
                     ToolDefinition(
-                        name=tool.name, description=tool.description, parameters=tool.parameters
+                        name=tool.name,
+                        description=tool.description,
+                        parameters=tool.parameters,
                     )
                 )
         return self._apply_stage_limit(fallback, stage) if fallback else tools
@@ -1174,7 +1199,9 @@ class ToolSelector(ModeAwareMixin):
         self._cached_core_tools = None
         self._cached_core_readonly = None
         self._cached_web_tools = None
-        logger.debug("Tool selection cache invalidated - will re-discover on next access")
+        logger.debug(
+            "Tool selection cache invalidated - will re-discover on next access"
+        )
 
     def set_enabled_tools(self, tools: Optional[Set[str]]) -> None:
         """Set which tools are enabled for selection (vertical filter).
@@ -1257,7 +1284,10 @@ class ToolSelector(ModeAwareMixin):
         Returns:
             Reordered/filtered list of tools based on vertical strategy
         """
-        if not self._vertical_context or not self._vertical_context.has_tool_selection_strategy:
+        if (
+            not self._vertical_context
+            or not self._vertical_context.has_tool_selection_strategy
+        ):
             return tools
 
         strategy = self._vertical_context.tool_selection_strategy
@@ -1296,16 +1326,22 @@ class ToolSelector(ModeAwareMixin):
                 others = [t for t in tools if t.name not in priority_set]
 
                 # Sort priority tools by their position in priority_tools list
-                priority_order = {name: i for i, name in enumerate(result.priority_tools)}
+                priority_order = {
+                    name: i for i, name in enumerate(result.priority_tools)
+                }
                 priority_ordered.sort(key=lambda t: priority_order.get(t.name, 999))
 
                 tools = priority_ordered + others
-                logger.debug(f"Vertical strategy prioritized tools: {result.priority_tools}")
+                logger.debug(
+                    f"Vertical strategy prioritized tools: {result.priority_tools}"
+                )
 
             # Exclude tools
             if result.excluded_tools:
                 tools = [t for t in tools if t.name not in result.excluded_tools]
-                logger.debug(f"Vertical strategy excluded tools: {sorted(result.excluded_tools)}")
+                logger.debug(
+                    f"Vertical strategy excluded tools: {sorted(result.excluded_tools)}"
+                )
 
             # Log reasoning if provided
             if result.reasoning:
@@ -1428,11 +1464,17 @@ class ToolSelector(ModeAwareMixin):
 
                     # Check tool description keywords
                     desc_words = tool.description.lower().split()[:10]
-                    if any(word in message_lower for word in desc_words if len(word) > 4):
+                    if any(
+                        word in message_lower for word in desc_words if len(word) > 4
+                    ):
                         should_include = True
 
                     # Skip write/execute for analysis tasks
-                    if should_include and is_analysis_task and config.readonly_only_for_analysis:
+                    if (
+                        should_include
+                        and is_analysis_task
+                        and config.readonly_only_for_analysis
+                    ):
                         if not self._is_readonly_tool(name):
                             should_include = False
 
@@ -1455,7 +1497,9 @@ class ToolSelector(ModeAwareMixin):
         self._record_selection("tiered", len(result))
         return result
 
-    def _filter_by_enabled(self, tools: List["ToolDefinition"]) -> List["ToolDefinition"]:
+    def _filter_by_enabled(
+        self, tools: List["ToolDefinition"]
+    ) -> List["ToolDefinition"]:
         """Filter tools by the enabled tools set.
 
         Args:
@@ -1504,9 +1548,16 @@ class ToolSelector(ModeAwareMixin):
             Tuple of (similarity_threshold, max_tools)
         """
         # Factor 1: Model size - Check configuration first, then fall back to detection
-        if self.tool_selection_config and "base_threshold" in self.tool_selection_config:
-            base_threshold = self.tool_selection_config.get("base_threshold", DEFAULT_THRESHOLD)
-            base_max_tools = self.tool_selection_config.get("base_max_tools", DEFAULT_MAX_TOOLS)
+        if (
+            self.tool_selection_config
+            and "base_threshold" in self.tool_selection_config
+        ):
+            base_threshold = self.tool_selection_config.get(
+                "base_threshold", DEFAULT_THRESHOLD
+            )
+            base_max_tools = self.tool_selection_config.get(
+                "base_max_tools", DEFAULT_MAX_TOOLS
+            )
             logger.debug(
                 f"Using configured tool selection: threshold={base_threshold:.2f}, "
                 f"max_tools={base_max_tools}"
@@ -1525,7 +1576,9 @@ class ToolSelector(ModeAwareMixin):
             elif any(size in model_lower for size in [":13b", ":14b", ":15b"]):
                 base_threshold = 0.20
                 base_max_tools = 10
-            elif any(size in model_lower for size in [":30b", ":32b", ":34b", ":70b", ":72b"]):
+            elif any(
+                size in model_lower for size in [":30b", ":32b", ":34b", ":70b", ":72b"]
+            ):
                 base_threshold = 0.15
                 base_max_tools = 12
             else:
@@ -1681,7 +1734,9 @@ class ToolSelector(ModeAwareMixin):
             self._embeddings_initialized = True
 
         # Get adaptive threshold and max_tools
-        threshold, max_tools = self.get_adaptive_threshold(user_message, conversation_depth)
+        threshold, max_tools = self.get_adaptive_threshold(
+            user_message, conversation_depth
+        )
 
         # Select tools with context awareness
         tools = await self.semantic_selector.select_relevant_tools_with_context(
@@ -1755,7 +1810,9 @@ class ToolSelector(ModeAwareMixin):
 
         # Cap to fallback_max_tools to avoid broadcasting too many tools
         if len(tools) > self.fallback_max_tools:
-            logger.debug(f"Capping tools from {len(tools)} to {self.fallback_max_tools}")
+            logger.debug(
+                f"Capping tools from {len(tools)} to {self.fallback_max_tools}"
+            )
             tools = tools[: self.fallback_max_tools]
 
         # Record selection AFTER final cap to reflect actual tool count
@@ -1822,7 +1879,9 @@ class ToolSelector(ModeAwareMixin):
         all_tools = list(self.tools.list_tools())
 
         # Start with planned tools if provided
-        selected_tools: List[ToolDefinition] = list(planned_tools) if planned_tools else []
+        selected_tools: List[ToolDefinition] = (
+            list(planned_tools) if planned_tools else []
+        )
         existing_names = {t.name for t in selected_tools}
 
         # If vertical has set enabled tools, use those directly
@@ -1844,7 +1903,9 @@ class ToolSelector(ModeAwareMixin):
                     existing_names.add(tool.name)
 
             # Apply stage filtering and return
-            stage = self.conversation_state.get_stage() if self.conversation_state else None
+            stage = (
+                self.conversation_state.get_stage() if self.conversation_state else None
+            )
             selected_tools = self._filter_tools_for_stage(selected_tools, stage)
 
             tool_names = [t.name for t in selected_tools]
@@ -1955,7 +2016,9 @@ class ToolSelector(ModeAwareMixin):
                 keep_names = set(selected_names) | critical
                 filtered = [t for t in tools if t.name in keep_names]
                 if len(filtered) >= 3:
-                    logger.info(f"Edge model filtered tools: {len(tools)} -> {len(filtered)}")
+                    logger.info(
+                        f"Edge model filtered tools: {len(tools)} -> {len(filtered)}"
+                    )
                     return filtered
 
         except Exception as e:
@@ -1992,13 +2055,17 @@ class ToolSelector(ModeAwareMixin):
         current_stage = self.conversation_state.get_stage()
         stage_tools = self.conversation_state.get_stage_tools()
 
-        logger.debug(f"Stage detection: {current_stage.name}, recommended tools: {stage_tools}")
+        logger.debug(
+            f"Stage detection: {current_stage.name}, recommended tools: {stage_tools}"
+        )
 
         # Core tools always included (stage-aware, read-only for explore/analysis)
         core = self._get_stage_core_tools(current_stage)
 
         # Web tools check (dynamic discovery)
-        web_tools = self._get_web_tools_cached() if needs_web_tools(user_message) else set()
+        web_tools = (
+            self._get_web_tools_cached() if needs_web_tools(user_message) else set()
+        )
 
         # Combine stage-specific tools with core and web tools
         keep = stage_tools | core | web_tools
@@ -2037,15 +2104,21 @@ class ToolSelector(ModeAwareMixin):
         core_fallback = self._get_stage_core_tools(current_stage)
         # Also include vertical_core tools in fallback (GAP-4 fix)
         if tiered_config:
-            core_fallback = core_fallback | tiered_config.mandatory | tiered_config.vertical_core
+            core_fallback = (
+                core_fallback | tiered_config.mandatory | tiered_config.vertical_core
+            )
         fallback_tools = [t for t in tools if t.name in core_fallback]
 
         if fallback_tools:
-            logger.debug(f"Stage pruning fallback: {len(fallback_tools)} core+vertical tools")
+            logger.debug(
+                f"Stage pruning fallback: {len(fallback_tools)} core+vertical tools"
+            )
             return fallback_tools
 
         # Last resort: return a small prefix
-        logger.warning(f"Stage pruning: last resort fallback to {self.fallback_max_tools} tools")
+        logger.warning(
+            f"Stage pruning: last resort fallback to {self.fallback_max_tools} tools"
+        )
         return tools[: self.fallback_max_tools]
 
     def get_task_aware_tools(
