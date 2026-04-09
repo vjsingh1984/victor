@@ -813,6 +813,11 @@ class PipelineSettings(_BaseModel):
     # Heuristic confidence threshold — below this, fallback to next in chain
     heuristic_confidence_threshold: float = 0.7
 
+    # Parallel exploration — spawn concurrent subagents during READING stage
+    parallel_exploration: bool = True
+    max_exploration_agents: int = 3
+    exploration_tool_budget: int = 10
+
     intelligent_pipeline_enabled: bool = True
     intelligent_quality_scoring: bool = True
     intelligent_mode_learning: bool = True
