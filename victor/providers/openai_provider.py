@@ -199,6 +199,18 @@ class OpenAIProvider(BaseProvider):
         model_lower = model.lower()
         return any(model_lower.startswith(prefix) for prefix in ["o1", "o3"])
 
+    def _uses_max_completion_tokens(self, model: str) -> bool:
+        """Check if model requires max_completion_tokens instead of max_tokens.
+
+        GPT-5.x and O-series models use max_completion_tokens.
+        GPT-5.x still supports temperature and tools unlike O-series.
+        """
+        model_lower = model.lower()
+        return any(
+            model_lower.startswith(prefix)
+            for prefix in ["o1", "o3", "gpt-5", "gpt5"]
+        )
+
     @property
     def name(self) -> str:
         """Provider name."""
@@ -273,6 +285,14 @@ class OpenAIProvider(BaseProvider):
                     request_params["max_completion_tokens"] = max_tokens
                     # Remove any temperature if passed in kwargs
                     request_params.pop("temperature", None)
+                elif self._uses_max_completion_tokens(model):
+                    # GPT-5.x uses max_completion_tokens but still supports
+                    # temperature and tools
+                    request_params["max_completion_tokens"] = max_tokens
+                    request_params["temperature"] = temperature
+                    if tools:
+                        request_params["tools"] = self._convert_tools(tools)
+                        request_params["tool_choice"] = "auto"
                 else:
                     # Standard models use max_tokens and temperature
                     request_params["temperature"] = temperature
@@ -387,6 +407,13 @@ class OpenAIProvider(BaseProvider):
                 request_params["max_completion_tokens"] = max_tokens
                 # Remove any temperature if passed in kwargs
                 request_params.pop("temperature", None)
+            elif self._uses_max_completion_tokens(model):
+                # GPT-5.x uses max_completion_tokens but supports temperature/tools
+                request_params["max_completion_tokens"] = max_tokens
+                request_params["temperature"] = temperature
+                if tools:
+                    request_params["tools"] = self._convert_tools(tools)
+                    request_params["tool_choice"] = "auto"
             else:
                 # Standard models use max_tokens and temperature
                 request_params["temperature"] = temperature
