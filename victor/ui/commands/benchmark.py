@@ -298,6 +298,10 @@ def run_benchmark(
 
     # Build config — account for start_task offset in max_tasks
     effective_max_tasks = max_tasks
+    # Resolve start_task — when called programmatically (not via Typer CLI),
+    # the default may be a typer.OptionInfo rather than int.
+    if not isinstance(start_task, int):
+        start_task = 0
     if start_task > 0 and max_tasks is not None:
         effective_max_tasks = max_tasks + start_task
 

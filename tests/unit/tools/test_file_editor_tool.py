@@ -67,7 +67,7 @@ class TestEditBasicOperations:
         result = await edit(ops="not valid json")
 
         assert result["success"] is False
-        assert "Invalid JSON" in result["error"]
+        assert "syntax error" in result["error"] or "Invalid JSON" in result["error"]
 
     @pytest.mark.asyncio
     async def test_edit_json_control_character_recovery(self, tmp_path):

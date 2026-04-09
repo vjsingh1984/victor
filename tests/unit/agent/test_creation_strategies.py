@@ -118,9 +118,7 @@ class TestFrameworkStrategy:
     @pytest.fixture
     def mock_context(self):
         """Return mock AgentCreationContext."""
-        from victor.config.settings import Settings
-
-        settings = MagicMock(spec=Settings)
+        settings = MagicMock()
         settings.provider.default_temperature = 0.7
         settings.provider.default_max_tokens = 4096
 

@@ -607,7 +607,7 @@ def get_safety_checker() -> SafetyChecker:
             from victor.config.settings import load_settings
 
             settings = load_settings()
-            approval_mode = _resolve_approval_mode(settings.write_approval_mode)
+            approval_mode = _resolve_approval_mode(settings.security.write_approval_mode)
         except Exception:
             # Default to RISKY_ONLY if settings unavailable
             approval_mode = ApprovalMode.RISKY_ONLY

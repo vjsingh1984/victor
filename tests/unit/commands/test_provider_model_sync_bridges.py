@@ -470,6 +470,7 @@ class TestBenchmarkSyncBridge:
             benchmark_cmd.run_benchmark(
                 benchmark="humaneval",
                 max_tasks=2,
+                start_task=0,
                 model="model-x",
                 profile="default",
                 output=None,
@@ -479,6 +480,8 @@ class TestBenchmarkSyncBridge:
                 resume=False,
                 provider=None,
                 log_level=None,
+                debug_modules=None,
+                no_edge_model=False,
             )
 
         mock_async.assert_called_once_with(
@@ -490,6 +493,7 @@ class TestBenchmarkSyncBridge:
             max_turns=4,
             resume=False,
             provider_override=None,
+            start_task=0,
         )
         mock_run_sync.assert_called_once_with(coro)
 

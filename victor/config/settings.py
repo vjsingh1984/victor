@@ -2198,9 +2198,6 @@ class Settings(BaseSettings):
             normalized[pattern] = parsed_timeout
         return normalized
 
-    # Track whether flat-access deprecation warnings have been emitted
-    _flat_access_warned: bool = False
-
     @model_validator(mode="after")
     def _sync_nested_groups(self) -> "Settings":
         """Sync flat field values into nested config groups.
@@ -2229,15 +2226,9 @@ class Settings(BaseSettings):
                         has_nested_overlap = True
                 object.__setattr__(self, group_name, model_cls(**data))
 
-        if has_nested_overlap and not self._flat_access_warned:
-            warnings.warn(
-                "Flat settings field access (e.g. settings.default_provider) is deprecated. "
-                "Use nested groups instead (e.g. settings.provider.default_provider). "
-                "Flat fields will be removed in v1.0.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            object.__setattr__(self, "_flat_access_warned", True)
+        # Flat→nested sync is silent. All source code has been migrated to
+        # nested access (settings.provider.X). Flat fields remain as env-var
+        # entry points only (VICTOR_DEFAULT_PROVIDER → default_provider → provider.default_provider).
         return self
 
     @model_validator(mode="after")

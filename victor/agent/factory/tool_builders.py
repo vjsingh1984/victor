@@ -495,9 +495,9 @@ class ToolBuildersMixin:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         semantic_selector = SemanticToolSelector(
-            embedding_model=self.settings.embedding_model,
-            embedding_provider=self.settings.embedding_provider,
-            ollama_base_url=self.settings.ollama_base_url,
+            embedding_model=self.settings.tools.embedding_model,
+            embedding_provider=self.settings.tools.embedding_provider,
+            ollama_base_url=self.settings.provider.ollama_base_url,
             cache_embeddings=True,
         )
         logger.debug("SemanticToolSelector created")

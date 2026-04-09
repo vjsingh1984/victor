@@ -438,7 +438,7 @@ def chat(
 
         # Apply CLI flags to settings
         if log_events:
-            settings.enable_observability_logging = True
+            settings.observability.enable_observability_logging = True
 
         setup_safety_confirmation()
 
@@ -456,11 +456,11 @@ def chat(
                 extra_fields["base_url"] = endpoint
                 if provider in {"ollama", "lmstudio", "vllm"}:
                     if provider == "ollama":
-                        settings.ollama_base_url = endpoint
+                        settings.provider.ollama_base_url = endpoint
                     elif provider == "lmstudio":
-                        settings.lmstudio_base_urls = [endpoint]
+                        settings.provider.lmstudio_base_urls = [endpoint]
                     elif provider == "vllm":
-                        settings.vllm_base_url = endpoint
+                        settings.provider.vllm_base_url = endpoint
                 else:
                     console.print(
                         "[bold yellow]Warning:[/] --endpoint is ignored for this provider."
@@ -574,7 +574,7 @@ async def run_oneshot(
     if formatter is None:
         formatter = create_formatter()
 
-    settings.one_shot_mode = True
+    settings.automation.one_shot_mode = True
     start_time = time.time()
     session_id = str(uuid.uuid4())
     success = False
@@ -1010,7 +1010,10 @@ async def _run_cli_repl(
 
     while True:
         try:
-            user_input = prompt_session.prompt("You> ")
+            # Use prompt_async() — prompt_toolkit's native async input.
+            # The sync .prompt() internally calls asyncio.run() which crashes
+            # when we're already inside an event loop (run_sync → asyncio.run).
+            user_input = await prompt_session.prompt_async("You> ")
 
             if not user_input.strip():
                 continue

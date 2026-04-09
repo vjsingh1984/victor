@@ -65,7 +65,7 @@ class EmbeddingRegistry:
             raise TypeError(f"{provider_class} must inherit from BaseEmbeddingProvider")
 
         cls._providers[name] = provider_class
-        print(f"Registered embedding provider: {name}")
+        logger.debug("Registered embedding provider: %s", name)
 
     @classmethod
     def get(cls, name: str) -> Type[BaseEmbeddingProvider]:

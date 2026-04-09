@@ -160,7 +160,7 @@ def _auto_select_strategy(
         Strategy name: "keyword" or "semantic"
     """
     # Check air-gapped mode
-    if settings and settings.airgapped_mode:
+    if settings and settings.security.airgapped_mode:
         logger.info("Air-gapped mode detected: using keyword strategy")
         return "keyword"
 

@@ -241,7 +241,7 @@ class OllamaConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         result = dict(base_settings)
-        result.setdefault("base_url", settings.ollama_base_url)
+        result.setdefault("base_url", settings.provider.ollama_base_url)
         return result
 
 
@@ -302,7 +302,7 @@ class VLLMConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         result = dict(base_settings)
-        result.setdefault("base_url", settings.vllm_base_url)
+        result.setdefault("base_url", settings.provider.vllm_base_url)
         return result
 
 

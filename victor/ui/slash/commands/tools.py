@@ -275,7 +275,7 @@ class SearchCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        current = not ctx.settings.airgapped_mode
+        current = not ctx.settings.security.airgapped_mode
 
         if not ctx.args:
             status = "[green]enabled[/]" if current else "[red]disabled[/]"
@@ -285,10 +285,10 @@ class SearchCommand(BaseSlashCommand):
 
         action = ctx.args[0].lower()
         if action in ("on", "enable", "1", "true"):
-            ctx.settings.airgapped_mode = False
+            ctx.settings.security.airgapped_mode = False
             ctx.console.print("[green]Web search enabled[/]")
         elif action in ("off", "disable", "0", "false"):
-            ctx.settings.airgapped_mode = True
+            ctx.settings.security.airgapped_mode = True
             ctx.console.print("[yellow]Web search disabled (air-gapped mode)[/]")
         else:
             ctx.console.print(f"[red]Invalid option:[/] {action}")

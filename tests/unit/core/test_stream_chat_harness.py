@@ -95,12 +95,12 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
             max_tokens=2048,
         )
     }
-    settings.use_semantic_tool_selection = False
-    settings.use_mcp_tools = False
+    settings.tools.use_semantic_tool_selection = False
+    settings.mcp.mcp_enabled = False
     settings.analytics_log_file = None
     settings.analytics_enabled = False
     settings.tools.tool_call_budget = 300
-    settings.airgapped_mode = False
+    settings.security.airgapped_mode = False
     settings.load_tool_config = lambda: {}
 
     orchestrator = AgentOrchestrator(settings=settings, provider=provider, model="fake")

@@ -1549,7 +1549,7 @@ async def read(
             settings = get_settings()
 
             # Check for airgapped mode or local providers
-            if settings.airgapped_mode:
+            if settings.security.airgapped_mode:
                 return 1500, 65536  # ~2000 lines, 32KB for local models (airgapped)
 
             # Check provider name for local indicators

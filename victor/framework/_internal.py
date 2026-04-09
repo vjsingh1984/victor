@@ -109,7 +109,7 @@ async def create_orchestrator_from_options(
 
     # Apply airgapped mode
     if airgapped:
-        settings.airgapped_mode = True
+        settings.security.airgapped_mode = True
 
     if getattr(settings, "framework_private_fallback_strict_mode", False):
         os.environ.setdefault("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")

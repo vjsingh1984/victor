@@ -137,9 +137,9 @@ class ConfigCommand(BaseSlashCommand):
             Panel(
                 f"[bold]Provider:[/] {ctx.settings.provider.default_provider}\n"
                 f"[bold]Model:[/] {ctx.settings.provider.default_model}\n"
-                f"[bold]Ollama URL:[/] {ctx.settings.ollama_base_url}\n"
-                f"[bold]Air-gapped:[/] {ctx.settings.airgapped_mode}\n"
-                f"[bold]Semantic Selection:[/] {ctx.settings.use_semantic_tool_selection}\n"
+                f"[bold]Ollama URL:[/] {ctx.settings.provider.ollama_base_url}\n"
+                f"[bold]Air-gapped:[/] {ctx.settings.security.airgapped_mode}\n"
+                f"[bold]Semantic Selection:[/] {ctx.settings.tools.use_semantic_tool_selection}\n"
                 f"[bold]Embedding Model:[/] {ctx.settings.search.unified_embedding_model}\n"
                 f"[bold]Tool Budget:[/] {ctx.settings.tools.tool_call_budget}\n"
                 f"[bold]Config Dir:[/] {ctx.settings.get_config_dir()}",

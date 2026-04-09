@@ -49,7 +49,7 @@ def test_orchestrator_uses_profile_provider_name():
         tool_calling_models={"ollama": ["specific-tool-model"]},
         tool_cache_dir_override=tempfile.mkdtemp(),
     )
-    settings.tool_cache_enabled = False
+    settings.tools.tool_cache_enabled = False
 
     # Test: model in tool_calling_models should be recognized
     orch_ok = AgentOrchestrator(
