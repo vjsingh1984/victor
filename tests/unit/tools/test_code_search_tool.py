@@ -114,7 +114,7 @@ async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(
     mock_index.semantic_search.assert_awaited_once_with(
         query="json parsing crash on empty payload",
         max_results=2,
-        filter_metadata={"language": "python"},
+        filter_metadata=None,  # "language" stripped (not in index schema)
         similarity_threshold=0.25,
         expand_query=True,
     )

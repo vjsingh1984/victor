@@ -781,6 +781,14 @@ class RLCoordinator:
                 return ContextPruningLearner(
                     name=name, db_connection=self.db, learning_rate=0.15
                 )
+            elif name == "prompt_optimizer":
+                from victor.framework.rl.learners.prompt_optimizer import (
+                    PromptOptimizerLearner,
+                )
+
+                return PromptOptimizerLearner(
+                    name=name, db_connection=self.db, learning_rate=0.1
+                )
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None

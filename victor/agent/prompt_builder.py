@@ -619,11 +619,46 @@ class SystemPromptBuilder:
                 base_prompt = f"{base_prompt}\n\n{tool_guidance}"
 
         # ASI-derived tool effectiveness guidance (GEPA-inspired)
-        # Distilled from execution trace analysis of 64K+ events
+        # Check if prompt optimizer has an evolved version, else use static default
         if "tool_guidance" in sections_to_include:
-            base_prompt = f"{base_prompt}\n\n{ASI_TOOL_EFFECTIVENESS_GUIDANCE}"
+            optimized = self._get_optimized_section(
+                "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
+            )
+            guidance = optimized or ASI_TOOL_EFFECTIVENESS_GUIDANCE
+            base_prompt = f"{base_prompt}\n\n{guidance}"
 
         return base_prompt
+
+    def _get_optimized_section(self, section_name: str) -> Optional[str]:
+        """Check if the prompt optimizer has an evolved version of a section.
+
+        Returns the evolved text if a candidate exists with sufficient
+        confidence, otherwise None (caller uses the static default).
+        """
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("prompt_optimizer")
+            if learner is None:
+                return None
+            rec = learner.get_recommendation(
+                getattr(self, "provider_name", "") or "",
+                getattr(self, "model", "") or "",
+                getattr(self, "task_type", "default"),
+                section_name=section_name,
+            )
+            if rec and rec.confidence > 0.6 and not rec.is_baseline:
+                logger.info(
+                    "Using GEPA-evolved prompt section '%s' (gen=%s, confidence=%.2f)",
+                    section_name,
+                    rec.reason,
+                    rec.confidence,
+                )
+                return rec.value
+        except Exception:
+            pass
+        return None
 
     def _get_active_sections(self) -> set:
         """Determine which prompt sections to include.
