@@ -56,9 +56,12 @@ class ExplorationCoordinator:
         """Initialize with the parent orchestrator's provider context.
 
         Args:
-            provider_context: The provider context from ExecutionCoordinator
-                             (provides settings, provider, model, tools)
+            provider_context: The provider context from ExecutionCoordinator.
+                             If this is an OrchestratorProtocolAdapter, we extract
+                             the underlying AgentOrchestrator for full context.
         """
+        # Extract the full orchestrator if available (for SubAgent creation)
+        self._orchestrator = getattr(provider_context, "_orchestrator", None)
         self._context = provider_context
 
     async def explore_parallel(
@@ -84,11 +87,18 @@ class ExplorationCoordinator:
                 SubAgentOrchestrator,
             )
             from victor.agent.subagents.base import SubAgentRole
-
-            # Build subagent context from provider context
             from victor.agent.subagents.protocols import SubAgentContextAdapter
 
-            sub_context = SubAgentContextAdapter(self._context)
+            # Use the full orchestrator for proper tool registry access
+            if self._orchestrator is not None:
+                sub_context = SubAgentContextAdapter(self._orchestrator)
+            else:
+                # Fallback: try using context directly (may lack tools)
+                sub_context = SubAgentContextAdapter(self._context)
+                logger.debug(
+                    "ExplorationCoordinator: no orchestrator, subagents may lack tools"
+                )
+
             orchestrator = SubAgentOrchestrator(sub_context)
 
             # Decompose task into parallel exploration subtasks
