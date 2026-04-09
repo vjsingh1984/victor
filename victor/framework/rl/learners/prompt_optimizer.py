@@ -136,10 +136,101 @@ class GEPAStrategy:
 
     Uses LLM for reflection + mutation when available. Falls back to
     heuristic reflection (failure frequency analysis) when LLM unavailable.
+
+    LLM sources (in order of preference):
+    1. Explicit llm_service (decision service)
+    2. Ollama local model (free, fast — default: qwen3.5:2b)
+    3. Heuristic fallback (no LLM needed)
     """
 
-    def __init__(self, llm_service: Any = None):
+    def __init__(
+        self,
+        llm_service: Any = None,
+        ollama_model: str = "qwen3.5:2b",
+        ollama_url: str = "http://localhost:11434",
+    ):
         self._llm = llm_service
+        self._provider_name = "ollama"
+        self._model = ollama_model
+        self._provider = None  # Lazy-loaded
+
+    def _get_provider(self) -> Any:
+        """Get or create provider via Victor's provider abstraction.
+
+        Uses the configured provider name to instantiate. Defaults to
+        ollama (free, local). Set _provider_name to None to disable.
+        """
+        if self._provider is not None:
+            return self._provider
+        if not self._provider_name:
+            return None
+        try:
+            if self._provider_name == "ollama":
+                from victor.providers.ollama_provider import OllamaProvider
+
+                self._provider = OllamaProvider()
+            else:
+                from importlib import import_module
+
+                mod = import_module(
+                    f"victor.providers.{self._provider_name}_provider"
+                )
+                cls_name = f"{self._provider_name.title()}Provider"
+                self._provider = getattr(mod, cls_name)()
+            return self._provider
+        except Exception as e:
+            logger.debug("Failed to create %s provider: %s", self._provider_name, e)
+            return None
+
+    def _call_llm(self, prompt: str, max_tokens: int = 500) -> Optional[str]:
+        """Call LLM via Victor's provider abstraction (free local or cloud).
+
+        Prepends /no_think for Qwen models to suppress verbose reasoning.
+        """
+        provider = self._get_provider()
+        if provider is None:
+            return None
+        try:
+            from victor.core.async_utils import run_sync_in_thread
+            from victor.providers.base import Message
+
+            # Suppress thinking for Qwen models
+            effective_prompt = prompt
+            if "qwen" in self._model.lower():
+                effective_prompt = f"/no_think\n{prompt}"
+
+            messages = [Message(role="user", content=effective_prompt)]
+            response = run_sync_in_thread(
+                provider.chat(
+                    messages=messages,
+                    model=self._model,
+                    max_tokens=max_tokens,
+                    temperature=0.7,
+                ),
+                timeout=30.0,
+            )
+            content = response.content if response else ""
+            # Strip thinking artifacts (Qwen3, DeepSeek R1)
+            import re
+
+            if "<think>" in content:
+                content = re.sub(
+                    r"<think>.*?</think>", "", content, flags=re.DOTALL
+                ).strip()
+            # Strip "Thinking Process:" preamble
+            if "Thinking Process:" in content:
+                parts = re.split(
+                    r"\n(?=TOOL EFFECTIVENESS|[A-Z]{3,}[:\s])", content
+                )
+                for part in reversed(parts):
+                    if "Thinking Process" not in part and len(part.strip()) > 50:
+                        content = part.strip()
+                        break
+            if content and len(content) > 20:
+                return content.strip()
+        except Exception as e:
+            logger.debug("LLM call via %s failed: %s", self._provider_name, e)
+        return None
 
     def reflect(
         self,
@@ -177,7 +268,24 @@ class GEPAStrategy:
 
         reflection = "\n".join(lines)
 
-        # If LLM available, enhance with LLM-driven reflection
+        # Enhance with LLM-driven reflection (provider → decision service → skip)
+        llm_prompt = (
+            f"You are analyzing execution traces for an AI coding agent.\n\n"
+            f"{reflection}\n\n"
+            f"Current prompt section '{section_name}':\n{current_text[:500]}\n\n"
+            f"What 3 specific, actionable changes to this prompt guidance would "
+            f"reduce the failure patterns above? Be concise — bullet points only."
+        )
+
+        # Try provider abstraction first (Ollama by default, free + local)
+        llm_result = self._call_llm(llm_prompt)
+        if llm_result:
+            reflection += (
+                f"\n\nLLM Reflection ({self._provider_name}/{self._model}):\n{llm_result}"
+            )
+            return reflection
+
+        # Try decision service if available
         if self._llm is not None:
             try:
                 from victor.agent.services.protocols.decision_service import (
@@ -187,12 +295,7 @@ class GEPAStrategy:
                 llm_reflection = self._llm.decide_sync(
                     DecisionType.TASK_TYPE_CLASSIFICATION,
                     {
-                        "message_excerpt": (
-                            f"Reflect on these execution failures for prompt section "
-                            f"'{section_name}':\n{reflection}\n\nCurrent prompt:\n"
-                            f"{current_text[:500]}\n\nWhat specific changes would "
-                            f"reduce failures and improve success rate?"
-                        ),
+                        "message_excerpt": llm_prompt,
                     },
                 )
                 if llm_reflection.source != "timeout_fallback":
@@ -207,36 +310,26 @@ class GEPAStrategy:
     ) -> str:
         """Generate mutated prompt text based on reflection.
 
-        If LLM unavailable, applies heuristic mutations based on common
-        failure patterns identified in the reflection.
+        Uses provider abstraction for LLM mutation, falls back to
+        heuristic mutations based on failure patterns.
         """
-        # If LLM available, use it for intelligent mutation
-        if self._llm is not None:
-            try:
-                from victor.agent.services.protocols.decision_service import (
-                    DecisionType,
-                )
+        mutation_prompt = (
+            f"Improve this prompt section for an AI coding agent based on "
+            f"the execution analysis below.\n\n"
+            f"Current '{section_name}':\n{current_text}\n\n"
+            f"Reflection on failures:\n{reflection}\n\n"
+            f"Generate an improved version. Requirements:\n"
+            f"- Keep same length (±20%)\n"
+            f"- Be specific and actionable\n"
+            f"- Address the failure patterns from the reflection\n"
+            f"- Output ONLY the improved prompt text, no explanation\n\n"
+            f"Improved version:"
+        )
 
-                result = self._llm.decide_sync(
-                    DecisionType.TASK_TYPE_CLASSIFICATION,
-                    {
-                        "message_excerpt": (
-                            f"Improve this prompt section based on the reflection.\n\n"
-                            f"Current '{section_name}':\n{current_text}\n\n"
-                            f"Reflection:\n{reflection}\n\n"
-                            f"Generate improved version (same length ±20%, "
-                            f"specific and actionable):"
-                        ),
-                    },
-                )
-                if (
-                    result.source != "timeout_fallback"
-                    and result.result
-                    and len(str(result.result)) > 20
-                ):
-                    return str(result.result)
-            except Exception:
-                pass
+        # Try provider abstraction (Ollama by default)
+        llm_result = self._call_llm(mutation_prompt, max_tokens=800)
+        if llm_result and len(llm_result) > 50:
+            return llm_result
 
         # Heuristic mutation: append failure-specific guidance
         mutations = []

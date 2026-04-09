@@ -81,19 +81,28 @@ class TestGEPAStrategy:
         assert "0 execution traces" in reflection
 
     def test_mutate_adds_guidance_for_file_failures(self):
+        """Heuristic mutation adds file verification guidance."""
         strategy = GEPAStrategy()
+        strategy._provider = None  # Force heuristic path
+        strategy._provider_name = None
         reflection = "file_not_found: 5 errors"
         result = strategy.mutate("Original.", reflection, "TEST")
         assert "ls()" in result or "Verify file" in result
 
     def test_mutate_adds_guidance_for_edit_failures(self):
+        """Heuristic mutation adds edit guidance."""
         strategy = GEPAStrategy()
+        strategy._provider = None
+        strategy._provider_name = None
         reflection = "edit mismatch: 3 errors"
         result = strategy.mutate("Original.", reflection, "TEST")
         assert "old_str" in result or "editing" in result
 
     def test_mutate_no_change_when_no_failures(self):
+        """Heuristic mutation makes no change when no failures detected."""
         strategy = GEPAStrategy()
+        strategy._provider = None
+        strategy._provider_name = None
         reflection = "Success rate: 10/10 (100%)"
         result = strategy.mutate("Original.", reflection, "TEST")
         assert result == "Original."
