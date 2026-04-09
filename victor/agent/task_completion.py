@@ -452,6 +452,11 @@ class TaskCompletionDetector:
         # Priority 1: LLM classification via decision service
         if self._decision_service is not None:
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("task_type_classification"):
+                    return
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 decision = self._decision_service.decide_sync(
@@ -592,13 +597,18 @@ class TaskCompletionDetector:
                 break
 
         # LLM augmentation: if no active signal found and service available,
-        # consult LLM for completion detection
+        # consult LLM for completion detection (gated by decision chain)
         if (
             not self._state.active_signal_detected
             and not self._state.completion_signals
             and self._decision_service is not None
         ):
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("task_completion"):
+                    return
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 decision = self._decision_service.decide_sync(
@@ -938,6 +948,11 @@ class TaskCompletionDetector:
             and self._decision_service is not None
         ):
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("task_completion"):
+                    return heuristic_confidence
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 conf_value = (

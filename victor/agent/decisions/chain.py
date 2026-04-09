@@ -95,3 +95,41 @@ def is_llm_primary(decision_type: str) -> bool:
 def invalidate_chain_cache() -> None:
     """Clear the chain cache (for testing or settings reload)."""
     _chain_cache.clear()
+
+
+def log_decision(
+    decision_type: str,
+    context: dict,
+    result: str,
+    source: str,
+    confidence: float = 0.0,
+) -> None:
+    """Append decision I/O to JSONL file for fine-tuning data collection.
+
+    Logs every decision (heuristic or LLM) with input context and output,
+    enabling future model fine-tuning on real decision patterns.
+
+    Path: ~/.victor/logs/decisions.jsonl
+    """
+    import json
+    from datetime import datetime
+    from pathlib import Path
+
+    try:
+        log_dir = Path.home() / ".victor" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = log_dir / "decisions.jsonl"
+
+        entry = {
+            "ts": datetime.now().isoformat(),
+            "type": decision_type,
+            "input": context,
+            "output": result,
+            "source": source,
+            "confidence": confidence,
+        }
+
+        with open(log_path, "a") as f:
+            f.write(json.dumps(entry, default=str) + "\n")
+    except Exception:
+        pass  # Never fail on logging

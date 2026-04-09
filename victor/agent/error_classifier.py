@@ -150,6 +150,11 @@ class ToolErrorClassifier:
         # LLM augmentation: when no pattern matches, consult LLM if available
         if self._decision_service is not None:
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("error_classification"):
+                    return heuristic_result
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 decision = self._decision_service.decide_sync(

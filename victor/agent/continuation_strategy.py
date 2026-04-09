@@ -963,6 +963,11 @@ class ContinuationStrategy:
         # running for 3+ turns without clear resolution
         if self._decision_service is not None and continuation_prompts >= 3:
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("continuation_action"):
+                    return "finish"
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 response_excerpt = (full_content or "")[-500:]

@@ -227,7 +227,7 @@ class LLMDecisionService:
         try:
             from victor.core.async_utils import run_sync_in_thread
 
-            return run_sync_in_thread(
+            result = run_sync_in_thread(
                 self.decide(
                     decision_type,
                     context,
@@ -236,6 +236,22 @@ class LLMDecisionService:
                 ),
                 timeout=self._config.timeout_ms / 1000.0,
             )
+
+            # Log decision for fine-tuning data collection
+            try:
+                from victor.agent.decisions.chain import log_decision
+
+                log_decision(
+                    decision_type=decision_type.value,
+                    context=context,
+                    result=str(getattr(result.result, "__dict__", result.result)),
+                    source=result.source,
+                    confidence=result.confidence,
+                )
+            except Exception:
+                pass
+
+            return result
         except (TimeoutError, Exception) as e:
             logger.debug("decide_sync thread execution failed: %s", e)
             self._metrics.total_calls += 1
