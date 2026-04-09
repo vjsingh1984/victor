@@ -296,11 +296,15 @@ def run_benchmark(
             console.print(f"[yellow]Warning:[/] Could not load profile: {e}")
             effective_model = "claude-3-sonnet"
 
-    # Build config
+    # Build config — account for start_task offset in max_tasks
+    effective_max_tasks = max_tasks
+    if start_task > 0 and max_tasks is not None:
+        effective_max_tasks = max_tasks + start_task
+
     config = EvaluationConfig(
         benchmark=bench_type,
         model=effective_model,
-        max_tasks=max_tasks,
+        max_tasks=effective_max_tasks,
         timeout_per_task=timeout,
         max_turns=max_turns,
         parallel_tasks=parallel,
