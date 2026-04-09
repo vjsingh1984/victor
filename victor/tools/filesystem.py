@@ -1255,18 +1255,34 @@ async def read(
                 else:
                     raise FileNotFoundError(f"File not found: {path}")
         except IsADirectoryError:
-            raise IsADirectoryError(
-                f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
-                f"or specify a file path within this directory."
-            )
+            # Auto-convert read(dir) → ls(dir)
+            logger.info(f"Auto-converting read('{path}') → ls('{path}')")
+            try:
+                dir_result = await ls(path=path, depth=1)
+                return (
+                    f"Note: '{path}' is a directory, showing contents:\n\n"
+                    f"{dir_result}"
+                )
+            except Exception:
+                raise IsADirectoryError(
+                    f"Cannot read directory as file: {path}\n"
+                    f"Suggestion: Use list_directory(path='{path}') to explore."
+                )
     if not file_path.is_file():
         if file_path.is_dir():
-            raise IsADirectoryError(
-                f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
-                f"or specify a file path within this directory."
-            )
+            # Auto-convert read(dir) → ls(dir) instead of erroring
+            logger.info(f"Auto-converting read('{path}') → ls('{path}')")
+            try:
+                dir_result = await ls(path=path, depth=1)
+                return (
+                    f"Note: '{path}' is a directory, showing contents:\n\n"
+                    f"{dir_result}"
+                )
+            except Exception:
+                raise IsADirectoryError(
+                    f"Cannot read directory as file: {path}\n"
+                    f"Suggestion: Use list_directory(path='{path}') to explore."
+                )
         raise IsADirectoryError(f"Path is not a file: {path}")
 
     # Binary file categories with helpful suggestions

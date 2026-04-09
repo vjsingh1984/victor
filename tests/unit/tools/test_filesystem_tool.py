@@ -75,10 +75,11 @@ async def test_read_file_not_found():
 
 @pytest.mark.asyncio
 async def test_read_file_not_a_file():
-    """Test reading a directory path."""
+    """Test reading a directory path auto-converts to ls."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        with pytest.raises(IsADirectoryError):
-            await read(path=tmpdir)
+        # Directories auto-convert to ls instead of raising
+        result = await read(path=tmpdir)
+        assert "directory" in result.lower() or "contents" in result.lower()
 
 
 @pytest.mark.asyncio
@@ -377,16 +378,11 @@ async def test_read_file_db_extension_rejected():
 
 
 @pytest.mark.asyncio
-async def test_read_file_directory_error_with_suggestion():
-    """Test that read_file gives helpful suggestion when trying to read a directory."""
+async def test_read_file_directory_auto_converts_to_ls():
+    """Test that read(dir) auto-converts to ls(dir) instead of erroring."""
     with tempfile.TemporaryDirectory() as tmpdir:
-        with pytest.raises(IsADirectoryError) as excinfo:
-            await read(path=tmpdir)
-
-        error_msg = str(excinfo.value)
-        assert "Cannot read directory as file" in error_msg
-        assert "list_directory" in error_msg
-        assert "Suggestion" in error_msg
+        result = await read(path=tmpdir)
+        assert "directory" in result.lower()
 
 
 # ============================================================================
