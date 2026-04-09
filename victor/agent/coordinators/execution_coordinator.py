@@ -56,6 +56,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Module-level guard to prevent recursive subagent exploration
+_EXPLORATION_IN_PROGRESS = False
+
 
 class ExecutionCoordinator:
     """Coordinator for agentic execution loop.
@@ -308,6 +311,12 @@ class ExecutionCoordinator:
         Only fires for COMPLEX/ACTION tasks when parallel_exploration is enabled.
         Falls back gracefully on any error.
         """
+        global _EXPLORATION_IN_PROGRESS
+
+        # Prevent recursive exploration (subagents should not spawn more subagents)
+        if _EXPLORATION_IN_PROGRESS:
+            return
+
         # Check if exploration is enabled and task warrants it
         try:
             from victor.config.settings import load_settings
@@ -329,7 +338,6 @@ class ExecutionCoordinator:
             return
 
         try:
-            import asyncio
             from pathlib import Path
 
             from victor.agent.coordinators.exploration_coordinator import (
@@ -340,13 +348,17 @@ class ExecutionCoordinator:
             project_root = Path(get_project_paths().project_root)
             explorer = ExplorationCoordinator(self._provider_context)
 
-            findings = await asyncio.wait_for(
-                explorer.explore_parallel(
-                    task_description=user_message,
-                    project_root=project_root,
-                ),
-                timeout=90,
-            )
+            _EXPLORATION_IN_PROGRESS = True
+            try:
+                findings = await asyncio.wait_for(
+                    explorer.explore_parallel(
+                        task_description=user_message,
+                        project_root=project_root,
+                    ),
+                    timeout=90,
+                )
+            finally:
+                _EXPLORATION_IN_PROGRESS = False
 
             if findings.summary:
                 self._chat_context.add_message(
