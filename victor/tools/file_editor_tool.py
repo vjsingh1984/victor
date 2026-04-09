@@ -373,23 +373,31 @@ async def edit(
                     pass  # Recovery failed, use original error
 
             if isinstance(ops, str):  # Still a string = parsing failed
-                # Detect delimiter issues
-                if "delimiter" in str(exc).lower():
-                    error_context = "\n\nHINT: Check for missing commas between array elements or object properties."
-                # Detect structure issues
-                elif "Expecting" in str(exc):
-                    error_context = (
-                        "\n\nHINT: Check JSON structure - ensure arrays use [], objects use {}, "
-                        "and strings are quoted."
-                    )
+                # Build a targeted correction prompt showing the error location
+                error_pos = getattr(exc, "pos", 0) or 0
+                snippet_start = max(0, error_pos - 40)
+                snippet_end = min(len(ops), error_pos + 40)
+                error_snippet = ops[snippet_start:snippet_end]
+                pointer = " " * min(40, error_pos - snippet_start) + "^"
 
-                example = (
-                    "\n\nCorrect format example:\n"
-                    '[{"type": "replace", "path": "file.py", "old_str": "x=1", "new_str": "x=2"}]'
+                correction_prompt = (
+                    f"Your edit JSON has a syntax error at position {error_pos}:\n"
+                    f"  ...{error_snippet}...\n"
+                    f"  {pointer} {exc.msg if hasattr(exc, 'msg') else str(exc)}\n\n"
+                    f"Please call edit() again with corrected JSON. Common fixes:\n"
+                    f"- Escape newlines in strings: use \\n not actual newlines\n"
+                    f"- Escape quotes in strings: use \\\" not bare quotes\n"
+                    f"- Ensure commas between array elements and object properties\n"
+                    f"- Ensure old_str matches the file content EXACTLY\n\n"
+                    f"Correct format:\n"
+                    f'edit(ops=[{{"type": "replace", "path": "file.py", '
+                    f'"old_str": "exact match", "new_str": "replacement"}}])'
                 )
+
                 return {
                     "success": False,
-                    "error": f"Invalid JSON for operations: {exc}{error_context}{example}",
+                    "error": correction_prompt,
+                    "retryable": True,
                 }
 
     if not ops:
