@@ -543,6 +543,22 @@ async def _literal_search(
             except Exception:
                 pass
 
+        # Normalize dotted notation: "Class.method" → search for "def method"
+        # in files containing "class Class". This handles the common pattern
+        # where models search for "SQLCompiler.get_order_by" but the source has
+        # "class SQLCompiler:" and "def get_order_by(self):" on separate lines.
+        search_query = query
+        dotted_class = None
+        if "." in query and not query.startswith(".") and " " not in query:
+            parts = query.rsplit(".", 1)
+            if len(parts) == 2 and parts[0][0].isupper():
+                dotted_class, method = parts
+                search_query = f"def {method}"
+                logger.info(
+                    "Dotted notation detected: %s → searching for '%s' in files with 'class %s'",
+                    query, search_query, dotted_class,
+                )
+
         logger.info(
             f"Literal search: query={query!r}, path={path!r}, "
             f"resolved={search_path!r}, exts={exts}"
@@ -577,9 +593,9 @@ async def _literal_search(
                         "--type=yaml",
                     ]
                 )
-            cmd.extend(["--", query, search_path])
+            cmd.extend(["--", search_query, search_path])
         else:
-            cmd = ["grep", "-rn", "--include=*.py", "--", query, search_path]
+            cmd = ["grep", "-rn", "--include=*.py", "--", search_query, search_path]
 
         result = subprocess.run(
             cmd,
@@ -598,6 +614,23 @@ async def _literal_search(
                 if fpath not in file_matches:
                     file_matches[fpath] = []
                 file_matches[fpath].append(line)
+
+        # For dotted notation (Class.method), filter to files containing the class
+        if dotted_class and file_matches:
+            filtered = {}
+            for fpath, matches in file_matches.items():
+                try:
+                    content = Path(fpath).read_text(errors="ignore")
+                    if f"class {dotted_class}" in content:
+                        filtered[fpath] = matches
+                except Exception:
+                    pass
+            if filtered:
+                file_matches = filtered
+                logger.info(
+                    "Dotted notation filter: %d files contain 'class %s'",
+                    len(filtered), dotted_class,
+                )
 
         # Sort by number of matches (most matches = most relevant)
         ranked = sorted(file_matches.items(), key=lambda x: len(x[1]), reverse=True)
