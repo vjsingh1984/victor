@@ -928,6 +928,14 @@ class TaskCompletionDetector:
         if self._has_file_modifications() and self._state.completion_signals:
             return CompletionConfidence.MEDIUM
 
+        # Diagnostic: signals present but no file mods — waiting for edits
+        if self._state.completion_signals and not self._has_file_modifications():
+            logger.debug(
+                "Completion signals detected (%d) but no file modifications — "
+                "waiting for edits before marking complete",
+                len(self._state.completion_signals),
+            )
+
         # Priority 3: Only passive completion signals (LOW confidence)
         if self._state.completion_signals:
             # Check if signals are only passive phrases (not active)
