@@ -477,6 +477,7 @@ class Schema:
         CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_CANDIDATE} (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             section_name TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'default',
             text_hash TEXT NOT NULL,
             text TEXT NOT NULL,
             generation INTEGER DEFAULT 0,
@@ -489,7 +490,7 @@ class Schema:
             sample_count INTEGER DEFAULT 0,
             is_active INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now')),
-            UNIQUE(section_name, text_hash)
+            UNIQUE(section_name, provider, text_hash)
         )
     """
 

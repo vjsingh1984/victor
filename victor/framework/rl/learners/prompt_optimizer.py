@@ -62,13 +62,19 @@ class ExecutionTrace:
 
 @dataclass
 class PromptCandidate:
-    """An evolved prompt section candidate with Bayesian scoring."""
+    """An evolved prompt section candidate with Bayesian scoring.
+
+    Candidates are scoped to (section_name, provider) so each provider
+    can evolve independently. A cheap model may need more explicit guidance
+    while a stronger model benefits from concise prompts.
+    """
 
     section_name: str
     text: str
     text_hash: str
     generation: int
     parent_hash: str
+    provider: str = "default"  # Provider scope (e.g., "xai", "anthropic", "ollama")
     scores: Dict[str, float] = field(default_factory=dict)
     alpha: float = 1.0
     beta_val: float = 1.0
@@ -304,12 +310,16 @@ class PromptOptimizerLearner(BaseLearner):
             logger.warning("Failed to create prompt optimizer tables: %s", e)
 
     def _load_candidates(self) -> None:
-        """Load candidates from DB into memory."""
+        """Load candidates from DB into memory.
+
+        Candidates are keyed by (section_name, provider) for provider-aware
+        prompt evolution. The dict key is "section_name::provider".
+        """
         from victor.core.schema import Tables
 
         try:
             cursor = self.db.execute(
-                f"SELECT section_name, text_hash, text, generation, parent_hash, "
+                f"SELECT section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
                 f"alpha, beta, sample_count "
                 f"FROM {Tables.AGENT_PROMPT_CANDIDATE}"
@@ -317,25 +327,32 @@ class PromptOptimizerLearner(BaseLearner):
             for row in cursor.fetchall():
                 candidate = PromptCandidate(
                     section_name=row[0],
-                    text_hash=row[1],
-                    text=row[2],
-                    generation=row[3],
-                    parent_hash=row[4] or "",
+                    provider=row[1] or "default",
+                    text_hash=row[2],
+                    text=row[3],
+                    generation=row[4],
+                    parent_hash=row[5] or "",
                     scores={
-                        "completion_score": row[5],
-                        "token_efficiency": row[6],
-                        "tool_effectiveness": row[7],
+                        "completion_score": row[6],
+                        "token_efficiency": row[7],
+                        "tool_effectiveness": row[8],
                     },
-                    alpha=row[8],
-                    beta_val=row[9],
-                    sample_count=row[10],
+                    alpha=row[9],
+                    beta_val=row[10],
+                    sample_count=row[11],
                 )
-                self._candidates.setdefault(row[0], []).append(candidate)
+                key = self._candidate_key(row[0], row[1] or "default")
+                self._candidates.setdefault(key, []).append(candidate)
             total = sum(len(v) for v in self._candidates.values())
             if total:
                 logger.info("Loaded %d prompt candidates from database", total)
         except Exception as e:
             logger.debug("Failed to load prompt candidates: %s", e)
+
+    @staticmethod
+    def _candidate_key(section_name: str, provider: str = "default") -> str:
+        """Build the dict key for a (section, provider) pair."""
+        return f"{section_name}::{provider}"
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Update posteriors for the active candidate."""
@@ -343,23 +360,24 @@ class PromptOptimizerLearner(BaseLearner):
         if not section:
             return
 
-        candidates = self._candidates.get(section, [])
-        active = [c for c in candidates if c.sample_count > 0]
-        if not active:
-            return
-
-        # Update most recently used candidate
-        candidate = active[-1]
-        success = outcome.success and outcome.quality_score >= 0.5
-        candidate.update(success)
-
-        # Update scores
-        candidate.scores["completion_score"] = (
-            candidate.scores.get("completion_score", 0.0) * 0.9
-            + outcome.quality_score * 0.1
-        )
-
-        self._save_candidate(candidate)
+        provider = outcome.provider or "default"
+        # Try provider-specific first, then default
+        for key in [
+            self._candidate_key(section, provider),
+            self._candidate_key(section, "default"),
+        ]:
+            candidates = self._candidates.get(key, [])
+            active = [c for c in candidates if c.sample_count > 0]
+            if active:
+                candidate = active[-1]
+                success = outcome.success and outcome.quality_score >= 0.5
+                candidate.update(success)
+                candidate.scores["completion_score"] = (
+                    candidate.scores.get("completion_score", 0.0) * 0.9
+                    + outcome.quality_score * 0.1
+                )
+                self._save_candidate(candidate)
+                return
 
     def get_recommendation(
         self,
@@ -368,11 +386,23 @@ class PromptOptimizerLearner(BaseLearner):
         task_type: str,
         section_name: Optional[str] = None,
     ) -> Optional[RLRecommendation]:
-        """Thompson Sampling over candidates for a section."""
+        """Thompson Sampling over candidates for a section.
+
+        Looks up provider-specific candidates first, then falls back to
+        'default' provider candidates. This enables per-provider prompt
+        evolution while sharing globally evolved prompts as baseline.
+        """
         if not section_name:
             return None
 
-        candidates = self._candidates.get(section_name, [])
+        # Try provider-specific first, then default
+        candidates = self._candidates.get(
+            self._candidate_key(section_name, provider or "default"), []
+        )
+        if not candidates:
+            candidates = self._candidates.get(
+                self._candidate_key(section_name, "default"), []
+            )
         if not candidates:
             return None
 
@@ -391,10 +421,19 @@ class PromptOptimizerLearner(BaseLearner):
         )
 
     def evolve(
-        self, section_name: str, current_text: str
+        self,
+        section_name: str,
+        current_text: str,
+        provider: str = "default",
     ) -> Optional[PromptCandidate]:
         """Run one GEPA evolution cycle for a section.
 
+        Args:
+            section_name: Which prompt section to evolve
+            current_text: Current text of the section
+            provider: Provider scope (e.g., "xai", "ollama", "default")
+
+        Steps:
         1. Collect execution traces from usage.jsonl + evaluation results
         2. Reflect on failure patterns (via strategy)
         3. Mutate prompt text (via strategy)
@@ -425,17 +464,19 @@ class PromptOptimizerLearner(BaseLearner):
         # Create candidate
         text_hash = hashlib.md5(new_text.encode()).hexdigest()[:12]
         parent_hash = hashlib.md5(current_text.encode()).hexdigest()[:12]
-        generation = self._get_max_generation(section_name) + 1
+        key = self._candidate_key(section_name, provider)
+        generation = self._get_max_generation(key) + 1
 
         candidate = PromptCandidate(
             section_name=section_name,
+            provider=provider,
             text=new_text,
             text_hash=text_hash,
             generation=generation,
             parent_hash=parent_hash,
         )
 
-        self._candidates.setdefault(section_name, []).append(candidate)
+        self._candidates.setdefault(key, []).append(candidate)
         self._save_candidate(candidate)
 
         logger.info(
@@ -460,11 +501,12 @@ class PromptOptimizerLearner(BaseLearner):
         try:
             self.db.execute(
                 f"INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_CANDIDATE} "
-                f"(section_name, text_hash, text, generation, parent_hash, "
+                f"(section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
-                f"alpha, beta, sample_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                f"alpha, beta, sample_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     candidate.section_name,
+                    candidate.provider,
                     candidate.text_hash,
                     candidate.text,
                     candidate.generation,

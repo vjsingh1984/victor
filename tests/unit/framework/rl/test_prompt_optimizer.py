@@ -124,26 +124,30 @@ class TestPromptOptimizerLearner:
         learner1 = PromptOptimizerLearner(name="test1", db_connection=db)
         candidate = PromptCandidate(
             section_name="TEST_SECTION",
+            provider="ollama",
             text="Evolved prompt text",
             text_hash="abc123",
             generation=1,
             parent_hash="parent",
         )
-        learner1._candidates["TEST_SECTION"] = [candidate]
+        key = learner1._candidate_key("TEST_SECTION", "ollama")
+        learner1._candidates[key] = [candidate]
         learner1._save_candidate(candidate)
 
         # Load in new learner instance
         learner2 = PromptOptimizerLearner(name="test2", db_connection=db)
-        assert "TEST_SECTION" in learner2._candidates
-        assert len(learner2._candidates["TEST_SECTION"]) == 1
-        loaded = learner2._candidates["TEST_SECTION"][0]
+        assert key in learner2._candidates
+        assert len(learner2._candidates[key]) == 1
+        loaded = learner2._candidates[key][0]
         assert loaded.text == "Evolved prompt text"
         assert loaded.generation == 1
+        assert loaded.provider == "ollama"
 
     def test_get_recommendation_with_candidate(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)
         candidate = PromptCandidate(
             section_name="TEST",
+            provider="ollama",
             text="Better prompt",
             text_hash="hash1",
             generation=1,
@@ -152,7 +156,8 @@ class TestPromptOptimizerLearner:
             beta_val=1.0,
             sample_count=10,
         )
-        learner._candidates["TEST"] = [candidate]
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [candidate]
 
         rec = learner.get_recommendation(
             "ollama", "qwen", "action", section_name="TEST"
@@ -161,17 +166,41 @@ class TestPromptOptimizerLearner:
         assert rec.value == "Better prompt"
         assert rec.confidence > 0
 
+    def test_get_recommendation_falls_back_to_default(self, db):
+        """Provider-specific miss should fall back to 'default' candidates."""
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="TEST",
+            provider="default",
+            text="Default prompt",
+            text_hash="hash2",
+            generation=1,
+            parent_hash="parent",
+            sample_count=5,
+        )
+        key = learner._candidate_key("TEST", "default")
+        learner._candidates[key] = [candidate]
+
+        # Query with a provider that has no specific candidates
+        rec = learner.get_recommendation(
+            "xai", "grok", "action", section_name="TEST"
+        )
+        assert rec is not None
+        assert rec.value == "Default prompt"
+
     def test_record_outcome_updates_candidate(self, db):
         learner = PromptOptimizerLearner(name="test", db_connection=db)
         candidate = PromptCandidate(
             section_name="TEST",
+            provider="ollama",
             text="Prompt",
             text_hash="h",
             generation=1,
             parent_hash="p",
             sample_count=1,
         )
-        learner._candidates["TEST"] = [candidate]
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [candidate]
 
         outcome = RLOutcome(
             provider="ollama",
