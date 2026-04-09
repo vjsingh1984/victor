@@ -351,7 +351,7 @@ class ExecutionCoordinator:
             from victor.config.settings import get_project_paths
 
             project_root = Path(get_project_paths().project_root)
-            explorer = ExplorationCoordinator(self._provider_context)
+            explorer = ExplorationCoordinator()
 
             # Get configurable timeout (local models need more time)
             try:

@@ -5,19 +5,22 @@
 
 """Parallel exploration coordinator for the agentic loop.
 
-Spawns concurrent RESEARCHER subagents during READING stage to explore
-different aspects of a codebase in parallel. Uses the existing
-SubAgentOrchestrator.fan_out() infrastructure — no new execution engine.
+Runs read-only tools (code_search, ls) in parallel before the main
+agent loop starts. Provides the agent with pre-loaded context about
+the project structure and relevant source files.
+
+Uses direct tool calls — no SubAgent overhead. Tools are called via
+asyncio.gather() for true parallelism.
 
 Usage:
-    coordinator = ExplorationCoordinator(provider_context)
+    coordinator = ExplorationCoordinator()
     findings = await coordinator.explore_parallel(
         "Fix the bug in separability_matrix",
         project_root=Path("/path/to/repo"),
     )
-    # findings.summary contains aggregated file paths and context
 """
 
+import asyncio
 import logging
 import re
 import time
@@ -30,189 +33,149 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ExplorationResult:
-    """Aggregated results from parallel exploration subagents."""
+    """Aggregated results from parallel exploration."""
 
     file_paths: List[str] = field(default_factory=list)
     summary: str = ""
     duration_seconds: float = 0.0
-    subagent_count: int = 0
-    tool_calls_total: int = 0
+    tool_calls: int = 0
 
 
 class ExplorationCoordinator:
     """Coordinates parallel file exploration during READING stage.
 
-    When a complex task is detected, this coordinator spawns 2-3 parallel
-    RESEARCHER subagents to explore the codebase concurrently:
-    - One finds source files related to the issue
-    - One finds test files
-    - One maps project structure (optional)
-
-    Results are aggregated and injected into the main agent's conversation
-    context, giving it a head start on understanding the codebase.
+    Runs code_search + ls in parallel to give the main agent a head start
+    on understanding the codebase. No SubAgent orchestrators — just direct
+    async tool calls for minimal overhead.
     """
-
-    def __init__(self, provider_context: Any):
-        """Initialize with the parent orchestrator's provider context.
-
-        Args:
-            provider_context: The provider context from ExecutionCoordinator.
-                             If this is an OrchestratorProtocolAdapter, we extract
-                             the underlying AgentOrchestrator for full context.
-        """
-        # Extract the full AgentOrchestrator if available (for SubAgent creation).
-        # provider_context may be OrchestratorProtocolAdapter wrapping the orchestrator.
-        orch = getattr(provider_context, "_orchestrator", None)
-        # Unwrap one level: OrchestratorProtocolAdapter._orchestrator → AgentOrchestrator
-        if orch is not None and not hasattr(orch, "provider_name"):
-            # Still wrapped — try one more level
-            orch = getattr(orch, "_orchestrator", orch)
-        self._orchestrator = orch
-        self._context = provider_context
 
     async def explore_parallel(
         self,
         task_description: str,
         project_root: Path,
-        max_agents: int = 3,
+        max_results: int = 5,
     ) -> ExplorationResult:
         """Run parallel exploration and return aggregated findings.
 
         Args:
             task_description: The user's task/issue description
             project_root: Root directory of the project to explore
-            max_agents: Maximum concurrent subagents (default 3)
+            max_results: Max search results to return
 
         Returns:
             ExplorationResult with file paths, summary, and metrics
         """
         start = time.time()
 
-        try:
-            from victor.agent.subagents.orchestrator import (
-                SubAgentOrchestrator,
-            )
-            from victor.agent.subagents.base import SubAgentRole
-            from victor.agent.subagents.protocols import SubAgentContextAdapter
-
-            # Use the full orchestrator for proper tool registry access
-            if self._orchestrator is not None:
-                sub_context = SubAgentContextAdapter(self._orchestrator)
-            else:
-                # Fallback: try using context directly (may lack tools)
-                sub_context = SubAgentContextAdapter(self._context)
-                logger.debug(
-                    "ExplorationCoordinator: no orchestrator, subagents may lack tools"
-                )
-
-            orchestrator = SubAgentOrchestrator(sub_context)
-
-            # Decompose task into parallel exploration subtasks
-            tasks = self._decompose_exploration(task_description, project_root)
-
-            logger.info(
-                "Starting parallel exploration: %d subagents for '%s'",
-                min(len(tasks), max_agents),
-                task_description[:80],
-            )
-
-            # Fan out using existing infrastructure
-            fan_out_result = await orchestrator.fan_out(
-                tasks[: max_agents],
-                max_concurrent=max_agents,
-            )
-
-            result = self._aggregate(fan_out_result)
-            result.duration_seconds = time.time() - start
-
-            logger.info(
-                "Parallel exploration complete: %d files found, %d tool calls, %.1fs",
-                len(result.file_paths),
-                result.tool_calls_total,
-                result.duration_seconds,
-            )
-
-            return result
-
-        except Exception as e:
-            logger.warning("Parallel exploration failed: %s", e)
+        # Extract key terms from task for targeted search
+        key_terms = self._extract_search_terms(task_description)
+        if not key_terms:
             return ExplorationResult(duration_seconds=time.time() - start)
 
-    def _decompose_exploration(
-        self, task: str, project_root: Optional[Path] = None
-    ) -> list:
-        """Decompose task into parallel exploration subtasks.
-
-        Generates 2-3 scoped research tasks from the user's task description.
-        Each subtask gets a focused prompt, read-only tools, and CWD info.
-        """
-        from victor.agent.subagents.orchestrator import SubAgentTask
-        from victor.agent.subagents.base import SubAgentRole
-
-        task_excerpt = task[:300]
-        cwd_hint = (
-            f"Working directory: {project_root}\n" if project_root else ""
+        logger.info(
+            "Parallel exploration: searching for %s in %s",
+            key_terms[:2],
+            project_root.name,
         )
 
-        tasks = [
-            SubAgentTask(
-                role=SubAgentRole.RESEARCHER,
-                task=(
-                    f"{cwd_hint}"
-                    f"Find the source code files most relevant to this issue. "
-                    f"Use code_search to find key functions/classes, then read "
-                    f"the most relevant file. Report file paths and key findings.\n\n"
-                    f"Issue: {task_excerpt}"
-                ),
-                tool_budget=10,
-                allowed_tools=["read", "ls", "code_search"],
-            ),
-            SubAgentTask(
-                role=SubAgentRole.RESEARCHER,
-                task=(
-                    f"{cwd_hint}"
-                    f"Find the test files related to this issue. Use ls to find "
-                    f"test directories, then code_search to locate relevant tests. "
-                    f"Report test file paths.\n\n"
-                    f"Issue: {task_excerpt}"
-                ),
-                tool_budget=8,
-                allowed_tools=["read", "ls", "code_search"],
-            ),
-        ]
+        # Run searches in parallel — direct tool calls, no SubAgent overhead
+        tasks = []
+        for term in key_terms[:3]:  # Max 3 parallel searches
+            tasks.append(self._search_codebase(term, project_root))
 
-        return tasks
+        # Also get project structure
+        tasks.append(self._list_project_structure(project_root))
 
-    def _aggregate(self, fan_out_result: Any) -> ExplorationResult:
-        """Extract file paths and summaries from subagent results."""
-        paths: List[str] = []
+        try:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+        except Exception as e:
+            logger.debug("Parallel exploration failed: %s", e)
+            return ExplorationResult(duration_seconds=time.time() - start)
+
+        # Aggregate results
+        file_paths: List[str] = []
         summaries: List[str] = []
-        total_tools = 0
+        tool_count = len(tasks)
 
-        for r in fan_out_result.results:
-            total_tools += r.tool_calls_used
-            if r.success and r.summary:
-                summaries.append(r.summary)
-                # Extract file paths from summary text
-                for line in r.summary.split("\n"):
-                    line = line.strip()
-                    # Match paths like "astropy/modeling/separable.py"
-                    path_match = re.search(
-                        r"([a-zA-Z0-9_/.-]+\.[a-zA-Z]{1,4})", line
-                    )
-                    if path_match:
-                        path = path_match.group(1)
-                        if "/" in path and path not in paths:
-                            paths.append(path)
+        for r in results:
+            if isinstance(r, Exception):
+                continue
+            if isinstance(r, dict):
+                # code_search result
+                files = r.get("files", [])
+                if isinstance(files, list):
+                    for f in files[:max_results]:
+                        path = f if isinstance(f, str) else str(f)
+                        if path not in file_paths:
+                            file_paths.append(path)
+                summary = r.get("summary", "")
+                if summary:
+                    summaries.append(summary)
+            elif isinstance(r, str):
+                # ls result
+                summaries.append(f"Project structure:\n{r[:500]}")
 
-        # Deduplicate and limit
-        paths = list(dict.fromkeys(paths))[:10]
-
-        summary = "\n\n".join(summaries[:3]) if summaries else ""
-
-        return ExplorationResult(
-            file_paths=paths,
-            summary=summary,
-            subagent_count=len(fan_out_result.results),
-            tool_calls_total=total_tools,
+        result = ExplorationResult(
+            file_paths=file_paths[:10],
+            summary="\n\n".join(summaries[:3]),
+            duration_seconds=time.time() - start,
+            tool_calls=tool_count,
         )
+
+        logger.info(
+            "Parallel exploration: %d files found, %d tool calls, %.1fs",
+            len(result.file_paths),
+            result.tool_calls,
+            result.duration_seconds,
+        )
+
+        return result
+
+    def _extract_search_terms(self, task: str) -> List[str]:
+        """Extract meaningful search terms from task description."""
+        # Remove common stop words and extract code-relevant terms
+        # Look for function names, class names, module references
+        terms = []
+
+        # Extract quoted strings
+        quoted = re.findall(r'`([^`]+)`|"([^"]+)"', task)
+        for q in quoted:
+            term = q[0] or q[1]
+            if len(term) > 2:
+                terms.append(term)
+
+        # Extract CamelCase or snake_case identifiers
+        identifiers = re.findall(r"\b[A-Z][a-zA-Z]+\b|\b[a-z]+_[a-z_]+\b", task)
+        for ident in identifiers:
+            if len(ident) > 3 and ident not in terms:
+                terms.append(ident)
+
+        return terms[:5]
+
+    async def _search_codebase(
+        self, query: str, project_root: Path
+    ) -> Dict[str, Any]:
+        """Run code_search for a single query."""
+        try:
+            from victor.tools.code_search_tool import code_search
+
+            result = await code_search(
+                query=query,
+                path=str(project_root),
+                k=5,
+            )
+            return result if isinstance(result, dict) else {"summary": str(result)}
+        except Exception as e:
+            logger.debug("Search for '%s' failed: %s", query, e)
+            return {}
+
+    async def _list_project_structure(self, project_root: Path) -> str:
+        """Get project directory listing."""
+        try:
+            from victor.tools.filesystem import ls
+
+            result = await ls(path=str(project_root), depth=1)
+            return result if isinstance(result, str) else str(result)
+        except Exception as e:
+            logger.debug("ls failed: %s", e)
+            return ""
