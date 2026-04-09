@@ -1311,6 +1311,29 @@ class FrameworkStepHandler(BaseStepHandler):
         if team_specs is None and hasattr(vertical, "get_team_specs"):
             team_specs = vertical.get_team_specs()
 
+        # Manifest-driven fallback: if vertical declares TEAMS in manifest
+        # but doesn't provide specs via protocol, build from declarations.
+        if not team_specs:
+            try:
+                from victor.core.verticals.manifest_contract import (
+                    get_or_create_vertical_manifest,
+                )
+                from victor_sdk.verticals.manifest import ExtensionType
+
+                manifest = get_or_create_vertical_manifest(vertical)
+                if manifest and ExtensionType.TEAMS in manifest.provides:
+                    # Try get_team_declarations() for declarative specs
+                    if hasattr(vertical, "get_team_declarations"):
+                        declarations = vertical.get_team_declarations()
+                        if declarations:
+                            team_specs = declarations
+                            logger.info(
+                                "Loaded %d team specs from manifest declarations",
+                                len(team_specs),
+                            )
+            except Exception as e:
+                logger.debug("Manifest team spec loading skipped: %s", e)
+
         if not team_specs:
             return
 
