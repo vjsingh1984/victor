@@ -884,6 +884,24 @@ models:
   # GOOGLE FAMILY
   # ---------------------------------------------------------------------------
 
+  "gemma4*":
+    training:
+      tool_calling: true   # Gemma 4 has native tool/function calling
+      code_generation: true
+
+    providers:
+      ollama:
+        native_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+      lmstudio:
+        native_tool_calls: true
+      vllm:
+        native_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 15
+
   "gemma3*":
     training:
       tool_calling: true   # Google trained with tool support
