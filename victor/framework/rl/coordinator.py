@@ -784,8 +784,8 @@ class RLCoordinator:
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None
-        except ImportError as e:
-            logger.warning(f"RL: Failed to import learner '{name}': {e}")
+        except (ImportError, TypeError) as e:
+            logger.warning(f"RL: Failed to create learner '{name}': {e}")
             return None
 
     def record_outcome(

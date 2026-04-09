@@ -1061,10 +1061,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self._rl_coordinator is not None:
             try:
                 pruning_learner = self._rl_coordinator.get_learner("context_pruning")
-            except KeyError:
-                logger.debug("context_pruning learner not registered in RL coordinator")
-            except AttributeError:
-                logger.debug("RL coordinator interface mismatch (missing get_learner)")
+            except (KeyError, AttributeError, TypeError) as e:
+                logger.debug("context_pruning learner unavailable: %s", e)
 
         # ContextCompactor: Proactive context management and tool result truncation (via factory)
         self._context_compactor = self._factory.create_context_compactor(
