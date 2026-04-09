@@ -532,11 +532,21 @@ class VictorAgentAdapter:
                 if self._turns == 1:
                     current_message = prompt
                 elif not self._completion_detector._has_file_modifications():
-                    current_message = (
-                        "You have not edited any files yet. "
-                        "Use the edit or write tool to fix the issue in the source code. "
-                        "Do not just describe the fix — apply it."
-                    )
+                    if self._turns >= 3:
+                        # Escalating nudge — agent has read files but not edited
+                        current_message = (
+                            "WARNING: You have read files for multiple turns "
+                            "but made ZERO edits. You MUST call the edit tool "
+                            "NOW to modify the source code. Pick the most "
+                            "relevant file and apply your fix immediately. "
+                            "Do NOT read more files."
+                        )
+                    else:
+                        current_message = (
+                            "You have not edited any files yet. "
+                            "Use the edit tool to fix the issue in the source code. "
+                            "Do not just describe the fix — apply it."
+                        )
                 else:
                     current_message = "Continue."
                 self._messages.append({"role": "user", "content": current_message})

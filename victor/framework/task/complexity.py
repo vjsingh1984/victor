@@ -568,6 +568,11 @@ class TaskComplexityService:
             if service is None:
                 return None
 
+            from victor.agent.decisions.chain import should_use_llm
+
+            if not should_use_llm("task_type_classification"):
+                return None
+
             from victor.agent.decisions.schemas import DecisionType
 
             decision = service.decide_sync(

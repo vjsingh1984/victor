@@ -265,6 +265,11 @@ def select_prompt_sections_with_edge_model(
         List of section names to include, or None if unavailable
     """
     try:
+        from victor.agent.decisions.chain import should_use_llm
+
+        if not should_use_llm("prompt_focus"):
+            return None
+
         from victor.agent.decisions.schemas import DecisionType
 
         decision = service.decide_sync(
