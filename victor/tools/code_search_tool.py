@@ -910,13 +910,29 @@ async def code_search(
         expand_query = getattr(settings, "semantic_query_expansion_enabled", True)
         enable_hybrid = getattr(settings, "enable_hybrid_search", False)
 
+        # Strip filter fields not in the index schema to avoid LanceDB errors.
+        # The index has: file_path, symbol_name, symbol_type, line_number, end_line.
+        # Fields like "language", "is_test_file" may not exist in all index backends.
+        _INDEX_FILTER_FIELDS = {"file_path", "symbol_name", "symbol_type", "line_number", "end_line"}
+        safe_filter = None
+        if filter_metadata:
+            safe_filter = {
+                k: v for k, v in filter_metadata.items()
+                if k in _INDEX_FILTER_FIELDS
+            }
+            dropped = set(filter_metadata) - set(safe_filter)
+            if dropped:
+                logger.debug("Dropped unsupported filter fields: %s", dropped)
+            if not safe_filter:
+                safe_filter = None
+
         # Perform semantic search with timeout and literal fallback
         try:
             results = await asyncio.wait_for(
                 index.semantic_search(
                     query=query,
                     max_results=k * 2 if enable_hybrid else k,
-                    filter_metadata=filter_metadata,
+                    filter_metadata=safe_filter,
                     similarity_threshold=similarity_threshold,
                     expand_query=expand_query,
                 ),
