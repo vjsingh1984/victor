@@ -476,11 +476,18 @@ async def _run_benchmark_async(
 
         # Skip tasks for targeted execution (--start-task)
         if start_task > 0 and start_task < len(tasks):
-            skipped = tasks[:start_task]
             tasks = tasks[start_task:]
             console.print(
-                f"[dim]Skipped {len(skipped)} tasks (starting from task {start_task})[/]"
+                f"[dim]Skipped {start_task} tasks (starting from index {start_task})[/]"
             )
+            # Override runner.load_tasks to return filtered set
+            # (harness calls load_tasks internally)
+            _original_load = runner.load_tasks
+
+            async def _filtered_load(cfg):
+                return tasks
+
+            runner.load_tasks = _filtered_load
 
         progress.update(task, description=f"Loaded {len(tasks)} tasks")
 
