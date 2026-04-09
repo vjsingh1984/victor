@@ -290,7 +290,9 @@ class SWEBenchRunner(BaseBenchmarkRunner):
                     ensure_project_importable,
                 )
 
-                await ensure_project_importable(repo_name, cached_repo)
+                await ensure_project_importable(
+                    repo_name, cached_repo, install_deps=True
+                )
 
                 try:
                     spec = __import__(repo_name)
