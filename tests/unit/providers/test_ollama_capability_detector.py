@@ -467,3 +467,64 @@ class TestDetectorIntegration:
 
         assert result.supports_tools is False
         assert result.template_has_tools is False
+
+
+# =============================================================================
+# CAPABILITIES API DETECTION TESTS
+# =============================================================================
+
+
+class TestCapabilitiesAPIDetection:
+    """Tests for capabilities-based detection (Ollama 0.20+)."""
+
+    @patch.object(OllamaCapabilityDetector, "get_model_info")
+    def test_capabilities_api_tools_detected(self, mock_get_info):
+        """Models with 'tools' in capabilities should be detected."""
+        mock_get_info.return_value = {
+            "capabilities": ["completion", "vision", "tools", "thinking"],
+            "template": "{{ .Prompt }}",
+        }
+        detector = OllamaCapabilityDetector()
+        result = detector.get_tool_support("gemma4:31b")
+
+        assert result.supports_tools is True
+        assert result.detection_method == "capabilities_api"
+        assert result.model == "gemma4:31b"
+
+    @patch.object(OllamaCapabilityDetector, "get_model_info")
+    def test_capabilities_api_no_tools(self, mock_get_info):
+        """Models without 'tools' in capabilities fall back to template."""
+        mock_get_info.return_value = {
+            "capabilities": ["completion"],
+            "template": "{{ .Prompt }}",
+        }
+        detector = OllamaCapabilityDetector()
+        result = detector.get_tool_support("basic-model:7b")
+
+        assert result.supports_tools is False
+        assert result.detection_method == "template"
+
+    @patch.object(OllamaCapabilityDetector, "get_model_info")
+    def test_capabilities_api_missing_field_falls_back(self, mock_get_info):
+        """Old Ollama without capabilities field falls back to template."""
+        mock_get_info.return_value = {
+            "template": "{{ if .Tools }}tools{{ end }}{{ .Prompt }}",
+        }
+        detector = OllamaCapabilityDetector()
+        result = detector.get_tool_support("qwen3:8b")
+
+        assert result.supports_tools is True
+        assert result.detection_method == "template"
+
+    @patch.object(OllamaCapabilityDetector, "get_model_info")
+    def test_capabilities_api_renderer_based_tools(self, mock_get_info):
+        """Gemma4-style: RENDERER/PARSER, no template tools, but capabilities."""
+        mock_get_info.return_value = {
+            "capabilities": ["completion", "tools"],
+            "template": "{{ .Prompt }}",
+        }
+        detector = OllamaCapabilityDetector()
+        result = detector.get_tool_support("gemma4:9b")
+
+        assert result.supports_tools is True
+        assert result.detection_method == "capabilities_api"

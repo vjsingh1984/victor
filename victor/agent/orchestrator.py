@@ -2883,15 +2883,49 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return True
 
     def _model_supports_tool_calls(self) -> bool:
-        """Check provider/model combo against the capability matrix."""
+        """Check provider/model combo against the capability matrix.
+
+        Fallback chain:
+        1. Static YAML config (model_capabilities.yaml) — fast, no network
+        2. Ollama /api/show capabilities — authoritative runtime detection
+        3. Default: False (warn user)
+        """
         provider_key = self.provider_name or getattr(self.provider, "name", "")
         if not provider_key:
             return True
 
+        # 1. Check static YAML config first (fast path)
         supported = self.tool_capabilities.is_tool_call_supported(
             provider_key, self.model
         )
-        if not supported and not self._tool_capability_warned:
+        if supported:
+            return True
+
+        # 2. For Ollama, query the API as authoritative fallback
+        if provider_key.lower() == "ollama":
+            try:
+                from victor.providers.ollama_capability_detector import (
+                    get_global_detector,
+                )
+
+                base_url = getattr(
+                    self.settings.provider, "ollama_base_url",
+                    "http://localhost:11434",
+                )
+                detector = get_global_detector(base_url)
+                tool_support = detector.get_tool_support(self.model)
+                if tool_support.supports_tools:
+                    logger.info(
+                        "Model '%s' supports tools (detected via Ollama API, method=%s)",
+                        self.model,
+                        tool_support.detection_method,
+                    )
+                    return True
+            except Exception as e:
+                logger.debug("Ollama capability detection failed: %s", e)
+
+        # 3. Not supported — warn user
+        if not self._tool_capability_warned:
             known = (
                 ", ".join(self.tool_capabilities.get_supported_models(provider_key))
                 or "none"
@@ -2905,7 +2939,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 f"Running without tools.[/]"
             )
             self._tool_capability_warned = True
-        return supported
+        return False
 
     def add_message(self, role: str, content: str) -> None:
         """Add a message to conversation history.
