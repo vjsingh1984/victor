@@ -60,8 +60,14 @@ class ExplorationCoordinator:
                              If this is an OrchestratorProtocolAdapter, we extract
                              the underlying AgentOrchestrator for full context.
         """
-        # Extract the full orchestrator if available (for SubAgent creation)
-        self._orchestrator = getattr(provider_context, "_orchestrator", None)
+        # Extract the full AgentOrchestrator if available (for SubAgent creation).
+        # provider_context may be OrchestratorProtocolAdapter wrapping the orchestrator.
+        orch = getattr(provider_context, "_orchestrator", None)
+        # Unwrap one level: OrchestratorProtocolAdapter._orchestrator → AgentOrchestrator
+        if orch is not None and not hasattr(orch, "provider_name"):
+            # Still wrapped — try one more level
+            orch = getattr(orch, "_orchestrator", orch)
+        self._orchestrator = orch
         self._context = provider_context
 
     async def explore_parallel(
