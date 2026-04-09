@@ -39,6 +39,7 @@ Phase 1: Extract ExecutionCoordinator
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -148,6 +149,9 @@ class ExecutionCoordinator:
             max_iterations_setting,
             max_iterations,
         )
+
+        # Parallel exploration for complex tasks (before agentic loop)
+        await self._run_parallel_exploration(user_message, task_classification)
 
         # Agentic loop: continue until no tool calls or budget exhausted
         final_response: Optional[CompletionResponse] = None
@@ -285,6 +289,81 @@ class ExecutionCoordinator:
             max_tokens=self._provider_context.max_tokens,
             tools=tools,
         )
+
+    # =====================================================================
+    # Parallel Exploration
+    # =====================================================================
+
+    async def _run_parallel_exploration(
+        self,
+        user_message: str,
+        task_classification: Any,
+    ) -> None:
+        """Run parallel exploration subagents for complex tasks.
+
+        Spawns concurrent RESEARCHER subagents to explore the codebase
+        before the main agentic loop starts. Findings are injected into
+        the conversation context as a user message.
+
+        Only fires for COMPLEX/ACTION tasks when parallel_exploration is enabled.
+        Falls back gracefully on any error.
+        """
+        # Check if exploration is enabled and task warrants it
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            pipeline = getattr(settings, "pipeline", None)
+            if pipeline and not getattr(pipeline, "parallel_exploration", True):
+                return
+
+            from victor.framework.task.protocols import TaskComplexity
+
+            if task_classification.complexity not in {
+                TaskComplexity.COMPLEX,
+                TaskComplexity.ACTION,
+                TaskComplexity.ANALYSIS,
+            }:
+                return
+        except Exception:
+            return
+
+        try:
+            import asyncio
+            from pathlib import Path
+
+            from victor.agent.coordinators.exploration_coordinator import (
+                ExplorationCoordinator,
+            )
+            from victor.config.settings import get_project_paths
+
+            project_root = Path(get_project_paths().project_root)
+            explorer = ExplorationCoordinator(self._provider_context)
+
+            findings = await asyncio.wait_for(
+                explorer.explore_parallel(
+                    task_description=user_message,
+                    project_root=project_root,
+                ),
+                timeout=90,
+            )
+
+            if findings.summary:
+                self._chat_context.add_message(
+                    "user",
+                    f"[Parallel exploration results]\n{findings.summary}",
+                )
+                logger.info(
+                    "Parallel exploration: %d files, %d tool calls, %.1fs",
+                    len(findings.file_paths),
+                    findings.tool_calls_total,
+                    findings.duration_seconds,
+                )
+
+        except asyncio.TimeoutError:
+            logger.debug("Parallel exploration timed out (90s), skipping")
+        except Exception as e:
+            logger.debug("Parallel exploration skipped: %s", e)
 
     # =====================================================================
     # Private Methods
