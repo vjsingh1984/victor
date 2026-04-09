@@ -353,16 +353,32 @@ class ExecutionCoordinator:
             project_root = Path(get_project_paths().project_root)
             explorer = ExplorationCoordinator()
 
-            # Get configurable timeout (local models need more time)
-            try:
-                from victor.config.settings import load_settings as _ls
+            # Calculate resource-aware exploration budget
+            from victor.agent.budget.resource_calculator import (
+                calculate_exploration_budget,
+            )
 
-                _pipeline = getattr(_ls(), "pipeline", None)
-                exploration_timeout = getattr(
-                    _pipeline, "exploration_timeout", 90
-                )
-            except Exception:
-                exploration_timeout = 90
+            provider_name = getattr(
+                self._provider_context, "provider_name", "ollama"
+            )
+            if hasattr(provider_name, "__call__"):
+                provider_name = "ollama"  # Mock fallback
+            model_name = getattr(self._provider_context, "model", None)
+            complexity_str = getattr(
+                task_classification, "complexity", "action"
+            )
+            if hasattr(complexity_str, "value"):
+                complexity_str = complexity_str.value
+
+            budget = calculate_exploration_budget(
+                complexity=complexity_str,
+                provider=provider_name,
+                model=model_name,
+            )
+
+            if budget.max_parallel_agents == 0:
+                self._exploration_done = True
+                return
 
             _EXPLORATION_IN_PROGRESS = True
             try:
@@ -370,8 +386,9 @@ class ExecutionCoordinator:
                     explorer.explore_parallel(
                         task_description=user_message,
                         project_root=project_root,
+                        max_results=budget.tool_budget_per_agent,
                     ),
-                    timeout=exploration_timeout,
+                    timeout=budget.exploration_timeout,
                 )
             finally:
                 _EXPLORATION_IN_PROGRESS = False
