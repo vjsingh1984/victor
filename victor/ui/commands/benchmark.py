@@ -322,6 +322,7 @@ def run_benchmark(
             max_turns=max_turns,
             resume=resume,
             provider_override=provider,
+            start_task=start_task,
         )
     )
 
@@ -450,6 +451,7 @@ async def _run_benchmark_async(
     max_turns: int = 10,
     resume: bool,
     provider_override: Optional[str] = None,
+    start_task: int = 0,
 ):
     from victor.evaluation.harness import EvaluationHarness
     from victor.evaluation.agent_adapter import VictorAgentAdapter
