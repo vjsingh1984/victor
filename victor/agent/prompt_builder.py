@@ -147,6 +147,25 @@ DO NOT re-read the full file without parameters - you will get the same truncate
 DO NOT assume content is missing - use offset/search to access additional sections.
 """.strip()
 
+# ASI-derived guidance: Lessons learned from execution trace analysis (GEPA-inspired).
+# These rules were extracted from 64K+ tool execution events across 11 days:
+# - 165 read(dir) errors → directory vs file guidance
+# - 60% literal code_search with 0 results → search mode guidance
+# - 70:9 read:code_search ratio → search-first discovery guidance
+# - 33% edit failure rate → edit precision guidance
+ASI_TOOL_EFFECTIVENESS_GUIDANCE = """
+TOOL EFFECTIVENESS (from execution data):
+- Use code_search(query='...') FIRST to discover relevant files before reading them.
+  Do NOT browse with read→read→read — search finds the right file in one call.
+- code_search works best with mode='semantic' for concepts and patterns.
+  Use mode='literal' only for exact identifiers you know exist.
+- For edits: include 3+ surrounding lines of context in old_str to ensure a unique match.
+  Ambiguous matches (old_str appears 2+ times) will fail — add more context.
+- Use ls() for directories, read() for files. read('directory_name') will auto-convert
+  but wastes a tool call.
+- Only access files within the current project. Never guess paths from other projects.
+""".strip()
+
 # Task-type hints are now in vertical prompt contributors (E5 M3).
 # Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.
 
@@ -598,6 +617,11 @@ class SystemPromptBuilder:
             tool_guidance = self.get_provider_tool_guidance()
             if tool_guidance:
                 base_prompt = f"{base_prompt}\n\n{tool_guidance}"
+
+        # ASI-derived tool effectiveness guidance (GEPA-inspired)
+        # Distilled from execution trace analysis of 64K+ events
+        if "tool_guidance" in sections_to_include:
+            base_prompt = f"{base_prompt}\n\n{ASI_TOOL_EFFECTIVENESS_GUIDANCE}"
 
         return base_prompt
 
