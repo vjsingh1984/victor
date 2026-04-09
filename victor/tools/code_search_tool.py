@@ -764,7 +764,20 @@ async def code_search(
     """
     # Route to literal search if mode is "literal"
     if mode == "literal":
-        return await _literal_search(query, path, k, exts)
+        result = await _literal_search(query, path, k, exts)
+        if result.get("count", 0) > 0:
+            return result
+        # Auto-escalate: literal returned 0 results, try semantic if available
+        settings = _exec_ctx.get("settings") if _exec_ctx else None
+        disable_embeddings = (_exec_ctx or {}).get("disable_embeddings", False)
+        if settings and not disable_embeddings:
+            logger.info(
+                "Literal search returned 0 results for '%s', auto-escalating to semantic",
+                query,
+            )
+            mode = "semantic"  # Fall through to semantic path below
+        else:
+            return result
     search_root = path
     try:
         root_path = Path(search_root).resolve()

@@ -596,6 +596,11 @@ class ToolExecutor:
         Returns:
             ToolExecutionResult with execution outcome
         """
+        # Resolve aliases (e.g., "search" → "code_search") before lookup
+        from victor.tools.decorators import resolve_tool_name
+
+        tool_name = resolve_tool_name(tool_name)
+
         # Record tool call start for debugging
         call_id = None
         if self._tool_call_tracer:

@@ -1193,6 +1193,18 @@ async def read(
             limit = line_end
     file_path = Path(path).expanduser().resolve()
 
+    # Early return for directory paths (handles "", ".", "src/", etc.)
+    if file_path.is_dir():
+        logger.info("Auto-converting read('%s') → ls('%s')", path, path)
+        try:
+            dir_result = await ls(path=str(file_path), depth=1)
+            return f"Note: '{path}' is a directory, showing contents:\n\n{dir_result}"
+        except Exception as e:
+            return (
+                f"'{path}' is a directory. Listing failed: {e}\n"
+                f"Use ls(path='{path}') to explore."
+            )
+
     if not file_path.exists():
         # Try PathResolver for intelligent path normalization and suggestions
         resolver = get_path_resolver()
@@ -1263,10 +1275,11 @@ async def read(
                     f"Note: '{path}' is a directory, showing contents:\n\n"
                     f"{dir_result}"
                 )
-            except Exception:
-                raise IsADirectoryError(
-                    f"Cannot read directory as file: {path}\n"
-                    f"Suggestion: Use list_directory(path='{path}') to explore."
+            except Exception as e:
+                logger.warning("ls() fallback failed for directory '%s': %s", path, e)
+                return (
+                    f"'{path}' is a directory. Listing failed: {e}\n"
+                    f"Use ls(path='{path}') to explore."
                 )
     if not file_path.is_file():
         if file_path.is_dir():
@@ -1278,10 +1291,11 @@ async def read(
                     f"Note: '{path}' is a directory, showing contents:\n\n"
                     f"{dir_result}"
                 )
-            except Exception:
-                raise IsADirectoryError(
-                    f"Cannot read directory as file: {path}\n"
-                    f"Suggestion: Use list_directory(path='{path}') to explore."
+            except Exception as e:
+                logger.warning("ls() fallback failed for directory '%s': %s", path, e)
+                return (
+                    f"'{path}' is a directory. Listing failed: {e}\n"
+                    f"Use ls(path='{path}') to explore."
                 )
         raise IsADirectoryError(f"Path is not a file: {path}")
 

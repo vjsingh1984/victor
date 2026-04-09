@@ -219,6 +219,25 @@ class LLMDecisionService:
                 confidence=heuristic_confidence,
             )
 
+        # Auto-disable if timeout rate is too high (>60% after 10+ calls)
+        if (
+            self._metrics.total_calls >= 10
+            and self._metrics.timeouts / max(self._metrics.total_calls, 1) > 0.6
+        ):
+            logger.warning(
+                "Edge model auto-disabled: %.0f%% timeout rate (%d/%d calls)",
+                100 * self._metrics.timeouts / self._metrics.total_calls,
+                self._metrics.timeouts,
+                self._metrics.total_calls,
+            )
+            self._metrics.total_calls += 1
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="auto_disabled",
+                confidence=heuristic_confidence,
+            )
+
         # Use run_sync_in_thread to handle both cases:
         # 1. No running loop — runs in a thread with its own loop
         # 2. Inside async context — also runs in a thread (avoids blocking)
@@ -255,10 +274,12 @@ class LLMDecisionService:
         except (TimeoutError, Exception) as e:
             logger.debug("decide_sync thread execution failed: %s", e)
             self._metrics.total_calls += 1
+            if isinstance(e, TimeoutError):
+                self._metrics.timeouts += 1
             return DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
-                source="heuristic",
+                source="timeout_fallback" if isinstance(e, TimeoutError) else "heuristic",
                 confidence=heuristic_confidence,
             )
 

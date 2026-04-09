@@ -9,6 +9,10 @@ from typing import Any, Dict
 class UsageLogger:
     """Logs agent usage events to a JSONL file for analytics."""
 
+    # Class-level dedup: prevents duplicate session_start events when
+    # multiple UsageLogger instances share the same logical session.
+    _started_sessions: set = set()
+
     def __init__(self, log_file: Path, enabled: bool = True):
         """
         Initializes the UsageLogger.
@@ -50,6 +54,12 @@ class UsageLogger:
         """
         if not self._enabled:
             return
+
+        # Deduplicate session_start — emit only once per session_id
+        if event_type == "session_start":
+            if self.session_id in UsageLogger._started_sessions:
+                return
+            UsageLogger._started_sessions.add(self.session_id)
 
         log_entry = {
             "session_id": self.session_id,

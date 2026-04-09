@@ -62,7 +62,7 @@ class EdgeModelConfig:
     enabled: bool = True
     provider: str = "ollama"
     model: str = "qwen3.5:2b"
-    timeout_ms: int = 2000
+    timeout_ms: int = 4000
     max_tokens: int = 50
     cache_ttl: int = 120
     confidence_threshold: float = 0.6

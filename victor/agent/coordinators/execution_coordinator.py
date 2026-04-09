@@ -161,6 +161,10 @@ class ExecutionCoordinator:
         final_response: Optional[CompletionResponse] = None
         consecutive_zero_tool_turns = 0
         MAX_ZERO_TOOL_TURNS = 3  # Nudge after 2, break after 3
+        # Search nudge: track read-heavy turns without code_search
+        consecutive_read_only_turns = 0
+        has_used_code_search = False
+        _READ_ONLY_TOOLS = {"read", "ls", "list_directory", "grep"}
 
         while iteration < iteration_budget:
             iteration += 1
@@ -200,6 +204,27 @@ class ExecutionCoordinator:
             # Check if model wants to use tools
             if response.tool_calls:
                 consecutive_zero_tool_turns = 0
+
+                # Track read-heavy turns for search nudge
+                turn_tools = {
+                    tc.get("name", "") for tc in response.tool_calls
+                }
+                if "code_search" in turn_tools:
+                    has_used_code_search = True
+                if turn_tools.issubset(_READ_ONLY_TOOLS):
+                    consecutive_read_only_turns += 1
+                else:
+                    consecutive_read_only_turns = 0
+                # Nudge after 5+ read-only turns without code_search
+                if consecutive_read_only_turns >= 5 and not has_used_code_search:
+                    self._chat_context.add_message(
+                        "user",
+                        "You have been browsing files for several turns. "
+                        "Consider using code_search(query='...') to find "
+                        "relevant code more efficiently.",
+                    )
+                    consecutive_read_only_turns = 0
+
                 # Handle tool calls and track results
                 tool_results = await self._tool_context._handle_tool_calls(
                     response.tool_calls
