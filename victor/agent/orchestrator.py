@@ -1644,15 +1644,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except Exception:
             pass
 
-        # Update system prompt if new context has content
+        # Rebuild system prompt with new workspace context (replaces old init.md)
+        base_prompt = self._build_system_prompt_with_adapter()
         if self.project_context.content:
-            base_prompt = self._build_system_prompt_with_adapter()
             self._system_prompt = (
                 base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
             )
             logger.info(
                 f"Loaded project context from {self.project_context.context_file}"
             )
+        else:
+            self._system_prompt = base_prompt
+
+        # Clear conversation history to remove old workspace context
+        # This ensures the model doesn't see init.md from the previous project
+        if hasattr(self, "reset_conversation"):
+            self.reset_conversation()
 
     def _apply_vertical_tools(self, tools: Set[str]) -> None:
         """Apply enabled tools to vertical context and access controller.
