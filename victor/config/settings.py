@@ -817,6 +817,7 @@ class PipelineSettings(_BaseModel):
     parallel_exploration: bool = True
     max_exploration_agents: int = 3
     exploration_tool_budget: int = 10
+    exploration_timeout: int = 90  # seconds (increase for local models)
 
     intelligent_pipeline_enabled: bool = True
     intelligent_quality_scoring: bool = True

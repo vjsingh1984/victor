@@ -108,7 +108,7 @@ class ExplorationCoordinator:
             orchestrator = SubAgentOrchestrator(sub_context)
 
             # Decompose task into parallel exploration subtasks
-            tasks = self._decompose_exploration(task_description)
+            tasks = self._decompose_exploration(task_description, project_root)
 
             logger.info(
                 "Starting parallel exploration: %d subagents for '%s'",
@@ -138,22 +138,27 @@ class ExplorationCoordinator:
             logger.warning("Parallel exploration failed: %s", e)
             return ExplorationResult(duration_seconds=time.time() - start)
 
-    def _decompose_exploration(self, task: str) -> list:
+    def _decompose_exploration(
+        self, task: str, project_root: Optional[Path] = None
+    ) -> list:
         """Decompose task into parallel exploration subtasks.
 
         Generates 2-3 scoped research tasks from the user's task description.
-        Each subtask gets a focused prompt and read-only tool access.
+        Each subtask gets a focused prompt, read-only tools, and CWD info.
         """
         from victor.agent.subagents.orchestrator import SubAgentTask
         from victor.agent.subagents.base import SubAgentRole
 
-        # Extract key terms from task for targeted search
         task_excerpt = task[:300]
+        cwd_hint = (
+            f"Working directory: {project_root}\n" if project_root else ""
+        )
 
         tasks = [
             SubAgentTask(
                 role=SubAgentRole.RESEARCHER,
                 task=(
+                    f"{cwd_hint}"
                     f"Find the source code files most relevant to this issue. "
                     f"Use code_search to find key functions/classes, then read "
                     f"the most relevant file. Report file paths and key findings.\n\n"
@@ -165,6 +170,7 @@ class ExplorationCoordinator:
             SubAgentTask(
                 role=SubAgentRole.RESEARCHER,
                 task=(
+                    f"{cwd_hint}"
                     f"Find the test files related to this issue. Use ls to find "
                     f"test directories, then code_search to locate relevant tests. "
                     f"Report test file paths.\n\n"

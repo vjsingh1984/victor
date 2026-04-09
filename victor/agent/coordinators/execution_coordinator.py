@@ -104,6 +104,7 @@ class ExecutionCoordinator:
         self._provider_context = provider_context
         self._execution_provider = execution_provider
         self._token_tracker = token_tracker
+        self._exploration_done = False  # Instance-level: fires once per conversation
 
     # =====================================================================
     # Public API
@@ -311,11 +312,15 @@ class ExecutionCoordinator:
         Only fires for COMPLEX/ACTION tasks when parallel_exploration is enabled.
         Falls back gracefully on any error.
         """
-        global _EXPLORATION_IN_PROGRESS
-
-        # Prevent recursive exploration (subagents should not spawn more subagents)
-        if _EXPLORATION_IN_PROGRESS:
+        # Only explore once per conversation, not on continuations
+        if self._exploration_done:
             return
+        if user_message.startswith("You have not edited") or user_message == "Continue.":
+            return
+
+        global _EXPLORATION_IN_PROGRESS
+        if _EXPLORATION_IN_PROGRESS:
+            return  # Prevent recursive subagent exploration
 
         # Check if exploration is enabled and task warrants it
         try:
@@ -348,6 +353,17 @@ class ExecutionCoordinator:
             project_root = Path(get_project_paths().project_root)
             explorer = ExplorationCoordinator(self._provider_context)
 
+            # Get configurable timeout (local models need more time)
+            try:
+                from victor.config.settings import load_settings as _ls
+
+                _pipeline = getattr(_ls(), "pipeline", None)
+                exploration_timeout = getattr(
+                    _pipeline, "exploration_timeout", 90
+                )
+            except Exception:
+                exploration_timeout = 90
+
             _EXPLORATION_IN_PROGRESS = True
             try:
                 findings = await asyncio.wait_for(
@@ -355,10 +371,11 @@ class ExecutionCoordinator:
                         task_description=user_message,
                         project_root=project_root,
                     ),
-                    timeout=90,
+                    timeout=exploration_timeout,
                 )
             finally:
                 _EXPLORATION_IN_PROGRESS = False
+                self._exploration_done = True  # Never explore again this conversation
 
             if findings.summary:
                 self._chat_context.add_message(
