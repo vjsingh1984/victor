@@ -61,16 +61,27 @@ def detect_test_runner(
     # 1. Check for Django
     django_settings = _detect_django(project_root)
     if django_settings:
-        cmd = [python, "-m", "django", "test", "--verbosity=2"]
-        if test_files:
-            # Convert file paths to django test labels
-            # e.g., "tests/test_utils/tests.py" → "test_utils.tests"
-            labels = _files_to_django_labels(test_files)
-            cmd.extend(labels)
-        env = {"DJANGO_SETTINGS_MODULE": django_settings}
-        logger.info(
-            "Detected Django project (settings=%s)", django_settings
-        )
+        # Django source repo uses tests/runtests.py
+        runtests = project_root / "tests" / "runtests.py"
+        if runtests.exists():
+            cmd = [python, str(runtests), "--verbosity=2"]
+            if test_files:
+                labels = _files_to_django_labels(test_files)
+                cmd.extend(labels)
+            env = {"DJANGO_SETTINGS_MODULE": django_settings}
+            logger.info(
+                "Detected Django source repo (runtests.py, settings=%s)",
+                django_settings,
+            )
+        else:
+            cmd = [python, "-m", "django", "test", "--verbosity=2"]
+            if test_files:
+                labels = _files_to_django_labels(test_files)
+                cmd.extend(labels)
+            env = {"DJANGO_SETTINGS_MODULE": django_settings}
+            logger.info(
+                "Detected Django project (settings=%s)", django_settings
+            )
         return TestRunnerConfig(command=cmd, env=env, runner_type="django")
 
     # 2. Check for pytest (Python)
@@ -115,6 +126,14 @@ def _detect_django(project_root: Path) -> Optional[str]:
             pass
         # Fallback: search for settings.py
         return _find_django_settings(project_root)
+
+    # Check if this IS django itself (source checkout — no manage.py)
+    # Django source has django/ package + tests/runtests.py
+    runtests = project_root / "tests" / "runtests.py"
+    django_pkg = project_root / "django" / "__init__.py"
+    if runtests.exists() and django_pkg.exists():
+        logger.info("Detected Django source repository (tests/runtests.py)")
+        return "test_sqlite"  # Django's default test settings
 
     # Check if django is a dependency
     for config_file in ["setup.py", "setup.cfg", "pyproject.toml"]:
