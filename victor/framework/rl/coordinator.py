@@ -615,7 +615,7 @@ class RLCoordinator:
             logger.warning(f"RL: Learner '{name}' already registered, replacing")
 
         self._learners[name] = learner
-        logger.info(f"RL: Registered learner '{name}'")
+        logger.debug(f"RL: Registered learner '{name}'")
 
     def set_active_learners(self, learners: List[str]) -> None:
         """Set the active learners allowlist.

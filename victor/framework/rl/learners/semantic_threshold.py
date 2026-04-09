@@ -293,7 +293,7 @@ class SemanticThresholdLearner(BaseLearner):
         if abs(recommended - current) < 0.01:
             return
 
-        logger.info(
+        logger.debug(
             f"RL: Updated semantic_threshold for {stats['context_key']}: "
             f"{current:.2f} → {recommended:.2f} "
             f"(zero_rate={zero_rate:.1%}, low_quality_rate={low_quality_rate:.1%})"

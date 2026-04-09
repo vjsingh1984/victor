@@ -1891,7 +1891,7 @@ class ToolSelector(ModeAwareMixin):
         # If vertical has set enabled tools, use those directly
         # This allows verticals like "research" to specify web_search, web_fetch, etc.
         if self._enabled_tools:
-            logger.info(
+            logger.debug(
                 f"Using vertical enabled tools ({len(self._enabled_tools)}): "
                 f"{sorted(self._enabled_tools)}"
             )
@@ -1913,7 +1913,7 @@ class ToolSelector(ModeAwareMixin):
             selected_tools = self._filter_tools_for_stage(selected_tools, stage)
 
             tool_names = [t.name for t in selected_tools]
-            logger.info(
+            logger.debug(
                 f"Selected {len(selected_tools)} tools from vertical filter: "
                 f"{', '.join(tool_names)}"
             )
