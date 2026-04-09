@@ -179,19 +179,12 @@ class SemanticThresholdLearner(BaseLearner):
         if stats["total_searches"] >= 5:
             self._update_threshold(stats)
 
-        # Dirty-check: skip write if recommendation unchanged (selective mode)
-        # Compare the OUTPUT that matters (recommended_threshold), not drifting counters
+        # Dirty-check: skip write ONLY when recommendation exists and is unchanged
+        # Always write when building up data (recommendation = None means not enough data)
         if rl_mode == "selective" and row:
             prev_stats = dict(zip(column_names, row))
             prev_rec = prev_stats.get("recommended_threshold")
             new_rec = stats.get("recommended_threshold")
-            # Skip if both None (no recommendation yet) or values close
-            if prev_rec is None and new_rec is None:
-                logger.debug(
-                    "RL: semantic_threshold no recommendation yet for %s, skipping",
-                    context_key,
-                )
-                return
             if (
                 prev_rec is not None
                 and new_rec is not None
