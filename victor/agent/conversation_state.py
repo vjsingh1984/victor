@@ -737,8 +737,16 @@ class ConversationStateMachine:
             if recent_overlap >= self.MIN_TOOLS_FOR_TRANSITION:
                 self._transition_to(detected, confidence=0.6 + (recent_overlap * 0.1))
             else:
-                # Heuristic uncertain — consult edge model as tiebreaker
+                # Heuristic uncertain — consult edge model only if in chain
+                from victor.agent.decisions.chain import should_use_llm
+
                 heuristic_confidence = 0.6 + (recent_overlap * 0.1)
+                if not should_use_llm("stage_detection"):
+                    logger.debug(
+                        "_maybe_transition: LLM not in chain, skipping edge tiebreaker"
+                    )
+                    return
+
                 edge_stage, edge_confidence = self._try_edge_model_transition(
                     detected, heuristic_confidence
                 )
