@@ -127,7 +127,7 @@ def validate_environment(settings: "Settings" | None = None) -> ValidationResult
 
     # Check for API keys (only if using cloud providers)
     if settings and hasattr(settings, "default_provider"):
-        provider = settings.default_provider
+        provider = settings.provider.default_provider
         local_providers = ["ollama", "lmstudio", "vllm", "llama.cpp"]
 
         # Only check for API keys if not using a local provider
@@ -177,9 +177,9 @@ def validate_paths(settings: "Settings") -> ValidationResult:
     # Validate codebase persist directory if specified
     if (
         hasattr(settings, "codebase_persist_directory")
-        and settings.codebase_persist_directory
+        and settings.search.codebase_persist_directory
     ):
-        persist_path = Path(settings.codebase_persist_directory)
+        persist_path = Path(settings.search.codebase_persist_directory)
         if not persist_path.exists():
             try:
                 persist_path.mkdir(parents=True, exist_ok=True)
@@ -209,7 +209,7 @@ def validate_provider_settings(settings: "Settings") -> ValidationResult:
     result = ValidationResult(True)
 
     # Check if default provider is configured
-    default_provider = settings.default_provider
+    default_provider = settings.provider.default_provider
     if not default_provider:
         result.add_error(
             ValidationError(
@@ -296,20 +296,20 @@ def validate_tool_settings(settings: "Settings") -> ValidationResult:
     result = ValidationResult(True)
 
     # Validate fallback_max_tools
-    if settings.fallback_max_tools < 1:
+    if settings.tools.fallback_max_tools < 1:
         result.add_error(
             ValidationError(
-                message=f"fallback_max_tools must be at least 1, got {settings.fallback_max_tools}",
+                message=f"fallback_max_tools must be at least 1, got {settings.tools.fallback_max_tools}",
                 suggestion="Set fallback_max_tools to 1 or higher in your profile YAML.",
                 field="fallback_max_tools",
                 error_code="INVALID_TOOL_BUDGET",
             )
         )
 
-    if settings.fallback_max_tools > 20:
+    if settings.tools.fallback_max_tools > 20:
         result.add_error(
             ValidationError(
-                message=f"fallback_max_tools is very high: {settings.fallback_max_tools}",
+                message=f"fallback_max_tools is very high: {settings.tools.fallback_max_tools}",
                 suggestion="Consider reducing fallback_max_tools to 10 or fewer for better performance. "
                 "Large tool budgets can lead to slower response times.",
                 field="fallback_max_tools",
@@ -318,10 +318,10 @@ def validate_tool_settings(settings: "Settings") -> ValidationResult:
         )
 
     # Validate cache settings
-    if settings.tool_selection_cache_ttl < 0:
+    if settings.tools.tool_selection_cache_ttl < 0:
         result.add_error(
             ValidationError(
-                message=f"tool_selection_cache_ttl cannot be negative: {settings.tool_selection_cache_ttl}",
+                message=f"tool_selection_cache_ttl cannot be negative: {settings.tools.tool_selection_cache_ttl}",
                 suggestion="Set tool_selection_cache_ttl to 0 or higher in your profile YAML.",
                 field="tool_selection_cache_ttl",
                 error_code="INVALID_CACHE_TTL",
@@ -366,7 +366,7 @@ def validate_performance_settings(settings: "Settings") -> ValidationResult:
                 )
             )
 
-        if not settings.tool_selection_cache_enabled:
+        if not settings.tools.tool_selection_cache_enabled:
             result.add_error(
                 ValidationError(
                     message="Tool selection cache is disabled",

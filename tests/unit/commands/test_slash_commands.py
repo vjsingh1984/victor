@@ -419,7 +419,7 @@ class TestSlashCommandHandlerStatus:
         stdout = io.StringIO()
         console = Console(file=stdout, force_terminal=False)
         settings = MagicMock()
-        settings.tool_call_budget = 25
+        settings.tools.tool_call_budget = 25
 
         agent = MagicMock()
         agent.provider_name = "anthropic"
@@ -854,12 +854,12 @@ class TestSystemCommands:
         stdout = io.StringIO()
         console = Console(file=stdout, force_terminal=False)
         settings = MagicMock()
-        settings.default_provider = "anthropic"
-        settings.default_model = "claude-3-5-sonnet"
+        settings.provider.default_provider = "anthropic"
+        settings.provider.default_model = "claude-3-5-sonnet"
         settings.ollama_base_url = "http://localhost:11434"
         settings.airgapped_mode = False
         settings.use_semantic_tool_selection = True
-        settings.unified_embedding_model = "all-MiniLM-L6-v2"
+        settings.search.unified_embedding_model = "all-MiniLM-L6-v2"
         settings.codebase_graph_store = "sqlite"
         settings.graph_enabled = True
 

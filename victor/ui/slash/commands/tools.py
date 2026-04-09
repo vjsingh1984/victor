@@ -86,7 +86,7 @@ class ToolsCommand(BaseSlashCommand):
             table.add_row(name, desc, cost)
 
         ctx.console.print(table)
-        ctx.console.print(f"\n[dim]Tool budget: {ctx.settings.tool_call_budget}[/]")
+        ctx.console.print(f"\n[dim]Tool budget: {ctx.settings.tools.tool_call_budget}[/]")
 
 
 @register_command

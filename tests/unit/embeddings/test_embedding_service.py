@@ -39,12 +39,12 @@ class TestDefaultEmbeddingModel:
         assert DEFAULT_EMBEDDING_MODEL == "BAAI/bge-small-en-v1.5"
 
     def test_settings_unified_model_matches_service(self):
-        """Test settings.unified_embedding_model matches service default."""
+        """Test settings.search.unified_embedding_model matches service default."""
         from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
         from victor.config.settings import Settings
 
         settings = Settings()
-        assert settings.unified_embedding_model == DEFAULT_EMBEDDING_MODEL
+        assert settings.search.unified_embedding_model == DEFAULT_EMBEDDING_MODEL
 
     def test_service_init_uses_default_model(self):
         """Test EmbeddingService __init__ default matches constant."""

@@ -474,15 +474,15 @@ def chat(
             override_profile = ProfileConfig(
                 provider=provider,
                 model=model,
-                temperature=settings.default_temperature,
-                max_tokens=settings.default_max_tokens,
+                temperature=settings.provider.default_temperature,
+                max_tokens=settings.provider.default_max_tokens,
                 **extra_fields,
             )
 
             # Replace profile loader to use the synthetic profile
             settings.load_profiles = lambda: {profile: override_profile}  # type: ignore[attr-defined]
-            settings.default_provider = provider
-            settings.default_model = model
+            settings.provider.default_provider = provider
+            settings.provider.default_model = model
 
         if actual_message:
             run_sync(
@@ -602,7 +602,7 @@ async def run_oneshot(
     shim: Optional[FrameworkShim] = None
     try:
         if tool_budget is not None:
-            settings.tool_call_budget = tool_budget
+            settings.tools.tool_call_budget = tool_budget
 
         if legacy_mode:
             # Legacy path: direct orchestrator creation (no framework features)
@@ -762,7 +762,7 @@ async def run_interactive(
             raise typer.Exit(1)
 
         if tool_budget is not None:
-            settings.tool_call_budget = tool_budget
+            settings.tools.tool_call_budget = tool_budget
 
         if legacy_mode:
             # Legacy path: direct orchestrator creation (no framework features)

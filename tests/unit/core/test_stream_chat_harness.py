@@ -99,7 +99,7 @@ def _make_orchestrator(provider: FakeProvider) -> AgentOrchestrator:
     settings.use_mcp_tools = False
     settings.analytics_log_file = None
     settings.analytics_enabled = False
-    settings.tool_call_budget = 300
+    settings.tools.tool_call_budget = 300
     settings.airgapped_mode = False
     settings.load_tool_config = lambda: {}
 

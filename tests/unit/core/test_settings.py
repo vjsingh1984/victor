@@ -151,10 +151,10 @@ class TestSettings:
         settings = Settings()
 
         # Note: default_provider is "ollama" in Settings class
-        assert settings.default_provider == "ollama"
-        assert settings.default_model == "qwen3-coder:30b"
-        assert settings.default_temperature == 0.7
-        assert settings.default_max_tokens == 4096
+        assert settings.provider.default_provider == "ollama"
+        assert settings.provider.default_model == "qwen3-coder:30b"
+        assert settings.provider.default_temperature == 0.7
+        assert settings.provider.default_max_tokens == 4096
         assert settings.log_level == "INFO"
         assert settings.airgapped_mode is False
         assert settings.stream_responses is True
@@ -611,7 +611,7 @@ class TestLoadSettings:
 
         assert isinstance(settings, Settings)
         # Note: default_provider is "ollama" in Settings class
-        assert settings.default_provider == "ollama"
+        assert settings.provider.default_provider == "ollama"
 
 
 class TestToolSelectionValidation:

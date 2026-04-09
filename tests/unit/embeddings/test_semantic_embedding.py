@@ -70,7 +70,7 @@ class TestSentenceTransformersEmbedding:
 
         selector = SemanticToolSelector()
         assert selector.embedding_provider == "sentence-transformers"
-        # Default model comes from settings.unified_embedding_model
+        # Default model comes from settings.search.unified_embedding_model
         # which defaults to BAAI/bge-small-en-v1.5 (or all-MiniLM-L6-v2 as fallback)
         assert selector.embedding_model in [DEFAULT_EMBEDDING_MODEL, "all-MiniLM-L6-v2"]
 

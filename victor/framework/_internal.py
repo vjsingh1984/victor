@@ -131,7 +131,7 @@ async def create_orchestrator_from_options(
     # Create OrchestratorFactory with provider
     provider_class = ProviderRegistry.get(provider)
     provider_instance = provider_class(
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -139,7 +139,7 @@ async def create_orchestrator_from_options(
     factory = OrchestratorFactory(
         settings=settings,
         provider=provider_instance,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
         profile_name=profile or "default",
@@ -151,7 +151,7 @@ async def create_orchestrator_from_options(
     agent = await factory.create_agent(
         mode="foreground",
         provider=provider,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         tools=tools,
         airgapped=airgapped,
         vertical=vertical,

@@ -15,7 +15,7 @@ from victor.providers.base import BaseProvider
 def create_mock_settings():
     """Create a mock settings object with all required attributes."""
     mock_settings = MagicMock(spec=Settings)
-    mock_settings.tool_call_budget = 300
+    mock_settings.tools.tool_call_budget = 300
     mock_settings.airgapped_mode = False
     mock_settings.use_semantic_tool_selection = False
     mock_settings.use_mcp_tools = False
@@ -23,7 +23,7 @@ def create_mock_settings():
     mock_settings.analytics_enabled = False
     mock_settings.show_cost_metrics = False
     mock_settings.load_tool_config.return_value = {}
-    mock_settings.unified_embedding_model = None
+    mock_settings.search.unified_embedding_model = None
     return mock_settings
 
 

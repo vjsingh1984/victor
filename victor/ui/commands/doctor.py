@@ -304,7 +304,7 @@ class DoctorChecks:
             # Check tool selection cache
             if (
                 hasattr(settings, "tool_selection_cache_enabled")
-                and settings.tool_selection_cache_enabled
+                and settings.tools.tool_selection_cache_enabled
             ):
                 self.add_check(
                     name="Performance: Tool Cache",

@@ -32,7 +32,7 @@ def mock_settings():
     # Recovery settings
     settings.recovery_blocked_consecutive_threshold = 4
     settings.recovery_blocked_total_threshold = 6
-    settings.tool_call_budget_warning_threshold = 250
+    settings.tools.tool_call_budget_warning_threshold = 250
     settings.max_consecutive_tool_calls = 8
     settings.use_recovery_handler = False
     settings.enable_context_compaction = False
@@ -41,7 +41,7 @@ def mock_settings():
     settings.recovery_timeout = 30.0
     # Tool settings
     settings.tool_timeout = 30.0
-    settings.tool_call_budget = 300
+    settings.tools.tool_call_budget = 300
     settings.tool_budget = 15
     settings.tool_selection_strategy = "hybrid"
     settings.semantic_weight = 0.7

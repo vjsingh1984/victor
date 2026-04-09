@@ -585,7 +585,7 @@ def _register_embedding_services(
     """
     from victor.storage.embeddings.service import EmbeddingService
 
-    model_name = settings.unified_embedding_model
+    model_name = settings.search.unified_embedding_model
 
     container.register(
         EmbeddingServiceProtocol,

@@ -363,7 +363,7 @@ class QueryEnhancementPipeline:
                 return False
 
             # Try to get provider
-            provider_name = self._config.provider or settings.default_provider
+            provider_name = self._config.provider or settings.provider.default_provider
             if provider_name:
                 ProviderRegistry.get(provider_name)
                 self._llm_available = True

@@ -77,7 +77,7 @@ class TestOrchestratorIntelligentHooks:
         settings.temperature = 0.7
         settings.max_tokens = 2048
         settings.log_level = "WARNING"
-        settings.tool_call_budget = 50
+        settings.tools.tool_call_budget = 50
         return settings
 
     @pytest.fixture
