@@ -195,6 +195,9 @@ def run_benchmark(
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
     ),
+    start_task: int = typer.Option(
+        0, "--start-task", help="Skip first N tasks (0-indexed, for targeting specific tasks)"
+    ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
     ),
@@ -464,6 +467,15 @@ async def _run_benchmark_async(
         harness.register_runner(runner)
 
         tasks = await runner.load_tasks(config)
+
+        # Skip tasks for targeted execution (--start-task)
+        if start_task > 0 and start_task < len(tasks):
+            skipped = tasks[:start_task]
+            tasks = tasks[start_task:]
+            console.print(
+                f"[dim]Skipped {len(skipped)} tasks (starting from task {start_task})[/]"
+            )
+
         progress.update(task, description=f"Loaded {len(tasks)} tasks")
 
         if not tasks:
