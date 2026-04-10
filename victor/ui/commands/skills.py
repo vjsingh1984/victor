@@ -31,18 +31,18 @@ def _build_registry():
 
     registry = SkillRegistry()
 
-    # Load from discovered verticals
+    # Load from discovered verticals via VerticalLoader
     try:
-        from victor.core.verticals.registry_manager import VerticalRegistryManager
+        from victor.core.verticals.vertical_loader import VerticalLoader
 
-        manager = VerticalRegistryManager()
-        for info in manager.list_verticals():
-            vertical_cls = info.get("class")
-            if vertical_cls and hasattr(vertical_cls, "get_skills"):
+        loader = VerticalLoader()
+        loader.discover_verticals()
+        for _name, vertical_cls in loader._discovered_verticals.items():
+            if hasattr(vertical_cls, "get_skills"):
                 try:
                     registry.from_vertical(vertical_cls)
                 except Exception:
-                    logger.debug("Failed to load skills from %s", info.get("name"))
+                    logger.debug("Failed to load skills from %s", _name)
     except Exception:
         logger.debug("Could not load verticals for skill discovery", exc_info=True)
 

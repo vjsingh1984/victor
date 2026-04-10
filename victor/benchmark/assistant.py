@@ -106,6 +106,49 @@ You are being evaluated on:
 """
 
     @classmethod
+    def get_skills(cls) -> list:
+        """Skills for benchmark task execution."""
+        from victor_sdk.skills import SkillDefinition
+
+        return [
+            SkillDefinition(
+                name="swe_bench_solve",
+                description="Solve a SWE-bench coding task: read issue, find files, implement fix, verify with tests",
+                category="benchmark",
+                prompt_fragment=(
+                    "SKILL: swe_bench_solve\n"
+                    "1. Read the issue/task description to understand the requirement\n"
+                    "2. Search the codebase for relevant files using grep and code_search\n"
+                    "3. Read the relevant source files and test files\n"
+                    "4. Implement the minimal fix that addresses the issue\n"
+                    "5. Run the test suite to verify the fix passes\n"
+                    "6. Generate a clean diff/patch of the changes"
+                ),
+                required_tools=["read", "grep", "edit", "shell"],
+                optional_tools=["code_search", "symbol", "refs", "git", "test"],
+                tags=frozenset({"benchmark", "swe-bench", "bug-fix"}),
+                max_tool_calls=40,
+            ),
+            SkillDefinition(
+                name="benchmark_analyze",
+                description="Analyze benchmark results: parse scores, compare runs, identify patterns",
+                category="benchmark",
+                prompt_fragment=(
+                    "SKILL: benchmark_analyze\n"
+                    "1. Read the benchmark output/results files\n"
+                    "2. Parse pass/fail counts and identify failing cases\n"
+                    "3. Compare against previous runs if available\n"
+                    "4. Identify patterns in failures (common modules, error types)\n"
+                    "5. Summarize findings with actionable next steps"
+                ),
+                required_tools=["read", "grep", "shell"],
+                optional_tools=["ls"],
+                tags=frozenset({"benchmark", "analysis", "metrics"}),
+                max_tool_calls=15,
+            ),
+        ]
+
+    @classmethod
     def get_stages(cls) -> Dict[str, StageDefinition]:
         """Benchmark-specific conversation stages.
 

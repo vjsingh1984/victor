@@ -123,9 +123,7 @@ class TestSkillRegistrySearch:
         from victor.framework.skills import SkillRegistry
 
         registry = SkillRegistry()
-        registry.register(
-            _make_skill("refactor", tags=frozenset({"code-quality", "cleanup"}))
-        )
+        registry.register(_make_skill("refactor", tags=frozenset({"code-quality", "cleanup"})))
         registry.register(_make_skill("deploy"))
         results = registry.search(query="cleanup")
         assert len(results) == 1

@@ -39,8 +39,7 @@ class SkillRegistry:
             return self._skills[name]
         except KeyError:
             raise KeyError(
-                f"Skill '{name}' not found. "
-                f"Available: {sorted(self._skills.keys())}"
+                f"Skill '{name}' not found. " f"Available: {sorted(self._skills.keys())}"
             )
 
     def get_optional(self, name: str) -> Optional[SkillDefinition]:
