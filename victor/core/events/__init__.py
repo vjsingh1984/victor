@@ -133,7 +133,6 @@ except ImportError:
 # Adapters for bridging with existing systems
 from victor.core.events.adapter import (
     victor_event_to_event as victor_event_to_event_simple,
-    event_to_victor_event as event_to_victor_event_simple,
     EventBusAdapter,
     TeamMessageBusAdapter,
 )
@@ -205,7 +204,6 @@ __all__ = [
     "register_lightweight_backends",
     # Adapters for bridging (simple versions)
     "victor_event_to_event_simple",
-    "event_to_victor_event_simple",
     "EventBusAdapter",
     "TeamMessageBusAdapter",
     # Migration utilities removed (migration complete)

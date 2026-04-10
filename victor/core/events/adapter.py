@@ -74,11 +74,6 @@ def victor_event_to_event(victor_event: "VictorEvent") -> MessagingEvent:
     )
 
 
-def event_to_victor_event(event: MessagingEvent) -> None:
-    """No-op stub — VictorEvent was removed, migration to MessagingEvent is complete."""
-    pass
-
-
 class EventBusAdapter:
     """Adapter to bridge legacy EventBus with protocol-based backends.
 
@@ -234,7 +229,6 @@ class TeamMessageBusAdapter:
 
 __all__ = [
     "victor_event_to_event",
-    "event_to_victor_event",
     "EventBusAdapter",
     "TeamMessageBusAdapter",
 ]
