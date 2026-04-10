@@ -294,6 +294,11 @@ class FrameworkShim:
             await matcher.initialize(registry)
             self._orchestrator._skill_matcher = matcher
 
+            # Attach analytics tracker
+            from victor.framework.skill_analytics import SkillAnalytics
+
+            self._orchestrator._skill_analytics = SkillAnalytics()
+
             logger.info(
                 "Skill auto-selection initialized: %d skills indexed",
                 len(registry.list_all()),

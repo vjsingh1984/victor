@@ -155,6 +155,9 @@ class SyncChatCoordinator:
                             "auto_skill": skill.name,
                             "auto_skill_score": round(score, 2),
                         }
+                        self._record_skill_analytics(
+                            [(skill.name, score)]
+                        )
                     else:
                         names = [s.name for s, _ in matches]
                         logger.info(
@@ -169,6 +172,11 @@ class SyncChatCoordinator:
                                 for s, sc in matches
                             ],
                         }
+                        self._record_skill_analytics(
+                            [(s.name, sc) for s, sc in matches]
+                        )
+                else:
+                    self._record_skill_miss()
             except Exception:
                 logger.debug("Skill auto-selection failed", exc_info=True)
 
@@ -204,6 +212,29 @@ class SyncChatCoordinator:
     # =====================================================================
     # Private Methods
     # =====================================================================
+
+    def _record_skill_analytics(self, selections: list) -> None:
+        """Record skill selection event in analytics."""
+        analytics = getattr(self._orchestrator, "_skill_analytics", None)
+        if analytics is None:
+            return
+        try:
+            if len(selections) == 1:
+                name, score = selections[0]
+                analytics.record_selection(name, score)
+            else:
+                analytics.record_multi_selection(selections)
+        except Exception:
+            pass
+
+    def _record_skill_miss(self) -> None:
+        """Record a skill miss event."""
+        analytics = getattr(self._orchestrator, "_skill_analytics", None)
+        if analytics is not None:
+            try:
+                analytics.record_miss()
+            except Exception:
+                pass
 
     @staticmethod
     def _attach_skill_metadata(response: Any, skill_info: Any) -> Any:

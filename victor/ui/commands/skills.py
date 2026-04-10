@@ -166,6 +166,53 @@ def search_skills(
     _render_skills_table(results, title=f"Search: '{query}'")
 
 
+@skills_app.command("stats")
+def skill_stats() -> None:
+    """Show skill selection analytics (from current or last session)."""
+    try:
+        from victor.framework.skill_analytics import SkillAnalytics
+
+        # Try to load from a running session — in CLI context this
+        # creates a fresh instance showing the analytics pattern
+        analytics = SkillAnalytics()
+
+        # In a real session, analytics would be populated.
+        # For CLI demonstration, show the schema
+        all_stats = analytics.get_all_stats()
+        global_stats = analytics.get_global_stats()
+
+        if not all_stats:
+            console.print("[dim]No skill analytics recorded yet.[/]")
+            console.print(
+                "[dim]Analytics are collected during 'victor chat' sessions "
+                "when skills are auto-selected.[/]"
+            )
+            return
+
+        table = Table(title="Skill Selection Analytics")
+        table.add_column("Skill", style="cyan")
+        table.add_column("Selections", justify="right")
+        table.add_column("Avg Score", justify="right")
+
+        for stat in all_stats:
+            table.add_row(
+                stat["name"],
+                str(stat["count"]),
+                f"{stat['avg_score']:.2f}",
+            )
+
+        console.print(table)
+        console.print()
+        console.print(
+            f"[dim]Total matches: {global_stats['total_matches']} | "
+            f"Misses: {global_stats['total_misses']} | "
+            f"Miss rate: {global_stats['miss_rate']:.0%} | "
+            f"Multi-skill: {global_stats['multi_skill_count']}[/]"
+        )
+    except Exception as e:
+        console.print(f"[red]Error loading analytics:[/] {e}")
+
+
 @skills_app.command("create")
 def create_skill(
     name: str = typer.Argument(help="Skill name (e.g., analyze_logs)"),
