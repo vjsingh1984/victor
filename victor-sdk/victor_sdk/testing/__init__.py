@@ -174,7 +174,10 @@ def assert_import_boundaries(
     return violations
 
 
+from victor_sdk.testing.fixtures import MockPluginContext  # noqa: E402
+
 __all__ = [
     "assert_valid_vertical",
     "assert_import_boundaries",
+    "MockPluginContext",
 ]
