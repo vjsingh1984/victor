@@ -176,9 +176,37 @@ class VerticalConfigRegistry:
         ],
     }
 
+    # Dynamic registry for vertical-provided configs (OCP extension point)
+    _registered_provider_hints: Dict[str, Dict[str, Any]] = {}
+    _registered_eval_criteria: Dict[str, List[str]] = {}
+
+    @classmethod
+    def register_vertical_config(
+        cls,
+        vertical: str,
+        provider_hints: Optional[Dict[str, Any]] = None,
+        evaluation_criteria: Optional[List[str]] = None,
+    ) -> None:
+        """Register configuration for a vertical dynamically.
+
+        Enables new verticals to provide their own provider hints and
+        evaluation criteria without modifying core code.
+
+        Args:
+            vertical: Vertical name
+            provider_hints: LLM provider selection hints
+            evaluation_criteria: Quality evaluation criteria
+        """
+        if provider_hints is not None:
+            cls._registered_provider_hints[vertical] = provider_hints
+        if evaluation_criteria is not None:
+            cls._registered_eval_criteria[vertical] = evaluation_criteria
+
     @classmethod
     def get_provider_hints(cls, vertical_name: str) -> Dict[str, Any]:
         """Get provider hints for a vertical.
+
+        Checks dynamic registry first, then falls back to built-in defaults.
 
         Args:
             vertical_name: Name of vertical (e.g., "coding", "research")
@@ -186,8 +214,11 @@ class VerticalConfigRegistry:
         Returns:
             Provider hints dictionary (copy to prevent mutation)
         """
+        # Check dynamic registry first
+        if vertical_name in cls._registered_provider_hints:
+            return cls._registered_provider_hints[vertical_name].copy()
+        # Fall back to built-in defaults
         if vertical_name not in cls._provider_hints:
-            # Fallback to default
             return cls._provider_hints["default"].copy()
         return cls._provider_hints[vertical_name].copy()
 
@@ -195,14 +226,19 @@ class VerticalConfigRegistry:
     def get_evaluation_criteria(cls, vertical_name: str) -> List[str]:
         """Get evaluation criteria for a vertical.
 
+        Checks dynamic registry first, then falls back to built-in defaults.
+
         Args:
             vertical_name: Name of vertical (e.g., "coding", "research")
 
         Returns:
             List of evaluation criteria (copy to prevent mutation)
         """
+        # Check dynamic registry first
+        if vertical_name in cls._registered_eval_criteria:
+            return cls._registered_eval_criteria[vertical_name].copy()
+        # Fall back to built-in defaults
         if vertical_name not in cls._evaluation_criteria:
-            # Fallback to default
             return cls._evaluation_criteria["default"].copy()
         return cls._evaluation_criteria[vertical_name].copy()
 

@@ -589,7 +589,7 @@ class TieredToolTemplate:
     # Standard mandatory tools - essential for any task across all verticals
     DEFAULT_MANDATORY: Set[str] = {"read", "ls", "grep"}
 
-    # Pre-configured vertical cores
+    # Pre-configured vertical cores (built-in defaults)
     VERTICAL_CORES: Dict[str, Set[str]] = {
         "coding": {"edit", "write", "shell", "git", "search", "overview"},
         "research": {"web_search", "web_fetch", "overview"},
@@ -598,7 +598,7 @@ class TieredToolTemplate:
         "rag": {"rag_search", "rag_query", "rag_list", "rag_stats", "rag_delete"},
     }
 
-    # Vertical-specific readonly_only_for_analysis settings
+    # Vertical-specific readonly_only_for_analysis settings (built-in defaults)
     VERTICAL_READONLY_DEFAULTS: Dict[str, bool] = {
         "coding": False,  # Coding often needs write tools
         "research": True,  # Research is primarily reading
@@ -606,6 +606,33 @@ class TieredToolTemplate:
         "data_analysis": False,  # Data analysis often writes results
         "rag": True,  # RAG is primarily reading/retrieval
     }
+
+    # Dynamic registry for vertical tool configs (OCP extension point)
+    # Verticals register via register_vertical_tools() at activation time.
+    # Takes precedence over VERTICAL_CORES/VERTICAL_READONLY_DEFAULTS.
+    _registered_verticals: Dict[str, Dict[str, Any]] = {}
+
+    @classmethod
+    def register_vertical_tools(
+        cls,
+        vertical: str,
+        core_tools: Set[str],
+        readonly_for_analysis: bool = True,
+    ) -> None:
+        """Register tool configuration for a vertical dynamically.
+
+        This enables new verticals to register their tool configs without
+        modifying core code (OCP compliance).
+
+        Args:
+            vertical: Vertical name
+            core_tools: Set of core tool names for this vertical
+            readonly_for_analysis: Whether to restrict writes in analysis mode
+        """
+        cls._registered_verticals[vertical] = {
+            "core_tools": core_tools,
+            "readonly_for_analysis": readonly_for_analysis,
+        }
 
     @classmethod
     def create(
@@ -638,14 +665,25 @@ class TieredToolTemplate:
 
     @classmethod
     def for_vertical(cls, vertical: str) -> Optional[TieredToolConfig]:
-        """Get pre-configured TieredToolConfig for a known vertical.
+        """Get TieredToolConfig for a vertical.
+
+        Checks dynamic registry first, then falls back to built-in defaults.
 
         Args:
-            vertical: Vertical name (coding, research, devops, data_analysis, rag)
+            vertical: Vertical name
 
         Returns:
             Configured TieredToolConfig or None if vertical not known
         """
+        # Check dynamic registry first (OCP extension point)
+        if vertical in cls._registered_verticals:
+            reg = cls._registered_verticals[vertical]
+            return cls.create(
+                vertical_core=set(reg["core_tools"]),
+                readonly_only_for_analysis=reg.get("readonly_for_analysis", True),
+            )
+
+        # Fall back to built-in defaults
         if vertical not in cls.VERTICAL_CORES:
             return None
 
