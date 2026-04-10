@@ -110,8 +110,11 @@ __all__ = [
     "VerticalConfig",  # noqa: F822
     "VerticalExtensions",  # noqa: F822
     # Tool dependency types
+    "BaseToolDependencyProvider",  # noqa: F822
     "ToolDependencyConfig",  # noqa: F822
     "ToolDependency",  # noqa: F822
+    "YAMLToolDependencyProvider",  # noqa: F822
+    "load_tool_dependency_yaml",  # noqa: F822
     "create_vertical_tool_dependency_provider",  # noqa: F822
     # Safety pattern types
     "SafetyExtensionProtocol",  # noqa: F822
@@ -208,8 +211,11 @@ def __getattr__(name: str):
         "VerticalConfig": "victor_sdk",
         "VerticalExtensions": "victor_sdk",
         # Tool dependency types
+        "BaseToolDependencyProvider": "victor.core.tool_dependency_base",
         "ToolDependencyConfig": "victor.core.tool_dependency_base",
         "ToolDependency": "victor.core.tool_types",
+        "YAMLToolDependencyProvider": "victor.core.tool_dependency_loader",
+        "load_tool_dependency_yaml": "victor.core.tool_dependency_loader",
         "create_vertical_tool_dependency_provider": "victor.core.tool_dependency_loader",
         # Safety pattern types
         "SafetyExtensionProtocol": "victor.core.verticals.protocols",
