@@ -10,19 +10,20 @@
 
 ```
                     SWE-bench Lite Pass Rate (20 tasks)
-  
+
+  DeepSeek Chat  ██████████████████████████████████████████████████████████████  75%  (15/20) ★ BEST
   GPT-5.4 Mini   ██████████████████████████████████████████████████████████  70%  (14/20)
   Grok 3 Mini    ████████████████████████████████████████████████████████    65%  (13/20)
-  DeepSeek Chat  ████████████████████████████                               30%  ( 6/20)
   Haiku 4.5      ████████████████                                           20%  ( 4/20)
                  ├─────────┼─────────┼─────────┼─────────┼─────────┤
                  0%       20%       40%       60%       80%      100%
 ```
 
-**Best overall**: GPT-5.4 Mini (70%) — enhanced with GEPA-evolved prompts  
-**Best value**: Grok 3 Mini Fast (65% at $0.30/1M tokens = 217 pts/$)  
-**GEPA impact**: +60pp on GPT-5.4 Mini (30% → 90% on 10-task subset)  
-**Haiku bottleneck**: 9 JSON syntax errors + 8 wrong file paths = 85% of failures
+**Best overall**: DeepSeek Chat (75%) — cheapest model, highest score with full fixes  
+**Best value**: DeepSeek Chat ($0.14/1M tokens, 75% = 536 pts/$)  
+**GEPA impact**: +10pp aggregate across 4 providers (36% → 46%)  
+**Infrastructure impact**: Working indexer + retry = +40pp for DeepSeek (35% → 75%)  
+**Key insight**: Framework fixes (indexer, retry) matter more than model choice
 
 ---
 
