@@ -1,0 +1,182 @@
+"""Adapts the async GEPAService to the sync PromptOptimizationStrategy protocol.
+
+The PromptOptimizerLearner expects a strategy with sync reflect() and mutate()
+methods. GEPAService provides these as sync methods already (using
+run_sync_in_thread internally), so this adapter primarily:
+
+1. Converts List[ExecutionTrace] → rich ASI text summary
+2. Delegates to GEPATierManager.get_service() for the current tier
+3. Tracks evolution deltas for auto-tier switching
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Any, Dict, List, Optional
+
+from victor.framework.rl.gepa_tier_manager import GEPATierManager
+
+logger = logging.getLogger(__name__)
+
+# Tool name → category mapping for per-tool-type GEPA evolution
+TOOL_CATEGORY_MAP: Dict[str, str] = {
+    "read": "exploration",
+    "ls": "exploration",
+    "list_directory": "exploration",
+    "code_search": "exploration",
+    "semantic_code_search": "exploration",
+    "overview": "exploration",
+    "graph": "analysis",
+    "architecture_summary": "analysis",
+    "edit": "mutation",
+    "write": "mutation",
+    "create_file": "mutation",
+    "bash": "execution",
+    "shell": "execution",
+    "git": "execution",
+    "run_tests": "execution",
+}
+
+
+def categorize_tool(tool_name: str) -> str:
+    """Map a tool name to its GEPA category."""
+    return TOOL_CATEGORY_MAP.get(tool_name, "general")
+
+
+class GEPAServiceStrategy:
+    """Adapts GEPAService to the PromptOptimizationStrategy protocol.
+
+    This is the strategy passed to PromptOptimizerLearner when
+    USE_GEPA_V2 is enabled.
+    """
+
+    def __init__(self, tier_manager: GEPATierManager):
+        self._tier_manager = tier_manager
+
+    def reflect(
+        self,
+        traces: List[Any],
+        section_name: str,
+        current_text: str,
+    ) -> str:
+        """Convert traces to ASI summary and call GEPA reflection."""
+        service = self._tier_manager.get_service()
+        traces_summary = self._format_traces_as_asi(traces)
+
+        # Prepend heuristic aggregates for context
+        heuristic = self._build_heuristic_summary(traces)
+        full_summary = f"{heuristic}\n\n{traces_summary}"
+
+        return service.reflect(full_summary, section_name, current_text)
+
+    def mutate(
+        self,
+        current_text: str,
+        reflection: str,
+        section_name: str,
+    ) -> str:
+        """Call GEPA mutation via current tier service."""
+        service = self._tier_manager.get_service()
+        return service.mutate(current_text, reflection, section_name)
+
+    def _format_traces_as_asi(self, traces: List[Any]) -> str:
+        """Convert ExecutionTrace list to rich ASI text summary.
+
+        This is the key difference from the old GEPAStrategy — we produce
+        a detailed per-session, per-tool-call narrative rather than just
+        aggregated failure counts.
+
+        Format:
+            Session s1 (action, ollama/qwen3):
+              [1] read("src/auth.py") → success (45ms)
+                  Reasoning: "I need to check the auth module..."
+              [2] edit("src/auth.py") → FAILED (12ms)
+                  Error: old_str not found
+                  Reasoning: "Now I'll fix the import..."
+              Result: FAILED (edit_mismatch)
+        """
+        lines: List[str] = []
+
+        for trace in traces[:20]:  # Limit to 20 sessions for context window
+            header = (
+                f"Session {trace.session_id[:8]} "
+                f"({trace.task_type}, {trace.provider}/{trace.model}):"
+            )
+            lines.append(header)
+
+            # Check if trace has detailed tool calls (enriched) or just counts
+            tool_calls = getattr(trace, "tool_call_details", None)
+            if tool_calls and isinstance(tool_calls, list):
+                for i, tc in enumerate(tool_calls[:10], 1):
+                    tool_name = getattr(tc, "tool_name", "?")
+                    success = getattr(tc, "success", True)
+                    duration = getattr(tc, "duration_ms", 0)
+                    status = "success" if success else "FAILED"
+                    args_summary = getattr(tc, "arguments_summary", "")
+
+                    line = f"  [{i}] {tool_name}({args_summary}) → {status}"
+                    if duration:
+                        line += f" ({duration:.0f}ms)"
+                    lines.append(line)
+
+                    reasoning = getattr(tc, "reasoning_before", "")
+                    if reasoning:
+                        lines.append(f'      Reasoning: "{reasoning[:200]}"')
+
+                    error = getattr(tc, "error_detail", "")
+                    if error and not success:
+                        lines.append(f"      Error: {error[:300]}")
+
+                    result_summary = getattr(tc, "result_summary", "")
+                    if result_summary and success:
+                        lines.append(f"      Result: {result_summary[:200]}")
+            else:
+                # Fallback for non-enriched traces (old format)
+                tc_count = getattr(trace, "tool_calls", 0)
+                if isinstance(tc_count, int):
+                    lines.append(f"  Tool calls: {tc_count}")
+                failures = getattr(trace, "tool_failures", {})
+                if failures:
+                    for cat, count in failures.items():
+                        lines.append(f"  Failures: {cat} x{count}")
+
+            # Session outcome
+            outcome = "SUCCESS" if trace.success else "FAILED"
+            score = getattr(trace, "completion_score", 0)
+            lines.append(f"  Outcome: {outcome} (score={score:.2f})")
+            lines.append("")
+
+        return "\n".join(lines) if lines else "No trace data available."
+
+    @staticmethod
+    def _build_heuristic_summary(traces: List[Any]) -> str:
+        """Build aggregated stats header (same as old GEPAStrategy.reflect)."""
+        total = len(traces)
+        successes = sum(1 for t in traces if t.success)
+        all_failures: Dict[str, int] = {}
+        total_tool_calls = 0
+        total_tokens = 0
+
+        for trace in traces:
+            tc = getattr(trace, "tool_calls", 0)
+            if isinstance(tc, int):
+                total_tool_calls += tc
+            elif isinstance(tc, list):
+                total_tool_calls += len(tc)
+            total_tokens += getattr(trace, "tokens_used", 0)
+            failures = getattr(trace, "tool_failures", {})
+            if isinstance(failures, dict):
+                for category, count in failures.items():
+                    all_failures[category] = all_failures.get(category, 0) + count
+
+        lines = [
+            f"Aggregate ({total} sessions):",
+            f"- Success rate: {successes}/{total} ({100*successes/max(total,1):.0f}%)",
+            f"- Avg tool calls: {total_tool_calls/max(total,1):.1f}",
+            f"- Avg tokens: {total_tokens/max(total,1):.0f}",
+        ]
+        if all_failures:
+            lines.append("- Top failures:")
+            for cat, count in sorted(all_failures.items(), key=lambda x: -x[1])[:5]:
+                lines.append(f"  {cat}: {count}")
+        return "\n".join(lines)
