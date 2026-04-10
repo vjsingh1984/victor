@@ -80,31 +80,17 @@ def create_symbol_store(
 
         return SqliteLanceDBStore(repo_root, **kwargs)
 
-    elif backend == "postgres+pgvector":
-        # Future implementation
+    elif backend == "proximadb":
+        # Future: ProximaDB provides vector + relational in a single engine
         raise NotImplementedError(
-            "postgres+pgvector backend not yet implemented. "
-            "Use 'sqlite+lancedb' for local development."
-        )
-
-    elif backend == "lancedb":
-        # Future implementation: LanceDB for both vectors and structured data
-        raise NotImplementedError(
-            "lancedb-only backend not yet implemented. "
-            "Use 'sqlite+lancedb' for local development."
-        )
-
-    elif backend == "duckdb+lancedb":
-        # Future implementation: DuckDB for analytical queries
-        raise NotImplementedError(
-            "duckdb+lancedb backend not yet implemented. "
-            "Use 'sqlite+lancedb' for local development."
+            "proximadb backend planned but not yet available. "
+            "Use 'sqlite+lancedb' (the default and recommended backend)."
         )
 
     else:
         raise ValueError(
             f"Unknown backend: {backend}. "
-            f"Supported: sqlite+lancedb, postgres+pgvector, lancedb, duckdb+lancedb"
+            f"Supported: sqlite+lancedb (default), proximadb (planned)"
         )
 
 
