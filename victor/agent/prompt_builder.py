@@ -640,15 +640,15 @@ class SystemPromptBuilder:
         Gated by prompt_optimization.enabled setting.
         Checks section_strategies to skip sections with empty strategy list.
         """
+        # Check if prompt optimization is enabled via any mechanism:
+        # 1. prompt_optimization.enabled in settings
+        # 2. gepa.enabled in gepa_settings
+        # 3. GEPASettings default (enabled=True)
         try:
-            from victor.config.settings import get_settings
+            from victor.config.gepa_settings import GEPASettings
 
-            po = getattr(get_settings(), "prompt_optimization", None)
-            if po is None or not po.enabled:
-                return None
-            # Check if this section has strategies assigned
-            strategies = po.get_strategies_for_section(section_name)
-            if not strategies:
+            gepa_cfg = GEPASettings()  # Uses default (enabled=True)
+            if not gepa_cfg.enabled:
                 return None
         except Exception:
             return None

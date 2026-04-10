@@ -391,6 +391,8 @@ class PromptOptimizerLearner(BaseLearner):
         max_prompt_chars: int = 1500,
     ):
         self._strategy: PromptOptimizationStrategy = strategy or GEPAStrategy()
+        self._extra_strategies: Dict[str, List["PromptOptimizationStrategy"]] = {}
+        # Section-specific strategy overrides (e.g., FEW_SHOT_EXAMPLES → MIPROv2)
         self._candidates: Dict[str, List[PromptCandidate]] = {}
         self._use_pareto = use_pareto
         self._max_prompt_chars = max_prompt_chars
@@ -399,6 +401,31 @@ class PromptOptimizerLearner(BaseLearner):
         self._load_candidates()
         if self._use_pareto:
             self._init_pareto_frontiers()
+        self._init_section_strategies()
+
+    def _init_section_strategies(self) -> None:
+        """Initialize section-specific strategies from config."""
+        try:
+            from victor.framework.rl.learners.strategies import (
+                MIPROv2Strategy,
+                CoTDistillationStrategy,
+            )
+
+            # FEW_SHOT_EXAMPLES uses MIPROv2 (mine demonstrations)
+            self._extra_strategies["FEW_SHOT_EXAMPLES"] = [MIPROv2Strategy()]
+
+            # ASI guidance uses GEPA (default) + CoT distillation (layered)
+            self._extra_strategies["ASI_TOOL_EFFECTIVENESS_GUIDANCE"] = [
+                self._strategy,  # GEPA first
+                CoTDistillationStrategy(),  # CoT layered on top
+            ]
+
+            logger.debug(
+                "Section strategies initialized: %s",
+                {k: [type(s).__name__ for s in v] for k, v in self._extra_strategies.items()},
+            )
+        except ImportError:
+            logger.debug("Strategy imports failed, using default GEPA only")
 
     def _ensure_tables(self) -> None:
         """Create the prompt candidate table and GEPA v2 extensions."""
@@ -569,12 +596,17 @@ class PromptOptimizerLearner(BaseLearner):
             )
             return None
 
-        # Reflect
-        reflection = self._strategy.reflect(traces, section_name, current_text)
-        logger.info("GEPA reflection for '%s':\n%s", section_name, reflection)
+        # Get strategies for this section (section-specific or default)
+        strategies = self._extra_strategies.get(section_name, [self._strategy])
 
-        # Mutate
-        new_text = self._strategy.mutate(current_text, reflection, section_name)
+        # Apply strategies sequentially (layered composition)
+        new_text = current_text
+        for strat in strategies:
+            strat_name = type(strat).__name__
+            reflection = strat.reflect(traces, section_name, new_text)
+            if reflection:
+                logger.info("%s reflection for '%s':\n%s", strat_name, section_name, reflection[:200])
+                new_text = strat.mutate(new_text, reflection, section_name)
         if new_text == current_text:
             logger.info("Mutation produced no change for '%s'", section_name)
             return None
