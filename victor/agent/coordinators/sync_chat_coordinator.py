@@ -125,6 +125,23 @@ class SyncChatCoordinator:
         Returns:
             CompletionResponse with complete response
         """
+        # Auto-select skill if matcher is available on the orchestrator
+        if (
+            self._orchestrator
+            and hasattr(self._orchestrator, "_skill_matcher")
+            and self._orchestrator._skill_matcher is not None
+        ):
+            try:
+                match_result = self._orchestrator._skill_matcher.match_sync(user_message)
+                if match_result:
+                    skill, score = match_result
+                    logger.info(
+                        "Auto-selected skill: %s (score=%.2f)", skill.name, score
+                    )
+                    self._orchestrator.inject_skill(skill)
+            except Exception:
+                logger.debug("Skill auto-selection failed", exc_info=True)
+
         # Auto-detect planning via QueryClassifier when use_planning is None
         if use_planning is None:
             if self._query_classifier:

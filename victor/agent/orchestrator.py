@@ -2115,6 +2115,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return result
 
+    def inject_skill(self, skill: Any) -> None:
+        """Inject a skill's prompt fragment into the current system prompt.
+
+        Called by the chat coordinator when auto-skill-selection matches
+        a skill to the user's message.
+
+        Args:
+            skill: A SkillDefinition with name, description, prompt_fragment.
+        """
+        skill_prompt = (
+            f"ACTIVE SKILL: {skill.name}\n"
+            f"Description: {skill.description}\n"
+            f"{skill.prompt_fragment}\n\n"
+        )
+        self._system_prompt = skill_prompt + (self._system_prompt or "")
+
+        # Sync to conversation's live message
+        if hasattr(self, "conversation") and self.conversation is not None:
+            self.conversation.system_prompt = self._system_prompt
+            if self.conversation._system_added and self.conversation._messages:
+                if self.conversation._messages[0].role == "system":
+                    from victor.agent.message_history import Message
+
+                    self.conversation._messages[0] = Message(
+                        role="system", content=self._system_prompt
+                    )
+
+        logger.info("Injected skill '%s' into system prompt", skill.name)
+
     def update_system_prompt_for_query(self, query_classification=None) -> None:
         """Rebuild system prompt with query-specific classification context.
 

@@ -229,9 +229,77 @@ class FrameworkShim:
         if self._enable_observability:
             self._wire_observability()
 
+        # Step 4: Initialize skill auto-selection
+        await self._initialize_skill_matcher()
+
         logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
 
         return self._orchestrator
+
+    async def _initialize_skill_matcher(self) -> None:
+        """Initialize embedding-based skill auto-selection on the orchestrator.
+
+        Discovers all skills from verticals + entry points + user YAML,
+        pre-embeds them, and attaches the matcher to the orchestrator.
+        Silently skips if disabled or on any error.
+        """
+        try:
+            # Check if auto-selection is enabled via settings
+            if not getattr(self._settings, "skill_auto_select_enabled", True):
+                return
+
+            from victor.framework.skill_matcher import SkillMatcher
+            from victor.framework.skills import SkillRegistry
+
+            registry = SkillRegistry()
+
+            # Load from discovered verticals
+            try:
+                from victor.core.verticals.vertical_loader import VerticalLoader
+
+                loader = VerticalLoader()
+                loader.discover_verticals()
+                for _name, vertical_cls in loader._discovered_verticals.items():
+                    if hasattr(vertical_cls, "get_skills"):
+                        try:
+                            registry.from_vertical(vertical_cls)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            # Load from entry points + user YAML
+            try:
+                registry.from_entry_points()
+            except Exception:
+                pass
+            try:
+                registry.from_user_skills()
+            except Exception:
+                pass
+
+            if not registry.list_all():
+                return
+
+            # Build thresholds from settings
+            high_t = getattr(self._settings, "skill_auto_select_high_threshold", 0.65)
+            low_t = getattr(self._settings, "skill_auto_select_low_threshold", 0.45)
+            use_edge = getattr(self._settings, "skill_auto_select_use_edge_fallback", True)
+
+            matcher = SkillMatcher(
+                high_threshold=high_t,
+                low_threshold=low_t,
+                use_edge_fallback=use_edge,
+            )
+            await matcher.initialize(registry)
+            self._orchestrator._skill_matcher = matcher
+
+            logger.info(
+                "Skill auto-selection initialized: %d skills indexed",
+                len(registry.list_all()),
+            )
+        except Exception:
+            logger.debug("Skill auto-selection initialization skipped", exc_info=True)
 
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.
