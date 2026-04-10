@@ -23,12 +23,11 @@ from __future__ import annotations
 
 from typing import Dict
 
-from victor.core.mode_config import (
-    ModeConfig,
+from victor.framework.extensions import (
     ModeConfigRegistry,
-    ModeDefinition,
     RegistryBasedModeConfigProvider,
 )
+from victor_sdk.verticals.mode_config import ModeConfig, ModeDefinition
 
 # =============================================================================
 # Data Analysis-Specific Modes (Registered with Central Registry)
