@@ -92,7 +92,7 @@ class FileEditor:
             auto_backup: Automatically backup files before editing
             console: Rich console for output
         """
-        from victor.config.settings import get_project_paths
+        from victor_coding.compat.settings import get_project_paths
 
         self.backup_dir = Path(backup_dir or get_project_paths().backups_dir)
         self.backup_dir.mkdir(parents=True, exist_ok=True)

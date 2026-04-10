@@ -128,7 +128,7 @@ class ProximaDBProvider(BaseEmbeddingProvider):
             persist_dir.mkdir(parents=True, exist_ok=True)
             print(f"Using persistent storage: {persist_dir}")
         else:
-            from victor.config.settings import get_project_paths
+            from victor_coding.compat.settings import get_project_paths
 
             persist_dir = get_project_paths().global_embeddings_dir / "proximadb"
             persist_dir.mkdir(parents=True, exist_ok=True)

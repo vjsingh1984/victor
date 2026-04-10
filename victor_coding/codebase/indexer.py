@@ -2966,7 +2966,7 @@ class CodebaseIndex:
                 config = {}
 
             # Load settings for defaults
-            from victor.config.settings import get_project_paths, load_settings
+            from victor_coding.compat.settings import get_project_paths, load_settings
 
             settings = load_settings()
             default_persist_dir = get_project_paths(self.root).embeddings_dir

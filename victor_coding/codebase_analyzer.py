@@ -60,7 +60,7 @@ except ImportError:
             return True
         return any(skip_dir in path.parts for skip_dir in skip_dirs)
 
-from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
+from victor_coding.compat.settings import VICTOR_CONTEXT_FILE, get_project_paths
 from victor_sdk.utils.ast_helpers import (
     extract_base_classes,
     extract_imports,
@@ -1774,7 +1774,7 @@ def _collect_embedding_status(root_path: Optional[str] = None) -> Optional[Dict[
 
     # Optional: inspect code embedding store (LanceDB) for metadata richness
     try:
-        from victor.config.settings import get_project_paths, load_settings
+        from victor_coding.compat.settings import get_project_paths, load_settings
 
         settings = load_settings()
         default_dir = get_project_paths(root).embeddings_dir
@@ -3064,7 +3064,7 @@ async def generate_enhanced_init_md(
     if not graph_insights.get("has_graph") and auto_index:
         progress("graph", "No graph data - building index automatically...")
         try:
-            from victor.config.settings import load_settings
+            from victor_coding.compat.settings import load_settings
             from victor.tools.code_search_tool import _get_or_build_index
 
             root = Path(root_path).resolve() if root_path else Path.cwd()
@@ -3212,10 +3212,10 @@ async def generate_enhanced_init_md(
     progress("deep", "Enhancing with LLM analysis...")
 
     try:
-        from victor.config.settings import Settings
+        from victor_coding.compat.settings import load_settings as _load
         from victor.providers.registry import ProviderRegistry
 
-        settings = Settings()
+        settings = _load()
         provider_name = settings.default_provider
         model_name = settings.default_model
         provider_settings = settings.get_provider_settings(provider_name)

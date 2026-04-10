@@ -185,7 +185,7 @@ class SymbolStore:
     @property
     def _db_path(self) -> Path:
         """Path to SQLite database (shared with conversation.db)."""
-        from victor.config.settings import get_project_paths
+        from victor_coding.compat.settings import get_project_paths
 
         # Use the same database as conversation history for consolidation
         return get_project_paths(self.root).conversation_db
