@@ -2795,10 +2795,10 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
             # Optional richer graph analytics
             try:
                 from victor.tools.graph_tool import GraphAnalyzer
-                from victor.storage.graph.sqlite_store import SqliteGraphStore
+                from victor_coding.codebase.graph.registry import create_graph_store
 
                 ga = GraphAnalyzer()
-                store = SqliteGraphStore(project_path=root)
+                store = create_graph_store(project_path=str(root))
                 nodes = await store.get_all_nodes()
                 edges = await store.get_all_edges()
                 for n in nodes:

@@ -66,8 +66,13 @@ class EmbeddingConfig(BaseModel):
     )
 
 
-# Import canonical EmbeddingSearchResult from storage.vector_stores.base
-from victor.storage.vector_stores.base import EmbeddingSearchResult
+# SDK-compatible embedding search result (no victor-ai dependency)
+try:
+    from victor_sdk.verticals.protocols.storage import (
+        EmbeddingSearchResultData as EmbeddingSearchResult,
+    )
+except ImportError:
+    from victor.storage.vector_stores.base import EmbeddingSearchResult  # type: ignore[no-redef]
 
 # Public search result type for this module
 __all_search__ = ["EmbeddingSearchResult"]

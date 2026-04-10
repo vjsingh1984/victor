@@ -48,7 +48,6 @@ from victor_coding.codebase.unified_extractor import UnifiedSymbolExtractor, Enr
 from victor_coding.languages.registry import get_language_registry
 from victor_coding.languages.tiers import get_tier, LanguageTier
 from victor_coding.codebase.graph.registry import create_graph_store
-from victor.storage.graph.sqlite_store import SqliteGraphStore
 from victor_coding.codebase.symbol_resolver import SymbolResolver
 from victor_sdk.utils.ast_helpers import (
     STDLIB_MODULES,

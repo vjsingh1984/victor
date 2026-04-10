@@ -48,7 +48,7 @@ from victor.framework.enrichment import (
 )
 
 if TYPE_CHECKING:
-    from victor.storage.graph.protocol import GraphStoreProtocol, GraphNode
+    from victor_sdk.verticals.protocols.storage import GraphStoreProtocol, GraphNodeData as GraphNode
 
 logger = logging.getLogger(__name__)
 
