@@ -125,22 +125,52 @@ class SyncChatCoordinator:
         Returns:
             CompletionResponse with complete response
         """
-        # Auto-select skill if matcher is available on the orchestrator
+        # Auto-select skill(s) if matcher is available on the orchestrator
+        skill_match_info = None
         if (
             self._orchestrator
             and hasattr(self._orchestrator, "_skill_matcher")
             and self._orchestrator._skill_matcher is not None
+            and not getattr(self._orchestrator, "_skill_auto_disabled", False)
+            and not getattr(self._orchestrator, "_manual_skill_active", False)
         ):
             try:
-                match_result = self._orchestrator._skill_matcher.match_sync(user_message)
-                if match_result:
-                    skill, score = match_result
-                    logger.info(
-                        "Auto-selected skill: %s (score=%.2f)", skill.name, score
-                    )
-                    self._orchestrator.inject_skill(skill)
+                matches = self._orchestrator._skill_matcher.match_multiple_sync(
+                    user_message
+                )
+                if matches:
+                    if len(matches) == 1:
+                        skill, score = matches[0]
+                        logger.info(
+                            "Auto-selected skill: %s (score=%.2f)",
+                            skill.name,
+                            score,
+                        )
+                        self._orchestrator.inject_skill(skill)
+                        skill_match_info = {
+                            "auto_skill": skill.name,
+                            "auto_skill_score": round(score, 2),
+                        }
+                    else:
+                        names = [s.name for s, _ in matches]
+                        logger.info(
+                            "Auto-selected %d skills: %s",
+                            len(matches),
+                            " → ".join(names),
+                        )
+                        self._orchestrator.inject_skills(matches)
+                        skill_match_info = {
+                            "auto_skills": [
+                                {"name": s.name, "score": round(sc, 2)}
+                                for s, sc in matches
+                            ],
+                        }
             except Exception:
                 logger.debug("Skill auto-selection failed", exc_info=True)
+
+        # Reset manual skill flag after use
+        if getattr(self._orchestrator, "_manual_skill_active", False):
+            self._orchestrator._manual_skill_active = False
 
         # Auto-detect planning via QueryClassifier when use_planning is None
         if use_planning is None:
@@ -152,20 +182,37 @@ class SyncChatCoordinator:
                 ):
                     self._orchestrator.update_system_prompt_for_query(classification)
                 if classification.should_plan:
-                    return await self._chat_with_planning(user_message)
+                    response = await self._chat_with_planning(user_message)
+                    return self._attach_skill_metadata(response, skill_match_info)
             else:
                 # Fallback to keyword heuristic
                 if self._should_use_planning(user_message):
-                    return await self._chat_with_planning(user_message)
+                    response = await self._chat_with_planning(user_message)
+                    return self._attach_skill_metadata(response, skill_match_info)
         elif use_planning and self._should_use_planning(user_message):
-            return await self._chat_with_planning(user_message)
+            response = await self._chat_with_planning(user_message)
+            return self._attach_skill_metadata(response, skill_match_info)
 
         # Use execution coordinator for agentic loop
-        return await self._execution_coordinator.execute_agentic_loop(user_message)
+        response = await self._execution_coordinator.execute_agentic_loop(user_message)
+        return self._attach_skill_metadata(response, skill_match_info)
 
     # =====================================================================
     # Private Methods
     # =====================================================================
+
+    @staticmethod
+    def _attach_skill_metadata(response: Any, skill_info: Any) -> Any:
+        """Attach skill match metadata to response if available."""
+        if skill_info and response is not None:
+            if not hasattr(response, "metadata") or response.metadata is None:
+                try:
+                    response.metadata = {}
+                except (AttributeError, TypeError):
+                    return response
+            if isinstance(response.metadata, dict):
+                response.metadata.update(skill_info)
+        return response
 
     def _should_use_planning(self, user_message: str) -> bool:
         """Determine if planning should be used for this task.

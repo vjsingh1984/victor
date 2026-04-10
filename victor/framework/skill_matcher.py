@@ -22,6 +22,8 @@ from victor_sdk.skills import SkillDefinition
 
 logger = logging.getLogger(__name__)
 
+PHASE_ORDER = {"diagnostic": 0, "action": 1, "verification": 2, "documentation": 3}
+
 # Lazy imports to avoid circular deps and heavy imports at module level
 FeatureFlag: Any = None
 decide_sync: Any = None
@@ -155,6 +157,65 @@ class SkillMatcher:
                 return edge_result
 
         return (skill, top_score)
+
+    def match_multiple_sync(
+        self,
+        user_message: str,
+        max_skills: int = 3,
+    ) -> List[Tuple[SkillDefinition, float]]:
+        """Find multiple matching skills, ordered by phase then score.
+
+        Returns:
+            List of (skill, score) tuples ordered for execution.
+            Empty list if no matches above threshold.
+        """
+        if not self._initialized or not self._skills:
+            return []
+
+        results = self._collection.search_sync(
+            user_message,
+            top_k=min(max_skills + 2, 6),
+            threshold=self._low_threshold,
+        )
+        if not results:
+            return []
+
+        # Resolve to SkillDefinition objects
+        candidates = []
+        for item, score in results:
+            skill = self._skills.get(item.id)
+            if skill:
+                candidates.append((skill, score))
+
+        if not candidates:
+            return []
+
+        # Single dominant match — return just that one
+        if len(candidates) == 1:
+            return [candidates[0]]
+        if (
+            candidates[0][1] >= self._high_threshold
+            and candidates[1][1] < self._low_threshold + 0.05
+        ):
+            return [candidates[0]]
+
+        # Multiple viable candidates — order by phase then score
+        ordered = self._order_by_phase(candidates)
+        return ordered[:max_skills]
+
+    @staticmethod
+    def _order_by_phase(
+        candidates: List[Tuple[SkillDefinition, float]],
+    ) -> List[Tuple[SkillDefinition, float]]:
+        """Order skills by phase (diagnostic→action→verification→documentation),
+        then by score within same phase."""
+        return sorted(
+            candidates,
+            key=lambda pair: (
+                PHASE_ORDER.get(getattr(pair[0], "phase", "action"), 1),
+                -pair[1],
+            ),
+        )
 
     def _edge_llm_decide(
         self,

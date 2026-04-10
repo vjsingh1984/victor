@@ -26,6 +26,8 @@ class DecisionType(str, Enum):
     TOOL_SELECTION = "tool_selection"
     PROMPT_FOCUS = "prompt_focus"
     STAGE_DETECTION = "stage_detection"
+    SKILL_SELECTION = "skill_selection"
+    MULTI_SKILL_DECOMPOSITION = "multi_skill_decomposition"
 
 
 class TaskCompletionDecision(BaseModel):

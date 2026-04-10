@@ -51,6 +51,31 @@ chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-s
 console = Console()
 
 
+def _display_skill_preview(con: Console, agent: Any, message: str) -> None:
+    """Show skill auto-selection feedback before the LLM response.
+
+    Does a preview match (deterministic, same as coordinator will use)
+    to display which skill(s) will be activated.
+    """
+    matcher = getattr(agent, "_skill_matcher", None)
+    if matcher is None or not getattr(matcher, "_initialized", False):
+        return
+    if getattr(agent, "_skill_auto_disabled", False):
+        return
+    try:
+        matches = matcher.match_multiple_sync(message)
+        if not matches:
+            return
+        if len(matches) == 1:
+            skill, score = matches[0]
+            con.print(f"[dim]\U0001f3af Skill: {skill.name} ({score:.2f})[/]")
+        else:
+            names = " \u2192 ".join(s.name for s, _ in matches)
+            con.print(f"[dim]\U0001f3af Skills: {names}[/]")
+    except Exception:
+        pass
+
+
 @chat_app.callback(invoke_without_command=True)
 def chat(
     ctx: typer.Context,
@@ -656,6 +681,9 @@ async def run_oneshot(
 
         # Planning mode requires non-streaming (plan generation → step execution → summary)
         use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
+
+        # Display skill auto-selection feedback before response
+        _display_skill_preview(console, agent, message)
 
         if use_streaming:
             from victor.ui.rendering import (
