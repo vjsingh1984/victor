@@ -516,6 +516,22 @@ benchmark = "victor.benchmark:plugin"
 # registered verticals at runtime.
 # =============================================================================
 
+# =============================================================================
+# Skill Registration (for verticals and third-party packages)
+# =============================================================================
+# Skills are composable units of expertise that bind prompts + tools.
+# Verticals and external packages can register skills via entry points:
+#
+#   [project.entry-points."victor.skills"]
+#   debug = "my_package.skills:debug_skill"
+#   refactor = "my_package.skills:refactor_skill"
+#
+# Each entry point should resolve to a SkillDefinition instance or a
+# callable returning one or a list of SkillDefinition objects.
+# =============================================================================
+[project.entry-points."victor.skills"]
+# Built-in skills will be registered here as they are created
+
 [tool.setuptools.packages.find]
 include = ["victor", "victor.*"]
 exclude = ["tests*", "docs*", "victor_test*"]
