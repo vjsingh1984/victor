@@ -577,6 +577,8 @@ async def _run_benchmark_async(
                 )
             workspace_manager = SWEBenchWorkspaceManager()
 
+            _warmed_repos: set = set()  # Track repos that have been pre-warmed this session
+
             async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
                 """Run agent on task and return generated code with metrics."""
                 cached_repo = workspace_manager.get_cached_repo_path(benchmark_task)
@@ -612,22 +614,28 @@ async def _run_benchmark_async(
 
                 # Pre-warm code_search index BEFORE task timer starts.
                 # This is a fixed cost — NOT deducted from the per-task timeout.
-                # Without pre-warm, code_search calls during the task will
-                # try to build the index on-the-fly and timeout repeatedly.
-                try:
-                    from victor.tools.code_search_tool import _get_or_build_index
-                    from victor.config.settings import load_settings
+                # Only do full pre-warm once per repo; subsequent tasks skip.
+                repo_key = str(work_dir) if work_dir else ""
+                if repo_key in _warmed_repos:
+                    logger.info("Index already warmed for %s, skipping pre-warm", work_dir.name if work_dir else "?")
+                    console.print("  Code search index pre-warmed (cached)")
+                else:
+                    try:
+                        from victor.tools.code_search_tool import _get_or_build_index
+                        from victor.config.settings import load_settings
 
-                    _prewarm_settings = load_settings()
-                    await asyncio.wait_for(
-                        _get_or_build_index(work_dir, _prewarm_settings, force_reindex=False),
-                        timeout=300,  # Allow up to 5 min — this is outside task timer
-                    )
-                    console.print("  Code search index pre-warmed")
-                except asyncio.TimeoutError:
-                    logger.warning("Index pre-warm timed out after 300s, code_search may be slow")
-                except Exception as e:
-                    logger.debug(f"Index pre-warm skipped: {e}")
+                        _prewarm_settings = load_settings()
+                        await asyncio.wait_for(
+                            _get_or_build_index(work_dir, _prewarm_settings, force_reindex=False),
+                            timeout=300,  # Allow up to 5 min — outside task timer
+                        )
+                        _warmed_repos.add(repo_key)
+                        console.print("  Code search index pre-warmed")
+                    except asyncio.TimeoutError:
+                        logger.warning("Index pre-warm timed out after 300s, code_search may be slow")
+                        _warmed_repos.add(repo_key)  # Don't retry on next task
+                    except Exception as e:
+                        logger.debug(f"Index pre-warm skipped: {e}")
 
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
