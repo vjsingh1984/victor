@@ -173,6 +173,38 @@ class TieredDecisionService:
             self._failed_tiers.add(tier)
             return None
 
+    async def decide(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> DecisionResult:
+        """Async version — delegates to decide_sync for compatibility."""
+        return self.decide_sync(
+            decision_type,
+            context,
+            heuristic_result=heuristic_result,
+            heuristic_confidence=heuristic_confidence,
+        )
+
+    async def decide_async(
+        self,
+        decision_type: DecisionType,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> DecisionResult:
+        """Async alias for decide()."""
+        return await self.decide(
+            decision_type,
+            context,
+            heuristic_result=heuristic_result,
+            heuristic_confidence=heuristic_confidence,
+        )
+
     def get_metrics(self) -> Dict[str, Any]:
         """Export metrics from all active tier services."""
         return {
@@ -180,3 +212,19 @@ class TieredDecisionService:
             "failed_tiers": list(self._failed_tiers),
             "routing": dict(self._tier_routing),
         }
+
+
+def create_tiered_decision_service(
+    config: Optional[DecisionServiceSettings] = None,
+) -> Optional["TieredDecisionService"]:
+    """Factory function to create a TieredDecisionService.
+
+    Returns None if disabled in settings.
+    """
+    if config is None:
+        config = DecisionServiceSettings()
+
+    if not config.enabled:
+        return None
+
+    return TieredDecisionService(config)
