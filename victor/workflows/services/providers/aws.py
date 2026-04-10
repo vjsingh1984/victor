@@ -175,7 +175,7 @@ class AWSServiceProvider(BaseServiceProvider):
 
     async def get_logs(self, handle: ServiceHandle, tail: int = 100) -> str:
         """Get CloudWatch logs for AWS service."""
-        # TODO: Implement CloudWatch log retrieval
+        # CloudWatch log retrieval — requires boto3, not yet implemented
         return "[AWS CloudWatch logs - use AWS Console or CLI]"
 
     async def _run_command_in_service(

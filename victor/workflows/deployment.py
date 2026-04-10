@@ -1341,7 +1341,7 @@ class RemoteDeploymentHandler(DeploymentHandler):
     ) -> Dict[str, Any]:
         """Execute node on remote server."""
         logger.debug(f"Executing node {node.id} remotely")
-        # TODO: HTTP/gRPC to remote
+        # Remote execution via HTTP/gRPC — future distributed feature
         return state
 
     async def cleanup(self) -> None:

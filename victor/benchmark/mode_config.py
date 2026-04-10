@@ -114,7 +114,7 @@ class BenchmarkModeConfig(BaseModeConfigProvider, ModeHelperMixin):
                 "investigation": 20,
             }
         """
-        # TODO: Define benchmark-specific task budgets
+        # Benchmark task budgets — extend as needed per vertical requirements
         return {
             # Quick tasks
             "quick": 10,
