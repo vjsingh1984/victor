@@ -29,14 +29,16 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Type
 
-from victor.core.verticals.base import StageDefinition, VerticalBase, VerticalConfig
-from victor.core.verticals.protocols import (
+from victor.framework.extensions import (
     MiddlewareProtocol,
-    SafetyExtensionProtocol,
-    PromptContributorProtocol,
     ModeConfigProviderProtocol,
-    ToolDependencyProviderProtocol,
+    PromptContributorProtocol,
+    SafetyExtensionProtocol,
+    StageDefinition,
     TieredToolConfig,
+    ToolDependencyProviderProtocol,
+    VerticalBase,
+    VerticalConfig,
     VerticalExtensions,
 )
 from victor.framework.tool_naming import ToolNames

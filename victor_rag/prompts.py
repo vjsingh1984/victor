@@ -16,8 +16,7 @@
 
 from typing import Dict, List, Optional
 
-from victor.core.vertical_types import TaskTypeHint
-from victor.core.verticals.protocols import PromptContributorProtocol
+from victor.framework.extensions import PromptContributorProtocol, TaskTypeHint
 
 
 class RAGPromptContributor(PromptContributorProtocol):
