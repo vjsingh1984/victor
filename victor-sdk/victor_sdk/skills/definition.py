@@ -43,6 +43,7 @@ class SkillDefinition:
     tags: FrozenSet[str] = field(default_factory=frozenset)
     max_tool_calls: int = 20
     version: str = "1.0.0"
+    phase: str = "action"  # "diagnostic", "action", "verification", "documentation"
 
     @property
     def all_tools(self) -> Set[str]:
@@ -61,6 +62,7 @@ class SkillDefinition:
             "tags": sorted(self.tags),
             "max_tool_calls": self.max_tool_calls,
             "version": self.version,
+            "phase": self.phase,
         }
 
     @classmethod
@@ -78,4 +80,5 @@ class SkillDefinition:
             tags=tags,
             max_tool_calls=data.get("max_tool_calls", 20),
             version=data.get("version", "1.0.0"),
+            phase=data.get("phase", "action"),
         )

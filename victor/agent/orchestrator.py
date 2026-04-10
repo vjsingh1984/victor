@@ -2144,6 +2144,54 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         logger.info("Injected skill '%s' into system prompt", skill.name)
 
+    def inject_skills(self, skills: List[Any]) -> None:
+        """Inject multiple skills' prompt fragments into the system prompt.
+
+        Skills are composed in order (first = highest priority). Caps at 3
+        to respect prompt budget. Uses arrow notation in header.
+
+        Args:
+            skills: List of (SkillDefinition, score) tuples.
+        """
+        if not skills:
+            return
+
+        skills = skills[:3]
+
+        skill_names = []
+        fragments = []
+        for item in skills:
+            skill = item[0] if isinstance(item, tuple) else item
+            skill_names.append(skill.name)
+            fragments.append(
+                f"ACTIVE SKILL: {skill.name}\n"
+                f"Description: {skill.description}\n"
+                f"{skill.prompt_fragment}\n"
+            )
+
+        composed = (
+            f"ACTIVE SKILLS ({len(skill_names)}): {' → '.join(skill_names)}\n"
+            f"Execute these skills in the listed order.\n\n"
+            + "\n".join(fragments)
+            + "\n"
+        )
+
+        self._system_prompt = composed + (self._system_prompt or "")
+
+        if hasattr(self, "conversation") and self.conversation is not None:
+            self.conversation.system_prompt = self._system_prompt
+            if self.conversation._system_added and self.conversation._messages:
+                if self.conversation._messages[0].role == "system":
+                    from victor.agent.message_history import Message
+
+                    self.conversation._messages[0] = Message(
+                        role="system", content=self._system_prompt
+                    )
+
+        logger.info(
+            "Injected %d skills: %s", len(skill_names), " → ".join(skill_names)
+        )
+
     def update_system_prompt_for_query(self, query_classification=None) -> None:
         """Rebuild system prompt with query-specific classification context.
 

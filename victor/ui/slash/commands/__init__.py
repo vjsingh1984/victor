@@ -42,6 +42,7 @@ from victor.ui.slash.commands import (
     model,
     navigation,
     session,
+    skills,
     system,
     tools,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "model",
     "navigation",
     "session",
+    "skills",
     "system",
     "tools",
 ]
