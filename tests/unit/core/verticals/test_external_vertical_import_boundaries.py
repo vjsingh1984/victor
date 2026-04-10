@@ -316,6 +316,13 @@ def test_framework_extensions_module_exports():
         "TeamSpecProviderProtocol",
         "EnrichmentStrategyProtocol",
         "MiddlewareProtocol",
+        # Tool dependency infrastructure
+        "BaseToolDependencyProvider",
+        "YAMLToolDependencyProvider",
+        "load_tool_dependency_yaml",
+        "ToolDependencyLoader",
+        "TieredToolConfig",
+        "TaskTypeHint",
     }
 
     assert set(extensions.__all__) == expected_exports, (

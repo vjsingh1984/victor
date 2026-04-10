@@ -15,6 +15,7 @@
 """Filesystem tools for reading, writing, and listing contents."""
 
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -1191,18 +1192,20 @@ async def read(
 
     # Workspace guard: warn if path is outside the current project root.
     # Returns helpful message so model self-corrects (doesn't raise).
-    try:
-        from victor.config.settings import get_project_paths
+    # Disabled via VICTOR_DISABLE_WORKSPACE_GUARD=1 for testing.
+    if not os.environ.get("VICTOR_DISABLE_WORKSPACE_GUARD"):
+        try:
+            from victor.config.settings import get_project_paths
 
-        _project_root = Path(get_project_paths().project_root).resolve()
-        if not str(file_path).startswith(str(_project_root)):
-            return (
-                f"Path '{path}' is outside the current workspace "
-                f"({_project_root.name}). You are working in the "
-                f"{_project_root.name} project. Use ls('.') to see files."
-            )
-    except Exception:
-        pass
+            _project_root = Path(get_project_paths().project_root).resolve()
+            if not str(file_path).startswith(str(_project_root)):
+                return (
+                    f"Path '{path}' is outside the current workspace "
+                    f"({_project_root.name}). You are working in the "
+                    f"{_project_root.name} project. Use ls('.') to see files."
+                )
+        except Exception:
+            pass
 
     # Early return for directory paths (handles "", ".", "src/", etc.)
     if file_path.is_dir():

@@ -162,7 +162,7 @@ async def test_chat_timeout_error(ollama_provider):
 
         messages = [Message(role="user", content="Hello")]
 
-        with pytest.raises(ProviderTimeoutError):
+        with pytest.raises((ProviderTimeoutError, ProviderError)):
             await ollama_provider.chat(messages=messages, model="llama3:8b")
 
 

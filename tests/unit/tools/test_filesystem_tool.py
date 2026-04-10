@@ -17,6 +17,7 @@
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch, MagicMock
 import pytest
 
 from victor.tools.filesystem import (
@@ -36,6 +37,12 @@ from victor.tools.filesystem import (
     is_file_cache_enabled,
     _cache_enabled,
 )
+
+
+@pytest.fixture(autouse=True)
+def _allow_tmp_workspace(monkeypatch):
+    """Disable workspace guard for tests that create files in /tmp."""
+    monkeypatch.setenv("VICTOR_DISABLE_WORKSPACE_GUARD", "1")
 
 
 @pytest.mark.asyncio
