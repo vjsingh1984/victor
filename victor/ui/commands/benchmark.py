@@ -343,6 +343,18 @@ def run_benchmark(
     results_table.add_row("Duration", f"{metrics['duration_seconds']:.1f}s")
     results_table.add_row("Total Tokens", f"{metrics['total_tokens']:,}")
 
+    # Extended token metrics (if available)
+    cached = metrics.get("cached_tokens", 0)
+    reasoning = metrics.get("reasoning_tokens", 0)
+    cost_micros = metrics.get("cost_usd_micros", 0)
+    if cached > 0:
+        results_table.add_row("Cached Tokens", f"[dim]{cached:,}[/]")
+    if reasoning > 0:
+        results_table.add_row("Reasoning Tokens", f"[dim]{reasoning:,}[/]")
+    if cost_micros > 0:
+        cost_usd = cost_micros / 1_000_000
+        results_table.add_row("API Cost", f"[dim]${cost_usd:.4f}[/]")
+
     console.print(results_table)
 
     # Save results if output specified

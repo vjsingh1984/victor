@@ -300,11 +300,17 @@ class VictorAgentAdapter:
                     "total_tokens": cum.get("total_tokens", 0),
                 }
 
+        # Get extended token fields from cumulative dict
+        cum = getattr(self.orchestrator, "_cumulative_token_usage", {})
+
         return {
             "code": "",  # No code generated on timeout
             "tokens_input": token_usage["input_tokens"],
             "tokens_output": token_usage["output_tokens"],
             "tokens_used": token_usage["total_tokens"],
+            "cached_tokens": cum.get("cached_tokens", 0),
+            "reasoning_tokens": cum.get("reasoning_tokens", 0),
+            "cost_usd_micros": cum.get("cost_usd_micros", 0),
             "tool_calls": len(self._tool_calls),
             "turns": self._turns,
             "file_edits": len(self._file_edits),

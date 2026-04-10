@@ -245,6 +245,9 @@ class TaskResult:
     tokens_used: int = 0
     tokens_input: int = 0  # Input tokens (prompt)
     tokens_output: int = 0  # Output tokens (completion)
+    cached_tokens: int = 0  # Prompt cache hits
+    reasoning_tokens: int = 0  # Hidden reasoning/thinking tokens
+    cost_usd_micros: int = 0  # Direct API cost (xAI)
     tool_calls: int = 0
     turns: int = 0
 
@@ -419,7 +422,10 @@ class EvaluationResult:
         return self.task_results
 
     def get_metrics(self) -> dict[str, Any]:
-        """Get summary metrics."""
+        """Get summary metrics including extended token tracking."""
+        cached = sum(r.cached_tokens for r in self.task_results)
+        reasoning = sum(r.reasoning_tokens for r in self.task_results)
+        cost_micros = sum(r.cost_usd_micros for r in self.task_results)
         return {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
@@ -432,6 +438,10 @@ class EvaluationResult:
             "total_tool_calls": self.total_tool_calls,
             "avg_tokens_per_task": self.total_tokens / max(1, self.total_tasks),
             "avg_duration_per_task": self.duration_seconds / max(1, self.total_tasks),
+            # Extended token metrics
+            "cached_tokens": cached,
+            "reasoning_tokens": reasoning,
+            "cost_usd_micros": cost_micros,
         }
 
 
