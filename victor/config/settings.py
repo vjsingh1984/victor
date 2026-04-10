@@ -499,564 +499,82 @@ class ProfileConfig(BaseSettings):
 # enabling both flat access (settings.default_provider) and
 # structured access (settings.provider.default_provider).
 
-from pydantic import BaseModel as _BaseModel  # noqa: E402
-
-
-class ProviderSettings(_BaseModel):
-    """Provider connection and model defaults."""
-
-    default_provider: str = "ollama"
-    default_model: str = "qwen3-coder:30b"
-    default_temperature: float = 0.7
-    default_max_tokens: int = 4096
-    anthropic_api_key: Optional[SecretStr] = None
-    openai_api_key: Optional[SecretStr] = None
-    google_api_key: Optional[SecretStr] = None
-    moonshot_api_key: Optional[SecretStr] = None
-    deepseek_api_key: Optional[SecretStr] = None
-    ollama_base_url: str = "http://localhost:11434"
-    lmstudio_base_urls: List[str] = Field(
-        default_factory=lambda: ["http://127.0.0.1:1234"]
-    )
-    vllm_base_url: str = "http://localhost:8000"
-    lmstudio_max_vram_gb: Optional[float] = 48.0
-
-    def __str__(self) -> str:
-        """Return provider name for string operations.
-
-        Enables backward compatibility with code that treats provider as a string.
-        Allows operations like str(provider), f"{provider}", etc.
-        """
-        return self.default_provider
-
-    # String-like methods for backward compatibility
-    def lower(self) -> str:
-        """Return lowercase provider name."""
-        return self.default_provider.lower()
-
-    def upper(self) -> str:
-        """Return uppercase provider name."""
-        return self.default_provider.upper()
-
-    def title(self) -> str:
-        """Return title-case provider name."""
-        return self.default_provider.title()
-
-    def startswith(self, prefix: str) -> bool:
-        """Check if provider name starts with prefix."""
-        return self.default_provider.startswith(prefix)
-
-    def endswith(self, suffix: str) -> bool:
-        """Check if provider name ends with suffix."""
-        return self.default_provider.endswith(suffix)
-
-    def replace(self, old: str, new: str) -> str:
-        """Replace substrings in provider name."""
-        return self.default_provider.replace(old, new)
-
-    def split(self, sep: str = None, maxsplit: int = -1):
-        """Split provider name."""
-        return self.default_provider.split(sep, maxsplit)
-
-    def strip(self) -> str:
-        """Strip whitespace from provider name."""
-        return self.default_provider.strip()
-
-    def __eq__(self, other: object) -> bool:
-        """Compare provider name with other (string or ProviderSettings)."""
-        if isinstance(other, str):
-            return self.default_provider == other
-        if isinstance(other, ProviderSettings):
-            return self.default_provider == other.default_provider
-        return NotImplemented
-
-    def __hash__(self) -> int:
-        """Hash provider name for dict/set operations."""
-        return hash(self.default_provider)
-
-
-class ToolSettings(_BaseModel):
-    """Tool execution, selection, and retry configuration."""
-
-    tool_call_budget: int = Field(
-        default_factory=lambda: BUDGET_LIMITS.max_session_budget
-    )
-    tool_call_budget_warning_threshold: int = Field(
-        default_factory=lambda: int(
-            BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
-        )
-    )
-    tool_calling_models: Dict[str, list[str]] = Field(
-        default_factory=_load_tool_capable_patterns_from_yaml
-    )
-    tool_retry_enabled: bool = True
-    tool_retry_max_attempts: int = 3
-    tool_retry_base_delay: float = 1.0
-    tool_retry_max_delay: float = 10.0
-    fallback_max_tools: int = 8
-    enable_tool_deduplication: bool = True
-    tool_deduplication_window_size: int = 20
-    use_semantic_tool_selection: bool = True
-    embedding_provider: str = "sentence-transformers"
-    embedding_model: str = "BAAI/bge-small-en-v1.5"
-    tool_cache_enabled: bool = True
-    tool_cache_ttl: int = 600
-    tool_cache_allowlist: List[str] = Field(
-        default_factory=lambda: [
-            "code_search",
-            "semantic_code_search",
-            "list_directory",
-            "plan_files",
-        ]
-    )
-    generic_result_cache_enabled: bool = False
-    generic_result_cache_ttl: int = 300
-    tool_selection_cache_enabled: bool = True
-    tool_selection_cache_ttl: int = 300
-    tool_validation_mode: str = "lenient"
-
-
-class SearchSettings(_BaseModel):
-    """Codebase search and semantic configuration."""
-
-    unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
-    codebase_vector_store: str = "lancedb"
-    codebase_embedding_provider: str = "sentence-transformers"
-    codebase_embedding_model: str = "BAAI/bge-small-en-v1.5"
-    codebase_persist_directory: Optional[str] = None
-    codebase_dimension: int = 384
-    codebase_batch_size: int = 32
-    codebase_graph_store: str = "sqlite"
-    codebase_graph_path: Optional[str] = None
-    core_readonly_tools: Optional[List[str]] = None
-    semantic_similarity_threshold: float = 0.25
-    semantic_query_expansion_enabled: bool = True
-    semantic_max_query_expansions: int = 5
-    enable_hybrid_search: bool = False
-    hybrid_search_semantic_weight: float = 0.6
-    hybrid_search_keyword_weight: float = 0.4
-    enable_semantic_threshold_rl_learning: bool = False
-    semantic_threshold_overrides: dict = Field(default_factory=dict)
-    # RL mode: "full" (write all), "selective" (skip unchanged), "none" (read-only)
-    rl_mode: str = "selective"
-
-
-class ResilienceSettings(_BaseModel):
-    """Circuit breaker, retry, rate limiting, and streaming metrics."""
-
-    resilience_enabled: bool = True
-    circuit_breaker_failure_threshold: int = 5
-    circuit_breaker_success_threshold: int = 2
-    circuit_breaker_timeout: float = 60.0
-    circuit_breaker_half_open_max: int = 3
-    retry_max_attempts: int = 3
-    retry_base_delay: float = 1.0
-    retry_max_delay: float = 60.0
-    retry_exponential_base: float = 2.0
-    rate_limiting_enabled: bool = True
-    rate_limit_requests_per_minute: int = 50
-    rate_limit_tokens_per_minute: int = 50000
-    rate_limit_max_concurrent: int = 5
-    rate_limit_queue_size: int = 100
-    rate_limit_num_workers: int = 3
-    streaming_metrics_enabled: bool = True
-    streaming_metrics_history_size: int = 1000
-
-
-class SecuritySettings(_BaseModel):
-    """Server security, sandboxing, and approval settings."""
-
-    airgapped_mode: bool = False
-    server_api_key: Optional[SecretStr] = None
-    server_session_secret: Optional[SecretStr] = None
-    server_max_sessions: int = 100
-    server_max_message_bytes: int = 32768
-    server_session_ttl_seconds: int = 86400
-    render_max_payload_bytes: int = 20000
-    render_timeout_seconds: int = 10
-    render_max_concurrency: int = 2
-    code_executor_network_disabled: bool = True
-    code_executor_memory_limit: Optional[str] = "512m"
-    code_executor_cpu_shares: Optional[int] = 256
-    write_approval_mode: str = "risky_only"
-    headless_mode: bool = False
-    dry_run_mode: bool = False
-    auto_approve_safe: bool = False
-    max_file_changes: Optional[int] = None
-    security_dependency_scan: bool = False
-    security_iac_scan: bool = False
-    docker_allow_dangerous_operations: bool = False
-
-
-class EventSettings(_BaseModel):
-    """Event system backend and configuration."""
-
-    event_backend_type: str = "in_memory"
-    event_backend_lazy_init: bool = True
-    event_delivery_guarantee: str = "at_most_once"
-    event_max_batch_size: int = 100
-    event_flush_interval_ms: float = 1000.0
-    event_queue_maxsize: int = 10000
-    event_queue_overflow_policy: str = "drop_newest"
-    event_queue_overflow_block_timeout_ms: float = 50.0
-    event_queue_overflow_topic_policies: Dict[str, str] = Field(
-        default_factory=lambda: {
-            "lifecycle.session.*": "block_with_timeout",
-            "vertical.applied": "block_with_timeout",
-            "error.*": "block_with_timeout",
-            "core.events.emit_sync.metrics": "drop_oldest",
-            "vertical.extensions.loader.metrics": "drop_oldest",
-        }
-    )
-    event_queue_overflow_topic_block_timeout_ms: Dict[str, float] = Field(
-        default_factory=lambda: {
-            "lifecycle.session.*": 150.0,
-            "vertical.applied": 120.0,
-            "error.*": 200.0,
-        }
-    )
-    event_emit_sync_metrics_enabled: bool = False
-    event_emit_sync_metrics_interval_seconds: float = 60.0
-    event_emit_sync_metrics_reset_after_emit: bool = False
-    event_emit_sync_metrics_topic: str = "core.events.emit_sync.metrics"
-    extension_loader_warn_queue_threshold: int = 24
-    extension_loader_error_queue_threshold: int = 32
-    extension_loader_warn_in_flight_threshold: int = 6
-    extension_loader_error_in_flight_threshold: int = 8
-    extension_loader_pressure_cooldown_seconds: float = 5.0
-    extension_loader_emit_pressure_events: bool = False
-    extension_loader_metrics_reporter_enabled: bool = False
-    extension_loader_metrics_reporter_interval_seconds: float = 60.0
-    extension_loader_metrics_reporter_reset_after_emit: bool = False
-    extension_loader_metrics_reporter_topic: str = "vertical.extensions.loader.metrics"
-
-
-class ObservabilitySettings(_BaseModel):
-    """Logging, observability, and analytics configuration."""
-
-    log_level: str = "INFO"
-    log_file: Optional[str] = None
-    enable_observability_logging: bool = False
-    observability_log_path: Optional[str] = None
-    analytics_enabled: bool = True
-
-
-class ContextSettings(_BaseModel):
-    """Context window management and conversation memory."""
-
-    context_compaction_strategy: str = "tiered"
-    context_min_messages_to_keep: int = 6
-    context_tool_retention_weight: float = 1.5
-    context_recency_weight: float = 2.0
-    context_semantic_threshold: float = 0.3
-    max_context_tokens: int = 100000
-    response_token_reserve: int = 4096
-    conversation_memory_enabled: bool = True
-    conversation_embeddings_enabled: bool = True
-
-
-class CheckpointSettings(_BaseModel):
-    """State checkpointing for time-travel debugging."""
-
-    checkpoint_enabled: bool = True
-    checkpoint_auto_interval: int = 5
-    checkpoint_max_per_session: int = 50
-    checkpoint_compression_enabled: bool = True
-    checkpoint_compression_threshold: int = 1024
-
-
-class UISettings(_BaseModel):
-    """User interface display preferences."""
-
-    theme: str = "monokai"
-    show_token_count: bool = True
-    show_cost_metrics: bool = False
-    stream_responses: bool = True
-    use_emojis: bool = Field(
-        default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
-    )
-
-
-class PipelineSettings(_BaseModel):
-    """Intelligent agent pipeline, quality scoring, and recovery."""
-
-    # =================================================================
-    # Decision Chain Configuration
-    # =================================================================
-    # Unified fallback chain for ALL decision points in the agentic loop.
-    # Each decision type maps to an ordered list of strategies:
-    #   "heuristic" — fast keyword/pattern/rule-based (default first)
-    #   "llm"       — LLM decision service via edge or main model
-    #
-    # The chain tries strategies in order. If a strategy returns a result
-    # with confidence >= its threshold, it's used. Otherwise, next in chain.
-    #
-    # Default: heuristic-first for all decisions (proven at 60% SWE-bench).
-    # Override per decision type or globally via decision_chain_default.
-    #
-    # Example ~/.victor/config.yaml:
-    #   pipeline:
-    #     decision_chain_default: ["heuristic", "llm"]
-    #     decision_chain:
-    #       stage_detection: ["heuristic", "llm"]
-    #       tool_selection: ["heuristic"]        # no LLM for tools
-    #       task_completion: ["llm", "heuristic"] # LLM-first for completion
-    # =================================================================
-
-    # Global default chain — applied to any decision type not in decision_chain
-    decision_chain_default: List[str] = Field(
-        default=["heuristic", "llm"]
-    )
-
-    # Per-decision-type overrides (keys match DecisionType enum values)
-    decision_chain: Dict[str, List[str]] = Field(default_factory=dict)
-
-    # Heuristic confidence threshold — below this, fallback to next in chain
-    heuristic_confidence_threshold: float = 0.7
-
-    # Parallel exploration — spawn concurrent subagents during READING stage
-    parallel_exploration: bool = True
-    max_exploration_agents: int = 3
-    exploration_tool_budget: int = 10
-    exploration_timeout: int = 90  # seconds (increase for local models)
-
-    intelligent_pipeline_enabled: bool = True
-    intelligent_quality_scoring: bool = True
-    intelligent_mode_learning: bool = True
-    intelligent_prompt_optimization: bool = True
-    intelligent_grounding_verification: bool = True
-    intelligent_min_quality_threshold: float = 0.5
-    intelligent_grounding_threshold: float = 0.7
-    intelligent_exploration_rate: float = 0.3
-    intelligent_learning_rate: float = 0.1
-    intelligent_discount_factor: float = 0.9
-    serialization_enabled: bool = True
-    serialization_default_format: Optional[str] = None
-    serialization_min_savings_threshold: float = 0.15
-    serialization_include_format_hint: bool = True
-    serialization_min_rows_for_tabular: int = 3
-    serialization_debug_mode: bool = False
-    max_exploration_iterations: int = 200
-    max_exploration_iterations_action: int = 500
-    max_exploration_iterations_analysis: int = 1000
-    min_content_threshold: int = 50
-    max_research_iterations: int = 50
-    recovery_empty_response_threshold: int = 5
-    recovery_blocked_consecutive_threshold: int = 6
-    recovery_blocked_total_threshold: int = 9
-    max_continuation_prompts_analysis: int = 6
-    max_continuation_prompts_action: int = 5
-    max_continuation_prompts_default: int = 3
-    continuation_prompt_overrides: dict = Field(default_factory=dict)
-    enable_continuation_rl_learning: bool = False
-    session_idle_timeout: int = 180
-
-
-class FeatureFlagSettings(_BaseModel):
-    """Feature flags for gradual rollout of architecture components."""
-
-    use_new_chat_service: bool = False
-    use_new_tool_service: bool = False
-    use_new_context_service: bool = False
-    use_new_provider_service: bool = False
-    use_new_recovery_service: bool = False
-    use_new_session_service: bool = False
-    use_composition_over_inheritance: bool = False
-    use_strategy_based_tool_registration: bool = False
-    use_provider_pooling: bool = False
-
-
-class PromptEnrichmentSettings(_BaseModel):
-    """Prompt enrichment and optimization configuration."""
-
-    prompt_enrichment_enabled: bool = True
-    prompt_enrichment_max_tokens: int = 2000
-    prompt_enrichment_timeout_ms: float = 500.0
-    prompt_enrichment_cache_enabled: bool = True
-    prompt_enrichment_cache_ttl: int = 300
-    prompt_enrichment_strategies: List[str] = Field(
-        default_factory=lambda: ["knowledge_graph", "conversation", "web_search"],
-    )
-    prompt_enrichment_coding: bool = True
-    prompt_enrichment_research: bool = True
-    prompt_enrichment_devops: bool = True
-    prompt_enrichment_data_analysis: bool = True
-
-
-class HITLSettings(_BaseModel):
-    """Human-in-the-loop workflow interrupt configuration."""
-
-    hitl_default_timeout: float = 300.0
-    hitl_default_fallback: str = "abort"
-    hitl_auto_approve_low_risk: bool = False
-    hitl_keyboard_shortcuts_enabled: bool = True
-
-
-class PluginSettings(_BaseModel):
-    """Plugin system configuration."""
-
-    plugin_enabled: bool = True
-    plugin_packages: List[str] = Field(default_factory=list)
-    plugin_disabled: List[str] = Field(default_factory=list)
-    plugin_config: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
-
-
-class PromptPolicySettings(_BaseModel):
-    """System prompt enforcement and fallback templates."""
-
-    prompt_policy_enforce_identity: bool = True
-    prompt_policy_enforce_guidelines: bool = True
-    prompt_policy_enforce_operating_preamble: bool = True
-    prompt_policy_enforce_unique_sections: bool = True
-    prompt_policy_protected_sections: List[str] = Field(
-        default_factory=lambda: ["identity", "guidelines", "operating_mode"]
-    )
-    prompt_policy_max_section_chars: int = 18000
-    prompt_policy_identity: Optional[str] = None
-    prompt_policy_guidelines: Optional[str] = None
-    prompt_policy_operating_template: Optional[str] = None
-    prompt_policy_fallback_template: Optional[str] = None
-
-
-class ConversationSettings(_BaseModel):
-    """Conversation persistence and history limits."""
-
-    conversation_memory_enabled: bool = True
-    conversation_embeddings_enabled: bool = True
-    max_conversation_history: int = 100
-    session_idle_timeout: int = 180
-
-
-class ExplorationSettings(_BaseModel):
-    """Exploration iteration limits, recovery, and continuation prompts."""
-
-    max_exploration_iterations: int = 8
-    max_exploration_iterations_action: int = 12
-    max_exploration_iterations_analysis: int = 50
-    chat_max_iterations: int = 50
-    max_consecutive_tool_calls: int = 20
-    max_research_iterations: int = 6
-    min_content_threshold: int = 150
-    recovery_empty_response_threshold: int = 5
-    recovery_blocked_consecutive_threshold: int = 6
-    recovery_blocked_total_threshold: int = 9
-    max_continuation_prompts_default: int = 3
-    max_continuation_prompts_action: int = 5
-    max_continuation_prompts_analysis: int = 6
-    continuation_prompt_overrides: Dict[str, Dict[str, int]] = Field(
-        default_factory=dict
-    )
-    enable_continuation_rl_learning: bool = False
-
-
-class SerializationSettings(_BaseModel):
-    """Token-optimized serialization strategies."""
-
-    serialization_enabled: bool = True
-    serialization_default_format: Optional[str] = None
-    serialization_min_savings_threshold: float = 0.15
-    serialization_include_format_hint: bool = True
-    serialization_min_rows_for_tabular: int = 3
-    serialization_debug_mode: bool = False
-
-
-class AutomationSettings(_BaseModel):
-    """Git automation, headless mode, and provider fallback."""
-
-    auto_commit_enabled: bool = False
-    headless_mode: bool = False
-    dry_run_mode: bool = False
-    auto_approve_safe: bool = False
-    one_shot_mode: bool = False
-    max_file_changes: Optional[int] = None
-    provider_health_checks: bool = True
-    provider_auto_fallback: bool = True
-    fallback_providers: List[str] = Field(default_factory=list)
-
-
-class CodeCorrectionSettings(_BaseModel):
-    """Automatic code correction configuration."""
-
-    code_correction_enabled: bool = True
-    code_correction_auto_fix: bool = True
-    code_correction_max_iterations: int = 3
-
-
-class McpSettings(_BaseModel):
-    """Model Context Protocol (MCP) server configuration.
-
-    MCP enables connecting to external tool servers using the JSON-RPC 2.0
-    protocol. Servers provide tools that are namespaced as mcp__{server}__{tool}.
-
-    Config file format (mcp.yaml or settings.json mcpServers section):
-        servers:
-          server-name:
-            type: stdio|sse|http
-            command: "npx"          # for stdio
-            args: ["-y", "server"]
-            env: {KEY: value}
-            url: "https://..."      # for sse/http
-    """
-
-    mcp_enabled: bool = True
-    mcp_servers: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
-    mcp_auto_discover: bool = True
-    mcp_tool_timeout_ms: int = 30000
-    mcp_max_retries: int = 2
-
-
-class SandboxSettings(_BaseModel):
-    """Sandbox/isolation configuration for safe tool execution.
-
-    Controls filesystem isolation, process namespace restrictions,
-    and environment variable filtering when executing tools.
-    """
-
-    sandbox_enabled: bool = False
-    sandbox_filesystem_mode: str = "workspace-only"
-    sandbox_namespace_restrictions: bool = True
-    sandbox_network_isolation: bool = False
-    sandbox_allowed_mounts: List[str] = Field(default_factory=list)
-
-
-class HooksSettings(_BaseModel):
-    """Pre/post tool use hook configuration.
-
-    Hooks are shell commands that run before and after tool execution.
-    They can allow, deny, or warn based on exit codes:
-      - Exit 0: Allow (stdout as optional message)
-      - Exit 2: Deny (stdout as denial reason)
-      - Other: Warn but allow
-    """
-
-    hooks_enabled: bool = True
-    hooks_pre_tool_use: List[str] = Field(default_factory=list)
-    hooks_post_tool_use: List[str] = Field(default_factory=list)
-
-
-class CompactionSettings(_BaseModel):
-    """Session compaction configuration for managing context window limits.
-
-    When conversation history exceeds token thresholds, older messages
-    are summarized to free context space while preserving recent history.
-    """
-
-    compaction_enabled: bool = True
-    compaction_preserve_recent: int = 4
-    compaction_max_estimated_tokens: int = 10000
-    compaction_auto_compact: bool = False
-
-
-class PermissionSettings(_BaseModel):
-    """Permission hierarchy for tool access control.
-
-    Three-tier permission model: read-only, workspace-write, danger-full-access.
-    Controls which tools agents can use based on session permission level.
-    """
-
-    permission_mode: str = "workspace-write"
-    permission_prompt_on_escalation: bool = True
-    permission_tool_overrides: Dict[str, str] = Field(default_factory=dict)
+from victor.config.provider_settings import ProviderSettings  # noqa: E402
+
+
+from victor.config.tool_settings import ToolSettings  # noqa: E402
+
+
+from victor.config.search_settings import SearchSettings  # noqa: E402
+
+
+from victor.config.resilience_settings import ResilienceSettings  # noqa: E402
+
+
+from victor.config.security_settings import SecuritySettings  # noqa: E402
+
+
+from victor.config.event_settings import EventSettings  # noqa: E402
+
+
+from victor.config.observability_settings import ObservabilitySettings  # noqa: E402
+
+
+from victor.config.context_settings import ContextSettings  # noqa: E402
+
+
+from victor.config.checkpoint_settings import CheckpointSettings  # noqa: E402
+
+
+from victor.config.ui_settings import UISettings  # noqa: E402
+
+
+from victor.config.pipeline_settings import PipelineSettings  # noqa: E402
+
+
+from victor.config.feature_flag_settings import FeatureFlagSettings  # noqa: E402
+
+
+from victor.config.prompt_enrichment_settings import PromptEnrichmentSettings  # noqa: E402
+
+
+from victor.config.hitl_settings import HITLSettings  # noqa: E402
+
+
+from victor.config.plugin_settings import PluginSettings  # noqa: E402
+
+
+from victor.config.prompt_policy_settings import PromptPolicySettings  # noqa: E402
+
+
+from victor.config.conversation_settings import ConversationSettings  # noqa: E402
+
+
+from victor.config.exploration_settings import ExplorationSettings  # noqa: E402
+
+
+from victor.config.serialization_settings import SerializationSettings  # noqa: E402
+
+
+from victor.config.automation_settings import AutomationSettings  # noqa: E402
+
+
+from victor.config.code_correction_settings import CodeCorrectionSettings  # noqa: E402
+
+
+from victor.config.mcp_settings import McpSettings  # noqa: E402
+
+
+from victor.config.sandbox_settings import SandboxSettings  # noqa: E402
+
+
+from victor.config.hooks_settings import HooksSettings  # noqa: E402
+
+
+from victor.config.compaction_settings import CompactionSettings  # noqa: E402
+
+
+from victor.config.permission_settings import PermissionSettings  # noqa: E402
 
 
 # Module-level mapping of group names to nested model classes
