@@ -2115,21 +2115,48 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         return result
 
+    def clear_active_skills(self) -> None:
+        """Remove any active skill injection, restoring the base system prompt.
+
+        Called at the start of each turn to ensure skills don't accumulate
+        across multi-turn conversations.
+        """
+        base = getattr(self, "_base_system_prompt", None)
+        if base is not None:
+            self._system_prompt = base
+        self._active_skill_prompt = ""
+
+        if hasattr(self, "conversation") and self.conversation is not None:
+            self.conversation.system_prompt = self._system_prompt
+            if self.conversation._system_added and self.conversation._messages:
+                if self.conversation._messages[0].role == "system":
+                    from victor.agent.message_history import Message
+
+                    self.conversation._messages[0] = Message(
+                        role="system", content=self._system_prompt
+                    )
+
     def inject_skill(self, skill: Any) -> None:
         """Inject a skill's prompt fragment into the current system prompt.
 
         Called by the chat coordinator when auto-skill-selection matches
-        a skill to the user's message.
+        a skill to the user's message. Stores the base prompt separately
+        so it can be restored on the next turn via clear_active_skills().
 
         Args:
             skill: A SkillDefinition with name, description, prompt_fragment.
         """
+        # Save base prompt before first injection
+        if not getattr(self, "_base_system_prompt", None):
+            self._base_system_prompt = self._system_prompt or ""
+
         skill_prompt = (
             f"ACTIVE SKILL: {skill.name}\n"
             f"Description: {skill.description}\n"
             f"{skill.prompt_fragment}\n\n"
         )
-        self._system_prompt = skill_prompt + (self._system_prompt or "")
+        self._active_skill_prompt = skill_prompt
+        self._system_prompt = skill_prompt + (self._base_system_prompt or "")
 
         # Sync to conversation's live message
         if hasattr(self, "conversation") and self.conversation is not None:
@@ -2176,7 +2203,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             + "\n"
         )
 
-        self._system_prompt = composed + (self._system_prompt or "")
+        # Save base prompt before first injection
+        if not getattr(self, "_base_system_prompt", None):
+            self._base_system_prompt = self._system_prompt or ""
+
+        self._active_skill_prompt = composed
+        self._system_prompt = composed + (self._base_system_prompt or "")
 
         if hasattr(self, "conversation") and self.conversation is not None:
             self.conversation.system_prompt = self._system_prompt
