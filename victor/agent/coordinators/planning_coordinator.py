@@ -365,10 +365,26 @@ class PlanningCoordinator:
                 )
                 planning_model = planning_model_override
 
+        # Build skill-aware prompt if skills are available
+        enriched_request = user_message
+        try:
+            matcher = getattr(self.orchestrator, "_skill_matcher", None)
+            if matcher and matcher._initialized and matcher._skills:
+                from victor.framework.skill_planner import build_skill_aware_plan_prompt
+
+                enriched_request = build_skill_aware_plan_prompt(
+                    user_message, matcher._skills
+                )
+                logger.debug(
+                    "Plan generation enriched with %d skills", len(matcher._skills)
+                )
+        except Exception:
+            logger.debug("Skill-aware planning enrichment skipped", exc_info=True)
+
         # Generate plan using readable schema
         plan = await generate_task_plan(
             provider=planning_provider,
-            user_request=user_message,
+            user_request=enriched_request,
             complexity=complexity,
             model=planning_model,
         )
