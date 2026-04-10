@@ -343,15 +343,29 @@ class SharedToolRegistry:
         for name, func in self.get_decorated_tools(airgapped_mode=airgapped_mode).items():
             result.append(func)
 
-        # Add class-based tools (create fresh instances)
-        # Note: We skip tools that are already in decorated_tools to avoid duplicates
+        # Add class-based tools as lazy proxies (deferred initialization)
+        # Tools are NOT instantiated until first execute() call — saves 1-2s startup
+        from victor.tools.progressive import LazyToolProxy
+        from victor.tools.enums import CostTier
+
         decorated_names = set(self._decorated_tools.keys())
         for name, cls in self.get_tool_classes(airgapped_mode=airgapped_mode).items():
             if name not in decorated_names:
                 try:
-                    instance = cls()
-                    result.append(instance)
+                    cost_tier = getattr(cls, "cost_tier", CostTier.FREE)
+                    if not isinstance(cost_tier, CostTier):
+                        cost_tier = CostTier.FREE
+                    description = getattr(cls, "description", "") or ""
+                    if callable(description):
+                        description = ""  # Skip property descriptors
+                    proxy = LazyToolProxy(
+                        name=name,
+                        factory=cls,
+                        cost_tier=cost_tier,
+                        description=description,
+                    )
+                    result.append(proxy)
                 except Exception as e:
-                    logger.debug(f"Skipped creating instance of {name}: {e}")
+                    logger.debug(f"Skipped lazy proxy for {name}: {e}")
 
         return result
