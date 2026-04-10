@@ -35,6 +35,7 @@ from typing import Any, Dict, List, Optional, Set
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.database import get_database
 from victor.core.schema import Tables, Schema
+from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ class AsyncWriterQueue:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> bool:
         """Queue an outcome for async writing.
 
@@ -345,7 +346,7 @@ class BatchedOutcomeWriter:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Queue an outcome for batched writing.
 
@@ -695,7 +696,7 @@ class RLCoordinator:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record an outcome for a specific learner.
 
@@ -846,7 +847,7 @@ class RLCoordinator:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         use_queue: Optional[bool] = None,
     ) -> None:
         """Async version of record_outcome - offloads SQLite to thread pool.

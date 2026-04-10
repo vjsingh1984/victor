@@ -29,6 +29,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from victor.config.model_capabilities import _load_tool_capable_patterns_from_yaml
 from victor.config.orchestrator_constants import BUDGET_LIMITS, TOOL_SELECTION_PRESETS
+from victor.core.constants import DEFAULT_VERTICAL
 from victor.config.secrets import reveal_secret, unwrap_secrets
 
 # =============================================================================
@@ -1216,7 +1217,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Verticals are domain-specific configurations that customize Victor's behavior.
     # Available verticals: coding, research, devops (extensible via plugins)
-    default_vertical: str = "coding"  # Default vertical when --vertical not specified
+    default_vertical: str = DEFAULT_VERTICAL  # Default vertical when --vertical not specified
     auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
 
     # Server Security (FastAPI/WebSocket layer)

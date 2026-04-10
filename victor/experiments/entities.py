@@ -27,6 +27,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
+from victor.core.constants import DEFAULT_VERTICAL
 
 
 class ExperimentStatus(str, Enum):
@@ -155,7 +156,7 @@ class Experiment:
     parent_id: Optional[str] = None
     group_id: Optional[str] = None
     workflow_name: Optional[str] = None
-    vertical: str = "coding"
+    vertical: str = DEFAULT_VERTICAL
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
