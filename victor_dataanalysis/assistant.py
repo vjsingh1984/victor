@@ -5,13 +5,14 @@ Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 
 from typing import Any, Dict, List, Optional
 
-from victor.core.verticals.base import StageDefinition, VerticalBase
-from victor.core.verticals.protocols import (
+from victor.framework.extensions import (
     ModeConfigProviderProtocol,
     PromptContributorProtocol,
     SafetyExtensionProtocol,
+    StageDefinition,
     TieredToolConfig,
     ToolDependencyProviderProtocol,
+    VerticalBase,
 )
 
 # Phase 3: Import framework capabilities

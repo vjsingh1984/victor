@@ -25,7 +25,7 @@ from victor.agent.coordinators.safety_coordinator import (
     SafetyCoordinator,
     SafetyRule,
 )
-from victor.core.verticals.protocols import SafetyExtensionProtocol, SafetyPattern
+from victor.framework.extensions import SafetyExtensionProtocol, SafetyPattern
 
 logger = logging.getLogger(__name__)
 
