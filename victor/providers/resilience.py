@@ -317,6 +317,17 @@ class ProviderRetryConfig:
         ConnectionError,
         TimeoutError,
         asyncio.TimeoutError,
+        # httpx transport errors: RemoteProtocolError, ReadError, etc.
+        # "Server disconnected without sending a response"
+    )
+
+    # Extended patterns that catch httpx transport errors by class name
+    retryable_exception_names: tuple = (
+        "RemoteProtocolError",
+        "ProtocolError",
+        "TransportError",
+        "ReadError",
+        "ConnectError",
     )
 
     retryable_status_codes: tuple = (429, 500, 502, 503, 504)
@@ -449,6 +460,18 @@ class ProviderRetryStrategy:
         # Check exception type
         if isinstance(error, self.config.retryable_exceptions):
             return True
+
+        # Check exception class name (catches httpx.RemoteProtocolError etc.
+        # without requiring httpx as a dependency of the resilience module)
+        error_class = type(error).__name__
+        if hasattr(self.config, "retryable_exception_names"):
+            for name in self.config.retryable_exception_names:
+                if error_class == name:
+                    return True
+            # Also check parent classes
+            for parent in type(error).__mro__:
+                if parent.__name__ in self.config.retryable_exception_names:
+                    return True
 
         # Check error message patterns
         error_str = str(error).lower()

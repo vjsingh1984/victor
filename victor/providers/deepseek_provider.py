@@ -220,10 +220,34 @@ class DeepSeekProvider(BaseProvider):
                 **kwargs,
             )
 
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
+            # Retry on transient transport errors (RemoteProtocolError,
+            # ConnectionReset, etc.) — DeepSeek API occasionally drops
+            # connections under sustained load.
+            import httpx as _httpx
+
+            last_err = None
+            for _attempt in range(3):
+                try:
+                    response = await self._execute_with_circuit_breaker(
+                        self.client.post, "/chat/completions", json=payload
+                    )
+                    response.raise_for_status()
+                    last_err = None
+                    break
+                except (_httpx.RemoteProtocolError, _httpx.ReadError, _httpx.ConnectError) as e:
+                    last_err = e
+                    if _attempt < 2:
+                        import asyncio as _aio
+                        delay = (2 ** _attempt) + 1  # 1s, 3s
+                        logger.warning(
+                            "DeepSeek transport error (attempt %d/3), retrying in %ds: %s",
+                            _attempt + 1, delay, e,
+                        )
+                        await _aio.sleep(delay)
+            if last_err:
+                raise ProviderError(
+                    f"DeepSeek transport error after 3 retries: {last_err}"
+                ) from last_err
 
             result = response.json()
             parsed = self._parse_response(result, model)
