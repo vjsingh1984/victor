@@ -5,13 +5,17 @@ Covers:
 - victor skill list --category coding
 - victor skill info <name>
 - victor skill search <query>
+- victor skill create <name>
 """
 
 from __future__ import annotations
 
+import os
+import tempfile
 from unittest.mock import patch, MagicMock
 
 import pytest
+import yaml
 from typer.testing import CliRunner
 
 from victor_sdk.skills import SkillDefinition
@@ -146,3 +150,100 @@ class TestSkillSearch:
             result = runner.invoke(app, ["search", "nonexistent"])
             assert result.exit_code == 0
             assert "No skills" in result.output
+
+
+class TestSkillCreate:
+    """victor skill create command."""
+
+    def test_create_writes_yaml(self):
+        app = _get_app()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "victor.ui.commands.skills._get_skills_dir",
+                return_value=tmpdir,
+            ):
+                result = runner.invoke(
+                    app,
+                    [
+                        "create",
+                        "my_skill",
+                        "--description",
+                        "My custom skill",
+                        "--category",
+                        "devops",
+                        "--prompt",
+                        "Do the devops thing.",
+                        "--tools",
+                        "read,grep,shell",
+                    ],
+                )
+                assert result.exit_code == 0
+                assert "Created" in result.output
+
+                # Verify file was written
+                path = os.path.join(tmpdir, "my_skill.yaml")
+                assert os.path.exists(path)
+                with open(path) as f:
+                    data = yaml.safe_load(f)
+                assert data["name"] == "my_skill"
+                assert data["description"] == "My custom skill"
+                assert data["category"] == "devops"
+                assert data["required_tools"] == ["read", "grep", "shell"]
+
+    def test_create_default_category(self):
+        app = _get_app()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "victor.ui.commands.skills._get_skills_dir",
+                return_value=tmpdir,
+            ):
+                result = runner.invoke(
+                    app,
+                    [
+                        "create",
+                        "simple",
+                        "--description",
+                        "Simple skill",
+                        "--prompt",
+                        "Do it.",
+                        "--tools",
+                        "read",
+                    ],
+                )
+                assert result.exit_code == 0
+                path = os.path.join(tmpdir, "simple.yaml")
+                with open(path) as f:
+                    data = yaml.safe_load(f)
+                assert data["category"] == "custom"
+
+
+class TestSkillRemove:
+    """victor skill remove command."""
+
+    def test_remove_existing(self):
+        app = _get_app()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a skill file first
+            path = os.path.join(tmpdir, "old_skill.yaml")
+            with open(path, "w") as f:
+                yaml.dump({"name": "old_skill"}, f)
+
+            with patch(
+                "victor.ui.commands.skills._get_skills_dir",
+                return_value=tmpdir,
+            ):
+                result = runner.invoke(app, ["remove", "old_skill"])
+                assert result.exit_code == 0
+                assert "Removed" in result.output
+                assert not os.path.exists(path)
+
+    def test_remove_nonexistent(self):
+        app = _get_app()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "victor.ui.commands.skills._get_skills_dir",
+                return_value=tmpdir,
+            ):
+                result = runner.invoke(app, ["remove", "nonexistent"])
+                assert result.exit_code == 0
+                assert "not found" in result.output.lower()

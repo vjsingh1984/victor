@@ -5,15 +5,19 @@ Covers:
 - search by query and category
 - from_vertical class method
 - from_entry_points with mocked entry points
+- from_yaml_directory with temp YAML files
 - duplicate registration handling
 - KeyError on missing skill
 """
 
 from __future__ import annotations
 
+import os
+import tempfile
 from unittest.mock import MagicMock, patch
 
 import pytest
+import yaml
 
 from victor_sdk.skills import SkillDefinition
 
@@ -239,3 +243,111 @@ class TestSkillRegistryFromEntryPoints:
             registry = SkillRegistry()
             registry.from_entry_points()
             assert registry.list_all() == []
+
+
+class TestSkillRegistryFromYamlDirectory:
+    """Load skills from YAML files in a directory."""
+
+    def test_from_yaml_directory(self):
+        from victor.framework.skills import SkillRegistry
+
+        skill_yaml = {
+            "name": "analyze_logs",
+            "description": "Parse log files for errors",
+            "category": "devops",
+            "prompt_fragment": "Find and analyze log files.",
+            "required_tools": ["read", "grep"],
+            "optional_tools": ["shell"],
+            "tags": ["logs", "debugging"],
+            "max_tool_calls": 15,
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "analyze_logs.yaml")
+            with open(path, "w") as f:
+                yaml.dump(skill_yaml, f)
+
+            registry = SkillRegistry()
+            registry.from_yaml_directory(tmpdir)
+            skill = registry.get("analyze_logs")
+            assert skill.name == "analyze_logs"
+            assert skill.category == "devops"
+            assert skill.required_tools == ["read", "grep"]
+            assert "logs" in skill.tags
+
+    def test_from_yaml_directory_multiple_files(self):
+        from victor.framework.skills import SkillRegistry
+
+        skills = [
+            {
+                "name": "skill_a",
+                "description": "Skill A",
+                "category": "general",
+                "prompt_fragment": "Do A.",
+                "required_tools": ["read"],
+            },
+            {
+                "name": "skill_b",
+                "description": "Skill B",
+                "category": "general",
+                "prompt_fragment": "Do B.",
+                "required_tools": ["write"],
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for s in skills:
+                path = os.path.join(tmpdir, f"{s['name']}.yaml")
+                with open(path, "w") as f:
+                    yaml.dump(s, f)
+
+            registry = SkillRegistry()
+            registry.from_yaml_directory(tmpdir)
+            assert len(registry.list_all()) == 2
+            assert registry.get("skill_a").description == "Skill A"
+            assert registry.get("skill_b").description == "Skill B"
+
+    def test_from_yaml_directory_skips_invalid(self):
+        from victor.framework.skills import SkillRegistry
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Write invalid YAML
+            bad_path = os.path.join(tmpdir, "bad.yaml")
+            with open(bad_path, "w") as f:
+                f.write("not: valid: yaml: [[[")
+
+            # Write non-YAML file
+            txt_path = os.path.join(tmpdir, "readme.txt")
+            with open(txt_path, "w") as f:
+                f.write("ignore me")
+
+            registry = SkillRegistry()
+            registry.from_yaml_directory(tmpdir)
+            assert registry.list_all() == []
+
+    def test_from_yaml_directory_nonexistent(self):
+        from victor.framework.skills import SkillRegistry
+
+        registry = SkillRegistry()
+        registry.from_yaml_directory("/nonexistent/path")
+        assert registry.list_all() == []
+
+    def test_from_yaml_yml_extension(self):
+        from victor.framework.skills import SkillRegistry
+
+        skill_yaml = {
+            "name": "yml_skill",
+            "description": "Skill from .yml file",
+            "category": "general",
+            "prompt_fragment": "Do something.",
+            "required_tools": ["read"],
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "yml_skill.yml")
+            with open(path, "w") as f:
+                yaml.dump(skill_yaml, f)
+
+            registry = SkillRegistry()
+            registry.from_yaml_directory(tmpdir)
+            assert registry.get("yml_skill").name == "yml_skill"

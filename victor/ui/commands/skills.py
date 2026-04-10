@@ -1,21 +1,25 @@
 """Skill management CLI commands.
 
 Provides ``victor skill`` subcommands for listing, inspecting,
-and searching skills across verticals and plugins.
+searching, creating, and removing skills.
 
 Usage:
     victor skill list
     victor skill list --category coding
     victor skill info debug_test
     victor skill search "refactor"
+    victor skill create my_skill --description "..." --tools "read,grep"
+    victor skill remove my_skill
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 import typer
+import yaml
 from rich.console import Console
 from rich.table import Table
 
@@ -23,6 +27,13 @@ logger = logging.getLogger(__name__)
 
 skills_app = typer.Typer(name="skill", help="Manage and discover skills")
 console = Console()
+
+
+def _get_skills_dir() -> str:
+    """Return the user skills directory (~/.victor/skills/)."""
+    from victor.framework.skills import USER_SKILLS_DIR
+
+    return USER_SKILLS_DIR
 
 
 def _build_registry():
@@ -51,6 +62,12 @@ def _build_registry():
         registry.from_entry_points()
     except Exception:
         logger.debug("Could not load skills from entry points", exc_info=True)
+
+    # Load from user YAML skills (~/.victor/skills/)
+    try:
+        registry.from_user_skills()
+    except Exception:
+        logger.debug("Could not load user skills", exc_info=True)
 
     return registry
 
@@ -147,3 +164,68 @@ def search_skills(
     registry = _build_registry()
     results = registry.search(query=query)
     _render_skills_table(results, title=f"Search: '{query}'")
+
+
+@skills_app.command("create")
+def create_skill(
+    name: str = typer.Argument(help="Skill name (e.g., analyze_logs)"),
+    description: str = typer.Option(..., "--description", "-d", help="What this skill does"),
+    prompt: str = typer.Option(
+        ..., "--prompt", "-p", help="Prompt fragment injected when skill is active"
+    ),
+    tools: str = typer.Option(
+        ..., "--tools", "-t", help="Comma-separated required tools (e.g., read,grep,shell)"
+    ),
+    category: str = typer.Option("custom", "--category", "-c", help="Skill category"),
+    optional_tools: Optional[str] = typer.Option(
+        None, "--optional-tools", help="Comma-separated optional tools"
+    ),
+    tags: Optional[str] = typer.Option(None, "--tags", help="Comma-separated tags"),
+    max_tool_calls: int = typer.Option(20, "--max-tool-calls", help="Max tool calls"),
+) -> None:
+    """Create a new user skill (saved as YAML in ~/.victor/skills/)."""
+    skills_dir = _get_skills_dir()
+    os.makedirs(skills_dir, exist_ok=True)
+
+    skill_data = {
+        "name": name,
+        "description": description,
+        "category": category,
+        "prompt_fragment": prompt,
+        "required_tools": [t.strip() for t in tools.split(",") if t.strip()],
+    }
+
+    if optional_tools:
+        skill_data["optional_tools"] = [t.strip() for t in optional_tools.split(",") if t.strip()]
+
+    if tags:
+        skill_data["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
+
+    skill_data["max_tool_calls"] = max_tool_calls
+
+    filepath = os.path.join(skills_dir, f"{name}.yaml")
+    with open(filepath, "w") as f:
+        yaml.dump(skill_data, f, default_flow_style=False, sort_keys=False)
+
+    console.print(f"[green]Created skill:[/] {name}")
+    console.print(f"[dim]Saved to:[/] {filepath}")
+    console.print()
+    console.print("The skill will appear in [cyan]victor skill list[/] immediately.")
+
+
+@skills_app.command("remove")
+def remove_skill(
+    name: str = typer.Argument(help="Name of the user skill to remove"),
+) -> None:
+    """Remove a user-created skill (deletes the YAML file from ~/.victor/skills/)."""
+    skills_dir = _get_skills_dir()
+
+    for ext in (".yaml", ".yml"):
+        filepath = os.path.join(skills_dir, f"{name}{ext}")
+        if os.path.exists(filepath):
+            os.remove(filepath)
+            console.print(f"[green]Removed skill:[/] {name}")
+            console.print(f"[dim]Deleted:[/] {filepath}")
+            return
+
+    console.print(f"[yellow]User skill '{name}' not found in {skills_dir}[/]")

@@ -1,13 +1,16 @@
 """Skill registry for Victor framework.
 
 Discovers and manages SkillDefinition instances from verticals,
-plugins, and entry points. Provides lookup, search, and enumeration.
+plugins, entry points, and YAML files. Provides lookup, search,
+and enumeration.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from importlib.metadata import entry_points
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Type
 
 from victor_sdk.skills import SkillDefinition
@@ -15,6 +18,7 @@ from victor_sdk.skills import SkillDefinition
 logger = logging.getLogger(__name__)
 
 SKILLS_ENTRY_POINT_GROUP = "victor.skills"
+USER_SKILLS_DIR = os.path.join(Path.home(), ".victor", "skills")
 
 
 class SkillRegistry:
@@ -120,3 +124,37 @@ class SkillRegistry:
                     ep.name,
                     exc_info=True,
                 )
+
+    def from_yaml_directory(self, directory: str) -> None:
+        """Load skill definitions from YAML files in a directory.
+
+        Each ``.yaml`` or ``.yml`` file should contain a single skill
+        definition with fields matching ``SkillDefinition.from_dict()``.
+        """
+        if not os.path.isdir(directory):
+            logger.debug("Skills directory does not exist: %s", directory)
+            return
+
+        import yaml
+
+        for filename in sorted(os.listdir(directory)):
+            if not filename.endswith((".yaml", ".yml")):
+                continue
+            filepath = os.path.join(directory, filename)
+            try:
+                with open(filepath) as f:
+                    data = yaml.safe_load(f)
+                if isinstance(data, dict) and "name" in data:
+                    skill = SkillDefinition.from_dict(data)
+                    self.register(skill)
+                    logger.debug("Loaded skill from YAML: %s", filepath)
+            except Exception:
+                logger.warning(
+                    "Failed to load skill from YAML: %s",
+                    filepath,
+                    exc_info=True,
+                )
+
+    def from_user_skills(self) -> None:
+        """Load skills from the user's ~/.victor/skills/ directory."""
+        self.from_yaml_directory(USER_SKILLS_DIR)
