@@ -32,7 +32,7 @@ class MIPROv2Settings(BaseModel):
     max_examples: int = 3
     min_completion_score: float = 0.7
     example_diversity: bool = True
-    max_example_chars: int = 500
+    max_example_chars: int = 400
 
 
 class CoTDistillationSettings(BaseModel):

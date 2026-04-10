@@ -611,7 +611,9 @@ async def _run_benchmark_async(
                             console.print(f"  [yellow]Git command timed out: {git_cmd[1]}[/]")
 
                 # Pre-warm code_search index BEFORE task timer starts.
-                # Timeout protected — if pre-warm hangs, skip and continue.
+                # This is a fixed cost — NOT deducted from the per-task timeout.
+                # Without pre-warm, code_search calls during the task will
+                # try to build the index on-the-fly and timeout repeatedly.
                 try:
                     from victor.tools.code_search_tool import _get_or_build_index
                     from victor.config.settings import load_settings
@@ -619,11 +621,11 @@ async def _run_benchmark_async(
                     _prewarm_settings = load_settings()
                     await asyncio.wait_for(
                         _get_or_build_index(work_dir, _prewarm_settings, force_reindex=False),
-                        timeout=120,
+                        timeout=300,  # Allow up to 5 min — this is outside task timer
                     )
-                    console.print("  [dim]Code search index pre-warmed[/]")
+                    console.print("  Code search index pre-warmed")
                 except asyncio.TimeoutError:
-                    logger.warning("Index pre-warm timed out after 120s, skipping")
+                    logger.warning("Index pre-warm timed out after 300s, code_search may be slow")
                 except Exception as e:
                     logger.debug(f"Index pre-warm skipped: {e}")
 

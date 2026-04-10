@@ -36,7 +36,7 @@ class MIPROv2Strategy:
         max_examples: int = 3,
         min_completion_score: float = 0.7,
         example_diversity: bool = True,
-        max_example_chars: int = 500,
+        max_example_chars: int = 400,
     ):
         self._max_examples = max_examples
         self._min_score = min_completion_score
