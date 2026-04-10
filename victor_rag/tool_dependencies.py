@@ -150,7 +150,7 @@ def _get_composed_patterns() -> Dict[str, Dict[str, Any]]:
     section of the YAML file. We need to load them from the spec directly
     since they're in metadata.
     """
-    from victor.core.tool_dependency_loader import ToolDependencyLoader
+    from victor.framework.extensions import ToolDependencyLoader
 
     loader = ToolDependencyLoader(canonicalize=False)
     spec = loader._load_and_validate(_YAML_CONFIG_PATH)
