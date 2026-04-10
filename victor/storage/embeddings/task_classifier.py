@@ -1365,6 +1365,9 @@ class TaskTypeClassifier:
             TaskType.GENERAL_QUERY: GENERAL_QUERY_PHRASES,
         }
 
+        # Merge additional phrases from vertical capabilities (OCP extension point)
+        self._merge_vertical_phrases()
+
         # Single unified collection for all task phrases (1 file instead of 9)
         self._collection = StaticEmbeddingCollection(
             name="task_classifier",
@@ -1373,6 +1376,51 @@ class TaskTypeClassifier:
         )
 
         self._initialized = False
+
+    def _merge_vertical_phrases(self) -> None:
+        """Merge additional phrases from vertical capabilities.
+
+        Queries the CapabilityRegistry for an enhanced TaskClassifierPhraseProtocol
+        and extends self._phrase_lists with any returned phrases. This allows
+        verticals to contribute domain-specific task classification examples
+        without modifying the core classifier.
+        """
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+            from victor.framework.vertical_protocols import (
+                TaskClassifierPhraseProtocol,
+            )
+
+            registry = CapabilityRegistry.get_instance()
+            contributor = registry.get(TaskClassifierPhraseProtocol)
+            if contributor is None or not registry.is_enhanced(
+                TaskClassifierPhraseProtocol
+            ):
+                return
+
+            extra_phrases = contributor.get_classifier_phrases()
+            for task_type_value, phrases in extra_phrases.items():
+                try:
+                    task_type = TaskType(task_type_value)
+                except ValueError:
+                    logger.warning(
+                        "Unknown task type '%s' from vertical phrases, skipping",
+                        task_type_value,
+                    )
+                    continue
+                if task_type in self._phrase_lists:
+                    self._phrase_lists[task_type].extend(phrases)
+                else:
+                    self._phrase_lists[task_type] = list(phrases)
+
+            if extra_phrases:
+                logger.info(
+                    "Merged %d vertical phrases across %d task types",
+                    sum(len(v) for v in extra_phrases.values()),
+                    len(extra_phrases),
+                )
+        except Exception:
+            logger.debug("Failed to merge vertical phrases", exc_info=True)
 
     @property
     def is_initialized(self) -> bool:
