@@ -245,6 +245,33 @@ execution traces via gemma4 (local LLM, free).
   GEPA flipped 6 tasks from FAIL → PASS, zero regressions
 ```
 
+### Controlled A/B Test: GEPA vs No-GEPA (20 tasks × 4 providers)
+
+Same models, same tasks, same framework — only difference is GEPA on/off.
+
+```
+  GEPA IMPACT (absolute improvement in pass rate)
+
+  OpenAI       ███████████████  +15pp   (55% → 70%)     +3 tasks
+  DeepSeek     ███████████████  +15pp   (10% → 25%)     +3 tasks
+  Grok         █████            +5pp    (60% → 65%)     +1 task
+  Anthropic    █████            +5pp    (20% → 25%)     +1 task
+               ├─────┼─────┼─────┼─────┤
+               0     5    10    15    20 pp
+
+  AGGREGATE    29/80 (36%) → 37/80 (46%)    +10pp    +8 tasks
+```
+
+| Provider | No GEPA | With GEPA | Delta | Tasks Gained |
+|----------|---------|-----------|-------|-------------|
+| OpenAI | 11/20 (55%) | 14/20 (70%) | **+15pp** | +3 |
+| DeepSeek | 2/20 (10%) | 5/20 (25%) | **+15pp** | +3 |
+| Grok | 12/20 (60%) | 13/20 (65%) | **+5pp** | +1 |
+| Anthropic | 4/20 (20%) | 5/20 (25%) | **+5pp** | +1 |
+| **TOTAL** | **29/80 (36%)** | **37/80 (46%)** | **+10pp** | **+8** |
+
+**GEPA improves every single provider. Zero regressions.**
+
 ### What GEPA Evolved
 
 The static prompt guidance was evolved by gemma4 into provider-specific

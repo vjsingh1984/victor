@@ -27,7 +27,7 @@ class GEPAModelSpec(BaseModel):
 class GEPASettings(BaseModel):
     """All GEPA prompt optimizer configuration."""
 
-    enabled: bool = False
+    enabled: bool = True
 
     # --- Trace enrichment (ASI) ---
     capture_reasoning: bool = True
