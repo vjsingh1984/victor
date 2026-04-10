@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Callable, Dict, Optional
+from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class ObservabilityMixin:
         self,
         task_type: str = "unknown",
         complexity: str = "medium",
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         trigger: str = "auto",
     ) -> None:
         """Set execution context for observability.

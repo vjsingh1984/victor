@@ -45,6 +45,7 @@ import logging
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
 
@@ -235,7 +236,7 @@ class SharedEncoder:
         task_type: str,
         provider: str,
         model: str,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> ContextEmbedding:
         """Encode a context into an embedding.
 

@@ -618,6 +618,7 @@ def bootstrap_capabilities() -> None:
         IgnorePatternsProtocol,
         LanguageRegistryProtocol,
         SymbolStoreFactoryProtocol,
+        TaskClassifierPhraseProtocol,
         TaskTypeHintProtocol,
         TreeSitterExtractorProtocol,
         TreeSitterParserProtocol,
@@ -655,6 +656,18 @@ def bootstrap_capabilities() -> None:
         LanguageRegistryProtocol, NullLanguageRegistry(), CapabilityStatus.STUB
     )
     registry.register(TaskTypeHintProtocol, NullTaskTypeHinter(), CapabilityStatus.STUB)
+
+    class _NullClassifierPhraseContributor:
+        """Returns no additional phrases when no vertical enhances this."""
+
+        def get_classifier_phrases(self) -> dict:
+            return {}
+
+    registry.register(
+        TaskClassifierPhraseProtocol,
+        _NullClassifierPhraseContributor(),
+        CapabilityStatus.STUB,
+    )
 
     from victor.contrib.editing.diff_editor import DiffEditor
 

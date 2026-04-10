@@ -20,6 +20,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Dict, Optional, TYPE_CHECKING
+from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
     from victor.protocols.provider_adapter import IProviderAdapter
@@ -52,7 +53,7 @@ class RLOutcome:
     quality_score: float
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
     metadata: Dict[str, Any] = field(default_factory=dict)
-    vertical: str = "coding"
+    vertical: str = DEFAULT_VERTICAL
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for storage."""

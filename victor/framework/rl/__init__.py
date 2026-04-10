@@ -91,6 +91,7 @@ from typing import (
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import RLCoordinator, get_rl_coordinator
+from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
     from victor.framework.agent import Agent
@@ -283,7 +284,7 @@ class RLManager:
         task_type: str = "general",
         quality_score: float = 1.0,
         metadata: Optional[Dict[str, Any]] = None,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record a successful outcome.
 
@@ -319,7 +320,7 @@ class RLManager:
         quality_score: float = 0.0,
         error: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record a failed outcome.
 
@@ -391,7 +392,7 @@ class RLManager:
         task_type: str,
         *,
         available_tools: Optional[List[str]] = None,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> Optional[List[str]]:
         """Get recommended tools for a task type.
 
@@ -538,7 +539,7 @@ def create_outcome(
     task_type: str = "general",
     quality_score: Optional[float] = None,
     metadata: Optional[Dict[str, Any]] = None,
-    vertical: str = "coding",
+    vertical: str = DEFAULT_VERTICAL,
 ) -> RLOutcome:
     """Create an RLOutcome.
 
@@ -577,7 +578,7 @@ def record_tool_success(
     provider: str = "unknown",
     model: str = "unknown",
     duration_ms: Optional[float] = None,
-    vertical: str = "coding",
+    vertical: str = DEFAULT_VERTICAL,
 ) -> None:
     """Record a successful tool execution.
 

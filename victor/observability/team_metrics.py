@@ -55,6 +55,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
+from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
 
@@ -296,7 +297,7 @@ def get_metrics_registry() -> MetricsRegistry:
 
 def record_team_spawned(
     team_name: str,
-    vertical: str = "coding",
+    vertical: str = DEFAULT_VERTICAL,
     task_type: str = "unknown",
     complexity: str = "medium",
     trigger: str = "auto",
@@ -421,7 +422,7 @@ def record_workflow_executed(
     workflow_name: str,
     mode: str = "build",
     trigger: str = "manual",
-    vertical: str = "coding",
+    vertical: str = DEFAULT_VERTICAL,
 ) -> None:
     """Record a workflow being executed.
 

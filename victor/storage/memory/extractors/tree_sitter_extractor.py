@@ -78,8 +78,13 @@ class TreeSitterEntityExtractor(EntityExtractor):
             ):
                 self._extractor = provider
             else:
-                logger.warning("Tree-sitter not available: victor-coding not installed")
-                raise ImportError("Tree-sitter requires victor-coding package")
+                logger.warning(
+                    "Tree-sitter extractor not available: "
+                    "no enhanced provider registered"
+                )
+                raise ImportError(
+                    "Tree-sitter extractor capability not registered"
+                )
         return self._extractor
 
     async def extract(

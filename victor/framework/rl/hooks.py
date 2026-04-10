@@ -62,6 +62,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
     from victor.framework.rl.coordinator import RLCoordinator
@@ -146,7 +147,7 @@ class RLEvent:
     provider: Optional[str] = None
     model: Optional[str] = None
     task_type: Optional[str] = None
-    vertical: str = "coding"
+    vertical: str = DEFAULT_VERTICAL
 
     # Outcome data
     success: Optional[bool] = None

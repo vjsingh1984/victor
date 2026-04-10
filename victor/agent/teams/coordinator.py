@@ -76,6 +76,7 @@ from victor.teams.types import (
 
 # Import canonical AgentMessage from victor.teams.types
 from victor.teams.types import AgentMessage
+from victor.core.constants import DEFAULT_VERTICAL
 from victor.agent.teams.communication import (
     TeamMessageBus,
     TeamSharedMemory,
@@ -292,7 +293,7 @@ class TeamCoordinator(ITeamCoordinator):
         self,
         task_type: str = "unknown",
         complexity: str = "medium",
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         trigger: str = "auto",
     ) -> None:
         """Set execution context for observability and RL.
