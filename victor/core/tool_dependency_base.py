@@ -12,14 +12,36 @@ Usage (backward compat — still works):
 
 from __future__ import annotations
 
-# Re-export from SDK — canonical implementations now live in victor_sdk.
-from victor_sdk.verticals.tool_dependencies import (  # noqa: F401
-    BaseToolDependencyProvider,
-    EmptyToolDependencyProvider,
-    ToolDependencyConfig,
-    ToolDependencyLoadError,
-    create_vertical_tool_dependency_provider,
-)
+# Re-export from SDK when available. The module may not exist yet if
+# the SDK hasn't been updated with the tool_dependencies subpackage.
+try:
+    from victor_sdk.verticals.tool_dependencies import (  # noqa: F401
+        BaseToolDependencyProvider,
+        EmptyToolDependencyProvider,
+        ToolDependencyConfig,
+        ToolDependencyLoadError,
+        create_vertical_tool_dependency_provider,
+    )
+except ImportError:
+    # SDK doesn't have tool_dependencies yet — provide stubs
+    from typing import Any, Dict, List, Optional
+
+    class BaseToolDependencyProvider:  # type: ignore[no-redef]
+        """Stub — install updated victor-sdk for full implementation."""
+        def get_dependencies(self, tool_name: str) -> List[str]:
+            return []
+
+    class EmptyToolDependencyProvider(BaseToolDependencyProvider):  # type: ignore[no-redef]
+        pass
+
+    class ToolDependencyConfig:  # type: ignore[no-redef]
+        pass
+
+    class ToolDependencyLoadError(Exception):  # type: ignore[no-redef]
+        pass
+
+    def create_vertical_tool_dependency_provider(*args: Any, **kwargs: Any) -> BaseToolDependencyProvider:
+        return EmptyToolDependencyProvider()
 
 __all__ = [
     "BaseToolDependencyProvider",
