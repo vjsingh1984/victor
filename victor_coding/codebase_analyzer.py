@@ -61,7 +61,7 @@ except ImportError:
         return any(skip_dir in path.parts for skip_dir in skip_dirs)
 
 from victor.config.settings import VICTOR_CONTEXT_FILE, get_project_paths
-from victor.core.utils.ast_helpers import (
+from victor_sdk.utils.ast_helpers import (
     extract_base_classes,
     extract_imports,
     is_stdlib_module,
@@ -2675,13 +2675,11 @@ async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, A
         GraphAnalyzer = None
         _load_graph = None
     from victor_coding.codebase.graph.registry import create_graph_store
-    from victor.core.schema import Tables
-
     root = Path(root_path).resolve() if root_path else Path.cwd()
     # Use consolidated project.db
     graph_db_path = root / ".victor" / "project.db"
-    _NT = Tables.GRAPH_NODE  # "graph_node"
-    _ET = Tables.GRAPH_EDGE  # "graph_edge"
+    _NT = "graph_node"
+    _ET = "graph_edge"
 
     insights: Dict[str, Any] = {
         "has_graph": False,

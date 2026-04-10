@@ -54,7 +54,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor_coding.languages.tiers import LanguageTier, get_tier
-from victor.core.utils.ast_helpers import (
+from victor_sdk.utils.ast_helpers import (
     extract_parameters,
     extract_symbols,
     get_annotation_str,
