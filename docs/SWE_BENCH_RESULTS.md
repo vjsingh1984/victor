@@ -13,14 +13,15 @@
   GPT-5.4 Mini   ██████████████████████████████████████████████████████████  70%  (14/20)
   Grok 3 Mini    ████████████████████████████████████████████████████████    65%  (13/20)
   DeepSeek Chat  ████████████████████████████                               30%  ( 6/20)
-  Haiku 4.5      ██████████████████                                         ~15% (running)
+  Haiku 4.5      ████████████████                                           20%  ( 4/20)
                  ├─────────┼─────────┼─────────┼─────────┼─────────┤
                  0%       20%       40%       60%       80%      100%
 ```
 
 **Best overall**: GPT-5.4 Mini (70%) — enhanced with GEPA-evolved prompts  
 **Best value**: Grok 3 Mini Fast (65% at $0.30/1M tokens = 217 pts/$)  
-**GEPA impact**: +60pp on GPT-5.4 Mini (30% → 90% on 10-task subset)
+**GEPA impact**: +60pp on GPT-5.4 Mini (30% → 90% on 10-task subset)  
+**Haiku bottleneck**: 9 JSON syntax errors + 8 wrong file paths = 85% of failures
 
 ---
 
@@ -59,34 +60,33 @@ requiring code changes validated by test suites.
 ## Per-Task Results Matrix
 
 ```
-                              openai       xai      deepseek   anthropic*
+                              openai       xai      deepseek   anthropic
 Task                          gpt5.4m    grok3mf   ds-chat    haiku4.5
 ─────────────────────────── ─────────  ─────────  ─────────  ─────────
- 1. astro-12907               ✓  17t     ✓   4t    ✗  24t     running
- 2. astro-14182               ✓  55t     ✓   6t    ✗  12t     running
- 3. astro-14365               ✓  37t     ✓   8t    ✗  17t     running
- 4. astro-14995               ✓  20t     ✓   5t    ✗  15t     running
- 5. astro-6938                ✓  28t     ✓   7t    ✗  20t     running
- 6. astro-7746                ✓  18t     ✓   3t    ✓  17t     running
- 7. django-10914              ✓  58t     ✓  15t    ✓  19t     running
- 8. django-10924              ✗  34t     ✗  12t    ✗  12t     running
- 9. django-11001              ✓   9t     ✓   5t    ✓  17t     running
-10. django-11019              ✗  33t     ✗  25t    ✗  12t     running
-11. django-11039              ✗  42t     ✓   8t    ✗  31t     running
-12. django-11049              ✗  52t     ✗   3t    ✓  24t     running
-13. django-11099              ✓   7t     ✓   6t    ✓  13t     running
-14. django-11133              ✓  10t     ✓   8t    ✗  23t     running
-15. django-11179              ✓  13t     ✓   3t    ✗  11t     running
-16. django-11283              ✓   8t     ✓   3t    ✓  23t     running
-17. django-11422              ✗  31t     ✗   8t    ✗  25t     running
-18. django-11564              ✗  50t     ✗  10t    ✗  18t     running
-19. django-11583              ✓  22t     ✗   7t    ✗  25t     running
-20. django-11620              ✓  28t     ✗   1t    ✗  17t     running
+ 1. astro-12907               ✓  17t     ✓   4t    ✗  24t     ✗   9t
+ 2. astro-14182               ✓  55t     ✓   6t    ✗  12t     ✗  10t
+ 3. astro-14365               ✓  37t     ✓   8t    ✗  17t     ✗  12t
+ 4. astro-14995               ✓  20t     ✓   5t    ✗  15t     ✗  11t
+ 5. astro-6938                ✓  28t     ✓   7t    ✗  20t     ✓  11t
+ 6. astro-7746                ✓  18t     ✓   3t    ✓  17t     ✗   9t
+ 7. django-10914              ✓  58t     ✓  15t    ✓  19t     ✗  13t
+ 8. django-10924              ✗  34t     ✗  12t    ✗  12t     ✗  13t
+ 9. django-11001              ✓   9t     ✓   5t    ✓  17t     ✓  12t
+10. django-11019              ✗  33t     ✗  25t    ✗  12t     ✗   9t
+11. django-11039              ✗  42t     ✓   8t    ✗  31t     ✗  14t
+12. django-11049              ✗  52t     ✗   3t    ✓  24t     ✗  15t
+13. django-11099              ✓   7t     ✓   6t    ✓  13t     ✓  13t
+14. django-11133              ✓  10t     ✓   8t    ✗  23t     ✗  10t
+15. django-11179              ✓  13t     ✓   3t    ✗  11t     ✗   9t
+16. django-11283              ✓   8t     ✓   3t    ✓  23t     ✓   6t
+17. django-11422              ✗  31t     ✗   8t    ✗  25t     ✗   9t
+18. django-11564              ✗  50t     ✗  10t    ✗  18t     ✗   8t
+19. django-11583              ✓  22t     ✗   7t    ✗  25t     ✗   9t
+20. django-11620              ✓  28t     ✗   1t    ✗  17t     ✗   9t
 ─────────────────────────── ─────────  ─────────  ─────────  ─────────
-TOTAL                        14/20      13/20       6/20      running
-PASS RATE                      70%        65%        30%      ~15%
+TOTAL                        14/20      13/20       6/20       4/20
+PASS RATE                      70%        65%        30%        20%
 
-*Anthropic Haiku 4.5 run in progress at time of report
  t = tool calls per task
 ```
 
@@ -180,11 +180,9 @@ of all 3 would achieve **80%** — 10pp above any single model.
   Grok 3 Mini     ████████████████████████████████████████████      217 pts/$
   DeepSeek Chat   ████████████████████████████████████████████      214 pts/$
   GPT-5.4 Mini    ███████████████████████                          117 pts/$
-  Haiku 4.5       ███████████████                                  ~15 pts/$*
+  Haiku 4.5       ████████████████████                              20 pts/$
                   ├─────────┼─────────┼─────────┼─────────┤
                   0        50       100       150       200
-
-  *estimated from partial results
 ```
 
 ### Total Run Cost (estimated for 20 tasks)
@@ -194,7 +192,7 @@ of all 3 would achieve **80%** — 10pp above any single model.
 | DeepSeek | ~400K | ~$0.06 | 30% | $0.01 |
 | Grok | ~200K | ~$0.06 | 65% | $0.005 |
 | GPT-5.4 | ~600K | ~$0.36 | 70% | $0.026 |
-| Haiku | ~300K | ~$0.30 | ~15% | ~$0.10 |
+| Haiku | ~300K | ~$0.30 | 20% | $0.075 |
 
 **Grok resolves tasks at $0.005 each** — the cheapest per resolved task.
 
@@ -209,7 +207,7 @@ of all 3 would achieve **80%** — 10pp above any single model.
 | 1 | GPT-5.4 Mini + GEPA | **70%** (14/20) | Maximum accuracy |
 | 2 | Grok 3 Mini Fast | **65%** (13/20) | Balanced performance |
 | 3 | DeepSeek Chat | **30%** (6/20) | Budget runs |
-| 4 | Haiku 4.5 | **~15%** (est.) | Not recommended for SWE-bench |
+| 4 | Haiku 4.5 | **20%** (4/20) | JSON formatting issues limit performance |
 
 ### Rank by Cost Efficiency
 
@@ -218,7 +216,7 @@ of all 3 would achieve **80%** — 10pp above any single model.
 | 1 | Grok 3 Mini Fast | **217 pts/$** | Best value overall |
 | 2 | DeepSeek Chat | **214 pts/$** | Cheapest absolute cost |
 | 3 | GPT-5.4 Mini | **117 pts/$** | When accuracy matters most |
-| 4 | Haiku 4.5 | **~15 pts/$** | Not cost-effective |
+| 4 | Haiku 4.5 | **20 pts/$** | Lowest — JSON errors waste API calls |
 
 ### Rank by Tool Efficiency
 
