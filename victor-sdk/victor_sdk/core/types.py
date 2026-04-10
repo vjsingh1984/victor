@@ -1068,6 +1068,7 @@ class VerticalDefinition:
     tier: Tier = Tier.STANDARD
     metadata: Dict[str, Any] = field(default_factory=dict)
     extensions: Dict[str, Any] = field(default_factory=dict)
+    skills: List[Any] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Normalize and validate constructor payloads."""
@@ -1096,6 +1097,7 @@ class VerticalDefinition:
             )
             normalized_metadata = dict(self.metadata)
             normalized_extensions = dict(self.extensions)
+            normalized_skills = list(self.skills)
         except VerticalConfigurationError:
             raise
         except Exception as exc:
@@ -1119,6 +1121,7 @@ class VerticalDefinition:
         object.__setattr__(self, "workflow_metadata", normalized_workflow_metadata)
         object.__setattr__(self, "metadata", normalized_metadata)
         object.__setattr__(self, "extensions", normalized_extensions)
+        object.__setattr__(self, "skills", normalized_skills)
 
         self.validate()
 

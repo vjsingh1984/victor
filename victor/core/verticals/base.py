@@ -573,6 +573,18 @@ class VerticalBase(
         return stages
 
     @classmethod
+    def get_skills(cls) -> List[Any]:
+        """Return skill definitions for this vertical.
+
+        Subclasses override this to declare composable skills. Each skill
+        binds a prompt fragment with a tool subset and constraints.
+
+        Returns:
+            List of SkillDefinition objects (empty by default)
+        """
+        return []
+
+    @classmethod
     def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
         """Hook for final configuration customization.
 
