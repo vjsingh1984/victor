@@ -374,7 +374,7 @@ class ExecutionCoordinator:
             )
 
             provider_name = getattr(self._provider_context, "provider_name", "ollama")
-            if hasattr(provider_name, "__call__"):
+            if callable(provider_name):
                 provider_name = "ollama"  # Mock fallback
             model_name = getattr(self._provider_context, "model", None)
             complexity_str = getattr(task_classification, "complexity", "action")

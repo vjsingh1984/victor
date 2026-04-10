@@ -148,7 +148,7 @@ class ToolErrorClassifier:
                 from victor.agent.decisions.chain import should_use_llm
 
                 if not should_use_llm("error_classification"):
-                    return heuristic_result
+                    return ErrorType.RETRYABLE
 
                 from victor.agent.decisions.schemas import DecisionType
 

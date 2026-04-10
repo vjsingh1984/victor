@@ -353,15 +353,8 @@ async def edit(
         try:
             ops = json.loads(ops)
         except json.JSONDecodeError as exc:
-            # Try to provide helpful error message and recovery hints
-            error_context = ""
-
             # Detect control character issues (common with embedded newlines)
             if "control character" in str(exc).lower():
-                error_context = (
-                    "\n\nHINT: JSON strings cannot contain raw newlines or tabs. "
-                    "Use \\n for newlines and \\t for tabs within string values."
-                )
                 # Try to fix by escaping control characters in strings
                 try:
                     fixed = _fix_json_control_chars(ops)

@@ -77,12 +77,9 @@ class TreeSitterEntityExtractor(EntityExtractor):
                 self._extractor = provider
             else:
                 logger.warning(
-                    "Tree-sitter extractor not available: "
-                    "no enhanced provider registered"
+                    "Tree-sitter extractor not available: " "no enhanced provider registered"
                 )
-                raise ImportError(
-                    "Tree-sitter extractor capability not registered"
-                )
+                raise ImportError("Tree-sitter extractor capability not registered")
         return self._extractor
 
     async def extract(

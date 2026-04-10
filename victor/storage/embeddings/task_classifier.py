@@ -1396,9 +1396,7 @@ class TaskTypeClassifier:
 
             registry = CapabilityRegistry.get_instance()
             contributor = registry.get(TaskClassifierPhraseProtocol)
-            if contributor is None or not registry.is_enhanced(
-                TaskClassifierPhraseProtocol
-            ):
+            if contributor is None or not registry.is_enhanced(TaskClassifierPhraseProtocol):
                 return
 
             extra_phrases = contributor.get_classifier_phrases()
