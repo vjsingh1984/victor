@@ -138,6 +138,7 @@ class Tables:
     AGENT_PROMPT_ELEMENT = "agent_prompt_element"  # Prompt components
     AGENT_PROMPT_HISTORY = "agent_prompt_history"  # Prompt history
     AGENT_PROMPT_CANDIDATE = "agent_prompt_candidate"  # GEPA-evolved prompt candidates
+    AGENT_PROMPT_PARETO_INSTANCE = "agent_prompt_pareto_instance"  # GEPA v2 Pareto instances
 
     # Curriculum & Policy
     AGENT_CURRICULUM_STAGE = "agent_curriculum_stage"  # Learning curriculum
@@ -491,6 +492,20 @@ class Schema:
             is_active INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now')),
             UNIQUE(section_name, provider, text_hash)
+        )
+    """
+
+    AGENT_PROMPT_PARETO_INSTANCE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_PARETO_INSTANCE} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            section_name TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'default',
+            instance_id TEXT NOT NULL,
+            best_candidate_hash TEXT,
+            best_score REAL DEFAULT 0.0,
+            sample_count INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(section_name, provider, instance_id)
         )
     """
 
@@ -939,6 +954,7 @@ class Schema:
             cls.AGENT_PROMPT_STYLE,
             cls.AGENT_PROMPT_ELEMENT,
             cls.AGENT_PROMPT_CANDIDATE,
+            cls.AGENT_PROMPT_PARETO_INSTANCE,
             cls.AGENT_CURRICULUM_STAGE,
             cls.AGENT_CURRICULUM_METRIC,
             cls.AGENT_POLICY_SNAPSHOT,

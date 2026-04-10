@@ -121,6 +121,7 @@ class TestPromptOptimizerLearner:
     def test_evolvable_sections(self, learner):
         assert "ASI_TOOL_EFFECTIVENESS_GUIDANCE" in learner.EVOLVABLE_SECTIONS
         assert "GROUNDING_RULES" in learner.EVOLVABLE_SECTIONS
+        assert "COMPLETION_GUIDANCE" in learner.EVOLVABLE_SECTIONS
 
     def test_get_recommendation_no_candidates(self, learner):
         rec = learner.get_recommendation(
@@ -240,3 +241,34 @@ class TestPromptOptimizerLearner:
         assert PromptOptimizerLearner._categorize_failure(
             "something else"
         ) == "other"
+
+    def test_evolve_completion_guidance_section(self, db):
+        """Verify COMPLETION_GUIDANCE can be evolved like other sections."""
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+
+        # Manually insert a candidate for COMPLETION_GUIDANCE
+        candidate = PromptCandidate(
+            section_name="COMPLETION_GUIDANCE",
+            provider="default",
+            text="Evolved completion guidance text",
+            text_hash="comp_hash",
+            generation=1,
+            parent_hash="parent",
+            alpha=5.0,
+            beta_val=1.0,
+            sample_count=10,
+        )
+        key = learner._candidate_key("COMPLETION_GUIDANCE", "default")
+        learner._candidates[key] = [candidate]
+
+        rec = learner.get_recommendation(
+            "anthropic", "claude", "action",
+            section_name="COMPLETION_GUIDANCE",
+        )
+        assert rec is not None
+        assert rec.value == "Evolved completion guidance text"
+
+    def test_candidate_key_format(self, learner):
+        """Verify candidate key uses section::provider format."""
+        key = learner._candidate_key("COMPLETION_GUIDANCE", "ollama")
+        assert key == "COMPLETION_GUIDANCE::ollama"

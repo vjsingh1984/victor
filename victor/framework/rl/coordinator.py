@@ -782,12 +782,64 @@ class RLCoordinator:
                     name=name, db_connection=self.db, learning_rate=0.15
                 )
             elif name == "prompt_optimizer":
+                # Check settings: skip when prompt optimization is off
+                try:
+                    from victor.config.settings import get_settings
+
+                    settings = get_settings()
+                    po_cfg = getattr(settings, "prompt_optimization", None)
+                    if po_cfg is not None and not po_cfg.enabled:
+                        logger.debug(
+                            "Prompt optimization disabled — skipping prompt_optimizer"
+                        )
+                        return None
+                except Exception:
+                    pass  # Settings unavailable — allow creation
+
                 from victor.framework.rl.learners.prompt_optimizer import (
                     PromptOptimizerLearner,
                 )
 
+                # GEPA v2: use tiered service + Pareto when gepa.enabled
+                strategy = None
+                use_pareto = False
+                max_prompt_chars = 1500
+                try:
+                    from victor.config.settings import get_settings
+
+                    settings = get_settings()
+                    po_cfg = getattr(settings, "prompt_optimization", None)
+                    gepa_cfg = (
+                        po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
+                    )
+                    if gepa_cfg and gepa_cfg.enabled:
+                        from victor.framework.rl.gepa_strategy_adapter import (
+                            GEPAServiceStrategy,
+                        )
+                        from victor.framework.rl.gepa_tier_manager import (
+                            GEPATierManager,
+                        )
+
+                        tier_mgr = GEPATierManager(gepa_cfg)
+                        strategy = GEPAServiceStrategy(tier_mgr)
+                        use_pareto = True
+                        max_prompt_chars = getattr(
+                            gepa_cfg, "max_prompt_chars", 1500
+                        )
+                        logger.info(
+                            "GEPA v2 enabled: tier=%s, pareto=True",
+                            tier_mgr.get_current_tier(),
+                        )
+                except Exception as e:
+                    logger.debug("GEPA v2 init skipped: %s", e)
+
                 return PromptOptimizerLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
+                    name=name,
+                    db_connection=self.db,
+                    learning_rate=0.1,
+                    strategy=strategy,
+                    use_pareto=use_pareto,
+                    max_prompt_chars=max_prompt_chars,
                 )
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")

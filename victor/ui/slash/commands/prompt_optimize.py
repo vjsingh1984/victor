@@ -3,17 +3,21 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Prompt optimization slash command (GEPA-inspired).
+"""Prompt optimization slash command (GEPA v2).
 
 Commands:
 - /prompt-optimize: Run evolution cycle on all evolvable sections
 - /prompt-optimize ASI: Evolve a specific section
 - /prompt-optimize --status: Show candidates and scores
+- /prompt-optimize --pareto: Show Pareto frontier (v2)
+- /prompt-optimize --tier [economic|balanced|performance]: Show/set tier
 
 Example:
     /prompt-optimize                    # Evolve all sections
     /prompt-optimize ASI                # Evolve ASI_TOOL_EFFECTIVENESS_GUIDANCE
     /prompt-optimize --status           # Show current candidates
+    /prompt-optimize --pareto           # Show Pareto frontier
+    /prompt-optimize --tier performance # Force performance tier
 """
 
 from __future__ import annotations
@@ -87,12 +91,14 @@ class PromptOptimizeCommand(BaseSlashCommand):
             # Get current prompt text for each section
             from victor.agent.prompt_builder import (
                 ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                COMPLETION_GUIDANCE,
                 GROUNDING_RULES,
             )
 
             section_text = {
                 "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
                 "GROUNDING_RULES": GROUNDING_RULES,
+                "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
             }
 
             # Run evolution
@@ -164,7 +170,30 @@ class PromptOptimizeCommand(BaseSlashCommand):
                 )
 
         ctx.console.print(table)
+
+        # GEPA v2: Pareto info
+        pareto_info = metrics.get("pareto", {})
+        if pareto_info:
+            pareto_table = Table(title="Pareto Frontier (GEPA v2)")
+            pareto_table.add_column("Section", style="cyan")
+            pareto_table.add_column("Hash", style="dim")
+            pareto_table.add_column("Gen", style="green")
+            pareto_table.add_column("Coverage", style="bold")
+            pareto_table.add_column("Chars", style="dim")
+
+            for section, info in pareto_info.items():
+                for c in info.get("candidates", []):
+                    pareto_table.add_row(
+                        section,
+                        c["hash"][:8],
+                        str(c["gen"]),
+                        str(c["coverage"]),
+                        str(c["chars"]),
+                    )
+            ctx.console.print(pareto_table)
+
         ctx.console.print(
             f"\n[dim]Total: {metrics['total_candidates']} candidates "
-            f"across {len(metrics['sections'])} sections[/]"
+            f"across {len(metrics['sections'])} sections"
+            f"{' (Pareto v2)' if metrics.get('use_pareto') else ''}[/]"
         )

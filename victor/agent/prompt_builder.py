@@ -611,12 +611,23 @@ class SystemPromptBuilder:
                 base_prompt = f"{base_prompt}\n\n{tool_constraint}"
 
         if "completion" in sections_to_include:
-            base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
+            optimized_completion = self._get_optimized_section(
+                "COMPLETION_GUIDANCE"
+            )
+            completion = optimized_completion or COMPLETION_GUIDANCE
+            base_prompt = f"{base_prompt}\n\n{completion}"
 
         if "tool_guidance" in sections_to_include:
             tool_guidance = self.get_provider_tool_guidance()
             if tool_guidance:
                 base_prompt = f"{base_prompt}\n\n{tool_guidance}"
+
+        # GEPA: Replace static GROUNDING_RULES with evolved version if available
+        optimized_grounding = self._get_optimized_section("GROUNDING_RULES")
+        if optimized_grounding:
+            base_prompt = base_prompt.replace(
+                GROUNDING_RULES, optimized_grounding
+            )
 
         # ASI-derived tool effectiveness guidance (GEPA-inspired)
         # Check if prompt optimizer has an evolved version, else use static default
@@ -634,7 +645,17 @@ class SystemPromptBuilder:
 
         Returns the evolved text if a candidate exists with sufficient
         confidence, otherwise None (caller uses the static default).
+        Gated by USE_GEPA master flag — returns None when GEPA is disabled.
         """
+        try:
+            from victor.config.settings import get_settings
+
+            po = getattr(get_settings(), "prompt_optimization", None)
+            if po is None or not po.enabled:
+                return None
+        except Exception:
+            return None
+
         try:
             from victor.framework.rl.coordinator import get_rl_coordinator
 

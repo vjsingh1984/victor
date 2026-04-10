@@ -46,8 +46,25 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class ToolCallTrace:
+    """Individual tool call within a session (ASI detail)."""
+
+    tool_name: str
+    arguments_summary: str = ""
+    reasoning_before: str = ""
+    success: bool = True
+    result_summary: str = ""
+    error_detail: str = ""
+    duration_ms: float = 0.0
+
+
+@dataclass
 class ExecutionTrace:
-    """Summary of one agent session's execution for prompt evolution."""
+    """Summary of one agent session's execution for prompt evolution.
+
+    When GEPA v2 trace enrichment is enabled, tool_call_details contains
+    per-call ASI data. Otherwise, tool_calls is an int count (v1 compat).
+    """
 
     session_id: str
     task_type: str
@@ -58,6 +75,8 @@ class ExecutionTrace:
     success: bool
     completion_score: float
     tokens_used: int
+    # GEPA v2: detailed per-call traces (ASI)
+    tool_call_details: List["ToolCallTrace"] = field(default_factory=list)
 
 
 @dataclass
@@ -371,6 +390,7 @@ class PromptOptimizerLearner(BaseLearner):
     EVOLVABLE_SECTIONS = [
         "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
         "GROUNDING_RULES",
+        "COMPLETION_GUIDANCE",
     ]
 
     DEFAULT_OBJECTIVES = [
@@ -386,19 +406,42 @@ class PromptOptimizerLearner(BaseLearner):
         learning_rate: float = 0.1,
         provider_adapter: Any = None,
         strategy: Optional[PromptOptimizationStrategy] = None,
+        use_pareto: bool = False,
+        max_prompt_chars: int = 1500,
     ):
         self._strategy: PromptOptimizationStrategy = strategy or GEPAStrategy()
         self._candidates: Dict[str, List[PromptCandidate]] = {}
+        self._use_pareto = use_pareto
+        self._max_prompt_chars = max_prompt_chars
+        self._pareto_frontiers: Dict[str, Any] = {}  # section → ParetoFrontier
         super().__init__(name, db_connection, learning_rate, provider_adapter)
         self._load_candidates()
+        if self._use_pareto:
+            self._init_pareto_frontiers()
 
     def _ensure_tables(self) -> None:
-        """Create the prompt candidate table."""
+        """Create the prompt candidate table and GEPA v2 extensions."""
         from victor.core.schema import Schema
 
         try:
             self.db.executescript(Schema.AGENT_PROMPT_CANDIDATE)
-            logger.debug("Prompt optimizer tables ensured")
+            self.db.executescript(Schema.AGENT_PROMPT_PARETO_INSTANCE)
+            # Migrate: add v2 columns to existing table
+            for col_def, default in [
+                ("instance_scores TEXT", "'{}'"),
+                ("coverage_count INTEGER", "0"),
+                ("is_on_frontier INTEGER", "1"),
+                ("char_length INTEGER", "0"),
+            ]:
+                try:
+                    self.db.execute(
+                        f"ALTER TABLE agent_prompt_candidate "
+                        f"ADD COLUMN {col_def} DEFAULT {default}"
+                    )
+                except Exception:
+                    pass  # Column already exists
+            self.db.commit()
+            logger.debug("Prompt optimizer tables ensured (v2)")
         except Exception as e:
             logger.warning("Failed to create prompt optimizer tables: %s", e)
 
@@ -535,7 +578,12 @@ class PromptOptimizerLearner(BaseLearner):
         Returns:
             New PromptCandidate, or None if insufficient data
         """
-        traces = self._collect_traces(limit=50)
+        # Use v2 trace collection when Pareto mode is enabled
+        if self._use_pareto:
+            traces = self._collect_traces_v2(limit=50)
+        else:
+            traces = self._collect_traces(limit=50)
+
         if len(traces) < MIN_TRACES_FOR_EVOLUTION:
             logger.info(
                 "Not enough traces for evolution (%d < %d)",
@@ -552,6 +600,22 @@ class PromptOptimizerLearner(BaseLearner):
         new_text = self._strategy.mutate(current_text, reflection, section_name)
         if new_text == current_text:
             logger.info("Mutation produced no change for '%s'", section_name)
+            return None
+
+        # Prompt bloat control: hard-truncate
+        if self._max_prompt_chars and len(new_text) > self._max_prompt_chars:
+            new_text = new_text[: self._max_prompt_chars]
+            logger.info(
+                "GEPA bloat control: truncated '%s' to %d chars",
+                section_name, self._max_prompt_chars,
+            )
+
+        # Reject if over 2x the limit (likely garbage output)
+        if self._max_prompt_chars and len(new_text) > 2 * self._max_prompt_chars:
+            logger.warning(
+                "GEPA rejected mutation for '%s': %d chars > 2x limit",
+                section_name, len(new_text),
+            )
             return None
 
         # Create candidate
@@ -572,11 +636,26 @@ class PromptOptimizerLearner(BaseLearner):
         self._candidates.setdefault(key, []).append(candidate)
         self._save_candidate(candidate)
 
+        # GEPA v2: Add to Pareto frontier
+        if self._use_pareto:
+            if section_name not in self._pareto_frontiers:
+                from victor.framework.rl.pareto import ParetoFrontier
+                self._pareto_frontiers[section_name] = ParetoFrontier(
+                    max_candidates=20
+                )
+            self._pareto_frontiers[section_name].add_candidate(
+                text_hash=text_hash,
+                text=new_text,
+                generation=generation,
+            )
+
         logger.info(
-            "GEPA evolved '%s' to gen-%d (hash=%s)",
+            "GEPA evolved '%s' to gen-%d (hash=%s, %d chars%s)",
             section_name,
             generation,
             text_hash,
+            len(new_text),
+            ", pareto" if self._use_pareto else "",
         )
         return candidate
 
@@ -721,6 +800,151 @@ class PromptOptimizerLearner(BaseLearner):
             return "timeout"
         return "other"
 
+    # ------------------------------------------------------------------
+    # GEPA v2: Pareto support
+    # ------------------------------------------------------------------
+
+    def _init_pareto_frontiers(self) -> None:
+        """Initialize Pareto frontiers from existing candidates."""
+        try:
+            from victor.framework.rl.pareto import ParetoFrontier
+        except ImportError:
+            logger.warning("Pareto module not available, disabling Pareto mode")
+            self._use_pareto = False
+            return
+
+        for key, candidates in self._candidates.items():
+            section = key.split("::")[0] if "::" in key else key
+            if section not in self._pareto_frontiers:
+                self._pareto_frontiers[section] = ParetoFrontier(max_candidates=20)
+            frontier = self._pareto_frontiers[section]
+            for c in candidates:
+                frontier.add_candidate(
+                    text_hash=c.text_hash,
+                    text=c.text,
+                    generation=c.generation,
+                    instance_scores=c.scores,
+                )
+
+    def get_pareto_frontier(self, section_name: str) -> Optional[Any]:
+        """Get the Pareto frontier for a section (if Pareto mode enabled)."""
+        return self._pareto_frontiers.get(section_name)
+
+    def _collect_traces_v2(self, limit: int = 50) -> List[ExecutionTrace]:
+        """Collect enriched execution traces (GEPA v2 with ASI detail).
+
+        Reads the enriched JSONL events which include reasoning_before_call,
+        result_summary, error_detail, and duration_ms per tool call.
+        Falls back to v1 collection if enriched fields are absent.
+        """
+        traces: List[ExecutionTrace] = []
+
+        try:
+            from victor.config.settings import get_project_paths
+
+            logs_dir = get_project_paths().global_logs_dir
+        except Exception:
+            logs_dir = Path.home() / ".victor" / "logs"
+
+        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [
+            logs_dir / "usage.jsonl"
+        ]
+
+        sessions: Dict[str, Dict[str, Any]] = {}
+        for jsonl_path in jsonl_files:
+            if not jsonl_path.exists():
+                continue
+            try:
+                opener = gzip.open if jsonl_path.suffix == ".gz" else open
+                mode = "rt" if jsonl_path.suffix == ".gz" else "r"
+                with opener(jsonl_path, mode) as f:
+                    for line in f:
+                        try:
+                            event = json.loads(line.strip())
+                            sid = event.get("session_id", "")
+                            etype = event.get("event_type", "")
+                            data = event.get("data", {})
+
+                            if sid not in sessions:
+                                sessions[sid] = {
+                                    "tool_calls": 0,
+                                    "failures": {},
+                                    "provider": "",
+                                    "model": "",
+                                    "task_type": "default",
+                                    "tokens": 0,
+                                    "details": [],  # v2: per-call details
+                                }
+
+                            if etype == "tool_call":
+                                sessions[sid]["tool_calls"] += 1
+                                # v2: capture detail
+                                detail = ToolCallTrace(
+                                    tool_name=data.get("tool_name", ""),
+                                    arguments_summary=str(
+                                        data.get("arguments_sanitized", "")
+                                    )[:200],
+                                    reasoning_before=str(
+                                        data.get("reasoning_before_call", "")
+                                    )[:500],
+                                )
+                                sessions[sid]["details"].append(detail)
+
+                            elif etype == "tool_result":
+                                success = data.get("success", True)
+                                # Update the last detail entry
+                                details = sessions[sid]["details"]
+                                if details:
+                                    last = details[-1]
+                                    last.success = success
+                                    last.duration_ms = data.get("duration_ms", 0)
+                                    last.result_summary = str(
+                                        data.get("result_summary", "")
+                                    )[:500]
+                                    last.error_detail = str(
+                                        data.get("error_detail", "")
+                                    )[:500]
+
+                                if not success:
+                                    error = str(
+                                        data.get("error_detail")
+                                        or data.get("error")
+                                        or data.get("result", {}).get("error", "")
+                                    )
+                                    cat = self._categorize_failure(error)
+                                    sessions[sid]["failures"][cat] = (
+                                        sessions[sid]["failures"].get(cat, 0) + 1
+                                    )
+
+                            elif etype == "task_classification":
+                                sessions[sid]["task_type"] = data.get(
+                                    "task_type", "default"
+                                )
+                        except (json.JSONDecodeError, KeyError):
+                            continue
+            except Exception:
+                continue
+
+        for sid, data in list(sessions.items())[-limit:]:
+            if data["tool_calls"] > 0:
+                has_failures = bool(data["failures"])
+                traces.append(
+                    ExecutionTrace(
+                        session_id=sid,
+                        task_type=data["task_type"],
+                        provider=data.get("provider", "unknown"),
+                        model=data.get("model", "unknown"),
+                        tool_calls=data["tool_calls"],
+                        tool_failures=data["failures"],
+                        success=not has_failures,
+                        completion_score=0.5 if has_failures else 0.8,
+                        tokens_used=data.get("tokens", 0),
+                        tool_call_details=data.get("details", []),
+                    )
+                )
+
+        return traces
+
     def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward from outcome."""
         return (
@@ -731,6 +955,21 @@ class PromptOptimizerLearner(BaseLearner):
 
     def export_metrics(self) -> Dict[str, Any]:
         """Export optimizer metrics."""
+        pareto_info = {}
+        for section, frontier in self._pareto_frontiers.items():
+            pareto_info[section] = {
+                "frontier_size": frontier.size,
+                "candidates": [
+                    {
+                        "hash": e.text_hash,
+                        "gen": e.generation,
+                        "coverage": e.coverage_count,
+                        "chars": e.char_length,
+                    }
+                    for e in frontier.get_frontier()
+                ],
+            }
+
         return {
             "total_candidates": sum(
                 len(v) for v in self._candidates.values()
@@ -746,4 +985,6 @@ class PromptOptimizerLearner(BaseLearner):
                 ),
                 default=0,
             ),
+            "use_pareto": self._use_pareto,
+            "pareto": pareto_info,
         }
