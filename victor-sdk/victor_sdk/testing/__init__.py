@@ -44,6 +44,9 @@ _DEFAULT_FORBIDDEN_PREFIXES = (
     "victor.core.container",
     "victor.core.bootstrap",
     "victor.evaluation.",
+    "victor.storage.",
+    "victor.config.settings",
+    "victor.config.api_keys",
 )
 
 # Allowed import prefixes (safe for external verticals)
