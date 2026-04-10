@@ -3,6 +3,11 @@
 These helpers centralize the migration bridge from legacy in-tree coding
 modules to the extracted ``victor-coding`` package so runtime/UI surfaces do
 not duplicate fallback import logic.
+
+Note: These functions are the only place in core that imports from
+victor_coding directly. All imports are lazy (inside functions) and
+wrapped in try/except with fallback chains. Core functions correctly
+without victor-coding installed.
 """
 
 from __future__ import annotations
