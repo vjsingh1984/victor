@@ -116,6 +116,8 @@ __all__ = [
     "YAMLToolDependencyProvider",  # noqa: F822
     "load_tool_dependency_yaml",  # noqa: F822
     "create_vertical_tool_dependency_provider",  # noqa: F822
+    "TieredToolConfig",  # noqa: F822
+    "TaskTypeHint",  # noqa: F822
     # Safety pattern types
     "SafetyExtensionProtocol",  # noqa: F822
     "SafetyPattern",  # noqa: F822
@@ -217,6 +219,8 @@ def __getattr__(name: str):
         "YAMLToolDependencyProvider": "victor.core.tool_dependency_loader",
         "load_tool_dependency_yaml": "victor.core.tool_dependency_loader",
         "create_vertical_tool_dependency_provider": "victor.core.tool_dependency_loader",
+        "TieredToolConfig": "victor.core.verticals.protocols",
+        "TaskTypeHint": "victor.core.vertical_types",
         # Safety pattern types
         "SafetyExtensionProtocol": "victor.core.verticals.protocols",
         "SafetyPattern": "victor.core.verticals.protocols",
