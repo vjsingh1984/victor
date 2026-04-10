@@ -63,6 +63,7 @@ ENTRY_POINT_GROUPS = frozenset(
         "victor.hook.providers",
         "victor.compaction.providers",
         "victor.sdk.protocols",
+        "victor.skills",
     }
 )
 

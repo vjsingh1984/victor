@@ -121,6 +121,8 @@ from victor_sdk.discovery import (
     get_discovery_summary,
     reload_discovery,
 )
+from victor_sdk.skills import SkillDefinition, SkillProvider
+
 from victor_sdk.validation import (
     ValidationIssue,
     ValidationReport,
@@ -260,4 +262,7 @@ __all__ = [
     "PermissionProvider",
     "CompactionProvider",
     "ExternalPluginProvider",
+    # Skills
+    "SkillDefinition",
+    "SkillProvider",
 ]

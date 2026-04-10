@@ -265,6 +265,7 @@ class VerticalBase(ABC):
                 workflow_metadata=cls.get_workflow_metadata(),
                 tier=cls.get_tier(),
                 metadata=cls.get_metadata(),
+                skills=cls.get_skills(),
             )
         except VerticalConfigurationError as exc:
             if exc.vertical_name is not None:
@@ -590,6 +591,18 @@ class VerticalBase(ABC):
             version=cls.get_version(),
             provides=provides,
         )
+
+    @classmethod
+    def get_skills(cls) -> List[Any]:
+        """Return skill definitions for this vertical.
+
+        Subclasses override this to declare composable skills. Each skill
+        is a SkillDefinition that binds a prompt fragment with a tool subset.
+
+        Returns:
+            List of SkillDefinition objects (empty by default)
+        """
+        return []
 
     @classmethod
     def _get_toolset(cls) -> ToolSet:
