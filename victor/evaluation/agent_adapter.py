@@ -290,6 +290,15 @@ class VictorAgentAdapter:
                 "output_tokens": usage.output_tokens,
                 "total_tokens": usage.total_tokens,
             }
+        # Fallback: read from _cumulative_token_usage directly if metrics returns 0
+        if token_usage["total_tokens"] == 0:
+            cum = getattr(self.orchestrator, "_cumulative_token_usage", {})
+            if cum.get("total_tokens", 0) > 0:
+                token_usage = {
+                    "input_tokens": cum.get("prompt_tokens", 0),
+                    "output_tokens": cum.get("completion_tokens", 0),
+                    "total_tokens": cum.get("total_tokens", 0),
+                }
 
         return {
             "code": "",  # No code generated on timeout
@@ -644,6 +653,17 @@ class VictorAgentAdapter:
         # Capture token usage from orchestrator (P1: Token Tracking Fix)
         if hasattr(self.orchestrator, "get_token_usage"):
             trace.token_usage = self.orchestrator.get_token_usage()
+            # Fallback: read cumulative dict directly if metrics reports 0
+            if trace.token_usage and trace.token_usage.total_tokens == 0:
+                cum = getattr(self.orchestrator, "_cumulative_token_usage", {})
+                if cum.get("total_tokens", 0) > 0:
+                    from victor.evaluation.protocol import TokenUsage
+
+                    trace.token_usage = TokenUsage(
+                        input_tokens=cum.get("prompt_tokens", 0),
+                        output_tokens=cum.get("completion_tokens", 0),
+                        total_tokens=cum.get("total_tokens", 0),
+                    )
 
         return trace
 
