@@ -211,7 +211,7 @@ jobs:
           retention-days: 30
 
   sast-scan:
-    name: SAST Scan (Semgrep, Advisory)
+    name: SAST Scan (Semgrep)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -224,9 +224,7 @@ jobs:
         uses: returntocorp/semgrep-action@v1
         with:
           config: auto
-          args: --sarif --output=semgrep.sarif
-        # Advisory until repo-specific exclusions are tuned and documented.
-        continue-on-error: true
+          args: --sarif --output=semgrep.sarif --exclude='archive/*' --exclude='docs/*' --exclude='tests/*' --exclude='examples/*' --exclude='vscode-victor/*'
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 

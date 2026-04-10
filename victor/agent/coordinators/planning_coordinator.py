@@ -101,6 +101,7 @@ class PlanningConfig:
 
     # Planning behavior
     show_plan_before_execution: bool = True  # Require user to see plan first
+    auto_approve: bool = True  # Auto-approve plans (False = wait for user confirmation)
     allow_plan_modification: bool = False  # Allow user to modify plan (future)
     max_parallel_steps: int = 1  # Max steps to execute in parallel (future)
 
@@ -397,22 +398,42 @@ class PlanningCoordinator:
         return plan
 
     def _show_plan_to_user(self, plan: ReadableTaskPlan) -> None:
-        """Display the plan to the user.
+        """Display the plan to the user using Rich formatting.
 
         Args:
             plan: Plan to display
         """
-        # Interactive plan display — tracked in #86
-        # For now, log the plan structure
-        logger.info(f"Plan: {plan.name}")
-        logger.info(f"Complexity: {plan.complexity.value}")
-        logger.info(f"Steps: {len(plan.steps)}")
+        try:
+            from rich.console import Console
+            from rich.panel import Panel
+            from rich.table import Table
 
-        for i, step in enumerate(plan.steps):
-            step_id = step[0]
-            step_type = step[1]
-            step_desc = step[2]
-            logger.info(f"  {step_id}. [{step_type}] {step_desc}")
+            console = Console()
+            table = Table(
+                title=f"\U0001f4cb {plan.name} ({plan.complexity.value})",
+                show_lines=False,
+            )
+            table.add_column("#", style="dim", width=3)
+            table.add_column("Type", style="cyan", width=12)
+            table.add_column("Description")
+            table.add_column("Tools", style="dim")
+
+            for step in plan.steps:
+                step_id = str(step[0]) if len(step) > 0 else ""
+                step_type = str(step[1]) if len(step) > 1 else ""
+                step_desc = str(step[2]) if len(step) > 2 else ""
+                step_tools = str(step[3]) if len(step) > 3 else ""
+                table.add_row(step_id, step_type, step_desc, step_tools)
+
+            console.print(table)
+
+            if plan.duration:
+                console.print(f"[dim]Estimated: {plan.duration}[/]")
+        except Exception:
+            # Fallback to logger if Rich unavailable
+            logger.info("Plan: %s (%s, %d steps)", plan.name, plan.complexity.value, len(plan.steps))
+            for step in plan.steps:
+                logger.info("  %s. [%s] %s", step[0], step[1], step[2] if len(step) > 2 else "")
 
     async def _execute_plan(self, plan: ReadableTaskPlan) -> "PlanResult":
         """Execute the plan step by step.
@@ -434,7 +455,7 @@ class PlanningCoordinator:
         # Execute with auto-approval (can be made configurable)
         result = await planner.execute_plan(
             execution_plan,
-            auto_approve=True,  # Configurable approval tracked in #86
+            auto_approve=self.config.auto_approve,
         )
 
         logger.info(
