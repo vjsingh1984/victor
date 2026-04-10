@@ -119,16 +119,9 @@ __all__ = [
     "TieredToolConfig",  # noqa: F822
     "TaskTypeHint",  # noqa: F822
     "ToolDependencyLoader",  # noqa: F822
-    # Safety and conversation coordinator types
+    # Safety pattern types
     "SafetyExtensionProtocol",  # noqa: F822
     "SafetyPattern",  # noqa: F822
-    "SafetyAction",  # noqa: F822
-    "SafetyCategory",  # noqa: F822
-    "SafetyCoordinator",  # noqa: F822
-    "SafetyRule",  # noqa: F822
-    "ConversationCoordinator",  # noqa: F822
-    "ConversationStats",  # noqa: F822
-    "TurnType",  # noqa: F822
     # Promoted protocols (from SDK, re-exported for convenience)
     "PromptContributorProtocol",  # noqa: F822
     "ModeConfigProviderProtocol",  # noqa: F822
@@ -230,16 +223,9 @@ def __getattr__(name: str):
         "TieredToolConfig": "victor.core.verticals.protocols",
         "TaskTypeHint": "victor.core.vertical_types",
         "ToolDependencyLoader": "victor.core.tool_dependency_loader",
-        # Safety and conversation coordinator types
+        # Safety pattern types
         "SafetyExtensionProtocol": "victor.core.verticals.protocols",
         "SafetyPattern": "victor.core.verticals.protocols",
-        "SafetyAction": "victor.agent.coordinators.safety_coordinator",
-        "SafetyCategory": "victor.agent.coordinators.safety_coordinator",
-        "SafetyCoordinator": "victor.agent.coordinators.safety_coordinator",
-        "SafetyRule": "victor.agent.coordinators.safety_coordinator",
-        "ConversationCoordinator": "victor.agent.coordinators.conversation_coordinator",
-        "ConversationStats": "victor.agent.coordinators.conversation_coordinator",
-        "TurnType": "victor.agent.coordinators.conversation_coordinator",
         # Promoted protocols
         "PromptContributorProtocol": "victor.core.verticals.protocols",
         "ModeConfigProviderProtocol": "victor.core.verticals.protocols",
