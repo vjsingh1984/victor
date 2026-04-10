@@ -3,7 +3,7 @@
 
 import pytest
 
-from victor.core.verticals.protocols import VerticalExtensions
+from victor_sdk import VerticalExtensions
 
 
 class TestCodingVerticalExtensions:
@@ -127,4 +127,3 @@ class TestVerticalIntegrationWithProtocols:
         assert hasattr(CodingAssistant, "get_rl_config_provider")
         assert hasattr(CodingAssistant, "get_rl_hooks")
         assert hasattr(CodingAssistant, "get_team_spec_provider")
-

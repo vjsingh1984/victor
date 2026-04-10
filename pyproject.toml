@@ -36,11 +36,14 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "victor-ai>=0.6.0,<1.0",  # Requires @register_vertical decorator and new SDK features
+    "victor-sdk>=0.6.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24",  # Required by victor.storage.embeddings (used by codebase search)
 ]
 
 [project.optional-dependencies]
+runtime = [
+    "victor-ai>=0.6.0,<1.0",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -85,9 +88,6 @@ coding = "victor_coding.capabilities:CodingCapabilityProvider"
 coding = "victor_coding.service_provider:CodingServiceProvider"
 
 [project.entry-points."victor.team_spec_providers"]
-coding = "victor_coding.teams:CodingTeamSpecProvider"
-
-[project.entry-points."victor.framework.teams.providers"]
 coding = "victor_coding.teams:CodingTeamSpecProvider"
 
 # NEW: Victor SDK Protocol implementations

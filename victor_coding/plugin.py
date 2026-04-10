@@ -6,8 +6,6 @@ from typing import Any, Dict, Optional
 
 from victor_sdk import PluginContext, VictorPlugin
 
-from victor_coding.assistant import CodingAssistant
-
 
 class CodingPlugin(VictorPlugin):
     """VictorPlugin adapter for the coding vertical package."""
@@ -17,6 +15,8 @@ class CodingPlugin(VictorPlugin):
         return "coding"
 
     def register(self, context: PluginContext) -> None:
+        from victor_coding.assistant import CodingAssistant
+
         context.register_vertical(CodingAssistant)
 
     def get_cli_app(self) -> Optional[Any]:
@@ -38,7 +38,7 @@ class CodingPlugin(VictorPlugin):
         return {
             "healthy": True,
             "vertical": "coding",
-            "vertical_class": CodingAssistant.__name__,
+            "vertical_class": "CodingAssistant",
         }
 
 
