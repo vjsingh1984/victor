@@ -2,6 +2,8 @@
 
 This guide explains Victor's unified configuration system, which provides a streamlined way to manage provider accounts, authentication, and settings.
 
+> For a comprehensive reference of all settings (tools, skills, planning, optimization, feature flags), see **[Settings Reference](settings-reference.md)**.
+
 ## Overview
 
 Victor uses a single configuration file (`~/.victor/config.yaml`) that unifies:
