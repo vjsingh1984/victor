@@ -137,9 +137,7 @@ class IntegrationTestAgent:
         # Generate output, potentially using previous output in pipeline
         previous_output = context.get("previous_output", "")
         if previous_output:
-            return (
-                f"{self.output_prefix}: Processed [{previous_output}] for task: {task}"
-            )
+            return f"{self.output_prefix}: Processed [{previous_output}] for task: {task}"
         return f"{self.output_prefix}: Completed task: {task}"
 
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
@@ -685,10 +683,7 @@ class TestPipelineFormation:
         coordinator: UnifiedTeamCoordinator,
     ):
         """Each stage output becomes input for the next."""
-        agents = [
-            IntegrationTestAgent(f"stage_{i}", output_prefix=f"Stage{i}")
-            for i in range(3)
-        ]
+        agents = [IntegrationTestAgent(f"stage_{i}", output_prefix=f"Stage{i}") for i in range(3)]
 
         for agent in agents:
             coordinator.add_member(agent)

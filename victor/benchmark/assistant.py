@@ -239,8 +239,6 @@ You are being evaluated on:
         """Apply benchmark-specific configuration tweaks."""
         # Add benchmark-specific metadata
         config.metadata["tool_budget"] = 30  # Recommended for complex benchmark tasks
-        config.metadata["thinking"] = (
-            True  # Enable extended thinking for complex reasoning
-        )
+        config.metadata["thinking"] = True  # Enable extended thinking for complex reasoning
 
         return config

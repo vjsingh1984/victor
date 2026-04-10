@@ -157,9 +157,7 @@ def long_running_workflow():
 class TestStreamingWorkflowE2E:
     """End-to-end streaming workflow tests."""
 
-    async def test_stream_simple_transform_workflow(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_stream_simple_transform_workflow(self, mock_orchestrator, three_node_workflow):
         """Test streaming a simple transform workflow.
 
         Verifies event sequence: START -> NODE_START -> NODE_COMPLETE (x3) -> COMPLETE
@@ -167,9 +165,7 @@ class TestStreamingWorkflowE2E:
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         events: List[WorkflowStreamChunk] = []
-        async for chunk in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             events.append(chunk)
 
         # Verify we got events
@@ -186,12 +182,8 @@ class TestStreamingWorkflowE2E:
         assert events[-1].is_final is True
 
         # Should have NODE_START and NODE_COMPLETE for each of 3 nodes
-        node_starts = [
-            e for e in events if e.event_type == WorkflowEventType.NODE_START
-        ]
-        node_completes = [
-            e for e in events if e.event_type == WorkflowEventType.NODE_COMPLETE
-        ]
+        node_starts = [e for e in events if e.event_type == WorkflowEventType.NODE_START]
+        node_completes = [e for e in events if e.event_type == WorkflowEventType.NODE_COMPLETE]
 
         assert len(node_starts) == 3
         assert len(node_completes) == 3
@@ -200,9 +192,7 @@ class TestStreamingWorkflowE2E:
         node_ids = [e.node_id for e in node_starts]
         assert node_ids == ["step_a", "step_b", "step_c"]
 
-    async def test_stream_progress_increases(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_stream_progress_increases(self, mock_orchestrator, three_node_workflow):
         """Test that progress increases during streaming.
 
         Verifies progress: 0 -> 33 -> 66 -> 100
@@ -210,9 +200,7 @@ class TestStreamingWorkflowE2E:
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         progress_values: List[float] = []
-        async for chunk in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             progress_values.append(chunk.progress)
 
         # Progress should start at 0
@@ -235,9 +223,7 @@ class TestStreamingWorkflowE2E:
         assert 0.0 in unique_progress
         assert 100.0 in unique_progress
 
-    async def test_stream_multi_node_sequence(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_stream_multi_node_sequence(self, mock_orchestrator, three_node_workflow):
         """Test streaming maintains node order in sequence.
 
         Verifies nodes execute in dependency order.
@@ -247,9 +233,7 @@ class TestStreamingWorkflowE2E:
         # Track node execution order
         execution_order: List[str] = []
 
-        async for chunk in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             if chunk.event_type == WorkflowEventType.NODE_COMPLETE:
                 execution_order.append(chunk.node_id)
 
@@ -274,8 +258,7 @@ class TestStreamingWorkflowE2E:
         error_events = [
             e
             for e in events
-            if e.event_type
-            in [WorkflowEventType.NODE_ERROR, WorkflowEventType.WORKFLOW_ERROR]
+            if e.event_type in [WorkflowEventType.NODE_ERROR, WorkflowEventType.WORKFLOW_ERROR]
         ]
         assert len(error_events) > 0
 
@@ -284,9 +267,7 @@ class TestStreamingWorkflowE2E:
         assert len(errors_with_messages) > 0
 
         # The failing node should have reported its error
-        node_errors = [
-            e for e in events if e.event_type == WorkflowEventType.NODE_ERROR
-        ]
+        node_errors = [e for e in events if e.event_type == WorkflowEventType.NODE_ERROR]
         if node_errors:
             failure_node_error = [e for e in node_errors if e.node_id == "failure"]
             assert len(failure_node_error) > 0
@@ -301,9 +282,7 @@ class TestStreamingWorkflowE2E:
         else:
             assert final_event.event_type == WorkflowEventType.WORKFLOW_ERROR
 
-    async def test_subscription_receives_events(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_subscription_receives_events(self, mock_orchestrator, three_node_workflow):
         """Test subscription callback receives matching events.
 
         Subscribes to NODE_COMPLETE events and verifies callback invocation.
@@ -317,14 +296,10 @@ class TestStreamingWorkflowE2E:
             subscribed_events.append(chunk)
 
         # Subscribe to NODE_COMPLETE events only
-        unsubscribe = executor.subscribe(
-            [WorkflowEventType.NODE_COMPLETE], on_node_complete
-        )
+        unsubscribe = executor.subscribe([WorkflowEventType.NODE_COMPLETE], on_node_complete)
 
         # Execute workflow via astream
-        async for _ in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for _ in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             pass
 
         # Unsubscribe after workflow completes
@@ -341,9 +316,7 @@ class TestStreamingWorkflowE2E:
         node_ids = {e.node_id for e in subscribed_events}
         assert node_ids == {"step_a", "step_b", "step_c"}
 
-    async def test_subscription_unsubscribe_works(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_subscription_unsubscribe_works(self, mock_orchestrator, three_node_workflow):
         """Test that unsubscribe stops callback invocation."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -359,17 +332,13 @@ class TestStreamingWorkflowE2E:
         unsubscribe()
 
         # Execute workflow
-        async for _ in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for _ in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             pass
 
         # Should not have received any events via callback
         assert call_count["value"] == 0
 
-    async def test_cancellation_stops_workflow(
-        self, mock_orchestrator, long_running_workflow
-    ):
+    async def test_cancellation_stops_workflow(self, mock_orchestrator, long_running_workflow):
         """Test cancellation properly stops streaming.
 
         Starts a long workflow and cancels mid-execution.
@@ -400,9 +369,7 @@ class TestStreamingWorkflowE2E:
         # Should have fewer events than a complete workflow
         # Complete workflow: START + (START + COMPLETE) * 3 + COMPLETE = 8 events
         # Cancelled workflow should have less
-        node_completes = [
-            e for e in events if e.event_type == WorkflowEventType.NODE_COMPLETE
-        ]
+        node_completes = [e for e in events if e.event_type == WorkflowEventType.NODE_COMPLETE]
         # Should have stopped before completing all 3 nodes
         # We cancel after first NODE_COMPLETE, so we might get 1-2 completes
         assert len(node_completes) < 3
@@ -414,9 +381,7 @@ class TestStreamingWorkflowE2E:
         result = executor.cancel_workflow("nonexistent_workflow_id")
         assert result is False
 
-    async def test_backward_compatibility_execute(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_backward_compatibility_execute(self, mock_orchestrator, three_node_workflow):
         """Test execute() still works on StreamingWorkflowExecutor.
 
         Verifies that the base class execute() method returns
@@ -425,9 +390,7 @@ class TestStreamingWorkflowE2E:
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         # Use the inherited execute() method (not astream)
-        result = await executor.execute(
-            three_node_workflow, initial_context={"counter": 0}
-        )
+        result = await executor.execute(three_node_workflow, initial_context={"counter": 0})
 
         # Should return WorkflowResult
         assert isinstance(result, WorkflowResult)
@@ -466,9 +429,7 @@ class TestStreamingWorkflowE2E:
         # After fully completing the iteration, should be empty
         assert executor.get_active_workflows() == []
 
-    async def test_get_workflow_progress(
-        self, mock_orchestrator, long_running_workflow
-    ):
+    async def test_get_workflow_progress(self, mock_orchestrator, long_running_workflow):
         """Test get_workflow_progress returns current progress."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -493,16 +454,12 @@ class TestStreamingWorkflowE2E:
         # After completion, should return None
         assert executor.get_workflow_progress(workflow_id) is None
 
-    async def test_workflow_metadata_in_chunks(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_workflow_metadata_in_chunks(self, mock_orchestrator, three_node_workflow):
         """Test that workflow metadata is included in chunks."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         first_chunk: Optional[WorkflowStreamChunk] = None
-        async for chunk in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             if chunk.event_type == WorkflowEventType.WORKFLOW_START:
                 first_chunk = chunk
                 break
@@ -514,16 +471,12 @@ class TestStreamingWorkflowE2E:
         assert "total_nodes" in first_chunk.metadata
         assert first_chunk.metadata["total_nodes"] == 3
 
-    async def test_node_metadata_in_chunks(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_node_metadata_in_chunks(self, mock_orchestrator, three_node_workflow):
         """Test that node metadata is included in node event chunks."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         node_events: List[WorkflowStreamChunk] = []
-        async for chunk in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             if chunk.event_type in [
                 WorkflowEventType.NODE_START,
                 WorkflowEventType.NODE_COMPLETE,
@@ -536,9 +489,7 @@ class TestStreamingWorkflowE2E:
             assert event.node_name is not None
 
         # NODE_START should have node_type in metadata
-        start_events = [
-            e for e in node_events if e.event_type == WorkflowEventType.NODE_START
-        ]
+        start_events = [e for e in node_events if e.event_type == WorkflowEventType.NODE_START]
         for event in start_events:
             assert "node_type" in event.metadata
 
@@ -587,9 +538,7 @@ class TestStreamingWorkflowEdgeCases:
             return ctx
 
         workflow = (
-            WorkflowBuilder("single_node_workflow")
-            .add_transform("only_step", single_step)
-            .build()
+            WorkflowBuilder("single_node_workflow").add_transform("only_step", single_step).build()
         )
 
         executor = StreamingWorkflowExecutor(mock_orchestrator)
@@ -626,9 +575,7 @@ class TestStreamingWorkflowEdgeCases:
         unsub1 = executor.subscribe([WorkflowEventType.NODE_START], on_start)
         unsub2 = executor.subscribe([WorkflowEventType.NODE_COMPLETE], on_complete)
 
-        async for _ in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for _ in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             pass
 
         unsub1()
@@ -645,9 +592,7 @@ class TestStreamingWorkflowEdgeCases:
             ctx["quick"] = True
             return ctx
 
-        workflow = (
-            WorkflowBuilder("quick_workflow").add_transform("quick", quick_step).build()
-        )
+        workflow = WorkflowBuilder("quick_workflow").add_transform("quick", quick_step).build()
 
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
@@ -658,16 +603,12 @@ class TestStreamingWorkflowEdgeCases:
         # Should complete successfully within timeout
         assert events[-1].is_final is True
 
-    async def test_workflow_id_consistency(
-        self, mock_orchestrator, three_node_workflow
-    ):
+    async def test_workflow_id_consistency(self, mock_orchestrator, three_node_workflow):
         """Test that workflow_id is consistent across all events."""
         executor = StreamingWorkflowExecutor(mock_orchestrator)
 
         workflow_ids = set()
-        async for chunk in executor.astream(
-            three_node_workflow, initial_context={"counter": 0}
-        ):
+        async for chunk in executor.astream(three_node_workflow, initial_context={"counter": 0}):
             workflow_ids.add(chunk.workflow_id)
 
         # All events should have the same workflow_id

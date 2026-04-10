@@ -188,9 +188,7 @@ def complex(x):
         simple_metrics = await analyzer.analyze(simple_code, language="python")
         complex_metrics = await analyzer.analyze(complex_code, language="python")
 
-        assert (
-            complex_metrics.cyclomatic_complexity > simple_metrics.cyclomatic_complexity
-        )
+        assert complex_metrics.cyclomatic_complexity > simple_metrics.cyclomatic_complexity
 
 
 class TestTaskResult:

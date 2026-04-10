@@ -203,12 +203,8 @@ def test_vertical_loader_load_activates_sdk_vertical_through_adapter(monkeypatch
 
     activated = []
     monkeypatch.setattr(loader, "_negotiate_manifest", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        loader, "_validate_dependencies", lambda *_args, **_kwargs: None
-    )
-    monkeypatch.setattr(
-        loader, "_activate", lambda vertical: activated.append(vertical)
-    )
+    monkeypatch.setattr(loader, "_validate_dependencies", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(loader, "_activate", lambda vertical: activated.append(vertical))
 
     resolved = loader.load("sdk_external")
 

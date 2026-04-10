@@ -332,9 +332,7 @@ class TestCheckpointIntegration:
             yield Path(tmpdir)
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        SQLiteCheckpointBackend is None, reason="aiosqlite not installed"
-    )
+    @pytest.mark.skipif(SQLiteCheckpointBackend is None, reason="aiosqlite not installed")
     async def test_checkpoint_save_restore(self, temp_dir):
         """Test saving and restoring checkpoints."""
         backend = SQLiteCheckpointBackend(storage_path=temp_dir)
@@ -370,9 +368,7 @@ class TestCheckpointIntegration:
         assert restored["context"]["project"] == "victor"
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        SQLiteCheckpointBackend is None, reason="aiosqlite not installed"
-    )
+    @pytest.mark.skipif(SQLiteCheckpointBackend is None, reason="aiosqlite not installed")
     async def test_checkpoint_list_and_diff(self, temp_dir):
         """Test listing checkpoints and comparing."""
         backend = SQLiteCheckpointBackend(storage_path=temp_dir)
@@ -439,9 +435,7 @@ class TestCrossComponentIntegration:
         assert len(agent.metadata["entities"]) > 0
 
     @pytest.mark.asyncio
-    @pytest.mark.skipif(
-        SQLiteCheckpointBackend is None, reason="aiosqlite not installed"
-    )
+    @pytest.mark.skipif(SQLiteCheckpointBackend is None, reason="aiosqlite not installed")
     async def test_pipeline_with_hitl_checkpoint(self):
         """Test pipeline execution with HITL and checkpoint integration."""
         # This simulates a real workflow:

@@ -73,11 +73,7 @@ class TestBenchmarkRun:
         result = runner.invoke(benchmark_app, ["run", "--help"])
         assert result.exit_code == 0
         # Options may be truncated by Rich formatting, check for key parts
-        assert (
-            "max-tasks" in result.stdout
-            or "max_tasks" in result.stdout
-            or "-n" in result.stdout
-        )
+        assert "max-tasks" in result.stdout or "max_tasks" in result.stdout or "-n" in result.stdout
         assert "timeout" in result.stdout
         assert "profile" in result.stdout
 
@@ -103,9 +99,7 @@ class TestBenchmarkLeaderboard:
 
     def test_leaderboard_swe_bench(self):
         """Test showing SWE-bench leaderboard."""
-        result = runner.invoke(
-            benchmark_app, ["leaderboard", "--benchmark", "swe-bench"]
-        )
+        result = runner.invoke(benchmark_app, ["leaderboard", "--benchmark", "swe-bench"])
         assert result.exit_code == 0
         assert "Leaderboard" in result.stdout
         assert "Rank" in result.stdout
@@ -194,8 +188,4 @@ class TestBenchmarkExecution:
                 "default",
             ],
         )
-        assert (
-            "MBPP" in result.stdout
-            or "mbpp" in result.stdout
-            or result.exit_code in (0, 1)
-        )
+        assert "MBPP" in result.stdout or "mbpp" in result.stdout or result.exit_code in (0, 1)

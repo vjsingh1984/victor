@@ -76,9 +76,7 @@ def test_get_handlers_prefers_runtime_module_when_available(monkeypatch) -> None
 
     monkeypatch.setitem(sys.modules, "victor_research", external_pkg)
     monkeypatch.setitem(sys.modules, "victor_research.runtime", runtime_pkg)
-    monkeypatch.setitem(
-        sys.modules, "victor_research.runtime.handlers", runtime_handlers
-    )
+    monkeypatch.setitem(sys.modules, "victor_research.runtime.handlers", runtime_handlers)
     monkeypatch.setitem(sys.modules, "victor_research.handlers", root_handlers)
 
     with patch(
@@ -128,9 +126,7 @@ def test_get_workflow_provider_prefers_runtime_module(monkeypatch) -> None:
 
     monkeypatch.setitem(sys.modules, "victor_research", external_pkg)
     monkeypatch.setitem(sys.modules, "victor_research.runtime", runtime_pkg)
-    monkeypatch.setitem(
-        sys.modules, "victor_research.runtime.workflows", runtime_workflows
-    )
+    monkeypatch.setitem(sys.modules, "victor_research.runtime.workflows", runtime_workflows)
 
     with patch(
         "victor.core.verticals.workflow_provider.vertical_runtime_module_candidates",

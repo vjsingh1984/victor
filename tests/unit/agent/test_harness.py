@@ -208,9 +208,7 @@ class TestBaseBenchmarkRunner:
             create_test_task("task4", language="python", difficulty="easy"),
         ]
         runner = MockBenchmarkRunner(tasks)
-        config = create_test_config(
-            languages=["python"], difficulties=["easy"], max_tasks=1
-        )
+        config = create_test_config(languages=["python"], difficulties=["easy"], max_tasks=1)
 
         filtered = runner._filter_tasks(tasks, config)
 
@@ -541,9 +539,7 @@ class TestEvaluationHarness:
         runner = MockBenchmarkRunner(tasks)
         runner.set_run_result(
             "task1",
-            TaskResult(
-                task_id="task1", status=TaskStatus.FAILED, error_message="Test failed"
-            ),
+            TaskResult(task_id="task1", status=TaskStatus.FAILED, error_message="Test failed"),
         )
         harness = EvaluationHarness(runners={BenchmarkType.HUMAN_EVAL: runner})
         config = create_test_config()

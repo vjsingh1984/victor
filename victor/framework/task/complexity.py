@@ -243,9 +243,7 @@ class ComplexityBudget:
     @classmethod
     def for_complexity(cls, complexity: "TaskComplexity") -> "ComplexityBudget":
         """Get budget config for a complexity level."""
-        return COMPLEXITY_BUDGETS.get(
-            complexity, COMPLEXITY_BUDGETS[TaskComplexity.MEDIUM]
-        )
+        return COMPLEXITY_BUDGETS.get(complexity, COMPLEXITY_BUDGETS[TaskComplexity.MEDIUM])
 
 
 # Single source of truth for all budget-related configs
@@ -364,12 +362,8 @@ class TaskComplexityService:
     def __init__(
         self,
         budgets: Optional[Dict[TaskComplexity, int]] = None,
-        custom_patterns: Optional[
-            Dict[TaskComplexity, List[Tuple[str, float, str]]]
-        ] = None,
-        custom_classifiers: Optional[
-            List[Callable[[str], Optional[TaskClassification]]]
-        ] = None,
+        custom_patterns: Optional[Dict[TaskComplexity, List[Tuple[str, float, str]]]] = None,
+        custom_classifiers: Optional[List[Callable[[str], Optional[TaskClassification]]]] = None,
         use_semantic: bool = True,
         semantic_threshold: float = 0.65,
         use_rl: bool = True,
@@ -474,9 +468,7 @@ class TaskComplexityService:
                 # Check if complexity learner is registered
                 self._rl_learner = coordinator.get_learner("complexity")
                 if self._rl_learner is None:
-                    logger.debug(
-                        "Complexity RL learner not registered, using inference only"
-                    )
+                    logger.debug("Complexity RL learner not registered, using inference only")
                     self.use_rl = False
             except (ImportError, Exception) as e:
                 logger.debug(f"RL integration not available: {e}")

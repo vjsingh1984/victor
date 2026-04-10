@@ -293,9 +293,7 @@ async def test_stream_basic(ollama_provider):
 async def test_stream_timeout_error(ollama_provider):
     """Test stream timeout error handling."""
     mock_response = MagicMock()
-    mock_response.__aenter__ = AsyncMock(
-        side_effect=httpx.TimeoutException("Stream timed out")
-    )
+    mock_response.__aenter__ = AsyncMock(side_effect=httpx.TimeoutException("Stream timed out"))
     mock_response.__aexit__ = AsyncMock()
 
     with patch.object(ollama_provider.client, "stream", return_value=mock_response):
@@ -592,9 +590,7 @@ class TestEndpointDiscovery:
                 mock_client.return_value = mock_instance
 
                 # Use skip_discovery since we're testing _select_base_url directly
-                provider = OllamaProvider(
-                    base_url="http://localhost:11434", _skip_discovery=True
-                )
+                provider = OllamaProvider(base_url="http://localhost:11434", _skip_discovery=True)
                 # Now test _select_base_url directly
                 result = provider._select_base_url("http://ignored:11434", 10)
 
@@ -689,9 +685,7 @@ class TestStreamRetryWithoutTools:
 
             # First call with tools should fail
             if call_count == 1 and "tools" in payload and payload["tools"]:
-                return create_mock_response(
-                    400, '{"error":"model does not support tools"}'
-                )
+                return create_mock_response(400, '{"error":"model does not support tools"}')
             # Second call without tools should succeed
             return create_mock_response(200)
 

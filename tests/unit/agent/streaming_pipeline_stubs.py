@@ -50,9 +50,7 @@ class OrchestratorStub:
         self._read_files_session = set()
         self._all_files_read_nudge_sent = False
         self._task_completion_detector = None
-        self.sanitizer = SimpleNamespace(
-            sanitize=lambda text: text, strip_markup=lambda text: text
-        )
+        self.sanitizer = SimpleNamespace(sanitize=lambda text: text, strip_markup=lambda text: text)
         self.add_message = lambda role, content: None
         self._recovery_coordinator = SimpleNamespace(
             check_natural_completion=lambda *_, **__: None,
@@ -73,9 +71,7 @@ class OrchestratorStub:
             get_metrics=lambda: {},
             unique_resources=set(),
         )
-        self._streaming_handler = SimpleNamespace(
-            handle_loop_warning=lambda *_, **__: None
-        )
+        self._streaming_handler = SimpleNamespace(handle_loop_warning=lambda *_, **__: None)
         self.tool_calls_used = 0
         self.observed_files: List[str] = []
         self._continuation_prompts = 0
@@ -134,8 +130,8 @@ class DummyCoordinator:
 
         # Override orchestrator defaults if custom limit_result provided
         if limit_result is not None:
-            self._orchestrator._handle_context_and_iteration_limits = (
-                self._make_limit_handler(limit_result)
+            self._orchestrator._handle_context_and_iteration_limits = self._make_limit_handler(
+                limit_result
             )
 
     @staticmethod

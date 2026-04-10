@@ -199,9 +199,7 @@ class StaticEmbeddingCollection:
 
             # 2. Verify cache matches current items
             if cache_data.get("items_hash") != items_hash:
-                logger.info(
-                    f"Collection '{self.name}': items changed, cache invalidated"
-                )
+                logger.info(f"Collection '{self.name}': items changed, cache invalidated")
                 return False
 
             # 3. Verify embedding model matches
@@ -217,9 +215,7 @@ class StaticEmbeddingCollection:
             # 4. Validate embedding dimensions match current model
             embeddings = cache_data.get("embeddings")
             if embeddings is None:
-                logger.warning(
-                    f"Collection '{self.name}': cache missing embeddings array"
-                )
+                logger.warning(f"Collection '{self.name}': cache missing embeddings array")
                 self._delete_cache("missing embeddings")
                 return False
 
@@ -243,9 +239,7 @@ class StaticEmbeddingCollection:
             # 5. Validate item count matches embedding count
             items = cache_data.get("items", {})
             item_ids = cache_data.get("item_ids", [])
-            if embeddings.shape[0] != len(items) or embeddings.shape[0] != len(
-                item_ids
-            ):
+            if embeddings.shape[0] != len(items) or embeddings.shape[0] != len(item_ids):
                 logger.warning(
                     f"Collection '{self.name}': data integrity error - "
                     f"embeddings: {embeddings.shape[0]}, items: {len(items)}, ids: {len(item_ids)}"
@@ -255,9 +249,7 @@ class StaticEmbeddingCollection:
 
             # 6. Check for NaN or Inf in embeddings (corruption detection)
             if not np.isfinite(embeddings).all():
-                logger.warning(
-                    f"Collection '{self.name}': embeddings contain NaN or Inf values"
-                )
+                logger.warning(f"Collection '{self.name}': embeddings contain NaN or Inf values")
                 self._delete_cache("corrupted embeddings")
                 return False
 
@@ -267,9 +259,7 @@ class StaticEmbeddingCollection:
             self._item_ids = item_ids
             self._items_hash = items_hash
 
-            logger.debug(
-                f"Collection '{self.name}': loaded {len(self._items)} items from cache"
-            )
+            logger.debug(f"Collection '{self.name}': loaded {len(self._items)} items from cache")
             return True
 
         except (pickle.UnpicklingError, EOFError) as e:
@@ -324,9 +314,7 @@ class StaticEmbeddingCollection:
         if not items:
             logger.warning(f"Collection '{self.name}': initialized with empty items")
             self._items = {}
-            self._embeddings = np.empty(
-                (0, self.embedding_service.dimension), dtype=np.float32
-            )
+            self._embeddings = np.empty((0, self.embedding_service.dimension), dtype=np.float32)
             self._item_ids = []
             return
 
@@ -338,9 +326,7 @@ class StaticEmbeddingCollection:
             return
 
         # Cache miss - compute embeddings
-        logger.info(
-            f"Collection '{self.name}': computing embeddings for {len(items)} items"
-        )
+        logger.info(f"Collection '{self.name}': computing embeddings for {len(items)} items")
 
         # Store items
         self._items = {item.id: item for item in items}
@@ -365,9 +351,7 @@ class StaticEmbeddingCollection:
         if not items:
             logger.warning(f"Collection '{self.name}': initialized with empty items")
             self._items = {}
-            self._embeddings = np.empty(
-                (0, self.embedding_service.dimension), dtype=np.float32
-            )
+            self._embeddings = np.empty((0, self.embedding_service.dimension), dtype=np.float32)
             self._item_ids = []
             return
 
@@ -379,9 +363,7 @@ class StaticEmbeddingCollection:
             return
 
         # Cache miss - compute embeddings
-        logger.info(
-            f"Collection '{self.name}': computing embeddings for {len(items)} items"
-        )
+        logger.info(f"Collection '{self.name}': computing embeddings for {len(items)} items")
 
         # Store items
         self._items = {item.id: item for item in items}
@@ -414,18 +396,14 @@ class StaticEmbeddingCollection:
             List of (item, score) tuples, sorted by score descending
         """
         if not self.is_initialized or self._embeddings is None:
-            logger.warning(
-                f"Collection '{self.name}': not initialized, returning empty results"
-            )
+            logger.warning(f"Collection '{self.name}': not initialized, returning empty results")
             return []
 
         # Get query embedding
         query_embedding = await self.embedding_service.embed_text(query)
 
         # Calculate similarities
-        similarities = EmbeddingService.cosine_similarity_matrix(
-            query_embedding, self._embeddings
-        )
+        similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]
@@ -458,18 +436,14 @@ class StaticEmbeddingCollection:
             List of (item, score) tuples, sorted by score descending
         """
         if not self.is_initialized or self._embeddings is None:
-            logger.warning(
-                f"Collection '{self.name}': not initialized, returning empty results"
-            )
+            logger.warning(f"Collection '{self.name}': not initialized, returning empty results")
             return []
 
         # Get query embedding
         query_embedding = self.embedding_service.embed_text_sync(query)
 
         # Calculate similarities
-        similarities = EmbeddingService.cosine_similarity_matrix(
-            query_embedding, self._embeddings
-        )
+        similarities = EmbeddingService.cosine_similarity_matrix(query_embedding, self._embeddings)
 
         # Get top-k indices
         top_indices = np.argsort(similarities)[::-1][:top_k]

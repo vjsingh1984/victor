@@ -480,23 +480,17 @@ class TestBranchManager:
         assert branch.status == BranchStatus.ACTIVE
 
     @pytest.mark.asyncio
-    async def test_create_branch_duplicate_name(
-        self, branch_manager, populated_backend
-    ):
+    async def test_create_branch_duplicate_name(self, branch_manager, populated_backend):
         """Test creating branch with duplicate name fails."""
         backend, session_id, checkpoints = populated_backend
         branch_manager.backend = backend
 
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[0].checkpoint_id
-        )
+        await branch_manager.create_branch("feature", session_id, checkpoints[0].checkpoint_id)
 
         from victor.storage.checkpoints.tree import CheckpointError
 
         with pytest.raises(CheckpointError, match="already exists"):
-            await branch_manager.create_branch(
-                "feature", session_id, checkpoints[1].checkpoint_id
-            )
+            await branch_manager.create_branch("feature", session_id, checkpoints[1].checkpoint_id)
 
     @pytest.mark.asyncio
     async def test_checkout_branch(self, branch_manager, populated_backend):
@@ -504,9 +498,7 @@ class TestBranchManager:
         backend, session_id, checkpoints = populated_backend
         branch_manager.backend = backend
 
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[0].checkpoint_id
-        )
+        await branch_manager.create_branch("feature", session_id, checkpoints[0].checkpoint_id)
         branch = await branch_manager.checkout("feature", session_id)
 
         assert branch.name == "feature"
@@ -519,9 +511,7 @@ class TestBranchManager:
         backend, session_id, checkpoints = populated_backend
         branch_manager.backend = backend
 
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[0].checkpoint_id
-        )
+        await branch_manager.create_branch("feature", session_id, checkpoints[0].checkpoint_id)
 
         updated = await branch_manager.update_branch_head(
             "feature",
@@ -537,15 +527,9 @@ class TestBranchManager:
         backend, session_id, checkpoints = populated_backend
         branch_manager.backend = backend
 
-        await branch_manager.create_branch(
-            "main", session_id, checkpoints[0].checkpoint_id
-        )
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[1].checkpoint_id
-        )
-        await branch_manager.create_branch(
-            "experiment", session_id, checkpoints[2].checkpoint_id
-        )
+        await branch_manager.create_branch("main", session_id, checkpoints[0].checkpoint_id)
+        await branch_manager.create_branch("feature", session_id, checkpoints[1].checkpoint_id)
+        await branch_manager.create_branch("experiment", session_id, checkpoints[2].checkpoint_id)
 
         branches = await branch_manager.list_branches(session_id)
 
@@ -559,9 +543,7 @@ class TestBranchManager:
         backend, session_id, checkpoints = populated_backend
         branch_manager.backend = backend
 
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[0].checkpoint_id
-        )
+        await branch_manager.create_branch("feature", session_id, checkpoints[0].checkpoint_id)
 
         # Can't delete unmerged branch without force
         from victor.storage.checkpoints.tree import CheckpointError
@@ -597,13 +579,9 @@ class TestMergeOperations:
         branch_manager.backend = backend
 
         # Create main at cp1
-        await branch_manager.create_branch(
-            "main", session_id, checkpoints[1].checkpoint_id
-        )
+        await branch_manager.create_branch("main", session_id, checkpoints[1].checkpoint_id)
         # Create feature at cp3 (ahead of main)
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[3].checkpoint_id
-        )
+        await branch_manager.create_branch("feature", session_id, checkpoints[3].checkpoint_id)
 
         result = await branch_manager.merge(
             "feature",
@@ -620,21 +598,15 @@ class TestMergeOperations:
         assert main.head_checkpoint_id == checkpoints[3].checkpoint_id
 
     @pytest.mark.asyncio
-    async def test_fast_forward_fails_on_diverged(
-        self, branch_manager, populated_backend
-    ):
+    async def test_fast_forward_fails_on_diverged(self, branch_manager, populated_backend):
         """Test fast-forward fails when branches have diverged."""
         backend, session_id, checkpoints = populated_backend
         branch_manager.backend = backend
 
         # Create main at cp3
-        await branch_manager.create_branch(
-            "main", session_id, checkpoints[3].checkpoint_id
-        )
+        await branch_manager.create_branch("main", session_id, checkpoints[3].checkpoint_id)
         # Create feature at cp4 (diverged from main)
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[4].checkpoint_id
-        )
+        await branch_manager.create_branch("feature", session_id, checkpoints[4].checkpoint_id)
 
         result = await branch_manager.merge(
             "feature",
@@ -654,13 +626,9 @@ class TestMergeOperations:
         branch_manager.backend = backend
 
         # Create main at cp3
-        await branch_manager.create_branch(
-            "main", session_id, checkpoints[3].checkpoint_id
-        )
+        await branch_manager.create_branch("main", session_id, checkpoints[3].checkpoint_id)
         # Create feature at cp4 (diverged from main at cp2)
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[4].checkpoint_id
-        )
+        await branch_manager.create_branch("feature", session_id, checkpoints[4].checkpoint_id)
 
         result = await branch_manager.merge(
             "feature",
@@ -683,12 +651,8 @@ class TestMergeOperations:
         backend, session_id, checkpoints = populated_backend
         branch_manager.backend = backend
 
-        await branch_manager.create_branch(
-            "main", session_id, checkpoints[1].checkpoint_id
-        )
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[3].checkpoint_id
-        )
+        await branch_manager.create_branch("main", session_id, checkpoints[1].checkpoint_id)
+        await branch_manager.create_branch("feature", session_id, checkpoints[3].checkpoint_id)
 
         result = await branch_manager.merge(
             "feature",
@@ -722,9 +686,7 @@ class TestReplay:
         branch_manager.backend = backend
 
         # Create and checkout main at cp3
-        await branch_manager.create_branch(
-            "main", session_id, checkpoints[3].checkpoint_id
-        )
+        await branch_manager.create_branch("main", session_id, checkpoints[3].checkpoint_id)
         await branch_manager.checkout("main", session_id)
 
         # Replay from cp1 to current head
@@ -751,12 +713,8 @@ class TestTreeVisualization:
         backend, session_id, checkpoints = populated_backend
         branch_manager = BranchManager(backend)
 
-        await branch_manager.create_branch(
-            "main", session_id, checkpoints[3].checkpoint_id
-        )
-        await branch_manager.create_branch(
-            "feature", session_id, checkpoints[4].checkpoint_id
-        )
+        await branch_manager.create_branch("main", session_id, checkpoints[3].checkpoint_id)
+        await branch_manager.create_branch("feature", session_id, checkpoints[4].checkpoint_id)
 
         tree = await branch_manager.get_tree(session_id)
 

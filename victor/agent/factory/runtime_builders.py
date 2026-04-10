@@ -126,9 +126,7 @@ class RuntimeBuildersMixin:
         logger.debug("StreamingCoordinator created")
         return coordinator
 
-    def create_streaming_chat_handler(
-        self, message_adder: Any
-    ) -> "StreamingChatHandler":
+    def create_streaming_chat_handler(self, message_adder: Any) -> "StreamingChatHandler":
         """Create streaming chat handler for testable streaming loop logic.
 
         Args:
@@ -147,14 +145,10 @@ class RuntimeBuildersMixin:
             session_idle_timeout=session_idle_timeout,
             presentation=presentation,
         )
-        logger.debug(
-            f"StreamingChatHandler created (idle_timeout={session_idle_timeout})"
-        )
+        logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
 
-    def create_streaming_chat_pipeline(
-        self, coordinator: Any
-    ) -> "StreamingChatPipeline":
+    def create_streaming_chat_pipeline(self, coordinator: Any) -> "StreamingChatPipeline":
         """Create the canonical StreamingChatPipeline bound to a coordinator."""
         from victor.agent.streaming import create_streaming_chat_pipeline
 
@@ -226,9 +220,7 @@ class RuntimeBuildersMixin:
         )
         from victor.agent.orchestrator_utils import calculate_max_context_chars
 
-        model_context_chars = calculate_max_context_chars(
-            self.settings, provider, model
-        )
+        model_context_chars = calculate_max_context_chars(self.settings, provider, model)
 
         compaction_strategy_str = getattr(
             self.settings, "context_compaction_strategy", "tiered"
@@ -249,15 +241,11 @@ class RuntimeBuildersMixin:
                 enable_stage_tracking=True,
                 enable_context_monitoring=True,
                 compaction_strategy=compaction_strategy,
-                min_messages_to_keep=getattr(
-                    self.settings, "context_min_messages_to_keep", 6
-                ),
+                min_messages_to_keep=getattr(self.settings, "context_min_messages_to_keep", 6),
                 tool_result_retention_weight=getattr(
                     self.settings, "context_tool_retention_weight", 1.5
                 ),
-                recent_message_weight=getattr(
-                    self.settings, "context_recency_weight", 2.0
-                ),
+                recent_message_weight=getattr(self.settings, "context_recency_weight", 2.0),
                 semantic_relevance_threshold=getattr(
                     self.settings, "context_semantic_threshold", 0.3
                 ),
@@ -425,9 +413,7 @@ class RuntimeBuildersMixin:
             initial_model=model,
             provider_name=provider_name,
             config=ProviderManagerConfig(
-                enable_health_checks=getattr(
-                    self.settings, "provider_health_checks", True
-                ),
+                enable_health_checks=getattr(self.settings, "provider_health_checks", True),
                 auto_fallback=getattr(self.settings, "provider_auto_fallback", True),
                 fallback_providers=getattr(self.settings, "fallback_providers", []),
             ),

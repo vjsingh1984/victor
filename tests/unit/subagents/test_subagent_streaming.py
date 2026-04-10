@@ -289,9 +289,7 @@ class TestSubAgentOrchestratorStreamSpawn:
 
         with patch.object(SubAgent, "stream_execute", mock_stream_execute):
             chunks: List[StreamChunk] = []
-            async for chunk in orchestrator.stream_spawn(
-                SubAgentRole.RESEARCHER, "Test task"
-            ):
+            async for chunk in orchestrator.stream_spawn(SubAgentRole.RESEARCHER, "Test task"):
                 chunks.append(chunk)
                 assert isinstance(chunk, StreamChunk)
 
@@ -312,9 +310,7 @@ class TestSubAgentOrchestratorStreamSpawn:
             original_init(self, config, parent)
 
         async def mock_stream_execute() -> AsyncIterator[StreamChunk]:
-            yield StreamChunk(
-                content="Done", is_final=True, metadata={"tool_calls_used": 5}
-            )
+            yield StreamChunk(content="Done", is_final=True, metadata={"tool_calls_used": 5})
 
         with patch.object(SubAgent, "__init__", capture_init):
             with patch.object(SubAgent, "stream_execute", mock_stream_execute):
@@ -381,10 +377,7 @@ class TestSubAgentOrchestratorStreamSpawn:
             assert final_chunk.is_final is True
             # Timeout should be indicated in metadata
             assert final_chunk.metadata is not None
-            assert (
-                "error" in final_chunk.metadata
-                or "timeout" in str(final_chunk.metadata).lower()
-            )
+            assert "error" in final_chunk.metadata or "timeout" in str(final_chunk.metadata).lower()
 
     @pytest.mark.asyncio
     async def test_stream_spawn_uses_role_defaults(self, mock_parent):
@@ -437,9 +430,7 @@ class TestSubAgentOrchestratorStreamSpawn:
             yield StreamChunk(content="Done", is_final=True)
 
         with patch.object(SubAgent, "stream_execute", mock_stream_execute):
-            async for _ in orchestrator.stream_spawn(
-                SubAgentRole.RESEARCHER, "Test task"
-            ):
+            async for _ in orchestrator.stream_spawn(SubAgentRole.RESEARCHER, "Test task"):
                 pass
 
             # After completion, no active subagents
@@ -459,16 +450,12 @@ class TestSubAgentOrchestratorStreamSpawn:
 
         with patch.object(SubAgent, "stream_execute", empty_stream_execute):
             chunks: List[StreamChunk] = []
-            async for chunk in orchestrator.stream_spawn(
-                SubAgentRole.RESEARCHER, "Test task"
-            ):
+            async for chunk in orchestrator.stream_spawn(SubAgentRole.RESEARCHER, "Test task"):
                 chunks.append(chunk)
 
             # Should handle gracefully, possibly with a final chunk indicating completion
             # The implementation should ensure at least a final chunk is yielded
-            assert (
-                len(chunks) >= 0
-            )  # At minimum, empty is acceptable; ideally has final chunk
+            assert len(chunks) >= 0  # At minimum, empty is acceptable; ideally has final chunk
 
 
 # =============================================================================

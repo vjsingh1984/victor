@@ -58,9 +58,7 @@ class FakeProximaClient:
         self.graph_nodes: List[Dict[str, Any]] = []
         self.graph_edges: List[Dict[str, Any]] = []
 
-    def create_collection(
-        self, name: str, config: Any = None, **kwargs: Any
-    ) -> Dict[str, Any]:
+    def create_collection(self, name: str, config: Any = None, **kwargs: Any) -> Dict[str, Any]:
         del config, kwargs
         if name not in self.created_collections:
             self.created_collections.append(name)
@@ -73,9 +71,7 @@ class FakeProximaClient:
     def delete_collection(self, name: str) -> None:
         self.collections.pop(name, None)
 
-    def insert_vectors(
-        self, collection: str, records: List[Any], **kwargs: Any
-    ) -> None:
+    def insert_vectors(self, collection: str, records: List[Any], **kwargs: Any) -> None:
         del kwargs
         self.collections[collection].extend(records)
 
@@ -361,10 +357,7 @@ class TestSqliteLanceDBMigration:
             for record in fake_client.collections["victor_migration_repo_vectors"]
         }
         assert "function:src/main.py:parse_json" in migrated_vector_ids
-        assert any(
-            node["id"] == "function:src/main.py:main"
-            for node in fake_client.graph_nodes
-        )
+        assert any(node["id"] == "function:src/main.py:main" for node in fake_client.graph_nodes)
         assert any(edge["edge_type"] == "CALLS" for edge in fake_client.graph_edges)
         assert len(fake_client.collections["victor_migration_repo_documents"]) == 1
 

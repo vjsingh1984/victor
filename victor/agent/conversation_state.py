@@ -528,10 +528,7 @@ class ConversationStateMachine:
             for kw in keywords:
                 if kw in content_lower:
                     weight = 1.0
-                    if (
-                        stage == ConversationStage.EXECUTION
-                        and kw in WEAK_EXECUTION_KEYWORDS
-                    ):
+                    if stage == ConversationStage.EXECUTION and kw in WEAK_EXECUTION_KEYWORDS:
                         weight = 0.5
                     scores[stage] = scores.get(stage, 0) + weight
 
@@ -591,9 +588,7 @@ class ConversationStateMachine:
                     else ",".join(self.state.last_tools[-5:])
                 ),
                 "detected_stage_heuristic": (
-                    tool_context.get("detected_stage_heuristic", "")
-                    if tool_context
-                    else ""
+                    tool_context.get("detected_stage_heuristic", "") if tool_context else ""
                 ),
                 "files_observed": len(self.state.observed_files),
                 "files_modified": len(self.state.modified_files),
@@ -647,9 +642,7 @@ class ConversationStateMachine:
             }
             result = stage_map.get(stage_name)
             if result:
-                logger.info(
-                    f"Edge stage detection: {stage_name} (confidence={confidence:.2f})"
-                )
+                logger.info(f"Edge stage detection: {stage_name} (confidence={confidence:.2f})")
             return result, confidence
 
         except Exception as e:
@@ -687,9 +680,7 @@ class ConversationStateMachine:
             elif self.state.stage in tied_stages:
                 # Current stage is tied - stay to avoid oscillation
                 detected = self.state.stage
-                logger.debug(
-                    "_detect_stage_from_tools: Tie resolved by staying at current stage"
-                )
+                logger.debug("_detect_stage_from_tools: Tie resolved by staying at current stage")
             else:
                 # Pick the most advanced (highest in workflow order)
                 detected = max(tied_stages, key=lambda s: STAGE_ORDER[s])
@@ -742,9 +733,7 @@ class ConversationStateMachine:
 
                 heuristic_confidence = 0.6 + (recent_overlap * 0.1)
                 if not should_use_llm("stage_detection"):
-                    logger.debug(
-                        "_maybe_transition: LLM not in chain, skipping edge tiebreaker"
-                    )
+                    logger.debug("_maybe_transition: LLM not in chain, skipping edge tiebreaker")
                     return
 
                 edge_stage, edge_confidence = self._try_edge_model_transition(
@@ -783,9 +772,7 @@ class ConversationStateMachine:
         return self._detect_stage_with_edge_model(
             content="",
             tool_context={
-                "last_tools": (
-                    ",".join(self.state.last_tools) if self.state.last_tools else ""
-                ),
+                "last_tools": (",".join(self.state.last_tools) if self.state.last_tools else ""),
                 "current_stage": self.state.stage.name.lower(),
                 "detected_stage_heuristic": heuristic_stage.name.lower(),
                 "message_excerpt": "",
@@ -826,9 +813,7 @@ class ConversationStateMachine:
 
         return False
 
-    def _transition_to(
-        self, new_stage: ConversationStage, confidence: float = 0.5
-    ) -> None:
+    def _transition_to(self, new_stage: ConversationStage, confidence: float = 0.5) -> None:
         """Transition to a new stage.
 
         Args:
@@ -853,9 +838,7 @@ class ConversationStateMachine:
         # All other backward transitions require BACKWARD_TRANSITION_THRESHOLD (0.85).
         if STAGE_ORDER[new_stage] < STAGE_ORDER[old_stage]:
             is_natural_backward = (old_stage, new_stage) in NATURAL_BACKWARD_TRANSITIONS
-            threshold = (
-                0.50 if is_natural_backward else self.BACKWARD_TRANSITION_THRESHOLD
-            )
+            threshold = 0.50 if is_natural_backward else self.BACKWARD_TRANSITION_THRESHOLD
             if confidence < threshold:
                 logger.debug(
                     f"_transition_to: Backward transition blocked {old_stage.name} -> {new_stage.name}, "
@@ -1037,9 +1020,7 @@ class ConversationStateMachine:
         for record in self._transition_history:
             path = f"{record['from_stage']}->{record['to_stage']}"
             path_counts[path] = path_counts.get(path, 0) + 1
-            stage_entries[record["to_stage"]] = (
-                stage_entries.get(record["to_stage"], 0) + 1
-            )
+            stage_entries[record["to_stage"]] = stage_entries.get(record["to_stage"], 0) + 1
             total_confidence += record["confidence"]
 
         return {

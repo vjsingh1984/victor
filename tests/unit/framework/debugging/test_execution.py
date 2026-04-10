@@ -139,9 +139,7 @@ class TestExecutionController:
         # Let pause complete
         await pause_task
 
-    async def test_should_pause_with_breakpoints(
-        self, execution_controller, sample_state
-    ):
+    async def test_should_pause_with_breakpoints(self, execution_controller, sample_state):
         """Test should_pause with breakpoints."""
         bp = WorkflowBreakpoint(
             id="bp-1",
@@ -158,9 +156,7 @@ class TestExecutionController:
 
         assert should is True
 
-    async def test_should_pause_without_breakpoints(
-        self, execution_controller, sample_state
-    ):
+    async def test_should_pause_without_breakpoints(self, execution_controller, sample_state):
         """Test should_pause without breakpoints."""
         should = execution_controller.should_pause(
             node_id="analyze",

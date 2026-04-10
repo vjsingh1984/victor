@@ -88,9 +88,7 @@ class ToolParameter(BaseModel):
     name: str = Field(..., description="Parameter name")
     type: str = Field(..., description="Parameter type (string, number, boolean, etc.)")
     description: str = Field(..., description="Parameter description")
-    enum: Optional[list[str]] = Field(
-        default=None, description="Allowed values for enum types"
-    )
+    enum: Optional[list[str]] = Field(default=None, description="Allowed values for enum types")
     required: bool = Field(default=True, description="Whether parameter is required")
 
 
@@ -100,9 +98,7 @@ class ToolResult(BaseModel):
     success: bool = Field(..., description="Whether execution succeeded")
     output: Any = Field(..., description="Tool output data")
     error: Optional[str] = Field(default=None, description="Error message if failed")
-    metadata: Optional[Dict[str, Any]] = Field(
-        default=None, description="Additional metadata"
-    )
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
 
 
 class ToolConfig:
@@ -180,9 +176,7 @@ class ToolConfig:
         self.http_connection_pool_max_connections_per_host = (
             http_connection_pool_max_connections_per_host
         )
-        self.http_connection_pool_connection_timeout = (
-            http_connection_pool_connection_timeout
-        )
+        self.http_connection_pool_connection_timeout = http_connection_pool_connection_timeout
         self.http_connection_pool_total_timeout = http_connection_pool_total_timeout
 
     @classmethod
@@ -589,9 +583,7 @@ class BaseTool(ABC):
                     msg = f"Parameter '{path}' has wrong type: expected {expected}, got {actual}"
                     errors.append(msg)
                     if error.path:
-                        invalid_params[str(error.path[0])] = (
-                            f"type: expected {expected}"
-                        )
+                        invalid_params[str(error.path[0])] = f"type: expected {expected}"
                 elif error.validator == "enum":
                     # Enum constraint violation
                     path = ".".join(str(p) for p in error.path) or "root"

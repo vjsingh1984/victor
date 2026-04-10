@@ -218,9 +218,7 @@ class TestModeTransitionLearner:
 
         reset_database()
 
-    def test_get_recommendation_exploitation(
-        self, learner: ModeTransitionLearner
-    ) -> None:
+    def test_get_recommendation_exploitation(self, learner: ModeTransitionLearner) -> None:
         """Test get_recommendation returns best action in exploitation mode."""
         state_key = "explore:analysis:low:low:fair:fair"
 
@@ -249,9 +247,7 @@ class TestModeTransitionLearner:
         assert rec is not None
         assert rec.value == "plan:0"  # Higher Q-value action
 
-    def test_get_recommendation_exploration(
-        self, learner: ModeTransitionLearner
-    ) -> None:
+    def test_get_recommendation_exploration(self, learner: ModeTransitionLearner) -> None:
         """Test get_recommendation can explore with high epsilon."""
         import random
 
@@ -292,12 +288,8 @@ class TestModeTransitionLearner:
         """Test task statistics retrieval."""
         task_type = "edit"
 
-        _record_transition_outcome(
-            learner, task_type=task_type, success=True, quality_score=0.8
-        )
-        _record_transition_outcome(
-            learner, task_type=task_type, success=False, quality_score=0.3
-        )
+        _record_transition_outcome(learner, task_type=task_type, success=True, quality_score=0.8)
+        _record_transition_outcome(learner, task_type=task_type, success=False, quality_score=0.3)
 
         stats = learner.get_task_stats(task_type)
 

@@ -131,9 +131,7 @@ async def test_chat_success_basic(google_provider):
     mock_response.usage_metadata.total_token_count = 30
 
     # Mock the client.aio.models.generate_content method
-    google_provider.client.aio.models.generate_content = AsyncMock(
-        return_value=mock_response
-    )
+    google_provider.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     messages = [Message(role="user", content="Hello")]
     response = await google_provider.chat(
@@ -156,9 +154,7 @@ async def test_chat_success_basic(google_provider):
 async def test_chat_without_usage(google_provider):
     """Test chat response without usage metadata."""
     mock_response = create_mock_response("Response", usage_metadata=None)
-    google_provider.client.aio.models.generate_content = AsyncMock(
-        return_value=mock_response
-    )
+    google_provider.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
     messages = [Message(role="user", content="Hello")]
     response = await google_provider.chat(
@@ -184,9 +180,7 @@ async def test_chat_with_conversation_history(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [
@@ -227,9 +221,7 @@ async def test_chat_with_system_message(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [
@@ -257,9 +249,7 @@ async def test_chat_error_handling(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat.side_effect = Exception("API error")
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Hello")]
@@ -288,9 +278,7 @@ async def test_chat_with_custom_generation_config(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Hello")]
@@ -340,9 +328,7 @@ async def test_stream_success(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Hello")]
@@ -380,9 +366,7 @@ async def test_stream_with_history(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [
@@ -410,9 +394,7 @@ async def test_stream_error(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat.side_effect = Exception("Stream error")
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Hello")]
@@ -648,9 +630,7 @@ async def test_single_user_message(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Only message")]
@@ -682,9 +662,7 @@ async def test_model_initialization_params(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Test")]
@@ -722,9 +700,7 @@ async def test_stream_model_initialization(google_provider):
     mock_model = MagicMock()
     mock_model.start_chat = MagicMock(return_value=mock_chat)
 
-    with patch(
-        "victor.providers.google_provider.genai.GenerativeModel"
-    ) as mock_gen_model:
+    with patch("victor.providers.google_provider.genai.GenerativeModel") as mock_gen_model:
         mock_gen_model.return_value = mock_model
 
         messages = [Message(role="user", content="Test")]
@@ -786,9 +762,7 @@ class TestConvertTools:
                 description="Read a file",
                 parameters={
                     "type": "object",
-                    "properties": {
-                        "path": {"type": "string", "description": "File path"}
-                    },
+                    "properties": {"path": {"type": "string", "description": "File path"}},
                     "required": ["path"],
                 },
             )
@@ -803,11 +777,7 @@ class TestConvertTools:
         """Test converting tool without parameters."""
         from victor.providers.base import ToolDefinition
 
-        tools = [
-            ToolDefinition(
-                name="get_time", description="Get current time", parameters={}
-            )
-        ]
+        tools = [ToolDefinition(name="get_time", description="Get current time", parameters={})]
 
         result = google_provider._convert_tools(tools)
         assert len(result) == 1
@@ -1118,14 +1088,10 @@ class TestStreamWithTools:
         mock_response.usage_metadata = None
         mock_response.text = ""  # Fallback text
 
-        google_provider.client.aio.models.generate_content = AsyncMock(
-            return_value=mock_response
-        )
+        google_provider.client.aio.models.generate_content = AsyncMock(return_value=mock_response)
 
         tools = [
-            ToolDefinition(
-                name="read_file", description="Read file", parameters={"type": "object"}
-            )
+            ToolDefinition(name="read_file", description="Read file", parameters={"type": "object"})
         ]
 
         messages = [Message(role="user", content="Read test.py")]
@@ -1177,9 +1143,7 @@ class TestListModels:
         mock_model2.output_token_limit = 8192
         mock_model2.supported_generation_methods = ["generateContent"]
 
-        google_provider.client.models.list = MagicMock(
-            return_value=[mock_model1, mock_model2]
-        )
+        google_provider.client.models.list = MagicMock(return_value=[mock_model1, mock_model2])
 
         models = await google_provider.list_models()
 
@@ -1212,9 +1176,7 @@ class TestListModels:
     @pytest.mark.asyncio
     async def test_list_models_error(self, google_provider):
         """Test list models error handling."""
-        google_provider.client.models.list = MagicMock(
-            side_effect=Exception("API error")
-        )
+        google_provider.client.models.list = MagicMock(side_effect=Exception("API error"))
 
         with pytest.raises(ProviderError) as exc_info:
             await google_provider.list_models()
@@ -1304,9 +1266,7 @@ class TestChatErrorHandling:
         from victor.providers.base import Message
 
         original_error = ProviderError(message="Original error", provider="google")
-        google_provider.client.aio.models.generate_content = AsyncMock(
-            side_effect=original_error
-        )
+        google_provider.client.aio.models.generate_content = AsyncMock(side_effect=original_error)
 
         messages = [Message(role="user", content="Hello")]
 
@@ -1343,9 +1303,7 @@ class TestStreamErrorHandling:
         messages = [Message(role="user", content="Hello")]
 
         with pytest.raises(ProviderError) as exc_info:
-            async for _ in google_provider.stream(
-                messages=messages, model="gemini-1.5-pro"
-            ):
+            async for _ in google_provider.stream(messages=messages, model="gemini-1.5-pro"):
                 pass
 
         assert "Google streaming error" in str(exc_info.value)

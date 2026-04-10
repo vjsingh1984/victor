@@ -111,11 +111,7 @@ class CapabilityRegistry:
         if config_path is None:
             # Default to package config (victor/config/model_capabilities.yaml)
             # Navigate from victor/processing/serialization/ to victor/config/
-            config_path = (
-                Path(__file__).parent.parent.parent
-                / "config"
-                / "model_capabilities.yaml"
-            )
+            config_path = Path(__file__).parent.parent.parent / "config" / "model_capabilities.yaml"
 
         self._config_path = config_path
         self._config: Dict[str, Any] = {}
@@ -360,11 +356,7 @@ class CapabilityRegistry:
                 if "enable_reference_encoding" in overrides
                 else base.enable_reference_encoding
             ),
-            debug_mode=(
-                override_caps.debug_mode
-                if "debug_mode" in overrides
-                else base.debug_mode
-            ),
+            debug_mode=(override_caps.debug_mode if "debug_mode" in overrides else base.debug_mode),
         )
 
     def clear_cache(self) -> None:
@@ -418,9 +410,7 @@ def config_from_settings() -> SerializationConfig:
         preferred_format = None
         if settings.serialization_default_format:
             try:
-                preferred_format = SerializationFormat(
-                    settings.serialization_default_format
-                )
+                preferred_format = SerializationFormat(settings.serialization_default_format)
             except ValueError:
                 logger.warning(
                     f"Unknown serialization format: {settings.serialization_default_format}"

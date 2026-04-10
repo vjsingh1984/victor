@@ -54,9 +54,7 @@ class ToolCallSignature:
     arguments_hash: int
 
     @classmethod
-    def from_call(
-        cls, tool_name: str, arguments: dict[str, Any]
-    ) -> "ToolCallSignature":
+    def from_call(cls, tool_name: str, arguments: dict[str, Any]) -> "ToolCallSignature":
         """Create signature from tool call parameters."""
         # Create a hashable representation of arguments
         # Sort keys for consistent hashing
@@ -75,10 +73,7 @@ class ToolCallSignature:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ToolCallSignature):
             return False
-        return (
-            self.tool_name == other.tool_name
-            and self.arguments_hash == other.arguments_hash
-        )
+        return self.tool_name == other.tool_name and self.arguments_hash == other.arguments_hash
 
 
 class ToolErrorClassifier:

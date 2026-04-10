@@ -40,9 +40,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-def get_session_logger(
-    session_id: Optional[str] = None, component: str = ""
-) -> logging.Logger:
+def get_session_logger(session_id: Optional[str] = None, component: str = "") -> logging.Logger:
     """Get a session-aware logger.
 
     Args:

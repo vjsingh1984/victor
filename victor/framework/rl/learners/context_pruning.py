@@ -292,9 +292,7 @@ class ContextPruningLearner(BaseLearner):
         config = PRUNING_CONFIGS[best_action]
 
         total_visits = sum(s.get("visits", 0) for s in action_stats.values())
-        confidence = min(
-            1.0, total_visits / (self.MIN_SAMPLES_FOR_CONFIDENCE * len(self.ACTIONS))
-        )
+        confidence = min(1.0, total_visits / (self.MIN_SAMPLES_FOR_CONFIDENCE * len(self.ACTIONS)))
 
         return RLRecommendation(
             action=best_action.value,
@@ -340,9 +338,7 @@ class ContextPruningLearner(BaseLearner):
         # Normalize tokens_saved to 0-1 range (assume max savings ~50K tokens)
         normalized_savings = min(1.0, tokens_saved / 50000.0)
         success_bonus = 1.0 if task_success else -0.5  # Penalty for failure
-        reward = (
-            0.4 * normalized_savings + 0.6 * success_bonus
-        ) * 100  # Scale to 0-100
+        reward = (0.4 * normalized_savings + 0.6 * success_bonus) * 100  # Scale to 0-100
 
         cursor = self.db.cursor()
         now = datetime.now(timezone.utc).isoformat()

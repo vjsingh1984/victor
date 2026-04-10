@@ -613,9 +613,7 @@ class RequestResponseProtocol(BaseConversationProtocol):
         else:
             self._awaiting_response = False
             # Next responder
-            responders = [
-                p.agent_id for p in self._participants if p.agent_id != self.questioner
-            ]
+            responders = [p.agent_id for p in self._participants if p.agent_id != self.questioner]
             if responders:
                 idx = (context.turn_count // 2) % len(responders)
                 return responders[idx]
@@ -753,10 +751,7 @@ class ConsensusProtocol(BaseConversationProtocol):
     ) -> Optional[str]:
         """Get next speaker, entering voting phase periodically."""
         # Check if we should enter voting phase
-        if (
-            context.turn_count > 0
-            and context.turn_count % (len(self._participants) * 2) == 0
-        ):
+        if context.turn_count > 0 and context.turn_count % (len(self._participants) * 2) == 0:
             self._in_voting_phase = True
             self._votes.clear()
 

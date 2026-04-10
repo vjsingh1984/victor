@@ -24,9 +24,7 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple
 
 # Basic configuration
 LOG = logging.getLogger("data_pipeline")
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 # Constants
 CHECKPOINT_DIR = Path("victor/data/checkpoints")
@@ -335,7 +333,5 @@ if __name__ == "__main__":
         rec["value_squared"] = rec["value"] ** 2
         return rec
 
-    pipeline = DataPipeline(
-        "https://jsonplaceholder.typicode.com/posts", SCHEMA, transform_func
-    )
+    pipeline = DataPipeline("https://jsonplaceholder.typicode.com/posts", SCHEMA, transform_func)
     pipeline.run()

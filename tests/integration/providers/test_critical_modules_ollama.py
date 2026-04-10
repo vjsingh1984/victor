@@ -52,9 +52,7 @@ def is_ollama_available() -> bool:
 
 def requires_ollama():
     """Pytest marker to skip tests when Ollama is not available."""
-    return pytest.mark.skipif(
-        not is_ollama_available(), reason="Ollama server not available"
-    )
+    return pytest.mark.skipif(not is_ollama_available(), reason="Ollama server not available")
 
 
 # Default model for tests
@@ -148,8 +146,7 @@ class TestTaskCompletionE2E:
 
         state = detector.get_state()
         has_active = state.active_signal_detected or any(
-            "active:" in s or "TASK COMPLETE" in s.upper()
-            for s in state.completion_signals
+            "active:" in s or "TASK COMPLETE" in s.upper() for s in state.completion_signals
         )
         assert has_active or len(state.completion_signals) > 0
 

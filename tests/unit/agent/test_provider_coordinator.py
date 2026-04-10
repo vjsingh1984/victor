@@ -234,9 +234,7 @@ class TestProviderCoordinator:
         callback.assert_called_once_with(mock_state)
 
     @pytest.mark.asyncio
-    async def test_switch_model_async_notifies_hooks(
-        self, coordinator, mock_manager, mock_state
-    ):
+    async def test_switch_model_async_notifies_hooks(self, coordinator, mock_manager, mock_state):
         """Async switch_model path delegates to manager and notifies hooks."""
         callback = MagicMock()
         coordinator._post_switch_hooks = [callback]
@@ -310,9 +308,7 @@ class TestProviderCoordinator:
         assert coordinator._is_monitoring is True
 
     @pytest.mark.asyncio
-    async def test_start_health_monitoring_already_running(
-        self, coordinator, mock_manager
-    ):
+    async def test_start_health_monitoring_already_running(self, coordinator, mock_manager):
         """Test start_health_monitoring when already running."""
         coordinator._is_monitoring = True
 
@@ -385,9 +381,7 @@ class TestProviderCoordinator:
         assert chunks == ["chunk1", "chunk2", "chunk3"]
 
     @pytest.mark.asyncio
-    async def test_stream_with_rate_limit_retry_retries_on_rate_limit(
-        self, coordinator
-    ):
+    async def test_stream_with_rate_limit_retry_retries_on_rate_limit(self, coordinator):
         """Test stream_with_rate_limit_retry retries on rate limit."""
         call_count = 0
 
@@ -402,9 +396,7 @@ class TestProviderCoordinator:
             yield "success"
 
         # Patch sleep to avoid actual waiting
-        with patch(
-            "victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock
-        ):
+        with patch("victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock):
             chunks = []
             async for chunk in coordinator.stream_with_rate_limit_retry(mock_stream):
                 chunks.append(chunk)
@@ -423,9 +415,7 @@ class TestProviderCoordinator:
                 yield "never"
             raise Exception("Rate limit exceeded. 429 Too Many Requests")
 
-        with patch(
-            "victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock
-        ):
+        with patch("victor.agent.provider_coordinator.asyncio.sleep", new_callable=AsyncMock):
             with pytest.raises(Exception, match="Rate limit"):
                 async for _ in coordinator.stream_with_rate_limit_retry(mock_stream):
                     pass

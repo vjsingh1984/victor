@@ -183,9 +183,7 @@ class CircuitBreaker:
         self._total_calls = 0
         self._total_failures = 0
         self._total_rejected = 0
-        self._state_changes: deque[tuple[float, CircuitState, CircuitState]] = deque(
-            maxlen=100
-        )
+        self._state_changes: deque[tuple[float, CircuitState, CircuitState]] = deque(maxlen=100)
 
     @staticmethod
     def _coerce_state(state: Any) -> Any:
@@ -271,9 +269,7 @@ class CircuitBreaker:
         """Transition to a new state."""
         old_state = self._coerce_state(self._state)
         new_state = self._coerce_state(new_state)
-        if not isinstance(old_state, CircuitState) or not isinstance(
-            new_state, CircuitState
-        ):
+        if not isinstance(old_state, CircuitState) or not isinstance(new_state, CircuitState):
             return
         self._state = old_state
         if self._state != new_state:
@@ -346,8 +342,7 @@ class CircuitBreaker:
                     pass  # Callback errors must not break the breaker
 
             raise CircuitBreakerError(
-                f"Circuit breaker '{self.name}' is OPEN. "
-                f"Retry after {retry_after:.1f}s",
+                f"Circuit breaker '{self.name}' is OPEN. " f"Retry after {retry_after:.1f}s",
                 state=state,
                 retry_after=retry_after,
                 last_error=self._last_exception,
@@ -543,9 +538,7 @@ class CircuitBreakerRegistry:
         if bus is None:
             return
 
-        def on_state_change(
-            old_state: CircuitState, new_state: CircuitState, name: str
-        ) -> None:
+        def on_state_change(old_state: CircuitState, new_state: CircuitState, name: str) -> None:
             bus.emit_metric(
                 "circuit_breaker.state_change",
                 1.0,

@@ -114,9 +114,7 @@ class TestOrchestratorIntelligentHooks:
         integration.pipeline._mode_controller.record_outcome = MagicMock()
         return integration
 
-    def test_prepare_intelligent_request_returns_none_when_disabled(
-        self, mock_settings
-    ):
+    def test_prepare_intelligent_request_returns_none_when_disabled(self, mock_settings):
         """Should return None when intelligent pipeline is disabled."""
         mock_settings.intelligent_pipeline_enabled = False
 

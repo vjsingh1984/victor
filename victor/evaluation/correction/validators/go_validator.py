@@ -249,9 +249,7 @@ class GoCodeValidator(BaseCodeValidator):
 
         # Add missing imports
         if validation.missing_imports:
-            fixed_code = self._add_missing_imports(
-                fixed_code, list(validation.missing_imports)
-            )
+            fixed_code = self._add_missing_imports(fixed_code, list(validation.missing_imports))
 
         return fixed_code
 
@@ -464,22 +462,14 @@ class GoCodeValidator(BaseCodeValidator):
             # Convert to import block
             existing = re.search(r'import\s+"([^"]+)"', code).group(1)
             all_imports = [existing] + missing
-            import_block = (
-                "import (\n" + "\n".join(f'\t"{pkg}"' for pkg in all_imports) + "\n)\n"
-            )
-            return (
-                code[: single_import.start()]
-                + import_block
-                + code[single_import.end() :]
-            )
+            import_block = "import (\n" + "\n".join(f'\t"{pkg}"' for pkg in all_imports) + "\n)\n"
+            return code[: single_import.start()] + import_block + code[single_import.end() :]
 
         # No existing imports - add after package declaration
         package_match = re.search(r"package\s+\w+\n*", code)
         if package_match:
             insert_pos = package_match.end()
-            import_block = (
-                "\nimport (\n" + "\n".join(f'\t"{pkg}"' for pkg in missing) + "\n)\n"
-            )
+            import_block = "\nimport (\n" + "\n".join(f'\t"{pkg}"' for pkg in missing) + "\n)\n"
             return code[:insert_pos] + import_block + code[insert_pos:]
 
         return code

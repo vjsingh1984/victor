@@ -116,9 +116,7 @@ class TestWorkflowParser:
         loader = Mock()
         loader.load.return_value = {"alpha": workflow}
         parser = WorkflowParser(loader)
-        request = WorkflowCompilationRequest(
-            source="workflows:\n  alpha: {}", validate=True
-        )
+        request = WorkflowCompilationRequest(source="workflows:\n  alpha: {}", validate=True)
 
         parsed = parser.parse(request)
 
@@ -184,9 +182,7 @@ class TestLegacyWorkflowGraphCompiler:
         backend.compile.return_value = compiled
         backend_factory = Mock(return_value=backend)
 
-        result = LegacyWorkflowGraphCompiler(compiler_factory=backend_factory).compile(
-            parsed
-        )
+        result = LegacyWorkflowGraphCompiler(compiler_factory=backend_factory).compile(parsed)
 
         backend_factory.assert_called_once_with()
         backend.compile.assert_called_once_with(workflow)
@@ -200,9 +196,7 @@ class TestNativeWorkflowGraphCompiler:
             request=WorkflowCompilationRequest(source="workflow.yaml"),
             workflow=workflow,
         )
-        native = NativeWorkflowGraphCompiler(
-            node_executor_factory=NodeExecutorFactory()
-        )
+        native = NativeWorkflowGraphCompiler(node_executor_factory=NodeExecutorFactory())
         legacy = LegacyWorkflowGraphCompiler()
 
         native_graph = native.compile(parsed)
@@ -216,9 +210,7 @@ class TestNativeWorkflowGraphCompiler:
             request=WorkflowCompilationRequest(source="workflow.yaml"),
             workflow=workflow,
         )
-        native = NativeWorkflowGraphCompiler(
-            node_executor_factory=NodeExecutorFactory()
-        )
+        native = NativeWorkflowGraphCompiler(node_executor_factory=NodeExecutorFactory())
         legacy = LegacyWorkflowGraphCompiler()
 
         native_graph = native.compile(parsed)
@@ -232,9 +224,7 @@ class TestNativeWorkflowGraphCompiler:
             request=WorkflowCompilationRequest(source="workflow.yaml"),
             workflow=workflow,
         )
-        native = NativeWorkflowGraphCompiler(
-            node_executor_factory=NodeExecutorFactory()
-        )
+        native = NativeWorkflowGraphCompiler(node_executor_factory=NodeExecutorFactory())
         legacy = LegacyWorkflowGraphCompiler()
 
         native_result = asyncio.run(native.compile(parsed).invoke({"value": 3}))
@@ -244,9 +234,7 @@ class TestNativeWorkflowGraphCompiler:
         assert legacy_result.success is True
         assert native_result.state["a"] == legacy_result.state["a"]
         assert native_result.state["b"] == legacy_result.state["b"]
-        assert (
-            native_result.state["finished"] == legacy_result.state["finished"] is True
-        )
+        assert native_result.state["finished"] == legacy_result.state["finished"] is True
         assert (
             native_result.state["_parallel_results"].keys()
             == legacy_result.state["_parallel_results"].keys()
@@ -269,22 +257,16 @@ class TestNativeWorkflowGraphCompiler:
             workflow=workflow,
         )
 
-        native = NativeWorkflowGraphCompiler(
-            node_executor_factory=NodeExecutorFactory()
-        )
+        native = NativeWorkflowGraphCompiler(node_executor_factory=NodeExecutorFactory())
 
-        with pytest.raises(
-            ValueError, match="Unsupported workflow node type 'custom_unknown'"
-        ):
+        with pytest.raises(ValueError, match="Unsupported workflow node type 'custom_unknown'"):
             native.compile(parsed)
 
 
 class TestWorkflowCompilerFacade:
     def test_workflow_compiler_uses_explicit_boundary_stages(self) -> None:
         parsed = ParsedWorkflowDefinition(
-            request=WorkflowCompilationRequest(
-                source="workflow.yaml", workflow_name="alpha"
-            ),
+            request=WorkflowCompilationRequest(source="workflow.yaml", workflow_name="alpha"),
             workflow=_make_workflow("alpha"),
         )
         parser = Mock()
@@ -343,9 +325,7 @@ class TestWorkflowCompilerFacade:
         graph_compiler.compile.assert_called_once_with(parsed)
 
     def test_workflow_compiler_impl_reuses_shared_facade(self) -> None:
-        compiler = WorkflowCompilerImpl(
-            yaml_loader=Mock(), validator=Mock(), node_factory=Mock()
-        )
+        compiler = WorkflowCompilerImpl(yaml_loader=Mock(), validator=Mock(), node_factory=Mock())
 
         assert isinstance(compiler, WorkflowCompiler)
 
@@ -379,7 +359,5 @@ class TestWorkflowCompilerFacade:
 
         compiled = compiler.compile("workflow.yaml")
 
-        node_executor_factory.create_executor.assert_called_once_with(
-            workflow.nodes["start"]
-        )
+        node_executor_factory.create_executor.assert_called_once_with(workflow.nodes["start"])
         assert compiled.get_graph_schema()["entry_point"] == "start"

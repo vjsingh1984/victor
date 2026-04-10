@@ -46,14 +46,10 @@ def test_load_safety_rules_filters_with_normalized_vertical_names(mock_cached_ep
 
     ep = MagicMock()
     ep.name = "data-analysis"
-    ep.load.return_value = lambda _enforcer: called.__setitem__(
-        "count", called["count"] + 1
-    )
+    ep.load.return_value = lambda _enforcer: called.__setitem__("count", called["count"] + 1)
     mock_cached_eps.return_value = (ep,)
 
-    loaded = load_safety_rules_from_entry_points(
-        enforcer, vertical_names=["data_analysis"]
-    )
+    loaded = load_safety_rules_from_entry_points(enforcer, vertical_names=["data_analysis"])
 
     assert loaded == 1
     assert called["count"] == 1
@@ -69,9 +65,7 @@ def test_register_escape_hatches_filters_with_normalized_vertical_names(
 
     ep = MagicMock()
     ep.name = "data-analysis"
-    ep.load.return_value = lambda _registry: called.__setitem__(
-        "count", called["count"] + 1
-    )
+    ep.load.return_value = lambda _registry: called.__setitem__("count", called["count"] + 1)
     mock_cached_eps.return_value = (ep,)
 
     registered = register_escape_hatches_from_entry_points(
@@ -93,9 +87,7 @@ def test_register_commands_filters_with_normalized_vertical_names(mock_cached_ep
     ep.load.return_value = lambda _app: called.__setitem__("count", called["count"] + 1)
     mock_cached_eps.return_value = (ep,)
 
-    registered = register_commands_from_entry_points(
-        app, vertical_names=["data_analysis"]
-    )
+    registered = register_commands_from_entry_points(app, vertical_names=["data_analysis"])
 
     assert registered == 1
     assert called["count"] == 1

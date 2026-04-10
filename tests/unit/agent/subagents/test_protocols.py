@@ -245,9 +245,7 @@ class TestToolExecutorProtocol:
             ) -> Any:
                 return {"result": "success"}
 
-            def validate_arguments(
-                self, tool_name: str, arguments: Dict[str, Any]
-            ) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
                 return True
 
         executor = MinimalExecutor()
@@ -285,9 +283,7 @@ class TestToolExecutorProtocol:
         from victor.agent.protocols import ToolExecutorProtocol
         from typing import Any, Dict
 
-        def run_tool_safely(
-            executor: ToolExecutorProtocol, tool: str, args: Dict[str, Any]
-        ) -> Any:
+        def run_tool_safely(executor: ToolExecutorProtocol, tool: str, args: Dict[str, Any]) -> Any:
             """Function accepting ToolExecutorProtocol."""
             if executor.validate_arguments(tool, args):
                 return executor.execute(tool, args)
@@ -305,9 +301,7 @@ class TestToolExecutorProtocol:
             ) -> Any:
                 return {"executed": tool_name}
 
-            def validate_arguments(
-                self, tool_name: str, arguments: Dict[str, Any]
-            ) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
                 return "required_arg" in arguments
 
         executor = TestExecutor()
@@ -345,9 +339,7 @@ class TestToolExecutorProtocolImplementation:
                 self.executed_tools.append((tool_name, arguments))
                 return {"tool": tool_name, "args": arguments, "async": True}
 
-            def validate_arguments(
-                self, tool_name: str, arguments: Dict[str, Any]
-            ) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
                 return tool_name in self.valid_tools
 
         return MockExecutor()
@@ -363,9 +355,7 @@ class TestToolExecutorProtocolImplementation:
     @pytest.mark.asyncio
     async def test_aexecute_returns_result(self, mock_executor):
         """Async execute should return tool result."""
-        result = await mock_executor.aexecute(
-            "write", {"path": "/test", "content": "hello"}
-        )
+        result = await mock_executor.aexecute("write", {"path": "/test", "content": "hello"})
 
         assert result["tool"] == "write"
         assert result["async"] is True
@@ -448,9 +438,7 @@ class TestProtocolIntegration:
             ) -> Any:
                 return {"success": True}
 
-            def validate_arguments(
-                self, tool_name: str, arguments: Dict[str, Any]
-            ) -> bool:
+            def validate_arguments(self, tool_name: str, arguments: Dict[str, Any]) -> bool:
                 return True
 
         context = ContextImpl()

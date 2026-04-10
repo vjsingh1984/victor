@@ -985,9 +985,7 @@ class NodeExecutor:
             else:
                 # Traditional deep copy approach
                 if remaining is not None:
-                    state = await asyncio.wait_for(
-                        node.execute(state), timeout=remaining
-                    )
+                    state = await asyncio.wait_for(node.execute(state), timeout=remaining)
                 else:
                     state = await node.execute(state)
 
@@ -1381,9 +1379,7 @@ class CompiledGraph(Generic[StateType]):
         try:
             while current_node != END:
                 # Check iteration limits (delegated to IterationController)
-                should_continue, error = iteration_controller.should_continue(
-                    current_node
-                )
+                should_continue, error = iteration_controller.should_continue(current_node)
                 if not should_continue:
                     logger.warning(f"Iteration limit reached: {error}")
                     return GraphExecutionResult(
@@ -1398,9 +1394,7 @@ class CompiledGraph(Generic[StateType]):
                 # Check interrupt before (delegated to InterruptHandler)
                 if interrupt_handler.should_interrupt_before(current_node):
                     logger.info(f"Interrupt before node: {current_node}")
-                    await checkpoint_manager.save_checkpoint(
-                        thread_id, current_node, state
-                    )
+                    await checkpoint_manager.save_checkpoint(thread_id, current_node, state)
                     return GraphExecutionResult(
                         state=state,
                         success=True,
@@ -1429,9 +1423,7 @@ class CompiledGraph(Generic[StateType]):
 
                 # Debug hook - after node
                 if hook:
-                    await hook.after_node(
-                        current_node, state, error if not success else None
-                    )
+                    await hook.after_node(current_node, state, error if not success else None)
 
                 if not success:
                     return GraphExecutionResult(
@@ -1896,8 +1888,7 @@ class StateGraph(Generic[StateType]):
                     for branch, target in edge.target.items():
                         if target != END and target not in self._nodes:
                             errors.append(
-                                f"Conditional target '{target}' not found "
-                                f"(branch: {branch})"
+                                f"Conditional target '{target}' not found " f"(branch: {branch})"
                             )
 
         # Check all nodes are reachable
@@ -2080,9 +2071,7 @@ class StateGraph(Generic[StateType]):
                     )
 
                 node_func = node_registry[func_name]
-                metadata = {
-                    k: v for k, v in node_def.items() if k not in ["id", "type", "func"]
-                }
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type", "func"]}
                 graph.add_node(node_id, node_func, **metadata)
 
             elif node_type == "passthrough":
@@ -2090,9 +2079,7 @@ class StateGraph(Generic[StateType]):
                 def passthrough_func(state):
                     return state
 
-                metadata = {
-                    k: v for k, v in node_def.items() if k not in ["id", "type"]
-                }
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
                 graph.add_node(node_id, passthrough_func, **metadata)
 
             elif node_type == "agent":
@@ -2108,9 +2095,7 @@ class StateGraph(Generic[StateType]):
 
                     return agent_placeholder
 
-                metadata = {
-                    k: v for k, v in node_def.items() if k not in ["id", "type"]
-                }
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
                 graph.add_node(node_id, create_agent_placeholder(node_def), **metadata)
 
             elif node_type == "compute":
@@ -2126,12 +2111,8 @@ class StateGraph(Generic[StateType]):
 
                     return compute_placeholder
 
-                metadata = {
-                    k: v for k, v in node_def.items() if k not in ["id", "type"]
-                }
-                graph.add_node(
-                    node_id, create_compute_placeholder(node_def), **metadata
-                )
+                metadata = {k: v for k, v in node_def.items() if k not in ["id", "type"]}
+                graph.add_node(node_id, create_compute_placeholder(node_def), **metadata)
 
             else:
                 raise TypeError(f"Unsupported node type: {node_type}")
@@ -2157,9 +2138,7 @@ class StateGraph(Generic[StateType]):
             elif edge_type == "conditional":
                 condition_name = edge_def.get("condition")
                 if not condition_name:
-                    raise ValueError(
-                        f"Conditional edge from '{source}' must specify 'condition'"
-                    )
+                    raise ValueError(f"Conditional edge from '{source}' must specify 'condition'")
 
                 if condition_name not in condition_registry:
                     raise ValueError(

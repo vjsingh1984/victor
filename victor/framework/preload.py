@@ -339,9 +339,7 @@ class PreloadManager:
             logger.info("No preload tasks to execute")
             return self._stats
 
-        logger.info(
-            f"Starting preload of {len(self._tasks)} tasks (parallel={parallel})..."
-        )
+        logger.info(f"Starting preload of {len(self._tasks)} tasks (parallel={parallel})...")
 
         # Sort tasks by priority (descending)
         sorted_tasks = sorted(
@@ -387,13 +385,9 @@ class PreloadManager:
             else:
                 if task.required:
                     self._stats.failed_tasks += 1
-                    logger.error(
-                        f"Required preload task '{task.name}' failed: {result.error}"
-                    )
+                    logger.error(f"Required preload task '{task.name}' failed: {result.error}")
                 else:
-                    logger.warning(
-                        f"Optional preload task '{task.name}' failed: {result.error}"
-                    )
+                    logger.warning(f"Optional preload task '{task.name}' failed: {result.error}")
 
         self._stats.duration = time.time() - start_time
         self._stats.task_results = self._results

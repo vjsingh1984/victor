@@ -790,16 +790,12 @@ class Agent:
         """
         # Check if vertical is configured
         if not self._vertical:
-            raise AgentError(
-                "No vertical configured. Create agent with vertical= parameter."
-            )
+            raise AgentError("No vertical configured. Create agent with vertical= parameter.")
 
         # Get workflow provider from vertical
         workflow_provider = self._vertical.get_workflow_provider()
         if not workflow_provider:
-            raise AgentError(
-                f"Vertical '{self._vertical.name}' does not provide workflows."
-            )
+            raise AgentError(f"Vertical '{self._vertical.name}' does not provide workflows.")
 
         # Use canonical API: run_compiled_workflow (uses UnifiedWorkflowCompiler internally)
         result = await workflow_provider.run_compiled_workflow(
@@ -852,35 +848,25 @@ class Agent:
 
         # Check if vertical is configured
         if not self._vertical:
-            raise AgentError(
-                "No vertical configured. Create agent with vertical= parameter."
-            )
+            raise AgentError("No vertical configured. Create agent with vertical= parameter.")
 
         # Get team specs using ISP-compliant provider pattern (LSP fix)
         if not hasattr(self._vertical, "get_team_spec_provider"):
-            raise AgentError(
-                f"Vertical '{self._vertical.name}' does not support teams."
-            )
+            raise AgentError(f"Vertical '{self._vertical.name}' does not support teams.")
 
         team_provider = self._vertical.get_team_spec_provider()
         if not team_provider or not hasattr(team_provider, "get_team_specs"):
-            raise AgentError(
-                f"Vertical '{self._vertical.name}' does not provide team specs."
-            )
+            raise AgentError(f"Vertical '{self._vertical.name}' does not provide team specs.")
 
         team_specs = team_provider.get_team_specs()
         if not team_specs:
-            raise AgentError(
-                f"Vertical '{self._vertical.name}' has no team specs defined."
-            )
+            raise AgentError(f"Vertical '{self._vertical.name}' has no team specs defined.")
 
         # Get the team specification
         team_spec = team_specs.get(team_name)
         if not team_spec:
             available = list(team_specs.keys())
-            raise AgentError(
-                f"Team '{team_name}' not found. " f"Available: {', '.join(available)}"
-            )
+            raise AgentError(f"Team '{team_name}' not found. " f"Available: {', '.join(available)}")
 
         # Create and run team
         team = await AgentTeam.create(

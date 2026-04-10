@@ -47,13 +47,9 @@ def test_enter_submits_prompt_without_unawaited_key_warnings() -> None:
             and "eventbus" not in str(w.message).lower()
         ]
         # Check that we don't have critical warnings about unawaited coroutines in the submit flow
-        critical_warnings = [
-            w for w in relevant_warnings if "was never awaited" in str(w.message)
-        ]
+        critical_warnings = [w for w in relevant_warnings if "was never awaited" in str(w.message)]
         # Allow some leniency for framework cleanup warnings
-        unawaited_from_app = [
-            w for w in critical_warnings if "emit" in str(w.message).lower()
-        ]
+        unawaited_from_app = [w for w in critical_warnings if "emit" in str(w.message).lower()]
         assert (
             len(unawaited_from_app) == 0
         ), f"Found unexpected unawaited coroutines: {[str(w.message) for w in unawaited_from_app]}"

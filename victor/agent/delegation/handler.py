@@ -195,9 +195,7 @@ class DelegationHandler:
                 return await self._execute_delegation(delegation, role)
             else:
                 # Asynchronous: start and return immediately
-                delegation.task = asyncio.create_task(
-                    self._execute_delegation(delegation, role)
-                )
+                delegation.task = asyncio.create_task(self._execute_delegation(delegation, role))
                 return DelegationResponse.pending(request.delegation_id, delegate_id)
 
         except Exception as e:
@@ -233,17 +231,13 @@ class DelegationHandler:
                 context = self._build_delegate_context(request)
 
                 # Determine tools
-                tools = request.required_tools or ROLE_DEFAULT_TOOLS.get(
-                    role, ["read", "ls"]
-                )
+                tools = request.required_tools or ROLE_DEFAULT_TOOLS.get(role, ["read", "ls"])
 
                 # Calculate timeout
                 timeout = request.deadline_seconds or 300
 
                 # Spawn delegate
-                logger.debug(
-                    f"Spawning {role.value} delegate for task: {request.task[:50]}..."
-                )
+                logger.debug(f"Spawning {role.value} delegate for task: {request.task[:50]}...")
 
                 result = await self.sub_agents.spawn(
                     role=role,
@@ -322,24 +316,15 @@ class DelegationHandler:
         # Infer from task keywords
         task_lower = request.task.lower()
 
-        if any(
-            kw in task_lower
-            for kw in ["find", "search", "research", "explore", "discover"]
-        ):
+        if any(kw in task_lower for kw in ["find", "search", "research", "explore", "discover"]):
             return SubAgentRole.RESEARCHER
-        elif any(
-            kw in task_lower for kw in ["plan", "design", "architect", "organize"]
-        ):
+        elif any(kw in task_lower for kw in ["plan", "design", "architect", "organize"]):
             return SubAgentRole.PLANNER
         elif any(
-            kw in task_lower
-            for kw in ["implement", "create", "build", "write", "edit", "fix"]
+            kw in task_lower for kw in ["implement", "create", "build", "write", "edit", "fix"]
         ):
             return SubAgentRole.EXECUTOR
-        elif any(
-            kw in task_lower
-            for kw in ["review", "check", "verify", "validate", "audit"]
-        ):
+        elif any(kw in task_lower for kw in ["review", "check", "verify", "validate", "audit"]):
             return SubAgentRole.REVIEWER
         elif any(kw in task_lower for kw in ["test", "spec", "assert", "mock"]):
             return SubAgentRole.TESTER
@@ -411,9 +396,7 @@ class DelegationHandler:
         Returns:
             DelegationResponse
         """
-        status = (
-            DelegationStatus.COMPLETED if result.success else DelegationStatus.FAILED
-        )
+        status = DelegationStatus.COMPLETED if result.success else DelegationStatus.FAILED
 
         # Extract discoveries from result
         discoveries = []

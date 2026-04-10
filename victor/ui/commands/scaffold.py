@@ -84,9 +84,7 @@ def validate_vertical_name(name: str) -> str:
     # Check for reserved names
     reserved = {"victor", "core", "tools", "providers", "config", "ui", "tests"}
     if name in reserved:
-        raise typer.BadParameter(
-            f"'{name}' is a reserved name. Please choose a different name."
-        )
+        raise typer.BadParameter(f"'{name}' is a reserved name. Please choose a different name.")
 
     return name
 
@@ -153,14 +151,10 @@ def check_existing_vertical(vertical_dir: Path, force: bool) -> bool:
     """
     if vertical_dir.exists():
         if force:
-            console.print(
-                f"[yellow]Warning: Overwriting existing vertical at {vertical_dir}[/]"
-            )
+            console.print(f"[yellow]Warning: Overwriting existing vertical at {vertical_dir}[/]")
             return True
         else:
-            console.print(
-                f"[red]Error: Vertical directory already exists at {vertical_dir}[/]"
-            )
+            console.print(f"[red]Error: Vertical directory already exists at {vertical_dir}[/]")
             console.print("Use --force to overwrite existing files.")
             return False
     return True
@@ -281,8 +275,7 @@ def new_vertical(
     console.print()
     console.print(
         Panel(
-            f"[bold blue]Creating new vertical: {name}[/]\n"
-            f"[dim]Description: {description}[/]",
+            f"[bold blue]Creating new vertical: {name}[/]\n" f"[dim]Description: {description}[/]",
             title="Victor Scaffold",
             border_style="blue",
         )
@@ -339,9 +332,7 @@ def new_vertical(
             f"  4. Use prompts.py, safety.py, and mode_config.py only for optional follow-on metadata"
         )
         if service_provider:
-            console.print(
-                f"  5. Wire any runtime-only integrations through service_provider.py"
-            )
+            console.print(f"  5. Wire any runtime-only integrations through service_provider.py")
         console.print()
         console.print("[dim]To use your new vertical:[/]")
         console.print(f"    from victor.{name} import {to_class_name(name)}Assistant")

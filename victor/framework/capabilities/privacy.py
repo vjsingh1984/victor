@@ -79,9 +79,7 @@ def _store_config(orchestrator: Any, name: str, config: Dict[str, Any]) -> None:
     )
 
 
-def _load_config(
-    orchestrator: Any, name: str, defaults: Dict[str, Any]
-) -> Dict[str, Any]:
+def _load_config(orchestrator: Any, name: str, defaults: Dict[str, Any]) -> Dict[str, Any]:
     """Load config from framework service when available, else fallback to orchestrator attr."""
     return load_capability_config(orchestrator, name, defaults)
 
@@ -205,9 +203,7 @@ def configure_secrets_masking(
         },
     )
 
-    logger.info(
-        f"Configured secrets masking: enabled={enabled}, replacement={replacement}"
-    )
+    logger.info(f"Configured secrets masking: enabled={enabled}, replacement={replacement}")
 
 
 def get_secrets_masking_config(orchestrator: Any) -> Dict[str, Any]:
@@ -263,9 +259,7 @@ def configure_audit_logging(
         },
     )
 
-    logger.info(
-        f"Configured audit logging: enabled={enabled}, data_access={log_data_access}"
-    )
+    logger.info(f"Configured audit logging: enabled={enabled}, data_access={log_data_access}")
 
 
 def get_audit_logging_config(orchestrator: Any) -> Dict[str, Any]:

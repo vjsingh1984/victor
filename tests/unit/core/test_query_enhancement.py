@@ -358,9 +358,7 @@ class TestRewriteStrategy:
     async def test_enhance_with_llm_response(self, strategy):
         """Test enhancement with mocked LLM response."""
         # The enhanced response should be longer than original/3 and shorter than original*5
-        strategy._call_llm = AsyncMock(
-            return_value="enhanced search query terms expanded"
-        )
+        strategy._call_llm = AsyncMock(return_value="enhanced search query terms expanded")
 
         context = EnhancementContext(domain="general")
         result = await strategy.enhance("test query input", context)
@@ -469,9 +467,7 @@ class TestQueryEnhancementPipeline:
     @pytest.mark.asyncio
     async def test_enhance_basic(self, pipeline):
         """Test basic enhancement."""
-        context = EnhancementContext(
-            entity_metadata=[{"name": "Test Company", "ticker": "TEST"}]
-        )
+        context = EnhancementContext(entity_metadata=[{"name": "Test Company", "ticker": "TEST"}])
         result = await pipeline.enhance("test query", context)
 
         assert result.original == "test query"
@@ -480,9 +476,7 @@ class TestQueryEnhancementPipeline:
     @pytest.mark.asyncio
     async def test_enhance_caching(self, pipeline):
         """Test that results are cached."""
-        context = EnhancementContext(
-            entity_metadata=[{"name": "Test", "ticker": "TST"}]
-        )
+        context = EnhancementContext(entity_metadata=[{"name": "Test", "ticker": "TST"}])
 
         # First call
         result1 = await pipeline.enhance("test query", context)
@@ -496,12 +490,8 @@ class TestQueryEnhancementPipeline:
     @pytest.mark.asyncio
     async def test_enhance_different_contexts_not_cached(self, pipeline):
         """Test that different contexts produce different cache keys."""
-        context1 = EnhancementContext(
-            entity_metadata=[{"name": "Apple", "ticker": "AAPL"}]
-        )
-        context2 = EnhancementContext(
-            entity_metadata=[{"name": "Google", "ticker": "GOOGL"}]
-        )
+        context1 = EnhancementContext(entity_metadata=[{"name": "Apple", "ticker": "AAPL"}])
+        context2 = EnhancementContext(entity_metadata=[{"name": "Google", "ticker": "GOOGL"}])
 
         result1 = await pipeline.enhance("compare revenue", context1)
         result2 = await pipeline.enhance("compare revenue", context2)
@@ -523,9 +513,7 @@ class TestQueryEnhancementPipeline:
         # Mock LLM unavailability
         pipeline._llm_available = False
 
-        context = EnhancementContext(
-            entity_metadata=[{"name": "Test", "ticker": "TST"}]
-        )
+        context = EnhancementContext(entity_metadata=[{"name": "Test", "ticker": "TST"}])
         result = await pipeline.enhance("test query", context)
 
         # Should fall back to entity expansion
@@ -655,9 +643,7 @@ class TestEnhancementResult:
             variants=["v1", "v2"],
             sub_queries=["sq1"],
         )
-        result = EnhancementResult.from_query(
-            query, latency_ms=100.0, llm_calls=1, cache_hit=False
-        )
+        result = EnhancementResult.from_query(query, latency_ms=100.0, llm_calls=1, cache_hit=False)
 
         assert result.success is True
         assert result.query == query
@@ -748,9 +734,7 @@ class TestCacheBehavior:
         )
         pipeline = QueryEnhancementPipeline(config=config)
 
-        context = EnhancementContext(
-            entity_metadata=[{"name": "Test", "ticker": "TST"}]
-        )
+        context = EnhancementContext(entity_metadata=[{"name": "Test", "ticker": "TST"}])
 
         # First call
         result1 = await pipeline.enhance("test", context)
@@ -774,9 +758,7 @@ class TestCacheBehavior:
         )
         pipeline = QueryEnhancementPipeline(config=config)
 
-        context = EnhancementContext(
-            entity_metadata=[{"name": "Test", "ticker": "TST"}]
-        )
+        context = EnhancementContext(entity_metadata=[{"name": "Test", "ticker": "TST"}])
 
         result1 = await pipeline.enhance("query one", context)
         result2 = await pipeline.enhance("query two", context)

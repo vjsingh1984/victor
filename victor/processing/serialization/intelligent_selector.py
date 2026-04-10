@@ -49,9 +49,7 @@ class FormatScore:
     def __post_init__(self):
         # Weighted combination
         self.final_score = (
-            self.base_score * 0.4
-            + self.historical_score * 0.35
-            + self.context_score * 0.25
+            self.base_score * 0.4 + self.historical_score * 0.35 + self.context_score * 0.25
         )
 
 
@@ -416,9 +414,7 @@ class IntelligentFormatSelector:
             tool_name: Specific tool to invalidate, or None for all
         """
         if tool_name:
-            keys_to_remove = [
-                k for k in self._tool_format_stats if k.startswith(tool_name)
-            ]
+            keys_to_remove = [k for k in self._tool_format_stats if k.startswith(tool_name)]
             for key in keys_to_remove:
                 del self._tool_format_stats[key]
         else:

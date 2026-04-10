@@ -160,9 +160,7 @@ class TestExtractRequiredFilesFromPrompt:
         """Extract relative file paths from message."""
         from victor.agent.streaming.pipeline import _extract_required_files_from_prompt
 
-        result = _extract_required_files_from_prompt(
-            "Check ./src/main.py and ../utils/helper.py"
-        )
+        result = _extract_required_files_from_prompt("Check ./src/main.py and ../utils/helper.py")
         assert set(result) == {"./src/main.py", "../utils/helper.py"}
 
     def test_extract_mixed_paths(self):
@@ -200,9 +198,7 @@ class TestExtractRequiredOutputsFromPrompt:
             _extract_required_outputs_from_prompt,
         )
 
-        result = _extract_required_outputs_from_prompt(
-            "Create output.txt and results.json"
-        )
+        result = _extract_required_outputs_from_prompt("Create output.txt and results.json")
         assert result == []
 
 
@@ -213,9 +209,7 @@ class TestPrepareTask:
         """Prepare task through task coordinator."""
         from victor.agent.unified_task_tracker import TrackerTaskType
 
-        mock_orchestrator.task_coordinator.prepare_task.return_value = MagicMock(
-            task_type="edit"
-        )
+        mock_orchestrator.task_coordinator.prepare_task.return_value = MagicMock(task_type="edit")
         result = chat_coordinator._prepare_task(
             "Write a function",
             TrackerTaskType.EDIT,
@@ -226,13 +220,9 @@ class TestPrepareTask:
 class TestGetRateLimitWaitTime:
     """Tests for _get_rate_limit_wait_time."""
 
-    def test_calculates_wait_time_with_backoff(
-        self, chat_coordinator, mock_orchestrator
-    ):
+    def test_calculates_wait_time_with_backoff(self, chat_coordinator, mock_orchestrator):
         """Calculate wait time with exponential backoff."""
-        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = (
-            2.0
-        )
+        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 2.0
         exc = Exception("Rate limited")
 
         # First attempt
@@ -249,9 +239,7 @@ class TestGetRateLimitWaitTime:
 
     def test_caps_wait_at_max(self, chat_coordinator, mock_orchestrator):
         """Cap wait time at 300 seconds."""
-        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = (
-            100.0
-        )
+        mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 100.0
         exc = Exception("Rate limited")
 
         # Would be 100 * 2^4 = 1600, but capped at 300
@@ -268,9 +256,7 @@ class TestHandleEmptyResponseRecovery:
     """Tests for _handle_empty_response_recovery."""
 
     @pytest.mark.asyncio
-    async def test_empty_response_recovery_logic(
-        self, chat_coordinator, mock_orchestrator
-    ):
+    async def test_empty_response_recovery_logic(self, chat_coordinator, mock_orchestrator):
         """Test empty response recovery handles provider stream."""
         from victor.providers.base import StreamChunk
 
@@ -280,15 +266,13 @@ class TestHandleEmptyResponseRecovery:
 
         mock_orchestrator.provider.stream = mock_stream
         mock_orchestrator.add_message = MagicMock()
-        mock_orchestrator.sanitizer.sanitize = MagicMock(
-            return_value="sanitized content"
-        )
+        mock_orchestrator.sanitizer.sanitize = MagicMock(return_value="sanitized content")
         mock_orchestrator._chunk_generator.generate_content_chunk = MagicMock(
             return_value=MagicMock()
         )
 
-        success, tool_calls, chunk = (
-            await chat_coordinator._handle_empty_response_recovery(MagicMock(), [])
+        success, tool_calls, chunk = await chat_coordinator._handle_empty_response_recovery(
+            MagicMock(), []
         )
 
         # Should recover content

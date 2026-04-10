@@ -174,9 +174,7 @@ class TestTaskClassifierComplex:
         )
 
         classifier = ComplexityClassifier()
-        result = classifier.classify(
-            "Provide a comprehensive analysis of the project architecture"
-        )
+        result = classifier.classify("Provide a comprehensive analysis of the project architecture")
 
         # ANALYSIS is the correct classification for comprehensive analysis tasks
         assert result.complexity == TaskComplexity.ANALYSIS
@@ -193,9 +191,7 @@ class TestTaskClassifierGeneration:
         )
 
         classifier = ComplexityClassifier()
-        result = classifier.classify(
-            "Create a simple function that calculates factorial"
-        )
+        result = classifier.classify("Create a simple function that calculates factorial")
 
         assert result.complexity == TaskComplexity.GENERATION
         # GENERATION tasks have minimum budget of 10 (may need file reads)
@@ -311,9 +307,7 @@ class TestConvenienceFunctions:
         """Test should_force_answer convenience function."""
         # NOTE: should_force_answer was deprecated and removed
         # This test can be removed or updated when the function is added to canonical API
-        pytest.skip(
-            "should_force_answer function deprecated - needs canonical implementation"
-        )
+        pytest.skip("should_force_answer function deprecated - needs canonical implementation")
 
 
 class TestCustomClassifier:

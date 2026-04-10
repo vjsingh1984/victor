@@ -33,9 +33,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     """Resolve a vertical attribute and skip test when unavailable."""
     module, _resolved = import_module_with_fallback(module_path)
     if module is None or not hasattr(module, attr_name):
-        pytest.skip(
-            f"Vertical module or attribute unavailable: {module_path}:{attr_name}"
-        )
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
     return getattr(module, attr_name)
 
 
@@ -94,9 +92,7 @@ class TestCLISessionInitialization:
             await handler.initialize(session_config)
 
         # Verify overrides were applied
-        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(
-            100, user_override=True
-        )
+        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(100, user_override=True)
         mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
             50, user_override=True
         )
@@ -105,9 +101,7 @@ class TestCLISessionInitialization:
     @pytest.mark.integration
     async def test_session_with_vertical_integration(self, session_config):
         """Test session with vertical integration."""
-        CodingAssistant = _load_vertical_attr(
-            "victor.coding.assistant", "CodingAssistant"
-        )
+        CodingAssistant = _load_vertical_attr("victor.coding.assistant", "CodingAssistant")
 
         session_config.vertical = "coding"
 
@@ -199,9 +193,7 @@ class TestCLIMessageProcessing:
 
         # Process multiple messages concurrently
         messages = ["Hello", "World", "Test"]
-        tasks = [
-            handler.process_message(mock_agent, msg, stream=True) for msg in messages
-        ]
+        tasks = [handler.process_message(mock_agent, msg, stream=True) for msg in messages]
 
         responses = await asyncio.gather(*tasks)
 
@@ -330,9 +322,7 @@ class TestOneShotIntegration:
             async def mock_stream(msg):
                 yield MagicMock(content="One-shot response", type="content")
 
-            with patch.object(
-                handler, "process_message", return_value="One-shot response"
-            ):
+            with patch.object(handler, "process_message", return_value="One-shot response"):
                 metrics = await handler.execute(session_config, "Test message")
 
         assert metrics.success is True
@@ -343,9 +333,7 @@ class TestOneShotIntegration:
     async def test_oneshot_error_handling(self, handler, session_config):
         """Test one-shot error handling and cleanup."""
         mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(
-            side_effect=Exception("Initialization failed")
-        )
+        mock_shim.create_orchestrator = AsyncMock(side_effect=Exception("Initialization failed"))
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
             with pytest.raises(Exception, match="Initialization failed"):
@@ -380,9 +368,7 @@ class TestCLIModeSwitching:
         mock_shim.emit_session_start = MagicMock()
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
-            with patch(
-                "victor.agent.mode_controller.get_mode_controller"
-            ) as mock_get_controller:
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_get_controller.return_value = mock_controller
 
@@ -407,9 +393,7 @@ class TestCLIModeSwitching:
         mock_shim.emit_session_start = MagicMock()
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
-            with patch(
-                "victor.agent.mode_controller.get_mode_controller"
-            ) as mock_get_controller:
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 # Simulate mode switch failure
                 mock_controller.switch_mode.side_effect = ValueError("Invalid mode")
@@ -532,9 +516,7 @@ class TestCLIErrorRecovery:
         )
 
         mock_shim = MagicMock()
-        mock_shim.create_orchestrator = AsyncMock(
-            side_effect=RuntimeError("Provider unavailable")
-        )
+        mock_shim.create_orchestrator = AsyncMock(side_effect=RuntimeError("Provider unavailable"))
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
             # Should raise initialization error

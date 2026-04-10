@@ -111,9 +111,7 @@ def _extract_thinking_content(response: str) -> Tuple[str, str]:
     think_pattern = r"<think>(.*?)</think>"
     matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
     thinking = "\n".join(matches) if matches else ""
-    content = re.sub(
-        think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE
-    ).strip()
+    content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
     return (thinking, content)
 
 
@@ -142,9 +140,7 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
     planning_keywords = {"complexity", "steps", "desc", "duration"}
 
     # Pattern 1: JSON code block with tool call
-    json_block_pattern = (
-        r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
-    )
+    json_block_pattern = r"```json\s*\n?\s*(\{[^`]*\"name\"\s*:\s*\"[^\"]+\"[^`]*\})\s*\n?```"
     matches = re.findall(json_block_pattern, content, re.DOTALL)
     for match in matches:
         try:
@@ -308,25 +304,17 @@ class LlamaCppProvider(BaseProvider):
                     provider.base_url = url
                     # Try to get loaded model info
                     try:
-                        models_resp = await provider.client.get(
-                            f"{url}/v1/models", timeout=5.0
-                        )
+                        models_resp = await provider.client.get(f"{url}/v1/models", timeout=5.0)
                         if models_resp.status_code == 200:
                             data = models_resp.json()
                             if data.get("data"):
-                                provider._loaded_model = data["data"][0].get(
-                                    "id", "default"
-                                )
+                                provider._loaded_model = data["data"][0].get("id", "default")
                     except Exception:
                         provider._loaded_model = "default"
-                    provider._provider_logger.logger.info(
-                        f"Connected to llama.cpp server at {url}"
-                    )
+                    provider._provider_logger.logger.info(f"Connected to llama.cpp server at {url}")
                     return provider
             except Exception as e:
-                provider._provider_logger.logger.debug(
-                    f"llama.cpp not available at {url}: {e}"
-                )
+                provider._provider_logger.logger.debug(f"llama.cpp not available at {url}: {e}")
                 continue
 
         raise ProviderConnectionError(
@@ -370,9 +358,7 @@ class LlamaCppProvider(BaseProvider):
                 return data.get("data", [])
             return []
         except Exception as e:
-            self._provider_logger.logger.warning(
-                f"Failed to list llama.cpp models: {e}"
-            )
+            self._provider_logger.logger.warning(f"Failed to list llama.cpp models: {e}")
             return []
 
     async def check_health(self) -> Dict[str, Any]:
@@ -514,9 +500,7 @@ class LlamaCppProvider(BaseProvider):
                     else str(error_data)
                 )
                 if not error_msg:
-                    error_msg = (
-                        e.response.text[:500] if e.response.text else "Unknown error"
-                    )
+                    error_msg = e.response.text[:500] if e.response.text else "Unknown error"
 
                 if status_code in (401, 403):
                     # Some llama.cpp servers may require authentication
@@ -560,8 +544,7 @@ class LlamaCppProvider(BaseProvider):
                     provider="llamacpp",
                     details={
                         "suggestion": (
-                            "Start llama.cpp server:\n"
-                            "  llama-server -m model.gguf --port 8080"
+                            "Start llama.cpp server:\n" "  llama-server -m model.gguf --port 8080"
                         )
                     },
                 ) from e
@@ -701,21 +684,17 @@ class LlamaCppProvider(BaseProvider):
                                         accumulated_tool_calls[idx]["id"] = tc["id"]
                                     func = tc.get("function", {})
                                     if "name" in func:
-                                        accumulated_tool_calls[idx]["name"] = func[
-                                            "name"
-                                        ]
+                                        accumulated_tool_calls[idx]["name"] = func["name"]
                                     if "arguments" in func:
-                                        accumulated_tool_calls[idx][
+                                        accumulated_tool_calls[idx]["arguments"] += func[
                                             "arguments"
-                                        ] += func["arguments"]
+                                        ]
 
                             # Final chunk
                             if finish_reason:
                                 # Check for thinking tags
                                 final_content = accumulated_content
-                                thinking, main_content = _extract_thinking_content(
-                                    final_content
-                                )
+                                thinking, main_content = _extract_thinking_content(final_content)
                                 if thinking:
                                     final_content = main_content
 
@@ -742,8 +721,8 @@ class LlamaCppProvider(BaseProvider):
 
                                 # Fallback: Extract tool calls from content
                                 if not parsed_tool_calls and final_content:
-                                    fallback_calls, remaining = (
-                                        _extract_tool_calls_from_content(final_content)
+                                    fallback_calls, remaining = _extract_tool_calls_from_content(
+                                        final_content
                                     )
                                     if fallback_calls:
                                         parsed_tool_calls = fallback_calls
@@ -828,9 +807,7 @@ class LlamaCppProvider(BaseProvider):
 
         # Fallback: Extract tool calls from content if server didn't parse them
         if not tool_calls and content:
-            fallback_calls, remaining_content = _extract_tool_calls_from_content(
-                content
-            )
+            fallback_calls, remaining_content = _extract_tool_calls_from_content(content)
             if fallback_calls:
                 tool_calls = fallback_calls
                 content = remaining_content

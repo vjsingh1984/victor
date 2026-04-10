@@ -208,9 +208,7 @@ class ToolRegistrar:
 
         logger.debug("ToolRegistrar facade initialized")
 
-    def set_background_task_callback(
-        self, callback: Callable[[Any, str], asyncio.Task]
-    ) -> None:
+    def set_background_task_callback(self, callback: Callable[[Any, str], asyncio.Task]) -> None:
         """Set callback for creating background tasks.
 
         Args:
@@ -420,16 +418,12 @@ class ToolRegistrar:
         if not self.config.airgapped_mode:
             try:
                 tool_config = self.settings.load_tool_config()
-                web_cfg = (
-                    tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
-                )
+                web_cfg = tool_config.get("web_tools", {}) or tool_config.get("web", {}) or {}
                 self._tool_config.update(
                     {
                         "web_fetch_top": web_cfg.get("summarize_fetch_top"),
                         "web_fetch_pool": web_cfg.get("summarize_fetch_pool"),
-                        "max_content_length": web_cfg.get(
-                            "summarize_max_content_length"
-                        ),
+                        "max_content_length": web_cfg.get("summarize_max_content_length"),
                     }
                 )
             except Exception as exc:
@@ -496,9 +490,7 @@ class ToolRegistrar:
                 return
 
             # Get all registered tool names for validation
-            registered_tools = {
-                tool.name for tool in self.tools.list_tools(only_enabled=False)
-            }
+            registered_tools = {tool.name for tool in self.tools.list_tools(only_enabled=False)}
 
             # Get critical tools dynamically from registry (priority=Priority.CRITICAL)
             from victor.agent.tool_selection import get_critical_tools
@@ -578,17 +570,13 @@ class ToolRegistrar:
 
             # Log tool states
             disabled_tools = [
-                name
-                for name, enabled in self.tools.get_tool_states().items()
-                if not enabled
+                name for name, enabled in self.tools.get_tool_states().items() if not enabled
             ]
             if disabled_tools:
                 logger.info(f"Disabled tools: {', '.join(sorted(disabled_tools))}")
 
             # Log enabled tool count
-            enabled_count = sum(
-                1 for enabled in self.tools.get_tool_states().values() if enabled
-            )
+            enabled_count = sum(1 for enabled in self.tools.get_tool_states().values() if enabled)
             logger.info(f"Enabled tools: {enabled_count}/{len(registered_tools)}")
 
         except Exception as e:
@@ -906,8 +894,7 @@ class ToolRegistrar:
                 {
                     "name": s.name,
                     "description": s.description,
-                    "connected": s.name
-                    in getattr(self.mcp_registry, "_connected_servers", {}),
+                    "connected": s.name in getattr(self.mcp_registry, "_connected_servers", {}),
                 }
                 for s in servers
             ],
@@ -987,9 +974,7 @@ class ToolRegistrar:
                 self._stats.dynamic_tools = load_result.tools_loaded
                 self._tools_loaded = True
                 result.tools_loaded = self._stats.dynamic_tools
-                logger.debug(
-                    f"Prewarmed {result.tools_loaded} dynamic tools via CatalogLoader"
-                )
+                logger.debug(f"Prewarmed {result.tools_loaded} dynamic tools via CatalogLoader")
 
             # Phase 2: Load plugins via PluginLoader
             if include_plugins and self.config.enable_plugins:
@@ -999,9 +984,7 @@ class ToolRegistrar:
                     result.plugins_loaded = load_result.tools_registered
                     self._stats.plugin_tools = load_result.tools_registered
                     self.plugin_manager = plugin_loader.plugin_manager
-                    logger.debug(
-                        f"Prewarmed {result.plugins_loaded} plugin tools via PluginLoader"
-                    )
+                    logger.debug(f"Prewarmed {result.plugins_loaded} plugin tools via PluginLoader")
                 except Exception as e:
                     result.warnings.append(f"Plugin prewarm failed: {e}")
                     logger.debug(f"Plugin prewarm failed: {e}")

@@ -81,9 +81,7 @@ def sample_tool():
         description="Get the weather for a location",
         parameters={
             "type": "object",
-            "properties": {
-                "location": {"type": "string", "description": "The city name"}
-            },
+            "properties": {"location": {"type": "string", "description": "The city name"}},
             "required": ["location"],
         },
     )
@@ -204,9 +202,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -223,9 +219,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -241,9 +235,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -259,9 +251,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -277,9 +267,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -295,9 +283,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -313,9 +299,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -331,9 +315,7 @@ class TestGroqProviderInit:
             sources_attempted=[],
             non_interactive=True,
         )
-        with patch(
-            "victor.providers.groq_provider.UnifiedApiKeyResolver"
-        ) as mock_resolver:
+        with patch("victor.providers.groq_provider.UnifiedApiKeyResolver") as mock_resolver:
             mock_resolver_instance = MagicMock()
             mock_resolver_instance.get_api_key.return_value = mock_key_result
             mock_resolver.return_value = mock_resolver_instance
@@ -371,13 +353,9 @@ class TestGroqProviderChat:
         mock_response.status_code = 429
         mock_response.text = "Rate limit exceeded"
 
-        error = httpx.HTTPStatusError(
-            "Rate limit", request=MagicMock(), response=mock_response
-        )
+        error = httpx.HTTPStatusError("Rate limit", request=MagicMock(), response=mock_response)
 
-        with patch.object(
-            groq_provider, "_execute_with_circuit_breaker", side_effect=error
-        ):
+        with patch.object(groq_provider, "_execute_with_circuit_breaker", side_effect=error):
             with pytest.raises(ProviderError) as exc_info:
                 await groq_provider.chat(
                     messages=sample_messages,
@@ -457,21 +435,15 @@ class TestGroqResponseParsing:
 
     def test_parse_response_basic(self, groq_provider, mock_chat_response):
         """Test parsing basic response."""
-        result = groq_provider._parse_response(
-            mock_chat_response, "llama-3.3-70b-versatile"
-        )
+        result = groq_provider._parse_response(mock_chat_response, "llama-3.3-70b-versatile")
 
         assert isinstance(result, CompletionResponse)
         assert result.content == "Hello! How can I help you today?"
         assert result.stop_reason == "stop"
 
-    def test_parse_response_with_tool_calls(
-        self, groq_provider, mock_tool_call_response
-    ):
+    def test_parse_response_with_tool_calls(self, groq_provider, mock_tool_call_response):
         """Test parsing response with tool calls."""
-        result = groq_provider._parse_response(
-            mock_tool_call_response, "llama-3.3-70b-versatile"
-        )
+        result = groq_provider._parse_response(mock_tool_call_response, "llama-3.3-70b-versatile")
 
         assert isinstance(result, CompletionResponse)
         assert result.tool_calls is not None
@@ -486,9 +458,7 @@ class TestGroqResponseParsing:
 
     def test_parse_response_no_content(self, groq_provider):
         """Test parsing response with no content."""
-        response = {
-            "choices": [{"message": {"role": "assistant"}, "finish_reason": "stop"}]
-        }
+        response = {"choices": [{"message": {"role": "assistant"}, "finish_reason": "stop"}]}
         result = groq_provider._parse_response(response, "test-model")
         assert result.content == ""
 

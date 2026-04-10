@@ -129,6 +129,4 @@ def list_marketplace(
 
 def get_categories() -> List[str]:
     """Return unique categories in the marketplace."""
-    return sorted(
-        {e.get("category", "") for e in _MARKETPLACE_ENTRIES if e.get("category")}
-    )
+    return sorted({e.get("category", "") for e in _MARKETPLACE_ENTRIES if e.get("category")})

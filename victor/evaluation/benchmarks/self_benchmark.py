@@ -59,9 +59,7 @@ class SelfBenchmarkConfig:
         timeout_per_task: Timeout per task in seconds
     """
 
-    benchmark_types: list[BenchmarkType] = field(
-        default_factory=lambda: [BenchmarkType.SWE_BENCH]
-    )
+    benchmark_types: list[BenchmarkType] = field(default_factory=lambda: [BenchmarkType.SWE_BENCH])
     model: str = "claude-3-sonnet"
     provider: str = "anthropic"
     max_tasks: int = 10

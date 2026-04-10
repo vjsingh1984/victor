@@ -260,19 +260,13 @@ class SearchRouter:
         # Add custom signals
         if custom_signals:
             if "keyword" in custom_signals:
-                self._compile_patterns(
-                    custom_signals["keyword"], self._keyword_patterns
-                )
+                self._compile_patterns(custom_signals["keyword"], self._keyword_patterns)
             if "semantic" in custom_signals:
-                self._compile_patterns(
-                    custom_signals["semantic"], self._semantic_patterns
-                )
+                self._compile_patterns(custom_signals["semantic"], self._semantic_patterns)
             if "bug" in custom_signals:
                 self._compile_patterns(custom_signals["bug"], self._bug_patterns)
             if "graph" in custom_signals:
-                self._compile_graph_patterns(
-                    custom_signals["graph"], self._graph_patterns
-                )
+                self._compile_graph_patterns(custom_signals["graph"], self._graph_patterns)
 
     def _compile_patterns(
         self,
@@ -341,12 +335,8 @@ class SearchRouter:
             )
 
         # Score both search types
-        keyword_score, keyword_matches = self._score_patterns(
-            query, self._keyword_patterns
-        )
-        semantic_score, semantic_matches = self._score_patterns(
-            query, self._semantic_patterns
-        )
+        keyword_score, keyword_matches = self._score_patterns(query, self._keyword_patterns)
+        semantic_score, semantic_matches = self._score_patterns(query, self._semantic_patterns)
 
         # Normalize scores
         max_score = max(keyword_score + semantic_score, 1.0)
@@ -354,10 +344,7 @@ class SearchRouter:
         semantic_norm = semantic_score / max_score if max_score > 0 else 0
 
         # Determine route
-        if (
-            keyword_score >= self.hybrid_threshold
-            and semantic_score >= self.hybrid_threshold
-        ):
+        if keyword_score >= self.hybrid_threshold and semantic_score >= self.hybrid_threshold:
             # Both signals present - hybrid search
             return SearchRoute(
                 search_type=SearchType.HYBRID,
@@ -374,9 +361,7 @@ class SearchRouter:
                 transformed_query=None,
                 matched_patterns=keyword_matches,
             )
-        elif (
-            semantic_score > keyword_score and semantic_score >= self.semantic_threshold
-        ):
+        elif semantic_score > keyword_score and semantic_score >= self.semantic_threshold:
             return SearchRoute(
                 search_type=SearchType.SEMANTIC,
                 confidence=semantic_norm,

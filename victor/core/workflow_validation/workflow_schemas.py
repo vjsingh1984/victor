@@ -74,18 +74,14 @@ class WorkflowNodeSchema(BaseModel):
         max_length=100,
         description="Unique node identifier (alphanumeric with underscores/hyphens)",
     )
-    name: str = Field(
-        ..., min_length=1, max_length=200, description="Human-readable node name"
-    )
+    name: str = Field(..., min_length=1, max_length=200, description="Human-readable node name")
     type: NodeKind = Field(..., description="Node type determining execution behavior")
     description: Optional[str] = Field(
         None, max_length=500, description="Optional node description"
     )
 
     # Common fields
-    next_nodes: List[str] = Field(
-        default_factory=list, description="Successor node IDs"
-    )
+    next_nodes: List[str] = Field(default_factory=list, description="Successor node IDs")
     timeout: Optional[int] = Field(
         None, ge=0, le=3600, description="Node timeout in seconds (max 1 hour)"
     )
@@ -110,9 +106,7 @@ class WorkflowNodeSchema(BaseModel):
     handler: Optional[str] = Field(None, description="Registered compute handler name")
 
     # Condition node fields
-    condition: Optional[str] = Field(
-        None, description="Condition function name for branching"
-    )
+    condition: Optional[str] = Field(None, description="Condition function name for branching")
     branches: Optional[Dict[str, str]] = Field(
         None, description="Branch mappings (condition_value -> node_id)"
     )
@@ -135,9 +129,7 @@ class WorkflowNodeSchema(BaseModel):
     ] = Field(None, description="Team coordination pattern")
 
     # Metadata
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional node metadata"
-    )
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional node metadata")
 
     @field_validator("id")
     @classmethod
@@ -161,8 +153,7 @@ class WorkflowNodeSchema(BaseModel):
 
         if not re.match(r"^[a-zA-Z0-9_\-]+$", v):
             raise ValueError(
-                "Node ID must be alphanumeric (underscores and hyphens allowed). "
-                f"Got: '{v}'"
+                "Node ID must be alphanumeric (underscores and hyphens allowed). " f"Got: '{v}'"
             )
         return v
 
@@ -214,12 +205,8 @@ class WorkflowEdgeSchema(BaseModel):
 
     source: str = Field(..., min_length=1, description="Source node ID")
     target: str = Field(..., description="Target node ID (or __end__ for terminal)")
-    label: Optional[str] = Field(
-        None, description="Optional edge label for visualization"
-    )
-    conditional: bool = Field(
-        default=False, description="Whether this edge is conditional"
-    )
+    label: Optional[str] = Field(None, description="Optional edge label for visualization")
+    conditional: bool = Field(default=False, description="Whether this edge is conditional")
     condition: Optional[str] = Field(
         None, description="Condition expression (if edge is conditional)"
     )
@@ -264,9 +251,7 @@ class WorkflowDefinitionSchema(BaseModel):
         max_length=100,
         description="Workflow name (unique identifier)",
     )
-    description: Optional[str] = Field(
-        None, max_length=500, description="Workflow description"
-    )
+    description: Optional[str] = Field(None, max_length=500, description="Workflow description")
     entry_point: str = Field(
         ..., min_length=1, description="Entry point node ID (must exist in nodes)"
     )
@@ -290,9 +275,7 @@ class WorkflowDefinitionSchema(BaseModel):
 
     @field_validator("nodes")
     @classmethod
-    def validate_node_ids_unique(
-        cls, v: List[WorkflowNodeSchema]
-    ) -> List[WorkflowNodeSchema]:
+    def validate_node_ids_unique(cls, v: List[WorkflowNodeSchema]) -> List[WorkflowNodeSchema]:
         """Ensure all node IDs are unique.
 
         Duplicate node IDs would cause ambiguity in execution and
@@ -311,8 +294,7 @@ class WorkflowDefinitionSchema(BaseModel):
         if len(ids) != len(set(ids)):
             duplicates = [node_id for node_id in ids if ids.count(node_id) > 1]
             raise ValueError(
-                f"Duplicate node IDs found: {set(duplicates)}. "
-                "Each node must have a unique ID."
+                f"Duplicate node IDs found: {set(duplicates)}. " "Each node must have a unique ID."
             )
         return v
 

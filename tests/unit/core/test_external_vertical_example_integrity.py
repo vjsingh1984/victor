@@ -56,9 +56,7 @@ def test_external_vertical_example_metadata_matches_security_assistant(
     assert definition.team_metadata.default_team == "security_review_team"
 
 
-def test_external_vertical_readme_documents_current_install_and_entry_point_flow() -> (
-    None
-):
+def test_external_vertical_readme_documents_current_install_and_entry_point_flow() -> None:
     """README examples should stay aligned with the package metadata contract."""
 
     readme = README_PATH.read_text(encoding="utf-8")
@@ -76,6 +74,4 @@ def test_external_vertical_readme_documents_current_install_and_entry_point_flow
     ]
 
     missing = sorted(snippet for snippet in required_snippets if snippet not in readme)
-    assert (
-        not missing
-    ), f"External vertical README is missing required snippets: {missing}"
+    assert not missing, f"External vertical README is missing required snippets: {missing}"

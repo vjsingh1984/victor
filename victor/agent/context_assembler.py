@@ -169,9 +169,7 @@ class TurnBoundaryContextAssembler:
 
         # 5. Semantic augmentation: retrieve relevant compacted context
         if self._conversation_controller and current_query:
-            retrieve_fn = getattr(
-                self._conversation_controller, "retrieve_relevant_history", None
-            )
+            retrieve_fn = getattr(self._conversation_controller, "retrieve_relevant_history", None)
             if retrieve_fn:
                 try:
                     remaining_budget = older_budget - older_chars

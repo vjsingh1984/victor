@@ -11,9 +11,7 @@ from victor.agent.services.adapters.chat_adapter import ChatServiceAdapter
 def mock_chat_coordinator():
     coordinator = MagicMock()
     coordinator.chat = AsyncMock(return_value=MagicMock(content="response"))
-    coordinator.chat_with_planning = AsyncMock(
-        return_value=MagicMock(content="planned")
-    )
+    coordinator.chat_with_planning = AsyncMock(return_value=MagicMock(content="planned"))
     coordinator.stream_chat = MagicMock()
     return coordinator
 
@@ -31,9 +29,7 @@ async def test_chat_delegates_to_coordinator(chat_adapter, mock_chat_coordinator
 
 async def test_chat_with_planning_delegates(chat_adapter, mock_chat_coordinator):
     result = await chat_adapter.chat_with_planning("complex task", use_planning=True)
-    mock_chat_coordinator.chat_with_planning.assert_awaited_once_with(
-        "complex task", True
-    )
+    mock_chat_coordinator.chat_with_planning.assert_awaited_once_with("complex task", True)
     assert result.content == "planned"
 
 

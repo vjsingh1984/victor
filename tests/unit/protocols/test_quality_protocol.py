@@ -238,9 +238,7 @@ def add(a, b):
 ```
 """
         score = assessor.assess(good_response, {})
-        good_correctness = score.get_dimension_score(
-            ProtocolQualityDimension.CORRECTNESS
-        )
+        good_correctness = score.get_dimension_score(ProtocolQualityDimension.CORRECTNESS)
 
         # Bad code with unbalanced brackets
         bad_response = """
@@ -250,9 +248,7 @@ def add(a, b:
 ```
 """
         score = assessor.assess(bad_response, {})
-        bad_correctness = score.get_dimension_score(
-            ProtocolQualityDimension.CORRECTNESS
-        )
+        bad_correctness = score.get_dimension_score(ProtocolQualityDimension.CORRECTNESS)
 
         assert good_correctness >= bad_correctness
 
@@ -275,12 +271,8 @@ question about what 2+2 equals is simply 4.
 """
         verbose_score = assessor.assess(verbose, {"query": query})
 
-        concise_val = concise_score.get_dimension_score(
-            ProtocolQualityDimension.CONCISENESS
-        )
-        verbose_val = verbose_score.get_dimension_score(
-            ProtocolQualityDimension.CONCISENESS
-        )
+        concise_val = concise_score.get_dimension_score(ProtocolQualityDimension.CONCISENESS)
+        verbose_val = verbose_score.get_dimension_score(ProtocolQualityDimension.CONCISENESS)
 
         assert concise_val >= verbose_val
 
@@ -296,12 +288,8 @@ question about what 2+2 equals is simply 4.
         poor_response = "Here's how to use Python."
         poor_score = assessor.assess(poor_response, {"query": query})
 
-        good_coverage = good_score.get_dimension_score(
-            ProtocolQualityDimension.COVERAGE
-        )
-        poor_coverage = poor_score.get_dimension_score(
-            ProtocolQualityDimension.COVERAGE
-        )
+        good_coverage = good_score.get_dimension_score(ProtocolQualityDimension.COVERAGE)
+        poor_coverage = poor_score.get_dimension_score(ProtocolQualityDimension.COVERAGE)
 
         assert good_coverage > poor_coverage
 
@@ -329,9 +317,7 @@ question about what 2+2 equals is simply 4.
         without_score = assessor.assess(without_headers, {})
 
         with_clarity = with_score.get_dimension_score(ProtocolQualityDimension.CLARITY)
-        without_clarity = without_score.get_dimension_score(
-            ProtocolQualityDimension.CLARITY
-        )
+        without_clarity = without_score.get_dimension_score(ProtocolQualityDimension.CLARITY)
 
         assert with_clarity >= without_clarity
 
@@ -365,12 +351,8 @@ class TestProviderAwareQualityAssessor:
         """Test Anthropic gets positive adjustments."""
         assessor = ProviderAwareQualityAssessor(provider_name="anthropic")
 
-        clarity_adj = assessor._get_provider_adjustment(
-            ProtocolQualityDimension.CLARITY
-        )
-        grounding_adj = assessor._get_provider_adjustment(
-            ProtocolQualityDimension.GROUNDING
-        )
+        clarity_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.CLARITY)
+        grounding_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.GROUNDING)
 
         assert clarity_adj > 0
         assert grounding_adj > 0
@@ -379,9 +361,7 @@ class TestProviderAwareQualityAssessor:
         """Test xAI gets negative conciseness adjustment."""
         assessor = ProviderAwareQualityAssessor(provider_name="xai")
 
-        conciseness_adj = assessor._get_provider_adjustment(
-            ProtocolQualityDimension.CONCISENESS
-        )
+        conciseness_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.CONCISENESS)
 
         assert conciseness_adj < 0
 
@@ -389,12 +369,8 @@ class TestProviderAwareQualityAssessor:
         """Test Ollama gets appropriate adjustments."""
         assessor = ProviderAwareQualityAssessor(provider_name="ollama")
 
-        correctness_adj = assessor._get_provider_adjustment(
-            ProtocolQualityDimension.CORRECTNESS
-        )
-        grounding_adj = assessor._get_provider_adjustment(
-            ProtocolQualityDimension.GROUNDING
-        )
+        correctness_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.CORRECTNESS)
+        grounding_adj = assessor._get_provider_adjustment(ProtocolQualityDimension.GROUNDING)
 
         assert correctness_adj < 0
         assert grounding_adj < 0
@@ -416,9 +392,7 @@ def example():
     return 42
 ```
 """
-        dim_score = assessor._assess_dimension(
-            ProtocolQualityDimension.CORRECTNESS, response, {}
-        )
+        dim_score = assessor._assess_dimension(ProtocolQualityDimension.CORRECTNESS, response, {})
 
         assert "provider adjustment" in dim_score.reason
 

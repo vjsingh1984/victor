@@ -193,9 +193,7 @@ class TestDeprecationWarnings:
             metadata = metadata_from_class(NewCodingVertical)
 
             # Vertical suffix is not deprecated
-            assistant_warnings = [
-                warning for warning in w if "Assistant" in str(warning.message)
-            ]
+            assistant_warnings = [warning for warning in w if "Assistant" in str(warning.message)]
             assert len(assistant_warnings) == 0
 
 

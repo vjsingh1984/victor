@@ -53,9 +53,7 @@ class TestSessionLedgerInit:
         assert ledger.config.max_render_chars == 3000
 
     def test_custom_config(self):
-        config = SessionLedgerConfig(
-            max_entries=50, max_render_chars=1000, file_summary_max_len=40
-        )
+        config = SessionLedgerConfig(max_entries=50, max_render_chars=1000, file_summary_max_len=40)
         ledger = SessionLedger(config=config)
         assert ledger.config.max_entries == 50
         assert ledger.config.max_render_chars == 1000
@@ -84,9 +82,7 @@ class TestSessionLedgerRecording:
 
     def test_record_recommendation(self):
         ledger = SessionLedger()
-        ledger.record_recommendation(
-            "Refactor the module into smaller classes", turn_index=4
-        )
+        ledger.record_recommendation("Refactor the module into smaller classes", turn_index=4)
         assert len(ledger.entries) == 1
         assert ledger.entries[0].category == "recommendation"
 
@@ -114,9 +110,7 @@ class TestUpdateFromToolResult:
     def test_read_tool_extraction(self):
         ledger = SessionLedger()
         result = "     1\tclass Foo:\n     2\t    pass\n     3\t"
-        ledger.update_from_tool_result(
-            "read", {"path": "/src/foo.py"}, result, turn_index=1
-        )
+        ledger.update_from_tool_result("read", {"path": "/src/foo.py"}, result, turn_index=1)
         assert "/src/foo.py" in ledger.get_files_read()
         entries = [e for e in ledger.entries if e.category == "file_read"]
         assert len(entries) == 1
@@ -145,9 +139,7 @@ class TestUpdateFromToolResult:
 
     def test_tool_output_marker_parsing(self):
         ledger = SessionLedger()
-        result = (
-            '<TOOL_OUTPUT tool="read" path="/src/bar.py">content here</TOOL_OUTPUT>'
-        )
+        result = '<TOOL_OUTPUT tool="read" path="/src/bar.py">content here</TOOL_OUTPUT>'
         ledger.update_from_tool_result("shell", {}, result, turn_index=1)
         assert "/src/bar.py" in ledger.get_files_read()
 
@@ -193,9 +185,7 @@ class TestSessionLedgerRender:
     def test_max_chars_truncation(self):
         ledger = SessionLedger()
         for i in range(100):
-            ledger.record_file_read(
-                f"/src/file_{i}.py", f"Content of file {i}", turn_index=i
-            )
+            ledger.record_file_read(f"/src/file_{i}.py", f"Content of file {i}", turn_index=i)
         rendered = ledger.render(max_chars=500)
         assert len(rendered) <= 520  # Allow small overshoot for closing tag
         assert "</SESSION_STATE>" in rendered

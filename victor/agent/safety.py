@@ -171,9 +171,7 @@ class ConfirmationRequest:
     details: List[str]
     arguments: Dict[str, Any]
 
-    def format_message(
-        self, presentation: Optional["PresentationProtocol"] = None
-    ) -> str:
+    def format_message(self, presentation: Optional["PresentationProtocol"] = None) -> str:
         """Format confirmation request as a user-friendly message.
 
         Args:
@@ -291,15 +289,13 @@ class SafetyChecker:
 
         # Compile regex patterns for efficiency
         self._critical_patterns = [
-            (re.compile(p, re.IGNORECASE), desc)
-            for p, desc in self.BASH_CRITICAL_PATTERNS
+            (re.compile(p, re.IGNORECASE), desc) for p, desc in self.BASH_CRITICAL_PATTERNS
         ]
         self._high_patterns = [
             (re.compile(p, re.IGNORECASE), desc) for p, desc in self.BASH_HIGH_PATTERNS
         ]
         self._medium_patterns = [
-            (re.compile(p, re.IGNORECASE), desc)
-            for p, desc in self.BASH_MEDIUM_PATTERNS
+            (re.compile(p, re.IGNORECASE), desc) for p, desc in self.BASH_MEDIUM_PATTERNS
         ]
 
         # Custom patterns from vertical extensions
@@ -337,9 +333,7 @@ class SafetyChecker:
         except re.error as e:
             logger.warning(f"Invalid regex pattern for safety checker: {pattern} - {e}")
 
-    def check_bash_command(
-        self, command: str
-    ) -> tuple[OperationalRiskLevel, List[str]]:
+    def check_bash_command(self, command: str) -> tuple[OperationalRiskLevel, List[str]]:
         """Check a bash command for dangerous patterns.
 
         Args:
@@ -485,9 +479,7 @@ class SafetyChecker:
         # Check file write operations
         elif tool_name == "write_file":
             file_path = arguments.get("path", arguments.get("file_path", ""))
-            risk_level, details = self.check_file_operation(
-                "write", file_path, overwrite=True
-            )
+            risk_level, details = self.check_file_operation("write", file_path, overwrite=True)
             if details:
                 descriptions.append(f"Write to: {file_path}")
 
@@ -528,10 +520,7 @@ class SafetyChecker:
 
         # RISKY_ONLY mode: only require confirmation for high-risk operations
         elif self.approval_mode == ApprovalMode.RISKY_ONLY:
-            if (
-                _RISK_ORDER[risk_level]
-                >= _RISK_ORDER[self.require_confirmation_threshold]
-            ):
+            if _RISK_ORDER[risk_level] >= _RISK_ORDER[self.require_confirmation_threshold]:
                 requires_confirmation = True
 
         # Auto-approve if confirmation not required
@@ -556,9 +545,7 @@ class SafetyChecker:
         request = ConfirmationRequest(
             tool_name=tool_name,
             risk_level=risk_level,
-            description=(
-                "; ".join(descriptions) if descriptions else f"Execute {tool_name}"
-            ),
+            description=("; ".join(descriptions) if descriptions else f"Execute {tool_name}"),
             details=details,
             arguments=arguments,
         )
@@ -729,9 +716,7 @@ def create_hitl_confirmation_callback(
                     )
                     return True
                 else:
-                    logger.warning(
-                        f"Safety confirmation timed out, aborting: {request.tool_name}"
-                    )
+                    logger.warning(f"Safety confirmation timed out, aborting: {request.tool_name}")
                     return False
             else:
                 # Rejected or other status

@@ -127,9 +127,7 @@ class DeprecatedConstantDescriptor(Generic[T]):
                 self._loaded = True
                 logger.debug(f"Loaded deprecated constant: {self.constant_name}")
             except Exception as e:
-                logger.error(
-                    f"Failed to load deprecated constant {self.constant_name}: {e}"
-                )
+                logger.error(f"Failed to load deprecated constant {self.constant_name}: {e}")
                 raise
 
         return self._cached_value  # type: ignore[return-value]

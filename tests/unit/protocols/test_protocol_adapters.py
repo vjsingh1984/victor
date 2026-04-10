@@ -160,9 +160,7 @@ class TestDirectProtocolAdapterSearch:
         mock_result = MagicMock()
         mock_result.success = True
         mock_result.data = {
-            "matches": [
-                {"file": "test.py", "line": 10, "content": "def test()", "score": 0.9}
-            ]
+            "matches": [{"file": "test.py", "line": 10, "content": "def test()", "score": 0.9}]
         }
 
         # Create mock module and class
@@ -199,9 +197,7 @@ class TestDirectProtocolAdapterSearch:
         """Test successful code search."""
         mock_result = MagicMock()
         mock_result.success = True
-        mock_result.data = {
-            "matches": [{"file": "main.py", "line": 5, "content": "import os"}]
-        }
+        mock_result.data = {"matches": [{"file": "main.py", "line": 5, "content": "import os"}]}
 
         mock_tool = MagicMock()
         mock_tool.execute = AsyncMock(return_value=mock_result)
@@ -502,9 +498,7 @@ class TestHTTPProtocolAdapterModel:
 
         await adapter.switch_mode(AgentMode.EXPLORE)
 
-        adapter._client.post.assert_called_once_with(
-            "/mode/switch", json={"mode": "explore"}
-        )
+        adapter._client.post.assert_called_once_with("/mode/switch", json={"mode": "explore"})
 
 
 class TestHTTPProtocolAdapterStatus:
@@ -623,9 +617,7 @@ class TestHTTPProtocolAdapterLSP:
     async def test_get_definition(self, adapter):
         """Test get definition via HTTP."""
         mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "locations": [{"file": "test.py", "line": 1}]
-        }
+        mock_response.json.return_value = {"locations": [{"file": "test.py", "line": 1}]}
         mock_response.raise_for_status = MagicMock()
         adapter._client.post = AsyncMock(return_value=mock_response)
 

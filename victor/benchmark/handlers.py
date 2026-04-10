@@ -123,9 +123,7 @@ class TestRunnerHandler:
             cmd = f"python {test_file}"
 
         try:
-            result = await tool_registry.execute(
-                "shell", command=cmd, timeout=timeout + 10
-            )
+            result = await tool_registry.execute("shell", command=cmd, timeout=timeout + 10)
 
             output_text = result.output if hasattr(result, "output") else str(result)
             test_output = self._parse_test_output(output_text, framework)
@@ -144,9 +142,7 @@ class TestRunnerHandler:
             context.set(output_key, output)
 
             status = (
-                ExecutorNodeStatus.COMPLETED
-                if output["success"]
-                else ExecutorNodeStatus.FAILED
+                ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
             )
 
             return NodeResult(
@@ -349,9 +345,7 @@ class LiveExecutorHandler:
         try:
             # Write code to temporary file
             suffix = ".py" if language == "python" else f".{language}"
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=suffix, delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
                 f.write(code)
                 code_file = f.name
 
@@ -385,9 +379,7 @@ class LiveExecutorHandler:
             return NodeResult(
                 node_id=node.id,
                 status=(
-                    ExecutorNodeStatus.COMPLETED
-                    if output["success"]
-                    else ExecutorNodeStatus.FAILED
+                    ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
                 ),
                 output=output,
                 duration_seconds=time.time() - start_time,
@@ -474,9 +466,7 @@ class LanguageDetectorHandler:
 
         # Find primary language
         primary = (
-            max(language_counts.items(), key=lambda x: x[1])[0]
-            if language_counts
-            else "unknown"
+            max(language_counts.items(), key=lambda x: x[1])[0] if language_counts else "unknown"
         )
 
         output = {
@@ -642,9 +632,7 @@ class MultiSolutionValidatorHandler:
 
             try:
                 # Write solution to temp file
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=".py", delete=False
-                ) as f:
+                with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
                     f.write(solution)
                     if test_cases:
                         # Append test cases
@@ -671,9 +659,7 @@ class MultiSolutionValidatorHandler:
                     {
                         "index": i,
                         "success": success,
-                        "output": (result.output if hasattr(result, "output") else "")[
-                            :500
-                        ],
+                        "output": (result.output if hasattr(result, "output") else "")[:500],
                     }
                 )
 
@@ -784,11 +770,7 @@ class CodeTesterHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=(
-                    ExecutorNodeStatus.COMPLETED
-                    if success
-                    else ExecutorNodeStatus.FAILED
-                ),
+                status=(ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED),
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -893,16 +875,10 @@ class SyntaxCheckHandler:
                     result = None
 
                 if result:
-                    output["valid"] = (
-                        result.success if hasattr(result, "success") else False
-                    )
+                    output["valid"] = result.success if hasattr(result, "success") else False
                     if not output["valid"]:
                         output["errors"].append(
-                            {
-                                "message": (
-                                    result.output if hasattr(result, "output") else ""
-                                )
-                            }
+                            {"message": (result.output if hasattr(result, "output") else "")}
                         )
 
             output_key = node.output_key or node.id
@@ -911,9 +887,7 @@ class SyntaxCheckHandler:
             return NodeResult(
                 node_id=node.id,
                 status=(
-                    ExecutorNodeStatus.COMPLETED
-                    if output["valid"]
-                    else ExecutorNodeStatus.FAILED
+                    ExecutorNodeStatus.COMPLETED if output["valid"] else ExecutorNodeStatus.FAILED
                 ),
                 output=output,
                 duration_seconds=time.time() - start_time,

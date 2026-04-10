@@ -456,9 +456,7 @@ class TestCapabilityNegotiationProtocol:
                 return "Test prompt"
 
         orchestrator = MockOrchestrator()
-        caps = CapabilityNegotiationProtocol._get_orchestrator_capabilities(
-            orchestrator
-        )
+        caps = CapabilityNegotiationProtocol._get_orchestrator_capabilities(orchestrator)
 
         assert "tools" in caps
         assert "prompt" in caps

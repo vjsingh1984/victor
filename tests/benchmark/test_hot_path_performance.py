@@ -55,12 +55,8 @@ class TestTokenCountingPerformance:
 
         text = "The quick brown fox jumps over the lazy dog. " * 100
 
-        rust_time = time_function(
-            lambda: victor_native.count_tokens_fast(text), iterations=1000
-        )
-        python_time = time_function(
-            lambda: len(text.split()) * 13 // 10, iterations=1000
-        )
+        rust_time = time_function(lambda: victor_native.count_tokens_fast(text), iterations=1000)
+        python_time = time_function(lambda: len(text.split()) * 13 // 10, iterations=1000)
 
         assert rust_time >= 0
         assert python_time >= 0
@@ -74,12 +70,8 @@ class TestTokenCountingPerformance:
         )
         texts = [f"word_{i} " * 50 for i in range(100)]
 
-        batch_time = time_function(
-            lambda: tokenizer.count_tokens_batch(texts), iterations=10
-        )
-        seq_time = time_function(
-            lambda: [tokenizer.count_tokens(t) for t in texts], iterations=10
-        )
+        batch_time = time_function(lambda: tokenizer.count_tokens_batch(texts), iterations=10)
+        seq_time = time_function(lambda: [tokenizer.count_tokens(t) for t in texts], iterations=10)
 
         assert batch_time >= 0
         assert seq_time >= 0

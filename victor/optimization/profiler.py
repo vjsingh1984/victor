@@ -125,15 +125,13 @@ class WorkflowProfiler:
 
         # Calculate workflow-level aggregates
         total_duration = sum(
-            max(node_stats[node_id].p99_duration for node_id in node_stats)
-            for _ in executions
+            max(node_stats[node_id].p99_duration for node_id in node_stats) for _ in executions
         ) / len(executions)
 
         total_cost = sum(stats.total_cost for stats in node_stats.values())
 
         total_tokens = sum(
-            stats.avg_input_tokens + stats.avg_output_tokens
-            for stats in node_stats.values()
+            stats.avg_input_tokens + stats.avg_output_tokens for stats in node_stats.values()
         )
 
         success_rate = np.mean([exec.get("success", True) for exec in executions])
@@ -240,12 +238,8 @@ class WorkflowProfiler:
 
             for node_id, metrics in node_metrics.items():
                 node_data[node_id]["durations"].append(metrics.get("duration", 0))
-                node_data[node_id]["input_tokens"].append(
-                    metrics.get("input_tokens", 0)
-                )
-                node_data[node_id]["output_tokens"].append(
-                    metrics.get("output_tokens", 0)
-                )
+                node_data[node_id]["input_tokens"].append(metrics.get("input_tokens", 0))
+                node_data[node_id]["output_tokens"].append(metrics.get("output_tokens", 0))
                 node_data[node_id]["costs"].append(metrics.get("cost", 0))
                 node_data[node_id]["successes"].append(metrics.get("success", True))
 
@@ -256,12 +250,10 @@ class WorkflowProfiler:
 
                 # Track tool calls
                 for tool_name, tool_stats in metrics.get("tools", {}).items():
-                    node_data[node_id]["tool_calls"][tool_name][
-                        "count"
-                    ] += tool_stats.get("count", 0)
-                    node_data[node_id]["tool_calls"][tool_name][
-                        "cost"
-                    ] += tool_stats.get("cost", 0)
+                    node_data[node_id]["tool_calls"][tool_name]["count"] += tool_stats.get(
+                        "count", 0
+                    )
+                    node_data[node_id]["tool_calls"][tool_name]["cost"] += tool_stats.get("cost", 0)
 
         # Calculate statistics
         node_stats = {}
@@ -315,9 +307,7 @@ class WorkflowProfiler:
             return bottlenecks
 
         # Calculate median duration
-        median_duration = np.median(
-            [stats.avg_duration for stats in node_stats.values()]
-        )
+        median_duration = np.median([stats.avg_duration for stats in node_stats.values()])
 
         total_cost = sum(stats.total_cost for stats in node_stats.values())
 
@@ -340,9 +330,7 @@ class WorkflowProfiler:
 
             # Check for dominant nodes
             if median_duration > 0:
-                contribution = stats.avg_duration / sum(
-                    s.avg_duration for s in node_stats.values()
-                )
+                contribution = stats.avg_duration / sum(s.avg_duration for s in node_stats.values())
                 if contribution > 0.20:
                     bottlenecks.append(
                         Bottleneck(
@@ -377,10 +365,7 @@ class WorkflowProfiler:
             # Detect expensive tools
             for tool_id, tool_data in stats.tool_calls.items():
                 tool_cost = tool_data.get("cost", 0)
-                if (
-                    total_cost > 0
-                    and tool_cost / total_cost > self.expensive_tool_threshold
-                ):
+                if total_cost > 0 and tool_cost / total_cost > self.expensive_tool_threshold:
                     bottlenecks.append(
                         Bottleneck(
                             type=BottleneckType.EXPENSIVE_TOOL,
@@ -497,9 +482,7 @@ class WorkflowProfiler:
                     stats = node_stats.get(bottleneck.node_id)
                     if stats:
                         hit_rate = 0.75  # Estimate 75% hit rate
-                        speedup = 1 / (
-                            hit_rate * 0.01 + (1 - hit_rate)
-                        )  # Cache is 100x faster
+                        speedup = 1 / (hit_rate * 0.01 + (1 - hit_rate))  # Cache is 100x faster
                         opportunities.append(
                             OptimizationOpportunity(
                                 strategy_type=OptimizationStrategyType.CACHING,

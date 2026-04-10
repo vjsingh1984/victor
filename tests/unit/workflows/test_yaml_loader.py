@@ -291,9 +291,7 @@ class TestLoadWorkflowFromDict:
         data = {
             "description": "With metadata",
             "metadata": {"version": "1.0", "author": "test"},
-            "nodes": [
-                {"id": "start", "type": "agent", "role": "executor", "goal": "Do work"}
-            ],
+            "nodes": [{"id": "start", "type": "agent", "role": "executor", "goal": "Do work"}],
         }
         workflow = load_workflow_from_dict(data, "metadata_test")
         assert workflow.metadata["version"] == "1.0"

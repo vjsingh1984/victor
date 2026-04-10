@@ -261,12 +261,8 @@ class TestDashboardWithRealEvents:
 
         # Emit test events
         await event_bus.emit("tool.start", {"tool": "test_tool", "category": "tool"})
-        await event_bus.emit(
-            "state.transition", {"stage": "active", "category": "state"}
-        )
-        await event_bus.emit(
-            "error.raised", {"error": "test error", "category": "error"}
-        )
+        await event_bus.emit("state.transition", {"stage": "active", "category": "state"})
+        await event_bus.emit("error.raised", {"error": "test error", "category": "error"})
 
         # Wait for async dispatch to deliver events
         await asyncio.sleep(0.2)

@@ -253,15 +253,11 @@ class TestTemplateLibrary:
             template_type=TemplateType.SEQUENTIAL
         )
 
-        assert all(
-            t.template_type == TemplateType.SEQUENTIAL for t in sequential_templates
-        )
+        assert all(t.template_type == TemplateType.SEQUENTIAL for t in sequential_templates)
 
     def test_match_template_success(self, template_library, sample_requirements):
         """Test successful template matching."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         assert template is not None
         assert isinstance(template, WorkflowTemplate)
@@ -295,9 +291,7 @@ class TestTemplateLibrary:
 
     def test_instantiate_template_success(self, template_library, sample_requirements):
         """Test successful template instantiation."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         schema = template_library.instantiate_template(template, sample_requirements)
 
@@ -311,9 +305,7 @@ class TestTemplateLibrary:
         self, template_library, sample_requirements
     ):
         """Test that placeholders are replaced in instantiated template."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         schema = template_library.instantiate_template(template, sample_requirements)
 
@@ -326,8 +318,7 @@ class TestTemplateLibrary:
 
         # Should contain actual values
         assert sample_requirements.description in schema_str or any(
-            task.description in schema_str
-            for task in sample_requirements.functional.tasks
+            task.description in schema_str for task in sample_requirements.functional.tasks
         )
 
 
@@ -349,9 +340,7 @@ class TestBuiltinTemplates:
     def test_conditional_research_template_exists(self, template_library):
         """Test conditional research template exists."""
         templates = template_library.list_templates(vertical="research")
-        conditional_templates = [
-            t for t in templates if "conditional" in t.name.lower()
-        ]
+        conditional_templates = [t for t in templates if "conditional" in t.name.lower()]
 
         assert len(conditional_templates) > 0
 
@@ -387,9 +376,7 @@ class TestPlaceholderReplacement:
 
     def test_replace_workflow_name(self, template_library, sample_requirements):
         """Test workflow name placeholder is replaced."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         schema = template_library.instantiate_template(template, sample_requirements)
 
@@ -399,9 +386,7 @@ class TestPlaceholderReplacement:
 
     def test_replace_description(self, template_library, sample_requirements):
         """Test description placeholder is replaced."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         schema = template_library.instantiate_template(template, sample_requirements)
 
@@ -410,9 +395,7 @@ class TestPlaceholderReplacement:
 
     def test_replace_topic(self, template_library, sample_requirements):
         """Test topic placeholder is replaced."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         schema = template_library.instantiate_template(template, sample_requirements)
 
@@ -430,13 +413,9 @@ class TestPlaceholderReplacement:
 class TestSchemaValidation:
     """Tests for instantiated schema validation."""
 
-    def test_instantiated_schema_has_valid_structure(
-        self, template_library, sample_requirements
-    ):
+    def test_instantiated_schema_has_valid_structure(self, template_library, sample_requirements):
         """Test instantiated schema has valid structure."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         schema = template_library.instantiate_template(template, sample_requirements)
 
@@ -456,9 +435,7 @@ class TestSchemaValidation:
         self, template_library, sample_requirements
     ):
         """Test instantiated schema has no remaining placeholders."""
-        template = template_library.match_template(
-            sample_requirements, vertical="research"
-        )
+        template = template_library.match_template(sample_requirements, vertical="research")
 
         schema = template_library.instantiate_template(template, sample_requirements)
 

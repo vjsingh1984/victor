@@ -97,9 +97,7 @@ class ChatServiceProtocol(Protocol):
         """
         ...
 
-    async def stream_chat(
-        self, user_message: str, **kwargs
-    ) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
         """Stream chat response in chunks for real-time feedback.
 
         Provides incremental response chunks as they're generated,

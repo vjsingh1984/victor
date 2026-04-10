@@ -321,8 +321,7 @@ class TestTraversalOrdering:
 
             if depth2_indices:  # Only check if there are depth-2 items
                 assert max(depth1_indices) < min(depth2_indices), (
-                    f"BFS should have all depth-1 items before depth-2. "
-                    f"Got paths: {paths}"
+                    f"BFS should have all depth-1 items before depth-2. " f"Got paths: {paths}"
                 )
 
     @pytest.mark.asyncio
@@ -352,12 +351,8 @@ class TestTraversalOrdering:
             nested_indices = [i for i, p in enumerate(paths) if "/" in p or "\\" in p]
 
             if nested_indices:
-                assert a_idx < min(
-                    nested_indices
-                ), "a should appear before nested files"
-                assert b_idx < min(
-                    nested_indices
-                ), "b should appear before nested files"
+                assert a_idx < min(nested_indices), "a should appear before nested files"
+                assert b_idx < min(nested_indices), "b should appear before nested files"
 
     @pytest.mark.asyncio
     async def test_truncation_sees_top_level_dirs(self):
@@ -607,13 +602,8 @@ class TestListDirectoryEdgeCases:
                 name = item.get("path", item.get("name"))
                 depth_by_name[name] = item["depth"]
 
-            assert (
-                depth_by_name.get("file.txt") == 1
-                or depth_by_name.get("file.txt", 0) == 1
-            )
-            assert (
-                depth_by_name.get("subdir") == 1 or depth_by_name.get("subdir", 0) == 1
-            )
+            assert depth_by_name.get("file.txt") == 1 or depth_by_name.get("file.txt", 0) == 1
+            assert depth_by_name.get("subdir") == 1 or depth_by_name.get("subdir", 0) == 1
 
     @pytest.mark.asyncio
     async def test_sorted_output(self):

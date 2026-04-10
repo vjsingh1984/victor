@@ -95,9 +95,7 @@ class TestPythonCallExtractor:
     def test_valid_tool_names_filter(self):
         """Test filtering by valid tool names."""
         content = "I'll call read(path='foo.py') and unknown_function(arg=1)"
-        result = self.extractor.extract_from_text(
-            content, valid_tool_names={"read", "write"}
-        )
+        result = self.extractor.extract_from_text(content, valid_tool_names={"read", "write"})
 
         assert result.success
         assert len(result.tool_calls) == 1

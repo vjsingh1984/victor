@@ -43,9 +43,7 @@ def mock_orchestrator():
     }
     # Set up protocol methods instead of private attribute
     orchestrator._enabled_tools = set()
-    orchestrator.get_enabled_tools = MagicMock(
-        side_effect=lambda: orchestrator._enabled_tools
-    )
+    orchestrator.get_enabled_tools = MagicMock(side_effect=lambda: orchestrator._enabled_tools)
     orchestrator.set_enabled_tools = MagicMock(
         side_effect=lambda tools: setattr(orchestrator, "_enabled_tools", tools)
     )

@@ -43,9 +43,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     try:
         return _resolve_vertical_attr(module_path, attr_name)
     except ImportError:
-        pytest.skip(
-            f"Vertical module or attribute unavailable: {module_path}:{attr_name}"
-        )
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
 
 
 class TestResearchCapabilityProviderAdoption:

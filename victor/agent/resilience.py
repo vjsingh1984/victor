@@ -224,9 +224,7 @@ class MultiCircuitBreaker:
         """
         # Check if exception should be excluded
         if error and isinstance(error, self.config.exclude_exceptions):
-            logger.debug(
-                f"Circuit '{name}' - excluded exception: {type(error).__name__}"
-            )
+            logger.debug(f"Circuit '{name}' - excluded exception: {type(error).__name__}")
             return
 
         stats = self._circuits[name]
@@ -280,9 +278,7 @@ class MultiCircuitBreaker:
             "last_failure_time": stats.last_failure_time,
             "last_state_change": stats.last_state_change,
             "time_since_failure": (
-                time.time() - stats.last_failure_time
-                if stats.last_failure_time
-                else None
+                time.time() - stats.last_failure_time if stats.last_failure_time else None
             ),
         }
 
@@ -630,9 +626,7 @@ class ResilientExecutor:
             result = await self.retry_handler.execute_with_retry(
                 func,
                 *args,
-                on_retry=lambda attempt, e: self.circuit_breaker.record_failure(
-                    name, e
-                ),
+                on_retry=lambda attempt, e: self.circuit_breaker.record_failure(name, e),
                 **kwargs,
             )
             self.circuit_breaker.record_success(name)

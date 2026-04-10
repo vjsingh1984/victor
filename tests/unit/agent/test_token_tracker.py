@@ -54,12 +54,8 @@ class TestTokenTracker:
 
     def test_accumulate_multiple_responses(self) -> None:
         tracker = TokenTracker()
-        tracker.accumulate(
-            {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
-        )
-        tracker.accumulate(
-            {"prompt_tokens": 200, "completion_tokens": 80, "total_tokens": 280}
-        )
+        tracker.accumulate({"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150})
+        tracker.accumulate({"prompt_tokens": 200, "completion_tokens": 80, "total_tokens": 280})
         usage = tracker.get_usage()
         assert usage["prompt_tokens"] == 300
         assert usage["completion_tokens"] == 130

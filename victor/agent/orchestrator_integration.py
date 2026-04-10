@@ -364,9 +364,7 @@ class OrchestratorIntegration:
             return self._pipeline._mode_controller.get_optimal_tool_budget(task_type)
         return self._orchestrator.tool_budget
 
-    def add_quality_observer(
-        self, observer: Callable[[float, Dict[str, float]], None]
-    ) -> None:
+    def add_quality_observer(self, observer: Callable[[float, Dict[str, float]], None]) -> None:
         """Add observer for quality score events.
 
         Args:
@@ -374,9 +372,7 @@ class OrchestratorIntegration:
         """
         self._quality_observers.append(observer)
 
-    def add_grounding_observer(
-        self, observer: Callable[[bool, List[str]], None]
-    ) -> None:
+    def add_grounding_observer(self, observer: Callable[[bool, List[str]], None]) -> None:
         """Add observer for grounding verification events.
 
         Args:
@@ -427,8 +423,7 @@ class OrchestratorIntegration:
         grounding_score = round(self._metrics.avg_grounding_score, 3)
 
         return {
-            "quality_meets_threshold": quality_score
-            >= self._config.min_quality_threshold,
+            "quality_meets_threshold": quality_score >= self._config.min_quality_threshold,
             "quality_score": quality_score,
             "quality_threshold": self._config.min_quality_threshold,
             "grounding_meets_threshold": grounding_score
@@ -520,14 +515,10 @@ class OrchestratorIntegration:
                 ),
             }
         except (AttributeError, KeyError) as e:
-            logger.debug(
-                f"IntelligentPipeline prepare_request skipped (not configured): {e}"
-            )
+            logger.debug(f"IntelligentPipeline prepare_request skipped (not configured): {e}")
             return None
         except (ValueError, TypeError) as e:
-            logger.debug(
-                f"IntelligentPipeline prepare_request failed (data error): {e}"
-            )
+            logger.debug(f"IntelligentPipeline prepare_request failed (data error): {e}")
             return None
 
     async def validate_intelligent_response(
@@ -589,14 +580,10 @@ class OrchestratorIntegration:
                 "grounding_feedback": getattr(result, "grounding_feedback", ""),
             }
         except (AttributeError, KeyError) as e:
-            logger.debug(
-                f"IntelligentPipeline validate_response skipped (not configured): {e}"
-            )
+            logger.debug(f"IntelligentPipeline validate_response skipped (not configured): {e}")
             return None
         except (ValueError, TypeError) as e:
-            logger.debug(
-                f"IntelligentPipeline validate_response failed (data error): {e}"
-            )
+            logger.debug(f"IntelligentPipeline validate_response failed (data error): {e}")
             return None
 
     def record_intelligent_outcome(
@@ -652,9 +639,7 @@ class OrchestratorIntegration:
                     task_type = "action"
 
                 # Get vertical name from context (avoid hardcoded "coding")
-                vertical_name = (
-                    getattr(vertical_context, "vertical_name", None) or "default"
-                )
+                vertical_name = getattr(vertical_context, "vertical_name", None) or "default"
 
                 # Record outcome for continuation_prompts learner
                 outcome = RLOutcome(
@@ -672,9 +657,7 @@ class OrchestratorIntegration:
                     },
                     vertical=vertical_name,
                 )
-                rl_coordinator.record_outcome(
-                    "continuation_prompts", outcome, vertical_name
-                )
+                rl_coordinator.record_outcome("continuation_prompts", outcome, vertical_name)
 
                 # Emit RL hook for continuation prompt
                 self.emit_continuation_event(
@@ -698,8 +681,7 @@ class OrchestratorIntegration:
                         metadata={
                             "flagged_as_stuck": stuck_loop_detected,
                             "actually_stuck": stuck_loop_detected and not success,
-                            "eventually_made_progress": not stuck_loop_detected
-                            and success,
+                            "eventually_made_progress": not stuck_loop_detected and success,
                         },
                         vertical=vertical_name,
                     )

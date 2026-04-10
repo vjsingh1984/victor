@@ -397,9 +397,7 @@ class ProviderPool:
         logger.debug("Created new provider for %s/%s", provider_name, model)
         return provider
 
-    async def release(
-        self, provider_name: str, model: str, provider: "ManagedProvider"
-    ) -> None:
+    async def release(self, provider_name: str, model: str, provider: "ManagedProvider") -> None:
         """Return a provider to the pool.
 
         Checks provider health before re-pooling. Unhealthy providers
@@ -428,9 +426,7 @@ class ProviderPool:
                     try:
                         await provider.shutdown()
                     except Exception as e:
-                        logger.warning(
-                            "Error shutting down pooled provider %s: %s", key, e
-                        )
+                        logger.warning("Error shutting down pooled provider %s: %s", key, e)
             self._pools.clear()
             self._in_use.clear()
 

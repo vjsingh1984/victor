@@ -278,9 +278,7 @@ class OutputFormatter:
             # Elapsed time format: (X.XXs) = 8 chars
             time_display = f"({duration_str.strip('()')})" if duration_str else ""
             error_display = f" [red]{error[:30]}[/]" if error else ""
-            self._console.print(
-                f"{status_icon} [bold]{base}[/] {time_display}{error_display}"
-            )
+            self._console.print(f"{status_icon} [bold]{base}[/] {time_display}{error_display}")
             if success and follow_up_suggestions:
                 for suggestion in follow_up_suggestions[:2]:
                     if not isinstance(suggestion, dict):
@@ -537,12 +535,8 @@ class OutputFormatter:
         """
         # Try tool call format first (model hallucinated tool calls)
         # Format: <parameter=content> ... </tool_call> or <parameter=content>...</parameter>
-        tool_content_pattern = (
-            r"<parameter=content>\s*(.*?)\s*(?:</tool_call>|</parameter>|\Z)"
-        )
-        tool_matches = re.findall(
-            tool_content_pattern, content, re.DOTALL | re.IGNORECASE
-        )
+        tool_content_pattern = r"<parameter=content>\s*(.*?)\s*(?:</tool_call>|</parameter>|\Z)"
+        tool_matches = re.findall(tool_content_pattern, content, re.DOTALL | re.IGNORECASE)
         if tool_matches:
             # Extract the code from tool call content
             extracted = tool_matches[0].strip()

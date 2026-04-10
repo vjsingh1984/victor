@@ -153,9 +153,7 @@ class MFAConfig:
             "required_for_read": self.required_for_read,
             "required_for_write": self.required_for_write,
             "cache_duration": self.cache_duration,
-            "fallback_method": (
-                self.fallback_method.value if self.fallback_method else None
-            ),
+            "fallback_method": (self.fallback_method.value if self.fallback_method else None),
         }
 
     @classmethod
@@ -947,9 +945,7 @@ class SSOAuthenticator:
             import hashlib
 
             code_challenge = (
-                base64.urlsafe_b64encode(
-                    hashlib.sha256(code_verifier.encode()).digest()
-                )
+                base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest())
                 .decode()
                 .rstrip("=")
             )
@@ -1325,9 +1321,7 @@ class SystemAuthenticator:
                 except PAM.error:
                     return False
             except ImportError:
-                logger.error(
-                    "PAM module not available. Install: pip install python-pam"
-                )
+                logger.error("PAM module not available. Install: pip install python-pam")
                 return False
 
     def get_current_pam_user(self) -> Optional[str]:
@@ -1688,12 +1682,8 @@ class SystemAuthenticator:
                 return {
                     "cn": str(entry.cn) if hasattr(entry, "cn") else None,
                     "email": str(entry.mail) if hasattr(entry, "mail") else None,
-                    "groups": (
-                        list(entry.memberOf) if hasattr(entry, "memberOf") else []
-                    ),
-                    "department": (
-                        str(entry.department) if hasattr(entry, "department") else None
-                    ),
+                    "groups": (list(entry.memberOf) if hasattr(entry, "memberOf") else []),
+                    "department": (str(entry.department) if hasattr(entry, "department") else None),
                 }
 
         except Exception as e:
@@ -1720,9 +1710,7 @@ class SystemAuthenticator:
                 resume = 0
 
                 while True:
-                    info, total, resume = win32net.NetUserGetLocalGroups(
-                        None, username, level
-                    )
+                    info, total, resume = win32net.NetUserGetLocalGroups(None, username, level)
                     groups.extend([g["name"] for g in info])
                     if not resume:
                         break
@@ -1767,9 +1755,7 @@ class SystemAuthenticator:
         if auth_type == SystemAuthType.PAM:
             if not username or not password:
                 return False, None
-            if self.verify_pam_credentials(
-                username, password, self.config.service_name
-            ):
+            if self.verify_pam_credentials(username, password, self.config.service_name):
                 return True, username
             return False, None
 
@@ -2110,9 +2096,7 @@ class KubernetesCredentials:
     @classmethod
     def from_default(cls) -> Optional["KubernetesCredentials"]:
         """Load from default kubeconfig."""
-        kubeconfig_path = os.environ.get(
-            "KUBECONFIG", os.path.expanduser("~/.kube/config")
-        )
+        kubeconfig_path = os.environ.get("KUBECONFIG", os.path.expanduser("~/.kube/config"))
 
         if os.path.exists(kubeconfig_path):
             return cls(
@@ -2146,10 +2130,14 @@ class DatabaseCredentials:
             return base
 
         elif self.driver == "mysql":
-            return f"mysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            return (
+                f"mysql://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            )
 
         elif self.driver == "mongodb":
-            return f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            return (
+                f"mongodb://{self.username}:{self.password}@{self.host}:{self.port}/{self.database}"
+            )
 
         elif self.driver == "redis":
             if self.password:
@@ -2271,9 +2259,7 @@ class EnvironmentBackend(CredentialBackend):
         cred_type = parts[0]
 
         if cred_type == "aws":
-            creds = AWSCredentials.from_environment(
-                parts[1] if len(parts) > 1 else "default"
-            )
+            creds = AWSCredentials.from_environment(parts[1] if len(parts) > 1 else "default")
             return creds.to_dict() if creds else None
 
         elif cred_type == "azure":
@@ -2310,9 +2296,7 @@ class KeyringBackend(CredentialBackend):
 
     def __init__(self):
         if not KEYRING_AVAILABLE:
-            raise ImportError(
-                "keyring not available. Install with: pip install keyring"
-            )
+            raise ImportError("keyring not available. Install with: pip install keyring")
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         try:
@@ -2595,9 +2579,7 @@ class CredentialManager:
         self._storage_backend.set(f"docker/{creds.registry}", creds.to_dict())
 
     # Kubernetes
-    def get_kubernetes(
-        self, context: Optional[str] = None
-    ) -> Optional[KubernetesCredentials]:
+    def get_kubernetes(self, context: Optional[str] = None) -> Optional[KubernetesCredentials]:
         """Get Kubernetes credentials."""
         key = f"kubernetes/{context}" if context else "kubernetes/default"
         data = self._get_raw(key)

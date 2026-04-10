@@ -127,10 +127,7 @@ class CompositeExtractor(EntityExtractor):
         context: Optional[Dict[str, Any]],
     ) -> List[ExtractionResult]:
         """Run extractors in parallel."""
-        tasks = [
-            extractor.extract(content, source, context)
-            for extractor in self._extractors
-        ]
+        tasks = [extractor.extract(content, source, context) for extractor in self._extractors]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
 

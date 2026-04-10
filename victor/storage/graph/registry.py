@@ -34,8 +34,6 @@ def create_graph_store(
         return MemoryGraphStore()
     if backend == "duckdb":
         if DuckDBGraphStore is None:
-            raise ValueError(
-                "DuckDB graph backend requested but duckdb is not installed"
-            )
+            raise ValueError("DuckDB graph backend requested but duckdb is not installed")
         return DuckDBGraphStore(project_path)
     raise ValueError(f"Unsupported graph store backend: {name}")

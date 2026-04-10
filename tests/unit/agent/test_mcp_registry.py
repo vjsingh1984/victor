@@ -148,9 +148,7 @@ class TestMCPRegistryConnect:
         mock_client.tools = []
         mock_client.resources = []
 
-        with patch(
-            "victor.integrations.mcp.registry.MCPClient", return_value=mock_client
-        ):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             result = await registry.connect("test")
             assert result is True
             assert registry._servers["test"].status == ServerStatus.CONNECTED
@@ -166,9 +164,7 @@ class TestMCPRegistryConnect:
         mock_client = MagicMock()
         mock_client.connect = AsyncMock(return_value=False)
 
-        with patch(
-            "victor.integrations.mcp.registry.MCPClient", return_value=mock_client
-        ):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             result = await registry.connect("test")
             assert result is False
             assert registry._servers["test"].status == ServerStatus.FAILED
@@ -184,9 +180,7 @@ class TestMCPRegistryConnect:
         mock_client = MagicMock()
         mock_client.connect = AsyncMock(side_effect=Exception("Connection error"))
 
-        with patch(
-            "victor.integrations.mcp.registry.MCPClient", return_value=mock_client
-        ):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             result = await registry.connect("test")
             assert result is False
             assert registry._servers["test"].status == ServerStatus.FAILED
@@ -227,9 +221,7 @@ class TestMCPRegistryConnect:
 
         registry = MCPRegistry()
         registry.register_server(MCPServerConfig(name="s1", command=["echo"]))
-        registry.register_server(
-            MCPServerConfig(name="s2", command=["echo"], auto_connect=False)
-        )
+        registry.register_server(MCPServerConfig(name="s2", command=["echo"], auto_connect=False))
         registry.register_server(MCPServerConfig(name="s3", command=["echo"]))
 
         mock_client = MagicMock()
@@ -237,9 +229,7 @@ class TestMCPRegistryConnect:
         mock_client.tools = []
         mock_client.resources = []
 
-        with patch(
-            "victor.integrations.mcp.registry.MCPClient", return_value=mock_client
-        ):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             results = await registry.connect_all()
             # Only s1 and s3 have auto_connect=True
             assert "s1" in results
@@ -377,9 +367,7 @@ class TestMCPRegistryStartStop:
         mock_client.tools = []
         mock_client.resources = []
 
-        with patch(
-            "victor.integrations.mcp.registry.MCPClient", return_value=mock_client
-        ):
+        with patch("victor.integrations.mcp.registry.MCPClient", return_value=mock_client):
             await registry.start()
             assert registry._running is True
             # Clean up
@@ -587,9 +575,7 @@ class TestMCPRegistryFiltering:
         registry.register_server(
             MCPServerConfig(name="server1", command=["echo"], tags=["file", "local"])
         )
-        registry.register_server(
-            MCPServerConfig(name="server2", command=["cat"], tags=["network"])
-        )
+        registry.register_server(MCPServerConfig(name="server2", command=["cat"], tags=["network"]))
 
         # Without connected servers, tools will be empty
         tools = registry.get_tools_by_tag("file")
@@ -598,9 +584,7 @@ class TestMCPRegistryFiltering:
     def test_get_tools_by_tag_no_match(self):
         """Test getting tools by non-existent tag."""
         registry = MCPRegistry()
-        registry.register_server(
-            MCPServerConfig(name="server1", command=["echo"], tags=["local"])
-        )
+        registry.register_server(MCPServerConfig(name="server1", command=["echo"], tags=["local"]))
 
         tools = registry.get_tools_by_tag("remote")
 
@@ -719,12 +703,8 @@ class TestMCPRegistrySummary:
     def test_get_registry_status_full(self):
         """Test getting full registry status."""
         registry = MCPRegistry()
-        registry.register_server(
-            MCPServerConfig(name="server1", command=["echo"], enabled=True)
-        )
-        registry.register_server(
-            MCPServerConfig(name="server2", command=["cat"], enabled=False)
-        )
+        registry.register_server(MCPServerConfig(name="server1", command=["echo"], enabled=True))
+        registry.register_server(MCPServerConfig(name="server2", command=["cat"], enabled=False))
         registry._servers["server1"].status = ServerStatus.CONNECTED
 
         status = registry.get_registry_status()

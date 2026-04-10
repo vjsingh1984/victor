@@ -267,9 +267,7 @@ class TestSWEBenchLoader:
 
     def test_load_with_instance_ids(self, sample_jsonl_file):
         """Test loading specific instance IDs."""
-        config = SWEBenchConfig(
-            instance_ids=["django__django-11583", "flask__flask-5678"]
-        )
+        config = SWEBenchConfig(instance_ids=["django__django-11583", "flask__flask-5678"])
         loader = SWEBenchLoader(config)
         tasks = loader.load_from_file(sample_jsonl_file)
 

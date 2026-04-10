@@ -57,9 +57,7 @@ class TestZAICodingPlan:
             api_key="test-key",
             coding_plan=True,
         )
-        assert str(provider.client.base_url).rstrip("/") == (
-            "https://api.z.ai/api/coding/paas/v4"
-        )
+        assert str(provider.client.base_url).rstrip("/") == ("https://api.z.ai/api/coding/paas/v4")
 
     def test_standard_default_base_url(self):
         provider = ZAIProvider(

@@ -36,9 +36,7 @@ class TeamNodeExecutor:
     def __init__(self, context: Any = None):
         self._context = context
 
-    async def execute(
-        self, node: "TeamNodeWorkflow", state: "WorkflowState"
-    ) -> "WorkflowState":
+    async def execute(self, node: "TeamNodeWorkflow", state: "WorkflowState") -> "WorkflowState":
         """Execute a team node and merge its output back into workflow state."""
         from victor.agent.subagents import SubAgentRole
         from victor.framework.state_merging import MergeMode
@@ -55,9 +53,7 @@ class TeamNodeExecutor:
                 id=node.id,
                 name=node.name,
                 goal=node.goal,
-                team_formation=self._resolve_team_formation(
-                    node.team_formation, TeamFormation
-                ),
+                team_formation=self._resolve_team_formation(node.team_formation, TeamFormation),
                 members=self._build_members(node.members, SubAgentRole, TeamMember),
                 config=TeamNodeConfig(
                     timeout_seconds=node.timeout_seconds,
@@ -109,12 +105,8 @@ class TeamNodeExecutor:
             "planner": getattr(role_enum, "PLANNER", role_enum.EXECUTOR),
             "executor": getattr(role_enum, "EXECUTOR", role_enum.RESEARCHER),
             "reviewer": getattr(role_enum, "REVIEWER", role_enum.EXECUTOR),
-            "writer": getattr(
-                role_enum, "WRITER", getattr(role_enum, "EXECUTOR", None)
-            ),
-            "analyst": getattr(
-                role_enum, "ANALYST", getattr(role_enum, "RESEARCHER", None)
-            ),
+            "writer": getattr(role_enum, "WRITER", getattr(role_enum, "EXECUTOR", None)),
+            "analyst": getattr(role_enum, "ANALYST", getattr(role_enum, "RESEARCHER", None)),
         }
 
         built_members = []
@@ -151,29 +143,21 @@ class TeamNodeExecutor:
                 formation_enum.SEQUENTIAL,
             ),
             "pipeline": getattr(formation_enum, "PIPELINE", formation_enum.SEQUENTIAL),
-            "consensus": getattr(
-                formation_enum, "CONSENSUS", formation_enum.SEQUENTIAL
-            ),
+            "consensus": getattr(formation_enum, "CONSENSUS", formation_enum.SEQUENTIAL),
         }
         return formation_map.get((formation or "").lower(), formation_enum.SEQUENTIAL)
 
     def _resolve_merge_mode(self, merge_mode: str, merge_mode_enum: Any) -> Any:
         merge_mode_map = {
             "team_wins": merge_mode_enum.TEAM_WINS,
-            "graph_wins": getattr(
-                merge_mode_enum, "GRAPH_WINS", merge_mode_enum.TEAM_WINS
-            ),
+            "graph_wins": getattr(merge_mode_enum, "GRAPH_WINS", merge_mode_enum.TEAM_WINS),
             "merge": getattr(merge_mode_enum, "MERGE", merge_mode_enum.TEAM_WINS),
             "error": getattr(merge_mode_enum, "ERROR", merge_mode_enum.TEAM_WINS),
         }
         return merge_mode_map.get((merge_mode or "").lower(), merge_mode_enum.TEAM_WINS)
 
     def _get_orchestrator(self) -> Any:
-        if (
-            self._context
-            and hasattr(self._context, "orchestrator")
-            and self._context.orchestrator
-        ):
+        if self._context and hasattr(self._context, "orchestrator") and self._context.orchestrator:
             return self._context.orchestrator
 
         if (

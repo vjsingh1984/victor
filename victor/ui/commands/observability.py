@@ -92,9 +92,7 @@ def dashboard_command(
     json_output: bool = typer.Option(
         False, "--json", "-j", help="Output as JSON instead of formatted text"
     ),
-    watch: bool = typer.Option(
-        False, "--watch", "-w", help="Continuously update dashboard"
-    ),
+    watch: bool = typer.Option(False, "--watch", "-w", help="Continuously update dashboard"),
     interval: float = typer.Option(
         5.0, "--interval", "-i", help="Update interval in seconds (for --watch)"
     ),
@@ -151,9 +149,7 @@ def dashboard_command(
 
         # Print formatted dashboard
         typer.echo("\n" + "=" * 60)
-        typer.echo(
-            f"VICTOR OBSERVABILITY DASHBOARD - {format_timestamp(data.timestamp)}"
-        )
+        typer.echo(f"VICTOR OBSERVABILITY DASHBOARD - {format_timestamp(data.timestamp)}")
         typer.echo("=" * 60 + "\n")
 
         # Sources summary
@@ -169,20 +165,12 @@ def dashboard_command(
         if data.cache_metrics:
             typer.echo("💾 CACHE METRICS")
             typer.echo("-" * 40)
-            total = (
-                data.cache_metrics["total_hits"] + data.cache_metrics["total_misses"]
-            )
+            total = data.cache_metrics["total_hits"] + data.cache_metrics["total_misses"]
             if total > 0:
-                typer.echo(
-                    f"Hit Rate: {format_percentage(data.cache_metrics['hit_rate'])}"
-                )
-                typer.echo(
-                    f"Total Hits: {data.cache_metrics['total_hits']:,} / {total:,}"
-                )
+                typer.echo(f"Hit Rate: {format_percentage(data.cache_metrics['hit_rate'])}")
+                typer.echo(f"Total Hits: {data.cache_metrics['total_hits']:,} / {total:,}")
             if data.cache_metrics["total_size"] > 0:
-                typer.echo(
-                    f"Cache Size: {format_bytes(data.cache_metrics['total_size'])}"
-                )
+                typer.echo(f"Cache Size: {format_bytes(data.cache_metrics['total_size'])}")
             if data.cache_metrics["evictions"] > 0:
                 typer.echo(f"Evictions: {data.cache_metrics['evictions']:,}")
             typer.echo("")
@@ -192,25 +180,16 @@ def dashboard_command(
             typer.echo("🔧 TOOL METRICS")
             typer.echo("-" * 40)
             typer.echo(f"Total Calls: {data.tool_metrics['total_calls']:,}")
-            typer.echo(
-                f"Success Rate: {format_percentage(data.tool_metrics['success_rate'])}"
-            )
+            typer.echo(f"Success Rate: {format_percentage(data.tool_metrics['success_rate'])}")
             if data.tool_metrics["average_latency"] > 0:
-                typer.echo(
-                    f"Avg Latency: {data.tool_metrics['average_latency'] * 1000:.1f}ms"
-                )
+                typer.echo(f"Avg Latency: {data.tool_metrics['average_latency'] * 1000:.1f}ms")
             typer.echo("")
 
         # Coordinator metrics
-        if (
-            data.coordinator_metrics
-            and data.coordinator_metrics.get("total_operations", 0) > 0
-        ):
+        if data.coordinator_metrics and data.coordinator_metrics.get("total_operations", 0) > 0:
             typer.echo("🎯 COORDINATOR METRICS")
             typer.echo("-" * 40)
-            typer.echo(
-                f"Total Operations: {data.coordinator_metrics['total_operations']:,}"
-            )
+            typer.echo(f"Total Operations: {data.coordinator_metrics['total_operations']:,}")
             if data.coordinator_metrics["average_latency"] > 0:
                 typer.echo(
                     f"Avg Latency: {data.coordinator_metrics['average_latency'] * 1000:.1f}ms"
@@ -218,10 +197,7 @@ def dashboard_command(
             typer.echo("")
 
         # Capability metrics
-        if (
-            data.capability_metrics
-            and data.capability_metrics.get("capability_count", 0) > 0
-        ):
+        if data.capability_metrics and data.capability_metrics.get("capability_count", 0) > 0:
             typer.echo("⚡ CAPABILITY METRICS")
             typer.echo("-" * 40)
             typer.echo(f"Capabilities: {data.capability_metrics['capability_count']}")
@@ -235,9 +211,7 @@ def dashboard_command(
             typer.echo(f"Verticals: {data.vertical_metrics['vertical_count']}")
             typer.echo(f"Total Requests: {data.vertical_metrics['total_requests']:,}")
             if data.vertical_metrics["average_latency"] > 0:
-                typer.echo(
-                    f"Avg Latency: {data.vertical_metrics['average_latency'] * 1000:.1f}ms"
-                )
+                typer.echo(f"Avg Latency: {data.vertical_metrics['average_latency'] * 1000:.1f}ms")
             typer.echo("")
 
         # System metrics
@@ -245,9 +219,7 @@ def dashboard_command(
             typer.echo("🖥️  SYSTEM METRICS")
             typer.echo("-" * 40)
             if data.system_metrics.get("memory_usage_bytes", 0) > 0:
-                typer.echo(
-                    f"Memory: {format_bytes(data.system_metrics['memory_usage_bytes'])}"
-                )
+                typer.echo(f"Memory: {format_bytes(data.system_metrics['memory_usage_bytes'])}")
             if data.system_metrics.get("cpu_usage_percent", 0) > 0:
                 typer.echo(f"CPU: {data.system_metrics['cpu_usage_percent']:.1f}%")
             typer.echo("")
@@ -260,9 +232,7 @@ def dashboard_command(
                 severity_icon = {"error": "🔴", "warning": "🟡", "info": "🔵"}.get(
                     alert["severity"], "⚪"
                 )
-                typer.echo(
-                    f"{severity_icon} [{alert['severity'].upper()}] {alert['message']}"
-                )
+                typer.echo(f"{severity_icon} [{alert['severity'].upper()}] {alert['message']}")
             typer.echo("")
 
         typer.echo("=" * 60)
@@ -288,9 +258,7 @@ def metrics_command(
     source: Optional[str] = typer.Argument(
         None, help="Source ID to filter by (shows all if not specified)"
     ),
-    source_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Filter by source type"
-    ),
+    source_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by source type"),
     json_output: bool = typer.Option(
         False, "--json", "-j", help="Output as JSON instead of formatted text"
     ),
@@ -327,9 +295,7 @@ def metrics_command(
         if source_type:
             snapshots = collection.get_by_source_type(source_type)
             if not snapshots:
-                typer.echo(
-                    f"Error: No sources found with type '{source_type}'", err=True
-                )
+                typer.echo(f"Error: No sources found with type '{source_type}'", err=True)
                 raise typer.Exit(1)
         else:
             snapshots = collection.snapshots
@@ -350,9 +316,7 @@ def metrics_command(
             typer.echo(f"\n{metric.name}")
             typer.echo(f"  Description: {metric.description}")
 
-            labels_str = ", ".join(
-                f"{label.key}={label.value}" for label in metric.labels
-            )
+            labels_str = ", ".join(f"{label.key}={label.value}" for label in metric.labels)
             if labels_str:
                 typer.echo(f"  Labels: {labels_str}")
 
@@ -392,12 +356,8 @@ def metrics_command(
 @app.command("history")
 def history_command(
     hours: float = typer.Option(1.0, "--hours", "-h", help="Hours of history to show"),
-    source: Optional[str] = typer.Option(
-        None, "--source", "-s", help="Filter by source ID"
-    ),
-    source_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="Filter by source type"
-    ),
+    source: Optional[str] = typer.Option(None, "--source", "-s", help="Filter by source ID"),
+    source_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by source type"),
     json_output: bool = typer.Option(
         False, "--json", "-j", help="Output as JSON instead of formatted text"
     ),
@@ -417,9 +377,7 @@ def history_command(
     """
     manager = ObservabilityManager.get_instance()
 
-    history = manager.get_historical_data(
-        source_id=source, source_type=source_type, hours=hours
-    )
+    history = manager.get_historical_data(source_id=source, source_type=source_type, hours=hours)
 
     if not history:
         typer.echo("No historical data available")

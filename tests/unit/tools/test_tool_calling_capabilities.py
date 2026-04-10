@@ -156,9 +156,7 @@ class TestToolCallingAdapterRegistry:
 
     def test_unknown_provider_fallback(self):
         """Unknown provider should fall back to OpenAI-compatible."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "custom_provider", "some-model"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("custom_provider", "some-model")
         # Should not raise, returns OpenAI-compatible adapter
         assert adapter is not None
 
@@ -246,9 +244,7 @@ class TestModelCapabilityLoaderEdgeCases:
     def test_get_capabilities_with_format_hint(self):
         """Test get_capabilities accepts format_hint parameter."""
         loader = ModelCapabilityLoader()
-        caps = loader.get_capabilities(
-            "ollama", "test", format_hint=ToolCallFormat.OPENAI
-        )
+        caps = loader.get_capabilities("ollama", "test", format_hint=ToolCallFormat.OPENAI)
         assert caps is not None
 
     def test_config_file_not_found(self):

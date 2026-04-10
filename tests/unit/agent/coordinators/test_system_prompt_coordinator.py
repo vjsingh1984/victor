@@ -68,9 +68,7 @@ def coordinator(mock_prompt_builder, mock_task_analyzer, mock_tools):
 class TestSystemPromptCoordinator:
     """Test suite for SystemPromptCoordinator."""
 
-    def test_build_system_prompt_large_context(
-        self, mock_prompt_builder, mock_task_analyzer
-    ):
+    def test_build_system_prompt_large_context(self, mock_prompt_builder, mock_task_analyzer):
         """Prompt includes parallel read budget for >= 32K context."""
         coord = SystemPromptCoordinator(
             prompt_builder=mock_prompt_builder,
@@ -85,9 +83,7 @@ class TestSystemPromptCoordinator:
         assert "PARALLEL READ BUDGET" in result
         assert "You are a helpful assistant." in result
 
-    def test_build_system_prompt_small_context(
-        self, mock_prompt_builder, mock_task_analyzer
-    ):
+    def test_build_system_prompt_small_context(self, mock_prompt_builder, mock_task_analyzer):
         """Prompt omits parallel read budget for < 32K context."""
         coord = SystemPromptCoordinator(
             prompt_builder=mock_prompt_builder,
@@ -127,9 +123,7 @@ class TestSystemPromptCoordinator:
             "write a function", history
         )
 
-    def test_classify_task_with_context_no_history(
-        self, coordinator, mock_task_analyzer
-    ):
+    def test_classify_task_with_context_no_history(self, coordinator, mock_task_analyzer):
         """Context classification works without history."""
         coordinator.classify_task_with_context("write a function")
         mock_task_analyzer.classify_task_with_context.assert_called_once_with(
@@ -145,9 +139,7 @@ class TestSystemPromptCoordinator:
             # Should not raise
             coordinator._emit_prompt_used_event("test prompt")
 
-    def test_emit_prompt_used_event_local_provider(
-        self, mock_prompt_builder, mock_task_analyzer
-    ):
+    def test_emit_prompt_used_event_local_provider(self, mock_prompt_builder, mock_task_analyzer):
         """Local provider gets 'detailed' prompt style in RL event."""
         coord = SystemPromptCoordinator(
             prompt_builder=mock_prompt_builder,

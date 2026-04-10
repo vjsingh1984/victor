@@ -342,9 +342,7 @@ class TestToolPipelineParallelExecution:
         assert parallel_pipeline.parallel_executor is executor
 
     @pytest.mark.asyncio
-    async def test_parallel_execution_single_tool(
-        self, parallel_pipeline, mock_tool_executor
-    ):
+    async def test_parallel_execution_single_tool(self, parallel_pipeline, mock_tool_executor):
         """Test parallel execution with single tool falls back to sequential."""
         tool_calls = [{"name": "test_tool", "arguments": {"x": 1}}]
 
@@ -355,9 +353,7 @@ class TestToolPipelineParallelExecution:
         assert not result.parallel_execution_used
 
     @pytest.mark.asyncio
-    async def test_parallel_execution_disabled(
-        self, mock_tool_registry, mock_tool_executor
-    ):
+    async def test_parallel_execution_disabled(self, mock_tool_registry, mock_tool_executor):
         """Test parallel execution when disabled."""
         config = ToolPipelineConfig(
             tool_budget=20,
@@ -380,9 +376,7 @@ class TestToolPipelineParallelExecution:
         assert not result.parallel_execution_used
 
     @pytest.mark.asyncio
-    async def test_parallel_skips_invalid_tools(
-        self, parallel_pipeline, mock_tool_registry
-    ):
+    async def test_parallel_skips_invalid_tools(self, parallel_pipeline, mock_tool_registry):
         """Test that parallel execution skips invalid tool names."""
 
         # Disable one tool
@@ -405,9 +399,7 @@ class TestToolPipelineParallelExecution:
         assert result.skipped_calls >= 2
 
     @pytest.mark.asyncio
-    async def test_parallel_skips_repeated_failures(
-        self, parallel_pipeline, mock_tool_executor
-    ):
+    async def test_parallel_skips_repeated_failures(self, parallel_pipeline, mock_tool_executor):
         """Test that parallel execution skips repeated failing calls."""
         # Add a failed signature using the actual signature format
         # Compute the signature the same way the pipeline does
@@ -428,9 +420,7 @@ class TestToolPipelineParallelExecution:
         assert any("Repeated failing" in (r or "") for r in skip_reasons)
 
     @pytest.mark.asyncio
-    async def test_parallel_budget_enforcement(
-        self, mock_tool_registry, mock_tool_executor
-    ):
+    async def test_parallel_budget_enforcement(self, mock_tool_registry, mock_tool_executor):
         """Test that parallel execution enforces budget."""
         config = ToolPipelineConfig(
             tool_budget=2,
@@ -448,9 +438,7 @@ class TestToolPipelineParallelExecution:
             {"name": "tool3", "arguments": {}},
         ]
 
-        result = await pipeline.execute_tool_calls_parallel(
-            tool_calls, {}, force_parallel=True
-        )
+        result = await pipeline.execute_tool_calls_parallel(tool_calls, {}, force_parallel=True)
 
         # Should stop after budget exhausted
         assert result.budget_exhausted is True
@@ -490,16 +478,12 @@ class TestToolPipelineNormalization:
 
     def test_normalize_string_json_arguments(self, pipeline):
         """Test normalizing JSON string arguments."""
-        args, strategy = pipeline._normalize_arguments(
-            "test_tool", '{"path": "file.py"}'
-        )
+        args, strategy = pipeline._normalize_arguments("test_tool", '{"path": "file.py"}')
         assert args == {"path": "file.py"}
 
     def test_normalize_string_python_literal(self, pipeline):
         """Test normalizing Python literal string arguments."""
-        args, strategy = pipeline._normalize_arguments(
-            "test_tool", "{'path': 'file.py'}"
-        )
+        args, strategy = pipeline._normalize_arguments("test_tool", "{'path': 'file.py'}")
         assert args == {"path": "file.py"}
 
     def test_normalize_invalid_string(self, pipeline):
@@ -672,9 +656,7 @@ class TestToolPipelineCodeCorrection:
     ):
         """Test that middleware exceptions are handled gracefully."""
         # Use ValueError since we now catch specific exception types
-        mock_correction_middleware.validate_and_fix.side_effect = ValueError(
-            "Middleware error"
-        )
+        mock_correction_middleware.validate_and_fix.side_effect = ValueError("Middleware error")
 
         tool_calls = [{"name": "write_code", "arguments": {"code": "test"}}]
         result = await pipeline_with_correction.execute_tool_calls(tool_calls, {})
@@ -833,10 +815,7 @@ class TestToolPipelineSearchRouting:
         mock_tool_executor.execute.assert_awaited_once()
         executed_kwargs = mock_tool_executor.execute.await_args.kwargs
         assert executed_kwargs["tool_name"] == "code_search"
-        assert (
-            executed_kwargs["arguments"]["query"]
-            == "json parsing crash on empty payload"
-        )
+        assert executed_kwargs["arguments"]["query"] == "json parsing crash on empty payload"
         assert executed_kwargs["arguments"]["mode"] == "bugs"
         assert result.successful_calls == 1
 
@@ -882,9 +861,7 @@ class TestToolPipelineSearchRouting:
         assert result.successful_calls == 1
 
     @pytest.mark.asyncio
-    async def test_on_tool_complete_exception_handled(
-        self, pipeline, mock_tool_executor
-    ):
+    async def test_on_tool_complete_exception_handled(self, pipeline, mock_tool_executor):
         """Test that exceptions in on_tool_complete are handled."""
 
         def failing_complete(result):
@@ -949,18 +926,14 @@ class TestFallbackOnToolFailure:
 
     async def test_fallback_on_tool_failure(self, fallback_pipeline):
         """Test that failed tool call triggers fallback to alternative tool."""
-        tool_calls = [
-            {"name": "semantic_code_search", "arguments": {"query": "MyClass"}}
-        ]
+        tool_calls = [{"name": "semantic_code_search", "arguments": {"query": "MyClass"}}]
         result = await fallback_pipeline.execute_tool_calls(tool_calls, {})
 
         assert result.successful_calls == 1
         assert result.results[0].success is True
         assert result.results[0].tool_name == "code_search"
 
-    async def test_no_fallback_when_tool_succeeds(
-        self, mock_tool_registry, mock_tool_executor
-    ):
+    async def test_no_fallback_when_tool_succeeds(self, mock_tool_registry, mock_tool_executor):
         """Test that successful tools don't trigger fallback."""
         pipeline = ToolPipeline(
             tool_registry=mock_tool_registry,

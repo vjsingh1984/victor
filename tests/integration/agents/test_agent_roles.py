@@ -130,9 +130,7 @@ class CapabilityAwareAgent:
                 output_parts.append("Read files")
 
         if self.has_capability(AgentCapability.SEARCH):
-            if self.can_use_tool("semantic_search") and self.use_tool(
-                "semantic_search"
-            ):
+            if self.can_use_tool("semantic_search") and self.use_tool("semantic_search"):
                 output_parts.append("Searched codebase")
 
         if self.has_capability(AgentCapability.WRITE):
@@ -140,9 +138,7 @@ class CapabilityAwareAgent:
                 output_parts.append("Wrote files")
 
         return (
-            f"{self._id}: {', '.join(output_parts)}"
-            if output_parts
-            else f"{self._id}: No actions"
+            f"{self._id}: {', '.join(output_parts)}" if output_parts else f"{self._id}: No actions"
         )
 
     async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:

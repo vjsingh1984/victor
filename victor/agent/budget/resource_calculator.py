@@ -86,9 +86,7 @@ def calculate_exploration_budget(
         from victor.agent.subagents.orchestrator import get_context_for_role
         from victor.agent.subagents.base import SubAgentRole
 
-        context_per_agent = get_context_for_role(
-            SubAgentRole.RESEARCHER, provider, model
-        )
+        context_per_agent = get_context_for_role(SubAgentRole.RESEARCHER, provider, model)
     except Exception:
         context_per_agent = 50000
 

@@ -145,9 +145,7 @@ class ModelCapability:
     supports_streaming: bool = True
     max_context_tokens: int = 8192
     cost_tier: str = "medium"  # low, medium, high
-    strengths: Set[str] = field(
-        default_factory=set
-    )  # e.g., {"code", "analysis", "creative"}
+    strengths: Set[str] = field(default_factory=set)  # e.g., {"code", "analysis", "creative"}
     weaknesses: Set[str] = field(default_factory=set)
 
 
@@ -298,30 +296,22 @@ class AutomaticModelFallback:
 
         # Filter out current model
         candidates = [
-            (p, m)
-            for p, m in chain
-            if not (p == current_provider and m == current_model)
+            (p, m) for p, m in chain if not (p == current_provider and m == current_model)
         ]
 
         # Filter by airgapped mode
         if self._airgapped_mode:
             candidates = [
-                (p, m)
-                for p, m in candidates
-                if p.lower() in ("ollama", "lmstudio", "vllm")
+                (p, m) for p, m in candidates if p.lower() in ("ollama", "lmstudio", "vllm")
             ]
 
         # Filter by circuit breaker availability
         available = [
-            (p, m)
-            for p, m in candidates
-            if self._get_circuit_breaker(p, m).is_available()
+            (p, m) for p, m in candidates if self._get_circuit_breaker(p, m).is_available()
         ]
 
         if not available:
-            logger.warning(
-                f"No available fallback models for {current_provider}/{current_model}"
-            )
+            logger.warning(f"No available fallback models for {current_provider}/{current_model}")
             return None
 
         # Score candidates based on failure type preferences

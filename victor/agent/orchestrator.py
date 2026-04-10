@@ -477,9 +477,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         # Keep legacy attributes for compatibility while deferring heavy coordinator init.
         self._provider_coordinator = self._provider_runtime.provider_coordinator
-        self._provider_switch_coordinator = (
-            self._provider_runtime.provider_switch_coordinator
-        )
+        self._provider_switch_coordinator = self._provider_runtime.provider_switch_coordinator
 
     def _initialize_memory_runtime(self) -> None:
         """Initialize memory/session runtime boundaries."""
@@ -494,15 +492,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._memory_session_id = self._memory_runtime.memory_session_id
 
         # Initialize LanceDB embedding store for efficient semantic retrieval if memory enabled.
-        if self.memory_manager and getattr(
-            self.settings, "conversation_embeddings_enabled", True
-        ):
+        if self.memory_manager and getattr(self.settings, "conversation_embeddings_enabled", True):
             try:
                 self._init_conversation_embedding_store()
             except ImportError as embed_err:
-                logger.debug(
-                    f"ConversationEmbeddingStore dependencies not available: {embed_err}"
-                )
+                logger.debug(f"ConversationEmbeddingStore dependencies not available: {embed_err}")
             except (OSError, IOError) as embed_err:
                 logger.warning(
                     f"Failed to initialize ConversationEmbeddingStore (I/O error): {embed_err}"
@@ -525,15 +519,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             debug_logger=self.debug_logger,
             cumulative_token_usage=self._cumulative_token_usage,
             tool_cost_lookup=lambda name: (
-                self.tools.get_tool_cost(name)
-                if hasattr(self, "tools")
-                else CostTier.FREE
+                self.tools.get_tool_cost(name) if hasattr(self, "tools") else CostTier.FREE
             ),
         )
         self.usage_logger = self._metrics_runtime.usage_logger
-        self.streaming_metrics_collector = (
-            self._metrics_runtime.streaming_metrics_collector
-        )
+
+        # Wrap with trace enricher for GEPA ASI when prompt optimization enabled
+        try:
+            from victor.observability.analytics.trace_enrichment import (
+                create_trace_enricher,
+            )
+
+            po_cfg = getattr(self.settings, "prompt_optimization", None)
+            gepa_cfg = po_cfg.gepa if po_cfg and po_cfg.enabled else None
+            self.usage_logger = create_trace_enricher(self.usage_logger, gepa_settings=gepa_cfg)
+        except Exception:
+            pass  # Trace enrichment is best-effort
+
+        self.streaming_metrics_collector = self._metrics_runtime.streaming_metrics_collector
         self._metrics_collector = self._metrics_runtime.metrics_collector
         self._session_cost_tracker = self._metrics_runtime.session_cost_tracker
         self._metrics_coordinator = self._metrics_runtime.metrics_coordinator
@@ -551,9 +554,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             create_workflow_runtime_components,
         )
 
-        self._workflow_runtime = create_workflow_runtime_components(
-            factory=self._factory
-        )
+        self._workflow_runtime = create_workflow_runtime_components(factory=self._factory)
         self._workflow_registry = self._workflow_runtime.workflow_registry
 
     def _initialize_coordination_runtime(self) -> None:
@@ -562,9 +563,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             create_coordination_runtime_components,
         )
 
-        self._coordination_runtime = create_coordination_runtime_components(
-            factory=self._factory
-        )
+        self._coordination_runtime = create_coordination_runtime_components(factory=self._factory)
         self._recovery_coordinator = self._coordination_runtime.recovery_coordinator
         self._chunk_generator = self._coordination_runtime.chunk_generator
         self._tool_planner = self._coordination_runtime.tool_planner
@@ -594,13 +593,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
-            tool_selector=(
-                self.tool_selector if hasattr(self, "tool_selector") else None
-            ),
+            tool_selector=(self.tool_selector if hasattr(self, "tool_selector") else None),
             tool_access_controller=getattr(self, "_tool_access_controller", None),
-            mode_controller=(
-                self.mode_controller if hasattr(self, "mode_controller") else None
-            ),
+            mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
             session_state_manager=self._session_state,
             lifecycle_manager=self._lifecycle_manager,
             memory_manager=self.memory_manager,
@@ -721,9 +716,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.provider_name,
             self.tool_adapter,
             self.tool_calling_caps,
-        ) = self._factory.create_provider_manager_with_adapter(
-            provider, model, provider_name
-        )
+        ) = self._factory.create_provider_manager_with_adapter(provider, model, provider_name)
 
         # Provider runtime boundary: coordinator services are created lazily on first use.
         self._initialize_provider_runtime()
@@ -748,13 +741,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Inject project context if available
         if self.project_context.content:
             self._system_prompt = (
-                base_system_prompt
-                + "\n\n"
-                + self.project_context.get_system_prompt_addition()
+                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
             )
-            logger.info(
-                f"Loaded project context from {self.project_context.context_file}"
-            )
+            logger.info(f"Loaded project context from {self.project_context.context_file}")
         else:
             self._system_prompt = base_system_prompt
 
@@ -814,16 +803,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._shown_tool_errors: set = set()
         self._tool_context_cache: Optional[dict] = None
 
-        # Result cache for pure/idempotent tools (via factory)
-        self.tool_cache = self._factory.create_tool_cache()
-        # Minimal dependency graph (used for planning search→read→analyze) (via factory, DI)
-        # Tool dependencies are registered via ToolRegistrar after it's created
-        self.tool_graph = self._factory.create_tool_dependency_graph()
-
-        # Stateful managers (DI with fallback)
-        # Code execution manager for Docker-based code execution (via factory, DI with fallback)
-        self.code_manager = self._factory.create_code_execution_manager()
-
         # Workflow runtime boundary (lazy registry + default workflow registration).
         self._initialize_workflow_runtime()
 
@@ -833,537 +812,34 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Memory/session runtime boundary with embedding-store initialization.
         self._initialize_memory_runtime()
 
-        # Conversation state machine for intelligent stage detection (via factory, DI with fallback)
+        # Conversation state machine for intelligent stage detection
         self.conversation_state = self._factory.create_conversation_state_machine()
 
-        # Intent classifier for semantic continuation/completion detection (via factory)
+        # Intent classifier for semantic continuation/completion detection
         self.intent_classifier = self._factory.create_intent_classifier()
 
-        # Intelligent pipeline integration (lazy initialization via factory)
-        # Provides RL-based mode learning, quality scoring, prompt optimization
+        # Intelligent pipeline integration (lazy initialization)
         self._intelligent_integration: Optional["OrchestratorIntegration"] = None
         self._intelligent_integration_config = self._factory.create_integration_config()
-        self._intelligent_pipeline_enabled = getattr(
-            settings, "intelligent_pipeline_enabled", True
-        )
+        self._intelligent_pipeline_enabled = getattr(settings, "intelligent_pipeline_enabled", True)
 
-        # Sub-agent orchestration (via factory) - lazy initialization for parallel task delegation
+        # Sub-agent orchestration (lazy initialization)
         self._subagent_orchestrator, self._subagent_orchestration_enabled = (
             self._factory.setup_subagent_orchestration()
         )
 
-        # Tool registry (via factory)
-        self.tools = self._factory.create_tool_registry()
-        # Alias for backward compatibility - some code uses tool_registry instead of tools
-        self.tool_registry = self.tools
+        # Component assembly phases (tools → conversation → intelligence)
+        from victor.agent.runtime.component_assembler import ComponentAssembler
 
-        # Initialize ToolRegistrar (via factory) - tool registration, plugins, MCP integration
-        self.tool_registrar = self._factory.create_tool_registrar(
-            self.tools, self.tool_graph, provider, model
-        )
-        self.tool_registrar.set_background_task_callback(self._create_background_task)
+        ComponentAssembler.assemble_tools(self, provider, model)
+        ComponentAssembler.assemble_conversation(self, provider, model)
+        ComponentAssembler.assemble_intelligence(self)
 
-        # Register tool dependencies for planning (delegates to ToolRegistrar)
-        self.tool_registrar._register_tool_dependencies()
+        # Post-factory component preparation and facade assembly
+        from victor.agent.runtime.bootstrapper import AgentRuntimeBootstrapper
 
-        # Synchronous registration (dynamic tools, configs)
-        self._register_default_tools()  # Delegates to ToolRegistrar
-        self.tool_registrar._load_tool_configurations()  # Delegates to ToolRegistrar
-        self.tools.register_before_hook(self._log_tool_call)
-
-        # Plugin system for extensible tools (via factory, delegates to ToolRegistrar)
-        self.plugin_manager = self._factory.initialize_plugin_system(
-            self.tool_registrar
-        )
-
-        # Argument normalizer for handling malformed tool arguments (via factory, DI with fallback)
-        self.argument_normalizer = self._factory.create_argument_normalizer(provider)
-
-        # Initialize middleware chain from vertical extensions (via factory)
-        # Middleware provides code validation, safety checks, and domain-specific processing
-        self._middleware_chain, self._code_correction_middleware = (
-            self._factory.create_middleware_chain()
-        )
-
-        # Initialize SafetyChecker with vertical patterns (via factory)
-        # Exposes via property for UI layer to set confirmation callback
-        self._safety_checker = self._factory.create_safety_checker()
-
-        # Initialize AutoCommitter for AI-assisted commits (via factory)
-        # Provides conventional commits with co-authorship attribution
-        self._auto_committer = self._factory.create_auto_committer()
-
-        # Tool executor for centralized tool execution with retry, caching, and metrics (via factory)
-        self.tool_executor = self._factory.create_tool_executor(
-            tools=self.tools,
-            argument_normalizer=self.argument_normalizer,
-            tool_cache=self.tool_cache,
-            safety_checker=self._safety_checker,
-            code_correction_middleware=self._code_correction_middleware,
-        )
-
-        # Parallel tool executor for concurrent independent tool calls (via factory)
-        self.parallel_executor = self._factory.create_parallel_executor(
-            self.tool_executor
-        )
-
-        # Response completer for ensuring complete responses after tool calls (via factory)
-        self.response_completer = self._factory.create_response_completer()
-
-        # Semantic tool selector (via factory - optional, configured via settings)
-        self.use_semantic_selection, self._embedding_preload_task = (
-            self._factory.setup_semantic_selection()
-        )
-        self._runtime_preload_task: Optional[asyncio.Task] = None
-        self.semantic_selector = self._factory.create_semantic_selector()
-
-        # Initialize UnifiedTaskTracker (via factory, DI with fallback)
-        # This is the single source of truth for task progress, milestones, and loop detection
-        self.unified_tracker = self._factory.create_unified_tracker(
-            self.tool_calling_caps
-        )
-
-        # Initialize unified ToolSelector (via factory) - semantic + keyword selection
-        self.tool_selector = self._factory.create_tool_selector(
-            tools=self.tools,
-            semantic_selector=self.semantic_selector,
-            conversation_state=self.conversation_state,
-            unified_tracker=self.unified_tracker,
-            model=self.model,
-            provider_name=self.provider_name,
-            tool_selection=self.tool_selection,
-            on_selection_recorded=self._record_tool_selection,
-        )
-
-        # Initialize ToolAccessController for unified tool access control (via factory)
-        # Replaces scattered is_tool_enabled/get_enabled_tools logic with layered precedence
-        self._tool_access_controller = self._factory.create_tool_access_controller(
-            registry=self.tools,
-        )
-
-        # Initialize BudgetManager for unified budget tracking (via factory)
-        # Centralizes budget management with consistent multiplier composition
-        self._budget_manager = self._factory.create_budget_manager()
-
-        # =================================================================
-        # NEW: Decomposed component facades for orchestrator responsibilities
-        # These provide cleaner interfaces while maintaining backward compatibility
-        # =================================================================
-
-        # ConversationController: Manages message history and conversation state (via factory)
-        self._conversation_controller = self._factory.create_conversation_controller(
-            provider=provider,
-            model=model,
-            conversation=self.conversation,
-            conversation_state=self.conversation_state,
-            memory_manager=self.memory_manager,
-            memory_session_id=self._memory_session_id,
-            system_prompt=self._system_prompt,
-            context_reminder_manager=(
-                self.reminder_manager if hasattr(self, "reminder_manager") else None
-            ),
-            hierarchical_manager=self._factory.create_hierarchical_compaction_manager(),
-        )
-
-        # SessionLedger: Structured session state tracking (survives compaction)
-        self._session_ledger = self._factory.create_session_ledger()
-
-        # LifecycleManager: Coordinate session lifecycle and resource cleanup (via factory)
-        # Handles conversation reset, session recovery, graceful shutdown
-        # Must be created AFTER conversation_controller and other dependencies
-        self._lifecycle_manager = self._factory.create_lifecycle_manager(
-            conversation_controller=self._conversation_controller,
-            metrics_collector=(
-                self._metrics_coordinator.metrics_collector
-                if hasattr(self, "_metrics_coordinator")
-                else None
-            ),
-            context_compactor=(
-                self._context_compactor if hasattr(self, "_context_compactor") else None
-            ),
-            sequence_tracker=(
-                self._sequence_tracker if hasattr(self, "_sequence_tracker") else None
-            ),
-            usage_analytics=(
-                self._usage_analytics if hasattr(self, "_usage_analytics") else None
-            ),
-            reminder_manager=(
-                self._reminder_manager if hasattr(self, "_reminder_manager") else None
-            ),
-        )
-
-        # Tool deduplication tracker for preventing redundant calls (via factory)
-        self._deduplication_tracker = self._factory.create_tool_deduplication_tracker()
-
-        # ToolPipeline: Coordinates tool execution flow (via factory)
-        # Middleware chain enables vertical-specific tool processing (code correction, validation, etc.)
-        self._tool_pipeline = self._factory.create_tool_pipeline(
-            tools=self.tools,
-            tool_executor=self.tool_executor,
-            tool_budget=self.tool_budget,
-            tool_cache=self.tool_cache,
-            argument_normalizer=self.argument_normalizer,
-            on_tool_start=self._on_tool_start_callback,
-            on_tool_complete=self._on_tool_complete_callback,
-            deduplication_tracker=self._deduplication_tracker,
-            middleware_chain=self._middleware_chain,
-            search_router=self.search_router,
-        )
-
-        # Wire pending semantic cache to tool pipeline (deferred from embedding store init)
-        if (
-            hasattr(self, "_pending_semantic_cache")
-            and self._pending_semantic_cache is not None
-        ):
-            self._tool_pipeline.set_semantic_cache(self._pending_semantic_cache)
-            logger.info("[AgentOrchestrator] Semantic tool result cache enabled")
-            self._pending_semantic_cache = None  # Clear reference
-
-        # StreamingController: Manages streaming sessions and metrics (via factory)
-        self._streaming_controller = self._factory.create_streaming_controller(
-            streaming_metrics_collector=self.streaming_metrics_collector,
-            on_session_complete=self._on_streaming_session_complete,
-        )
-
-        # StreamingCoordinator: Coordinates streaming response processing (via factory)
-        self._streaming_coordinator = self._factory.create_streaming_coordinator(
-            streaming_controller=self._streaming_controller,
-        )
-
-        # StreamingChatHandler: Testable extraction of streaming loop logic (via factory)
-        self._streaming_handler = self._factory.create_streaming_chat_handler(
-            message_adder=self
-        )
-
-        # IterationCoordinator: Loop control for streaming chat (using handler)
-        self._iteration_coordinator: Optional[IterationCoordinator] = None
-
-        # TaskAnalyzer: Unified task analysis facade
-        self._task_analyzer = get_task_analyzer()
-
-        # SystemPromptCoordinator: Prompt building, shell resolution, task classification
-        self._system_prompt_coordinator = SystemPromptCoordinator(
-            prompt_builder=self.prompt_builder,
-            get_context_window=self._get_model_context_window,
-            provider_name=self.provider_name,
-            model_name=self.model,
-            get_tools=lambda: self.tools,
-            get_mode_controller=lambda: self.mode_controller,
-            task_analyzer=self._task_analyzer,
-            session_id=getattr(self, "_session_id", ""),
-        )
-
-        # RLCoordinator: Framework-level RL with unified SQLite storage (via factory)
-        self._rl_coordinator = self._factory.create_rl_coordinator()
-
-        # Get context pruning learner from RL coordinator (if available)
-        pruning_learner = None
-        if self._rl_coordinator is not None:
-            try:
-                pruning_learner = self._rl_coordinator.get_learner("context_pruning")
-            except (KeyError, AttributeError, TypeError) as e:
-                logger.debug("context_pruning learner unavailable: %s", e)
-
-        # ContextCompactor: Proactive context management and tool result truncation (via factory)
-        self._context_compactor = self._factory.create_context_compactor(
-            conversation_controller=self._conversation_controller,
-            pruning_learner=pruning_learner,
-        )
-
-        # ContextManager: Centralized context window management (TD-002 refactoring)
-        # Consolidates _get_model_context_window, _get_max_context_chars,
-        # _check_context_overflow, and _handle_compaction
-        self._context_manager = create_context_manager(
-            provider_name=self.provider_name,
-            model=self.model,
-            conversation_controller=self._conversation_controller,
-            context_compactor=self._context_compactor,
-            debug_logger=self.debug_logger,
-            settings=self.settings,
-        )
-
-        # ToolOutputFormatter: LLM-context-aware formatting of tool results
-        # (Initialization consolidated: the definitive initialization occurs
-        # later in this method to avoid accidental double-initialization.)
-        # Previous duplicate initialization removed to reduce boilerplate.
-
-        # Initialize UsageAnalytics singleton for data-driven optimization (via factory)
-        self._usage_analytics = self._factory.create_usage_analytics()
-
-        # Token usage tracking now managed by SessionStateManager (TD-002)
-        # Access via self._cumulative_token_usage property or self._session_state.get_token_usage()
-
-        # Initialize ToolSequenceTracker for intelligent next-tool suggestions (via factory)
-        self._sequence_tracker = self._factory.create_sequence_tracker()
-
-        # Initialize ToolOutputFormatter for LLM-context-aware output formatting (via factory)
-        self._tool_output_formatter = self._factory.create_tool_output_formatter(
-            self._context_compactor
-        )
-
-        # Resilience runtime boundary: lazily materialize recovery handler/integration.
-        self._initialize_resilience_runtime(context_compactor=self._context_compactor)
-
-        # Coordination runtime boundary: defer recovery/chunk/planner/task coordinators.
-        self._initialize_coordination_runtime()
-
-        # Initialize ObservabilityIntegration for unified event bus (via factory)
-        self._observability = self._factory.create_observability()
-
-        # Initialize ConversationCheckpointManager for time-travel debugging (via factory)
-        # Provides save/restore/fork capabilities for conversation state
-        self._checkpoint_manager = self._factory.create_checkpoint_manager()
-
-        # =================================================================
-        # Workflow Optimization Components - MODE workflow optimizations
-        # These address issues identified during EXPLORE/PLAN/BUILD testing
-        # =================================================================
-
-        # Initialize workflow optimization components (via factory)
-        self._workflow_optimization = (
-            self._factory.create_workflow_optimization_components(
-                timeout_seconds=getattr(settings, "execution_timeout", None)
-            )
-        )
-
-        # Wire component dependencies (via factory)
-        self._factory.wire_component_dependencies(
-            recovery_handler=None,
-            context_compactor=self._context_compactor,
-            observability=self._observability,
-            conversation_state=self.conversation_state,
-        )
-
-        # Initialize VerticalContext for unified vertical state management
-        # This replaces scattered _vertical_* attributes with a proper container
-        self._vertical_context: VerticalContext = create_vertical_context()
-
-        # Initialize VerticalIntegrationAdapter for single-source vertical methods
-        # Eliminates duplicate apply_vertical_* implementations (SRP compliance)
-        self._vertical_integration_adapter = VerticalIntegrationAdapter(self)
-
-        # Initialize ModeWorkflowTeamCoordinator for intelligent team/workflow suggestions
-        # Lazy initialization pattern - coordinator is created on first access
-        self._mode_workflow_team_coordinator: Optional[Any] = None
-
-        # Interaction runtime boundary: lazily materialize chat/tool/session coordinators.
-        self._initialize_interaction_runtime()
-
-        # Service layer delegation (Strangler Fig pattern).
-        # When USE_SERVICE_LAYER flag is enabled, orchestrator delegates to
-        # service adapters instead of coordinators directly.
-        self._initialize_services()
-
-        # =================================================================
-        # NEW: Sync/Streaming Coordinators for Phase 2 split
-        # These provide separate execution paths for sync and streaming
-        # =================================================================
-        # Initialize new coordinators for sync/streaming split (lazy initialization)
-        self._execution_coordinator: Optional[Any] = None
-        self._sync_chat_coordinator: Optional[Any] = None
-        self._streaming_chat_coordinator: Optional[Any] = None
-        self._unified_chat_coordinator: Optional[Any] = None
-
-        # Protocol adapter for DIP compliance
-        self._protocol_adapter: Optional[Any] = None
-
-        # Initialize capability registry for explicit capability discovery
-        # This replaces hasattr duck-typing with type-safe protocol conformance
-        self.__init_capability_registry__()
-
-        # =================================================================
-        # Domain Facades: Group related components behind coherent interfaces
-        # These wrap already-initialized components (conservative approach)
-        # so that orchestrator properties can delegate through facades.
-        # =================================================================
-        from victor.agent.facades import (
-            ChatFacade,
-            MetricsFacade,
-            OrchestrationFacade,
-            ProviderFacade,
-            ResilienceFacade,
-            SessionFacade,
-            ToolFacade,
-            WorkflowFacade,
-        )
-
-        self._chat_facade = ChatFacade(
-            conversation=self.conversation,
-            conversation_controller=self._conversation_controller,
-            conversation_state=self.conversation_state,
-            memory_manager=self.memory_manager,
-            memory_session_id=self._memory_session_id,
-            embedding_store=getattr(self, "_conversation_embedding_store", None),
-            intent_classifier=self.intent_classifier,
-            intent_detector=self.intent_detector,
-            reminder_manager=self.reminder_manager,
-            system_prompt=self._system_prompt,
-            response_completer=self.response_completer,
-            context_compactor=self._context_compactor,
-            task_completion_detector=self._task_completion_detector,
-        )
-
-        self._tool_facade = ToolFacade(
-            tools=self.tools,
-            tool_pipeline=self._tool_pipeline,
-            tool_executor=self.tool_executor,
-            tool_selector=self.tool_selector,
-            tool_cache=self.tool_cache,
-            tool_graph=self.tool_graph,
-            tool_registrar=self.tool_registrar,
-            tool_budget=self.tool_budget,
-            tool_output_formatter=self._tool_output_formatter,
-            deduplication_tracker=self._deduplication_tracker,
-            argument_normalizer=self.argument_normalizer,
-            parallel_executor=self.parallel_executor,
-            safety_checker=self._safety_checker,
-            auto_committer=self._auto_committer,
-            middleware_chain=self._middleware_chain,
-            code_correction_middleware=self._code_correction_middleware,
-            tool_access_controller=self._tool_access_controller,
-            budget_manager=self._budget_manager,
-            search_router=self.search_router,
-            semantic_selector=self.semantic_selector,
-            task_classifier=self.task_classifier,
-            sequence_tracker=self._sequence_tracker,
-            unified_tracker=self.unified_tracker,
-            plugin_manager=self.plugin_manager,
-        )
-
-        self._provider_facade = ProviderFacade(
-            provider=self.provider,
-            model=self.model,
-            provider_name=self.provider_name,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            thinking=self.thinking,
-            provider_manager=self._provider_manager,
-            provider_runtime=self._provider_runtime,
-            provider_coordinator=self._provider_coordinator,
-            provider_switch_coordinator=self._provider_switch_coordinator,
-        )
-
-        self._session_facade = SessionFacade(
-            session_state=self._session_state,
-            session_accessor=self._session_accessor,
-            session_ledger=self._session_ledger,
-            lifecycle_manager=self._lifecycle_manager,
-            active_session_id=self.active_session_id,
-            memory_session_id=self._memory_session_id,
-            profile_name=self._profile_name,
-            checkpoint_manager=self._checkpoint_manager,
-        )
-
-        self._metrics_facade = MetricsFacade(
-            metrics_runtime=self._metrics_runtime,
-            metrics_collector=self._metrics_collector,
-            usage_analytics=self._usage_analytics,
-            usage_logger=self.usage_logger,
-            streaming_metrics_collector=self.streaming_metrics_collector,
-            session_cost_tracker=self._session_cost_tracker,
-            metrics_coordinator=self._metrics_coordinator,
-            debug_logger=self.debug_logger,
-            callback_coordinator=self._callback_coordinator,
-        )
-
-        self._resilience_facade = ResilienceFacade(
-            resilience_runtime=self._resilience_runtime,
-            recovery_handler=self._recovery_handler,
-            recovery_integration=self._recovery_integration,
-            recovery_coordinator=self._recovery_coordinator,
-            chunk_generator=self._chunk_generator,
-            context_manager=self._context_manager,
-            rl_coordinator=self._rl_coordinator,
-            code_manager=self.code_manager,
-            background_tasks=self._background_tasks,
-            cancel_event=self._cancel_event,
-            is_streaming=self._is_streaming,
-        )
-
-        self._workflow_facade = WorkflowFacade(
-            workflow_registry=self._workflow_registry,
-            workflow_runtime=self._workflow_runtime,
-            workflow_optimization=self._workflow_optimization,
-            mode_workflow_team_coordinator=self._mode_workflow_team_coordinator,
-        )
-
-        self._orchestration_facade = OrchestrationFacade(
-            interaction_runtime=self._interaction_runtime,
-            chat_coordinator=self._chat_coordinator,
-            tool_coordinator=self._tool_coordinator,
-            session_coordinator=self._session_coordinator,
-            execution_coordinator=self._execution_coordinator,
-            sync_chat_coordinator=self._sync_chat_coordinator,
-            streaming_chat_coordinator=self._streaming_chat_coordinator,
-            unified_chat_coordinator=self._unified_chat_coordinator,
-            protocol_adapter=self._protocol_adapter,
-            streaming_handler=self._streaming_handler,
-            streaming_controller=self._streaming_controller,
-            streaming_coordinator=self._streaming_coordinator,
-            iteration_coordinator=getattr(self, "_iteration_coordinator", None),
-            task_analyzer=self._task_analyzer,
-            presentation=self._presentation,
-            vertical_integration_adapter=self._vertical_integration_adapter,
-            vertical_context=self._vertical_context,
-            observability=self._observability,
-            execution_tracer=getattr(self, "_execution_tracer", None),
-            tool_call_tracer=getattr(self, "_tool_call_tracer", None),
-            intelligent_integration=self._intelligent_integration,
-            subagent_orchestrator=self._subagent_orchestrator,
-        )
-
-        logger.debug(
-            "Domain facades created: ChatFacade, ToolFacade, ProviderFacade, "
-            "SessionFacade, MetricsFacade, ResilienceFacade, WorkflowFacade, "
-            "OrchestrationFacade"
-        )
-
-        # Wire up LifecycleManager with dependencies for shutdown
-        # (must be done after all components are initialized)
-        self._lifecycle_manager.set_provider(self.provider)
-        self._lifecycle_manager.set_code_manager(
-            self.code_manager if hasattr(self, "code_manager") else None
-        )
-        self._lifecycle_manager.set_semantic_selector(
-            self.semantic_selector if hasattr(self, "semantic_selector") else None
-        )
-        self._lifecycle_manager.set_usage_logger(
-            self.usage_logger if hasattr(self, "usage_logger") else None
-        )
-        # Note: background_tasks is a set, convert to list for lifecycle manager
-        self._lifecycle_manager.set_background_tasks(list(self._background_tasks))
-        # Set callbacks for orchestrator-specific shutdown logic
-        self._lifecycle_manager.set_flush_analytics_callback(self.flush_analytics)
-        self._lifecycle_manager.set_stop_health_monitoring_callback(
-            self.stop_health_monitoring
-        )
-
-        # Initialize session context for tracing/propagation
-        set_session_id(self.active_session_id or "")
-
-        # Debug-mode conformance assertion for ChatOrchestratorProtocol
-        # Placed at end of __init__ so all attributes are initialized
-        if __debug__:
-            from victor.agent.coordinators.chat_protocols import (
-                ChatOrchestratorProtocol,
-            )
-            from victor.framework.protocols import verify_protocol_conformance
-
-            _conforms, _missing = verify_protocol_conformance(
-                self, ChatOrchestratorProtocol
-            )
-            assert (
-                _conforms
-            ), f"AgentOrchestrator missing ChatOrchestratorProtocol members: {_missing}"
-
-        logger.info(
-            "Orchestrator initialized with decomposed components: "
-            "ConversationController, ToolPipeline, StreamingController, StreamingChatHandler, "
-            "TaskAnalyzer, ContextCompactor, UsageAnalytics, ToolSequenceTracker, "
-            "ToolOutputFormatter, RecoveryCoordinator, ChunkGenerator, ToolPlanner, TaskCoordinator, "
-            "ObservabilityIntegration, WorkflowOptimization, VerticalContext, ModeWorkflowTeamCoordinator, "
-            "CapabilityRegistry"
-        )
+        AgentRuntimeBootstrapper.prepare_components(self, settings)
+        AgentRuntimeBootstrapper.finalize(self)
 
     # =====================================================================
     # Callbacks for decomposed components — delegated to CallbackCoordinator
@@ -1389,9 +865,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             get_vertical_context=lambda: self._vertical_context,
         )
 
-    def _on_tool_start_callback(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> None:
+    def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Callback when tool execution starts (from ToolPipeline)."""
         self._callback_coordinator.on_tool_start(tool_name, arguments)
 
@@ -1571,9 +1045,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync coordinator with new vertical context (if already initialized)
         if self._mode_workflow_team_coordinator is not None:
             self._mode_workflow_team_coordinator.set_vertical_context(context)
-            logger.debug(
-                f"Coordinator synced with vertical context: {context.vertical_name}"
-            )
+            logger.debug(f"Coordinator synced with vertical context: {context.vertical_name}")
 
         # Sync tool selector with vertical context for vertical-specific tool selection (DIP)
         if hasattr(self, "tool_selector") and self.tool_selector is not None:
@@ -1587,9 +1059,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync middleware chain with vertical context for vertical-aware middleware (DIP)
         if hasattr(self, "_middleware_chain") and self._middleware_chain is not None:
             self._middleware_chain.set_vertical_context(context)
-            logger.debug(
-                f"Middleware chain synced with vertical context: {context.vertical_name}"
-            )
+            logger.debug(f"Middleware chain synced with vertical context: {context.vertical_name}")
 
         logger.debug(f"Vertical context set: {context.vertical_name}")
 
@@ -1650,9 +1120,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._system_prompt = (
                 base_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
             )
-            logger.info(
-                f"Loaded project context from {self.project_context.context_file}"
-            )
+            logger.info(f"Loaded project context from {self.project_context.context_file}")
         else:
             self._system_prompt = base_prompt
 
@@ -1798,9 +1266,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Get orchestrator state to pass to integration
         stream_context = getattr(self, "_current_stream_context", None)
         continuation_prompts = getattr(self, "_continuation_prompts", 0)
-        max_continuation_prompts_used = getattr(
-            self, "_max_continuation_prompts_used", 6
-        )
+        max_continuation_prompts_used = getattr(self, "_max_continuation_prompts_used", 6)
         stuck_loop_detected = getattr(self, "_stuck_loop_detected", False)
 
         try:
@@ -2252,9 +1718,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         preload_manager = PreloadManager(
-            enable_parallel=bool(
-                getattr(self.settings, "framework_preload_parallel", True)
-            )
+            enable_parallel=bool(getattr(self.settings, "framework_preload_parallel", True))
         )
         preload_manager.add_task(
             "configuration",
@@ -2300,9 +1764,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                             )
                         ),
                         total_timeout=int(
-                            getattr(
-                                self.settings, "http_connection_pool_total_timeout", 60
-                            )
+                            getattr(self.settings, "http_connection_pool_total_timeout", 60)
                         ),
                     )
                 )
@@ -2342,9 +1804,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if getattr(self.settings, "framework_preload_enabled", False):
             if self._runtime_preload_task is not None:
                 return
-            task = self._create_background_task(
-                self._run_runtime_preload(), name="runtime_preload"
-            )
+            task = self._create_background_task(self._run_runtime_preload(), name="runtime_preload")
             if task:
                 self._runtime_preload_task = task
                 logger.info("Started runtime preload task")
@@ -2357,9 +1817,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not self.use_semantic_selection or self._embedding_preload_task:
             return
 
-        task = self._create_background_task(
-            self._preload_embeddings(), name="embedding_preload"
-        )
+        task = self._create_background_task(self._preload_embeddings(), name="embedding_preload")
         if task:
             self._embedding_preload_task = task
             logger.info("Started background task for embedding preload")
@@ -2407,9 +1865,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             SearchType.HYBRID: "both",
         }
 
-        recommended_tool = route.tool_name or tool_map.get(
-            route.search_type, "code_search"
-        )
+        recommended_tool = route.tool_name or tool_map.get(route.search_type, "code_search")
 
         return {
             "recommended_tool": recommended_tool,
@@ -2675,9 +2131,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         base_system_prompt = self._build_system_prompt_with_adapter()
         if self.project_context and self.project_context.content:
             self._system_prompt = (
-                base_system_prompt
-                + "\n\n"
-                + self.project_context.get_system_prompt_addition()
+                base_system_prompt + "\n\n" + self.project_context.get_system_prompt_addition()
             )
         else:
             self._system_prompt = base_system_prompt
@@ -2784,13 +2238,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with classification results
         """
-        return self._system_prompt_coordinator.classify_task_with_context(
-            user_message, history
-        )
+        return self._system_prompt_coordinator.classify_task_with_context(user_message, history)
 
-    def _format_tool_output(
-        self, tool_name: str, args: Dict[str, Any], output: Any
-    ) -> str:
+    def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
         """Format tool output with clear boundaries to prevent model hallucination.
 
         Delegates to ToolOutputFormatter for:
@@ -2814,9 +2264,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             model=getattr(self.settings, "model", None),
             remaining_tokens=context_metrics.remaining_tokens,
             max_tokens=context_metrics.max_tokens,
-            response_token_reserve=getattr(
-                self.settings, "response_token_reserve", 4096
-            ),
+            response_token_reserve=getattr(self.settings, "response_token_reserve", 4096),
         )
 
         # Delegate to the extracted formatter
@@ -2852,9 +2300,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Delegate to ToolRegistrar for dynamic tool registration
         registered_count = self.tool_registrar._register_dynamic_tools()
-        logger.debug(
-            f"Dynamically registered {registered_count} tools via ToolRegistrar"
-        )
+        logger.debug(f"Dynamically registered {registered_count} tools via ToolRegistrar")
 
         # MCP integration - delegate to ToolRegistrar
         if getattr(self.settings, "use_mcp_tools", False):
@@ -2895,9 +2341,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return True
 
         # 1. Check static YAML config first (fast path)
-        supported = self.tool_capabilities.is_tool_call_supported(
-            provider_key, self.model
-        )
+        supported = self.tool_capabilities.is_tool_call_supported(provider_key, self.model)
         if supported:
             return True
 
@@ -2909,7 +2353,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 )
 
                 base_url = getattr(
-                    self.settings.provider, "ollama_base_url",
+                    self.settings.provider,
+                    "ollama_base_url",
                     "http://localhost:11434",
                 )
                 detector = get_global_detector(base_url)
@@ -2926,10 +2371,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # 3. Not supported — warn user
         if not self._tool_capability_warned:
-            known = (
-                ", ".join(self.tool_capabilities.get_supported_models(provider_key))
-                or "none"
-            )
+            known = ", ".join(self.tool_capabilities.get_supported_models(provider_key)) or "none"
             logger.warning(
                 f"Model '{self.model}' is not marked as tool-call-capable for provider '{provider_key}'. "
                 f"Known tool-capable models: {known}"
@@ -2982,6 +2424,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.usage_logger.log_event("user_prompt", {"content": content})
         elif role == "assistant":
             self.usage_logger.log_event("assistant_response", {"content": content})
+            # Buffer reasoning for next tool call (GEPA ASI enrichment)
+            if hasattr(self.usage_logger, "set_reasoning_context") and content:
+                self.usage_logger.set_reasoning_context(content)
 
     async def chat(
         self,
@@ -3003,9 +2448,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         if self._use_service_layer and self._chat_service:
             return await self._chat_service.chat(user_message)
-        return await self._chat_coordinator.chat(
-            user_message, use_planning=use_planning
-        )
+        return await self._chat_coordinator.chat(user_message, use_planning=use_planning)
 
     async def chat_with_planning(
         self,
@@ -3049,12 +2492,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
         """
         if self._use_service_layer and self._chat_service:
-            return await self._chat_service.chat_with_planning(
-                user_message, use_planning
-            )
-        return await self._chat_coordinator.chat_with_planning(
-            user_message, use_planning
-        )
+            return await self._chat_service.chat_with_planning(user_message, use_planning)
+        return await self._chat_coordinator.chat_with_planning(user_message, use_planning)
 
     async def _handle_context_and_iteration_limits(
         self,
@@ -3102,9 +2541,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Extracted from CRITICAL-001 Phase 2D.
         """
         # Delegate to TaskCoordinator
-        self.task_coordinator.apply_intent_guard(
-            user_message, self.conversation_controller
-        )
+        self.task_coordinator.apply_intent_guard(user_message, self.conversation_controller)
 
         # Sync current_intent back to orchestrator
         self._current_intent = self.task_coordinator.current_intent
@@ -3202,9 +2639,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Get elapsed time from streaming controller
         elapsed_time = 0.0
         if self._streaming_controller.current_session:
-            elapsed_time = (
-                time.time() - self._streaming_controller.current_session.start_time
-            )
+            elapsed_time = time.time() - self._streaming_controller.current_session.start_time
 
         return StreamingRecoveryContext(
             iteration=stream_ctx.total_iterations,
@@ -3341,13 +2776,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             Tuple of (result, success, error_message or None)
         """
         if self._use_service_layer and self._tool_service:
-            return await self._tool_service.execute_tool_with_retry(
-                tool_name, tool_args, context
-            )
+            return await self._tool_service.execute_tool_with_retry(tool_name, tool_args, context)
 
-        async def _executor(
-            name: str, args: Dict[str, Any], ctx: Dict[str, Any]
-        ) -> Any:
+        async def _executor(name: str, args: Dict[str, Any], ctx: Dict[str, Any]) -> Any:
             return await self.tools.execute(name, context=ctx, **args)
 
         def _on_success(name: str, args: Dict[str, Any], result: Any) -> None:
@@ -3374,9 +2805,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             },
         )
 
-    async def _handle_tool_calls(
-        self, tool_calls: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+    async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.
 
         Thin facade that delegates validation and normalization to
@@ -3398,9 +2827,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
             if not validation.valid:
                 if validation.skip_reason:
-                    self.console.print(
-                        f"[yellow]{warn_icon} {validation.skip_reason}[/]"
-                    )
+                    self.console.print(f"[yellow]{warn_icon} {validation.skip_reason}[/]")
                 if validation.error_result:
                     results.append(validation.error_result)
                 continue
@@ -3462,10 +2889,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             error_msg = exec_result.error
 
             # Reset activity timer
-            if (
-                hasattr(self, "_current_stream_context")
-                and self._current_stream_context
-            ):
+            if hasattr(self, "_current_stream_context") and self._current_stream_context:
                 self._current_stream_context.reset_activity_timer()
 
             # --- State updates (orchestrator-local) ---
@@ -3475,20 +2899,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 self.observed_files.add(str(normalized_args.get("path")))
 
             # Reset continuation/input prompts on successful tool call
-            if (
-                hasattr(self, "_continuation_prompts")
-                and self._continuation_prompts > 0
-            ):
+            if hasattr(self, "_continuation_prompts") and self._continuation_prompts > 0:
                 logger.debug(
                     f"Resetting continuation prompts counter (was {self._continuation_prompts}) after successful tool call"
                 )
                 self._continuation_prompts = 0
                 if hasattr(self, "_tool_calls_at_continuation_start"):
                     self._tool_calls_at_continuation_start = self.tool_calls_used
-            if (
-                hasattr(self, "_asking_input_prompts")
-                and self._asking_input_prompts > 0
-            ):
+            if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:
                 logger.debug(
                     f"Resetting asking input prompts counter (was {self._asking_input_prompts}) after successful tool call"
                 )
@@ -3497,21 +2915,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             elapsed_ms = (time.monotonic() - start) * 1000
 
             error_type = (
-                type(exec_result.error).__name__
-                if exec_result.error and not success
-                else None
+                type(exec_result.error).__name__ if exec_result.error and not success else None
             )
-            self._record_tool_execution(
-                tool_name, success, elapsed_ms, error_type=error_type
-            )
+            self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
             result_dict = {"success": success}
             if hasattr(exec_result, "result") and exec_result.result:
                 result_dict["result"] = exec_result.result
-            self.unified_tracker.update_from_tool_call(
-                tool_name, normalized_args, result_dict
-            )
+            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
             # --- Result formatting + conversation injection ---
             output = exec_result.result if success else None
@@ -3531,6 +2943,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             error_display = None if semantic_success else (error_msg or "Unknown error")
 
+            # Set duration context for trace enricher (GEPA ASI)
+            if hasattr(self.usage_logger, "set_duration_context"):
+                self.usage_logger.set_duration_context(elapsed_ms)
+
             self.usage_logger.log_event(
                 "tool_result",
                 {
@@ -3542,12 +2958,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
             if semantic_success:
-                logger.debug(
-                    f"Tool {tool_name} executed successfully ({elapsed_ms:.0f}ms)"
-                )
-                formatted_output = self._format_tool_output(
-                    tool_name, normalized_args, output
-                )
+                logger.debug(f"Tool {tool_name} executed successfully ({elapsed_ms:.0f}ms)")
+                formatted_output = self._format_tool_output(tool_name, normalized_args, output)
                 output_preview = str(output)[:500] if output else "<empty>"
                 if len(str(output)) > 500:
                     output_preview += f"... [truncated, total {len(str(output))} chars]"
@@ -3577,16 +2989,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
                     )
 
-                error_output = (
-                    output if isinstance(output, dict) else {"error": error_display}
-                )
-                formatted_error = self._format_tool_output(
-                    tool_name, normalized_args, error_output
-                )
+                error_output = output if isinstance(output, dict) else {"error": error_display}
+                formatted_error = self._format_tool_output(tool_name, normalized_args, error_output)
                 self.add_message("user", formatted_error)
-                logger.debug(
-                    f"Sent error feedback to model for {tool_name}: {error_display}"
-                )
+                logger.debug(f"Sent error feedback to model for {tool_name}: {error_display}")
 
                 results.append(
                     {
@@ -3720,9 +3126,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._memory_session_id = session_id
         return success
 
-    def get_memory_context(
-        self, max_tokens: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get token-aware context messages from memory manager.
 
         Delegates to SessionCoordinator.
@@ -4061,9 +3465,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of message dictionaries
         """
-        return [
-            {"role": m.role, "content": m.content} for m in self.conversation.messages
-        ]
+        return [{"role": m.role, "content": m.content} for m in self.conversation.messages]
 
     def get_message_count(self) -> int:
         """Get message count (protocol method).

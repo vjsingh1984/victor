@@ -171,9 +171,7 @@ Requirements:
         assert req1.confidence > 0
 
         # Multiple matches
-        req2 = extractor.extract(
-            "read 5 files and provide top 3 fixes with 10 findings"
-        )
+        req2 = extractor.extract("read 5 files and provide top 3 fixes with 10 findings")
         assert req2.confidence > req1.confidence
 
     def test_budget_computation(self, extractor):
@@ -271,9 +269,7 @@ class TestIntegrationWithTaskTracker:
             create_tracker_with_prompt_requirements,
         )
 
-        tracker, _, _ = create_tracker_with_prompt_requirements(
-            "Read 5 files and provide 3 fixes"
-        )
+        tracker, _, _ = create_tracker_with_prompt_requirements("Read 5 files and provide 3 fixes")
 
         assert tracker._progress.has_prompt_requirements is True
         # Soft limit buffer should allow 50% overage (set in should_stop)

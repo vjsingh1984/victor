@@ -54,24 +54,16 @@ console = Console()
 @keys_app.callback(invoke_without_command=True)
 def keys(
     ctx: typer.Context,
-    setup: bool = typer.Option(
-        False, "--setup", "-s", help="Create API keys template file"
-    ),
-    list_keys: bool = typer.Option(
-        True, "--list", "-l", help="List configured providers"
-    ),
-    provider: Optional[str] = typer.Option(
-        None, "--set", help="Set API key for a provider"
-    ),
+    setup: bool = typer.Option(False, "--setup", "-s", help="Create API keys template file"),
+    list_keys: bool = typer.Option(True, "--list", "-l", help="List configured providers"),
+    provider: Optional[str] = typer.Option(None, "--set", help="Set API key for a provider"),
     service: Optional[str] = typer.Option(
         None, "--set-service", help="Set API key for a service (e.g., finnhub, fred)"
     ),
     keyring: bool = typer.Option(
         False, "--keyring", "-k", help="Store key in system keyring (secure)"
     ),
-    migrate: bool = typer.Option(
-        False, "--migrate", help="Migrate keys from file to keyring"
-    ),
+    migrate: bool = typer.Option(False, "--migrate", help="Migrate keys from file to keyring"),
     delete_keyring: Optional[str] = typer.Option(
         None, "--delete-keyring", help="Delete provider key from keyring"
     ),
@@ -97,9 +89,7 @@ def keys(
     """
     if ctx.invoked_subcommand is None:
         # Show deprecation notice
-        console.print(
-            "[yellow]Note:[/] 'victor keys' is deprecated. Use 'victor auth' instead."
-        )
+        console.print("[yellow]Note:[/] 'victor keys' is deprecated. Use 'victor auth' instead.")
         console.print("[dim]New command features:[/]")
         console.print("  • victor auth setup - Interactive setup wizard")
         console.print("  • victor auth add - Quick add provider account")
@@ -132,9 +122,7 @@ def keys(
 def _setup():
     # Create template file
     if DEFAULT_KEYS_FILE.exists():
-        if not Confirm.ask(
-            f"[yellow]{DEFAULT_KEYS_FILE} already exists. Overwrite?[:]"
-        ):
+        if not Confirm.ask(f"[yellow]{DEFAULT_KEYS_FILE} already exists. Overwrite?[:]"):
             console.print("[dim]Cancelled[/]")
             return
 
@@ -145,9 +133,7 @@ def _setup():
     # Set secure permissions
     os.chmod(DEFAULT_KEYS_FILE, 0o600)
 
-    console.print(
-        f"[green]✓[/] Created API keys template at [cyan]{DEFAULT_KEYS_FILE}[/]"
-    )
+    console.print(f"[green]✓[/] Created API keys template at [cyan]{DEFAULT_KEYS_FILE}[/]")
     console.print("\n[yellow]Next steps:[/]")
     console.print(f"  1. Edit [cyan]{DEFAULT_KEYS_FILE}[/]")
     console.print("  2. Replace placeholder values with your actual API keys")
@@ -161,9 +147,7 @@ def _delete_keyring(provider_name: str):
     # Delete key from keyring
     provider_name = provider_name.lower()
     if not is_keyring_available():
-        console.print(
-            "[red]Keyring not available.[/] Install with: pip install keyring"
-        )
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
         raise typer.Exit(1)
 
     if _delete_key_from_keyring(provider_name):
@@ -175,9 +159,7 @@ def _delete_keyring(provider_name: str):
 def _migrate():
     # Migrate keys from file to keyring
     if not is_keyring_available():
-        console.print(
-            "[red]Keyring not available.[/] Install with: pip install keyring"
-        )
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
         console.print("\n[dim]Platform requirements:[/]")
         console.print("  macOS: Built-in Keychain support")
         console.print("  Windows: Built-in Credential Manager")
@@ -233,9 +215,7 @@ def _set_key(provider: str, keyring: bool):
 
     # Check keyring availability if requested
     if keyring and not is_keyring_available():
-        console.print(
-            "[red]Keyring not available.[/] Install with: pip install keyring"
-        )
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
         console.print("[dim]Falling back to file storage...[/]")
         keyring = False
 
@@ -252,9 +232,7 @@ def _set_key(provider: str, keyring: bool):
     manager = APIKeyManager()
     if manager.set_key(provider, key.strip(), use_keyring=keyring):
         location = "system keyring" if keyring else str(DEFAULT_KEYS_FILE)
-        console.print(
-            f"[green]✓[/] API key for [cyan]{provider}[/] saved to {location}"
-        )
+        console.print(f"[green]✓[/] API key for [cyan]{provider}[/] saved to {location}")
     else:
         console.print("[red]Failed to save API key")
         raise typer.Exit(1)
@@ -272,9 +250,7 @@ def _list_keys():
     table.add_column("Aliases", style="dim")
 
     # Filter out aliases, show only primary providers
-    primary_providers = {
-        k: v for k, v in PROVIDER_ENV_VARS.items() if k not in PROVIDER_ALIASES
-    }
+    primary_providers = {k: v for k, v in PROVIDER_ENV_VARS.items() if k not in PROVIDER_ALIASES}
 
     for prov, env_var in sorted(primary_providers.items()):
         # Determine source - check both primary and alias
@@ -315,9 +291,7 @@ def _list_keys():
     # Show keyring status
     backend_name, status = _get_keyring_info()
     keyring_status = (
-        "[green]✓ Available[/]"
-        if is_keyring_available()
-        else "[yellow]Not installed[/]"
+        "[green]✓ Available[/]" if is_keyring_available() else "[yellow]Not installed[/]"
     )
     console.print(f"[dim]Keyring:[/] {backend_name} {keyring_status}")
     console.print(f"[dim]Keys file:[/] {DEFAULT_KEYS_FILE}")
@@ -326,9 +300,7 @@ def _list_keys():
         console.print()
         console.print("[yellow]No API keys configured.[/]")
         console.print("  [cyan]victor keys --setup[/]          Create template file")
-        console.print(
-            "  [cyan]victor keys --set anthropic --keyring[/]  Store in keyring (secure)"
-        )
+        console.print("  [cyan]victor keys --set anthropic --keyring[/]  Store in keyring (secure)")
 
 
 def _get_keyring_info() -> tuple[str, str]:
@@ -354,17 +326,13 @@ def _set_service_key(service_name: str, use_keyring: bool):
 
     # Check keyring availability if requested
     if use_keyring and not is_keyring_available():
-        console.print(
-            "[red]Keyring not available.[/] Install with: pip install keyring"
-        )
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
         console.print("[dim]Falling back to file storage...[/]")
         use_keyring = False
 
     storage_type = "keyring" if use_keyring else "file"
     env_var = SERVICE_ENV_VARS[service_name]
-    console.print(
-        f"[cyan]Setting API key for service {service_name}[/] (storage: {storage_type})"
-    )
+    console.print(f"[cyan]Setting API key for service {service_name}[/] (storage: {storage_type})")
     console.print(f"[dim]Environment variable: {env_var}[/]")
     console.print("[dim]Paste your API key (input hidden):[/]")
 
@@ -388,15 +356,11 @@ def _delete_service_keyring(service_name: str):
     """Delete service key from keyring."""
     service_name = service_name.lower()
     if not is_keyring_available():
-        console.print(
-            "[red]Keyring not available.[/] Install with: pip install keyring"
-        )
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
         raise typer.Exit(1)
 
     if delete_service_key_from_keyring(service_name):
-        console.print(
-            f"[green]✓[/] Deleted service [cyan]{service_name}[/] from keyring"
-        )
+        console.print(f"[green]✓[/] Deleted service [cyan]{service_name}[/] from keyring")
     else:
         console.print(f"[yellow]Key for service {service_name} not found in keyring")
 
@@ -456,9 +420,7 @@ def _list_services():
     # Show keyring status
     backend_name, status = _get_keyring_info()
     keyring_status = (
-        "[green]✓ Available[/]"
-        if is_keyring_available()
-        else "[yellow]Not installed[/]"
+        "[green]✓ Available[/]" if is_keyring_available() else "[yellow]Not installed[/]"
     )
     console.print(f"[dim]Keyring:[/] {backend_name} {keyring_status}")
 
@@ -481,16 +443,12 @@ def _set_oauth_client_id(provider: str):
     oauth_providers = {"openai", "qwen"}
     if provider not in oauth_providers:
         console.print(f"[red]Provider '{provider}' does not support OAuth.[/]")
-        console.print(
-            f"Supported OAuth providers: {', '.join(sorted(oauth_providers))}"
-        )
+        console.print(f"Supported OAuth providers: {', '.join(sorted(oauth_providers))}")
         raise typer.Exit(1)
 
     # Check keyring availability
     if not is_keyring_available():
-        console.print(
-            "[red]Keyring not available.[/] Install with: pip install keyring"
-        )
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
         raise typer.Exit(1)
 
     console.print(f"[cyan]Setting OAuth client_id for {provider}[/]")
@@ -507,14 +465,10 @@ def _set_oauth_client_id(provider: str):
         from victor.providers.oauth_manager import _set_oauth_client_id_in_keyring
 
         if _set_oauth_client_id_in_keyring(provider, client_id.strip()):
-            console.print(
-                f"[green]✓[/] OAuth client_id for [cyan]{provider}[/] saved to keyring"
-            )
+            console.print(f"[green]✓[/] OAuth client_id for [cyan]{provider}[/] saved to keyring")
             console.print()
             console.print("[yellow]Important:[/]")
-            console.print(
-                f"  This client_id must be registered with {provider.upper()}"
-            )
+            console.print(f"  This client_id must be registered with {provider.upper()}")
             console.print(
                 f'  You can now use: victor chat --provider {provider} --auth-mode oauth "Your message"'
             )
@@ -534,16 +488,12 @@ def _delete_oauth_client_id(provider: str):
     oauth_providers = {"openai", "qwen"}
     if provider not in oauth_providers:
         console.print(f"[red]Provider '{provider}' does not support OAuth.[/]")
-        console.print(
-            f"Supported OAuth providers: {', '.join(sorted(oauth_providers))}"
-        )
+        console.print(f"Supported OAuth providers: {', '.join(sorted(oauth_providers))}")
         raise typer.Exit(1)
 
     # Check keyring availability
     if not is_keyring_available():
-        console.print(
-            "[red]Keyring not available.[/] Install with: pip install keyring"
-        )
+        console.print("[red]Keyring not available.[/] Install with: pip install keyring")
         raise typer.Exit(1)
 
     try:
@@ -551,9 +501,7 @@ def _delete_oauth_client_id(provider: str):
 
         # Delete the OAuth client_id from keyring
         keyring.delete_password("victor", f"oauth_client_id_{provider}")
-        console.print(
-            f"[green]✓[/] Deleted OAuth client_id for [cyan]{provider}[/] from keyring"
-        )
+        console.print(f"[green]✓[/] Deleted OAuth client_id for [cyan]{provider}[/] from keyring")
     except Exception as e:
         console.print(f"[yellow]Failed to delete OAuth client_id: {e}[/]")
         console.print("[dim]The client_id may not be stored in the keyring.[/]")

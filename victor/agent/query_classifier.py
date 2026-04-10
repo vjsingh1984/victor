@@ -58,9 +58,7 @@ _QUERY_PATTERNS: List[Tuple[re.Pattern, QueryType]] = [
         QueryType.DEBUGGING,
     ),
     (
-        re.compile(
-            r"\b(review|evaluate|check|assess|audit|inspect|examine)\b", re.IGNORECASE
-        ),
+        re.compile(r"\b(review|evaluate|check|assess|audit|inspect|examine)\b", re.IGNORECASE),
         QueryType.REVIEW,
     ),
     (
@@ -96,9 +94,7 @@ class QueryClassifier:
             return self._complexity_service
         from victor.framework.task.complexity import TaskComplexityService
 
-        self._complexity_service = TaskComplexityService(
-            use_semantic=False, use_rl=False
-        )
+        self._complexity_service = TaskComplexityService(use_semantic=False, use_rl=False)
         return self._complexity_service
 
     def classify(self, message: str) -> QueryClassification:
@@ -140,19 +136,14 @@ class QueryClassifier:
         """Derive whether planning should be used."""
         if complexity in (TaskComplexity.COMPLEX, TaskComplexity.ANALYSIS):
             return True
-        if (
-            complexity == TaskComplexity.MEDIUM
-            and query_type == QueryType.IMPLEMENTATION
-        ):
+        if complexity == TaskComplexity.MEDIUM and query_type == QueryType.IMPLEMENTATION:
             return True
         if query_type == QueryType.EXPLORATION:
             return True
         return False
 
     @staticmethod
-    def _derive_should_use_subagents(
-        query_type: QueryType, complexity: TaskComplexity
-    ) -> bool:
+    def _derive_should_use_subagents(query_type: QueryType, complexity: TaskComplexity) -> bool:
         """Derive whether sub-agents should be used."""
         if query_type == QueryType.EXPLORATION and complexity in (
             TaskComplexity.COMPLEX,

@@ -162,13 +162,9 @@ class TestSettings:
         assert settings.event_queue_overflow_policy == "drop_newest"
         assert settings.event_queue_overflow_block_timeout_ms == 50.0
         assert (
-            settings.event_queue_overflow_topic_policies["vertical.applied"]
-            == "block_with_timeout"
+            settings.event_queue_overflow_topic_policies["vertical.applied"] == "block_with_timeout"
         )
-        assert (
-            settings.event_queue_overflow_topic_block_timeout_ms["lifecycle.session.*"]
-            == 150.0
-        )
+        assert settings.event_queue_overflow_topic_block_timeout_ms["lifecycle.session.*"] == 150.0
         assert settings.extension_loader_warn_queue_threshold == 24
         assert settings.extension_loader_error_queue_threshold == 32
         assert settings.extension_loader_warn_in_flight_threshold == 6
@@ -178,9 +174,7 @@ class TestSettings:
         assert settings.extension_loader_metrics_reporter_interval_seconds == 60.0
         assert settings.generic_result_cache_enabled is False
         assert settings.http_connection_pool_enabled is False
-        assert (
-            settings.framework_preload_enabled is True
-        )  # Enabled by default for performance
+        assert settings.framework_preload_enabled is True  # Enabled by default for performance
         assert settings.framework_private_fallback_strict_mode is False
         assert settings.framework_protocol_fallback_strict_mode is False
 
@@ -191,9 +185,7 @@ class TestSettings:
         settings = Settings(event_queue_overflow_policy="Drop_Oldest")
         assert settings.event_queue_overflow_policy == "drop_oldest"
 
-        with pytest.raises(
-            ValueError, match="event_queue_overflow_policy must be one of"
-        ):
+        with pytest.raises(ValueError, match="event_queue_overflow_policy must be one of"):
             Settings(event_queue_overflow_policy="reject")
 
     def test_settings_event_topic_overflow_policy_validation(self):
@@ -211,20 +203,14 @@ class TestSettings:
             ValueError,
             match="event_queue_overflow_topic_policies values must be one of",
         ):
-            Settings(
-                event_queue_overflow_topic_policies={"lifecycle.session.*": "reject"}
-            )
+            Settings(event_queue_overflow_topic_policies={"lifecycle.session.*": "reject"})
 
     def test_settings_event_topic_block_timeout_validation(self):
         """Per-topic block timeout overrides must be numeric and >= 0."""
         import pytest
 
-        settings = Settings(
-            event_queue_overflow_topic_block_timeout_ms={"error.*": 125}
-        )
-        assert settings.event_queue_overflow_topic_block_timeout_ms == {
-            "error.*": 125.0
-        }
+        settings = Settings(event_queue_overflow_topic_block_timeout_ms={"error.*": 125})
+        assert settings.event_queue_overflow_topic_block_timeout_ms == {"error.*": 125.0}
 
         with pytest.raises(
             ValueError,
@@ -274,9 +260,7 @@ class TestSettings:
         """Runtime infra thresholds must be valid."""
         import pytest
 
-        with pytest.raises(
-            ValueError, match="http_connection_pool_max_connections must be >= 1"
-        ):
+        with pytest.raises(ValueError, match="http_connection_pool_max_connections must be >= 1"):
             Settings(http_connection_pool_max_connections=0)
 
         with pytest.raises(
@@ -285,9 +269,7 @@ class TestSettings:
         ):
             Settings(http_connection_pool_max_connections_per_host=0)
 
-        with pytest.raises(
-            ValueError, match="http_connection_pool_total_timeout must be > 0"
-        ):
+        with pytest.raises(ValueError, match="http_connection_pool_total_timeout must be > 0"):
             Settings(http_connection_pool_total_timeout=0)
 
     def test_get_config_dir(self):
@@ -596,10 +578,7 @@ providers:
         assert isinstance(settings.server_session_secret, SecretStr)
         assert settings.server_session_secret.get_secret_value() == "session-secret"
         assert settings.security.server_api_key.get_secret_value() == "server-token"
-        assert (
-            settings.security.server_session_secret.get_secret_value()
-            == "session-secret"
-        )
+        assert settings.security.server_session_secret.get_secret_value() == "session-secret"
 
 
 class TestLoadSettings:
@@ -705,9 +684,7 @@ class TestToolSelectionValidation:
         """Test tool_selection with threshold out of range (covers lines 91-92)."""
         import pytest
 
-        with pytest.raises(
-            ValueError, match="base_threshold must be between 0.0 and 1.0"
-        ):
+        with pytest.raises(ValueError, match="base_threshold must be between 0.0 and 1.0"):
             ProfileConfig(
                 provider="ollama",
                 model="test",

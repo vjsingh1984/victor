@@ -56,9 +56,7 @@ class TestAutoGenerate:
 
     def test_compact_output_under_500_tokens(self, tmp_path):
         """Generated init.md should be compact (~500 tokens)."""
-        (tmp_path / "README.md").write_text(
-            "# Big Project\n\n" + "Description. " * 100 + "\n"
-        )
+        (tmp_path / "README.md").write_text("# Big Project\n\n" + "Description. " * 100 + "\n")
         for d in ["src", "lib", "tests", "docs", "scripts"]:
             (tmp_path / d).mkdir()
 

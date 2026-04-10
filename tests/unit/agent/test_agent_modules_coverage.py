@@ -36,9 +36,7 @@ class TestErrorRecoveryHandler:
 
     def test_recovery_result_with_message(self):
         """Test recovery result with message."""
-        result = RecoveryResult(
-            action=RecoveryAction.ABORT, user_message="Could not recover"
-        )
+        result = RecoveryResult(action=RecoveryAction.ABORT, user_message="Could not recover")
         assert result.action == RecoveryAction.ABORT
         assert "Could not recover" in result.user_message
 

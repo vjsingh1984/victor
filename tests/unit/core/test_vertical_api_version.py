@@ -92,6 +92,5 @@ class TestVerticalAPIVersion:
         assert VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION == 1
         assert VerticalRegistry.CURRENT_API_VERSION == 1
         assert (
-            VerticalRegistry.CURRENT_API_VERSION
-            >= VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION
+            VerticalRegistry.CURRENT_API_VERSION >= VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION
         )

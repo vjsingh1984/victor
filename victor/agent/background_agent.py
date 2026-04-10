@@ -180,9 +180,7 @@ class BackgroundAgentManager:
         self._running_tasks: Set[str] = set()
         self._lock = asyncio.Lock()
 
-        logger.info(
-            f"BackgroundAgentManager initialized (max_concurrent={max_concurrent})"
-        )
+        logger.info(f"BackgroundAgentManager initialized (max_concurrent={max_concurrent})")
 
     @property
     def active_count(self) -> int:

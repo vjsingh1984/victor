@@ -90,9 +90,7 @@ def scan_secrets(text: str) -> List[Any]:
                     break
                 line_num = i + 1
             matches.append(
-                SecretMatchFallback(
-                    name, m.group(), severity, m.start(), m.end(), line_num
-                )
+                SecretMatchFallback(name, m.group(), severity, m.start(), m.end(), line_num)
             )
 
     return matches
@@ -158,11 +156,7 @@ def mask_secrets(text: str, mask_char: str = "*", visible_chars: int = 4) -> str
             matched = m.group()
             if len(matched) > visible_chars * 2:
                 mask_len = len(matched) - visible_chars * 2
-                masked = (
-                    matched[:visible_chars]
-                    + mask_char * mask_len
-                    + matched[-visible_chars:]
-                )
+                masked = matched[:visible_chars] + mask_char * mask_len + matched[-visible_chars:]
             else:
                 masked = mask_char * len(matched)
             result = result.replace(matched, masked)
@@ -243,9 +237,7 @@ class PatternMatcherFallback:
         self.patterns = patterns
         self.case_insensitive = case_insensitive
         flags = re.IGNORECASE if case_insensitive else 0
-        self._compiled = [
-            (i, re.compile(re.escape(p), flags)) for i, p in enumerate(patterns)
-        ]
+        self._compiled = [(i, re.compile(re.escape(p), flags)) for i, p in enumerate(patterns)]
 
     def find_all(self, text: str) -> List[PatternMatchFallback]:
         matches = []
@@ -292,9 +284,7 @@ class PatternMatcherFallback:
         return result
 
 
-def contains_any_pattern(
-    text: str, patterns: List[str], case_insensitive: bool = True
-) -> bool:
+def contains_any_pattern(text: str, patterns: List[str], case_insensitive: bool = True) -> bool:
     """Check if text contains any pattern.
 
     Args:
@@ -312,9 +302,7 @@ def contains_any_pattern(
     return matcher.contains_any(text)
 
 
-def find_all_patterns(
-    text: str, patterns: List[str], case_insensitive: bool = True
-) -> List[Any]:
+def find_all_patterns(text: str, patterns: List[str], case_insensitive: bool = True) -> List[Any]:
     """Find all pattern matches in text.
 
     Args:
@@ -332,9 +320,7 @@ def find_all_patterns(
     return matcher.find_all(text)
 
 
-def count_pattern_matches(
-    text: str, patterns: List[str], case_insensitive: bool = True
-) -> int:
+def count_pattern_matches(text: str, patterns: List[str], case_insensitive: bool = True) -> int:
     """Count pattern matches in text.
 
     Args:

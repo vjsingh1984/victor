@@ -333,9 +333,7 @@ class AgentModeController:
         self._current_mode = prev
         return prev
 
-    def register_callback(
-        self, callback: Callable[[AgentMode, AgentMode], None]
-    ) -> None:
+    def register_callback(self, callback: Callable[[AgentMode, AgentMode], None]) -> None:
         """Register a callback for mode changes.
 
         Args:
@@ -343,9 +341,7 @@ class AgentModeController:
         """
         self._callbacks.append(callback)
 
-    def _emit_mode_transition_event(
-        self, old_mode: AgentMode, new_mode: AgentMode
-    ) -> None:
+    def _emit_mode_transition_event(self, old_mode: AgentMode, new_mode: AgentMode) -> None:
         """Emit RL event for mode transition.
 
         This activates the mode_transition learner to learn optimal

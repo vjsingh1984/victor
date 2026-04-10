@@ -417,9 +417,7 @@ class ChainRegistry:
                     return self._chains[key]
             return self._chains.get(name)
 
-    def get_metadata(
-        self, name: str, vertical: Optional[str] = None
-    ) -> Optional[ChainMetadata]:
+    def get_metadata(self, name: str, vertical: Optional[str] = None) -> Optional[ChainMetadata]:
         """Get metadata for a chain.
 
         Args:
@@ -489,9 +487,7 @@ class ChainRegistry:
             Dict mapping names to chain objects
         """
         with self._lock:
-            return {
-                k: self._chains[k] for k, m in self._metadata.items() if tag in m.tags
-            }
+            return {k: self._chains[k] for k, m in self._metadata.items() if tag in m.tags}
 
     def find_by_tags(self, tags: List[str], match_all: bool = False) -> Dict[str, Any]:
         """Find chains matching multiple tags.

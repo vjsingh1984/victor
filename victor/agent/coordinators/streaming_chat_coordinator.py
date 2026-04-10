@@ -178,9 +178,7 @@ class StreamingChatCoordinator:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(
-            user_message, tools
-        )
+        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
         return tools
 
@@ -260,9 +258,7 @@ class StreamingChatCoordinator:
             if content_parts:
                 partial = "".join(content_parts)
                 # Add partial content to conversation so it's not lost
-                self._chat_context.add_message(
-                    "assistant", partial + "\n\n[Stream interrupted]"
-                )
+                self._chat_context.add_message("assistant", partial + "\n\n[Stream interrupted]")
             raise
 
         # Add complete assistant response to history

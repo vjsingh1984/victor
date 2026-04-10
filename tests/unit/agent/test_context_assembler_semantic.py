@@ -103,9 +103,7 @@ class TestContextAssemblerSemantic:
 
     def test_graceful_degradation_on_error(self, many_messages):
         error_controller = MagicMock()
-        error_controller.retrieve_relevant_history.side_effect = RuntimeError(
-            "DB error"
-        )
+        error_controller.retrieve_relevant_history.side_effect = RuntimeError("DB error")
 
         assembler = TurnBoundaryContextAssembler(
             score_fn=make_score_fn(),

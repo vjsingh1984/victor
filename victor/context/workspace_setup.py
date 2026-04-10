@@ -59,9 +59,7 @@ async def ensure_project_importable(
     setup_cfg = project_root / "setup.cfg"
 
     if not (setup_py.exists() or pyproject.exists() or setup_cfg.exists()):
-        logger.debug(
-            "No build system found in %s, skipping install", project_root
-        )
+        logger.debug("No build system found in %s, skipping install", project_root)
         return False
 
     # Install the project
@@ -85,9 +83,7 @@ async def ensure_project_importable(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout, stderr = await asyncio.wait_for(
-            proc.communicate(), timeout=timeout
-        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
 
         if proc.returncode == 0:
             logger.info("Installed %s successfully", project_name)
@@ -103,9 +99,7 @@ async def ensure_project_importable(
 
     except asyncio.TimeoutError:
         proc.kill()
-        logger.warning(
-            "Installation of %s timed out after %ds", project_name, timeout
-        )
+        logger.warning("Installation of %s timed out after %ds", project_name, timeout)
         return False
     except Exception as e:
         logger.warning("Installation of %s failed: %s", project_name, e)

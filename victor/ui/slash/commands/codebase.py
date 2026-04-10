@@ -56,9 +56,7 @@ class ReindexCommand(BaseSlashCommand):
             from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
             from victor.config.settings import get_project_paths, load_settings
 
-            _factory = CapabilityRegistry.get_instance().get(
-                CodebaseIndexFactoryProtocol
-            )
+            _factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
             if _factory is None:
                 raise ImportError("Codebase indexing not available")
 
@@ -93,9 +91,7 @@ class ReindexCommand(BaseSlashCommand):
                     f"[bold]Embeddings:[/] {'enabled' if stats.get('embeddings_enabled') else 'disabled'}\n"
                     f"[bold]Indexed:[/] {stats.get('is_indexed', False)}\n"
                 )
-                ctx.console.print(
-                    Panel(content, title="Codebase Index", border_style="cyan")
-                )
+                ctx.console.print(Panel(content, title="Codebase Index", border_style="cyan"))
                 return
 
             ctx.console.print("[dim]Indexing codebase...[/]")
@@ -123,9 +119,7 @@ class ReindexCommand(BaseSlashCommand):
 
         except ImportError as e:
             ctx.console.print(f"[yellow]Indexing not available:[/] {e}")
-            ctx.console.print(
-                "[dim]Install with: pip install sentence-transformers lancedb[/]"
-            )
+            ctx.console.print("[dim]Install with: pip install sentence-transformers lancedb[/]")
         except Exception as e:
             ctx.console.print(f"[red]Indexing failed:[/] {e}")
             logger.exception("Reindex error")
@@ -174,21 +168,13 @@ class InitCommand(BaseSlashCommand):
                 ctx.console.print(
                     "  [cyan]/init --learn[/]    Enhance with conversation history insights"
                 )
-                ctx.console.print(
-                    "  [cyan]/init --deep[/]     LLM-powered analysis (any language)"
-                )
-                ctx.console.print(
-                    "  [cyan]/init --symlinks[/] Create CLAUDE.md and other aliases"
-                )
+                ctx.console.print("  [cyan]/init --deep[/]     LLM-powered analysis (any language)")
+                ctx.console.print("  [cyan]/init --symlinks[/] Create CLAUDE.md and other aliases")
 
                 preview = existing_content[:500]
                 ctx.console.print(
                     Panel(
-                        Markdown(
-                            preview + "\n\n..."
-                            if len(existing_content) > 500
-                            else preview
-                        ),
+                        Markdown(preview + "\n\n..." if len(existing_content) > 500 else preview),
                         title=f"Current {target_path.name}",
                         border_style="dim",
                     )
@@ -196,19 +182,13 @@ class InitCommand(BaseSlashCommand):
                 return
 
         if use_learn:
-            ctx.console.print(
-                "[dim]Analyzing codebase + learning from conversation history...[/]"
-            )
+            ctx.console.print("[dim]Analyzing codebase + learning from conversation history...[/]")
         elif use_index:
-            ctx.console.print(
-                "[dim]Indexing codebase (multi-language symbol analysis)...[/]"
-            )
+            ctx.console.print("[dim]Indexing codebase (multi-language symbol analysis)...[/]")
         elif deep:
             ctx.console.print("[dim]Analyzing codebase with LLM (deep mode)...[/]")
         elif update and existing_content:
-            ctx.console.print(
-                "[dim]Updating codebase analysis (preserving user sections)...[/]"
-            )
+            ctx.console.print("[dim]Updating codebase analysis (preserving user sections)...[/]")
         else:
             ctx.console.print("[dim]Analyzing codebase (quick mode)...[/]")
 
@@ -226,9 +206,7 @@ class InitCommand(BaseSlashCommand):
                 load_codebase_analyzer_attr("generate_victor_md_from_index"),
             )
         except ImportError:
-            ctx.console.print(
-                "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-            )
+            ctx.console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
             return
 
         try:
@@ -318,7 +296,5 @@ class InitCommand(BaseSlashCommand):
                     ctx.console.print(f"[dim]  Created symlink: {alias}[/]")
                 except Exception:
                     # Fall back to copying
-                    alias_path.write_text(
-                        target.read_text(encoding="utf-8"), encoding="utf-8"
-                    )
+                    alias_path.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
                     ctx.console.print(f"[dim]  Created copy: {alias}[/]")

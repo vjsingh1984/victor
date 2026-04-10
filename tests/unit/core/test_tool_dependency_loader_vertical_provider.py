@@ -52,9 +52,7 @@ def test_entry_point_provider_has_priority_over_fallbacks(monkeypatch) -> None:
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
 
     def _unexpected_import(_module_name: str):
-        raise AssertionError(
-            "fallback import should not execute when entry point resolves"
-        )
+        raise AssertionError("fallback import should not execute when entry point resolves")
 
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", _unexpected_import)
 
@@ -77,9 +75,7 @@ def test_entry_point_alias_name_matches_normalized_vertical(monkeypatch) -> None
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
 
     def _unexpected_import(_module_name: str):
-        raise AssertionError(
-            "fallback import should not execute when entry point resolves"
-        )
+        raise AssertionError("fallback import should not execute when entry point resolves")
 
     monkeypatch.setattr(loader_mod, "import_module_with_fallback", _unexpected_import)
 
@@ -113,9 +109,7 @@ def test_module_factory_fallback_is_used_when_entry_points_missing(monkeypatch) 
     "vertical",
     ["coding", "devops", "research", "rag", "dataanalysis"],
 )
-def test_package_resource_yaml_fallback_for_known_verticals(
-    monkeypatch, vertical: str
-) -> None:
+def test_package_resource_yaml_fallback_for_known_verticals(monkeypatch, vertical: str) -> None:
     """Known verticals return a provider (possibly empty) when entry points unavailable.
 
     After contrib vertical removal, bundled YAML configs are only available
@@ -123,24 +117,18 @@ def test_package_resource_yaml_fallback_for_known_verticals(
     the resolver gracefully returns an EmptyToolDependencyProvider.
     """
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     provider = create_vertical_tool_dependency_provider(vertical)
 
     # Provider should always be returned (not raise), even if empty
-    assert isinstance(
-        provider, (BaseToolDependencyProvider, EmptyToolDependencyProvider)
-    )
+    assert isinstance(provider, (BaseToolDependencyProvider, EmptyToolDependencyProvider))
 
 
 def test_unknown_vertical_returns_empty_provider(monkeypatch) -> None:
     """Unknown verticals should gracefully return an EmptyToolDependencyProvider."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     provider = create_vertical_tool_dependency_provider("mlops")
     assert isinstance(provider, EmptyToolDependencyProvider)
@@ -151,9 +139,7 @@ def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(
 ) -> None:
     """Known verticals should degrade to EmptyToolDependencyProvider on lookup failure."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     def _missing_resource(_package_name: str):
         raise ModuleNotFoundError("simulated missing package")
@@ -167,21 +153,15 @@ def test_known_vertical_returns_empty_provider_when_resource_lookup_fails(
 
 
 @pytest.mark.parametrize("alias_name", ["data-analysis", "data_analysis"])
-def test_dataanalysis_aliases_resolve_to_supported_vertical(
-    monkeypatch, alias_name: str
-) -> None:
+def test_dataanalysis_aliases_resolve_to_supported_vertical(monkeypatch, alias_name: str) -> None:
     """Historical data-analysis spellings should resolve without raising."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     provider = create_vertical_tool_dependency_provider(alias_name)
 
     # Alias should resolve (not raise ValueError) even if empty
-    assert isinstance(
-        provider, (BaseToolDependencyProvider, EmptyToolDependencyProvider)
-    )
+    assert isinstance(provider, (BaseToolDependencyProvider, EmptyToolDependencyProvider))
 
 
 def test_tool_dependency_entry_point_queries_are_cached(monkeypatch) -> None:
@@ -195,9 +175,7 @@ def test_tool_dependency_entry_point_queries_are_cached(monkeypatch) -> None:
         return []
 
     monkeypatch.setattr(loader_mod, "entry_points", _fake_entry_points)
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     create_vertical_tool_dependency_provider("mlops")
     create_vertical_tool_dependency_provider("mlops")
@@ -216,9 +194,7 @@ def test_clear_tool_dependency_entry_point_cache_forces_rescan(monkeypatch) -> N
         return []
 
     monkeypatch.setattr(loader_mod, "entry_points", _fake_entry_points)
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     create_vertical_tool_dependency_provider("mlops")
     loader_mod.clear_tool_dependency_entry_point_cache()
@@ -240,9 +216,7 @@ def test_resolution_stats_track_entry_point_path(monkeypatch) -> None:
             return lambda: sentinel
 
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     provider = create_vertical_tool_dependency_provider("coding")
     stats = loader_mod.get_tool_dependency_resolution_stats()
@@ -280,9 +254,7 @@ def test_resolution_stats_track_module_factory_path(monkeypatch) -> None:
 def test_resolution_stats_track_requests_and_cache_hits(monkeypatch) -> None:
     """Telemetry should record requests and provider cache usage."""
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     create_vertical_tool_dependency_provider("mlops")
     create_vertical_tool_dependency_provider("mlops")
@@ -308,9 +280,7 @@ def test_provider_cache_reuses_resolved_provider(monkeypatch) -> None:
             return lambda: sentinel
 
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     p1 = create_vertical_tool_dependency_provider("coding")
     p2 = create_vertical_tool_dependency_provider("coding")
@@ -339,9 +309,7 @@ def test_clear_vertical_provider_cache_forces_reresolution(monkeypatch) -> None:
             return lambda: EmptyToolDependencyProvider("coding")
 
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     p1 = create_vertical_tool_dependency_provider("coding")
     stats_before_clear = loader_mod.get_tool_dependency_resolution_stats()
@@ -378,13 +346,9 @@ def test_default_and_explicit_canonicalize_share_provider_cache_key(
             return lambda: EmptyToolDependencyProvider(vertical)
 
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
-    provider_default = create_vertical_tool_dependency_provider(
-        vertical, canonicalize=None
-    )
+    provider_default = create_vertical_tool_dependency_provider(vertical, canonicalize=None)
     provider_explicit = create_vertical_tool_dependency_provider(
         vertical, canonicalize=explicit_canonicalize
     )
@@ -405,9 +369,7 @@ def test_cache_clear_stats_track_clear_operations(monkeypatch) -> None:
             return lambda: sentinel
 
     monkeypatch.setattr(loader_mod, "entry_points", lambda group: [_FakeEntryPoint()])
-    monkeypatch.setattr(
-        loader_mod, "import_module_with_fallback", lambda _: (None, None)
-    )
+    monkeypatch.setattr(loader_mod, "import_module_with_fallback", lambda _: (None, None))
 
     create_vertical_tool_dependency_provider("coding")
     cleared = loader_mod.clear_vertical_tool_dependency_provider_cache()

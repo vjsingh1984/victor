@@ -166,9 +166,7 @@ class LLMDecisionService:
 
         except Exception:
             self._metrics.total_calls += 1
-            logger.debug(
-                "LLM decision call failed, using heuristic fallback", exc_info=True
-            )
+            logger.debug("LLM decision call failed, using heuristic fallback", exc_info=True)
             return DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
@@ -417,16 +415,12 @@ class LLMDecisionService:
             return schema.model_validate(data)
         except (json.JSONDecodeError, Exception) as e:
             self._metrics.parse_failures += 1
-            logger.debug(
-                "Failed to parse LLM decision response: %s (raw: %s)", e, raw_text[:200]
-            )
+            logger.debug("Failed to parse LLM decision response: %s (raw: %s)", e, raw_text[:200])
             raise
 
     def _cache_key(self, decision_type: DecisionType, context: Dict[str, Any]) -> str:
         """Generate a cache key from decision type and context."""
-        key_data = (
-            f"{decision_type.value}:{json.dumps(context, sort_keys=True, default=str)}"
-        )
+        key_data = f"{decision_type.value}:{json.dumps(context, sort_keys=True, default=str)}"
         return hashlib.md5(key_data.encode()).hexdigest()  # noqa: S324
 
     def _get_cached(self, cache_key: str) -> Optional[DecisionResult]:
@@ -457,9 +451,7 @@ class LLMDecisionService:
         """Update running average latency."""
         self._metrics._latency_sum += latency_ms
         if self._metrics.llm_calls > 0:
-            self._metrics.avg_latency_ms = (
-                self._metrics._latency_sum / self._metrics.llm_calls
-            )
+            self._metrics.avg_latency_ms = self._metrics._latency_sum / self._metrics.llm_calls
 
 
 def _elapsed_ms(start: float) -> float:

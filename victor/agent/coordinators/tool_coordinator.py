@@ -189,12 +189,8 @@ class ToolCoordinator:
         tool_adapter: Optional["ToolCallingAdapter"] = None,
         tool_access_controller: Optional[Any] = None,
         config: Optional[ToolCoordinatorConfig] = None,
-        on_selection_complete: Optional[
-            Callable[[str, int], None]
-        ] = None,  # method, count
-        on_budget_warning: Optional[
-            Callable[[int, int], None]
-        ] = None,  # remaining, total
+        on_selection_complete: Optional[Callable[[str, int], None]] = None,  # method, count
+        on_budget_warning: Optional[Callable[[int, int], None]] = None,  # remaining, total
         on_tool_complete: Optional[Callable[[ToolExecutionResult], None]] = None,
     ) -> None:
         """Initialize the ToolCoordinator.
@@ -242,9 +238,7 @@ class ToolCoordinator:
         self._tool_call_parser = ToolCallParser()
         self._tool_call_validator = ToolCallValidator()
         self._observability = ToolObservabilityHandler(self)
-        self._retry_executor = ToolRetryExecutor(
-            self._config, self._pipeline, self._cache
-        )
+        self._retry_executor = ToolRetryExecutor(self._config, self._pipeline, self._cache)
 
         # Tool access dependencies (injected after init)
         self._mode_controller: Optional[Any] = None
@@ -343,9 +337,7 @@ class ToolCoordinator:
         effective_budget = int(self._config.default_budget * multiplier)
         self._total_budget = effective_budget
 
-        logger.debug(
-            f"Budget multiplier set to {multiplier}, effective budget: {effective_budget}"
-        )
+        logger.debug(f"Budget multiplier set to {multiplier}, effective budget: {effective_budget}")
 
     def is_budget_exhausted(self) -> bool:
         """Check if tool budget is exhausted.
@@ -527,9 +519,7 @@ class ToolCoordinator:
 
         return ToolAccessContext(
             session_enabled_tools=self._enabled_tools,
-            current_mode=(
-                self._mode_controller.config.name if self._mode_controller else None
-            ),
+            current_mode=(self._mode_controller.config.name if self._mode_controller else None),
         )
 
     # =====================================================================
@@ -570,10 +560,7 @@ class ToolCoordinator:
         # Check mode controller for BUILD mode (allows all tools including shell)
         if self._mode_controller:
             config = self._mode_controller.config
-            if (
-                config.allow_all_tools
-                and ToolNames.SHELL not in config.disallowed_tools
-            ):
+            if config.allow_all_tools and ToolNames.SHELL not in config.disallowed_tools:
                 logger.debug(
                     f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (BUILD mode allows shell tools)"
                 )
@@ -581,22 +568,16 @@ class ToolCoordinator:
 
         # Check if full shell is enabled first
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL):
-            logger.debug(
-                f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)"
-            )
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)")
             return ToolNames.SHELL
 
         # Fall back to shell_readonly if enabled
         if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(
-                f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)"
-            )
+            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)")
             return ToolNames.SHELL_READONLY
 
         # Neither enabled - return canonical name (will fail validation)
-        logger.debug(
-            f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'"
-        )
+        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
         return canonical
 
     # =====================================================================
@@ -687,9 +668,7 @@ class ToolCoordinator:
         call_count = len(tool_calls)
 
         if remaining < call_count:
-            logger.warning(
-                f"Insufficient budget: {remaining} remaining, {call_count} requested"
-            )
+            logger.warning(f"Insufficient budget: {remaining} remaining, {call_count} requested")
 
         # Build execution context
         execution_context = {}
@@ -708,9 +687,7 @@ class ToolCoordinator:
         )
 
         # Update tracking
-        successful = (
-            result.successful_calls if hasattr(result, "successful_calls") else 0
-        )
+        successful = result.successful_calls if hasattr(result, "successful_calls") else 0
         self._execution_count += successful
         self.consume_budget(successful)
 
@@ -810,9 +787,7 @@ class ToolCoordinator:
             if len(normalized_tool_calls) != len(tool_calls):
                 logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
             tool_calls = normalized_tool_calls or None
-            logger.debug(
-                f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls"
-            )
+            logger.debug(f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls")
 
         # Filter out invalid/hallucinated tool names early
         if tool_calls:
@@ -1036,9 +1011,7 @@ class ToolCoordinator:
                 canonical, tool_call.get("arguments", {})
             )
             if not schema_result.valid:
-                logger.warning(
-                    f"Schema validation: {canonical}: {schema_result.errors}"
-                )
+                logger.warning(f"Schema validation: {canonical}: {schema_result.errors}")
 
         return ToolCallValidation(
             valid=True,
@@ -1057,9 +1030,7 @@ class ToolCoordinator:
     ) -> "NormalizedArgs":
         """Normalize tool arguments through all stages (JSON parsing, normalization, dedup)."""
         _failed = (
-            failed_signatures
-            if failed_signatures is not None
-            else self._failed_tool_signatures
+            failed_signatures if failed_signatures is not None else self._failed_tool_signatures
         )
         import ast as _ast
 
@@ -1080,9 +1051,7 @@ class ToolCoordinator:
             tool_args = {}
 
         # Stage 2: ArgumentNormalizer (handles malformed JSON syntax)
-        normalized_args, strategy = argument_normalizer.normalize_arguments(
-            tool_args, tool_name
-        )
+        normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
 
         # Stage 3: ToolCallingAdapter (handles missing required params)
         normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)

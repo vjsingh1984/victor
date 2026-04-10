@@ -460,11 +460,7 @@ class WorkflowRuntime:
         from victor.workflows.definition import WorkflowNodeType
 
         # workflow.nodes is a Dict[str, WorkflowNode]
-        nodes = (
-            workflow.nodes.values()
-            if isinstance(workflow.nodes, dict)
-            else workflow.nodes
-        )
+        nodes = workflow.nodes.values() if isinstance(workflow.nodes, dict) else workflow.nodes
         for node in nodes:
             # Check node type
             if hasattr(node, "node_type"):

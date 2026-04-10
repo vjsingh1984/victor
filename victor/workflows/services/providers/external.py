@@ -192,9 +192,7 @@ class ManagedRedisProvider(ExternalServiceProvider):
             password = config.environment.get("REDIS_PASSWORD", "")
 
             if password:
-                handle.connection_info["REDIS_URL"] = (
-                    f"redis://:{password}@{handle.host}:{port}/0"
-                )
+                handle.connection_info["REDIS_URL"] = f"redis://:{password}@{handle.host}:{port}/0"
             else:
                 handle.connection_info["REDIS_URL"] = f"redis://{handle.host}:{port}/0"
             handle.connection_info["REDIS_HOST"] = handle.host

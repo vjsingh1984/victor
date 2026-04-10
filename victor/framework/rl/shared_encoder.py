@@ -225,9 +225,7 @@ class SharedEncoder:
             for row in cursor.fetchall():
                 self._task_embeddings[row[0]] = json.loads(row[1])
 
-            logger.debug(
-                f"SharedEncoder: Loaded {len(self._task_embeddings)} task embeddings"
-            )
+            logger.debug(f"SharedEncoder: Loaded {len(self._task_embeddings)} task embeddings")
         except Exception as e:
             logger.debug(f"SharedEncoder: Could not load embeddings: {e}")
 
@@ -306,10 +304,7 @@ class SharedEncoder:
                     score = 1.0
                     break
                 # Partial match
-                if (
-                    any(c in task_lower for c in keyword[:3])
-                    or task_lower[:3] in keyword
-                ):
+                if any(c in task_lower for c in keyword[:3]) or task_lower[:3] in keyword:
                     score = max(score, 0.5)
 
             category_scores.append(score)
@@ -340,10 +335,7 @@ class SharedEncoder:
 
         # Unknown provider - use hash-based embedding
         hash_val = int(hashlib.md5(provider.encode()).hexdigest()[:8], 16)
-        return [
-            0.5 + 0.3 * ((hash_val >> (i * 8)) % 256) / 255.0
-            for i in range(self.PROVIDER_DIM)
-        ]
+        return [0.5 + 0.3 * ((hash_val >> (i * 8)) % 256) / 255.0 for i in range(self.PROVIDER_DIM)]
 
     def _encode_model(self, model: str, provider: str) -> List[float]:
         """Encode model into embedding.
@@ -433,10 +425,7 @@ class SharedEncoder:
         similarities = []
 
         for cached in self._cache.values():
-            if (
-                cached.task_type == embedding.task_type
-                and cached.provider == embedding.provider
-            ):
+            if cached.task_type == embedding.task_type and cached.provider == embedding.provider:
                 continue  # Skip exact match
 
             sim = embedding.similarity(cached)
@@ -464,9 +453,7 @@ class SharedEncoder:
             self._task_embeddings[task_type] = self._encode_task_type(task_type)
 
         current = self._task_embeddings[task_type]
-        updated = [
-            c + learning_rate * g for c, g in zip(current, gradient[: self.TASK_DIM])
-        ]
+        updated = [c + learning_rate * g for c, g in zip(current, gradient[: self.TASK_DIM])]
 
         # Normalize
         norm = math.sqrt(sum(x * x for x in updated))

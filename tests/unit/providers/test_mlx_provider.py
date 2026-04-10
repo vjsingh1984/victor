@@ -46,9 +46,7 @@ def _mlx_runtime_available() -> bool:
     return probe.returncode == 0
 
 
-pytestmark = pytest.mark.skipif(
-    not _mlx_runtime_available(), reason="mlx-lm runtime unavailable"
-)
+pytestmark = pytest.mark.skipif(not _mlx_runtime_available(), reason="mlx-lm runtime unavailable")
 
 
 class TestMLXProvider:
@@ -113,9 +111,7 @@ class TestMLXProviderIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    @pytest.mark.skip(
-        reason="MLX integration tests require model download and are slow"
-    )
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_check_connection(self, provider):
         """Test connection check."""
         # This will try to load the model
@@ -124,9 +120,7 @@ class TestMLXProviderIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    @pytest.mark.skip(
-        reason="MLX integration tests require model download and are slow"
-    )
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_simple_completion(self, provider):
         """Test simple text completion."""
         messages = [Message(role="user", content="Say 'Hello, MLX!'")]
@@ -143,9 +137,7 @@ class TestMLXProviderIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    @pytest.mark.skip(
-        reason="MLX integration tests require model download and are slow"
-    )
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_multi_turn_conversation(self, provider):
         """Test multi-turn conversation."""
         messages = [
@@ -168,9 +160,7 @@ class TestMLXProviderIntegration:
 
     @pytest.mark.asyncio
     @pytest.mark.slow
-    @pytest.mark.skip(
-        reason="MLX integration tests require model download and are slow"
-    )
+    @pytest.mark.skip(reason="MLX integration tests require model download and are slow")
     async def test_streaming(self, provider):
         """Test streaming response."""
         messages = [Message(role="user", content="Count from 1 to 5")]
@@ -199,9 +189,7 @@ class TestMLXProviderErrorHandling:
 
         monkeypatch.setattr(mlx_module, "_MLX_IMPORT_ATTEMPTED", True)
         monkeypatch.setattr(mlx_module, "_MLX_AVAILABLE", False)
-        monkeypatch.setattr(
-            mlx_module, "_MLX_IMPORT_ERROR", RuntimeError("forced test failure")
-        )
+        monkeypatch.setattr(mlx_module, "_MLX_IMPORT_ERROR", RuntimeError("forced test failure"))
 
         with pytest.raises(ImportError, match="mlx-lm is not available"):
             MLXProvider(model="test-model")

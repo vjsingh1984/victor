@@ -79,9 +79,7 @@ def explore_mode_controller():
     mock.config.disallowed_tools = {"shell", "write_file", "edit_files"}
     mock.is_tool_allowed.side_effect = lambda t: t in {"read_file", "list_directory"}
     mock.get_tool_priority.return_value = 1.5
-    mock.get_system_prompt_addition.return_value = (
-        "EXPLORE mode: Read-only exploration."
-    )
+    mock.get_system_prompt_addition.return_value = "EXPLORE mode: Read-only exploration."
     return mock
 
 

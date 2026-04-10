@@ -82,15 +82,11 @@ def _build_sdist(package_dir: Path, output_dir: Path) -> Path:
     return artifact_path
 
 
-def _assert_archive_contains_suffixes(
-    names: set[str], required_suffixes: set[str]
-) -> None:
+def _assert_archive_contains_suffixes(names: set[str], required_suffixes: set[str]) -> None:
     """Assert an archive contains paths ending in the required suffixes."""
 
     missing = sorted(
-        suffix
-        for suffix in required_suffixes
-        if not any(name.endswith(suffix) for name in names)
+        suffix for suffix in required_suffixes if not any(name.endswith(suffix) for name in names)
     )
     assert not missing, f"Missing required archive paths: {missing}"
 
@@ -123,14 +119,10 @@ def test_victor_sdk_wheel_and_sdist_include_contract_files(tmp_path: Path) -> No
     }
 
     with zipfile.ZipFile(wheel_path) as archive:
-        _assert_archive_contains_suffixes(
-            set(archive.namelist()), wheel_required_suffixes
-        )
+        _assert_archive_contains_suffixes(set(archive.namelist()), wheel_required_suffixes)
 
     with tarfile.open(sdist_path, "r:gz") as archive:
-        _assert_archive_contains_suffixes(
-            set(archive.getnames()), sdist_required_suffixes
-        )
+        _assert_archive_contains_suffixes(set(archive.getnames()), sdist_required_suffixes)
 
 
 @pytest.mark.integration
@@ -153,9 +145,7 @@ def test_external_vertical_wheel_and_sdist_include_entry_point_and_sources(
                 "METADATA",
             },
         )
-        entry_points_name = next(
-            name for name in names if name.endswith("entry_points.txt")
-        )
+        entry_points_name = next(name for name in names if name.endswith("entry_points.txt"))
         entry_points = archive.read(entry_points_name).decode("utf-8")
         assert "[victor.plugins]" in entry_points
         assert "security = victor_security:plugin" in entry_points

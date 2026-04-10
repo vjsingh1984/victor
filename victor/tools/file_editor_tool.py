@@ -386,7 +386,7 @@ async def edit(
                     f"  {pointer} {exc.msg if hasattr(exc, 'msg') else str(exc)}\n\n"
                     f"Please call edit() again with corrected JSON. Common fixes:\n"
                     f"- Escape newlines in strings: use \\n not actual newlines\n"
-                    f"- Escape quotes in strings: use \\\" not bare quotes\n"
+                    f'- Escape quotes in strings: use \\" not bare quotes\n'
                     f"- Ensure commas between array elements and object properties\n"
                     f"- Ensure old_str matches the file content EXACTLY\n\n"
                     f"Correct format:\n"
@@ -578,9 +578,7 @@ async def edit(
                 occurrences = original_content.count(old_str)
                 if occurrences == 0:
                     # Build helpful error message
-                    old_str_preview = (
-                        old_str[:80] + "..." if len(old_str) > 80 else old_str
-                    )
+                    old_str_preview = old_str[:80] + "..." if len(old_str) > 80 else old_str
                     old_str_first_line = old_str.split("\n")[0][:60]
 
                     # Try to find similar content to help debug
@@ -601,9 +599,8 @@ async def edit(
                                     f"{start + j + 1}: {file_lines[start + j]}"
                                     for j in range(end - start)
                                 ]
-                                context_str = (
-                                    "\n\nActual file content around match:\n"
-                                    + "\n".join(numbered)
+                                context_str = "\n\nActual file content around match:\n" + "\n".join(
+                                    numbered
                                 )
                                 break
                     elif old_str.rstrip() in original_content:

@@ -276,9 +276,7 @@ class OpenRouterProvider(BaseProvider):
                 messages, model, temperature, max_tokens, tools, True, **kwargs
             )
 
-            async with self.client.stream(
-                "POST", "/chat/completions", json=payload
-            ) as response:
+            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
                 accumulated_tool_calls: List[Dict[str, Any]] = []
 
@@ -290,11 +288,7 @@ class OpenRouterProvider(BaseProvider):
                     if data_str.strip() == "[DONE]":
                         yield StreamChunk(
                             content="",
-                            tool_calls=(
-                                accumulated_tool_calls
-                                if accumulated_tool_calls
-                                else None
-                            ),
+                            tool_calls=(accumulated_tool_calls if accumulated_tool_calls else None),
                             stop_reason="stop",
                             is_final=True,
                         )
@@ -302,9 +296,7 @@ class OpenRouterProvider(BaseProvider):
 
                     try:
                         chunk_data = json.loads(data_str)
-                        yield self._parse_stream_chunk(
-                            chunk_data, accumulated_tool_calls
-                        )
+                        yield self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                     except json.JSONDecodeError:
                         pass
 
@@ -478,13 +470,10 @@ class OpenRouterProvider(BaseProvider):
                 return result.get("data", [])
         except Exception as e:
             # Use provider logger for debug output
-            self._provider_logger.logger.debug(
-                f"Failed to fetch models from OpenRouter: {e}"
-            )
+            self._provider_logger.logger.debug(f"Failed to fetch models from OpenRouter: {e}")
 
         return [
-            {"id": model_id, **model_info}
-            for model_id, model_info in OPENROUTER_MODELS.items()
+            {"id": model_id, **model_info} for model_id, model_info in OPENROUTER_MODELS.items()
         ]
 
     async def close(self) -> None:

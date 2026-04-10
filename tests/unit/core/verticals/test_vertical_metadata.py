@@ -63,25 +63,14 @@ class TestVerticalMetadata:
 
     def test_extract_name_from_classname_assistant_suffix(self):
         """Test name extraction from class names with 'Assistant' suffix."""
-        assert (
-            VerticalMetadata._extract_name_from_classname("CodingAssistant") == "coding"
-        )
-        assert (
-            VerticalMetadata._extract_name_from_classname("DevOpsAssistant") == "devops"
-        )
-        assert (
-            VerticalMetadata._extract_name_from_classname("ResearchAssistant")
-            == "research"
-        )
+        assert VerticalMetadata._extract_name_from_classname("CodingAssistant") == "coding"
+        assert VerticalMetadata._extract_name_from_classname("DevOpsAssistant") == "devops"
+        assert VerticalMetadata._extract_name_from_classname("ResearchAssistant") == "research"
 
     def test_extract_name_from_classname_vertical_suffix(self):
         """Test name extraction from class names with 'Vertical' suffix."""
-        assert (
-            VerticalMetadata._extract_name_from_classname("CodingVertical") == "coding"
-        )
-        assert (
-            VerticalMetadata._extract_name_from_classname("DevOpsVertical") == "devops"
-        )
+        assert VerticalMetadata._extract_name_from_classname("CodingVertical") == "coding"
+        assert VerticalMetadata._extract_name_from_classname("DevOpsVertical") == "devops"
         assert VerticalMetadata._extract_name_from_classname("RAGVertical") == "rag"
 
     def test_extract_name_from_classname_no_suffix_emits_warning(self):
@@ -96,9 +85,7 @@ class TestVerticalMetadata:
         assert VerticalMetadata._normalize_name("DevOps") == "devops"
         assert VerticalMetadata._normalize_name("AI_ML") == "ai_ml"
         assert VerticalMetadata._normalize_name("data-analysis") == "data_analysis"
-        assert (
-            VerticalMetadata._normalize_name("machine learning") == "machine_learning"
-        )
+        assert VerticalMetadata._normalize_name("machine learning") == "machine_learning"
 
     def test_make_display_name(self):
         """Test display name generation."""

@@ -129,16 +129,10 @@ class TestHybridToolSelector:
         """Create sample tool definitions."""
         return [
             ToolDefinition(name="read_file", description="Read a file", parameters={}),
-            ToolDefinition(
-                name="write_file", description="Write a file", parameters={}
-            ),
-            ToolDefinition(
-                name="code_search", description="Search code", parameters={}
-            ),
+            ToolDefinition(name="write_file", description="Write a file", parameters={}),
+            ToolDefinition(name="code_search", description="Search code", parameters={}),
             ToolDefinition(name="git_status", description="Git status", parameters={}),
-            ToolDefinition(
-                name="shell", description="Run shell command", parameters={}
-            ),
+            ToolDefinition(name="shell", description="Run shell command", parameters={}),
         ]
 
     @pytest.fixture
@@ -162,9 +156,7 @@ class TestHybridToolSelector:
         assert selector.config.semantic_weight == 0.7
         assert selector.config.enable_rl is True
 
-    def test_init_with_custom_config(
-        self, mock_semantic_selector, mock_keyword_selector
-    ):
+    def test_init_with_custom_config(self, mock_semantic_selector, mock_keyword_selector):
         """Test initialization with custom config."""
         config = HybridSelectorConfig(
             semantic_weight=0.6,
@@ -310,18 +302,14 @@ class TestHybridToolSelector:
         mock_semantic_selector.close.assert_called_once()
         mock_keyword_selector.close.assert_called_once()
 
-    def test_ensure_minimum_tools_adds_semantic(
-        self, hybrid_selector, tool_definitions
-    ):
+    def test_ensure_minimum_tools_adds_semantic(self, hybrid_selector, tool_definitions):
         """Test _ensure_minimum_tools adds semantic tools when below minimum."""
         # Only keyword tools in blended (no semantic)
         blended = tool_definitions[3:5]  # git_status, shell
         semantic_tools = tool_definitions[:3]  # read_file, write_file, code_search
         keyword_tools = tool_definitions[3:5]  # git_status, shell
 
-        result = hybrid_selector._ensure_minimum_tools(
-            blended, semantic_tools, keyword_tools
-        )
+        result = hybrid_selector._ensure_minimum_tools(blended, semantic_tools, keyword_tools)
 
         # Should have added semantic tools to meet minimum of 3
         result_names = [t.name for t in result]
@@ -330,9 +318,7 @@ class TestHybridToolSelector:
         assert "shell" in result_names
         # Some semantic tools should be added
         semantic_added = sum(
-            1
-            for name in result_names
-            if name in ["read_file", "write_file", "code_search"]
+            1 for name in result_names if name in ["read_file", "write_file", "code_search"]
         )
         assert semantic_added >= 1  # At least 1 semantic added
 
@@ -388,21 +374,13 @@ class TestHybridToolSelectorRLIntegration:
         """Create sample tool definitions."""
         return [
             ToolDefinition(name="read_file", description="Read a file", parameters={}),
-            ToolDefinition(
-                name="write_file", description="Write a file", parameters={}
-            ),
-            ToolDefinition(
-                name="code_search", description="Search code", parameters={}
-            ),
+            ToolDefinition(name="write_file", description="Write a file", parameters={}),
+            ToolDefinition(name="code_search", description="Search code", parameters={}),
             ToolDefinition(name="git_status", description="Git status", parameters={}),
-            ToolDefinition(
-                name="shell", description="Run shell command", parameters={}
-            ),
+            ToolDefinition(name="shell", description="Run shell command", parameters={}),
         ]
 
-    def test_rl_disabled_skips_learner(
-        self, mock_semantic_selector, mock_keyword_selector
-    ):
+    def test_rl_disabled_skips_learner(self, mock_semantic_selector, mock_keyword_selector):
         """Test that RL disabled skips learner initialization."""
         config = HybridSelectorConfig(enable_rl=False)
         selector = HybridToolSelector(
@@ -462,9 +440,7 @@ class TestHybridToolSelectorRLIntegration:
         # Only called once due to caching
         assert mock_coordinator.get_learner.call_count == 1
 
-    def test_apply_rl_boost_empty_tools(
-        self, mock_semantic_selector, mock_keyword_selector
-    ):
+    def test_apply_rl_boost_empty_tools(self, mock_semantic_selector, mock_keyword_selector):
         """Test _apply_rl_boost with empty tools list."""
         config = HybridSelectorConfig(enable_rl=False)
         selector = HybridToolSelector(

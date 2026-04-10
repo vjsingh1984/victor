@@ -140,12 +140,10 @@ class TaskResult:
         modified = []
         for call in self.tool_calls:
             tool = call.get("tool", call.get("tool_name", ""))
-            if tool in ("write", "edit", "file_edit", "write_file") and call.get(
-                "success", True
-            ):
-                path = call.get("arguments", {}).get("path") or call.get(
-                    "arguments", {}
-                ).get("file_path")
+            if tool in ("write", "edit", "file_edit", "write_file") and call.get("success", True):
+                path = call.get("arguments", {}).get("path") or call.get("arguments", {}).get(
+                    "file_path"
+                )
                 if path and path not in modified:
                     modified.append(path)
         return modified
@@ -160,12 +158,10 @@ class TaskResult:
         read = []
         for call in self.tool_calls:
             tool = call.get("tool", call.get("tool_name", ""))
-            if tool in ("read", "read_file", "ls", "list_directory") and call.get(
-                "success", True
-            ):
-                path = call.get("arguments", {}).get("path") or call.get(
-                    "arguments", {}
-                ).get("file_path")
+            if tool in ("read", "read_file", "ls", "list_directory") and call.get("success", True):
+                path = call.get("arguments", {}).get("path") or call.get("arguments", {}).get(
+                    "file_path"
+                )
                 if path and path not in read:
                     read.append(path)
         return read

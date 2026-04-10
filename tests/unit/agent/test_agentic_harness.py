@@ -141,9 +141,7 @@ class TestAgenticExecutionTrace:
             EvalToolCall(name="file_read", arguments={"path": "a.py"}),
             EvalToolCall(name="file_write", arguments={"path": "b.py"}),
         ]
-        trace = AgenticExecutionTrace(
-            task_id="test-001", start_time=0.0, tool_calls=calls
-        )
+        trace = AgenticExecutionTrace(task_id="test-001", start_time=0.0, tool_calls=calls)
         assert len(trace.tool_calls) == 2
         assert trace.total_tool_calls == 2
 
@@ -153,9 +151,7 @@ class TestAgenticExecutionTrace:
             FileEdit(path="a.py", action="modify"),
             FileEdit(path="b.py", action="create"),
         ]
-        trace = AgenticExecutionTrace(
-            task_id="test-001", start_time=0.0, file_edits=edits
-        )
+        trace = AgenticExecutionTrace(task_id="test-001", start_time=0.0, file_edits=edits)
         assert len(trace.file_edits) == 2
         assert trace.files_modified == ["a.py", "b.py"]
 
@@ -177,9 +173,7 @@ class TestAgenticExecutionTrace:
             ),
         ]
         edits = [
-            FileEdit(
-                path="a.py", action="modify", before_content="old", after_content="new"
-            ),
+            FileEdit(path="a.py", action="modify", before_content="old", after_content="new"),
         ]
         trace = AgenticExecutionTrace(
             task_id="test-001",
@@ -343,9 +337,7 @@ class TestPatchApplicationValidator:
         """Test validation with empty patch and no file edits."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
-            trace = AgenticExecutionTrace(
-                task_id="test-001", start_time=0.0, generated_patch=""
-            )
+            trace = AgenticExecutionTrace(task_id="test-001", start_time=0.0, generated_patch="")
             task = BenchmarkTask(
                 task_id="test-001",
                 benchmark=BenchmarkType.SWE_BENCH,
@@ -377,11 +369,7 @@ class TestFileEditValidator:
             trace = AgenticExecutionTrace(
                 task_id="test-001",
                 start_time=0.0,
-                file_edits=[
-                    FileEdit(
-                        path="test.py", action="modify", after_content="new content"
-                    )
-                ],
+                file_edits=[FileEdit(path="test.py", action="modify", after_content="new content")],
             )
             task = BenchmarkTask(
                 task_id="test-001",
@@ -400,9 +388,7 @@ class TestFileEditValidator:
         """Test validation with no file edits."""
         with tempfile.TemporaryDirectory() as tmpdir:
             workspace = Path(tmpdir)
-            trace = AgenticExecutionTrace(
-                task_id="test-001", start_time=0.0, file_edits=[]
-            )
+            trace = AgenticExecutionTrace(task_id="test-001", start_time=0.0, file_edits=[])
             task = BenchmarkTask(
                 task_id="test-001",
                 benchmark=BenchmarkType.SWE_BENCH,
@@ -442,12 +428,8 @@ class TestToolUsageValidator:
                 task_id="test-001",
                 start_time=0.0,
                 tool_calls=[
-                    EvalToolCall(
-                        name="file_write", arguments={"path": "test.py"}, success=True
-                    ),
-                    EvalToolCall(
-                        name="edit_file", arguments={"path": "test.py"}, success=True
-                    ),
+                    EvalToolCall(name="file_write", arguments={"path": "test.py"}, success=True),
+                    EvalToolCall(name="edit_file", arguments={"path": "test.py"}, success=True),
                 ],
             )
             task = BenchmarkTask(
@@ -498,12 +480,8 @@ class TestToolUsageValidator:
                 task_id="test-001",
                 start_time=0.0,
                 tool_calls=[
-                    EvalToolCall(
-                        name="code_search", arguments={"query": "func"}, success=True
-                    ),
-                    EvalToolCall(
-                        name="grep", arguments={"pattern": "def"}, success=True
-                    ),
+                    EvalToolCall(name="code_search", arguments={"query": "func"}, success=True),
+                    EvalToolCall(name="grep", arguments={"pattern": "def"}, success=True),
                 ],
             )
             task = BenchmarkTask(
@@ -582,9 +560,7 @@ class TestTestPassingValidator:
                 mock_runner.language = MagicMock()
                 mock_registry.detect_runner.return_value = mock_runner
 
-                success, message, score = await validator.validate(
-                    task, trace, workspace
-                )
+                success, message, score = await validator.validate(task, trace, workspace)
                 assert success is True
                 assert score == 1.0
 

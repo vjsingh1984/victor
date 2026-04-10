@@ -212,9 +212,7 @@ class KeywordClassifier:
         return any(kw.lower() in text_lower for kw in self.keyword_map[category])
 
 
-def create_combined_classifier(
-    *keyword_dicts: Dict[str, List[str]]
-) -> KeywordClassifier:
+def create_combined_classifier(*keyword_dicts: Dict[str, List[str]]) -> KeywordClassifier:
     """Create a classifier combining multiple keyword dictionaries.
 
     Args:

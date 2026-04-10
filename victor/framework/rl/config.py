@@ -99,9 +99,7 @@ class BaseRLConfig:
     quality_thresholds: Dict[str, float] = field(default_factory=dict)
 
     # Continuation patience by provider - shared defaults
-    default_patience: Dict[str, int] = field(
-        default_factory=lambda: dict(DEFAULT_PATIENCE_MAP)
-    )
+    default_patience: Dict[str, int] = field(default_factory=lambda: dict(DEFAULT_PATIENCE_MAP))
 
     # Exploration bonus for tool selection (can be overridden)
     exploration_bonus: float = 0.15

@@ -117,9 +117,7 @@ class HealthReport:
             "timestamp": self.timestamp.isoformat(),
             "version": self.version,
             "uptime_seconds": self.uptime_seconds,
-            "components": {
-                name: comp.to_dict() for name, comp in self.components.items()
-            },
+            "components": {name: comp.to_dict() for name, comp in self.components.items()},
         }
 
     @property
@@ -136,9 +134,7 @@ class HealthReport:
     def unhealthy_components(self) -> List[str]:
         """Get list of unhealthy component names."""
         return [
-            name
-            for name, comp in self.components.items()
-            if comp.status == HealthStatus.UNHEALTHY
+            name for name, comp in self.components.items() if comp.status == HealthStatus.UNHEALTHY
         ]
 
 
@@ -333,9 +329,7 @@ class ProviderHealthCheck(BaseHealthCheck):
 
         # Fallback: check if provider has required attributes
         has_name = hasattr(self._provider, "name")
-        has_chat = hasattr(self._provider, "chat") or hasattr(
-            self._provider, "stream_chat"
-        )
+        has_chat = hasattr(self._provider, "chat") or hasattr(self._provider, "stream_chat")
 
         details["has_name"] = has_name
         details["has_chat"] = has_chat

@@ -290,9 +290,7 @@ class TestBaseSessionHandler:
             await handler.initialize(mock_config)
 
         # Verify overrides were applied
-        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(
-            100, user_override=True
-        )
+        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(100, user_override=True)
         mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
             50, user_override=True
         )
@@ -350,9 +348,7 @@ class TestOneshotSessionHandler:
         mock_shim.create_orchestrator = AsyncMock(return_value=mock_agent)
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
-            with patch.object(
-                handler, "process_message", side_effect=Exception("Process error")
-            ):
+            with patch.object(handler, "process_message", side_effect=Exception("Process error")):
                 with patch.object(handler, "cleanup") as mock_cleanup:
                     with pytest.raises(Exception):
                         await handler.execute(mock_config, "Test message")
@@ -524,9 +520,7 @@ class TestSessionHandlerErrorHandling:
         mock_shim.emit_session_start = MagicMock()
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
-            with patch(
-                "victor.agent.mode_controller.get_mode_controller"
-            ) as mock_get_controller:
+            with patch("victor.agent.mode_controller.get_mode_controller") as mock_get_controller:
                 mock_controller = MagicMock()
                 mock_controller.switch_mode.side_effect = Exception("Invalid mode")
                 mock_get_controller.return_value = mock_controller

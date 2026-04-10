@@ -188,9 +188,7 @@ class ToolTierRegistry:
 
         # Register pre-configured vertical tiers from TieredToolTemplate
         for vertical_name, vertical_core in TieredToolTemplate.VERTICAL_CORES.items():
-            readonly = TieredToolTemplate.VERTICAL_READONLY_DEFAULTS.get(
-                vertical_name, True
-            )
+            readonly = TieredToolTemplate.VERTICAL_READONLY_DEFAULTS.get(vertical_name, True)
             self.register(
                 name=vertical_name,
                 config=TieredToolConfig(
@@ -500,9 +498,7 @@ class ToolTierRegistry:
 
             # Check for empty mandatory tools
             if not entry.config.mandatory:
-                errors.append(
-                    "Empty mandatory tool set (should include at least 'read')"
-                )
+                errors.append("Empty mandatory tool set (should include at least 'read')")
 
             return errors
 

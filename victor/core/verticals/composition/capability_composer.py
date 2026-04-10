@@ -236,9 +236,7 @@ class CapabilityComposer(BaseComposer):
 
         # Get tools and system prompt from composer (if set)
         tools = getattr(self, "_tools", [])
-        system_prompt = getattr(
-            self, "_system_prompt", f"You are {metadata.description}"
-        )
+        system_prompt = getattr(self, "_system_prompt", f"You are {metadata.description}")
 
         # Create vertical class dynamically
         class ComposedVertical(VerticalBase):

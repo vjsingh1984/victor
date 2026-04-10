@@ -610,9 +610,7 @@ class SecurityScanner:
         # Check for vulnerabilities
         for dep in result.dependencies:
             try:
-                cves = await self._cve_db.search_by_package(
-                    dep.name, dep.ecosystem, dep.version
-                )
+                cves = await self._cve_db.search_by_package(dep.name, dep.ecosystem, dep.version)
                 for cve in cves:
                     vuln = Vulnerability(
                         cve=cve,
@@ -661,9 +659,7 @@ class SecurityScanner:
         # Check vulnerabilities
         for dep in result.dependencies:
             try:
-                cves = await self._cve_db.search_by_package(
-                    dep.name, dep.ecosystem, dep.version
-                )
+                cves = await self._cve_db.search_by_package(dep.name, dep.ecosystem, dep.version)
                 for cve in cves:
                     vuln = Vulnerability(
                         cve=cve,

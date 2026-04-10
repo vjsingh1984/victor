@@ -460,9 +460,7 @@ class RLCoordinator:
         rec = coordinator.get_recommendation("continuation_patience", ...)
     """
 
-    def __init__(
-        self, storage_path: Optional[Path] = None, db_path: Optional[Path] = None
-    ):
+    def __init__(self, storage_path: Optional[Path] = None, db_path: Optional[Path] = None):
         """Initialize RL coordinator.
 
         Args:
@@ -518,9 +516,7 @@ class RLCoordinator:
         # Connect to RL hooks and metrics for event-driven updates
         self._connect_hooks_and_metrics()
 
-        logger.info(
-            f"RL: Coordinator initialized with unified database at {self.db_path}"
-        )
+        logger.info(f"RL: Coordinator initialized with unified database at {self.db_path}")
 
     def _ensure_core_tables(self) -> None:
         """Create core tables for telemetry and cross-learner analysis."""
@@ -694,25 +690,19 @@ class RLCoordinator:
                     SemanticThresholdLearner,
                 )
 
-                return SemanticThresholdLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return SemanticThresholdLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "model_selector":
                 from victor.framework.rl.learners.model_selector import (
                     ModelSelectorLearner,
                 )
 
-                return ModelSelectorLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return ModelSelectorLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "cache_eviction":
                 from victor.framework.rl.learners.cache_eviction import (
                     CacheEvictionLearner,
                 )
 
-                return CacheEvictionLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "grounding_threshold":
                 from victor.framework.rl.learners.grounding_threshold import (
                     GroundingThresholdLearner,
@@ -726,33 +716,25 @@ class RLCoordinator:
                     QualityWeightLearner,
                 )
 
-                return QualityWeightLearner(
-                    name=name, db_connection=self.db, learning_rate=0.05
-                )
+                return QualityWeightLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "tool_selector":
                 from victor.framework.rl.learners.tool_selector import (
                     ToolSelectorLearner,
                 )
 
-                return ToolSelectorLearner(
-                    name=name, db_connection=self.db, learning_rate=0.05
-                )
+                return ToolSelectorLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "mode_transition":
                 from victor.framework.rl.learners.mode_transition import (
                     ModeTransitionLearner,
                 )
 
-                return ModeTransitionLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return ModeTransitionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "prompt_template":
                 from victor.framework.rl.learners.prompt_template import (
                     PromptTemplateLearner,
                 )
 
-                return PromptTemplateLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "team_composition":
                 from victor.agent.teams.learner import TeamCompositionLearner
 
@@ -763,25 +745,19 @@ class RLCoordinator:
                     CrossVerticalLearner,
                 )
 
-                return CrossVerticalLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return CrossVerticalLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "workflow_execution":
                 from victor.framework.rl.learners.workflow_execution import (
                     WorkflowExecutionLearner,
                 )
 
-                return WorkflowExecutionLearner(
-                    name=name, db_connection=self.db, learning_rate=0.1
-                )
+                return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "context_pruning":
                 from victor.framework.rl.learners.context_pruning import (
                     ContextPruningLearner,
                 )
 
-                return ContextPruningLearner(
-                    name=name, db_connection=self.db, learning_rate=0.15
-                )
+                return ContextPruningLearner(name=name, db_connection=self.db, learning_rate=0.15)
             elif name == "prompt_optimizer":
                 # Check settings: skip when prompt optimization is off
                 try:
@@ -790,9 +766,7 @@ class RLCoordinator:
                     settings = get_settings()
                     po_cfg = getattr(settings, "prompt_optimization", None)
                     if po_cfg is not None and not po_cfg.enabled:
-                        logger.debug(
-                            "Prompt optimization disabled — skipping prompt_optimizer"
-                        )
+                        logger.debug("Prompt optimization disabled — skipping prompt_optimizer")
                         return None
                 except Exception:
                     pass  # Settings unavailable — allow creation
@@ -810,9 +784,7 @@ class RLCoordinator:
 
                     settings = get_settings()
                     po_cfg = getattr(settings, "prompt_optimization", None)
-                    gepa_cfg = (
-                        po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
-                    )
+                    gepa_cfg = po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
                     if gepa_cfg and gepa_cfg.enabled:
                         from victor.framework.rl.gepa_strategy_adapter import (
                             GEPAServiceStrategy,
@@ -824,9 +796,7 @@ class RLCoordinator:
                         tier_mgr = GEPATierManager(gepa_cfg)
                         strategy = GEPAServiceStrategy(tier_mgr)
                         use_pareto = True
-                        max_prompt_chars = getattr(
-                            gepa_cfg, "max_prompt_chars", 1500
-                        )
+                        max_prompt_chars = getattr(gepa_cfg, "max_prompt_chars", 1500)
                         logger.info(
                             "GEPA v2 enabled: tier=%s, pareto=True",
                             tier_mgr.get_current_tier(),
@@ -1030,18 +1000,14 @@ class RLCoordinator:
                        False=force immediate)
         """
         # Determine whether to use writer queue
-        should_queue = (
-            use_queue if use_queue is not None else self._writer_queue_enabled
-        )
+        should_queue = use_queue if use_queue is not None else self._writer_queue_enabled
 
         if should_queue and self._writer_queue:
             # Queue for batched writing (non-blocking)
             await self._writer_queue.queue_async(learner_name, outcome, vertical)
         else:
             # Direct write (offloaded to thread pool)
-            await asyncio.to_thread(
-                self.record_outcome, learner_name, outcome, vertical
-            )
+            await asyncio.to_thread(self.record_outcome, learner_name, outcome, vertical)
 
     async def get_recommendation_async(
         self,
@@ -1080,9 +1046,7 @@ class RLCoordinator:
         Returns:
             Dictionary mapping learner name to recommendation
         """
-        return await asyncio.to_thread(
-            self.get_all_recommendations, provider, model, task_type
-        )
+        return await asyncio.to_thread(self.get_all_recommendations, provider, model, task_type)
 
     async def export_metrics_async(self) -> Dict[str, Any]:
         """Async version of export_metrics.

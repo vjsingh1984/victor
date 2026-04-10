@@ -314,9 +314,7 @@ class PythonAstIndexer(InstrumentedAccelerator):
             identifiers = set(_IDENTIFIER_PATTERN.findall(source))
             return list(identifiers)
 
-    def extract_identifiers_with_positions(
-        self, source: str
-    ) -> List[Tuple[str, int, int]]:
+    def extract_identifiers_with_positions(self, source: str) -> List[Tuple[str, int, int]]:
         """Extract identifiers with their positions.
 
         Args:

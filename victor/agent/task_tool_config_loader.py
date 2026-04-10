@@ -180,9 +180,7 @@ class TaskToolConfigLoader:
                     self._config = yaml.safe_load(f)
                     logger.debug(f"Loaded task tool config from {self._config_path}")
             else:
-                logger.warning(
-                    f"Task tool config not found at {self._config_path}, using defaults"
-                )
+                logger.warning(f"Task tool config not found at {self._config_path}, using defaults")
                 self._config = self.DEFAULT_CONFIG
         except Exception as e:
             logger.error(f"Failed to load task tool config: {e}")

@@ -73,9 +73,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
 
             registry = CapabilityRegistry.get_instance()
             provider = registry.get(TreeSitterExtractorProtocol)
-            if provider is not None and registry.is_enhanced(
-                TreeSitterExtractorProtocol
-            ):
+            if provider is not None and registry.is_enhanced(TreeSitterExtractorProtocol):
                 self._extractor = provider
             else:
                 logger.warning(
@@ -138,9 +136,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
                 import tempfile
 
                 suffix = file_path.suffix or self._get_extension_for_language(language)
-                with tempfile.NamedTemporaryFile(
-                    mode="w", suffix=suffix, delete=False
-                ) as f:
+                with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
                     f.write(content)
                     temp_path = Path(f.name)
 
@@ -262,9 +258,7 @@ class TreeSitterEntityExtractor(EntityExtractor):
         suffix = self._get_extension_for_language(language)
 
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=suffix, delete=False
-            ) as f:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=suffix, delete=False) as f:
                 f.write(content)
                 temp_path = Path(f.name)
 

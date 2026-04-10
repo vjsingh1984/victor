@@ -601,23 +601,15 @@ class TestRequestQueue:
             # Submit all requests quickly to queue them before processing
             # The priority queue will order them: CRITICAL (0) < NORMAL (2) < LOW (3)
             tasks = [
-                single_worker_manager.submit(
-                    record("low"), priority=RequestPriority.LOW
-                ),
-                single_worker_manager.submit(
-                    record("critical"), priority=RequestPriority.CRITICAL
-                ),
-                single_worker_manager.submit(
-                    record("normal"), priority=RequestPriority.NORMAL
-                ),
+                single_worker_manager.submit(record("low"), priority=RequestPriority.LOW),
+                single_worker_manager.submit(record("critical"), priority=RequestPriority.CRITICAL),
+                single_worker_manager.submit(record("normal"), priority=RequestPriority.NORMAL),
             ]
 
             await asyncio.gather(*tasks)
 
             # Critical should be processed first (priority 0), then normal (2), then low (3)
-            assert (
-                order[0] == "critical"
-            ), f"Expected 'critical' first, got order: {order}"
+            assert order[0] == "critical", f"Expected 'critical' first, got order: {order}"
             assert order[1] == "normal", f"Expected 'normal' second, got order: {order}"
             assert order[2] == "low", f"Expected 'low' third, got order: {order}"
         finally:
@@ -1078,9 +1070,7 @@ class TestSharedInfrastructureIntegration:
                 execution_order[0] == "critical_1"
             ), f"Expected critical first, got: {execution_order}"
             # Verify batch was processed last
-            assert (
-                execution_order[-1] == "batch_1"
-            ), f"Expected batch last, got: {execution_order}"
+            assert execution_order[-1] == "batch_1", f"Expected batch last, got: {execution_order}"
 
         finally:
             await manager.shutdown()

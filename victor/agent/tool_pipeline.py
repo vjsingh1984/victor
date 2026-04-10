@@ -595,9 +595,7 @@ class ToolPipeline:
             )
         return self._parallel_executor
 
-    def _parallel_progress_callback(
-        self, tool_name: str, status: str, success: bool
-    ) -> None:
+    def _parallel_progress_callback(self, tool_name: str, status: str, success: bool) -> None:
         """Progress callback for parallel execution."""
         if status == "started" and self.on_tool_start:
             try:
@@ -675,9 +673,7 @@ class ToolPipeline:
             arguments = {}
 
         # Apply basic normalizer first
-        normalized_args, strategy = self.normalizer.normalize_arguments(
-            arguments, tool_name
-        )
+        normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
 
         # Apply parameter enforcement if available for this tool
         # This handles missing required parameters and type coercion (GAP-9)
@@ -697,9 +693,7 @@ class ToolPipeline:
             except ParameterInferenceError as e:
                 # Could not infer required parameter - log but don't fail here
                 # The tool execution will fail with a more meaningful error
-                logger.warning(
-                    f"Could not infer required parameter for {tool_name}: {e}"
-                )
+                logger.warning(f"Could not infer required parameter for {tool_name}: {e}")
             except ParameterValidationError as e:
                 # Invalid parameter value - log warning
                 logger.warning(f"Parameter validation failed for {tool_name}: {e}")
@@ -735,9 +729,7 @@ class ToolPipeline:
         routed_tool_name = route.tool_name
         if routed_tool_name == "graph" and routed_tool_name != tool_name:
             routed_args = {
-                key: value
-                for key, value in arguments.items()
-                if key in GRAPH_TOOL_ARGUMENTS
+                key: value for key, value in arguments.items() if key in GRAPH_TOOL_ARGUMENTS
             }
             routed_args.update(route.tool_arguments)
         else:
@@ -759,9 +751,7 @@ class ToolPipeline:
         self, tool_name: str, arguments: Any, context: Optional[Dict[str, Any]] = None
     ) -> tuple[str, Dict[str, Any], NormalizationStrategy]:
         """Normalize a full tool call, including search-routing adjustments."""
-        normalized_args, strategy = self._normalize_arguments(
-            tool_name, arguments, context=context
-        )
+        normalized_args, strategy = self._normalize_arguments(tool_name, arguments, context=context)
         normalized_tool_name, normalized_args, changed = self._apply_search_routing(
             tool_name, normalized_args
         )
@@ -816,9 +806,7 @@ class ToolPipeline:
         if self.signature_store is not None:
             try:
                 if self.signature_store.is_known_failure(tool_name, args):
-                    logger.debug(
-                        f"Tool call is known failure (persistent): {tool_name}"
-                    )
+                    logger.debug(f"Tool call is known failure (persistent): {tool_name}")
                     return True
             except (OSError, IOError) as e:
                 logger.warning(f"Signature store check failed (I/O error): {e}")
@@ -829,9 +817,7 @@ class ToolPipeline:
         signature = self._get_call_signature(tool_name, args)
         return signature in self._failed_signatures
 
-    def record_failure(
-        self, tool_name: str, args: Dict[str, Any], error_message: str
-    ) -> None:
+    def record_failure(self, tool_name: str, args: Dict[str, Any], error_message: str) -> None:
         """Record a failed tool call.
 
         Uses persistent SignatureStore when available for cross-session learning,
@@ -904,9 +890,7 @@ class ToolPipeline:
         """
         return tool_name in IDEMPOTENT_TOOLS
 
-    def get_cached_result(
-        self, tool_name: str, args: Dict[str, Any]
-    ) -> Optional[ToolCallResult]:
+    def get_cached_result(self, tool_name: str, args: Dict[str, Any]) -> Optional[ToolCallResult]:
         """Get cached result for an idempotent tool call.
 
         Args:
@@ -929,9 +913,7 @@ class ToolPipeline:
             logger.debug(f"Cache hit for {tool_name}: {signature[:100]}...")
         return cached
 
-    def cache_result(
-        self, tool_name: str, args: Dict[str, Any], result: ToolCallResult
-    ) -> None:
+    def cache_result(self, tool_name: str, args: Dict[str, Any], result: ToolCallResult) -> None:
         """Cache result for an idempotent tool call.
 
         Only successful results from idempotent tools are cached.
@@ -965,9 +947,7 @@ class ToolPipeline:
         # LRU cache handles eviction automatically (Workstream E fix)
         self._idempotent_cache.set(signature, cached_result)
         self._cache_misses += 1
-        logger.debug(
-            f"Cached result for {tool_name} (cache size: {len(self._idempotent_cache)})"
-        )
+        logger.debug(f"Cached result for {tool_name} (cache size: {len(self._idempotent_cache)})")
 
     def invalidate_file_cache(self, file_path: str) -> int:
         """Invalidate cached results that involve a specific file path.
@@ -1021,9 +1001,7 @@ class ToolPipeline:
             stats["semantic_cache"] = self.semantic_cache.get_stats()
         return stats
 
-    def _is_duplicate_read(
-        self, file_path: str, max_age_seconds: float = 300.0
-    ) -> bool:
+    def _is_duplicate_read(self, file_path: str, max_age_seconds: float = 300.0) -> bool:
         """Check if file was recently read (within TTL window).
 
         Used to prevent re-reading identical files during prompting loops.
@@ -1177,9 +1155,7 @@ class ToolPipeline:
                     "tool": tool_name,
                     "args": raw_args,
                     "success": call_result.success,
-                    "result": (
-                        str(call_result.result)[:500] if call_result.result else ""
-                    ),
+                    "result": (str(call_result.result)[:500] if call_result.result else ""),
                     "error": call_result.error,
                 }
             )
@@ -1223,16 +1199,12 @@ class ToolPipeline:
                 "timeout": context.get("timeout", 180),
                 "task_type": context.get("task_type", "unknown"),
             }
-            checkpoint_result = self._synthesis_checkpoint.check(
-                tool_history, task_context
-            )
+            checkpoint_result = self._synthesis_checkpoint.check(tool_history, task_context)
             if checkpoint_result.should_synthesize:
                 result.synthesis_recommended = True
                 result.synthesis_reason = checkpoint_result.reason
                 result.synthesis_prompt = checkpoint_result.suggested_prompt
-                logger.info(
-                    f"Synthesis checkpoint triggered: {checkpoint_result.reason}"
-                )
+                logger.info(f"Synthesis checkpoint triggered: {checkpoint_result.reason}")
 
         # Set aggregation state
         if self._output_aggregator:
@@ -1248,9 +1220,7 @@ class ToolPipeline:
                     result.synthesis_reason = (
                         f"Aggregation state: {self._output_aggregator.state.value}"
                     )
-                    result.synthesis_prompt = (
-                        self._output_aggregator.get_synthesis_prompt()
-                    )
+                    result.synthesis_prompt = self._output_aggregator.get_synthesis_prompt()
 
         result.total_time_ms = (time.monotonic() - start_time) * 1000
         return result
@@ -1343,9 +1313,7 @@ class ToolPipeline:
             validated_calls.append({"name": tool_name, "arguments": normalized_args})
 
         # Execute validated calls in parallel
-        parallel_result = await self.parallel_executor.execute_parallel(
-            validated_calls, context
-        )
+        parallel_result = await self.parallel_executor.execute_parallel(validated_calls, context)
 
         # Build pipeline result
         result = PipelineExecutionResult(
@@ -1379,9 +1347,7 @@ class ToolPipeline:
                 # Track failed signature
                 if self.config.enable_failed_signature_tracking:
                     # We need to get arguments back - use tool name + error as key
-                    self._failed_signatures.add(
-                        (exec_result.tool_name, exec_result.error or "")
-                    )
+                    self._failed_signatures.add((exec_result.tool_name, exec_result.error or ""))
 
             # Update call count
             self._calls_used += 1
@@ -1485,9 +1451,7 @@ class ToolPipeline:
                 skip_reason="Tool budget exhausted",
             )
 
-        normalization_applied = (
-            None if strategy == NormalizationStrategy.DIRECT else strategy.value
-        )
+        normalization_applied = None if strategy == NormalizationStrategy.DIRECT else strategy.value
 
         # Check idempotent cache for read-only tools
         # This prevents DeepSeek/Ollama from re-reading the same file multiple times
@@ -1513,9 +1477,7 @@ class ToolPipeline:
         # This catches similar-but-not-identical queries that would return same results
         if self.config.enable_semantic_caching and self.semantic_cache is not None:
             try:
-                semantic_result = await self.semantic_cache.get(
-                    tool_name, normalized_args
-                )
+                semantic_result = await self.semantic_cache.get(tool_name, normalized_args)
                 if semantic_result is not None:
                     logger.info(f"[Pipeline] Semantic cache hit for {tool_name}")
                     self._executed_tools.append(tool_name)
@@ -1658,9 +1620,7 @@ class ToolPipeline:
                 if before_result.modified_arguments:
                     normalized_args = before_result.modified_arguments
             except (ValueError, TypeError, KeyError) as e:
-                logger.warning(
-                    f"Middleware chain process_before failed (data error): {e}"
-                )
+                logger.warning(f"Middleware chain process_before failed (data error): {e}")
             except AttributeError as e:
                 logger.debug(f"Middleware chain not properly configured: {e}")
 
@@ -1685,8 +1645,7 @@ class ToolPipeline:
         except asyncio.TimeoutError:
             effective_timeout = self._get_tool_timeout(tool_name)
             logger.warning(
-                f"[Pipeline] Tool '{tool_name}' timed out after "
-                f"{effective_timeout}s"
+                f"[Pipeline] Tool '{tool_name}' timed out after " f"{effective_timeout}s"
             )
             exec_result = ToolExecutionResult(
                 tool_name=tool_name,
@@ -1724,15 +1683,10 @@ class ToolPipeline:
                 recovery = recover_from_error(
                     Exception(exec_result.error), tool_name, normalized_args
                 )
-                if (
-                    recovery.action == RecoveryAction.FALLBACK_TOOL
-                    and recovery.fallback_tool
-                ):
+                if recovery.action == RecoveryAction.FALLBACK_TOOL and recovery.fallback_tool:
                     fallback_name = recovery.fallback_tool
                     if self.tools.is_tool_enabled(fallback_name):
-                        logger.info(
-                            f"[Pipeline] Falling back from {tool_name} to {fallback_name}"
-                        )
+                        logger.info(f"[Pipeline] Falling back from {tool_name} to {fallback_name}")
                         try:
                             fb_result = await asyncio.wait_for(
                                 self.executor.execute(
@@ -1751,9 +1705,7 @@ class ToolPipeline:
                                 success=fb_result.success,
                                 result=fb_result.result,
                                 error=fb_result.error,
-                                execution_time_ms=(
-                                    (time.monotonic() - start_time) * 1000
-                                ),
+                                execution_time_ms=((time.monotonic() - start_time) * 1000),
                             )
             except Exception as e:
                 logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")
@@ -1780,10 +1732,7 @@ class ToolPipeline:
                 modified_result = await self.middleware_chain.process_after(
                     tool_name, normalized_args, call_result.result, call_result.success
                 )
-                if (
-                    modified_result is not None
-                    and modified_result != call_result.result
-                ):
+                if modified_result is not None and modified_result != call_result.result:
                     call_result = ToolCallResult(
                         tool_name=call_result.tool_name,
                         arguments=call_result.arguments,
@@ -1805,13 +1754,9 @@ class ToolPipeline:
                                 },
                             )
                         except Exception as e:
-                            logger.debug(
-                                f"on_tool_event middleware notification failed: {e}"
-                            )
+                            logger.debug(f"on_tool_event middleware notification failed: {e}")
             except (ValueError, TypeError, KeyError) as e:
-                logger.warning(
-                    f"Middleware chain process_after failed (data error): {e}"
-                )
+                logger.warning(f"Middleware chain process_after failed (data error): {e}")
             except AttributeError as e:
                 logger.debug(f"Middleware chain not properly configured: {e}")
 
@@ -1835,9 +1780,7 @@ class ToolPipeline:
             if self.config.enable_semantic_caching and self.semantic_cache is not None:
                 try:
                     # Get file path for mtime tracking
-                    file_path = normalized_args.get("path") or normalized_args.get(
-                        "file_path"
-                    )
+                    file_path = normalized_args.get("path") or normalized_args.get("file_path")
                     await self.semantic_cache.put(
                         tool_name,
                         normalized_args,
@@ -1865,9 +1808,7 @@ class ToolPipeline:
             try:
                 self.deduplication_tracker.add_call(tool_name, normalized_args)
             except (ValueError, TypeError) as e:
-                logger.warning(
-                    f"Failed to record call in deduplication tracker (data error): {e}"
-                )
+                logger.warning(f"Failed to record call in deduplication tracker (data error): {e}")
             except AttributeError as e:
                 logger.debug(f"Deduplication tracker not properly initialized: {e}")
 

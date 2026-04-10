@@ -47,9 +47,7 @@ def test_initialize_conversation_embedding_store_delegates_to_session_coordinato
         "victor.agent.coordinators.session_coordinator.SessionCoordinator.init_conversation_embedding_store"
     ) as init_store:
         init_store.return_value = (expected_store, expected_cache)
-        store, cache = initialize_conversation_embedding_store(
-            memory_manager=memory_manager
-        )
+        store, cache = initialize_conversation_embedding_store(memory_manager=memory_manager)
 
     init_store.assert_called_once_with(memory_manager=memory_manager)
     assert store is expected_store
@@ -83,10 +81,8 @@ def test_session_coordinator_init_embedding_store_bridges_sync_initialization():
             wraps=real_run_sync,
         ) as run_sync_mock,
     ):
-        result_store, result_cache = (
-            SessionCoordinator.init_conversation_embedding_store(
-                memory_manager=memory_manager
-            )
+        result_store, result_cache = SessionCoordinator.init_conversation_embedding_store(
+            memory_manager=memory_manager
         )
 
     assert result_store is store
@@ -132,14 +128,10 @@ def test_session_coordinator_init_embedding_store_schedules_on_running_loop():
             "victor.agent.coordinators.session_coordinator.asyncio.get_running_loop",
             return_value=loop,
         ),
-        patch(
-            "victor.agent.coordinators.session_coordinator.run_sync"
-        ) as run_sync_mock,
+        patch("victor.agent.coordinators.session_coordinator.run_sync") as run_sync_mock,
     ):
-        result_store, result_cache = (
-            SessionCoordinator.init_conversation_embedding_store(
-                memory_manager=memory_manager
-            )
+        result_store, result_cache = SessionCoordinator.init_conversation_embedding_store(
+            memory_manager=memory_manager
         )
 
     assert result_store is store
@@ -172,15 +164,11 @@ def test_session_coordinator_init_embedding_store_reuses_existing_embedding_serv
             return_value=semantic_cache,
         ),
     ):
-        result_store, result_cache = (
-            SessionCoordinator.init_conversation_embedding_store(
-                memory_manager=memory_manager
-            )
+        result_store, result_cache = SessionCoordinator.init_conversation_embedding_store(
+            memory_manager=memory_manager
         )
 
     assert result_store is store
     assert result_cache is semantic_cache
     memory_manager.set_embedding_store.assert_called_once_with(store)
-    memory_manager.set_embedding_service.assert_called_once_with(
-        existing_embedding_service
-    )
+    memory_manager.set_embedding_service.assert_called_once_with(existing_embedding_service)

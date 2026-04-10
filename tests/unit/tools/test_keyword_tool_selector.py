@@ -300,9 +300,7 @@ class TestKeywordToolSelectorStageFiltering:
         """Test _get_stage_core_tools returns readonly tools for analysis."""
         from victor.agent.conversation_state import ConversationStage
 
-        with patch.object(
-            selector, "_get_core_readonly_cached", return_value={"read_file"}
-        ):
+        with patch.object(selector, "_get_core_readonly_cached", return_value={"read_file"}):
             result = selector._get_stage_core_tools(ConversationStage.ANALYSIS)
             assert result == {"read_file"}
 

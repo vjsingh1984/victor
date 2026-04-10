@@ -25,9 +25,7 @@ def resolve_capability_config_service(
     """Resolve framework CapabilityConfigService via orchestrator container port."""
     get_container = getattr(orchestrator, "get_service_container", None)
     container = (
-        get_container()
-        if callable(get_container)
-        else getattr(orchestrator, "container", None)
+        get_container() if callable(get_container) else getattr(orchestrator, "container", None)
     )
     if container is None or not hasattr(container, "get_optional"):
         return None
@@ -88,9 +86,7 @@ def load_capability_config(
                 return service.get_config(name, default_copy, scope_key=scope_key)
             for legacy_name in legacy_service_names:
                 if service.has_config(legacy_name, scope_key=scope_key):
-                    return service.get_config(
-                        legacy_name, default_copy, scope_key=scope_key
-                    )
+                    return service.get_config(legacy_name, default_copy, scope_key=scope_key)
             return default_copy
 
         return service.get_config(name, default_copy, scope_key=scope_key)
@@ -144,9 +140,7 @@ def update_capability_config_section(
         root_defaults,
         fallback_attr=fallback_attr,
     )
-    merged = (
-        dict(root_config) if isinstance(root_config, dict) else deepcopy(root_defaults)
-    )
+    merged = dict(root_config) if isinstance(root_config, dict) else deepcopy(root_defaults)
     merged[section_name] = section_config
     store_capability_config(
         orchestrator,

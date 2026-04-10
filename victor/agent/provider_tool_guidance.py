@@ -245,9 +245,7 @@ Focus on depth over breadth when exploring.
                     return True
 
         # Check for excessive ls/listing calls
-        ls_count = sum(
-            1 for h in tool_history if h.get("tool") in ("ls", "list_directory")
-        )
+        ls_count = sum(1 for h in tool_history if h.get("tool") in ("ls", "list_directory"))
         if ls_count >= 4:
             return True
 
@@ -527,9 +525,7 @@ def get_tool_guidance_strategy(provider_name: str) -> ToolGuidanceStrategy:
     strategy = strategy_class()
     _strategy_cache[provider_key] = strategy
 
-    logger.debug(
-        f"Created tool guidance strategy for {provider_name}: {strategy_class.__name__}"
-    )
+    logger.debug(f"Created tool guidance strategy for {provider_name}: {strategy_class.__name__}")
 
     return strategy
 

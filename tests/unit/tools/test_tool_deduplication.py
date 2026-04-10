@@ -106,9 +106,7 @@ class TestSearchRedundancy:
         tracker = ToolDeduplicationTracker()
 
         tracker.add_call("grep", {"query": "tool registration", "mode": "semantic"})
-        is_dup = tracker.is_redundant(
-            "grep", {"query": "tool registration", "mode": "regex"}
-        )
+        is_dup = tracker.is_redundant("grep", {"query": "tool registration", "mode": "regex"})
 
         assert is_dup is True
 

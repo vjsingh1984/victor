@@ -206,10 +206,7 @@ class OpenAIProvider(BaseProvider):
         GPT-5.x still supports temperature and tools unlike O-series.
         """
         model_lower = model.lower()
-        return any(
-            model_lower.startswith(prefix)
-            for prefix in ["o1", "o3", "gpt-5", "gpt5"]
-        )
+        return any(model_lower.startswith(prefix) for prefix in ["o1", "o3", "gpt-5", "gpt5"])
 
     @property
     def name(self) -> str:
@@ -265,9 +262,7 @@ class OpenAIProvider(BaseProvider):
         ) as log_success:
             try:
                 # Convert messages to OpenAI format
-                openai_messages = [
-                    {"role": msg.role, "content": msg.content} for msg in messages
-                ]
+                openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
                 # Check if O-series reasoning model
                 is_o_series = self._is_o_series_model(model)
@@ -337,10 +332,7 @@ class OpenAIProvider(BaseProvider):
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,
                     ) from e
-                elif any(
-                    term in error_str
-                    for term in ["rate limit", "429", "too many requests"]
-                ):
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
                     raise ProviderRateLimitError(
                         message=f"Rate limit exceeded: {str(e)}",
                         provider=self.name,
@@ -385,9 +377,7 @@ class OpenAIProvider(BaseProvider):
             await self._ensure_valid_token()
 
             # Convert messages
-            openai_messages = [
-                {"role": msg.role, "content": msg.content} for msg in messages
-            ]
+            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Check if O-series reasoning model
             is_o_series = self._is_o_series_model(model)
@@ -444,9 +434,7 @@ class OpenAIProvider(BaseProvider):
         """Convert standard tools to OpenAI format."""
         return convert_tools_to_openai_format(tools)
 
-    def _parse_response(
-        self, response: ChatCompletion, model: str
-    ) -> CompletionResponse:
+    def _parse_response(self, response: ChatCompletion, model: str) -> CompletionResponse:
         """Parse OpenAI API response.
 
         Args:
@@ -487,9 +475,7 @@ class OpenAIProvider(BaseProvider):
             stop_reason=choice.finish_reason,
             usage=usage,
             model=model,
-            raw_response=(
-                response.model_dump() if hasattr(response, "model_dump") else None
-            ),
+            raw_response=(response.model_dump() if hasattr(response, "model_dump") else None),
         )
 
     def _parse_stream_chunk(
@@ -636,8 +622,7 @@ class OpenAIProvider(BaseProvider):
                 model_id = model.id
                 # Filter to chat-capable GPT models
                 if any(
-                    prefix in model_id
-                    for prefix in ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"]
+                    prefix in model_id for prefix in ["gpt-4", "gpt-3.5", "o1", "o3", "chatgpt"]
                 ):
                     models.append(
                         {

@@ -144,11 +144,7 @@ class ToolSerializationRegistry:
         if config_path is None:
             # Default to package config (victor/config/model_capabilities.yaml)
             # Navigate from victor/processing/serialization/ to victor/config/
-            config_path = (
-                Path(__file__).parent.parent.parent
-                / "config"
-                / "model_capabilities.yaml"
-            )
+            config_path = Path(__file__).parent.parent.parent / "config" / "model_capabilities.yaml"
 
         self._config_path = config_path
         self._config: Dict[str, Any] = {}
@@ -166,9 +162,7 @@ class ToolSerializationRegistry:
                 with open(self._config_path, "r") as f:
                     full_config = yaml.safe_load(f) or {}
                     self._config = full_config.get("tool_serialization", {})
-                logger.debug(
-                    f"Loaded tool serialization config from {self._config_path}"
-                )
+                logger.debug(f"Loaded tool serialization config from {self._config_path}")
 
                 # Build category map
                 categories = self._config.get("categories", {})
@@ -303,9 +297,7 @@ class ToolSerializationRegistry:
         # Parse preferred format
         if "preferred_format" in config and config["preferred_format"]:
             try:
-                result.preferred_format = SerializationFormat(
-                    config["preferred_format"]
-                )
+                result.preferred_format = SerializationFormat(config["preferred_format"])
             except ValueError:
                 pass
 
@@ -373,9 +365,7 @@ class ToolSerializationRegistry:
 
         if "preferred_format" in overrides and overrides["preferred_format"]:
             try:
-                result.preferred_format = SerializationFormat(
-                    overrides["preferred_format"]
-                )
+                result.preferred_format = SerializationFormat(overrides["preferred_format"])
             except ValueError:
                 pass
 

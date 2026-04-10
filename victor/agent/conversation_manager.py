@@ -417,9 +417,7 @@ class ConversationManager:
             return self.message_count() - metrics.message_count
         return 0
 
-    def get_memory_context(
-        self, max_tokens: Optional[int] = None
-    ) -> List[Dict[str, Any]]:
+    def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get token-aware context for LLM calls.
 
         Delegates to ContextOverflowHandler (SRP).
@@ -540,9 +538,7 @@ class ConversationManager:
 
         self._session = session
         self._session_id = session_id
-        logger.info(
-            f"Recovered session {session_id} with {len(session.messages)} messages"
-        )
+        logger.info(f"Recovered session {session_id} with {len(session.messages)} messages")
         return True
 
     def get_session_stats(self) -> Dict[str, Any]:
@@ -668,9 +664,7 @@ class ConversationManager:
                             "session_id": result.session_id,
                             "similarity": result.similarity,
                             "timestamp": (
-                                result.timestamp.isoformat()
-                                if result.timestamp
-                                else None
+                                result.timestamp.isoformat() if result.timestamp else None
                             ),
                         }
                     )

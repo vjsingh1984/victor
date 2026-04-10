@@ -88,9 +88,7 @@ class TestVerticalImportBoundaries:
 
         # Get all Python files in vertical
         vertical_path = Path(module.__file__).parent
-        py_files = [
-            f for f in vertical_path.rglob("*.py") if "__pycache__" not in str(f)
-        ]
+        py_files = [f for f in vertical_path.rglob("*.py") if "__pycache__" not in str(f)]
 
         errors = []
         for py_file in py_files:
@@ -145,12 +143,7 @@ class TestVictorSDKNoDependencies:
             for i, line in enumerate(lines, 1):
                 # Skip empty lines, comments, and docstrings
                 stripped = line.strip()
-                if (
-                    not stripped
-                    or stripped.startswith("#")
-                    or '"""' in line
-                    or "'''" in line
-                ):
+                if not stripped or stripped.startswith("#") or '"""' in line or "'''" in line:
                     continue
 
                 # Check for actual import statements from victor
@@ -186,9 +179,7 @@ class TestVictorSDKNoDependencies:
         allowed_deps = ["typing-extensions"]
         for dep in dependencies:
             dep_name = dep.split(">=")[0].split("==")[0].strip()
-            assert (
-                dep_name in allowed_deps
-            ), f"victor-sdk has unexpected dependency: {dep}"
+            assert dep_name in allowed_deps, f"victor-sdk has unexpected dependency: {dep}"
 
 
 class TestCanonicalProtocolImports:
@@ -237,9 +228,8 @@ class TestCanonicalProtocolImports:
                 # Allow it in comments
                 lines = content.split("\n")
                 for i, line in enumerate(lines, 1):
-                    if (
-                        "from victor.teams.protocols import" in line
-                        and not line.strip().startswith("#")
+                    if "from victor.teams.protocols import" in line and not line.strip().startswith(
+                        "#"
                     ):
                         errors.append(
                             f"{py_file.relative_to(victor_path)}:{i} "
@@ -292,11 +282,7 @@ if failed:
             cwd=Path(__file__).resolve().parents[3],
         )
         if result.returncode != 0:
-            details = (
-                result.stdout.strip()
-                or result.stderr.strip()
-                or "unknown import failure"
-            )
+            details = result.stdout.strip() or result.stderr.strip() or "unknown import failure"
             pytest.fail(f"Failed to import modules:\n{details}")
 
     def test_can_import_all_modules(self) -> None:

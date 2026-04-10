@@ -162,9 +162,7 @@ class TestFormations:
         coordinator.add_member(MockTeamMember("m2", "Agreed"))
         coordinator.set_formation(TeamFormation.CONSENSUS)
 
-        result = await coordinator.execute_task(
-            "Test task", {"max_consensus_rounds": 1}
-        )
+        result = await coordinator.execute_task("Test task", {"max_consensus_rounds": 1})
 
         assert result["success"] is True
         assert result.get("consensus_achieved") is True
@@ -289,9 +287,7 @@ class TestFactoryFunction:
     def test_enable_observability(self):
         """Should accept enable_observability flag."""
         mock_orch = MagicMock()
-        coordinator = create_coordinator(
-            orchestrator=mock_orch, enable_observability=True
-        )
+        coordinator = create_coordinator(orchestrator=mock_orch, enable_observability=True)
         assert isinstance(coordinator, UnifiedTeamCoordinator)
 
     def test_enable_rl(self):

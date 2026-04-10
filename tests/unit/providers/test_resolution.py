@@ -159,16 +159,12 @@ class TestUnifiedApiKeyResolver:
     def test_get_api_key_keyring_skipped_in_non_interactive(self):
         """Test keyring is skipped in non-interactive mode."""
         with patch.dict(os.environ, {}, clear=True):
-            with patch(
-                "victor.providers.resolution.is_keyring_available", return_value=True
-            ):
+            with patch("victor.providers.resolution.is_keyring_available", return_value=True):
                 resolver = UnifiedApiKeyResolver(non_interactive=True)
                 result = resolver.get_api_key("deepseek")
 
                 # Check that keyring source shows "skipped"
-                keyring_sources = [
-                    s for s in result.sources_attempted if s.source == "keyring"
-                ]
+                keyring_sources = [s for s in result.sources_attempted if s.source == "keyring"]
                 assert len(keyring_sources) > 0
                 assert "skipped" in keyring_sources[0].description
 

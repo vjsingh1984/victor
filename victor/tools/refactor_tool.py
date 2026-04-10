@@ -217,9 +217,7 @@ def _collect_python_files(
             # Recurse into subdirectories based on scope
             if scope == "directory" and current_depth == 0:
                 # For "directory" scope, only go one level deep
-                sub_files = _collect_python_files(
-                    item, "file", depth, current_depth + 1
-                )
+                sub_files = _collect_python_files(item, "file", depth, current_depth + 1)
             else:
                 sub_files = _collect_python_files(item, scope, depth, current_depth + 1)
             files.extend(sub_files)
@@ -433,9 +431,7 @@ async def rename(
     require_def = scope == "file"
 
     for file_path in files:
-        result = _rename_in_file(
-            file_path, old_name, new_name, require_definition=require_def
-        )
+        result = _rename_in_file(file_path, old_name, new_name, require_definition=require_def)
         if result:
             all_file_changes.append(result)
             total_changes += len(result["changes"])
@@ -496,9 +492,7 @@ async def rename(
 
         report.append("")
         if applied_count == len(all_file_changes):
-            report.append(
-                f"{_get_icon('success')} All {applied_count} files updated successfully"
-            )
+            report.append(f"{_get_icon('success')} All {applied_count} files updated successfully")
         else:
             report.append(
                 f"{_get_icon('warning')}  {applied_count}/{len(all_file_changes)} files updated (some failed)"
@@ -669,9 +663,7 @@ async def extract(
         report.append(f"{_get_icon('success')} Function extracted successfully")
     else:
         report.append("")
-        report.append(
-            f"{_get_icon('warning')}  This is a PREVIEW - no changes were made"
-        )
+        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {
@@ -810,9 +802,7 @@ async def inline(
         report.append(f"{_get_icon('success')} Variable inlined successfully")
     else:
         report.append("")
-        report.append(
-            f"{_get_icon('warning')}  This is a PREVIEW - no changes were made"
-        )
+        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {
@@ -941,9 +931,7 @@ async def organize_imports(
     # Keep docstring and initial comments
     docstring_end = 0
     for i, line in enumerate(lines):
-        if i == 0 and (
-            line.strip().startswith('"""') or line.strip().startswith("'''")
-        ):
+        if i == 0 and (line.strip().startswith('"""') or line.strip().startswith("'''")):
             # Module docstring
             new_lines.append(line)
             for j in range(i + 1, len(lines)):
@@ -994,9 +982,7 @@ async def organize_imports(
         report.append(f"{_get_icon('success')} Imports organized successfully")
     else:
         report.append("")
-        report.append(
-            f"{_get_icon('warning')}  This is a PREVIEW - no changes were made"
-        )
+        report.append(f"{_get_icon('warning')}  This is a PREVIEW - no changes were made")
         report.append("   Run with preview=False to apply changes")
 
     return {

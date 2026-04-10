@@ -208,9 +208,7 @@ class TestStructureRefiner:
         refiner = StructureRefiner(conservative=True)
 
         workflow = {
-            "nodes": [
-                {"id": "node1", "type": "agent", "role": "executor", "goal": "Task 1"}
-            ]
+            "nodes": [{"id": "node1", "type": "agent", "role": "executor", "goal": "Task 1"}]
         }
 
         errors = [
@@ -337,9 +335,7 @@ class TestSecurityRefiner:
 
         assert len(fixes) > 0
         total_budget = sum(
-            n.get("tool_budget", 0)
-            for n in refined["nodes"]
-            if n.get("type") == "agent"
+            n.get("tool_budget", 0) for n in refined["nodes"] if n.get("type") == "agent"
         )
         assert total_budget <= 100
 
@@ -486,9 +482,7 @@ class TestWorkflowRefiner:
         refiner_aggressive = WorkflowRefiner(conservative=False)
 
         workflow = {
-            "nodes": [
-                {"id": "agent1", "type": "agent", "role": "executor", "goal": "Task"}
-            ],
+            "nodes": [{"id": "agent1", "type": "agent", "role": "executor", "goal": "Task"}],
             "entry_point": "agent1",
         }
 
@@ -600,9 +594,7 @@ class TestRefinementIntegration:
         refiner = WorkflowRefiner()
 
         workflow = {
-            "nodes": [
-                {"id": "agent1", "type": "agent", "role": "executor", "goal": "Task"}
-            ],
+            "nodes": [{"id": "agent1", "type": "agent", "role": "executor", "goal": "Task"}],
             "entry_point": "agent1",
         }
 

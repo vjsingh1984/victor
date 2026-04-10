@@ -692,9 +692,7 @@ class ABTestManager:
             statistical_significance=bool(row[2]),
             p_value=row[3],
             confidence_interval=json.loads(row[4]) if row[4] else None,
-            variant_results={
-                k: VariantResult(**v) for k, v in json.loads(row[5]).items()
-            },
+            variant_results={k: VariantResult(**v) for k, v in json.loads(row[5]).items()},
             recommendation=row[6],
             reasoning=row[7],
             analyzed_at=row[8],

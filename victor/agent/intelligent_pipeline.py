@@ -188,9 +188,7 @@ class IntelligentAgentPipeline:
         self._provider_adapter = get_provider_adapter(provider_name)
 
         # Provider-aware deduplication
-        self._deduplication_enabled = (
-            self._provider_adapter.capabilities.output_deduplication
-        )
+        self._deduplication_enabled = self._provider_adapter.capabilities.output_deduplication
 
         # Observers for feedback
         self._observers: List[Callable[[ResponseResult], None]] = []
@@ -276,9 +274,7 @@ class IntelligentAgentPipeline:
                     mode_transition_learner=mode_transition_learner,
                 )
             except Exception as e:
-                logger.warning(
-                    f"[IntelligentPipeline] Mode controller init failed: {e}"
-                )
+                logger.warning(f"[IntelligentPipeline] Mode controller init failed: {e}")
         return self._mode_controller
 
     def get_provider_quality_thresholds(self) -> dict:
@@ -326,9 +322,7 @@ class IntelligentAgentPipeline:
                     from victor.framework.rl.coordinator import get_rl_coordinator
 
                     coordinator = get_rl_coordinator()
-                    grounding_threshold_learner = coordinator.get_learner(
-                        "grounding_threshold"
-                    )
+                    grounding_threshold_learner = coordinator.get_learner("grounding_threshold")
                 except Exception as e:
                     logger.debug(
                         f"[IntelligentPipeline] Could not get grounding_threshold learner: {e}"
@@ -340,9 +334,7 @@ class IntelligentAgentPipeline:
                     grounding_threshold_learner=grounding_threshold_learner,
                 )
             except Exception as e:
-                logger.warning(
-                    f"[IntelligentPipeline] Grounding verifier init failed: {e}"
-                )
+                logger.warning(f"[IntelligentPipeline] Grounding verifier init failed: {e}")
         return self._grounding_verifier
 
     def _emit_grounding_event(
@@ -394,9 +386,7 @@ class IntelligentAgentPipeline:
 
                 self._resilient_executor = ResilientExecutor()
             except Exception as e:
-                logger.warning(
-                    f"[IntelligentPipeline] Resilient executor init failed: {e}"
-                )
+                logger.warning(f"[IntelligentPipeline] Resilient executor init failed: {e}")
         return self._resilient_executor
 
     def _get_output_deduplicator(self) -> OutputDeduplicator:
@@ -623,8 +613,7 @@ class IntelligentAgentPipeline:
             )
             quality_score = quality_result.overall_score
             quality_details = {
-                dim.dimension.value: dim.score
-                for dim in quality_result.dimension_scores
+                dim.dimension.value: dim.score for dim in quality_result.dimension_scores
             }
             improvement_suggestions = quality_result.improvement_suggestions
 
@@ -729,12 +718,8 @@ class IntelligentAgentPipeline:
             # First response without prepare_request - initialize stats
             self._stats.total_requests = 1
             n = 1
-        self._stats.avg_quality_score += (
-            quality_score - self._stats.avg_quality_score
-        ) / n
-        self._stats.avg_grounding_score += (
-            grounding_score - self._stats.avg_grounding_score
-        ) / n
+        self._stats.avg_quality_score += (quality_score - self._stats.avg_quality_score) / n
+        self._stats.avg_grounding_score += (grounding_score - self._stats.avg_grounding_score) / n
         self._stats.total_learning_reward += learning_reward
 
         result = ResponseResult(
@@ -872,8 +857,8 @@ class IntelligentAgentPipeline:
                 "cache_state", "unknown"
             )
         if self._mode_controller:
-            self._stats.mode_transitions = (
-                self._mode_controller.get_session_stats().get("mode_transitions", 0)
+            self._stats.mode_transitions = self._mode_controller.get_session_stats().get(
+                "mode_transitions", 0
             )
         return self._stats
 
@@ -891,9 +876,7 @@ class IntelligentAgentPipeline:
         summary = {
             "profile_name": self.profile_name,
             "total_requests": self._stats.total_requests,
-            "success_rate": (
-                self._stats.successful_requests / max(self._stats.total_requests, 1)
-            ),
+            "success_rate": (self._stats.successful_requests / max(self._stats.total_requests, 1)),
         }
 
         if self._prompt_builder:

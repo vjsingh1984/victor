@@ -256,9 +256,7 @@ async def scan(
                                 "id": vuln.get("id"),
                                 "fix_versions": vuln.get("fix_versions"),
                                 "severity": vuln.get("severity", "medium"),
-                                "message": vuln.get(
-                                    "description", "Vulnerability detected"
-                                ),
+                                "message": vuln.get("description", "Vulnerability detected"),
                             }
                         )
                 results["dependencies"] = {
@@ -311,9 +309,7 @@ async def scan(
             all_findings.extend(findings)
         except FileNotFoundError:
             results.setdefault("config", {})
-            results["config"][
-                "error"
-            ] = "bandit not installed. Install with: pip install bandit"
+            results["config"]["error"] = "bandit not installed. Install with: pip install bandit"
         except subprocess.CalledProcessError as exc:
             results.setdefault("config", {})
             results["config"]["error"] = f"bandit failed: {exc.stderr}"
@@ -361,9 +357,7 @@ async def scan(
         if secrets_filtered:
             report.append("  Critical: Hardcoded secrets detected!")
             for finding in secrets_filtered[:5]:
-                report.append(
-                    f"    {finding['file']} (line {finding['line']}): {finding['type']}"
-                )
+                report.append(f"    {finding['file']} (line {finding['line']}): {finding['type']}")
             if len(secrets_filtered) > 5:
                 report.append(f"    ... and {len(secrets_filtered) - 5} more")
         report.append("")
@@ -380,9 +374,7 @@ async def scan(
         report.append(f"  Issues found: {len(config_filtered)}")
         if config_filtered:
             for finding in config_filtered[:5]:
-                report.append(
-                    f"    {finding['file']} (line {finding['line']}): {finding['type']}"
-                )
+                report.append(f"    {finding['file']} (line {finding['line']}): {finding['type']}")
             if len(config_filtered) > 5:
                 report.append(f"    ... and {len(config_filtered) - 5} more")
         report.append("")
@@ -393,12 +385,8 @@ async def scan(
         if "error" in results["dependencies"]:
             report.append(f"  {results['dependencies']['error']}")
         else:
-            report.append(
-                f"  Packages checked: {results['dependencies']['packages_checked']}"
-            )
-            report.append(
-                f"  Vulnerabilities: {len(results['dependencies']['vulnerabilities'])}"
-            )
+            report.append(f"  Packages checked: {results['dependencies']['packages_checked']}")
+            report.append(f"  Vulnerabilities: {len(results['dependencies']['vulnerabilities'])}")
             if results["dependencies"]["vulnerabilities"]:
                 for vuln in results["dependencies"]["vulnerabilities"][:5]:
                     report.append(f"    {vuln['package']}: {vuln['message']}")

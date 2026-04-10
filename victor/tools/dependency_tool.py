@@ -138,9 +138,7 @@ async def _do_outdated() -> Dict[str, Any]:
     if major_updates:
         report.append(f"Major updates ({len(major_updates)}):")
         for pkg in major_updates[:5]:
-            report.append(
-                f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}"
-            )
+            report.append(f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}")
         if len(major_updates) > 5:
             report.append(f"  ... and {len(major_updates) - 5} more")
         report.append("")
@@ -148,9 +146,7 @@ async def _do_outdated() -> Dict[str, Any]:
     if minor_updates:
         report.append(f"Minor updates ({len(minor_updates)}):")
         for pkg in minor_updates[:5]:
-            report.append(
-                f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}"
-            )
+            report.append(f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}")
         if len(minor_updates) > 5:
             report.append(f"  ... and {len(minor_updates) - 5} more")
         report.append("")
@@ -158,9 +154,7 @@ async def _do_outdated() -> Dict[str, Any]:
     if patch_updates:
         report.append(f"Patch updates ({len(patch_updates)}):")
         for pkg in patch_updates[:5]:
-            report.append(
-                f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}"
-            )
+            report.append(f"  {pkg['name']}: {pkg['version']} -> {pkg['latest_version']}")
         if len(patch_updates) > 5:
             report.append(f"  ... and {len(patch_updates) - 5} more")
 
@@ -212,9 +206,7 @@ async def _do_security() -> Dict[str, Any]:
 
     if not vulnerabilities:
         report.append("No known vulnerabilities found!")
-        report.append(
-            "\nNote: This is a basic check. For comprehensive auditing, use: pip-audit"
-        )
+        report.append("\nNote: This is a basic check. For comprehensive auditing, use: pip-audit")
     else:
         report.append(f"Found {len(vulnerabilities)} potential vulnerabilities:\n")
         for vuln in vulnerabilities:

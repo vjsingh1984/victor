@@ -288,9 +288,7 @@ class TestConversationStateMachineTransitions:
         sm = ConversationStateMachine()
 
         # Send message with strong execution keywords
-        sm.record_message(
-            "Please fix and change and implement this update", is_user=True
-        )
+        sm.record_message("Please fix and change and implement this update", is_user=True)
 
         # Confidence should be updated
         assert sm.state._stage_confidence >= 0
@@ -585,13 +583,12 @@ class TestEdgeModelStageTransitionFallback:
         mock_service = MagicMock()
         mock_service.decide_sync.return_value = decision
 
-        with patch.object(
-            sm, "_detect_stage_from_tools", return_value=ConversationStage.READING
-        ), patch.object(
-            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
-        ), patch("victor.agent.conversation_state.get_container") as mock_container, patch(
-            "victor.core.feature_flags.get_feature_flag_manager"
-        ) as mock_ffm:
+        with (
+            patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
+            patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
+            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
@@ -611,10 +608,13 @@ class TestEdgeModelStageTransitionFallback:
 
         mock_service = MagicMock()
 
-        with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
-            return_value={"edit", "write", "shell"},
-        ), patch("victor.agent.conversation_state.get_container") as mock_container:
+        with (
+            patch(
+                "victor.agent.conversation_state.registry_get_tools_by_stage",
+                return_value={"edit", "write", "shell"},
+            ),
+            patch("victor.agent.conversation_state.get_container") as mock_container,
+        ):
             mock_container.return_value.get.return_value = mock_service
 
             sm._maybe_transition()
@@ -628,14 +628,14 @@ class TestEdgeModelStageTransitionFallback:
 
         sm = self._make_sm_at_execution()
 
-        with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
-            return_value={"read", "code_search"},
-        ), patch(
-            "victor.core.feature_flags.get_feature_flag_manager"
-        ) as mock_ffm, patch(
-            "victor.agent.conversation_state.get_container"
-        ) as mock_container:
+        with (
+            patch(
+                "victor.agent.conversation_state.registry_get_tools_by_stage",
+                return_value={"read", "code_search"},
+            ),
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+            patch("victor.agent.conversation_state.get_container") as mock_container,
+        ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = None  # No service
 
@@ -654,13 +654,12 @@ class TestEdgeModelStageTransitionFallback:
         mock_service = MagicMock()
         mock_service.decide_sync.return_value = decision
 
-        with patch.object(
-            sm, "_detect_stage_from_tools", return_value=ConversationStage.READING
-        ), patch.object(
-            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
-        ), patch("victor.agent.conversation_state.get_container") as mock_container, patch(
-            "victor.core.feature_flags.get_feature_flag_manager"
-        ) as mock_ffm:
+        with (
+            patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
+            patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
+            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
@@ -677,11 +676,11 @@ class TestEdgeModelStageTransitionFallback:
 
         mock_service = MagicMock()
 
-        with patch.object(
-            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
-        ), patch("victor.agent.conversation_state.get_container") as mock_container, patch(
-            "victor.core.feature_flags.get_feature_flag_manager"
-        ) as mock_ffm:
+        with (
+            patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
+            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
             mock_ffm.return_value.is_enabled.return_value = False
             mock_container.return_value.get.return_value = mock_service
 
@@ -702,13 +701,12 @@ class TestEdgeModelStageTransitionFallback:
         mock_service = MagicMock()
         mock_service.decide_sync.return_value = decision
 
-        with patch.object(
-            sm, "_detect_stage_from_tools", return_value=ConversationStage.READING
-        ), patch.object(
-            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
-        ), patch("victor.agent.conversation_state.get_container") as mock_container, patch(
-            "victor.core.feature_flags.get_feature_flag_manager"
-        ) as mock_ffm:
+        with (
+            patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
+            patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
+            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
@@ -727,13 +725,12 @@ class TestEdgeModelStageTransitionFallback:
         mock_service = MagicMock()
         mock_service.decide_sync.return_value = decision
 
-        with patch.object(
-            sm, "_detect_stage_from_tools", return_value=ConversationStage.READING
-        ), patch.object(
-            sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect
-        ), patch("victor.agent.conversation_state.get_container") as mock_container, patch(
-            "victor.core.feature_flags.get_feature_flag_manager"
-        ) as mock_ffm:
+        with (
+            patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
+            patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
+            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+        ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = mock_service
 
@@ -815,9 +812,7 @@ class TestNaturalStageProgression:
         sm.state.message_count = 5
         sm.state.observed_files = {"some_file.py"}
 
-        result = sm._detect_stage_from_content(
-            "create and implement a new feature for the module"
-        )
+        result = sm._detect_stage_from_content("create and implement a new feature for the module")
         assert result == ConversationStage.EXECUTION
 
     def test_benchmark_adapter_starts_reading(self):

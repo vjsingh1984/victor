@@ -383,9 +383,7 @@ class WorkflowEngine:
 
                 if isinstance(result, GraphExecutionResult):
                     final_state = (
-                        result.state
-                        if isinstance(result.state, dict)
-                        else {"result": result.state}
+                        result.state if isinstance(result.state, dict) else {"result": result.state}
                     )
                     nodes_executed = result.node_history
                     success = result.success
@@ -394,9 +392,7 @@ class WorkflowEngine:
                     # Direct dict result
                     final_state = result
                     nodes_executed = (
-                        result.pop("_nodes_executed", [])
-                        if "_nodes_executed" in result
-                        else []
+                        result.pop("_nodes_executed", []) if "_nodes_executed" in result else []
                     )
                     success = True
                     error = None

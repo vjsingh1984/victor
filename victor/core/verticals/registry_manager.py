@@ -138,11 +138,7 @@ class PackageSpec:
             return cls(name=name, source=PackageSourceType.GIT, url=url)
 
         # Local path
-        if (
-            spec_str.startswith("/")
-            or spec_str.startswith("./")
-            or spec_str.startswith("../")
-        ):
+        if spec_str.startswith("/") or spec_str.startswith("./") or spec_str.startswith("../"):
             path = Path(spec_str).resolve()
             name = path.name
             return cls(name=name, source=PackageSourceType.LOCAL, url=str(path))
@@ -614,9 +610,7 @@ class VerticalRegistryManager:
                     metadata_file = vertical.location / "victor-vertical.toml"
                     if metadata_file.exists():
                         try:
-                            vertical.metadata = VerticalPackageMetadata.from_toml(
-                                metadata_file
-                            )
+                            vertical.metadata = VerticalPackageMetadata.from_toml(metadata_file)
                         except Exception:
                             pass
                 return vertical
@@ -733,9 +727,7 @@ class VerticalRegistryManager:
 
         # Check for reserved names
         if package_spec.name in self.BUILTIN_VERTICALS:
-            errors.append(
-                f"Package name '{package_spec.name}' conflicts with built-in vertical"
-            )
+            errors.append(f"Package name '{package_spec.name}' conflicts with built-in vertical")
 
         # For git and local packages, try to load metadata
         if package_spec.source in [PackageSourceType.GIT, PackageSourceType.LOCAL]:

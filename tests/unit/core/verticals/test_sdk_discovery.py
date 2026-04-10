@@ -156,9 +156,7 @@ class TestSDKDiscoveryWithMockSDK:
             "coding-git": git_capability,
         }
         registry.get_capability_providers.return_value = capability_providers
-        registry.get_capability_provider.side_effect = (
-            lambda name: capability_providers.get(name)
-        )
+        registry.get_capability_provider.side_effect = lambda name: capability_providers.get(name)
 
         # Mock validators
         validators = {

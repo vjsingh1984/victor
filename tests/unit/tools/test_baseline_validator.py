@@ -58,16 +58,12 @@ class TestGetTestStatus:
 
     def test_skipped_result(self):
         """Test skipped result returns SKIPPED status."""
-        result = TestResult(
-            test_name="test_foo", passed=True, skip_reason="not applicable"
-        )
+        result = TestResult(test_name="test_foo", passed=True, skip_reason="not applicable")
         assert get_test_status(result) == TestStatus.SKIPPED
 
     def test_error_result(self):
         """Test error result returns ERROR status."""
-        result = TestResult(
-            test_name="test_foo", passed=False, error_message="ImportError"
-        )
+        result = TestResult(test_name="test_foo", passed=False, error_message="ImportError")
         assert get_test_status(result) == TestStatus.ERROR
 
 
@@ -180,9 +176,7 @@ class TestTestBaseline:
             fail_to_pass=["test_a"],
             pass_to_pass=["test_b"],
             fail_to_pass_results={
-                "test_a": TestResult(
-                    test_name="test_a", passed=False, duration_ms=100.0
-                ),
+                "test_a": TestResult(test_name="test_a", passed=False, duration_ms=100.0),
             },
             pass_to_pass_results={
                 "test_b": TestResult(test_name="test_b", passed=True),
@@ -421,9 +415,7 @@ class TestBaselineValidator:
             fail_to_pass=["test_a"],
             pass_to_pass=[],
             fail_to_pass_results={
-                "test_a": TestResult(
-                    test_name="test_a", passed=True
-                ),  # Should be failing
+                "test_a": TestResult(test_name="test_a", passed=True),  # Should be failing
             },
         )
 
@@ -444,9 +436,7 @@ class TestBaselineValidator:
             fail_to_pass=["test_a"],
             pass_to_pass=["test_b", "test_c"],
             fail_to_pass_results={
-                "test_a": TestResult(
-                    test_name="test_a", passed=False
-                ),  # Correctly failing
+                "test_a": TestResult(test_name="test_a", passed=False),  # Correctly failing
             },
             pass_to_pass_results={
                 "test_b": TestResult(

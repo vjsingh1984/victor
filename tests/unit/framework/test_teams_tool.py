@@ -141,9 +141,7 @@ class TestTeamsTool:
         with patch("victor.tools.teams_tool.httpx") as mock_httpx:
             mock_client = AsyncMock()
             mock_client.post.return_value = mock_response
-            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(
-                return_value=mock_client
-            )
+            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             result = await teams(
@@ -173,9 +171,7 @@ class TestTeamsTool:
         with patch("victor.tools.teams_tool.httpx") as mock_httpx:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
-            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(
-                return_value=mock_client
-            )
+            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             result = await teams(operation="list_teams", context=context)
@@ -213,9 +209,7 @@ class TestTeamsTool:
         with patch("victor.tools.teams_tool.httpx") as mock_httpx:
             mock_client = AsyncMock()
             mock_client.get.return_value = mock_response
-            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(
-                return_value=mock_client
-            )
+            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             result = await teams(
@@ -272,9 +266,7 @@ class TestTeamsTool:
         with patch("victor.tools.teams_tool.httpx") as mock_httpx:
             mock_client = AsyncMock()
             mock_client.post.return_value = mock_response
-            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(
-                return_value=mock_client
-            )
+            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             result = await teams(
@@ -314,9 +306,7 @@ class TestTeamsTool:
         with patch("victor.tools.teams_tool.httpx") as mock_httpx:
             mock_client = AsyncMock()
             mock_client.post.return_value = mock_response
-            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(
-                return_value=mock_client
-            )
+            mock_httpx.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
             mock_httpx.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=None)
 
             result = await teams(

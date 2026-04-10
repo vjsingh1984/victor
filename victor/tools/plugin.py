@@ -163,9 +163,7 @@ class ToolPlugin(ABC):
         """
         pass
 
-    def on_tool_executed(
-        self, tool_name: str, success: bool, result: Any
-    ) -> None:  # noqa: B027
+    def on_tool_executed(self, tool_name: str, success: bool, result: Any) -> None:  # noqa: B027
         """Called after a tool from this plugin is executed.
 
         Useful for logging, metrics, or plugin-specific handling.
@@ -291,7 +289,5 @@ class FunctionToolPlugin(ToolPlugin):
                 # Legacy check
                 tools.append(func.Tool)
             else:
-                logger.warning(
-                    f"Function {func.__name__} is not a @tool decorated function"
-                )
+                logger.warning(f"Function {func.__name__} is not a @tool decorated function")
         return tools

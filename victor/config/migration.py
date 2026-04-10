@@ -380,9 +380,7 @@ class ConfigMigrator:
                 model = profile_config.get("model")
 
                 if not provider:
-                    result.add_warning(
-                        f"Profile '{profile_name}' missing provider, skipping"
-                    )
+                    result.add_warning(f"Profile '{profile_name}' missing provider, skipping")
                     continue
 
                 # Determine auth method
@@ -427,18 +425,14 @@ class ConfigMigrator:
             if provider not in migrated_providers:
                 try:
                     # Determine auth method
-                    auth_method = (
-                        "none" if provider in self.LOCAL_PROVIDERS else "api_key"
-                    )
+                    auth_method = "none" if provider in self.LOCAL_PROVIDERS else "api_key"
 
                     # Create account for this provider
                     account = ProviderAccount(
                         name=provider,
                         provider=provider,
                         model="default",
-                        auth=AuthConfig(
-                            method=auth_method, source="file", value=api_key
-                        ),
+                        auth=AuthConfig(method=auth_method, source="file", value=api_key),
                         tags=["migrated", "api-key-only"],
                     )
 

@@ -248,9 +248,7 @@ ScanResult = IaCScanResult
 class ScanPolicy:
     """Policy configuration for IaC scanning."""
 
-    enabled_platforms: list[IaCPlatform] = field(
-        default_factory=lambda: list(IaCPlatform)
-    )
+    enabled_platforms: list[IaCPlatform] = field(default_factory=lambda: list(IaCPlatform))
     min_severity: IaCSeverity = IaCSeverity.LOW
     excluded_rules: list[str] = field(default_factory=list)
     excluded_paths: list[str] = field(default_factory=list)
@@ -305,9 +303,7 @@ class IaCScannerProtocol(ABC):
         ...
 
     @abstractmethod
-    async def scan(
-        self, config: IaCConfig, policy: ScanPolicy | None = None
-    ) -> list[IaCFinding]:
+    async def scan(self, config: IaCConfig, policy: ScanPolicy | None = None) -> list[IaCFinding]:
         """Scan an IaC configuration for security issues.
 
         Args:

@@ -143,9 +143,7 @@ class PromptOptimizationStrategy(Protocol):
         """Analyze traces and produce a reflection/diagnosis."""
         ...
 
-    def mutate(
-        self, current_text: str, reflection: str, section_name: str
-    ) -> str:
+    def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
         """Generate mutated prompt section text."""
         ...
 
@@ -191,9 +189,7 @@ class GEPAStrategy:
             else:
                 from importlib import import_module
 
-                mod = import_module(
-                    f"victor.providers.{self._provider_name}_provider"
-                )
+                mod = import_module(f"victor.providers.{self._provider_name}_provider")
                 cls_name = f"{self._provider_name.title()}Provider"
                 self._provider = getattr(mod, cls_name)()
             return self._provider
@@ -233,14 +229,10 @@ class GEPAStrategy:
             import re
 
             if "<think>" in content:
-                content = re.sub(
-                    r"<think>.*?</think>", "", content, flags=re.DOTALL
-                ).strip()
+                content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
             # Strip "Thinking Process:" preamble
             if "Thinking Process:" in content:
-                parts = re.split(
-                    r"\n(?=TOOL EFFECTIVENESS|[A-Z]{3,}[:\s])", content
-                )
+                parts = re.split(r"\n(?=TOOL EFFECTIVENESS|[A-Z]{3,}[:\s])", content)
                 for part in reversed(parts):
                     if "Thinking Process" not in part and len(part.strip()) > 50:
                         content = part.strip()
@@ -280,9 +272,7 @@ class GEPAStrategy:
         ]
         if all_failures:
             lines.append("- Top failure categories:")
-            for cat, count in sorted(
-                all_failures.items(), key=lambda x: -x[1]
-            )[:5]:
+            for cat, count in sorted(all_failures.items(), key=lambda x: -x[1])[:5]:
                 lines.append(f"  - {cat}: {count}")
 
         reflection = "\n".join(lines)
@@ -299,9 +289,7 @@ class GEPAStrategy:
         # Try provider abstraction first (Ollama by default, free + local)
         llm_result = self._call_llm(llm_prompt)
         if llm_result:
-            reflection += (
-                f"\n\nLLM Reflection ({self._provider_name}/{self._model}):\n{llm_result}"
-            )
+            reflection += f"\n\nLLM Reflection ({self._provider_name}/{self._model}):\n{llm_result}"
             return reflection
 
         # Try decision service if available
@@ -324,9 +312,7 @@ class GEPAStrategy:
 
         return reflection
 
-    def mutate(
-        self, current_text: str, reflection: str, section_name: str
-    ) -> str:
+    def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
         """Generate mutated prompt text based on reflection.
 
         Uses provider abstraction for LLM mutation, falls back to
@@ -353,17 +339,11 @@ class GEPAStrategy:
         # Heuristic mutation: append failure-specific guidance
         mutations = []
         if "file_not_found" in reflection.lower():
-            mutations.append(
-                "- Verify file paths with ls() before reading them."
-            )
+            mutations.append("- Verify file paths with ls() before reading them.")
         if "edit" in reflection.lower() and "mismatch" in reflection.lower():
-            mutations.append(
-                "- When editing, read the file first and copy old_str exactly."
-            )
+            mutations.append("- When editing, read the file first and copy old_str exactly.")
         if "timeout" in reflection.lower():
-            mutations.append(
-                "- Keep tool calls focused. Avoid redundant reads of the same file."
-            )
+            mutations.append("- Keep tool calls focused. Avoid redundant reads of the same file.")
 
         if mutations:
             return current_text + "\n" + "\n".join(mutations)
@@ -536,17 +516,13 @@ class PromptOptimizerLearner(BaseLearner):
             self._candidate_key(section_name, provider or "default"), []
         )
         if not candidates:
-            candidates = self._candidates.get(
-                self._candidate_key(section_name, "default"), []
-            )
+            candidates = self._candidates.get(self._candidate_key(section_name, "default"), [])
         if not candidates:
             return None
 
         # Thompson Sampling: sample from each candidate's Beta distribution
         best = max(candidates, key=lambda c: c.sample())
-        confidence = min(
-            best.sample_count / (MIN_SAMPLES_FOR_CONFIDENCE * 2), 1.0
-        )
+        confidence = min(best.sample_count / (MIN_SAMPLES_FOR_CONFIDENCE * 2), 1.0)
 
         return RLRecommendation(
             value=best.text,
@@ -607,14 +583,16 @@ class PromptOptimizerLearner(BaseLearner):
             new_text = new_text[: self._max_prompt_chars]
             logger.info(
                 "GEPA bloat control: truncated '%s' to %d chars",
-                section_name, self._max_prompt_chars,
+                section_name,
+                self._max_prompt_chars,
             )
 
         # Reject if over 2x the limit (likely garbage output)
         if self._max_prompt_chars and len(new_text) > 2 * self._max_prompt_chars:
             logger.warning(
                 "GEPA rejected mutation for '%s': %d chars > 2x limit",
-                section_name, len(new_text),
+                section_name,
+                len(new_text),
             )
             return None
 
@@ -640,9 +618,8 @@ class PromptOptimizerLearner(BaseLearner):
         if self._use_pareto:
             if section_name not in self._pareto_frontiers:
                 from victor.framework.rl.pareto import ParetoFrontier
-                self._pareto_frontiers[section_name] = ParetoFrontier(
-                    max_candidates=20
-                )
+
+                self._pareto_frontiers[section_name] = ParetoFrontier(max_candidates=20)
             self._pareto_frontiers[section_name].add_candidate(
                 text_hash=text_hash,
                 text=new_text,
@@ -707,18 +684,14 @@ class PromptOptimizerLearner(BaseLearner):
             logs_dir = Path.home() / ".victor" / "logs"
 
         # Read from all usage.jsonl files (current + rotated .gz)
-        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [
-            logs_dir / "usage.jsonl"
-        ]
+        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [logs_dir / "usage.jsonl"]
 
         sessions: Dict[str, Dict[str, Any]] = {}
         for jsonl_path in jsonl_files:
             if not jsonl_path.exists():
                 continue
             try:
-                opener = (
-                    gzip.open if jsonl_path.suffix == ".gz" else open
-                )
+                opener = gzip.open if jsonl_path.suffix == ".gz" else open
                 mode = "rt" if jsonl_path.suffix == ".gz" else "r"
                 with opener(jsonl_path, mode) as f:
                     for line in f:
@@ -743,20 +716,14 @@ class PromptOptimizerLearner(BaseLearner):
                             elif etype == "tool_result":
                                 if not data.get("success", True):
                                     error = str(
-                                        data.get("error")
-                                        or data.get("result", {}).get(
-                                            "error", ""
-                                        )
+                                        data.get("error") or data.get("result", {}).get("error", "")
                                     )
                                     cat = self._categorize_failure(error)
                                     sessions[sid]["failures"][cat] = (
-                                        sessions[sid]["failures"].get(cat, 0)
-                                        + 1
+                                        sessions[sid]["failures"].get(cat, 0) + 1
                                     )
                             elif etype == "task_classification":
-                                sessions[sid]["task_type"] = data.get(
-                                    "task_type", "default"
-                                )
+                                sessions[sid]["task_type"] = data.get("task_type", "default")
                         except (json.JSONDecodeError, KeyError):
                             continue
             except Exception:
@@ -846,9 +813,7 @@ class PromptOptimizerLearner(BaseLearner):
         except Exception:
             logs_dir = Path.home() / ".victor" / "logs"
 
-        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [
-            logs_dir / "usage.jsonl"
-        ]
+        jsonl_files = sorted(logs_dir.glob("usage.*.jsonl.gz")) + [logs_dir / "usage.jsonl"]
 
         sessions: Dict[str, Dict[str, Any]] = {}
         for jsonl_path in jsonl_files:
@@ -881,12 +846,12 @@ class PromptOptimizerLearner(BaseLearner):
                                 # v2: capture detail
                                 detail = ToolCallTrace(
                                     tool_name=data.get("tool_name", ""),
-                                    arguments_summary=str(
-                                        data.get("arguments_sanitized", "")
-                                    )[:200],
-                                    reasoning_before=str(
-                                        data.get("reasoning_before_call", "")
-                                    )[:500],
+                                    arguments_summary=str(data.get("arguments_sanitized", ""))[
+                                        :200
+                                    ],
+                                    reasoning_before=str(data.get("reasoning_before_call", ""))[
+                                        :500
+                                    ],
                                 )
                                 sessions[sid]["details"].append(detail)
 
@@ -898,12 +863,8 @@ class PromptOptimizerLearner(BaseLearner):
                                     last = details[-1]
                                     last.success = success
                                     last.duration_ms = data.get("duration_ms", 0)
-                                    last.result_summary = str(
-                                        data.get("result_summary", "")
-                                    )[:500]
-                                    last.error_detail = str(
-                                        data.get("error_detail", "")
-                                    )[:500]
+                                    last.result_summary = str(data.get("result_summary", ""))[:500]
+                                    last.error_detail = str(data.get("error_detail", ""))[:500]
 
                                 if not success:
                                     error = str(
@@ -917,9 +878,7 @@ class PromptOptimizerLearner(BaseLearner):
                                     )
 
                             elif etype == "task_classification":
-                                sessions[sid]["task_type"] = data.get(
-                                    "task_type", "default"
-                                )
+                                sessions[sid]["task_type"] = data.get("task_type", "default")
                         except (json.JSONDecodeError, KeyError):
                             continue
             except Exception:
@@ -971,13 +930,8 @@ class PromptOptimizerLearner(BaseLearner):
             }
 
         return {
-            "total_candidates": sum(
-                len(v) for v in self._candidates.values()
-            ),
-            "sections": {
-                name: len(candidates)
-                for name, candidates in self._candidates.items()
-            },
+            "total_candidates": sum(len(v) for v in self._candidates.values()),
+            "sections": {name: len(candidates) for name, candidates in self._candidates.items()},
             "max_generation": max(
                 (
                     max((c.generation for c in cands), default=0)

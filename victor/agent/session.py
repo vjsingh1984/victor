@@ -95,9 +95,7 @@ class Session:
 
     metadata: SessionMetadata
     conversation: Dict[str, Any]  # Serialized MessageHistory state
-    conversation_state: Optional[Dict[str, Any]] = (
-        None  # ConversationStateMachine state
-    )
+    conversation_state: Optional[Dict[str, Any]] = None  # ConversationStateMachine state
     tool_selection_stats: Optional[Dict[str, Any]] = None  # Tool usage statistics
 
     def to_dict(self) -> Dict[str, Any]:

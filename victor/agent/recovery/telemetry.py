@@ -204,9 +204,7 @@ class RecoveryTelemetryCollector:
 
             # Update counters
             self._failure_counts[context.failure_type.name] += 1
-            self._failure_counts[
-                f"{context.provider_name}:{context.failure_type.name}"
-            ] += 1
+            self._failure_counts[f"{context.provider_name}:{context.failure_type.name}"] += 1
 
         # Persist to database
         if self._db_path:
@@ -352,9 +350,7 @@ class RecoveryTelemetryCollector:
 
         with self._lock:
             recent_failures = [e for e in self._failure_events if e.timestamp >= cutoff]
-            recent_recoveries = [
-                e for e in self._recovery_events if e.timestamp >= cutoff
-            ]
+            recent_recoveries = [e for e in self._recovery_events if e.timestamp >= cutoff]
 
         # Aggregate by type
         failures_by_type: Dict[str, int] = defaultdict(int)
@@ -368,9 +364,7 @@ class RecoveryTelemetryCollector:
 
         # Recovery stats
         successful = sum(1 for e in recent_recoveries if e.success)
-        total_quality_improvement = sum(
-            e.quality_improvement for e in recent_recoveries
-        )
+        total_quality_improvement = sum(e.quality_improvement for e in recent_recoveries)
 
         return {
             "time_window_hours": time_window_hours,
@@ -378,8 +372,7 @@ class RecoveryTelemetryCollector:
             "total_recovery_attempts": len(recent_recoveries),
             "successful_recoveries": successful,
             "recovery_rate": successful / max(len(recent_recoveries), 1),
-            "avg_quality_improvement": total_quality_improvement
-            / max(len(recent_recoveries), 1),
+            "avg_quality_improvement": total_quality_improvement / max(len(recent_recoveries), 1),
             "failures_by_type": dict(failures_by_type),
             "failures_by_model": dict(failures_by_model),
             "failures_by_provider": dict(failures_by_provider),
@@ -432,26 +425,18 @@ class RecoveryTelemetryCollector:
                     lines.append(f'recovery_failures_total{{type="{key}"}} {count}')
 
         # Recovery counts
-        lines.append(
-            "# HELP recovery_attempts_total Total recovery attempts by strategy"
-        )
+        lines.append("# HELP recovery_attempts_total Total recovery attempts by strategy")
         lines.append("# TYPE recovery_attempts_total counter")
         with self._lock:
             for strategy, count in self._recovery_counts.items():
-                lines.append(
-                    f'recovery_attempts_total{{strategy="{strategy}"}} {count}'
-                )
+                lines.append(f'recovery_attempts_total{{strategy="{strategy}"}} {count}')
 
         # Success counts
-        lines.append(
-            "# HELP recovery_successes_total Successful recoveries by strategy"
-        )
+        lines.append("# HELP recovery_successes_total Successful recoveries by strategy")
         lines.append("# TYPE recovery_successes_total counter")
         with self._lock:
             for strategy, count in self._success_counts.items():
-                lines.append(
-                    f'recovery_successes_total{{strategy="{strategy}"}} {count}'
-                )
+                lines.append(f'recovery_successes_total{{strategy="{strategy}"}} {count}')
 
         return "\n".join(lines)
 
@@ -473,15 +458,11 @@ class RecoveryTelemetryCollector:
 
         with self._lock:
             original_failures = len(self._failure_events)
-            self._failure_events = [
-                e for e in self._failure_events if e.timestamp >= cutoff
-            ]
+            self._failure_events = [e for e in self._failure_events if e.timestamp >= cutoff]
             cleared += original_failures - len(self._failure_events)
 
             original_recoveries = len(self._recovery_events)
-            self._recovery_events = [
-                e for e in self._recovery_events if e.timestamp >= cutoff
-            ]
+            self._recovery_events = [e for e in self._recovery_events if e.timestamp >= cutoff]
             cleared += original_recoveries - len(self._recovery_events)
 
         # Also clear from database
@@ -490,12 +471,8 @@ class RecoveryTelemetryCollector:
                 conn = sqlite3.connect(str(self._db_path))
                 cursor = conn.cursor()
                 cutoff_str = cutoff.isoformat()
-                cursor.execute(
-                    "DELETE FROM failure_events WHERE timestamp < ?", (cutoff_str,)
-                )
-                cursor.execute(
-                    "DELETE FROM recovery_events WHERE timestamp < ?", (cutoff_str,)
-                )
+                cursor.execute("DELETE FROM failure_events WHERE timestamp < ?", (cutoff_str,))
+                cursor.execute("DELETE FROM recovery_events WHERE timestamp < ?", (cutoff_str,))
                 conn.commit()
                 conn.close()
             except Exception as e:

@@ -143,9 +143,7 @@ class TestStateInspector:
 
     def test_get_value_missing(self, state_inspector, sample_state):
         """Test getting missing value with default."""
-        value = state_inspector.get_value(
-            sample_state, "missing_key", default="default"
-        )
+        value = state_inspector.get_value(sample_state, "missing_key", default="default")
 
         assert value == "default"
 

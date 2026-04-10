@@ -103,13 +103,9 @@ class ChunkingRegistry:
 
                         if isinstance(strategy, ChunkingStrategy):
                             self.register(strategy)
-                            logger.debug(
-                                f"Discovered external strategy: {strategy.name}"
-                            )
+                            logger.debug(f"Discovered external strategy: {strategy.name}")
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to load chunking strategy '{ep_name}': {e}"
-                        )
+                        logger.warning(f"Failed to load chunking strategy '{ep_name}': {e}")
         except Exception:
             pass
 

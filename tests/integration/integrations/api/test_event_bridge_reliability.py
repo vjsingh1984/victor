@@ -71,8 +71,7 @@ class TestEventBridgeLossDetection:
 
         # Verify no events were lost
         assert len(received) == total_events, (
-            f"Event loss detected: expected {total_events}, "
-            f"received {len(received)}"
+            f"Event loss detected: expected {total_events}, " f"received {len(received)}"
         )
 
         # Verify event integrity
@@ -112,8 +111,7 @@ class TestEventBridgeLossDetection:
 
         # Should still receive all events (queued in broadcaster)
         assert len(received) == total_events, (
-            f"Event loss with slow consumer: expected {total_events}, "
-            f"received {len(received)}"
+            f"Event loss with slow consumer: expected {total_events}, " f"received {len(received)}"
         )
 
     @pytest.mark.asyncio
@@ -167,8 +165,7 @@ class TestEventBridgeLossDetection:
         # (this is expected behavior - no buffering for disconnected clients)
         # But events before and after should be delivered
         assert len(received) >= 20, (
-            f"Expected at least 20 events (before + after reconnect), "
-            f"got {len(received)}"
+            f"Expected at least 20 events (before + after reconnect), " f"got {len(received)}"
         )
 
     @pytest.mark.asyncio
@@ -299,9 +296,7 @@ class TestEventBridgeOrdering:
         # Wait for delivery
         max_wait = 10
         deadline = time.time() + max_wait
-        while (
-            len(received) < num_sources * events_per_source and time.time() < deadline
-        ):
+        while len(received) < num_sources * events_per_source and time.time() < deadline:
             await asyncio.sleep(0.05)
 
         await bridge.async_stop()
@@ -455,9 +450,7 @@ class TestEventBridgeReliabilitySLOs:
         p95_latency = dashboard["dispatch_latency_p95_ms"]
 
         # Verify SLO compliance (p95 < 500ms, relaxed for CI/test environments)
-        assert (
-            p95_latency < 500.0
-        ), f"P95 dispatch latency {p95_latency:.2f}ms exceeds SLO of 200ms"
+        assert p95_latency < 500.0, f"P95 dispatch latency {p95_latency:.2f}ms exceeds SLO of 200ms"
 
     @pytest.mark.asyncio
     async def test_zero_skipped_subscriptions(self):

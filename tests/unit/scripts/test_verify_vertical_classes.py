@@ -5,15 +5,8 @@ import sys
 from pathlib import Path
 
 # scripts/ is not a Python package (no __init__.py), so import the module directly
-_SCRIPT_PATH = (
-    Path(__file__).resolve().parents[3]
-    / "scripts"
-    / "ci"
-    / "verify_vertical_classes.py"
-)
-_spec = importlib.util.spec_from_file_location(
-    "scripts.ci.verify_vertical_classes", _SCRIPT_PATH
-)
+_SCRIPT_PATH = Path(__file__).resolve().parents[3] / "scripts" / "ci" / "verify_vertical_classes.py"
+_spec = importlib.util.spec_from_file_location("scripts.ci.verify_vertical_classes", _SCRIPT_PATH)
 _mod = importlib.util.module_from_spec(_spec)
 sys.modules[_spec.name] = _mod
 _spec.loader.exec_module(_mod)

@@ -34,9 +34,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     """Resolve a vertical attribute and skip test when unavailable."""
     module, _resolved = import_module_with_fallback(module_path)
     if module is None or not hasattr(module, attr_name):
-        pytest.skip(
-            f"Vertical module or attribute unavailable: {module_path}:{attr_name}"
-        )
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
     return getattr(module, attr_name)
 
 

@@ -164,9 +164,7 @@ class RecoveryService:
 
         action = await self.select_recovery_action(context)
 
-        self._logger.info(
-            f"Executing recovery action: {action} for error: {context.error_type}"
-        )
+        self._logger.info(f"Executing recovery action: {action} for error: {context.error_type}")
 
         # Track by error type
         error_type = context.error_type

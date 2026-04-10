@@ -59,9 +59,7 @@ def list_plugins(
     plugin_type: Optional[str] = typer.Option(
         None, "--type", "-t", help="Filter by type: vertical, external, plugin"
     ),
-    enabled_only: bool = typer.Option(
-        False, "--enabled", help="Show only enabled plugins"
-    ),
+    enabled_only: bool = typer.Option(False, "--enabled", help="Show only enabled plugins"),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
 ) -> None:
     """List all plugins (verticals, external plugins, and entry-point plugins)."""
@@ -110,9 +108,7 @@ def list_plugins(
 @plugin_app.command("install")
 def install_plugin(
     source: str = typer.Argument(help="Local path or git URL to install from"),
-    enable: bool = typer.Option(
-        True, "--enable/--no-enable", help="Enable after install"
-    ),
+    enable: bool = typer.Option(True, "--enable/--no-enable", help="Enable after install"),
 ) -> None:
     """Install a plugin from a local path or git URL."""
     from victor.core.plugins.external import ExternalPluginManager
@@ -120,9 +116,7 @@ def install_plugin(
 
     manager = _get_manager()
 
-    source_type = (
-        "git_url" if source.endswith(".git") or "://" in source else "local_path"
-    )
+    source_type = "git_url" if source.endswith(".git") or "://" in source else "local_path"
 
     console.print(f"[cyan]Installing plugin from {source}...[/]")
 
@@ -155,9 +149,7 @@ def install_plugin(
 
 @plugin_app.command("uninstall")
 def uninstall_plugin(
-    plugin_id: str = typer.Argument(
-        help="Plugin ID to uninstall (e.g., my-plugin@external)"
-    ),
+    plugin_id: str = typer.Argument(help="Plugin ID to uninstall (e.g., my-plugin@external)"),
     force: bool = typer.Option(False, "--force", help="Skip confirmation"),
 ) -> None:
     """Uninstall an external plugin."""
@@ -249,10 +241,7 @@ def plugin_info(
                 }
                 for t in manifest.tools
             ],
-            "commands": [
-                {"name": c.name, "description": c.description}
-                for c in manifest.commands
-            ],
+            "commands": [{"name": c.name, "description": c.description} for c in manifest.commands],
             "hooks": {
                 "pre_tool_use": manifest.hooks.pre_tool_use,
                 "post_tool_use": manifest.hooks.post_tool_use,
@@ -266,9 +255,7 @@ def plugin_info(
     console.print()
     console.print(f"  ID:       {plugin.plugin_id}")
     console.print(f"  Kind:     {plugin.kind.value}")
-    console.print(
-        f"  Status:   {'[green]enabled[/]' if plugin.enabled else '[dim]disabled[/]'}"
-    )
+    console.print(f"  Status:   {'[green]enabled[/]' if plugin.enabled else '[dim]disabled[/]'}")
     console.print(f"  Path:     {plugin.root_path}")
 
     if manifest.permissions:

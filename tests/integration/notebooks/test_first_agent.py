@@ -133,9 +133,7 @@ class TestFirstAgentNotebook:
         events_received = []
         content_parts = []
 
-        async for event in ollama_agent.stream(
-            "Count to 3. Reply with just the numbers."
-        ):
+        async for event in ollama_agent.stream("Count to 3. Reply with just the numbers."):
             events_received.append(event.type)
 
             if event.type == EventType.CONTENT and event.content:
@@ -153,9 +151,7 @@ class TestFirstAgentNotebook:
     async def test_multi_turn_conversations(self, ollama_agent):
         """Test maintaining context across multiple messages."""
         session = ollama_agent.chat("My favorite color is blue. Remember this.")
-        response2 = await session.send(
-            "What is my favorite color? Reply with one word."
-        )
+        response2 = await session.send("What is my favorite color? Reply with one word.")
         assert response2.success is True
         assert response2.content
 

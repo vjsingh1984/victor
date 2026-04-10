@@ -209,9 +209,7 @@ class EntityMemoryIntegration:
 
             # Get related entities
             if include_related:
-                related = await self._entity_memory.get_related(
-                    entity.id, limit=max_related
-                )
+                related = await self._entity_memory.get_related(entity.id, limit=max_related)
                 for rel_entity, relation in related:
                     context["relationships"].append(
                         {

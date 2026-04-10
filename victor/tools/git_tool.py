@@ -284,9 +284,7 @@ async def git(
 
         author_info = ""
         if author_name or author_email:
-            author_info = (
-                f" (as {author_name or 'default'} <{author_email or 'default'}>)"
-            )
+            author_info = f" (as {author_name or 'default'} <{author_email or 'default'}>)"
 
         return {
             "success": True,
@@ -494,9 +492,7 @@ async def pr(
 
         if success and diff:
             # Get commit log
-            _, log, _ = await _run_git_async(
-                "log", f"{base_branch}..HEAD", "--pretty=format:- %s"
-            )
+            _, log, _ = await _run_git_async("log", f"{base_branch}..HEAD", "--pretty=format:- %s")
 
             # Generate PR content
             prompt = f"""Generate a pull request title and description for these changes.
@@ -643,9 +639,7 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         return {"success": False, "output": "", "error": stderr}
 
     # Find conflicted files (marked with UU)
-    conflicted = [
-        line.split()[-1] for line in status.split("\n") if line.startswith("UU")
-    ]
+    conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
 
     if not conflicted:
         return {"success": True, "output": "No merge conflicts detected", "error": ""}
@@ -672,9 +666,7 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                 end = content.find(">>>>>>> ", start)
                 if end != -1:
                     conflict_section = content[start : end + 50]
-                    analysis.append(
-                        f"   First conflict preview:\n   {conflict_section[:200]}..."
-                    )
+                    analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
 
         except Exception as e:
             analysis.append(f"   Error reading file: {e}")
@@ -712,9 +704,7 @@ async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
                             f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
                         )
                 except Exception as e:
-                    logger.debug(
-                        "Failed to read merge conflict details for %s: %s", file, e
-                    )
+                    logger.debug("Failed to read merge conflict details for %s: %s", file, e)
 
             if conflict_details:
                 prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
@@ -742,9 +732,7 @@ Be concise and practical."""
                 for line in suggestions.split("\n"):
                     analysis.append(f"   {line}")
             else:
-                analysis.append(
-                    "   Could not extract conflict details for AI analysis."
-                )
+                analysis.append("   Could not extract conflict details for AI analysis.")
         except Exception as e:
             analysis.append(f"   AI analysis failed: {e}")
 

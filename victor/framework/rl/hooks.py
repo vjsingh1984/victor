@@ -132,6 +132,10 @@ class RLEventType(str, Enum):
     PROMPT_USED = "prompt_used"
     """Prompt template was used. Triggers: prompt_template"""
 
+    # Prompt optimization
+    GEPA_EVOLUTION = "gepa_evolution"
+    """GEPA prompt evolution cycle completed. Triggers: prompt_optimizer"""
+
 
 @dataclass
 class RLEvent:
@@ -272,9 +276,7 @@ class RLHookRegistry:
         if event_type in self._subscribers:
             self._subscribers[event_type].discard(learner_name)
 
-    def add_handler(
-        self, event_type: RLEventType, handler: Callable[[RLEvent], None]
-    ) -> None:
+    def add_handler(self, event_type: RLEventType, handler: Callable[[RLEvent], None]) -> None:
         """Add a custom event handler.
 
         Allows extension without modifying learner code.
@@ -301,21 +303,15 @@ class RLHookRegistry:
         # Track exploration vs exploitation
         if event.was_exploration:
             for learner in self._subscribers.get(event.type, []):
-                self._exploration_counts[learner] = (
-                    self._exploration_counts.get(learner, 0) + 1
-                )
+                self._exploration_counts[learner] = self._exploration_counts.get(learner, 0) + 1
         else:
             for learner in self._subscribers.get(event.type, []):
-                self._exploitation_counts[learner] = (
-                    self._exploitation_counts.get(learner, 0) + 1
-                )
+                self._exploitation_counts[learner] = self._exploitation_counts.get(learner, 0) + 1
 
         # Track epsilon values
         if event.epsilon_value is not None:
             for learner in self._subscribers.get(event.type, []):
-                self._epsilon_history.append(
-                    (event.timestamp, learner, event.epsilon_value)
-                )
+                self._epsilon_history.append((event.timestamp, learner, event.epsilon_value))
 
         # Dispatch to subscribed learners
         if self._coordinator is None:
@@ -339,9 +335,7 @@ class RLHookRegistry:
             except Exception as e:
                 # Don't log warnings for closed database errors (expected during shutdown)
                 if "closed database" in str(e).lower():
-                    logger.debug(
-                        f"RL: Skipping dispatch to '{learner_name}' - database closed"
-                    )
+                    logger.debug(f"RL: Skipping dispatch to '{learner_name}' - database closed")
                 else:
                     logger.warning(f"RL: Failed to dispatch to '{learner_name}': {e}")
 
@@ -370,9 +364,7 @@ class RLHookRegistry:
             model=event.model or "",
             task_type=event.task_type or "general",
             success=event.success if event.success is not None else True,
-            quality_score=(
-                event.quality_score if event.quality_score is not None else 0.5
-            ),
+            quality_score=(event.quality_score if event.quality_score is not None else 0.5),
             metadata={
                 "event_type": event.type.value,
                 "tool_name": event.tool_name,
@@ -420,8 +412,7 @@ class RLHookRegistry:
             "exploitation_counts": dict(self._exploitation_counts),
             "exploration_rates": {
                 name: self.get_exploration_rate(name)
-                for name in set(self._exploration_counts)
-                | set(self._exploitation_counts)
+                for name in set(self._exploration_counts) | set(self._exploitation_counts)
             },
             "epsilon_history_size": len(self._epsilon_history),
             "subscribers": {
@@ -440,9 +431,7 @@ class RLHookRegistry:
         Returns:
             List of (timestamp, epsilon) tuples
         """
-        entries = [
-            (ts, eps) for ts, name, eps in self._epsilon_history if name == learner_name
-        ]
+        entries = [(ts, eps) for ts, name, eps in self._epsilon_history if name == learner_name]
         return entries[-limit:]
 
 

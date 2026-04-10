@@ -38,9 +38,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     """Load a vertical attribute or skip when unavailable."""
     module, _resolved = import_module_with_fallback(module_path)
     if module is None or not hasattr(module, attr_name):
-        pytest.skip(
-            f"Vertical module or attribute unavailable: {module_path}:{attr_name}"
-        )
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
     return getattr(module, attr_name)
 
 
@@ -153,9 +151,7 @@ class TestInfrastructureScanner:
     def test_scan_aws_terminate_instances(self):
         """Scanner should detect aws ec2 terminate-instances."""
         scanner = InfrastructureScanner()
-        result = scanner.scan_command(
-            "aws ec2 terminate-instances --instance-ids i-123"
-        )
+        result = scanner.scan_command("aws ec2 terminate-instances --instance-ids i-123")
         assert result.has_high is True
 
     def test_scan_aws_delete_bucket(self):
@@ -430,9 +426,7 @@ class TestVerticalIntegration:
         patterns = ext.get_bash_patterns()
         assert len(patterns) > 0
         # Should include k8s/docker patterns
-        assert any(
-            p.category in ("kubernetes", "docker", "terraform") for p in patterns
-        )
+        assert any(p.category in ("kubernetes", "docker", "terraform") for p in patterns)
 
     def test_coding_extension_scan_command(self):
         """CodingSafetyExtension.scan_command should work."""

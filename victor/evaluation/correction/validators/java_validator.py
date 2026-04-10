@@ -247,9 +247,7 @@ class JavaCodeValidator(BaseCodeValidator):
 
         # Add missing imports
         if validation.missing_imports:
-            fixed_code = self._add_missing_imports(
-                fixed_code, list(validation.missing_imports)
-            )
+            fixed_code = self._add_missing_imports(fixed_code, list(validation.missing_imports))
 
         return fixed_code
 
@@ -419,9 +417,7 @@ class JavaCodeValidator(BaseCodeValidator):
         if not missing:
             return code
 
-        import_statements = (
-            "\n".join(f"import {imp};" for imp in sorted(missing)) + "\n"
-        )
+        import_statements = "\n".join(f"import {imp};" for imp in sorted(missing)) + "\n"
 
         # Find where to insert imports
         # After package declaration, before class declaration

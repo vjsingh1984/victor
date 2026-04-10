@@ -150,16 +150,12 @@ def auth_add(
     provider: str = typer.Option(
         ..., "--provider", "-p", help="Provider name (e.g., anthropic, openai)"
     ),
-    model: str = typer.Option(
-        ..., "--model", "-m", help="Model name (e.g., claude-sonnet-4-5)"
-    ),
+    model: str = typer.Option(..., "--model", "-m", help="Model name (e.g., claude-sonnet-4-5)"),
     name: str = typer.Option("default", "--name", "-n", help="Account name"),
     auth_method: str = typer.Option(
         "api_key", "--auth-method", help="Authentication method (api_key, oauth, none)"
     ),
-    endpoint: Optional[str] = typer.Option(
-        None, "--endpoint", "-e", help="Custom endpoint URL"
-    ),
+    endpoint: Optional[str] = typer.Option(None, "--endpoint", "-e", help="Custom endpoint URL"),
     api_key: Optional[str] = typer.Option(
         None, "--api-key", help="API key (will prompt if not provided)"
     ),
@@ -301,9 +297,7 @@ def auth_remove(
 
 @auth_app.command("migrate")
 def auth_migrate(
-    force: bool = typer.Option(
-        False, "--force", "-f", help="Overwrite existing config"
-    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing config"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be done"),
 ) -> None:
     """Migrate from old configuration format.
@@ -376,12 +370,8 @@ def auth_migrate(
 
 @auth_app.command("test")
 def auth_test(
-    name: Optional[str] = typer.Option(
-        None, "--name", "-n", help="Account name to test"
-    ),
-    provider: Optional[str] = typer.Option(
-        None, "--provider", "-p", help="Provider to test"
-    ),
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Account name to test"),
+    provider: Optional[str] = typer.Option(None, "--provider", "-p", help="Provider to test"),
 ) -> None:
     """Test a provider connection.
 
@@ -418,9 +408,7 @@ def auth_test(
             console.print("[dim]Run 'victor auth setup' to configure[/]")
             raise typer.Exit(1)
 
-    console.print(
-        f"[cyan]Testing connection to {account.provider}/{account.model}...[/]"
-    )
+    console.print(f"[cyan]Testing connection to {account.provider}/{account.model}...[/]")
     console.print()
 
     # Run test
@@ -572,9 +560,7 @@ class AuthSetupWizard:
         if Confirm.ask("Migrate to new format?", default=True):
             result = run_migration(prompt=False)
             if result.success:
-                self.console.print(
-                    f"[green]✓[/] Migrated {result.migrated_accounts} accounts"
-                )
+                self.console.print(f"[green]✓[/] Migrated {result.migrated_accounts} accounts")
                 self.console.print()
                 return True
             else:
@@ -706,9 +692,7 @@ class AuthSetupWizard:
             self.state["selected_model"] = Prompt.ask("Enter model name")
 
         self.console.print()
-        self.console.print(
-            f"[green]✓[/] Selected: {provider}/{self.state['selected_model']}"
-        )
+        self.console.print(f"[green]✓[/] Selected: {provider}/{self.state['selected_model']}")
         return True
 
     def _configure_authentication(self) -> bool:
@@ -732,9 +716,7 @@ class AuthSetupWizard:
 
         # Check if OAuth is available
         if provider in OAUTH_PROVIDERS:
-            self.console.print(
-                f"[cyan]OAuth is available for {provider.capitalize()}[/]"
-            )
+            self.console.print(f"[cyan]OAuth is available for {provider.capitalize()}[/]")
             use_oauth = Confirm.ask(
                 "Use OAuth (recommended)?",
                 default=True,
@@ -748,9 +730,7 @@ class AuthSetupWizard:
         # Default to API key
         self.state["auth_method"] = "api_key"
         self.console.print("[cyan]Enter your API key[/]")
-        self.console.print(
-            "[dim]Your key will be stored securely in the system keyring[/]"
-        )
+        self.console.print("[dim]Your key will be stored securely in the system keyring[/]")
 
         api_key = Prompt.ask("API key", password=True)
         self.state["api_key"] = api_key

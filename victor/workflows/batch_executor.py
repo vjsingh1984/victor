@@ -109,9 +109,7 @@ class BatchConfig:
         """Create config from dictionary (e.g., from YAML metadata)."""
         retry_str = data.get("retry_strategy", "end_of_batch")
         retry_strategy = (
-            BatchRetryStrategy(retry_str)
-            if retry_str
-            else BatchRetryStrategy.END_OF_BATCH
+            BatchRetryStrategy(retry_str) if retry_str else BatchRetryStrategy.END_OF_BATCH
         )
 
         return cls(
@@ -598,9 +596,7 @@ class BatchWorkflowExecutor(Generic[T]):
             if config.retry_strategy == BatchRetryStrategy.IMMEDIATE:
                 # Retry immediately with backoff
                 delay = config.retry_delay_seconds * (2 ** (item_result.attempts - 1))
-                logger.debug(
-                    f"Retrying item {idx} after {delay}s (attempt {item_result.attempts})"
-                )
+                logger.debug(f"Retrying item {idx} after {delay}s (attempt {item_result.attempts})")
                 item_result.status = ItemStatus.RETRYING
                 await asyncio.sleep(delay)
                 # Re-queue for immediate retry in current batch
@@ -627,9 +623,7 @@ class BatchWorkflowExecutor(Generic[T]):
             item_result.status = ItemStatus.FAILED
             progress.failed += 1
             progress.pending -= 1
-            logger.warning(
-                f"Item {idx} failed after {item_result.attempts} attempts: {error}"
-            )
+            logger.warning(f"Item {idx} failed after {item_result.attempts} attempts: {error}")
 
     async def _process_retry_queue(
         self,

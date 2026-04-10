@@ -120,9 +120,7 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(ToolPluginRegistryProtocol, "_create_tool_plugin_registry"),
     ServiceSpec(SemanticToolSelectorProtocol, "_create_semantic_tool_selector"),
     ServiceSpec(ProviderRegistryProtocol, "_create_provider_registry"),
-    ServiceSpec(
-        ConversationEmbeddingStoreProtocol, "_create_conversation_embedding_store"
-    ),
+    ServiceSpec(ConversationEmbeddingStoreProtocol, "_create_conversation_embedding_store"),
     ServiceSpec(MetricsCollectorProtocol, "_create_metrics_collector"),
     ServiceSpec(ToolCacheProtocol, "_create_tool_cache"),
     ServiceSpec(UsageLoggerProtocol, "_create_usage_logger"),
@@ -148,9 +146,7 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(ToolPlannerProtocol, "_create_tool_planner"),
     ServiceSpec(TaskCoordinatorProtocol, "_create_task_coordinator"),
     ServiceSpec(CompactionSummarizerProtocol, "_create_compaction_summarizer"),
-    ServiceSpec(
-        HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"
-    ),
+    ServiceSpec(HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"),
     ServiceSpec(SessionContextLinkerProtocol, "_create_session_context_linker"),
     ServiceSpec(
         ToolCoordinatorProtocol,
@@ -198,7 +194,5 @@ WORKFLOW_TRANSIENT_SPECS: List[ServiceSpec] = [
         "_create_workflow_compiler_impl",
         ServiceLifetime.TRANSIENT,
     ),
-    ServiceSpec(
-        WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT
-    ),
+    ServiceSpec(WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT),
 ]

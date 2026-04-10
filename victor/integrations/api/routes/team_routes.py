@@ -198,9 +198,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     name=team["name"],
                     goal=team["goal"],
                     members=members,
-                    formation=formation_map.get(
-                        team["formation"], TeamFormation.SEQUENTIAL
-                    ),
+                    formation=formation_map.get(team["formation"], TeamFormation.SEQUENTIAL),
                     total_tool_budget=team["total_tool_budget"],
                 )
 
@@ -223,9 +221,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
                     await server._broadcast_ws(
                         {
                             "type": "agent_event",
-                            "event": (
-                                "team_completed" if result.success else "team_failed"
-                            ),
+                            "event": ("team_completed" if result.success else "team_failed"),
                             "data": team,
                             "timestamp": time.time(),
                         }

@@ -78,9 +78,7 @@ class SaveCommand(BaseSlashCommand):
             # Get execution state for restoration on resume
             execution_state = None
             if hasattr(ctx.agent, "session_state_accessor"):
-                execution_state = (
-                    ctx.agent.session_state_accessor.session_state.execution_state
-                )
+                execution_state = ctx.agent.session_state_accessor.session_state.execution_state
 
             # Get session ledger for persistence
             session_ledger = getattr(ctx.agent, "session_ledger", None)
@@ -262,9 +260,7 @@ class SessionsCommand(BaseSlashCommand):
                 )
 
             ctx.console.print(table)
-            ctx.console.print(
-                "\n[dim]Use '/resume <session_id>' to restore a session[/]"
-            )
+            ctx.console.print("\n[dim]Use '/resume <session_id>' to restore a session[/]")
             ctx.console.print(
                 "[dim]Or '/switch <model> --resume <session_id>' to resume and switch[/]"
             )
@@ -346,9 +342,7 @@ class ResumeCommand(BaseSlashCommand):
                 )
 
             ctx.console.print(table)
-            ctx.console.print(
-                "\n[dim]Enter session number to resume (1-{})[/]", len(sessions)
-            )
+            ctx.console.print("\n[dim]Enter session number to resume (1-{})[/]", len(sessions))
             ctx.console.print("[dim]Or use: /resume <session_id>[/]")
 
         except Exception as e:
@@ -406,13 +400,9 @@ class ResumeCommand(BaseSlashCommand):
 
             if resume_ctx.ledger and hasattr(ctx.agent, "session_ledger"):
                 ctx.agent.session_ledger = resume_ctx.ledger
-                logger.info(
-                    f"Restored session ledger: {len(resume_ctx.ledger.entries)} entries"
-                )
+                logger.info(f"Restored session ledger: {len(resume_ctx.ledger.entries)} entries")
 
-            if resume_ctx.execution_state and hasattr(
-                ctx.agent, "session_state_accessor"
-            ):
+            if resume_ctx.execution_state and hasattr(ctx.agent, "session_state_accessor"):
                 accessor = ctx.agent.session_state_accessor
                 accessor.observed_files = resume_ctx.execution_state.observed_files
                 accessor.executed_tools = resume_ctx.execution_state.executed_tools
@@ -429,8 +419,8 @@ class ResumeCommand(BaseSlashCommand):
                             HierarchicalCompactionManager,
                         )
 
-                        cc._hierarchical_manager = (
-                            HierarchicalCompactionManager.from_dict(hierarchy_data)
+                        cc._hierarchical_manager = HierarchicalCompactionManager.from_dict(
+                            hierarchy_data
                         )
                         logger.info("Restored compaction hierarchy")
                     except Exception as e:
@@ -450,13 +440,9 @@ class ResumeCommand(BaseSlashCommand):
                         _cc._compaction_summaries.append(active_ctx)
                     try:
                         _cc.inject_compaction_context()
-                        logger.info(
-                            "Injected compaction context from restored hierarchy"
-                        )
+                        logger.info("Injected compaction context from restored hierarchy")
                     except Exception as e:
-                        logger.debug(
-                            f"Compaction context injection skipped on resume: {e}"
-                        )
+                        logger.debug(f"Compaction context injection skipped on resume: {e}")
 
             ctx.console.print(
                 Panel(
@@ -499,18 +485,14 @@ class CompactCommand(BaseSlashCommand):
         original_count = ctx.agent.conversation.message_count()
 
         if original_count < 5:
-            ctx.console.print(
-                "[dim]Conversation is already small enough, nothing to compact[/]"
-            )
+            ctx.console.print("[dim]Conversation is already small enough, nothing to compact[/]")
             return
 
         use_smart = self._has_flag(ctx, "--smart", "-s")
         keep_recent = 6
 
         # Parse --keep N
-        keep_val = self._get_flag_value(ctx, "--keep") or self._get_flag_value(
-            ctx, "-k"
-        )
+        keep_val = self._get_flag_value(ctx, "--keep") or self._get_flag_value(ctx, "-k")
         if keep_val:
             try:
                 keep_recent = int(keep_val)

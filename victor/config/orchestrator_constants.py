@@ -133,9 +133,7 @@ class BudgetLimits:
     complex_task: int = 100  # Complex tasks get generous budget (was 30)
     action_task: int = 200  # BUILD mode tasks - let task completion decide (was 75)
     analysis_task: int = 500  # PLAN/EXPLORE modes - effectively unlimited (was 100)
-    max_session_budget: int = (
-        2000  # Very high - rely on task completion detection (was 500)
-    )
+    max_session_budget: int = 2000  # Very high - rely on task completion detection (was 500)
     warning_threshold_pct: float = 0.90  # Only warn at 90% (1800/2000)
 
 

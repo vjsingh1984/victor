@@ -104,9 +104,7 @@ class LoggingConfig:
     file_max_bytes: int = 10 * 1024 * 1024  # 10MB
     file_backup_count: int = 5
     console_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    file_format: str = (
-        "%(asctime)s - %(session)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    file_format: str = "%(asctime)s - %(session)s - %(name)s - %(levelname)s - %(message)s"
     event_logging: bool = True
     module_levels: Dict[str, str] = field(default_factory=dict)
 

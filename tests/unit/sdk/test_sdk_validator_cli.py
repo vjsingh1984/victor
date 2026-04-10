@@ -105,9 +105,7 @@ class _PluginWrappingValidVertical(VictorPlugin):
 
 
 def _patch_distribution(monkeypatch, entry_points):
-    fake_dist = SimpleNamespace(
-        entry_points=entry_points, metadata={"Name": "victor-fake"}
-    )
+    fake_dist = SimpleNamespace(entry_points=entry_points, metadata={"Name": "victor-fake"})
     monkeypatch.setattr(
         "victor_sdk.validation.distribution",
         lambda package_name: fake_dist,
@@ -139,17 +137,13 @@ def test_validate_vertical_package_reports_framework_version_skew(monkeypatch):
     report = validate_vertical_package("victor-fake")
 
     assert report.ok is False
-    assert any(
-        issue.code == "framework_version_incompatible" for issue in report.issues
-    )
+    assert any(issue.code == "framework_version_incompatible" for issue in report.issues)
 
 
 def test_validate_vertical_package_accepts_valid_plugin_entry_point(monkeypatch):
     """Validator should share plugin parsing semantics with SDK discovery."""
 
-    _patch_distribution(
-        monkeypatch, [_FakeEntryPoint("valid", _PluginWrappingValidVertical)]
-    )
+    _patch_distribution(monkeypatch, [_FakeEntryPoint("valid", _PluginWrappingValidVertical)])
 
     report = validate_vertical_package("victor-fake")
 

@@ -137,9 +137,7 @@ async def test_lmstudio_simple_chat(lmstudio_provider):
         response = await client.get("http://localhost:1234/v1/models", timeout=5.0)
         model_name = response.json()["data"][0]["id"]
 
-    messages = [
-        Message(role="user", content="Say 'Hello from LMStudio' and nothing else.")
-    ]
+    messages = [Message(role="user", content="Say 'Hello from LMStudio' and nothing else.")]
 
     response = await lmstudio_provider.chat(
         messages=messages,
@@ -324,9 +322,7 @@ async def test_lmstudio_with_ollama_shared_model(lmstudio_provider):
             if not ollama_model:
                 pytest.skip("No Ollama-shared model found in LMStudio")
 
-        messages = [
-            Message(role="user", content="Say 'Model sharing works!' and nothing else.")
-        ]
+        messages = [Message(role="user", content="Say 'Model sharing works!' and nothing else.")]
 
         response = await lmstudio_provider.chat(
             messages=messages,
@@ -397,13 +393,9 @@ async def test_lmstudio_large_context(lmstudio_provider):
                 content=f"What is important about code quality aspect {i+1}? One sentence.",
             )
         )
-        messages.append(
-            Message(role="assistant", content=f"Code quality aspect {i+1} matters.")
-        )
+        messages.append(Message(role="assistant", content=f"Code quality aspect {i+1} matters."))
 
-    messages.append(
-        Message(role="user", content="Summarize our discussion in one sentence.")
-    )
+    messages.append(Message(role="user", content="Summarize our discussion in one sentence."))
 
     response = await lmstudio_provider.chat(
         messages=messages,

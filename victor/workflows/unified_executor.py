@@ -83,9 +83,7 @@ class ExecutorConfig:
     max_iterations: int = 25
     timeout: Optional[float] = None
     interrupt_nodes: List[str] = field(default_factory=list)
-    default_profile: Optional[str] = (
-        None  # Default profile for nodes without explicit profile
-    )
+    default_profile: Optional[str] = None  # Default profile for nodes without explicit profile
 
 
 @dataclass
@@ -283,9 +281,7 @@ class StateGraphExecutor:
             result = await compiled.invoke(state, thread_id=thread_id)
 
             # Extract user state (exclude internal fields)
-            user_state = {
-                k: v for k, v in result.state.items() if not k.startswith("_")
-            }
+            user_state = {k: v for k, v in result.state.items() if not k.startswith("_")}
 
             return ExecutorResult(
                 success=result.success,
@@ -334,9 +330,7 @@ class StateGraphExecutor:
         # Stream execution
         async for node_id, current_state in compiled.stream(state, thread_id=thread_id):
             # Filter internal fields for user
-            user_state = {
-                k: v for k, v in current_state.items() if not k.startswith("_")
-            }
+            user_state = {k: v for k, v in current_state.items() if not k.startswith("_")}
             yield (node_id, user_state)
 
 

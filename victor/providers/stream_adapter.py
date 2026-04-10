@@ -649,9 +649,7 @@ class UnifiedStreamAdapter:
         Raises:
             ProviderError: If streaming fails
         """
-        metrics = (
-            StreamMetrics(start_time=time.time()) if self._collect_metrics else None
-        )
+        metrics = StreamMetrics(start_time=time.time()) if self._collect_metrics else None
 
         try:
             # Get the raw stream from the provider

@@ -479,9 +479,7 @@ class TestPerformanceBenchmarks:
             mock_ep.value = f"test:Vertical{i}"
             mock_eps.append(mock_ep)
 
-        with patch(
-            "victor.framework.entry_point_registry.entry_points"
-        ) as mock_eps_func:
+        with patch("victor.framework.entry_point_registry.entry_points") as mock_eps_func:
             mock_eps_func.return_value = mock_eps
 
             registry = UnifiedEntryPointRegistry.get_instance()

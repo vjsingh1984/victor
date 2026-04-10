@@ -135,9 +135,7 @@ class SchemaValidator:
         # Check edges if present
         if "edges" in workflow:
             errors.extend(
-                self._validate_edges(
-                    workflow.get("edges", []), workflow.get("nodes", [])
-                )
+                self._validate_edges(workflow.get("edges", []), workflow.get("nodes", []))
             )
 
         # Check entry point if present
@@ -149,9 +147,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_required_fields(
-        self, workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _validate_required_fields(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Validate required top-level fields."""
         errors = []
         required_fields = ["nodes", "entry_point"]
@@ -170,9 +166,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_nodes(
-        self, nodes: List[Dict[str, Any]]
-    ) -> List[WorkflowValidationError]:
+    def _validate_nodes(self, nodes: List[Dict[str, Any]]) -> List[WorkflowValidationError]:
         """Validate nodes list."""
         errors = []
 
@@ -210,9 +204,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_node(
-        self, node: Dict[str, Any], index: int
-    ) -> List[WorkflowValidationError]:
+    def _validate_node(self, node: Dict[str, Any], index: int) -> List[WorkflowValidationError]:
         """Validate individual node."""
         errors = []
         node_id = node.get("id", f"nodes[{index}]")
@@ -502,9 +494,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_entry_point(
-        self, workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _validate_entry_point(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Validate entry point."""
         errors = []
         entry_point = workflow.get("entry_point")
@@ -524,9 +514,7 @@ class SchemaValidator:
 
         return errors
 
-    def _validate_workflow_config(
-        self, workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _validate_workflow_config(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Validate workflow-level configuration."""
         errors = []
 
@@ -755,9 +743,7 @@ class GraphStructureValidator:
         errors = []
 
         # Build node type lookup
-        node_types = {
-            node.get("id"): node.get("type") for node in nodes if "id" in node
-        }
+        node_types = {node.get("id"): node.get("type") for node in nodes if "id" in node}
         condition_nodes = {n.get("id") for n in nodes if n.get("type") == "condition"}
 
         # Detect cycles using DFS
@@ -889,9 +875,7 @@ class SemanticValidator:
 
         return errors
 
-    def _validate_node_semantics(
-        self, node: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _validate_node_semantics(self, node: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Validate node semantics."""
         errors = []
         node_id = node.get("id", "unknown")
@@ -932,9 +916,7 @@ class SemanticValidator:
                     for tool_name in tools:
                         if not self._tool_exists(tool_name):
                             severity = (
-                                ErrorSeverity.ERROR
-                                if self.strict_mode
-                                else ErrorSeverity.WARNING
+                                ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
                             )
                             errors.append(
                                 WorkflowValidationError(
@@ -958,9 +940,7 @@ class SemanticValidator:
         if "handler" in node and node["handler"]:
             handler_name = node["handler"]
             if handler_name not in self.handler_registry:
-                severity = (
-                    ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
-                )
+                severity = ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
                 errors.append(
                     WorkflowValidationError(
                         category=ErrorCategory.SEMANTIC,
@@ -978,9 +958,7 @@ class SemanticValidator:
                 for tool_name in tools:
                     if not self._tool_exists(tool_name):
                         severity = (
-                            ErrorSeverity.ERROR
-                            if self.strict_mode
-                            else ErrorSeverity.WARNING
+                            ErrorSeverity.ERROR if self.strict_mode else ErrorSeverity.WARNING
                         )
                         errors.append(
                             WorkflowValidationError(
@@ -1095,9 +1073,7 @@ class SecurityValidator:
 
         return errors
 
-    def _check_resource_limits(
-        self, workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _check_resource_limits(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Check workflow doesn't exceed resource limits."""
         errors = []
 
@@ -1144,9 +1120,7 @@ class SecurityValidator:
 
         return errors
 
-    def _check_tool_combinations(
-        self, workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _check_tool_combinations(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Check for dangerous tool combinations."""
         errors = []
 
@@ -1202,9 +1176,7 @@ class SecurityValidator:
 
         return errors
 
-    def _check_infinite_loops(
-        self, workflow: Dict[str, Any]
-    ) -> List[WorkflowValidationError]:
+    def _check_infinite_loops(self, workflow: Dict[str, Any]) -> List[WorkflowValidationError]:
         """Check for potential infinite loops."""
         errors = []
 
@@ -1307,12 +1279,9 @@ class WorkflowValidator:
         security_errors = self.security_validator.validate(workflow_dict)
 
         # Determine if valid (no critical or error-level issues)
-        all_errors = (
-            schema_errors + structure_errors + semantic_errors + security_errors
-        )
+        all_errors = schema_errors + structure_errors + semantic_errors + security_errors
         has_blocking_errors = any(
-            e.severity in [ErrorSeverity.CRITICAL, ErrorSeverity.ERROR]
-            for e in all_errors
+            e.severity in [ErrorSeverity.CRITICAL, ErrorSeverity.ERROR] for e in all_errors
         )
 
         return WorkflowGenerationValidationResult(
@@ -1324,9 +1293,7 @@ class WorkflowValidator:
             workflow_name=workflow_name,
         )
 
-    def validate_layer(
-        self, workflow: Dict[str, Any], layer: str
-    ) -> List[WorkflowValidationError]:
+    def validate_layer(self, workflow: Dict[str, Any], layer: str) -> List[WorkflowValidationError]:
         """Validate a single layer.
 
         Useful for targeted validation.
@@ -1357,8 +1324,7 @@ class WorkflowValidator:
             return self.security_validator.validate(workflow_dict)
         else:
             raise ValueError(
-                f"Invalid layer: {layer}. "
-                f"Valid layers: schema, structure, semantic, security"
+                f"Invalid layer: {layer}. " f"Valid layers: schema, structure, semantic, security"
             )
 
 
@@ -1657,10 +1623,7 @@ class RequirementValidator:
             )
 
         # Check: Conflicting quality constraints
-        if (
-            requirements.quality.max_duration_seconds
-            and len(requirements.functional.tasks) > 0
-        ):
+        if requirements.quality.max_duration_seconds and len(requirements.functional.tasks) > 0:
             min_time = len(requirements.functional.tasks) * 30  # 30s per task min
             if requirements.quality.max_duration_seconds < min_time:
                 errors.append(
@@ -1871,9 +1834,7 @@ class RequirementValidator:
 
         # Based on structure complexity
         if len(requirements.structural.branches) > 3:
-            recommendations.append(
-                "Complex branching logic - add comments/documentation"
-            )
+            recommendations.append("Complex branching logic - add comments/documentation")
 
         # Based on quality constraints
         if not requirements.quality.max_duration_seconds:
@@ -1883,13 +1844,8 @@ class RequirementValidator:
             recommendations.append("Add success criteria to verify workflow completion")
 
         # Based on vertical
-        if (
-            requirements.context.vertical == "coding"
-            and not requirements.context.project_context
-        ):
-            recommendations.append(
-                "Add project context (language, framework) for better results"
-            )
+        if requirements.context.vertical == "coding" and not requirements.context.project_context:
+            recommendations.append("Add project context (language, framework) for better results")
 
         return recommendations
 

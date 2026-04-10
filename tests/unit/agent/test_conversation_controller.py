@@ -114,9 +114,7 @@ class TestConversationController:
         controller = ConversationController()
         tool_calls = [{"name": "read_file", "arguments": {"path": "test.py"}}]
 
-        msg = controller.add_assistant_message(
-            "Let me read that.", tool_calls=tool_calls
-        )
+        msg = controller.add_assistant_message("Let me read that.", tool_calls=tool_calls)
 
         assert msg.tool_calls == tool_calls
 
@@ -335,9 +333,7 @@ class TestSmartCompaction:
         controller.set_system_prompt("System prompt")
         controller.add_user_message("User message 1")
         controller.add_assistant_message("Assistant response")
-        controller.add_tool_result(
-            "tool_1", "read_file", "File contents here - important data"
-        )
+        controller.add_tool_result("tool_1", "read_file", "File contents here - important data")
         controller.add_user_message("User message 2")
         controller.add_assistant_message("Another response")
         controller.add_user_message("User message 3")
@@ -450,12 +446,7 @@ class TestSmartCompaction:
         config = ConversationConfig()
 
         assert config.compaction_strategy == CompactionStrategy.TIERED
-        assert (
-            config.min_messages_to_keep == COMPACTION_CONFIG.min_messages_after_compact
-        )
-        assert (
-            config.tool_result_retention_weight
-            == COMPACTION_CONFIG.tool_result_retention_weight
-        )
+        assert config.min_messages_to_keep == COMPACTION_CONFIG.min_messages_after_compact
+        assert config.tool_result_retention_weight == COMPACTION_CONFIG.tool_result_retention_weight
         assert config.recent_message_weight == COMPACTION_CONFIG.recent_message_weight
         assert config.semantic_relevance_threshold == 0.3

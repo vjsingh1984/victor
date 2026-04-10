@@ -478,9 +478,7 @@ class TestCircuitBreakerRegistryObservability:
         CircuitBreakerRegistry.wire_observability(MockBus())
 
         # Create breaker AFTER wiring
-        breaker = CircuitBreakerRegistry.get_or_create(
-            "auto_wired", failure_threshold=1
-        )
+        breaker = CircuitBreakerRegistry.get_or_create("auto_wired", failure_threshold=1)
 
         # Trigger state change
         breaker._record_failure()

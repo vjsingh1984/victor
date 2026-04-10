@@ -39,9 +39,7 @@ def test_create_metrics_runtime_components_lazy_materialization():
     assert runtime.session_cost_tracker.initialized is False
     assert runtime.metrics_coordinator.initialized is False
 
-    with patch(
-        "victor.agent.session_cost_tracker.SessionCostTracker"
-    ) as session_cost_tracker_cls:
+    with patch("victor.agent.session_cost_tracker.SessionCostTracker") as session_cost_tracker_cls:
         with patch(
             "victor.agent.coordinators.metrics_coordinator.MetricsCoordinator"
         ) as metrics_coordinator_cls:
@@ -60,16 +58,12 @@ def test_create_metrics_runtime_components_lazy_materialization():
 
     factory.create_metrics_collector.assert_called_once()
     metrics_collector_kwargs = factory.create_metrics_collector.call_args.kwargs
-    assert (
-        metrics_collector_kwargs["streaming_metrics_collector"] is streaming_collector
-    )
+    assert metrics_collector_kwargs["streaming_metrics_collector"] is streaming_collector
     assert metrics_collector_kwargs["usage_logger"] is usage_logger
     assert metrics_collector_kwargs["debug_logger"] is debug_logger
     assert metrics_collector_kwargs["tool_cost_lookup"]("read_file") == "tier:read_file"
 
-    session_cost_tracker_cls.assert_called_once_with(
-        provider="ollama", model="qwen3-coder:30b"
-    )
+    session_cost_tracker_cls.assert_called_once_with(provider="ollama", model="qwen3-coder:30b")
     metrics_coordinator_cls.assert_called_once_with(
         metrics_collector=metrics_collector,
         session_cost_tracker=session_cost_tracker,

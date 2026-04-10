@@ -260,9 +260,7 @@ class TestCreateCoreServices:
 class TestCreateStreamingMetricsCollector:
     """Tests for create_streaming_metrics_collector method."""
 
-    def test_create_streaming_metrics_collector_when_enabled(
-        self, factory, mock_settings
-    ):
+    def test_create_streaming_metrics_collector_when_enabled(self, factory, mock_settings):
         """create_streaming_metrics_collector returns collector when enabled."""
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
 
@@ -271,9 +269,7 @@ class TestCreateStreamingMetricsCollector:
         collector = factory.create_streaming_metrics_collector()
         assert isinstance(collector, StreamingMetricsCollector)
 
-    def test_create_streaming_metrics_collector_when_disabled(
-        self, factory, mock_settings
-    ):
+    def test_create_streaming_metrics_collector_when_disabled(self, factory, mock_settings):
         """create_streaming_metrics_collector returns None when disabled."""
         mock_settings.streaming_metrics_enabled = False
 
@@ -353,9 +349,7 @@ class TestCreateObservability:
 class TestCreateOrchestratorFactory:
     """Tests for create_orchestrator_factory convenience function."""
 
-    def test_create_orchestrator_factory_returns_factory(
-        self, mock_settings, mock_provider
-    ):
+    def test_create_orchestrator_factory_returns_factory(self, mock_settings, mock_provider):
         """create_orchestrator_factory returns OrchestratorFactory."""
         factory = create_orchestrator_factory(
             settings=mock_settings,
@@ -499,9 +493,7 @@ class TestCreateMemoryComponents:
             mock_project.project_root = "/tmp/project"
             mock_paths.return_value = mock_project
 
-            with patch(
-                "victor.agent.conversation_memory.ConversationStore"
-            ) as mock_store_cls:
+            with patch("victor.agent.conversation_memory.ConversationStore") as mock_store_cls:
                 mock_store = MagicMock()
                 mock_session = MagicMock()
                 mock_session.session_id = "test-session-id"
@@ -665,9 +657,7 @@ class TestWorkflowOptimizationComponents:
         # Reset singleton for test
         ResourceManager._instance = None
 
-        components = factory.create_workflow_optimization_components(
-            timeout_seconds=30.0
-        )
+        components = factory.create_workflow_optimization_components(timeout_seconds=30.0)
 
         from victor.agent.orchestrator_factory import WorkflowOptimizationComponents
 

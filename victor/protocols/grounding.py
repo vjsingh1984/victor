@@ -219,9 +219,7 @@ class FileExistenceStrategy(IGroundingStrategy):
         else:
             # Claim says file does not exist
             is_grounded = not exists
-            reason = (
-                f"File {'does not exist' if not exists else 'exists'}: {claim.value}"
-            )
+            reason = f"File {'does not exist' if not exists else 'exists'}: {claim.value}"
 
         return VerificationResult(
             is_grounded=is_grounded,

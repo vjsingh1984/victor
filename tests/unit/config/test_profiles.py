@@ -149,9 +149,7 @@ class TestProfileGeneration:
 
     def test_generate_with_provider_override(self):
         """Provider override works in YAML generation."""
-        yaml_content = generate_profile_yaml(
-            BASIC_PROFILE, provider_override="anthropic"
-        )
+        yaml_content = generate_profile_yaml(BASIC_PROFILE, provider_override="anthropic")
         assert "provider: anthropic" in yaml_content
 
     def test_generate_with_model_override(self):
@@ -190,14 +188,10 @@ class TestSpecializedProfiles:
         """Coding profile is optimized for development."""
         assert CODING_PROFILE.name == "coding"
         assert "coder" in CODING_PROFILE.settings["default_model"].lower()
-        assert (
-            CODING_PROFILE.settings["default_temperature"] == 0.3
-        )  # Lower temp for code
+        assert CODING_PROFILE.settings["default_temperature"] == 0.3  # Lower temp for code
 
     def test_research_profile(self):
         """Research profile has higher context."""
         assert RESEARCH_PROFILE.name == "research"
         assert RESEARCH_PROFILE.settings["default_max_tokens"] == 16384
-        assert (
-            RESEARCH_PROFILE.settings["default_temperature"] == 0.8
-        )  # Higher temp for creativity
+        assert RESEARCH_PROFILE.settings["default_temperature"] == 0.8  # Higher temp for creativity

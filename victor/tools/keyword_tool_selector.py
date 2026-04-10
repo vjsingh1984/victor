@@ -151,9 +151,7 @@ class KeywordToolSelector:
 
         # Fallback: Build selected tool names using core tools + registry keyword matches
         # Uses keywords from @tool decorators as single source of truth
-        selected_tool_names = self._get_stage_core_tools(
-            context.conversation_stage
-        ).copy()
+        selected_tool_names = self._get_stage_core_tools(context.conversation_stage).copy()
 
         # Use registry-based keyword matching (from @tool decorators)
         registry_matches = get_tools_from_message(prompt)
@@ -307,9 +305,7 @@ class KeywordToolSelector:
                 or entry.execution_category == ExecutionCategory.READ_ONLY
             )
         except ImportError as e:
-            logger.debug(
-                f"Metadata registry module not available for readonly check: {e}"
-            )
+            logger.debug(f"Metadata registry module not available for readonly check: {e}")
             return False
         except Exception as e:
             logger.debug(
@@ -374,9 +370,7 @@ class KeywordToolSelector:
 
         # Skip stage filtering if user has write intent
         if prompt and self._has_write_intent(prompt):
-            logger.info(
-                "Write intent detected in prompt, skipping stage-based filtering"
-            )
+            logger.info("Write intent detected in prompt, skipping stage-based filtering")
             return tools
 
         from victor.agent.conversation_state import ConversationStage

@@ -67,9 +67,7 @@ class FeedbackGenerator:
 
         syntax_feedback = self._build_syntax_feedback(validation)
         import_feedback = self._build_import_feedback(validation)
-        test_feedback = self._build_test_feedback(
-            test_stdout, test_stderr, test_passed, test_total
-        )
+        test_feedback = self._build_test_feedback(test_stdout, test_stderr, test_passed, test_total)
 
         has_issues = any([syntax_feedback, import_feedback, test_feedback])
 
@@ -81,9 +79,7 @@ class FeedbackGenerator:
             test_feedback=test_feedback,
         )
 
-    def _build_syntax_feedback(
-        self, validation: Optional[CodeValidationResult]
-    ) -> Optional[str]:
+    def _build_syntax_feedback(self, validation: Optional[CodeValidationResult]) -> Optional[str]:
         """Build syntax error feedback."""
         if not validation or validation.syntax_valid:
             return None
@@ -93,9 +89,7 @@ class FeedbackGenerator:
             "Please fix the syntax and ensure the code is valid."
         )
 
-    def _build_import_feedback(
-        self, validation: Optional[CodeValidationResult]
-    ) -> Optional[str]:
+    def _build_import_feedback(self, validation: Optional[CodeValidationResult]) -> Optional[str]:
         """Build import issue feedback."""
         if not validation or validation.imports_valid:
             return None
@@ -119,9 +113,7 @@ class FeedbackGenerator:
     ) -> Optional[str]:
         """Build test failure feedback."""
         has_failures = test_stderr or (
-            test_passed is not None
-            and test_total is not None
-            and test_passed < test_total
+            test_passed is not None and test_total is not None and test_passed < test_total
         )
 
         if not has_failures:

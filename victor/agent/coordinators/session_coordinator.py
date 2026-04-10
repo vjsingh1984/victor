@@ -387,9 +387,7 @@ class SessionCoordinator:
         # Add memory manager stats if available
         if self._memory_manager and self._memory_session_id:
             try:
-                memory_stats = self._memory_manager.get_session_stats(
-                    self._memory_session_id
-                )
+                memory_stats = self._memory_manager.get_session_stats(self._memory_session_id)
                 if memory_stats:
                     base_stats.update(memory_stats)
             except Exception as e:
@@ -535,12 +533,8 @@ class SessionCoordinator:
             state: State dictionary from checkpoint
         """
         # Restore session state
-        self._session_state.execution_state.tool_calls_used = state.get(
-            "tool_calls_used", 0
-        )
-        self._session_state._tool_budget = state.get(
-            "tool_budget", self._session_state.tool_budget
-        )
+        self._session_state.execution_state.tool_calls_used = state.get("tool_calls_used", 0)
+        self._session_state._tool_budget = state.get("tool_budget", self._session_state.tool_budget)
 
         # Restore token usage
         token_usage = state.get("token_usage", {})
@@ -548,12 +542,8 @@ class SessionCoordinator:
             self._session_state.execution_state.token_usage = token_usage
 
         # Restore observed files and executed tools
-        self._session_state.execution_state.observed_files = set(
-            state.get("observed_files", [])
-        )
-        self._session_state.execution_state.executed_tools = list(
-            state.get("executed_tools", [])
-        )
+        self._session_state.execution_state.observed_files = set(state.get("observed_files", []))
+        self._session_state.execution_state.executed_tools = list(state.get("executed_tools", []))
 
         # Update session activity
         if self._current_session:
@@ -581,9 +571,7 @@ class SessionCoordinator:
                 {
                     "session_id": s.session_id,
                     "created_at": s.created_at.isoformat() if s.created_at else None,
-                    "last_activity": (
-                        s.last_activity.isoformat() if s.last_activity else None
-                    ),
+                    "last_activity": (s.last_activity.isoformat() if s.last_activity else None),
                     "project_path": s.project_path,
                     "provider": s.provider,
                     "model": s.model,
@@ -655,10 +643,7 @@ class SessionCoordinator:
             # Fall back to provided messages
             if messages:
                 # Convert Message objects to dict if needed
-                return [
-                    msg.model_dump() if hasattr(msg, "model_dump") else msg
-                    for msg in messages
-                ]
+                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
             return []
 
         try:
@@ -669,10 +654,7 @@ class SessionCoordinator:
         except Exception as e:
             logger.warning(f"Failed to get memory context: {e}, using fallback")
             if messages:
-                return [
-                    msg.model_dump() if hasattr(msg, "model_dump") else msg
-                    for msg in messages
-                ]
+                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
             return []
 
     # ========================================================================
@@ -755,8 +737,7 @@ class SessionCoordinator:
                     loop.create_task(conversation_embedding_store.initialize())
 
             logger.info(
-                "ConversationEmbeddingStore configured. "
-                "Message embeddings will sync to LanceDB."
+                "ConversationEmbeddingStore configured. " "Message embeddings will sync to LanceDB."
             )
 
             # Set up semantic tool result cache using the embedding service

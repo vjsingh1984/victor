@@ -28,11 +28,7 @@ class TestDockerOperationWhitelist:
             # Patch the import inside the function
             with patch.dict(
                 "sys.modules",
-                {
-                    "victor.config.settings": MagicMock(
-                        get_settings=lambda: mock_settings
-                    )
-                },
+                {"victor.config.settings": MagicMock(get_settings=lambda: mock_settings)},
             ):
                 result = await docker(
                     operation="exec",
@@ -67,11 +63,7 @@ class TestDockerOperationWhitelist:
             patch("victor.tools.docker_tool.check_docker_available", return_value=True),
             patch.dict(
                 "sys.modules",
-                {
-                    "victor.config.settings": MagicMock(
-                        get_settings=lambda: mock_settings
-                    )
-                },
+                {"victor.config.settings": MagicMock(get_settings=lambda: mock_settings)},
             ),
             patch(
                 "victor.tools.docker_tool._run_docker_command_async",
@@ -94,16 +86,10 @@ class TestDockerOperationWhitelist:
 
         for op in DANGEROUS_OPERATIONS:
             with (
-                patch(
-                    "victor.tools.docker_tool.check_docker_available", return_value=True
-                ),
+                patch("victor.tools.docker_tool.check_docker_available", return_value=True),
                 patch.dict(
                     "sys.modules",
-                    {
-                        "victor.config.settings": MagicMock(
-                            get_settings=lambda: mock_settings
-                        )
-                    },
+                    {"victor.config.settings": MagicMock(get_settings=lambda: mock_settings)},
                 ),
             ):
                 result = await docker(
@@ -112,9 +98,7 @@ class TestDockerOperationWhitelist:
                     options={"command": "echo hi"},
                 )
             assert result["success"] is False, f"{op} should be blocked"
-            assert (
-                "restricted" in result["error"]
-            ), f"{op} error should mention restricted"
+            assert "restricted" in result["error"], f"{op} error should mention restricted"
 
     def test_safe_and_dangerous_sets_are_disjoint(self):
         """SAFE_OPERATIONS and DANGEROUS_OPERATIONS must not overlap."""

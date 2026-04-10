@@ -116,9 +116,7 @@ class CompilerConfig:
     runner_registry: Optional["NodeRunnerRegistry"] = None
     validate_before_compile: bool = True
     preserve_state_type: bool = False
-    emitter: Optional[Any] = (
-        None  # ObservabilityEmitter, use Any to avoid circular import
-    )
+    emitter: Optional[Any] = None  # ObservabilityEmitter, use Any to avoid circular import
     enable_observability: bool = False
 
 
@@ -292,9 +290,7 @@ class WorkflowGraphCompiler(Generic[S]):
         # Build nodes
         nodes: Dict[str, Node] = {}
         for node_name, graph_node in graph._nodes.items():
-            node_func = self._create_node_function(
-                graph_node, GraphNodeType, graph.state_type
-            )
+            node_func = self._create_node_function(graph_node, GraphNodeType, graph.state_type)
             nodes[node_name] = Node(
                 id=node_name,
                 func=node_func,
@@ -329,9 +325,7 @@ class WorkflowGraphCompiler(Generic[S]):
                 edges[from_node] = []
 
             # Convert routes, replacing END markers
-            converted_routes = {
-                k: (END if v == graph.END else v) for k, v in routes.items()
-            }
+            converted_routes = {k: (END if v == graph.END else v) for k, v in routes.items()}
 
             # Create state-aware router
             state_type = graph.state_type
@@ -389,9 +383,7 @@ class WorkflowGraphCompiler(Generic[S]):
             runner = self._config.runner_registry.get_runner(graph_node.node_type.value)
             if runner:
                 node_config = self._extract_node_config(graph_node, GraphNodeType)
-                emitter = (
-                    self._config.emitter if self._config.enable_observability else None
-                )
+                emitter = self._config.emitter if self._config.enable_observability else None
                 return NodeRunnerWrapper(graph_node.name, node_config, runner, emitter)
 
         # Default: wrap the original function with state conversion
@@ -567,9 +559,7 @@ class WorkflowDefinitionCompiler:
                         source=node_id,
                         target=workflow_node.branches,
                         edge_type=EdgeType.CONDITIONAL,
-                        condition=lambda state, cond=workflow_node.condition: cond(
-                            state
-                        ),
+                        condition=lambda state, cond=workflow_node.condition: cond(state),
                     )
                 )
 

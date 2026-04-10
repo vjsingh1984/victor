@@ -154,9 +154,7 @@ class JsonLineExporter(BaseExporter):
         """
         # Filter by topic prefix (was category, now topic-based)
         if self.include_categories:
-            if not any(
-                event.topic.startswith(prefix) for prefix in self.include_categories
-            ):
+            if not any(event.topic.startswith(prefix) for prefix in self.include_categories):
                 return
         if any(event.topic.startswith(prefix) for prefix in self.exclude_categories):
             return
@@ -292,9 +290,7 @@ class LoggingExporter(BaseExporter):
         """
         # Filter by topic prefix
         if self.include_categories:
-            if not any(
-                event.topic.startswith(prefix) for prefix in self.include_categories
-            ):
+            if not any(event.topic.startswith(prefix) for prefix in self.include_categories):
                 return
         if any(event.topic.startswith(prefix) for prefix in self.exclude_categories):
             return

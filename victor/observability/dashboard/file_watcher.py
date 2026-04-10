@@ -60,9 +60,7 @@ class EventFileWatcher(Static):
                 logger.info("[EventFileWatcher] File exists, loading historical events")
                 self._load_existing_events()
             else:
-                logger.info(
-                    "[EventFileWatcher] File does not exist yet, will wait for creation"
-                )
+                logger.info("[EventFileWatcher] File does not exist yet, will wait for creation")
 
             # Always start watching (file may be created later)
             logger.info("[EventFileWatcher] Starting file watcher")
@@ -81,9 +79,7 @@ class EventFileWatcher(Static):
         logger.debug("[EventFileWatcher] _load_existing_events() START")
 
         if not self._file_path or not self._file_path.exists():
-            logger.debug(
-                f"[EventFileWatcher] No file or file doesn't exist: {self._file_path}"
-            )
+            logger.debug(f"[EventFileWatcher] No file or file doesn't exist: {self._file_path}")
             return
 
         event_bus = get_observability_bus()
@@ -118,9 +114,7 @@ class EventFileWatcher(Static):
                     logger.debug(f"[EventFileWatcher] Line {idx}: Empty, skipping")
                     continue
 
-                logger.debug(
-                    f"[EventFileWatcher] Line {idx}: Processing (length: {len(line)})"
-                )
+                logger.debug(f"[EventFileWatcher] Line {idx}: Processing (length: {len(line)})")
 
                 try:
                     # Parse JSONL line and create VictorEvent
@@ -147,9 +141,7 @@ class EventFileWatcher(Static):
                 except Exception as e:
                     # Skip invalid lines
                     events_failed += 1
-                    logger.warning(
-                        f"[EventFileWatcher] Line {idx}: Exception during parse: {e}"
-                    )
+                    logger.warning(f"[EventFileWatcher] Line {idx}: Exception during parse: {e}")
                     logger.debug(f"[EventFileWatcher] Line {idx} content: {line[:200]}")
                     continue
 
@@ -193,9 +185,7 @@ class EventFileWatcher(Static):
         When new lines are detected, they're parsed and emitted to the EventBus.
         """
         event_bus = get_observability_bus()
-        logger.info(
-            f"[EventFileWatcher] File watcher started, monitoring: {self._file_path}"
-        )
+        logger.info(f"[EventFileWatcher] File watcher started, monitoring: {self._file_path}")
 
         while self._watching and self._file_path:
             try:
@@ -250,9 +240,7 @@ class EventFileWatcher(Static):
 
                         except Exception as e:
                             # Skip invalid lines
-                            logger.debug(
-                                f"[EventFileWatcher] Failed to parse line: {e}"
-                            )
+                            logger.debug(f"[EventFileWatcher] Failed to parse line: {e}")
                             continue
 
                     if events_loaded > 0:
@@ -280,9 +268,7 @@ class EventFileWatcher(Static):
             {"id": "...", "timestamp": "2025-01-06T12:00:00Z", "topic": "tool.start", ...}
         """
         try:
-            logger.debug(
-                f"[EventFileWatcher._parse_jsonl_line] Parsing line (len={len(line)})"
-            )
+            logger.debug(f"[EventFileWatcher._parse_jsonl_line] Parsing line (len={len(line)})")
 
             # Parse JSON
             data = json.loads(line)
@@ -296,20 +282,14 @@ class EventFileWatcher(Static):
                 # Handle ISO format with or without microseconds
                 if "T" in timestamp_str:
                     # ISO format: 2025-01-06T12:00:00.000Z
-                    timestamp = datetime.fromisoformat(
-                        timestamp_str.replace("Z", "+00:00")
-                    )
+                    timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
                 else:
                     # Fallback for other formats
                     timestamp = datetime.fromisoformat(timestamp_str)
-                logger.debug(
-                    f"[EventFileWatcher._parse_jsonl_line] Timestamp: {timestamp}"
-                )
+                logger.debug(f"[EventFileWatcher._parse_jsonl_line] Timestamp: {timestamp}")
             else:
                 timestamp = datetime.now()
-                logger.debug(
-                    "[EventFileWatcher._parse_jsonl_line] No timestamp, using now"
-                )
+                logger.debug("[EventFileWatcher._parse_jsonl_line] No timestamp, using now")
 
             # Extract or construct topic
             topic = data.get("topic")
@@ -329,9 +309,7 @@ class EventFileWatcher(Static):
                 source=data.get("source"),
                 correlation_id=data.get("trace_id"),
                 headers=(
-                    {"session_id": data.get("session_id")}
-                    if data.get("session_id")
-                    else None
+                    {"session_id": data.get("session_id")} if data.get("session_id") else None
                 ),
             )
 
@@ -342,9 +320,7 @@ class EventFileWatcher(Static):
 
         except Exception as e:
             logger.error(f"[EventFileWatcher._parse_jsonl_line] Exception: {e}")
-            logger.debug(
-                f"[EventFileWatcher._parse_jsonl_line] Line content: {line[:300]}"
-            )
+            logger.debug(f"[EventFileWatcher._parse_jsonl_line] Line content: {line[:300]}")
             import traceback
 
             logger.debug(

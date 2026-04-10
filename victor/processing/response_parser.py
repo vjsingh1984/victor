@@ -123,9 +123,7 @@ def extract_content_from_response(
     try:
         return str(response)
     except Exception:
-        logger.warning(
-            f"Unable to extract content from response type: {type(response)}"
-        )
+        logger.warning(f"Unable to extract content from response type: {type(response)}")
         return None
 
 

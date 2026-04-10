@@ -146,18 +146,14 @@ class TestMarkdownExport:
 
     def test_includes_metadata(self, exporter, sample_conversation):
         """Test that metadata is included."""
-        result = exporter.export(
-            sample_conversation, ExportFormat.MARKDOWN, include_metadata=True
-        )
+        result = exporter.export(sample_conversation, ExportFormat.MARKDOWN, include_metadata=True)
 
         assert "claude-3-sonnet" in result
         assert "anthropic" in result
 
     def test_excludes_metadata(self, exporter, sample_conversation):
         """Test excluding metadata."""
-        result = exporter.export(
-            sample_conversation, ExportFormat.MARKDOWN, include_metadata=False
-        )
+        result = exporter.export(sample_conversation, ExportFormat.MARKDOWN, include_metadata=False)
 
         assert "Session Info" not in result
 
@@ -193,9 +189,7 @@ class TestJSONExport:
 
     def test_includes_metadata(self, exporter, sample_conversation):
         """Test metadata in JSON export."""
-        result = exporter.export(
-            sample_conversation, ExportFormat.JSON, include_metadata=True
-        )
+        result = exporter.export(sample_conversation, ExportFormat.JSON, include_metadata=True)
 
         data = json.loads(result)
         assert "metadata" in data
@@ -212,9 +206,7 @@ class TestJSONExport:
 
     def test_tool_calls_in_json(self, exporter, sample_conversation):
         """Test tool calls in JSON export."""
-        result = exporter.export(
-            sample_conversation, ExportFormat.JSON, include_tool_calls=True
-        )
+        result = exporter.export(sample_conversation, ExportFormat.JSON, include_tool_calls=True)
 
         data = json.loads(result)
         assistant_msg = data["messages"][1]

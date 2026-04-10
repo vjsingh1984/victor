@@ -136,12 +136,8 @@ class ModeState:
     def to_state_key(self) -> str:
         """Convert to discrete state key for Q-learning."""
         # Discretize continuous values
-        tool_ratio = self._discretize_ratio(
-            self.tool_calls_made / max(self.tool_budget, 1)
-        )
-        iter_ratio = self._discretize_ratio(
-            self.iteration_count / max(self.iteration_budget, 1)
-        )
+        tool_ratio = self._discretize_ratio(self.tool_calls_made / max(self.tool_budget, 1))
+        iter_ratio = self._discretize_ratio(self.iteration_count / max(self.iteration_budget, 1))
         quality_bucket = self._discretize_quality(self.quality_score)
         grounding_bucket = self._discretize_quality(self.grounding_score)
 
@@ -448,15 +444,11 @@ class QLearningStore:
                     # Very efficient - gradually decrease budget
                     # But never drop below what was actually used + buffer
                     target_budget = max(tool_budget_used + 3, current_budget - 2)
-                    new_budget = int(
-                        (1 - base_alpha) * current_budget + base_alpha * target_budget
-                    )
+                    new_budget = int((1 - base_alpha) * current_budget + base_alpha * target_budget)
                 else:
                     # Normal completion - keep budget stable, slight move toward usage
                     alpha = base_alpha * 0.5  # Even slower for stable scenarios
-                    new_budget = int(
-                        (1 - alpha) * current_budget + alpha * tool_budget_used
-                    )
+                    new_budget = int((1 - alpha) * current_budget + alpha * tool_budget_used)
             else:
                 # FAILURE or low quality
                 if budget_exhausted:
@@ -484,16 +476,12 @@ class QLearningStore:
             # Update quality and completion rate with standard EMA
             alpha = 0.1
             new_quality = (1 - alpha) * current_quality + alpha * quality_score
-            completion_rate = (1 - alpha) * current_completion + alpha * (
-                1.0 if completed else 0.0
-            )
+            completion_rate = (1 - alpha) * current_completion + alpha * (1.0 if completed else 0.0)
         else:
             # First sample - initialize with reasonable defaults
             count = 1
             # Don't just use what was used; start with a reasonable baseline
-            new_budget = max(
-                tool_budget_used + 5, self._get_min_budget_for_task(task_type)
-            )
+            new_budget = max(tool_budget_used + 5, self._get_min_budget_for_task(task_type))
             new_quality = quality_score
             completion_rate = 1.0 if completed else 0.0
 
@@ -671,9 +659,7 @@ class AdaptiveModeController:
         self._no_tool_iterations = 0
 
         if mode_transition_learner:
-            logger.info(
-                "RL: AdaptiveModeController using unified ModeTransitionLearner"
-            )
+            logger.info("RL: AdaptiveModeController using unified ModeTransitionLearner")
 
     def _normalize_provider_name(self, provider_name: Optional[str]) -> str:
         """Normalize provider name for threshold lookup.
@@ -838,9 +824,7 @@ class AdaptiveModeController:
                 action_taken=action,
             )
 
-        logger.debug(
-            f"[AdaptiveModeController] State: {state_key}, " f"Recommended: {action}"
-        )
+        logger.debug(f"[AdaptiveModeController] State: {state_key}, " f"Recommended: {action}")
 
         return action
 
@@ -1025,9 +1009,7 @@ class AdaptiveModeController:
 
         # Update task stats with outcome-aware budget learning
         # Detect if budget was exhausted (used >= budget)
-        budget_exhausted = (
-            self._current_state.tool_calls_made >= self._current_state.tool_budget
-        )
+        budget_exhausted = self._current_state.tool_calls_made >= self._current_state.tool_budget
 
         self._q_store.update_task_stats(
             task_type=self._current_state.task_type,
@@ -1086,18 +1068,12 @@ class AdaptiveModeController:
             from_mode = (
                 self._pending_transition.from_mode.value
                 if self._pending_transition
-                else (
-                    self._current_state.mode.value if self._current_state else "explore"
-                )
+                else (self._current_state.mode.value if self._current_state else "explore")
             )
             to_mode = (
                 self._pending_transition.to_mode.value
                 if self._pending_transition
-                else (
-                    self._current_action.target_mode.value
-                    if self._current_action
-                    else "explore"
-                )
+                else (self._current_action.target_mode.value if self._current_action else "explore")
             )
 
             outcome = RLOutcome(
@@ -1105,9 +1081,7 @@ class AdaptiveModeController:
                 model=self._model_name or "unknown",
                 success=success,
                 quality_score=quality_score,
-                task_type=(
-                    self._current_state.task_type if self._current_state else "general"
-                ),
+                task_type=(self._current_state.task_type if self._current_state else "general"),
                 metadata={
                     "from_mode": from_mode,
                     "to_mode": to_mode,
@@ -1115,9 +1089,7 @@ class AdaptiveModeController:
                     "action_key": action_key,
                     "task_completed": completed,
                     "tool_budget_used": (
-                        self._current_state.tool_calls_made
-                        if self._current_state
-                        else 0
+                        self._current_state.tool_calls_made if self._current_state else 0
                     ),
                     "tool_budget_total": (
                         self._current_state.tool_budget if self._current_state else 10
@@ -1126,9 +1098,7 @@ class AdaptiveModeController:
             )
 
             self._mode_transition_learner.record_outcome(outcome)
-            logger.debug(
-                f"RL: Recorded mode transition to unified learner: {from_mode}→{to_mode}"
-            )
+            logger.debug(f"RL: Recorded mode transition to unified learner: {from_mode}→{to_mode}")
 
         except Exception as e:
             logger.warning(f"RL: Failed to record to ModeTransitionLearner: {e}")
@@ -1191,9 +1161,7 @@ class AdaptiveModeController:
         # Try unified learner if available
         if self._mode_transition_learner:
             try:
-                learner_budget = self._mode_transition_learner.get_optimal_budget(
-                    task_type
-                )
+                learner_budget = self._mode_transition_learner.get_optimal_budget(task_type)
                 learner_stats = self._mode_transition_learner.get_task_stats(task_type)
                 learner_samples = learner_stats.get("sample_count", 0)
 
@@ -1299,10 +1267,7 @@ class AdaptiveModeController:
             self._no_tool_iterations = 0
 
         # Check if stuck: past minimum iterations and no progress
-        if (
-            iteration_count >= min_iterations
-            and self._no_tool_iterations >= no_tool_threshold
-        ):
+        if iteration_count >= min_iterations and self._no_tool_iterations >= no_tool_threshold:
             logger.warning(
                 f"[AdaptiveModeController] Loop detected for {self._provider_name}: "
                 f"{self._no_tool_iterations} consecutive iterations with no tool calls "

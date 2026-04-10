@@ -296,9 +296,7 @@ workflows:
 
         node1 = wf.nodes["step1"]
         # $ctx. prefix is stripped during parsing
-        assert "target_symbol" in str(node1.input_mapping) or "symbol" in str(
-            node1.input_mapping
-        )
+        assert "target_symbol" in str(node1.input_mapping) or "symbol" in str(node1.input_mapping)
 
     def test_parse_nested_context_references(self):
         """Test parsing nested context references like $ctx.data.field."""
@@ -424,9 +422,7 @@ workflows:
         assert (
             "empty_workflow" not in workflows
             or len(
-                workflows.get("empty_workflow", {}).nodes
-                if "empty_workflow" in workflows
-                else {}
+                workflows.get("empty_workflow", {}).nodes if "empty_workflow" in workflows else {}
             )
             == 0
         )

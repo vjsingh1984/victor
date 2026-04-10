@@ -265,20 +265,13 @@ class AgentSpec:
         """
         new_caps = AgentCapabilities(
             tools=self.capabilities.tools | (tools or set()),
-            tool_patterns=self.capabilities.tool_patterns
-            + kwargs.pop("tool_patterns", []),
+            tool_patterns=self.capabilities.tool_patterns + kwargs.pop("tool_patterns", []),
             skills=self.capabilities.skills | set(kwargs.pop("skills", [])),
             can_delegate=kwargs.pop("can_delegate", self.capabilities.can_delegate),
             can_ask_user=kwargs.pop("can_ask_user", self.capabilities.can_ask_user),
-            can_browse_web=kwargs.pop(
-                "can_browse_web", self.capabilities.can_browse_web
-            ),
-            can_execute_code=kwargs.pop(
-                "can_execute_code", self.capabilities.can_execute_code
-            ),
-            can_modify_files=kwargs.pop(
-                "can_modify_files", self.capabilities.can_modify_files
-            ),
+            can_browse_web=kwargs.pop("can_browse_web", self.capabilities.can_browse_web),
+            can_execute_code=kwargs.pop("can_execute_code", self.capabilities.can_execute_code),
+            can_modify_files=kwargs.pop("can_modify_files", self.capabilities.can_modify_files),
         )
         return AgentSpec(
             name=self.name,
@@ -305,30 +298,17 @@ class AgentSpec:
             New AgentSpec with merged constraints
         """
         new_constraints = AgentConstraints(
-            max_input_tokens=kwargs.get(
-                "max_input_tokens", self.constraints.max_input_tokens
-            ),
-            max_output_tokens=kwargs.get(
-                "max_output_tokens", self.constraints.max_output_tokens
-            ),
-            max_total_tokens=kwargs.get(
-                "max_total_tokens", self.constraints.max_total_tokens
-            ),
-            max_iterations=kwargs.get(
-                "max_iterations", self.constraints.max_iterations
-            ),
-            max_tool_calls=kwargs.get(
-                "max_tool_calls", self.constraints.max_tool_calls
-            ),
+            max_input_tokens=kwargs.get("max_input_tokens", self.constraints.max_input_tokens),
+            max_output_tokens=kwargs.get("max_output_tokens", self.constraints.max_output_tokens),
+            max_total_tokens=kwargs.get("max_total_tokens", self.constraints.max_total_tokens),
+            max_iterations=kwargs.get("max_iterations", self.constraints.max_iterations),
+            max_tool_calls=kwargs.get("max_tool_calls", self.constraints.max_tool_calls),
             max_cost_usd=kwargs.get("max_cost_usd", self.constraints.max_cost_usd),
-            timeout_seconds=kwargs.get(
-                "timeout_seconds", self.constraints.timeout_seconds
-            ),
+            timeout_seconds=kwargs.get("timeout_seconds", self.constraints.timeout_seconds),
             min_context_tokens=kwargs.get(
                 "min_context_tokens", self.constraints.min_context_tokens
             ),
-            required_tools=self.constraints.required_tools
-            | set(kwargs.get("required_tools", [])),
+            required_tools=self.constraints.required_tools | set(kwargs.get("required_tools", [])),
         )
         return AgentSpec(
             name=self.name,

@@ -625,9 +625,7 @@ class TestHealthChecker:
                 self.healthy = True
 
             async def _do_check(self):
-                status = (
-                    HealthStatus.HEALTHY if self.healthy else HealthStatus.UNHEALTHY
-                )
+                status = HealthStatus.HEALTHY if self.healthy else HealthStatus.UNHEALTHY
                 return ComponentHealth(self._name, status)
 
         check = ToggleCheck()

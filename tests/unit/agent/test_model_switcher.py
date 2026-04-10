@@ -182,9 +182,7 @@ class TestModelRegistry:
         found = switcher.find_model("Claude Sonnet")
 
         assert found is not None
-        assert (
-            "claude" in found.model_id.lower() or "sonnet" in found.display_name.lower()
-        )
+        assert "claude" in found.model_id.lower() or "sonnet" in found.display_name.lower()
 
     def test_find_model_not_found(self, switcher):
         """Test finding non-existent model."""

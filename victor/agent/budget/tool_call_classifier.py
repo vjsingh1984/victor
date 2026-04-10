@@ -124,9 +124,7 @@ class ToolCallClassifier(IToolCallClassifier):
             tool_name: Name of the tool to remove
         """
         if tool_name.lower() in self._write_tools:
-            self._write_tools = set(
-                self._write_tools
-            )  # Convert from frozenset if needed
+            self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
             self._write_tools.discard(tool_name.lower())
             logger.debug(f"ToolCallClassifier: removed write tool '{tool_name}'")
 

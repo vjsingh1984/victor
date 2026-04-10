@@ -123,9 +123,7 @@ class TestModelSelectorLearner:
         assert count == 1
         assert q_value != 0.5  # Should have been updated
 
-        task_q_value, task_count = _get_q_value_from_db(
-            coordinator, "anthropic", "analysis"
-        )
+        task_q_value, task_count = _get_q_value_from_db(coordinator, "anthropic", "analysis")
         assert task_count == 1
         assert task_q_value != 0.5
 
@@ -157,9 +155,7 @@ class TestModelSelectorLearner:
         assert (
             learner2.epsilon < initial_epsilon_learner1
         )  # Epsilon should decay from initial value
-        assert (
-            learner2.epsilon == learner1.epsilon
-        )  # The actual decayed value should be loaded
+        assert learner2.epsilon == learner1.epsilon  # The actual decayed value should be loaded
 
         # Clean up
         reset_database()

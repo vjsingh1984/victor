@@ -457,9 +457,7 @@ class ZAIProvider(BaseProvider):
                 **kwargs,
             )
 
-            async with self.client.stream(
-                "POST", "/chat/completions", json=payload
-            ) as response:
+            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
 
                 accumulated_tool_calls: List[Dict[str, Any]] = []
@@ -480,9 +478,7 @@ class ZAIProvider(BaseProvider):
                                 yield StreamChunk(
                                     content="",
                                     tool_calls=(
-                                        accumulated_tool_calls
-                                        if accumulated_tool_calls
-                                        else None
+                                        accumulated_tool_calls if accumulated_tool_calls else None
                                     ),
                                     stop_reason="stop",
                                     is_final=True,
@@ -491,9 +487,7 @@ class ZAIProvider(BaseProvider):
 
                         try:
                             chunk_data = json.loads(data_str)
-                            chunk = self._parse_stream_chunk(
-                                chunk_data, accumulated_tool_calls
-                            )
+                            chunk = self._parse_stream_chunk(chunk_data, accumulated_tool_calls)
                             if chunk:
                                 if chunk.is_final:
                                     has_sent_final = True
@@ -754,17 +748,13 @@ class ZAIProvider(BaseProvider):
 
         # Finalize tool calls on stream end
         final_tool_calls = None
-        if finish_reason == "tool_calls" or (
-            finish_reason == "stop" and accumulated_tool_calls
-        ):
+        if finish_reason == "tool_calls" or (finish_reason == "stop" and accumulated_tool_calls):
             final_tool_calls = []
             for tc in accumulated_tool_calls:
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = (
-                            json.loads(args) if isinstance(args, str) else args
-                        )
+                        parsed_args = json.loads(args) if isinstance(args, str) else args
                     except json.JSONDecodeError:
                         parsed_args = {}
                     final_tool_calls.append(

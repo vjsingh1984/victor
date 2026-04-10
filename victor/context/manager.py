@@ -43,12 +43,8 @@ class Message(BaseModel):
     role: str = Field(description="Message role (user/assistant/system)")
     content: str = Field(description="Message content")
     tokens: int = Field(default=0, description="Token count for this message")
-    priority: int = Field(
-        default=5, description="Priority (1-10, higher = more important)"
-    )
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+    priority: int = Field(default=5, description="Priority (1-10, higher = more important)")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
 class FileContext(BaseModel):
@@ -58,17 +54,13 @@ class FileContext(BaseModel):
     content: str = Field(description="File content")
     tokens: int = Field(default=0, description="Token count")
     relevance_score: float = Field(default=0.0, description="Relevance score (0-1)")
-    line_range: Optional[Tuple[int, int]] = Field(
-        default=None, description="Specific line range"
-    )
+    line_range: Optional[Tuple[int, int]] = Field(default=None, description="Specific line range")
 
 
 class ContextWindow(BaseModel):
     """Represents the current context window state."""
 
-    messages: List[Message] = Field(
-        default_factory=list, description="Conversation messages"
-    )
+    messages: List[Message] = Field(default_factory=list, description="Conversation messages")
     files: List[FileContext] = Field(default_factory=list, description="Included files")
     total_tokens: int = Field(default=0, description="Total tokens in context")
     max_tokens: int = Field(default=128000, description="Maximum context window size")
@@ -124,9 +116,7 @@ class ProjectContextLoader:
         self.encoder = None
 
         # Context window
-        self.context = ContextWindow(
-            max_tokens=max_tokens, reserved_tokens=reserved_tokens
-        )
+        self.context = ContextWindow(max_tokens=max_tokens, reserved_tokens=reserved_tokens)
 
     def count_tokens(self, text: str) -> int:
         """Count tokens in text.
@@ -241,9 +231,7 @@ class ProjectContextLoader:
         """
         parts = ["Here are the relevant files for context:\n"]
 
-        for file in sorted(
-            self.context.files, key=lambda f: f.relevance_score, reverse=True
-        ):
+        for file in sorted(self.context.files, key=lambda f: f.relevance_score, reverse=True):
             parts.append(f"\n--- {file.path} ---")
             if file.line_range:
                 parts.append(f"(Lines {file.line_range[0]}-{file.line_range[1]})")
@@ -383,9 +371,7 @@ class ProjectContextLoader:
         """
         if keep_system:
             system_messages = [m for m in self.context.messages if m.role == "system"]
-            removed_tokens = sum(
-                m.tokens for m in self.context.messages if m.role != "system"
-            )
+            removed_tokens = sum(m.tokens for m in self.context.messages if m.role != "system")
             self.context.messages = system_messages
         else:
             removed_tokens = sum(m.tokens for m in self.context.messages)
@@ -410,8 +396,6 @@ class ProjectContextLoader:
             "messages_by_role": {
                 "system": len([m for m in self.context.messages if m.role == "system"]),
                 "user": len([m for m in self.context.messages if m.role == "user"]),
-                "assistant": len(
-                    [m for m in self.context.messages if m.role == "assistant"]
-                ),
+                "assistant": len([m for m in self.context.messages if m.role == "assistant"]),
             },
         }

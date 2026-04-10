@@ -184,9 +184,7 @@ class NodeExecutorFactory(CompatibilityNodeExecutorFactory):
         *,
         replace: bool = False,
     ) -> None:
-        self._delegate.register_executor_type(
-            node_type, executor_class, replace=replace
-        )
+        self._delegate.register_executor_type(node_type, executor_class, replace=replace)
 
     def create_executor(
         self,
@@ -199,19 +197,13 @@ class NodeExecutorFactory(CompatibilityNodeExecutorFactory):
         finally:
             self._delegate._resolve_execution_context = original_resolver
 
-    def create_agent_executor(
-        self, node: "AgentNode"
-    ) -> Callable[[Dict[str, Any]], Any]:
+    def create_agent_executor(self, node: "AgentNode") -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
-    def create_compute_executor(
-        self, node: "ComputeNode"
-    ) -> Callable[[Dict[str, Any]], Any]:
+    def create_compute_executor(self, node: "ComputeNode") -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
-    def create_condition_router(
-        self, node: "ConditionNode"
-    ) -> Callable[[Dict[str, Any]], Any]:
+    def create_condition_router(self, node: "ConditionNode") -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
     def create_parallel_executor(
@@ -221,14 +213,10 @@ class NodeExecutorFactory(CompatibilityNodeExecutorFactory):
     ) -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
-    def create_transform_executor(
-        self, node: "TransformNode"
-    ) -> Callable[[Dict[str, Any]], Any]:
+    def create_transform_executor(self, node: "TransformNode") -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
-    def create_team_executor(
-        self, node: "TeamNodeWorkflow"
-    ) -> Callable[[Dict[str, Any]], Any]:
+    def create_team_executor(self, node: "TeamNodeWorkflow") -> Callable[[Dict[str, Any]], Any]:
         return self.create_executor(node)
 
     def supports_node_type(self, node_type: str) -> bool:
@@ -583,9 +571,7 @@ class UnifiedWorkflowCompiler:
             WorkflowCompilationRequest,
         )
 
-        should_validate = (
-            self._config.validate_before_compile if validate is None else validate
-        )
+        should_validate = self._config.validate_before_compile if validate is None else validate
         parsed = ParsedWorkflowDefinition(
             request=WorkflowCompilationRequest(
                 source=source,
@@ -607,12 +593,8 @@ class UnifiedWorkflowCompiler:
         transform_registry: Optional[Dict[str, Callable[..., Any]]],
     ) -> int:
         """Compute hash for cache key based on registries."""
-        condition_names = (
-            tuple(sorted(condition_registry.keys())) if condition_registry else ()
-        )
-        transform_names = (
-            tuple(sorted(transform_registry.keys())) if transform_registry else ()
-        )
+        condition_names = tuple(sorted(condition_registry.keys())) if condition_registry else ()
+        transform_names = tuple(sorted(transform_registry.keys())) if transform_registry else ()
         return hash((condition_names, transform_names))
 
     def _create_yaml_loader(

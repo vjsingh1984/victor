@@ -16,9 +16,7 @@ async def test_embedding_preloading_reduces_latency():
     """
     # 1. Mock the SemanticToolSelector and its embedding initialization
     mock_selector_instance = MagicMock()
-    mock_selector_instance.select_relevant_tools_with_context = AsyncMock(
-        return_value=[]
-    )
+    mock_selector_instance.select_relevant_tools_with_context = AsyncMock(return_value=[])
 
     # Define a dummy tool to register
     @tool
@@ -40,9 +38,7 @@ async def test_embedding_preloading_reduces_latency():
         "victor.tools.semantic_selector.SemanticToolSelector",
         return_value=mock_selector_instance,
     ):
-        settings = Settings(
-            use_semantic_tool_selection=True, embedding_model="test-model"
-        )
+        settings = Settings(use_semantic_tool_selection=True, embedding_model="test-model")
         mock_provider = MagicMock()
         mock_provider.supports_tools.return_value = True
         mock_provider.name = "test_provider"
@@ -68,9 +64,7 @@ async def test_embedding_preloading_reduces_latency():
         # --- Test 2: With preloading ---
         # Reset the mock for the new orchestrator instance
         mock_selector_instance.initialize_tool_embeddings.reset_mock()
-        mock_selector_instance.initialize_tool_embeddings.side_effect = (
-            async_sleep_side_effect
-        )
+        mock_selector_instance.initialize_tool_embeddings.side_effect = async_sleep_side_effect
 
         orchestrator_with_preload = AgentOrchestrator(
             settings=settings,

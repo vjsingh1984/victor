@@ -103,9 +103,7 @@ class TestParallelContextIsolation:
         await formation.execute(agents, context, _make_task())
 
         # All agents should have seen counter=0 (not 999 from another agent)
-        assert all(
-            v == 0 for v in seen_values
-        ), f"Agents saw mutated state: {seen_values}"
+        assert all(v == 0 for v in seen_values), f"Agents saw mutated state: {seen_values}"
 
     async def test_nested_dict_isolation(self):
         """Deep nested structures should be isolated between agents."""

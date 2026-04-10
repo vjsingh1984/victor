@@ -654,9 +654,7 @@ class LMStudioAdapter(BaseProviderAdapter):
         matches = re.findall(think_pattern, response, re.DOTALL | re.IGNORECASE)
 
         thinking = "\n".join(matches) if matches else ""
-        content = re.sub(
-            think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE
-        ).strip()
+        content = re.sub(think_pattern, "", response, flags=re.DOTALL | re.IGNORECASE).strip()
 
         return (thinking, content)
 
@@ -1252,9 +1250,7 @@ def get_provider_adapter(provider_name: str) -> BaseProviderAdapter:
     return adapter_class()
 
 
-def register_provider_adapter(
-    name: str, adapter_class: type[BaseProviderAdapter]
-) -> None:
+def register_provider_adapter(name: str, adapter_class: type[BaseProviderAdapter]) -> None:
     """Register a custom provider adapter.
 
     Args:

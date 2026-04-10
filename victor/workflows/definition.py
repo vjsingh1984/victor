@@ -256,9 +256,7 @@ class TransformNode(WorkflowNode):
         transform: Function that transforms context
     """
 
-    transform: Callable[[Dict[str, Any]], Dict[str, Any]] = field(
-        default=lambda ctx: ctx
-    )
+    transform: Callable[[Dict[str, Any]], Dict[str, Any]] = field(default=lambda ctx: ctx)
 
     @property
     def node_type(self) -> WorkflowNodeType:
@@ -635,9 +633,7 @@ class WorkflowDefinition:
         for node in self.nodes.values():
             for next_id in node.next_nodes:
                 if next_id not in self.nodes:
-                    errors.append(
-                        f"Node '{node.id}' references non-existent node '{next_id}'"
-                    )
+                    errors.append(f"Node '{node.id}' references non-existent node '{next_id}'")
 
             if isinstance(node, ConditionNode):
                 for branch, target in node.branches.items():
@@ -651,8 +647,7 @@ class WorkflowDefinition:
                 for parallel_id in node.parallel_nodes:
                     if parallel_id not in self.nodes:
                         errors.append(
-                            f"Parallel '{node.id}' references non-existent "
-                            f"node '{parallel_id}'"
+                            f"Parallel '{node.id}' references non-existent " f"node '{parallel_id}'"
                         )
 
         return errors
@@ -705,11 +700,7 @@ class WorkflowDefinition:
 
     def get_total_budget(self) -> int:
         """Sum of all agent tool budgets."""
-        return sum(
-            node.tool_budget
-            for node in self.nodes.values()
-            if isinstance(node, AgentNode)
-        )
+        return sum(node.tool_budget for node in self.nodes.values() if isinstance(node, AgentNode))
 
 
 class WorkflowBuilder:

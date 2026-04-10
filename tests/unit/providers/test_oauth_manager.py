@@ -361,9 +361,7 @@ class TestOAuthTokenManagerGetValidToken:
             expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
         )
         with patch("victor.providers.oauth_manager.SSOAuthenticator") as MockAuth:
-            MockAuth.return_value.refresh = AsyncMock(
-                side_effect=ValueError("refresh failed")
-            )
+            MockAuth.return_value.refresh = AsyncMock(side_effect=ValueError("refresh failed"))
             MockAuth.return_value.login = AsyncMock(return_value=new_tokens)
             result = await manager.get_valid_token()
 

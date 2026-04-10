@@ -379,9 +379,7 @@ class RLEvictionPolicy:
 
         return self._q_table[feature_key]
 
-    def _get_default_q_values(
-        self, state: CacheEntryState
-    ) -> Dict[EvictionAction, float]:
+    def _get_default_q_values(self, state: CacheEntryState) -> Dict[EvictionAction, float]:
         """Get default Q-values based on heuristics.
 
         Args:
@@ -468,9 +466,7 @@ class RLEvictionPolicy:
 
         self._q_table[feature_key][action] = new_q
 
-        logger.debug(
-            f"Q-update: {feature_key}:{action.value} {current_q:.3f} -> {new_q:.3f}"
-        )
+        logger.debug(f"Q-update: {feature_key}:{action.value} {current_q:.3f} -> {new_q:.3f}")
 
     def _track_decision(self, state: CacheEntryState, action: EvictionAction) -> None:
         """Track decision for later feedback.
@@ -484,9 +480,7 @@ class RLEvictionPolicy:
         # Limit tracked decisions
         if len(self._recent_decisions) > self._max_tracked_decisions:
             # Remove oldest entries
-            oldest_keys = list(self._recent_decisions.keys())[
-                : self._max_tracked_decisions // 2
-            ]
+            oldest_keys = list(self._recent_decisions.keys())[: self._max_tracked_decisions // 2]
             for key in oldest_keys:
                 del self._recent_decisions[key]
 
@@ -563,7 +557,5 @@ def get_rl_eviction_policy(
     """
     global _rl_eviction_policy
     if _rl_eviction_policy is None:
-        _rl_eviction_policy = RLEvictionPolicy(
-            cache_eviction_learner=cache_eviction_learner
-        )
+        _rl_eviction_policy = RLEvictionPolicy(cache_eviction_learner=cache_eviction_learner)
     return _rl_eviction_policy

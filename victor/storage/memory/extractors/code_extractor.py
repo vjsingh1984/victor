@@ -165,9 +165,7 @@ class CodeEntityExtractor(EntityExtractor):
                         continue
 
                     # Calculate confidence based on pattern specificity
-                    confidence = self._calculate_confidence(
-                        name, entity_type, pattern, context
-                    )
+                    confidence = self._calculate_confidence(name, entity_type, pattern, context)
 
                     if confidence >= self._min_confidence:
                         entity = Entity.create(

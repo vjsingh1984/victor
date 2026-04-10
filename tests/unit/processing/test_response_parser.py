@@ -483,9 +483,7 @@ class TestEdgeCases:
 
     def test_response_with_multiple_code_blocks(self):
         """Test response with multiple code blocks."""
-        response = (
-            'First: ```json\n{"first": 1}\n``` Second: ```json\n{"second": 2}\n```'
-        )
+        response = 'First: ```json\n{"first": 1}\n``` Second: ```json\n{"second": 2}\n```'
         json_str = extract_json_from_response(response)
         # Should extract the first JSON
         assert json_str is not None

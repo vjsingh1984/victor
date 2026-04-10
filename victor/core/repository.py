@@ -531,9 +531,7 @@ class InMemoryRepository(Repository[T], Generic[T]):
     ) -> int:
         """Count entities matching specification."""
         if specification:
-            return sum(
-                1 for e in self._store.values() if specification.is_satisfied_by(e)
-            )
+            return sum(1 for e in self._store.values() if specification.is_satisfied_by(e))
         return len(self._store)
 
     async def exists(self, id: str) -> bool:

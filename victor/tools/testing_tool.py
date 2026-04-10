@@ -111,9 +111,7 @@ def _summarize_report(report: Dict[str, Any]) -> Dict[str, Any]:
                 # Ensure long_repr is a string before splitting
                 if isinstance(long_repr, str):
                     error_lines = long_repr.split("\n")
-                    error_message = (
-                        error_lines[-1] if error_lines else "No error message captured."
-                    )
+                    error_message = error_lines[-1] if error_lines else "No error message captured."
                 else:
                     error_message = "Error representation was not a string."
 

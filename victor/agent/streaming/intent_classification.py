@@ -109,9 +109,7 @@ class SanitizerProtocol(Protocol):
 class ChunkGeneratorProtocol(Protocol):
     """Protocol for chunk generation."""
 
-    def generate_content_chunk(
-        self, content: str, is_final: bool = False
-    ) -> StreamChunk: ...
+    def generate_content_chunk(self, content: str, is_final: bool = False) -> StreamChunk: ...
 
 
 class RLCoordinatorProtocol(Protocol):
@@ -276,9 +274,7 @@ class IntentClassificationHandler:
             sanitized = self._sanitizer.sanitize(full_content)
             if sanitized:
                 logger.debug(f"Yielding content to UI: {len(sanitized)} chars")
-                result.add_chunk(
-                    self._chunk_generator.generate_content_chunk(sanitized)
-                )
+                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
                 stream_ctx.accumulate_content(sanitized)
                 logger.debug(
                     f"Total accumulated content: {stream_ctx.total_accumulated_chars} chars"
@@ -294,9 +290,7 @@ class IntentClassificationHandler:
         intent_result = self._classify_intent_cached(intent_text)
 
         # Step 4: Check for response loop
-        is_repeated_response = self._unified_tracker.check_response_loop(
-            full_content or ""
-        )
+        is_repeated_response = self._unified_tracker.check_response_loop(full_content or "")
 
         # Step 5: Build task completion signals
         task_completion_signals = self._build_task_completion_signals(tracking_state)
@@ -317,9 +311,7 @@ class IntentClassificationHandler:
 
         # Step 8: Determine final action with overrides
         action = action_result.get("action", "finish")
-        action = self._apply_action_overrides(
-            action, is_repeated_response, tracking_state
-        )
+        action = self._apply_action_overrides(action, is_repeated_response, tracking_state)
 
         result.action_result = action_result
         result.action = action
@@ -350,9 +342,7 @@ class IntentClassificationHandler:
 
         return intent_result
 
-    def _build_task_completion_signals(
-        self, tracking_state: TrackingState
-    ) -> Dict[str, Any]:
+    def _build_task_completion_signals(self, tracking_state: TrackingState) -> Dict[str, Any]:
         """Build task completion signals for early termination detection."""
         # Get cycle count from conversation state
         cycle_count = 0
@@ -365,9 +355,7 @@ class IntentClassificationHandler:
                     if hasattr(self._conversation_state, "_history"):
                         history = self._conversation_state._history
                         if hasattr(history, "get_max_visit_count"):
-                            cycle_count = max(
-                                cycle_count, history.get_max_visit_count()
-                            )
+                            cycle_count = max(cycle_count, history.get_max_visit_count())
             except Exception:
                 pass  # Don't fail on state access errors
 
@@ -377,9 +365,7 @@ class IntentClassificationHandler:
             "required_outputs": tracking_state.required_outputs,
             "all_files_read": (
                 len(tracking_state.required_files) > 0
-                and tracking_state.read_files_session.issuperset(
-                    tracking_state.required_files
-                )
+                and tracking_state.read_files_session.issuperset(tracking_state.required_files)
             ),
             "cycle_count": cycle_count,
             "synthesis_nudge_count": tracking_state.synthesis_nudge_count,
@@ -429,17 +415,11 @@ class IntentClassificationHandler:
         updates = action_result.get("updates", {})
 
         if "continuation_prompts" in updates:
-            result.state_updates["continuation_prompts"] = updates[
-                "continuation_prompts"
-            ]
+            result.state_updates["continuation_prompts"] = updates["continuation_prompts"]
         if "asking_input_prompts" in updates:
-            result.state_updates["asking_input_prompts"] = updates[
-                "asking_input_prompts"
-            ]
+            result.state_updates["asking_input_prompts"] = updates["asking_input_prompts"]
         if "synthesis_nudge_count" in updates:
-            result.state_updates["synthesis_nudge_count"] = updates[
-                "synthesis_nudge_count"
-            ]
+            result.state_updates["synthesis_nudge_count"] = updates["synthesis_nudge_count"]
 
         if action_result.get("set_final_summary_requested"):
             result.state_updates["final_summary_requested"] = True
@@ -456,8 +436,7 @@ class IntentClassificationHandler:
         # Override: Repeated response detected
         if is_repeated_response and action in ("prompt_tool_call", "request_summary"):
             logger.info(
-                "Continuation action: finish - "
-                "Overriding to finish due to repeated response"
+                "Continuation action: finish - " "Overriding to finish due to repeated response"
             )
             return "finish"
 
@@ -514,9 +493,7 @@ def create_tracking_state(orchestrator: "AgentOrchestrator") -> TrackingState:
     return TrackingState(
         continuation_prompts=getattr(orchestrator, "_continuation_prompts", 0),
         asking_input_prompts=getattr(orchestrator, "_asking_input_prompts", 0),
-        consecutive_blocked_attempts=getattr(
-            orchestrator, "_consecutive_blocked_attempts", 0
-        ),
+        consecutive_blocked_attempts=getattr(orchestrator, "_consecutive_blocked_attempts", 0),
         cumulative_prompt_interventions=getattr(
             orchestrator, "_cumulative_prompt_interventions", 0
         ),
@@ -524,9 +501,7 @@ def create_tracking_state(orchestrator: "AgentOrchestrator") -> TrackingState:
         max_prompts_summary_requested=getattr(
             orchestrator, "_max_prompts_summary_requested", False
         ),
-        final_summary_requested=getattr(
-            orchestrator, "_final_summary_requested", False
-        ),
+        final_summary_requested=getattr(orchestrator, "_final_summary_requested", False),
         force_finalize=getattr(orchestrator, "_force_finalize", False),
         required_files=set(getattr(orchestrator, "_required_files", [])),
         read_files_session=getattr(orchestrator, "_read_files_session", set()),

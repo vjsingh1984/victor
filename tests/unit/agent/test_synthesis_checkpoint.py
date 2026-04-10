@@ -174,9 +174,7 @@ class TestSimilarArgsCheckpoint:
         result = checkpoint.check(history, {})
 
         assert result.should_synthesize is True
-        assert (
-            "similar paths" in result.reason.lower() or "same" in result.reason.lower()
-        )
+        assert "similar paths" in result.reason.lower() or "same" in result.reason.lower()
 
     def test_repeated_queries_trigger(self, checkpoint):
         """Test repeated queries trigger synthesis."""
@@ -202,9 +200,7 @@ class TestTimeoutApproachingCheckpoint:
 
     @pytest.fixture
     def checkpoint(self):
-        return TimeoutApproachingCheckpoint(
-            warning_threshold=0.7, critical_threshold=0.9
-        )
+        return TimeoutApproachingCheckpoint(warning_threshold=0.7, critical_threshold=0.9)
 
     def test_plenty_of_time(self, checkpoint):
         """Test with plenty of time remaining."""
@@ -411,9 +407,7 @@ class TestFactoryFunctions:
         aggressive_count = next(
             c for c in aggressive._checkpoints if isinstance(c, ToolCountCheckpoint)
         )
-        default_count = next(
-            c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        default_count = next(c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint))
 
         assert aggressive_count.max_calls < default_count.max_calls
 
@@ -422,37 +416,27 @@ class TestFactoryFunctions:
         relaxed = create_relaxed_checkpoint()
         default = create_default_checkpoint()
 
-        relaxed_count = next(
-            c for c in relaxed._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
-        default_count = next(
-            c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        relaxed_count = next(c for c in relaxed._checkpoints if isinstance(c, ToolCountCheckpoint))
+        default_count = next(c for c in default._checkpoints if isinstance(c, ToolCountCheckpoint))
 
         assert relaxed_count.max_calls > default_count.max_calls
 
     def test_get_checkpoint_for_complexity_simple(self):
         """Test simple complexity gets aggressive checkpoint."""
         checkpoint = get_checkpoint_for_complexity("simple")
-        tool_count = next(
-            c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        tool_count = next(c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint))
         assert tool_count.max_calls == 5  # Aggressive setting
 
     def test_get_checkpoint_for_complexity_complex(self):
         """Test complex complexity gets relaxed checkpoint."""
         checkpoint = get_checkpoint_for_complexity("complex")
-        tool_count = next(
-            c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        tool_count = next(c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint))
         assert tool_count.max_calls == 20  # Relaxed setting
 
     def test_get_checkpoint_for_complexity_medium(self):
         """Test medium complexity gets default checkpoint."""
         checkpoint = get_checkpoint_for_complexity("medium")
-        tool_count = next(
-            c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint)
-        )
+        tool_count = next(c for c in checkpoint._checkpoints if isinstance(c, ToolCountCheckpoint))
         assert tool_count.max_calls == 12  # Default setting
 
 

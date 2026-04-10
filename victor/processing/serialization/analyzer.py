@@ -139,9 +139,7 @@ class DataAnalyzer:
 
         # Check if all items are dicts (potential uniform array)
         all_dicts = all(isinstance(item, dict) for item in data)
-        all_primitives = all(
-            isinstance(item, (str, int, float, bool, type(None))) for item in data
-        )
+        all_primitives = all(isinstance(item, (str, int, float, bool, type(None))) for item in data)
 
         if all_primitives:
             chars.structure_type = DataStructureType.PRIMITIVE_ARRAY
@@ -204,9 +202,7 @@ class DataAnalyzer:
         # Calculate uniformity (how similar the key sets are)
         if unique_keys:
             # Jaccard-like uniformity score
-            uniformity_sum = sum(
-                len(common_keys) / len(keys) if keys else 0 for keys in all_keys
-            )
+            uniformity_sum = sum(len(common_keys) / len(keys) if keys else 0 for keys in all_keys)
             chars.array_uniformity = uniformity_sum / len(all_keys)
         else:
             chars.array_uniformity = 1.0
@@ -227,9 +223,7 @@ class DataAnalyzer:
                     chars.has_nested_arrays = True
                 elif value is None:
                     chars.has_null_values = True
-                elif isinstance(value, str) and any(
-                    c in self.SPECIAL_CHARS for c in value
-                ):
+                elif isinstance(value, str) and any(c in self.SPECIAL_CHARS for c in value):
                     chars.has_special_chars = True
 
         # Analyze value repetition
@@ -339,16 +333,11 @@ class DataAnalyzer:
         if isinstance(data, dict):
             if not data:
                 return current_depth
-            return max(
-                self._calculate_nesting_depth(v, current_depth + 1)
-                for v in data.values()
-            )
+            return max(self._calculate_nesting_depth(v, current_depth + 1) for v in data.values())
         elif isinstance(data, list):
             if not data:
                 return current_depth
-            return max(
-                self._calculate_nesting_depth(item, current_depth + 1) for item in data
-            )
+            return max(self._calculate_nesting_depth(item, current_depth + 1) for item in data)
         else:
             return current_depth
 

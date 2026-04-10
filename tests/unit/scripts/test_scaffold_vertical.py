@@ -6,9 +6,7 @@ import sys
 
 
 def load_scaffold_module():
-    module_path = (
-        Path(__file__).resolve().parents[3] / "scripts" / "scaffold_vertical.py"
-    )
+    module_path = Path(__file__).resolve().parents[3] / "scripts" / "scaffold_vertical.py"
     spec = importlib.util.spec_from_file_location("scaffold_vertical", module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -27,15 +25,9 @@ def test_scaffold_vertical_emits_plugin_only_entry_point(tmp_path: Path) -> None
     pkg_dir = scaffold_vertical.scaffold("security", tmp_path)
 
     pyproject = (pkg_dir / "pyproject.toml").read_text(encoding="utf-8")
-    package_init = (pkg_dir / "victor_security" / "__init__.py").read_text(
-        encoding="utf-8"
-    )
-    assistant = (pkg_dir / "victor_security" / "assistant.py").read_text(
-        encoding="utf-8"
-    )
-    generated_test = (pkg_dir / "tests" / "test_security.py").read_text(
-        encoding="utf-8"
-    )
+    package_init = (pkg_dir / "victor_security" / "__init__.py").read_text(encoding="utf-8")
+    assistant = (pkg_dir / "victor_security" / "assistant.py").read_text(encoding="utf-8")
+    generated_test = (pkg_dir / "tests" / "test_security.py").read_text(encoding="utf-8")
 
     assert '[project.entry-points."victor.plugins"]' in pyproject
     assert 'security = "victor_security:plugin"' in pyproject

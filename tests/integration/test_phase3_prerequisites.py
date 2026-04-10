@@ -190,9 +190,7 @@ class TestMetricsCollectionE2E:
         graph.add_node("process", process_node)
         graph.add_node("check", check_node)
         graph.add_edge("process", "check")
-        graph.add_conditional_edge(
-            "check", should_continue, {"continue": "process", "done": END}
-        )
+        graph.add_conditional_edge("check", should_continue, {"continue": "process", "done": END})
         graph.set_entry_point("process")
 
         compiled = graph.compile()

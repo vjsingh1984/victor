@@ -381,9 +381,7 @@ class NegotiationResult:
             "supported_features": self.supported_features,
             "unsupported_features": self.unsupported_features,
             "missing_required_features": self.missing_required_features,
-            "fallback_version": (
-                str(self.fallback_version) if self.fallback_version else None
-            ),
+            "fallback_version": (str(self.fallback_version) if self.fallback_version else None),
             "error": self.error,
         }
 
@@ -466,9 +464,7 @@ class CapabilityNegotiator:
         results = {}
 
         # Get all capability names
-        all_names = set(vertical_capabilities.keys()) | set(
-            orchestrator_capabilities.keys()
-        )
+        all_names = set(vertical_capabilities.keys()) | set(orchestrator_capabilities.keys())
 
         for name in all_names:
             vertical_cap = vertical_capabilities.get(name)
@@ -527,11 +523,9 @@ class CapabilityNegotiator:
             )
 
         # Analyze feature compatibility
-        supported_features, unsupported_features, missing_required = (
-            self._analyze_features(
-                vertical_cap,
-                orchestrator_cap,
-            )
+        supported_features, unsupported_features, missing_required = self._analyze_features(
+            vertical_cap,
+            orchestrator_cap,
         )
 
         # Check if required features are missing
@@ -548,12 +542,8 @@ class CapabilityNegotiator:
 
         # Determine fallback
         fallback_version = None
-        if status == NegotiationStatus.FALLBACK or (
-            missing_required and self._enable_fallback
-        ):
-            fallback_version = self._find_fallback_version(
-                vertical_cap, orchestrator_cap
-            )
+        if status == NegotiationStatus.FALLBACK or (missing_required and self._enable_fallback):
+            fallback_version = self._find_fallback_version(vertical_cap, orchestrator_cap)
 
         return NegotiationResult(
             capability_name=name,
@@ -600,17 +590,11 @@ class CapabilityNegotiator:
         # Different major versions - try fallback if enabled
         if self._enable_fallback:
             # Check if vertical supports the orchestrator's version range
-            if (
-                vertical_cap.min_version
-                and orchestrator_version >= vertical_cap.min_version
-            ):
+            if vertical_cap.min_version and orchestrator_version >= vertical_cap.min_version:
                 return orchestrator_version, NegotiationStatus.FALLBACK
 
             # Check if orchestrator supports the vertical's version range
-            if (
-                orchestrator_cap.min_version
-                and vertical_version >= orchestrator_cap.min_version
-            ):
+            if orchestrator_cap.min_version and vertical_version >= orchestrator_cap.min_version:
                 return vertical_version, NegotiationStatus.FALLBACK
 
         # No compatible version found
@@ -633,9 +617,7 @@ class CapabilityNegotiator:
         vertical_features = {f.name: f for f in vertical_cap.features}
         orchestrator_features = {f.name: f for f in orchestrator_cap.features}
 
-        all_feature_names = set(vertical_features.keys()) | set(
-            orchestrator_features.keys()
-        )
+        all_feature_names = set(vertical_features.keys()) | set(orchestrator_features.keys())
 
         supported = []
         unsupported = []
@@ -723,13 +705,11 @@ class CapabilityNegotiationProtocol:
             negotiator = CapabilityNegotiator()
 
         # Get capabilities from vertical
-        vertical_caps = CapabilityNegotiationProtocol._get_vertical_capabilities(
-            vertical
-        )
+        vertical_caps = CapabilityNegotiationProtocol._get_vertical_capabilities(vertical)
 
         # Get capabilities from orchestrator
-        orchestrator_caps = (
-            CapabilityNegotiationProtocol._get_orchestrator_capabilities(orchestrator)
+        orchestrator_caps = CapabilityNegotiationProtocol._get_orchestrator_capabilities(
+            orchestrator
         )
 
         # Negotiate
@@ -749,18 +729,12 @@ class CapabilityNegotiationProtocol:
 
         # Get version from vertical
         vertical_version = Version.parse(
-            getattr(
-                vertical, "version", getattr(vertical, "get_version", lambda: "1.0.0")()
-            )
+            getattr(vertical, "version", getattr(vertical, "get_version", lambda: "1.0.0")())
         )
 
         # Tool capability
         if hasattr(vertical, "get_tools"):
-            _ = (
-                vertical.get_tools()
-                if callable(vertical.get_tools)
-                else vertical.get_tools
-            )
+            _ = vertical.get_tools() if callable(vertical.get_tools) else vertical.get_tools
             capabilities["tools"] = CapabilityDeclaration(
                 name="tools",
                 version=vertical_version,

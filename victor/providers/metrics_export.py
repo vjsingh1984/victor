@@ -132,9 +132,7 @@ class DashboardReport:
         """Convert to dictionary for serialization."""
         return {
             "timestamp": self.timestamp,
-            "circuit_breakers": {
-                name: vars(cb) for name, cb in self.circuit_breakers.items()
-            },
+            "circuit_breakers": {name: vars(cb) for name, cb in self.circuit_breakers.items()},
             "health": {name: vars(h) for name, h in self.health.items()},
             "resilience": {name: vars(r) for name, r in self.resilience.items()},
             "summary": self.summary,
@@ -228,15 +226,11 @@ class ResilienceMetricsExporter:
                 total_rejected = stats.get("total_rejected", 0)
 
                 # Calculate error rate
-                error_rate = (
-                    (total_failures / total_calls * 100) if total_calls > 0 else 0.0
-                )
+                error_rate = (total_failures / total_calls * 100) if total_calls > 0 else 0.0
 
                 # Calculate availability (excluding rejected requests)
                 successful = total_calls - total_failures - total_rejected
-                availability = (
-                    (successful / total_calls * 100) if total_calls > 0 else 100.0
-                )
+                availability = (successful / total_calls * 100) if total_calls > 0 else 100.0
 
                 metrics[name] = CircuitBreakerMetrics(
                     name=name,
@@ -252,9 +246,7 @@ class ResilienceMetricsExporter:
                     availability=round(availability, 2),
                 )
             except Exception as e:
-                logger.warning(
-                    f"Failed to collect metrics for circuit breaker {name}: {e}"
-                )
+                logger.warning(f"Failed to collect metrics for circuit breaker {name}: {e}")
 
         return metrics
 
@@ -280,9 +272,7 @@ class ResilienceMetricsExporter:
                 history = self._health_checker.get_provider_history(provider_name)
                 healthy_count = sum(1 for h in history if h.status.value == "healthy")
                 degraded_count = sum(1 for h in history if h.status.value == "degraded")
-                unhealthy_count = sum(
-                    1 for h in history if h.status.value == "unhealthy"
-                )
+                unhealthy_count = sum(1 for h in history if h.status.value == "unhealthy")
 
                 # Get uptime
                 uptime = self._health_checker.calculate_uptime(provider_name)
@@ -327,14 +317,10 @@ class ResilienceMetricsExporter:
                 # Calculate rates
                 total_successes = primary_successes + fallback_successes
                 success_rate = (
-                    (total_successes / total_requests * 100)
-                    if total_requests > 0
-                    else 0.0
+                    (total_successes / total_requests * 100) if total_requests > 0 else 0.0
                 )
                 fallback_rate = (
-                    (fallback_successes / total_successes * 100)
-                    if total_successes > 0
-                    else 0.0
+                    (fallback_successes / total_successes * 100) if total_successes > 0 else 0.0
                 )
 
                 metrics[name] = ResilienceMetrics(
@@ -364,25 +350,16 @@ class ResilienceMetricsExporter:
             "circuit_breakers": {
                 "total": len(cb_metrics),
                 "open": sum(1 for cb in cb_metrics.values() if cb.state == "open"),
-                "half_open": sum(
-                    1 for cb in cb_metrics.values() if cb.state == "half_open"
-                ),
+                "half_open": sum(1 for cb in cb_metrics.values() if cb.state == "half_open"),
                 "closed": sum(1 for cb in cb_metrics.values() if cb.state == "closed"),
             },
             "health": {
-                "healthy": sum(
-                    1 for h in health_metrics.values() if h.status == "healthy"
-                ),
-                "degraded": sum(
-                    1 for h in health_metrics.values() if h.status == "degraded"
-                ),
-                "unhealthy": sum(
-                    1 for h in health_metrics.values() if h.status == "unhealthy"
-                ),
+                "healthy": sum(1 for h in health_metrics.values() if h.status == "healthy"),
+                "degraded": sum(1 for h in health_metrics.values() if h.status == "degraded"),
+                "unhealthy": sum(1 for h in health_metrics.values() if h.status == "unhealthy"),
                 "average_latency_ms": round(
                     (
-                        sum(h.latency_ms for h in health_metrics.values())
-                        / len(health_metrics)
+                        sum(h.latency_ms for h in health_metrics.values()) / len(health_metrics)
                         if health_metrics
                         else 0.0
                     ),
@@ -390,12 +367,8 @@ class ResilienceMetricsExporter:
                 ),
             },
             "resilience": {
-                "total_requests": sum(
-                    r.total_requests for r in resilience_metrics.values()
-                ),
-                "total_failures": sum(
-                    r.total_failures for r in resilience_metrics.values()
-                ),
+                "total_requests": sum(r.total_requests for r in resilience_metrics.values()),
+                "total_failures": sum(r.total_failures for r in resilience_metrics.values()),
                 "average_success_rate": round(
                     (
                         sum(r.success_rate for r in resilience_metrics.values())
@@ -465,9 +438,7 @@ class ResilienceMetricsExporter:
         # Health metrics
         for name, h in report.health.items():
             prefix = f"victor_health_{name.replace('-', '_')}"
-            status_value = {"healthy": 0, "degraded": 1, "unhealthy": 2}.get(
-                h.status, -1
-            )
+            status_value = {"healthy": 0, "degraded": 1, "unhealthy": 2}.get(h.status, -1)
             lines.append(f"{prefix}_status {status_value}")
             lines.append(f"{prefix}_latency_ms {h.latency_ms}")
             lines.append(f"{prefix}_uptime_percent {h.uptime_percent}")
@@ -527,9 +498,7 @@ class ResilienceMetricsExporter:
                 lines.append(f"  - {name}: {cb.state} (failures: {cb.failure_count})")
 
         # Add unhealthy providers
-        unhealthy = [
-            name for name, h in report.health.items() if h.status == "unhealthy"
-        ]
+        unhealthy = [name for name, h in report.health.items() if h.status == "unhealthy"]
         if unhealthy:
             lines.append("")
             lines.append("Unhealthy Providers:")

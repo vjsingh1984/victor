@@ -340,39 +340,19 @@ class TestTeamEvent:
 
     def test_is_member_event(self):
         """is_member_event should identify member events."""
-        assert (
-            TeamEvent(type=TeamEventType.MEMBER_START, team_name="T").is_member_event
-            is True
-        )
+        assert TeamEvent(type=TeamEventType.MEMBER_START, team_name="T").is_member_event is True
 
-        assert (
-            TeamEvent(type=TeamEventType.MEMBER_COMPLETE, team_name="T").is_member_event
-            is True
-        )
+        assert TeamEvent(type=TeamEventType.MEMBER_COMPLETE, team_name="T").is_member_event is True
 
-        assert (
-            TeamEvent(type=TeamEventType.TEAM_START, team_name="T").is_member_event
-            is False
-        )
+        assert TeamEvent(type=TeamEventType.TEAM_START, team_name="T").is_member_event is False
 
     def test_is_lifecycle_event(self):
         """is_lifecycle_event should identify lifecycle events."""
-        assert (
-            TeamEvent(type=TeamEventType.TEAM_START, team_name="T").is_lifecycle_event
-            is True
-        )
+        assert TeamEvent(type=TeamEventType.TEAM_START, team_name="T").is_lifecycle_event is True
 
-        assert (
-            TeamEvent(
-                type=TeamEventType.TEAM_COMPLETE, team_name="T"
-            ).is_lifecycle_event
-            is True
-        )
+        assert TeamEvent(type=TeamEventType.TEAM_COMPLETE, team_name="T").is_lifecycle_event is True
 
-        assert (
-            TeamEvent(type=TeamEventType.MEMBER_START, team_name="T").is_lifecycle_event
-            is False
-        )
+        assert TeamEvent(type=TeamEventType.MEMBER_START, team_name="T").is_lifecycle_event is False
 
     def test_to_dict(self):
         """to_dict should serialize event correctly."""
@@ -519,9 +499,7 @@ class TestAgentTeamConfig:
         assert team.members[0].is_manager is True
 
     @pytest.mark.asyncio
-    async def test_create_hierarchical_preserves_explicit_manager(
-        self, mock_orchestrator
-    ):
+    async def test_create_hierarchical_preserves_explicit_manager(self, mock_orchestrator):
         """create should preserve explicitly set manager."""
         members = [
             TeamMemberSpec(role="researcher", goal="Research"),

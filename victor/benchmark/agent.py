@@ -54,9 +54,7 @@ class BenchmarkAgentConfig:
     enable_thinking: bool = True
     enable_observability: bool = True
     # Workflow execution options
-    use_workflow: bool = (
-        False  # If True, use YAML workflow instead of direct Agent.run()
-    )
+    use_workflow: bool = False  # If True, use YAML workflow instead of direct Agent.run()
     workflow_name: Optional[str] = None  # Workflow to use (auto-detected if None)
 
 
@@ -273,9 +271,7 @@ class BenchmarkAgent:
             framework_task = benchmark_task_to_framework_task(task)
 
             # Build enriched prompt
-            prompt = build_benchmark_prompt(
-                task, str(workspace_path) if workspace_path else None
-            )
+            prompt = build_benchmark_prompt(task, str(workspace_path) if workspace_path else None)
 
             # Execute with timeout
             try:
@@ -404,9 +400,7 @@ class BenchmarkAgent:
                     trace.success = test_results.get("pass_rate", 0) >= 0.95
 
             except asyncio.TimeoutError:
-                trace.error = (
-                    f"Workflow timed out after {self._config.timeout_per_task}s"
-                )
+                trace.error = f"Workflow timed out after {self._config.timeout_per_task}s"
                 trace.success = False
                 logger.warning(f"Task {task.task_id} workflow timed out")
 

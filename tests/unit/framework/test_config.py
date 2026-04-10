@@ -432,12 +432,8 @@ class TestSafetyEnforcer:
     def test_clear_rules(self):
         """clear_rules should remove all rules."""
         enforcer = SafetyEnforcer(config=SafetyConfig())
-        enforcer.add_rule(
-            SafetyRule(name="test1", description="Test", check_fn=lambda op: True)
-        )
-        enforcer.add_rule(
-            SafetyRule(name="test2", description="Test", check_fn=lambda op: True)
-        )
+        enforcer.add_rule(SafetyRule(name="test1", description="Test", check_fn=lambda op: True))
+        enforcer.add_rule(SafetyRule(name="test2", description="Test", check_fn=lambda op: True))
 
         assert len(enforcer.rules) == 2
 

@@ -149,9 +149,7 @@ class ReadResultCache:
         self._stats = ReadCacheStats()
         self._current_bytes = 0
 
-    def get(
-        self, path: str, offset: int = 0, limit: Optional[int] = None
-    ) -> Optional[str]:
+    def get(self, path: str, offset: int = 0, limit: Optional[int] = None) -> Optional[str]:
         """Get cached content if available and not expired.
 
         Args:

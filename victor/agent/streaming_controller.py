@@ -82,12 +82,8 @@ class StreamingSession:
             "metrics": (
                 {
                     "ttft": self.metrics.time_to_first_token if self.metrics else None,
-                    "total_duration": (
-                        self.metrics.total_duration if self.metrics else None
-                    ),
-                    "tokens_per_second": (
-                        self.metrics.tokens_per_second if self.metrics else None
-                    ),
+                    "total_duration": (self.metrics.total_duration if self.metrics else None),
+                    "tokens_per_second": (self.metrics.tokens_per_second if self.metrics else None),
                     "total_chunks": self.metrics.total_chunks if self.metrics else 0,
                 }
                 if self.metrics
@@ -229,9 +225,7 @@ class StreamingController:
             if self._current_metrics:
                 self._current_metrics.tool_calls_count += 1
 
-    def complete_session(
-        self, result: Optional[StreamResult] = None
-    ) -> Optional[StreamingSession]:
+    def complete_session(self, result: Optional[StreamResult] = None) -> Optional[StreamingSession]:
         """Complete the current streaming session.
 
         Args:
@@ -257,9 +251,7 @@ class StreamingController:
                 return False
 
             self._cancellation_requested = True
-            logger.info(
-                f"Cancellation requested for session: {self._current_session.session_id}"
-            )
+            logger.info(f"Cancellation requested for session: {self._current_session.session_id}")
             return True
 
     def is_cancellation_requested(self) -> bool:
@@ -352,9 +344,7 @@ class StreamingController:
             if session.metrics.has_actual_usage:
                 logger.debug(f"Recorded actual token usage: {total_tokens}")
             else:
-                logger.debug(
-                    f"Recorded estimated token usage: {total_tokens} (no API data)"
-                )
+                logger.debug(f"Recorded estimated token usage: {total_tokens} (no API data)")
         except Exception as e:
             logger.debug(f"Failed to record to metrics collector: {e}")
 
@@ -410,9 +400,7 @@ class StreamingController:
                     self._current_metrics.total_chunks if self._current_metrics else 0
                 ),
                 "content_length": (
-                    self._current_metrics.total_content_length
-                    if self._current_metrics
-                    else 0
+                    self._current_metrics.total_content_length if self._current_metrics else 0
                 ),
             }
 
@@ -432,13 +420,9 @@ class StreamingController:
         """
         with self._lock:
             total_sessions = len(self._session_history)
-            completed = sum(
-                1 for s in self._session_history if not s.cancelled and not s.error
-            )
+            completed = sum(1 for s in self._session_history if not s.cancelled and not s.error)
             cancelled = sum(1 for s in self._session_history if s.cancelled)
-            errored = sum(
-                1 for s in self._session_history if s.error and not s.cancelled
-            )
+            errored = sum(1 for s in self._session_history if s.error and not s.cancelled)
 
             avg_duration = 0.0
             avg_ttft = 0.0

@@ -131,8 +131,7 @@ class APIKeyNotFoundError(Exception):
             lines.append("  • Pass api_key parameter to provider constructor")
         else:
             lines.append(
-                f"  • Run: victor keys set {self.provider} --keyring "
-                "(for interactive CLI use)"
+                f"  • Run: victor keys set {self.provider} --keyring " "(for interactive CLI use)"
             )
             env_var = _get_provider_env_var(self.provider)
             if env_var:
@@ -204,9 +203,7 @@ class UnifiedApiKeyResolver:
             non_interactive: Force non-interactive mode (None = auto-detect)
         """
         self.non_interactive = (
-            non_interactive
-            if non_interactive is not None
-            else self._detect_non_interactive()
+            non_interactive if non_interactive is not None else self._detect_non_interactive()
         )
         self._cache: Dict[str, APIKeyResult] = {}
 
@@ -344,9 +341,7 @@ class UnifiedApiKeyResolver:
                 )
 
         # Priority 3: Keyring (skip in non-interactive mode)
-        check_keyring = (
-            check_keyring if check_keyring is not None else not self.non_interactive
-        )
+        check_keyring = check_keyring if check_keyring is not None else not self.non_interactive
 
         if check_keyring and is_keyring_available():
             from victor.config.api_keys import KEYRING_SERVICE

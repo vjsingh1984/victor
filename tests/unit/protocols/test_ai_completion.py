@@ -443,9 +443,7 @@ class TestProvideInlineCompletions:
     async def test_generates_inline_completion(self):
         """Test generates inline completion."""
         mock_llm = AsyncMock()
-        mock_llm.chat = AsyncMock(
-            return_value=MagicMock(content="inline_code", usage={})
-        )
+        mock_llm.chat = AsyncMock(return_value=MagicMock(content="inline_code", usage={}))
         provider = AICompletionProvider(provider=mock_llm)
         params = make_inline_params(prefix="def hello", suffix="", max_tokens=100)
         result = await provider.provide_inline_completions(params)

@@ -199,9 +199,7 @@ class BaseServiceProvider(ABC):
         """
         # Wait for start period
         if config.start_period > 0:
-            logger.debug(
-                f"Waiting {config.start_period}s start period for '{handle.config.name}'"
-            )
+            logger.debug(f"Waiting {config.start_period}s start period for '{handle.config.name}'")
             await asyncio.sleep(config.start_period)
 
         attempts = 0
@@ -348,9 +346,7 @@ class BaseServiceProvider(ABC):
             raise ValueError("No command configured for command health check")
 
         try:
-            exit_code, output = await self._run_command_in_service(
-                handle, config.command
-            )
+            exit_code, output = await self._run_command_in_service(handle, config.command)
 
             if exit_code != 0:
                 logger.debug(f"Command check failed with exit code {exit_code}")
@@ -379,9 +375,7 @@ class BaseServiceProvider(ABC):
         # Try pg_isready command first
         if hasattr(self, "_run_command_in_service"):
             try:
-                exit_code, _ = await self._run_command_in_service(
-                    handle, "pg_isready -U postgres"
-                )
+                exit_code, _ = await self._run_command_in_service(handle, "pg_isready -U postgres")
                 return exit_code == 0
             except NotImplementedError:
                 pass
@@ -398,9 +392,7 @@ class BaseServiceProvider(ABC):
         # Try redis-cli ping first
         if hasattr(self, "_run_command_in_service"):
             try:
-                exit_code, output = await self._run_command_in_service(
-                    handle, "redis-cli ping"
-                )
+                exit_code, output = await self._run_command_in_service(handle, "redis-cli ping")
                 return exit_code == 0 and "PONG" in output
             except NotImplementedError:
                 pass

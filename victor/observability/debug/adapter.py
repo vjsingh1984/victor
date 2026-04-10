@@ -262,9 +262,7 @@ class DebugAdapter(Protocol):
 
     # Execution control
 
-    async def continue_execution(
-        self, session_id: str, thread_id: Optional[int] = None
-    ) -> None:
+    async def continue_execution(self, session_id: str, thread_id: Optional[int] = None) -> None:
         """Continue execution.
 
         Args:

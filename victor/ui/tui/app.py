@@ -116,9 +116,7 @@ class SessionPicker(ModalScreen[Optional[str]]):
     def on_mount(self) -> None:
         table = self.query_one("#session-table", DataTable)
         table.cursor_type = "row"
-        table.add_columns(
-            "Source", "ID", "Name", "Provider", "Model", "Updated", "Messages"
-        )
+        table.add_columns("Source", "ID", "Name", "Provider", "Model", "Updated", "Messages")
         self._populate_table(self._sessions)
         if self._session_ids:
             table.focus()
@@ -139,9 +137,7 @@ class SessionPicker(ModalScreen[Optional[str]]):
         self._sort_sessions(lambda item: item.get("message_count", 0), reverse=True)
 
     def action_sort_name(self) -> None:
-        self._sort_sessions(
-            lambda item: (item.get("name") or "").lower(), reverse=False
-        )
+        self._sort_sessions(lambda item: (item.get("name") or "").lower(), reverse=False)
 
     def action_cancel(self) -> None:
         self.dismiss(None)
@@ -200,8 +196,7 @@ class SessionPicker(ModalScreen[Optional[str]]):
         filtered = []
         for session in self._sessions:
             haystack = " ".join(
-                str(session.get(key, ""))
-                for key in ("id", "name", "provider", "model", "source")
+                str(session.get(key, "")) for key in ("id", "name", "provider", "model", "source")
             ).lower()
             if query in haystack:
                 filtered.append(session)
@@ -573,9 +568,7 @@ class VictorTUI(App):
         Binding("ctrl+d", "toggle_details", "Toggle Details", show=True),
         Binding("ctrl+x", "cancel_stream", "Cancel", show=True),
         Binding("ctrl+g", "resume_any_session", "Resume Any Session", show=True),
-        Binding(
-            "ctrl+p", "resume_project_session", "Resume Project Session", show=True
-        ),
+        Binding("ctrl+p", "resume_project_session", "Resume Project Session", show=True),
         Binding("ctrl+r", "resume_session", "Resume Session", show=True),
         Binding("ctrl+s", "save_session", "Save Session", show=True),
         Binding("ctrl+e", "export_session", "Export Session", show=True),
@@ -627,9 +620,7 @@ class VictorTUI(App):
         self._tool_widgets: list[ToolCallWidget] = []
         self._tool_widget_limit = 5
         self._thinking_widget: ThinkingWidget | None = None
-        self._slash_handler = (
-            None  # Initialized in on_mount when conversation_log is ready
-        )
+        self._slash_handler = None  # Initialized in on_mount when conversation_log is ready
         self._console_adapter = None
         self._session_messages: list[Message] = []
         self._session_restore_task: asyncio.Task | None = None
@@ -655,9 +646,7 @@ class VictorTUI(App):
 
     def on_mount(self) -> None:
         """Handle mount event."""
-        self._conversation_log = self.query_one(
-            "#conversation-log", EnhancedConversationLog
-        )
+        self._conversation_log = self.query_one("#conversation-log", EnhancedConversationLog)
         self._input_widget = self.query_one("#input-widget", InputWidget)
         self._thinking_widget = self.query_one("#thinking-widget", ThinkingWidget)
         self._status_bar = self.query_one(StatusBar)
@@ -780,8 +769,7 @@ class VictorTUI(App):
             else:
                 # Demo mode
                 self._add_assistant_message(
-                    f"You said: *{message}*\n\n"
-                    "(No agent configured - running in demo mode)",
+                    f"You said: *{message}*\n\n" "(No agent configured - running in demo mode)",
                 )
         except Exception as e:
             self._add_error_message(str(e))
@@ -830,9 +818,7 @@ class VictorTUI(App):
                             try:
                                 self._conversation_log.update_streaming(content_buffer)
                             except Exception as e:
-                                logger.warning(
-                                    f"Failed to update streaming content: {e}"
-                                )
+                                logger.warning(f"Failed to update streaming content: {e}")
                             # Update jump-to-bottom button visibility during streaming
                             try:
                                 self._update_jump_to_bottom()
@@ -869,12 +855,8 @@ class VictorTUI(App):
                     elif chunk_type == "tool_end":
                         try:
                             self._finish_tool_call(
-                                success=(
-                                    chunk.success if hasattr(chunk, "success") else True
-                                ),
-                                elapsed=(
-                                    chunk.elapsed if hasattr(chunk, "elapsed") else None
-                                ),
+                                success=(chunk.success if hasattr(chunk, "success") else True),
+                                elapsed=(chunk.elapsed if hasattr(chunk, "elapsed") else None),
                             )
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
@@ -898,9 +880,7 @@ class VictorTUI(App):
                             self._finish_tool_call(
                                 success=tool_data.get("success", True),
                                 elapsed=tool_data.get("elapsed"),
-                                follow_up_suggestions=tool_data.get(
-                                    "follow_up_suggestions"
-                                ),
+                                follow_up_suggestions=tool_data.get("follow_up_suggestions"),
                             )
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
@@ -993,9 +973,7 @@ class VictorTUI(App):
             )
             self._prune_tool_widgets()
 
-    def _schedule_tool_widget_cleanup(
-        self, widget: ToolCallWidget, timeout: float = 6.0
-    ) -> None:
+    def _schedule_tool_widget_cleanup(self, widget: ToolCallWidget, timeout: float = 6.0) -> None:
         def _remove() -> None:
             self._remove_tool_widget(widget)
 
@@ -1265,16 +1243,12 @@ class VictorTUI(App):
             return
 
         conversation = session.get("conversation", {})
-        history = (
-            MessageHistory.from_dict(conversation) if conversation else MessageHistory()
-        )
+        history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
         messages = history.messages
 
         message_count = len(messages)
         if message_count > 50:
-            self._add_system_message(
-                f"Loading {message_count} messages from project session..."
-            )
+            self._add_system_message(f"Loading {message_count} messages from project session...")
 
         if self._conversation_log:
             self._conversation_log.clear()
@@ -1294,9 +1268,7 @@ class VictorTUI(App):
             if not content:
                 continue
             self._render_message(role, content)
-            self._session_messages.append(
-                Message(role=role, content=content, metadata={})
-            )
+            self._session_messages.append(Message(role=role, content=content, metadata={}))
             # Show progress for large sessions
             if message_count > 50 and (i + 1) % 25 == 0:
                 self._add_system_message(f"Loading... {i + 1}/{message_count}")
@@ -1311,15 +1283,11 @@ class VictorTUI(App):
                         conversation_state
                     )
                 except Exception as exc:
-                    self._add_error_message(
-                        f"Failed to restore conversation state: {exc}"
-                    )
+                    self._add_error_message(f"Failed to restore conversation state: {exc}")
 
         metadata = session.get("metadata", {})
         title = metadata.get("title") or session_id[:8]
-        self._add_system_message(
-            f"Project session loaded: {title} ({message_count} messages)"
-        )
+        self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
 
     def _render_message(self, role: str, content: str, replay: bool = False) -> None:
         if not self._conversation_log:
@@ -1446,19 +1414,13 @@ class VictorTUI(App):
             return
 
         conversation = session.get("conversation", {})
-        history = (
-            MessageHistory.from_dict(conversation) if conversation else MessageHistory()
-        )
+        history = MessageHistory.from_dict(conversation) if conversation else MessageHistory()
         messages = [(msg.role, msg.content) for msg in history.messages]
-        await self._replay_transcript_async(
-            messages, status_label="Loading project session"
-        )
+        await self._replay_transcript_async(messages, status_label="Loading project session")
 
         metadata = session.get("metadata", {})
         title = metadata.get("title") or session_id[:8]
-        self._add_system_message(
-            f"Project session loaded: {title} ({len(messages)} messages)"
-        )
+        self._add_system_message(f"Project session loaded: {title} ({len(messages)} messages)")
 
     def _handle_console_line(self, line: str) -> None:
         """Handle a single console output line for recording and UI refresh."""
@@ -1481,9 +1443,7 @@ class VictorTUI(App):
             )
             session.messages = list(self._session_messages)
             manager.save(session)
-            self._add_system_message(
-                f"Session saved: {session.id[:8]} (use Ctrl+R to resume)"
-            )
+            self._add_system_message(f"Session saved: {session.id[:8]} (use Ctrl+R to resume)")
         except Exception as e:
             self._add_error_message(f"Failed to save session: {e}")
 
@@ -1604,10 +1564,7 @@ Slash Commands:
         """Toggle sticky follow-pause mode (Ctrl+F)."""
         if not self._conversation_log:
             return
-        if (
-            self._conversation_log.follow_paused
-            or self._conversation_log.auto_scroll_enabled
-        ):
+        if self._conversation_log.follow_paused or self._conversation_log.auto_scroll_enabled:
             # Currently following or paused — toggle
             if self._conversation_log.follow_paused:
                 self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
@@ -1753,9 +1710,7 @@ Slash Commands:
     def _record_message(self, role: str, content: str, **metadata: Any) -> None:
         if not content:
             return
-        self._session_messages.append(
-            Message(role=role, content=content, metadata=metadata)
-        )
+        self._session_messages.append(Message(role=role, content=content, metadata=metadata))
 
     def _add_user_message(self, content: str) -> None:
         if self._conversation_log:

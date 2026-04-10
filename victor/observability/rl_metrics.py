@@ -259,9 +259,7 @@ class RLMetricsCollector:
 
             return LearnerMetrics(
                 name=learner_name,
-                total_samples=exported.get(
-                    "total_samples", exported.get("total_sessions", 0)
-                ),
+                total_samples=exported.get("total_samples", exported.get("total_sessions", 0)),
                 success_rate=success_rate,
                 avg_confidence=0.7,  # Could be computed from recommendations
                 q_value_mean=q_mean,
@@ -273,8 +271,7 @@ class RLMetricsCollector:
                 custom_metrics={
                     k: v
                     for k, v in exported.items()
-                    if isinstance(v, (int, float))
-                    and k not in ["total_samples", "total_sessions"]
+                    if isinstance(v, (int, float)) and k not in ["total_samples", "total_sessions"]
                 },
             )
 
@@ -293,30 +290,22 @@ class RLMetricsCollector:
         if self._coordinator:
             try:
                 exported = self._coordinator.export_metrics()
-                metrics.total_outcomes = exported.get("coordinator", {}).get(
-                    "total_outcomes", 0
-                )
-                metrics.active_learners = len(
-                    exported.get("coordinator", {}).get("learners", {})
-                )
+                metrics.total_outcomes = exported.get("coordinator", {}).get("total_outcomes", 0)
+                metrics.active_learners = len(exported.get("coordinator", {}).get("learners", {}))
             except Exception as e:
                 logger.warning(f"Failed to collect coordinator metrics: {e}")
 
         if self._experiment_coordinator:
             try:
                 exp_metrics = self._experiment_coordinator.export_metrics()
-                metrics.active_experiments = exp_metrics.get("by_status", {}).get(
-                    "running", 0
-                )
+                metrics.active_experiments = exp_metrics.get("by_status", {}).get("running", 0)
             except Exception as e:
                 logger.warning(f"Failed to collect experiment metrics: {e}")
 
         if self._curriculum_controller:
             try:
                 curr_metrics = self._curriculum_controller.export_metrics()
-                metrics.curriculum_distribution = curr_metrics.get(
-                    "stage_distribution", {}
-                )
+                metrics.curriculum_distribution = curr_metrics.get("stage_distribution", {})
             except Exception as e:
                 logger.warning(f"Failed to collect curriculum metrics: {e}")
 
@@ -413,9 +402,7 @@ class RLMetricsCollector:
                 "curriculum_distribution": sm.curriculum_distribution,
             },
             "alerts": {
-                "degradation_detected": (
-                    am := self.collect_alert_metrics()
-                ).degradation_detected,
+                "degradation_detected": (am := self.collect_alert_metrics()).degradation_detected,
                 "degradation_learners": am.degradation_learners,
                 "anomaly_score": am.anomaly_score,
                 "stale_learners": am.stale_learners,
@@ -468,29 +455,21 @@ class RLMetricsCollector:
         for learner_name, learner_data in metrics["learners"].items():
             safe_name = learner_name.replace("-", "_")
 
-            lines.append(
-                f"# HELP victor_rl_{safe_name}_samples Total samples for {learner_name}"
-            )
+            lines.append(f"# HELP victor_rl_{safe_name}_samples Total samples for {learner_name}")
             lines.append(f"# TYPE victor_rl_{safe_name}_samples counter")
-            lines.append(
-                f'victor_rl_{safe_name}_samples {learner_data["total_samples"]}'
-            )
+            lines.append(f'victor_rl_{safe_name}_samples {learner_data["total_samples"]}')
 
             lines.append(
                 f"# HELP victor_rl_{safe_name}_success_rate Success rate for {learner_name}"
             )
             lines.append(f"# TYPE victor_rl_{safe_name}_success_rate gauge")
-            lines.append(
-                f'victor_rl_{safe_name}_success_rate {learner_data["success_rate"]:.4f}'
-            )
+            lines.append(f'victor_rl_{safe_name}_success_rate {learner_data["success_rate"]:.4f}')
 
             lines.append(
                 f"# HELP victor_rl_{safe_name}_q_value_mean Mean Q-value for {learner_name}"
             )
             lines.append(f"# TYPE victor_rl_{safe_name}_q_value_mean gauge")
-            lines.append(
-                f'victor_rl_{safe_name}_q_value_mean {learner_data["q_value_mean"]:.4f}'
-            )
+            lines.append(f'victor_rl_{safe_name}_q_value_mean {learner_data["q_value_mean"]:.4f}')
 
         # System metrics
         lines.append("# HELP victor_rl_total_outcomes Total RL outcomes recorded")
@@ -499,9 +478,7 @@ class RLMetricsCollector:
 
         lines.append("# HELP victor_rl_active_learners Number of active learners")
         lines.append("# TYPE victor_rl_active_learners gauge")
-        lines.append(
-            f'victor_rl_active_learners {metrics["system"]["active_learners"]}'
-        )
+        lines.append(f'victor_rl_active_learners {metrics["system"]["active_learners"]}')
 
         lines.append("# HELP victor_rl_avg_reward Average computed reward")
         lines.append("# TYPE victor_rl_avg_reward gauge")
@@ -509,9 +486,7 @@ class RLMetricsCollector:
 
         lines.append("# HELP victor_rl_policy_drift Policy drift score")
         lines.append("# TYPE victor_rl_policy_drift gauge")
-        lines.append(
-            f'victor_rl_policy_drift {metrics["system"]["policy_drift_score"]:.4f}'
-        )
+        lines.append(f'victor_rl_policy_drift {metrics["system"]["policy_drift_score"]:.4f}')
 
         # Alert metrics
         lines.append("# HELP victor_rl_degradation_detected Policy degradation alert")
@@ -522,9 +497,7 @@ class RLMetricsCollector:
 
         lines.append("# HELP victor_rl_anomaly_score Anomaly detection score")
         lines.append("# TYPE victor_rl_anomaly_score gauge")
-        lines.append(
-            f'victor_rl_anomaly_score {metrics["alerts"]["anomaly_score"]:.4f}'
-        )
+        lines.append(f'victor_rl_anomaly_score {metrics["alerts"]["anomaly_score"]:.4f}')
 
         return "\n".join(lines)
 

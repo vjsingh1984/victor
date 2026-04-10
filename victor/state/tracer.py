@@ -188,9 +188,7 @@ class StateTracer:
             except Exception as e:
                 logger.warning(f"Failed to publish state transition event: {e}")
 
-        logger.debug(
-            f"State transition recorded: {scope}.{key} = {str(new_value)[:50]}"
-        )
+        logger.debug(f"State transition recorded: {scope}.{key} = {str(new_value)[:50]}")
 
     def get_history(
         self,

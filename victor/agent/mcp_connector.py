@@ -192,9 +192,7 @@ class MCPConnector:
         """
         result = MCPConnectResult()
 
-        if not self._config.enabled and not getattr(
-            self._settings, "use_mcp_tools", False
-        ):
+        if not self._config.enabled and not getattr(self._settings, "use_mcp_tools", False):
             logger.debug("MCP integration disabled")
             return result
 
@@ -226,9 +224,7 @@ class MCPConnector:
 
             # Start registry and connect to servers in background
             if result.servers_discovered > 0:
-                logger.info(
-                    f"MCPConnector: discovered {result.servers_discovered} server(s)"
-                )
+                logger.info(f"MCPConnector: discovered {result.servers_discovered} server(s)")
                 self._create_task(self._start_registry(), "mcp_registry_start")
 
         except ImportError:

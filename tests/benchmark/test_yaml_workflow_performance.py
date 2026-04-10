@@ -78,9 +78,7 @@ class YAMLWorkflowBenchmark:
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-            node_count = (
-                len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
-            )
+            node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
 
             return BenchmarkResult(
                 name="compilation",
@@ -214,7 +212,7 @@ class TestYAMLWorkflowCompilation:
 
         result = harness.benchmark_compilation(yaml_content)
 
-        print(f"\n=== Simple Workflow Compilation ===")
+        print("\n=== Simple Workflow Compilation ===")
         print(f"Time: {result.time_ms:.2f}ms")
         print(f"Peak Memory: {result.memory_peak_mb:.2f}MB")
         print(f"Node Count: {result.node_count}")
@@ -239,7 +237,7 @@ class TestYAMLWorkflowCompilation:
 
         result = harness.benchmark_compilation(yaml_content)
 
-        print(f"\n=== Complex Workflow Compilation ===")
+        print("\n=== Complex Workflow Compilation ===")
         print(f"Time: {result.time_ms:.2f}ms")
         print(f"Peak Memory: {result.memory_peak_mb:.2f}MB")
         print(f"Node Count: {result.node_count}")
@@ -264,7 +262,7 @@ class TestYAMLWorkflowCompilation:
 
         result = harness.benchmark_compilation(yaml_content)
 
-        print(f"\n=== Conditional Workflow Compilation ===")
+        print("\n=== Conditional Workflow Compilation ===")
         print(f"Time: {result.time_ms:.2f}ms")
         print(f"Peak Memory: {result.memory_peak_mb:.2f}MB")
         print(f"Node Count: {result.node_count}")
@@ -302,9 +300,7 @@ class TestYAMLWorkflowScaling:
                 f"Nodes: {count:3d} | Time: {result.time_ms:6.2f}ms | Memory: {result.memory_peak_mb:5.2f}MB"
             )
 
-            assert (
-                result.success
-            ), f"Compilation failed for {count} nodes: {result.error}"
+            assert result.success, f"Compilation failed for {count} nodes: {result.error}"
 
         # Check that time scales roughly linearly (allowing for overhead)
         # Each 2x nodes should take < 2.5x time (allowing for constant overhead)

@@ -632,9 +632,7 @@ class ContextCompactor:
         strategy = self.config.truncation_strategy
 
         if strategy == TruncationStrategy.SMART:
-            truncated = self._smart_truncate(
-                content, max_chars, max_lines, content_type
-            )
+            truncated = self._smart_truncate(content, max_chars, max_lines, content_type)
         elif strategy == TruncationStrategy.HEAD:
             truncated = self._head_truncate(content, max_chars, max_lines)
         elif strategy == TruncationStrategy.TAIL:
@@ -977,9 +975,7 @@ class ContextCompactor:
                     should, trigger = await self.should_compact_async()
 
                     if should and trigger != CompactionTrigger.NONE:
-                        logger.debug(
-                            f"Background compaction triggered: {trigger.value}"
-                        )
+                        logger.debug(f"Background compaction triggered: {trigger.value}")
                         await self.check_and_compact_async()
 
                     self._last_check_time = time.time()

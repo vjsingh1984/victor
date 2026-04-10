@@ -453,9 +453,7 @@ class InstrumentedAccelerator:
                 "calls_total": float(self._call_count),
                 "duration_ms_total": self._total_duration_ms,
                 "duration_ms_avg": (
-                    self._total_duration_ms / self._call_count
-                    if self._call_count > 0
-                    else 0.0
+                    self._total_duration_ms / self._call_count if self._call_count > 0 else 0.0
                 ),
             }
 

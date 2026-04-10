@@ -97,9 +97,7 @@ class ChatCoordinator:
         self._token_tracker = token_tracker
 
         # Lazy-initialized handlers
-        self._intent_classification_handler: Optional["IntentClassificationHandler"] = (
-            None
-        )
+        self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
         self._planning_coordinator: Optional["PlanningCoordinator"] = None
@@ -309,10 +307,7 @@ class ChatCoordinator:
         finally:
             # Update cumulative token usage after stream completes
             # This enables accurate token tracking for evaluations/benchmarks
-            if (
-                hasattr(orch, "_current_stream_context")
-                and orch._current_stream_context
-            ):
+            if hasattr(orch, "_current_stream_context") and orch._current_stream_context:
                 ctx = orch._current_stream_context
                 if hasattr(ctx, "cumulative_usage"):
                     if self._token_tracker is not None:
@@ -320,9 +315,7 @@ class ChatCoordinator:
                     else:
                         for key in orch._cumulative_token_usage:
                             if key in ctx.cumulative_usage:
-                                orch._cumulative_token_usage[
-                                    key
-                                ] += ctx.cumulative_usage[key]
+                                orch._cumulative_token_usage[key] += ctx.cumulative_usage[key]
                         # Calculate total if not tracked by provider
                         if orch._cumulative_token_usage["total_tokens"] == 0:
                             orch._cumulative_token_usage["total_tokens"] = (
@@ -389,17 +382,11 @@ class ChatCoordinator:
             orch._sequence_tracker.clear_history()
 
         # PERF: Start background compaction for async context management
-        if orch._context_manager and hasattr(
-            orch._context_manager, "start_background_compaction"
-        ):
-            await orch._context_manager.start_background_compaction(
-                interval_seconds=15.0
-            )
+        if orch._context_manager and hasattr(orch._context_manager, "start_background_compaction"):
+            await orch._context_manager.start_background_compaction(interval_seconds=15.0)
 
         # Local aliases for frequently-used values
-        max_total_iterations = orch.unified_tracker.config.get(
-            "max_total_iterations", 50
-        )
+        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 50)
         total_iterations = 0
         force_completion = False
 
@@ -421,8 +408,7 @@ class ChatCoordinator:
 
             if (
                 prompt_requirements.tool_budget
-                and prompt_requirements.tool_budget
-                > orch.unified_tracker._progress.tool_budget
+                and prompt_requirements.tool_budget > orch.unified_tracker._progress.tool_budget
             ):
                 orch.unified_tracker.set_tool_budget(prompt_requirements.tool_budget)
                 logger.info(
@@ -435,9 +421,7 @@ class ChatCoordinator:
                 and prompt_requirements.iteration_budget
                 > orch.unified_tracker._task_config.max_exploration_iterations
             ):
-                orch.unified_tracker.set_max_iterations(
-                    prompt_requirements.iteration_budget
-                )
+                orch.unified_tracker.set_max_iterations(prompt_requirements.iteration_budget)
                 logger.info(
                     f"Dynamic iterations from prompt: {prompt_requirements.iteration_budget}"
                 )
@@ -462,9 +446,7 @@ class ChatCoordinator:
         intelligent_context = await intelligent_task
         if intelligent_context:
             if intelligent_context.get("system_prompt_addition"):
-                orch.add_message(
-                    "system", intelligent_context["system_prompt_addition"]
-                )
+                orch.add_message("system", intelligent_context["system_prompt_addition"])
                 logger.debug("Injected intelligent pipeline optimized prompt")
 
         return (
@@ -532,9 +514,7 @@ class ChatCoordinator:
         ctx.complexity_tool_budget = complexity_tool_budget
 
         # Add task keyword results
-        ctx.is_analysis_task = task_keywords[
-            "is_analysis_task"
-        ] or unified_task_type.value in (
+        ctx.is_analysis_task = task_keywords["is_analysis_task"] or unified_task_type.value in (
             "analyze",
             "analysis",
         )
@@ -641,9 +621,7 @@ class ChatCoordinator:
         # 3. Check time limit
         time_limit = getattr(orch.settings, "stream_idle_timeout_seconds", 300)
         if stream_ctx.is_over_time_limit(time_limit):
-            logger.warning(
-                f"Stream time limit exceeded: {stream_ctx.elapsed_time():.1f}s"
-            )
+            logger.warning(f"Stream time limit exceeded: {stream_ctx.elapsed_time():.1f}s")
             yield StreamChunk(
                 content=f"\n\n[Session exceeded {time_limit}s idle timeout - providing summary]\n",
                 is_final=False,
@@ -695,18 +673,14 @@ class ChatCoordinator:
 
             # If still overflowing, force completion
             if orch._check_context_overflow(max_context):
-                logger.warning(
-                    "Still overflowing after compaction. Forcing completion."
-                )
+                logger.warning("Still overflowing after compaction. Forcing completion.")
                 chunk = StreamChunk(
                     content=f"\n[tool] {orch._presentation.icon('warning', with_color=False)} Context size limit reached. Providing summary.\n"
                 )
                 completion_prompt = orch._get_thinking_disabled_prompt(
                     "Context limit reached. Summarize in 2-3 sentences."
                 )
-                recent_messages = (
-                    orch.messages[-8:] if len(orch.messages) > 8 else orch.messages[:]
-                )
+                recent_messages = orch.messages[-8:] if len(orch.messages) > 8 else orch.messages[:]
                 completion_messages = recent_messages + [
                     Message(role="user", content=completion_prompt)
                 ]
@@ -750,12 +724,8 @@ class ChatCoordinator:
                 "Max iterations reached. Summarize key findings in 3-4 sentences. "
                 "Do NOT attempt any more tool calls."
             )
-            recent_messages = (
-                orch.messages[-10:] if len(orch.messages) > 10 else orch.messages[:]
-            )
-            completion_messages = recent_messages + [
-                Message(role="user", content=iteration_prompt)
-            ]
+            recent_messages = orch.messages[-10:] if len(orch.messages) > 10 else orch.messages[:]
+            completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
 
             chunk = StreamChunk(
                 content=f"\n[tool] {orch._presentation.icon('warning', with_color=False)} Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
@@ -776,14 +746,10 @@ class ChatCoordinator:
                         chunk = StreamChunk(content=sanitized)
             except (ProviderRateLimitError, ProviderTimeoutError) as e:
                 logger.error(f"Rate limit/timeout during final response: {e}")
-                chunk = StreamChunk(
-                    content="Rate limited or timeout. Please retry in a moment.\n"
-                )
+                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n")
             except ProviderAuthError as e:
                 logger.error(f"Auth error during final response: {e}")
-                chunk = StreamChunk(
-                    content="Authentication error. Check API credentials.\n"
-                )
+                chunk = StreamChunk(content="Authentication error. Check API credentials.\n")
             except (ConnectionError, TimeoutError) as e:
                 logger.error(f"Network error during final response: {e}")
                 chunk = StreamChunk(content="Network error. Check connection.\n")
@@ -823,9 +789,7 @@ class ChatCoordinator:
         Returns:
             Tuple of (full_content, tool_calls, total_tokens, garbage_detected)
         """
-        return await self._stream_with_rate_limit_retry(
-            tools, provider_kwargs, stream_ctx
-        )
+        return await self._stream_with_rate_limit_retry(tools, provider_kwargs, stream_ctx)
 
     def _get_rate_limit_wait_time(self, exc: Exception, attempt: int) -> float:
         """Get wait time for rate limit retry.
@@ -878,16 +842,10 @@ class ChatCoordinator:
                     )
                     await asyncio.sleep(wait_time)
                 else:
-                    logger.error(
-                        f"Rate limit persisted after {max_retries + 1} attempts"
-                    )
+                    logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
             except Exception as e:
                 exc_str = str(e).lower()
-                if (
-                    "rate_limit" in exc_str
-                    or "429" in exc_str
-                    or "rate limit" in exc_str
-                ):
+                if "rate_limit" in exc_str or "429" in exc_str or "rate limit" in exc_str:
                     last_exception = e
                     if attempt < max_retries:
                         wait_time = self._get_rate_limit_wait_time(e, attempt)
@@ -897,9 +855,7 @@ class ChatCoordinator:
                         )
                         await asyncio.sleep(wait_time)
                     else:
-                        logger.error(
-                            f"Rate limit persisted after {max_retries + 1} attempts"
-                        )
+                        logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
                 else:
                     raise
 
@@ -940,13 +896,11 @@ class ChatCoordinator:
             tools=tools,
             **provider_kwargs,
         ):
-            chunk, consecutive_garbage_chunks, garbage_detected = (
-                self._handle_stream_chunk(
-                    chunk,
-                    consecutive_garbage_chunks,
-                    max_garbage_chunks,
-                    garbage_detected,
-                )
+            chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
+                chunk,
+                consecutive_garbage_chunks,
+                max_garbage_chunks,
+                garbage_detected,
             )
             if chunk is None:
                 continue

@@ -189,10 +189,7 @@ class WorkflowGenerationValidationResult:
     def all_errors(self) -> List[WorkflowValidationError]:
         """Get all errors from all categories."""
         return (
-            self.schema_errors
-            + self.structure_errors
-            + self.semantic_errors
-            + self.security_errors
+            self.schema_errors + self.structure_errors + self.semantic_errors + self.security_errors
         )
 
     @property
@@ -223,9 +220,7 @@ class WorkflowGenerationValidationResult:
         if self.is_valid:
             base = "✓ Workflow validation passed"
             if self.all_errors:
-                warnings = [
-                    e for e in self.all_errors if e.severity == ErrorSeverity.WARNING
-                ]
+                warnings = [e for e in self.all_errors if e.severity == ErrorSeverity.WARNING]
                 if warnings:
                     base += f" ({len(warnings)} warnings)"
             return base
@@ -332,9 +327,7 @@ class RefinementResult:
             if self.fixes_applied:
                 base += f"\n  Fixes applied: {len(self.fixes_applied)}"
             if self.errors_fixed > 0:
-                base += (
-                    f"\n  Errors fixed: {self.errors_fixed}/{len(self.original_errors)}"
-                )
+                base += f"\n  Errors fixed: {self.errors_fixed}/{len(self.original_errors)}"
                 base += f" ({self.fix_rate*100:.1f}%)"
             return base
         return f"✗ Refinement failed after {self.iterations} iterations"

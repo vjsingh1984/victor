@@ -165,9 +165,9 @@ def _normal_ppf(p: float) -> float:
         )
     else:
         q = math.sqrt(-2 * math.log(1 - p))
-        return -(
-            ((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]
-        ) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+        return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / (
+            (((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1
+        )
 
 
 def _t_cdf(t: float, df: float) -> float:
@@ -518,15 +518,15 @@ def chi_squared_test(
 
     # Cramér's V as effect size
     min_dim = min(rows - 1, cols - 1)
-    cramers_v = (
-        math.sqrt(chi_sq / (total * min_dim)) if total > 0 and min_dim > 0 else 0.0
-    )
+    cramers_v = math.sqrt(chi_sq / (total * min_dim)) if total > 0 and min_dim > 0 else 0.0
 
     significant = p_value < significance_level
 
     # Generate recommendation
     if not significant:
-        rec = "Variables appear independent. Variant assignment doesn't affect outcome distribution."
+        rec = (
+            "Variables appear independent. Variant assignment doesn't affect outcome distribution."
+        )
     elif cramers_v > 0.5:
         rec = f"Strong association (V={cramers_v:.2f}). Variants have very different outcome distributions."
     elif cramers_v > 0.3:

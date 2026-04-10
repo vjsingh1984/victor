@@ -168,9 +168,7 @@ class ContextReminderManager:
         self,
         provider: str = "unknown",
         configs: Optional[Dict[ReminderType, ReminderConfig]] = None,
-        custom_formatters: Optional[
-            Dict[ReminderType, Callable[[ContextState], str]]
-        ] = None,
+        custom_formatters: Optional[Dict[ReminderType, Callable[[ContextState], str]]] = None,
         presentation: Optional["PresentationProtocol"] = None,
     ):
         """Initialize the context reminder manager.
@@ -181,7 +179,7 @@ class ContextReminderManager:
             custom_formatters: Custom formatter functions per reminder type
             presentation: Optional presentation adapter for icons (creates default if None)
         """
-        self.provider = provider.lower()
+        self.provider = str(provider).lower()
         self.configs = configs or self.DEFAULT_CONFIGS.copy()
         self.custom_formatters = custom_formatters or {}
         self.state = ContextState()
@@ -257,8 +255,7 @@ class ContextReminderManager:
         # Special case: task hint only injected once
         if reminder_type == ReminderType.TASK_HINT:
             return (
-                self.state.task_hint
-                and ReminderType.TASK_HINT not in self.state.reminder_history
+                self.state.task_hint and ReminderType.TASK_HINT not in self.state.reminder_history
             )
 
         # Special case: budget reminder only when running low
@@ -433,7 +430,7 @@ class ContextReminderManager:
         Args:
             provider: The provider name
         """
-        self.provider = provider.lower()
+        self.provider = str(provider).lower()
 
         # Adjust configs based on provider characteristics
         if provider in {"google", "anthropic", "openai"}:

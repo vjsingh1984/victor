@@ -35,15 +35,11 @@ class TestSystemPromptPolicy:
 
     def test_enforce_trims_large_sections(self):
         policy = SystemPromptPolicy(
-            SystemPromptPolicyConfig(
-                max_section_chars=50, protected_sections=("identity",)
-            )
+            SystemPromptPolicyConfig(max_section_chars=50, protected_sections=("identity",))
         )
         builder = PromptBuilder()
         builder.add_section("identity", "ID", priority=10)
-        builder.add_section(
-            "large_context", "X" * 200, priority=PromptBuilder.PRIORITY_CONTEXT
-        )
+        builder.add_section("large_context", "X" * 200, priority=PromptBuilder.PRIORITY_CONTEXT)
 
         policy.enforce(builder, context=None)
 

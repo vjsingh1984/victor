@@ -184,12 +184,8 @@ class TestMCPRegistryBasics:
     def test_list_servers(self):
         """Test listing registered servers."""
         registry = MCPRegistry()
-        registry.register_server(
-            MCPServerConfig(name="server1", command=["python", "s1.py"])
-        )
-        registry.register_server(
-            MCPServerConfig(name="server2", command=["python", "s2.py"])
-        )
+        registry.register_server(MCPServerConfig(name="server1", command=["python", "s1.py"]))
+        registry.register_server(MCPServerConfig(name="server2", command=["python", "s2.py"]))
         servers = registry.list_servers()
         assert "server1" in servers
         assert "server2" in servers
@@ -203,9 +199,7 @@ class TestMCPRegistryBasics:
     def test_get_server_status(self):
         """Test getting server status."""
         registry = MCPRegistry()
-        registry.register_server(
-            MCPServerConfig(name="test", command=["python", "s.py"])
-        )
+        registry.register_server(MCPServerConfig(name="test", command=["python", "s.py"]))
         status = registry.get_server_status("test")
         assert status is not None
         assert status["name"] == "test"
@@ -277,9 +271,7 @@ class TestMCPRegistryEvents:
     def test_reset_server(self):
         """Test resetting a failed server."""
         registry = MCPRegistry()
-        registry.register_server(
-            MCPServerConfig(name="test", command=["python", "s.py"])
-        )
+        registry.register_server(MCPServerConfig(name="test", command=["python", "s.py"]))
 
         # Manually set failure state
         entry = registry._servers["test"]

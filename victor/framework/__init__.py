@@ -563,9 +563,7 @@ def __getattr__(name: str):
 
 
 def __dir__():
-    return sorted(
-        set(_CORE_NAMES) | set(_NAME_TO_MODULE.keys()) | set(_ALIASED_IMPORTS.keys())
-    )
+    return sorted(set(_CORE_NAMES) | set(_NAME_TO_MODULE.keys()) | set(_ALIASED_IMPORTS.keys()))
 
 
 __all__ = list(__dir__())

@@ -12,9 +12,7 @@ from pathlib import Path
 
 
 def _load_benchmark_module():
-    script_path = (
-        Path(__file__).resolve().parents[2] / "scripts" / "benchmark_startup_kpi.py"
-    )
+    script_path = Path(__file__).resolve().parents[2] / "scripts" / "benchmark_startup_kpi.py"
     module_name = f"benchmark_startup_kpi_test_{uuid.uuid4().hex}"
     spec = importlib.util.spec_from_file_location(module_name, script_path)
     if spec is None or spec.loader is None:
@@ -274,16 +272,12 @@ def test_main_returns_exit_code_2_when_thresholds_fail(monkeypatch, capsys):
     monkeypatch.setattr(
         module,
         "_measure_import_victor",
-        lambda **_: module._TimingSummary(
-            cold_ms=150.0, warm_samples_ms=[1.0, 2.0, 3.0]
-        ),
+        lambda **_: module._TimingSummary(cold_ms=150.0, warm_samples_ms=[1.0, 2.0, 3.0]),
     )
     monkeypatch.setattr(
         module,
         "_measure_agent_create",
-        lambda **_: module._TimingSummary(
-            cold_ms=90.0, warm_samples_ms=[10.0, 12.0, 14.0]
-        ),
+        lambda **_: module._TimingSummary(cold_ms=90.0, warm_samples_ms=[10.0, 12.0, 14.0]),
     )
     monkeypatch.setattr(
         module.sys,
@@ -306,9 +300,7 @@ def test_main_returns_exit_code_2_when_thresholds_fail(monkeypatch, capsys):
     assert "import_victor.cold_ms" in payload["threshold_failures"][0]
 
 
-def test_main_returns_exit_code_2_when_activation_expectations_fail(
-    monkeypatch, capsys
-):
+def test_main_returns_exit_code_2_when_activation_expectations_fail(monkeypatch, capsys):
     module = _load_benchmark_module()
     monkeypatch.setattr(
         module,
@@ -365,18 +357,11 @@ def test_main_returns_exit_code_2_when_activation_expectations_fail(
     assert exit_code == 2
     assert "activation_probe" in payload
     assert payload["threshold_failures"]
+    assert any("generic_result_cache_enabled" in item for item in payload["threshold_failures"])
+    assert any("coordination_runtime_lazy" in item for item in payload["threshold_failures"])
+    assert any("activation_probe.cold_ms" in item for item in payload["threshold_failures"])
     assert any(
-        "generic_result_cache_enabled" in item for item in payload["threshold_failures"]
-    )
-    assert any(
-        "coordination_runtime_lazy" in item for item in payload["threshold_failures"]
-    )
-    assert any(
-        "activation_probe.cold_ms" in item for item in payload["threshold_failures"]
-    )
-    assert any(
-        "framework_registry_attempted_total" in item
-        for item in payload["threshold_failures"]
+        "framework_registry_attempted_total" in item for item in payload["threshold_failures"]
     )
 
 
@@ -425,10 +410,5 @@ def test_main_returns_exit_code_2_when_discovery_expectations_fail(monkeypatch, 
     payload = json.loads(output)
 
     assert exit_code == 2
-    assert any(
-        "discovery_probe.cold_ms" in item for item in payload["threshold_failures"]
-    )
-    assert any(
-        "discovery_probe.cache_hit_total" in item
-        for item in payload["threshold_failures"]
-    )
+    assert any("discovery_probe.cold_ms" in item for item in payload["threshold_failures"])
+    assert any("discovery_probe.cache_hit_total" in item for item in payload["threshold_failures"])

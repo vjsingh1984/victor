@@ -346,12 +346,8 @@ class TestRBACManager:
         user = User("dev", roles={dev_role})
         rbac.add_user(user)
         # Developer has READ, WRITE, EXECUTE
-        assert rbac.check_tool_access(
-            "dev", "edit_file", "filesystem", AccessMode.WRITE
-        )
-        assert not rbac.check_tool_access(
-            "dev", "web_search", "network", AccessMode.NETWORK
-        )
+        assert rbac.check_tool_access("dev", "edit_file", "filesystem", AccessMode.WRITE)
+        assert not rbac.check_tool_access("dev", "web_search", "network", AccessMode.NETWORK)
 
     def test_check_tool_access_disabled(self):
         """Test tool access check when disabled."""
@@ -369,9 +365,7 @@ class TestRBACManager:
         user = User("alice", roles={admin_role})
         rbac.add_user(user)
         rbac.set_current_user("alice")
-        assert rbac.check_current_user_tool_access(
-            "any_tool", "any_cat", AccessMode.MIXED
-        )
+        assert rbac.check_current_user_tool_access("any_tool", "any_cat", AccessMode.MIXED)
 
     def test_check_current_user_tool_access_no_user(self):
         """Test tool access check with no current user."""
@@ -525,9 +519,7 @@ class TestRequirePermissionDecorator:
         # Use new event loop to avoid pollution from other tests
         loop = asyncio.new_event_loop()
         try:
-            result = loop.run_until_complete(
-                async_write(_rbac_manager=rbac, _rbac_user="alice")
-            )
+            result = loop.run_until_complete(async_write(_rbac_manager=rbac, _rbac_user="alice"))
             assert result == "written"
         finally:
             loop.close()
@@ -547,9 +539,7 @@ class TestRequirePermissionDecorator:
         loop = asyncio.new_event_loop()
         try:
             with pytest.raises(PermissionError):
-                loop.run_until_complete(
-                    async_execute(_rbac_manager=rbac, _rbac_user="bob")
-                )
+                loop.run_until_complete(async_execute(_rbac_manager=rbac, _rbac_user="bob"))
         finally:
             loop.close()
 

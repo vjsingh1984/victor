@@ -98,9 +98,7 @@ class TestInitializationPhaseManager:
 
         # Make metrics_runtime fail
         orchestrator._initialize_provider_runtime = MagicMock()
-        orchestrator._initialize_metrics_runtime = MagicMock(
-            side_effect=RuntimeError("boom")
-        )
+        orchestrator._initialize_metrics_runtime = MagicMock(side_effect=RuntimeError("boom"))
         orchestrator._initialize_workflow_runtime = MagicMock()
         orchestrator._initialize_memory_runtime = MagicMock()
         orchestrator._initialize_resilience_runtime = MagicMock()

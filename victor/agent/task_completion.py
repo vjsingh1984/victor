@@ -472,9 +472,7 @@ class TaskCompletionDetector:
                     deliverables = _parse_deliverables(decision.result.deliverables)
                     # If LLM returned task_type but no deliverables, infer them
                     if not deliverables and hasattr(decision.result, "task_type"):
-                        deliverables = _infer_deliverables_from_task_type(
-                            decision.result.task_type
-                        )
+                        deliverables = _infer_deliverables_from_task_type(decision.result.task_type)
                     if deliverables:
                         self._state.expected_deliverables = list(deliverables)
                         logger.info(
@@ -484,16 +482,12 @@ class TaskCompletionDetector:
                         )
                         return self._state.expected_deliverables
             except Exception as e:
-                logger.debug(
-                    f"LLM intent classification failed, using regex fallback: {e}"
-                )
+                logger.debug(f"LLM intent classification failed, using regex fallback: {e}")
 
         # Priority 2: Regex keyword fallback
         deliverables = self._regex_classify_intent(user_message)
         self._state.expected_deliverables = list(deliverables)
-        logger.debug(
-            f"Regex intent classification: {self._state.expected_deliverables}"
-        )
+        logger.debug(f"Regex intent classification: {self._state.expected_deliverables}")
         return self._state.expected_deliverables
 
     def _regex_classify_intent(self, user_message: str) -> Set[DeliverableType]:
@@ -713,15 +707,11 @@ class TaskCompletionDetector:
             # If we have file edits + any completion signal, we're done
             if self._state.completion_signals:
                 is_complete = True
-                logger.info(
-                    "Bug fix completion: file edits + completion signal detected"
-                )
+                logger.info("Bug fix completion: file edits + completion signal detected")
             # If we have file edits + 2+ continuation requests, likely done
             elif self._state.continuation_requests >= 2:
                 is_complete = True
-                logger.info(
-                    "Bug fix completion: file edits + continuation requests detected"
-                )
+                logger.info("Bug fix completion: file edits + continuation requests detected")
 
         if is_complete:
             logger.info(
@@ -747,10 +737,7 @@ class TaskCompletionDetector:
         Returns:
             Markdown-formatted summary string
         """
-        if (
-            not self._state.completed_deliverables
-            and not self._state.completion_signals
-        ):
+        if not self._state.completed_deliverables and not self._state.completion_signals:
             return "No deliverables recorded."
 
         lines = ["## Task Completion Summary", ""]
@@ -766,9 +753,7 @@ class TaskCompletionDetector:
             lines.append("")
 
         if self._state.completion_signals:
-            lines.append(
-                f"### Completion Signals: {len(self._state.completion_signals)}"
-            )
+            lines.append(f"### Completion Signals: {len(self._state.completion_signals)}")
             lines.append("")
 
         lines.append(f"**Completion: {self._state.completion_percentage:.0f}%**")
@@ -940,8 +925,7 @@ class TaskCompletionDetector:
         if self._state.completion_signals:
             # Check if signals are only passive phrases (not active)
             has_only_passive = all(
-                signal.startswith("passive:")
-                for signal in self._state.completion_signals
+                signal.startswith("passive:") for signal in self._state.completion_signals
             )
             if has_only_passive:
                 return CompletionConfidence.LOW
@@ -951,8 +935,7 @@ class TaskCompletionDetector:
 
         # LLM augmentation: if confidence is LOW or NONE and service is available
         if (
-            heuristic_confidence
-            in (CompletionConfidence.LOW, CompletionConfidence.NONE)
+            heuristic_confidence in (CompletionConfidence.LOW, CompletionConfidence.NONE)
             and self._decision_service is not None
         ):
             try:
@@ -963,9 +946,7 @@ class TaskCompletionDetector:
 
                 from victor.agent.decisions.schemas import DecisionType
 
-                conf_value = (
-                    0.3 if heuristic_confidence == CompletionConfidence.LOW else 0.0
-                )
+                conf_value = 0.3 if heuristic_confidence == CompletionConfidence.LOW else 0.0
                 decision = self._decision_service.decide_sync(
                     DecisionType.TASK_COMPLETION,
                     context={

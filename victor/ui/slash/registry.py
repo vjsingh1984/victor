@@ -109,9 +109,7 @@ class CommandRegistry:
         # Remove from category
         category = command.metadata.category.lower()
         if category in self._categories:
-            self._categories[category] = [
-                n for n in self._categories[category] if n != name
-            ]
+            self._categories[category] = [n for n in self._categories[category] if n != name]
 
         return True
 
@@ -218,9 +216,7 @@ class CommandRegistry:
                                 logger.warning(f"Failed to register {attr_name}: {e}")
 
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to import command module {module_name}: {e}"
-                    )
+                    logger.warning(f"Failed to import command module {module_name}: {e}")
 
         except Exception as e:
             logger.error(f"Failed to discover commands from {package_path}: {e}")
@@ -297,9 +293,7 @@ def command(
         )
 
         # Add metadata property if not present
-        if not hasattr(cls, "metadata") or not isinstance(
-            getattr(cls, "metadata", None), property
-        ):
+        if not hasattr(cls, "metadata") or not isinstance(getattr(cls, "metadata", None), property):
             cls.metadata = property(lambda self: meta)
 
         # Register the command

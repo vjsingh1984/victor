@@ -85,9 +85,7 @@ class CompatibilityRule:
             for version_str in self.excluded_versions:
                 Version(version_str)
         except (InvalidVersion, ValueError) as e:
-            raise ValueError(
-                f"Invalid version constraint in rule for '{self.vertical_name}': {e}"
-            )
+            raise ValueError(f"Invalid version constraint in rule for '{self.vertical_name}': {e}")
 
 
 @dataclass
@@ -242,25 +240,17 @@ class VersionCompatibilityMatrix:
                         if "excluded_versions" in rule_data and isinstance(
                             rule_data["excluded_versions"], list
                         ):
-                            rule_data["excluded_versions"] = set(
-                                rule_data["excluded_versions"]
-                            )
+                            rule_data["excluded_versions"] = set(rule_data["excluded_versions"])
 
                         # Convert string status to enum
-                        if "status" in rule_data and isinstance(
-                            rule_data["status"], str
-                        ):
-                            rule_data["status"] = CompatibilityStatus(
-                                rule_data["status"]
-                            )
+                        if "status" in rule_data and isinstance(rule_data["status"], str):
+                            rule_data["status"] = CompatibilityStatus(rule_data["status"])
 
                         # Convert requires_features from list to set
                         if "requires_features" in rule_data and isinstance(
                             rule_data["requires_features"], list
                         ):
-                            rule_data["requires_features"] = set(
-                                rule_data["requires_features"]
-                            )
+                            rule_data["requires_features"] = set(rule_data["requires_features"])
 
                         rule = CompatibilityRule(**rule_data)
                         self._rules[rule.vertical_name] = rule
@@ -270,9 +260,7 @@ class VersionCompatibilityMatrix:
                         )
 
                 self._loaded = True
-                logger.info(
-                    f"Loaded {len(rules_data)} compatibility rules from {file_path}"
-                )
+                logger.info(f"Loaded {len(rules_data)} compatibility rules from {file_path}")
 
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON in compatibility matrix file: {e}")
@@ -384,9 +372,7 @@ class VersionCompatibilityMatrix:
                     )
 
             except (InvalidVersion, ValueError) as e:
-                logger.warning(
-                    f"Invalid version format during compatibility check: {e}"
-                )
+                logger.warning(f"Invalid version format during compatibility check: {e}")
                 return CompatibilityResult(
                     vertical_name=vertical_name,
                     vertical_version=vertical_version,
@@ -406,9 +392,7 @@ class VersionCompatibilityMatrix:
             # Downgrade to degraded if features are missing
             if missing_features and status == CompatibilityStatus.COMPATIBLE:
                 status = CompatibilityStatus.DEGRADED
-                message = (
-                    f"{rule.message} (degraded: missing features {missing_features})"
-                )
+                message = f"{rule.message} (degraded: missing features {missing_features})"
 
             return CompatibilityResult(
                 vertical_name=vertical_name,

@@ -322,9 +322,7 @@ class ToolService:
         """
         total_calls = sum(self._usage_stats.values())
         successful_calls = sum(
-            count
-            for tool, count in self._usage_stats.items()
-            if not tool.startswith("error:")
+            count for tool, count in self._usage_stats.items() if not tool.startswith("error:")
         )
 
         return {

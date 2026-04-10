@@ -103,9 +103,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._ToolResult = ToolResult
         # Note: self._items is inherited from BaseRegistry, aliased to _tools for compatibility
         self._tool_enabled: Dict[str, bool] = {}  # Track enabled/disabled state
-        self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = (
-            []
-        )
+        self._before_hooks: List[Union[Hook, Callable[[str, Dict[str, Any]], None]]] = []
         self._after_hooks: List[Union[Hook, Callable[..., Any]]] = []
 
         # Schema cache: version-counter based invalidation for O(1) cache checks.
@@ -288,9 +286,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
         strategy = self._strategy_registry.get_strategy_for(tool)
         if strategy is None:
-            raise TypeError(
-                f"No registration strategy found for tool type: {type(tool)}"
-            )
+            raise TypeError(f"No registration strategy found for tool type: {type(tool)}")
 
         strategy.register(self, tool, enabled)
         self._invalidate_schema_cache()
@@ -382,9 +378,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             def parameters(self) -> Dict[str, Any]:
                 return parameters
 
-            async def execute(
-                self, _exec_ctx: Dict[str, Any], **kwargs: Any
-            ) -> ToolResult:
+            async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
                 # MCP tools are executed via mcp_call, not directly
                 return ToolResult(
                     success=False,
@@ -532,9 +526,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         """
         if only_enabled:
             return [
-                tool
-                for name, tool in self._tools.items()
-                if self._tool_enabled.get(name, False)
+                tool for name, tool in self._tools.items() if self._tool_enabled.get(name, False)
             ]
         return list(self._tools.values())
 
@@ -589,9 +581,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             return tool.cost_tier
         return None
 
-    def get_tools_by_cost(
-        self, max_tier: CostTier = CostTier.HIGH, only_enabled: bool = True
-    ):
+    def get_tools_by_cost(self, max_tier: CostTier = CostTier.HIGH, only_enabled: bool = True):
         """Get tools filtered by maximum cost tier.
 
         Args:
@@ -655,9 +645,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             # Use detailed validation for better error messages
             validation = tool.validate_parameters_detailed(**kwargs)
             if not validation.valid:
-                error_msg = f"Invalid parameters for tool '{name}': " + "; ".join(
-                    validation.errors
-                )
+                error_msg = f"Invalid parameters for tool '{name}': " + "; ".join(validation.errors)
                 result = ToolResult(
                     success=False,
                     output=None,

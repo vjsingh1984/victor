@@ -496,8 +496,7 @@ class InfrastructureScanner:
 
         # Compile patterns for efficiency
         self._compiled_patterns = [
-            (re.compile(p.pattern, re.IGNORECASE | re.MULTILINE), p)
-            for p in self._patterns
+            (re.compile(p.pattern, re.IGNORECASE | re.MULTILINE), p) for p in self._patterns
         ]
 
     def scan_command(self, command: str) -> InfraScanResult:
@@ -617,9 +616,7 @@ class InfrastructureScanner:
 
         # Check for service account
         if re.search(r"automountServiceAccountToken:\s*true", content, re.IGNORECASE):
-            warnings.append(
-                "Service account token auto-mount enabled - disable if not needed"
-            )
+            warnings.append("Service account token auto-mount enabled - disable if not needed")
 
         # Check for run as root
         if re.search(r"runAsUser:\s*0", content):
@@ -631,9 +628,7 @@ class InfrastructureScanner:
 
         return warnings
 
-    def get_patterns_by_category(
-        self, category: InfraPatternCategory
-    ) -> List[SafetyPattern]:
+    def get_patterns_by_category(self, category: InfraPatternCategory) -> List[SafetyPattern]:
         """Get patterns for a specific category.
 
         Args:

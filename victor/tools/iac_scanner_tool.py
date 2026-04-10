@@ -302,15 +302,11 @@ class IaCScannerTool(BaseTool):
 
         # Findings by severity
         if result.critical_count > 0:
-            lines.append(
-                f"\n{_get_icon('level_critical')} **Critical ({result.critical_count}):**"
-            )
+            lines.append(f"\n{_get_icon('level_critical')} **Critical ({result.critical_count}):**")
             for f in result.findings:
                 if f.severity.value == "critical":
                     lines.append(f"  - [{f.rule_id}] {f.message}")
-                    lines.append(
-                        f"    {_get_icon('folder')} {f.file_path.name}:{f.line_number}"
-                    )
+                    lines.append(f"    {_get_icon('folder')} {f.file_path.name}:{f.line_number}")
                     if f.remediation:
                         lines.append(f"    {_get_icon('hint')} {f.remediation}")
 
@@ -319,14 +315,10 @@ class IaCScannerTool(BaseTool):
             for f in result.findings:
                 if f.severity.value == "high":
                     lines.append(f"  - [{f.rule_id}] {f.message}")
-                    lines.append(
-                        f"    {_get_icon('folder')} {f.file_path.name}:{f.line_number}"
-                    )
+                    lines.append(f"    {_get_icon('folder')} {f.file_path.name}:{f.line_number}")
 
         if result.medium_count > 0:
-            lines.append(
-                f"\n{_get_icon('level_medium')} **Medium ({result.medium_count}):**"
-            )
+            lines.append(f"\n{_get_icon('level_medium')} **Medium ({result.medium_count}):**")
             for f in result.findings[:10]:  # Limit medium findings shown
                 if f.severity.value == "medium":
                     lines.append(f"  - [{f.rule_id}] {f.message}")
@@ -341,9 +333,7 @@ class IaCScannerTool(BaseTool):
     def _format_findings(self, findings: list, file_path: Path) -> str:
         """Format findings for a specific file."""
         if not findings:
-            return (
-                f"{_get_icon('success')} No security issues found in {file_path.name}"
-            )
+            return f"{_get_icon('success')} No security issues found in {file_path.name}"
 
         lines = [f"**Security Findings in {file_path.name}**", ""]
         lines.append(f"**Total:** {len(findings)}")

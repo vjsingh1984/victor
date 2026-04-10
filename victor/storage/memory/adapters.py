@@ -108,9 +108,7 @@ class EntityMemoryAdapter:
             # Search entities by name
             entities = await self._memory.search(
                 query=query.query,
-                entity_types=(
-                    query.filters.get("entity_types") if query.filters else None
-                ),
+                entity_types=(query.filters.get("entity_types") if query.filters else None),
                 limit=query.limit,
             )
 
@@ -143,9 +141,7 @@ class EntityMemoryAdapter:
                             "source": entity.source,
                             "mentions": entity.mentions,
                         },
-                        timestamp=(
-                            entity.last_seen.timestamp() if entity.last_seen else None
-                        ),
+                        timestamp=(entity.last_seen.timestamp() if entity.last_seen else None),
                     )
                 )
 
@@ -297,13 +293,11 @@ class ConversationMemoryAdapter:
 
             # Try semantic search first
             if hasattr(self._store, "aget_semantically_relevant_messages"):
-                semantic_results = (
-                    await self._store.aget_semantically_relevant_messages(
-                        session_id=session_id,
-                        query=query.query,
-                        limit=query.limit,
-                        min_similarity=query.min_relevance or 0.3,
-                    )
+                semantic_results = await self._store.aget_semantically_relevant_messages(
+                    session_id=session_id,
+                    query=query.query,
+                    limit=query.limit,
+                    min_similarity=query.min_relevance or 0.3,
                 )
             else:
                 semantic_results = self._store.get_semantically_relevant_messages(
@@ -336,9 +330,7 @@ class ConversationMemoryAdapter:
 
             # If no semantic results, fall back to recent messages with keyword matching
             if not results:
-                recent = self._store.get_recent_messages(
-                    session_id, count=query.limit * 2
-                )
+                recent = self._store.get_recent_messages(session_id, count=query.limit * 2)
                 query_lower = query.query.lower()
 
                 for message in recent:
@@ -388,11 +380,7 @@ class ConversationMemoryAdapter:
 
         if isinstance(value, str):
             # Simple string content - assume user role
-            role = (
-                MessageRole(key)
-                if key in ["user", "assistant", "system"]
-                else MessageRole.USER
-            )
+            role = MessageRole(key) if key in ["user", "assistant", "system"] else MessageRole.USER
             self._store.add_message(session_id, role, value)
         elif isinstance(value, dict):
             role = MessageRole(value.get("role", "user"))
@@ -489,9 +477,7 @@ class GraphMemoryAdapter:
             if query.filters and "relation_types" in query.filters:
                 from victor.storage.memory.entity_types import RelationType
 
-                relation_types = [
-                    RelationType(rt) for rt in query.filters["relation_types"]
-                ]
+                relation_types = [RelationType(rt) for rt in query.filters["relation_types"]]
 
             # Get direction filter
             direction = "both"
@@ -530,16 +516,10 @@ class GraphMemoryAdapter:
                         metadata={
                             "relation_type": relation.relation_type.value,
                             "direction": (
-                                "outgoing"
-                                if relation.source_id == entity_id
-                                else "incoming"
+                                "outgoing" if relation.source_id == entity_id else "incoming"
                             ),
                         },
-                        timestamp=(
-                            relation.last_seen.timestamp()
-                            if relation.last_seen
-                            else None
-                        ),
+                        timestamp=(relation.last_seen.timestamp() if relation.last_seen else None),
                     )
                 )
 

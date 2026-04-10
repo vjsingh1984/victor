@@ -326,10 +326,7 @@ class ModelSwitcher:
 
         # Search by display name or model ID
         for _model_id, info in self._available_models.items():
-            if (
-                query_lower in info.display_name.lower()
-                or query_lower in info.model_id.lower()
-            ):
+            if query_lower in info.display_name.lower() or query_lower in info.model_id.lower():
                 return info
 
         return None
@@ -450,9 +447,7 @@ class ModelSwitcher:
             Recommended model or None
         """
         # Find models with matching capability
-        matching = [
-            m for m in self._available_models.values() if task_type in m.capabilities
-        ]
+        matching = [m for m in self._available_models.values() if task_type in m.capabilities]
 
         if not matching:
             return None

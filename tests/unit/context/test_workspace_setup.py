@@ -21,9 +21,7 @@ class TestDetectProjectName:
 
     def test_detect_from_pyproject(self, tmp_path):
         """Detect name from pyproject.toml."""
-        (tmp_path / "pyproject.toml").write_text(
-            '[project]\nname = "my-project"\n'
-        )
+        (tmp_path / "pyproject.toml").write_text('[project]\nname = "my-project"\n')
         result = detect_project_name(tmp_path)
         assert result == "my_project"
 
@@ -52,9 +50,7 @@ class TestEnsureProjectImportable:
     @pytest.mark.asyncio
     async def test_no_build_system_skips(self, tmp_path):
         """No setup.py/pyproject.toml → skip install, return False."""
-        result = await ensure_project_importable(
-            "nonexistent_pkg_xyz", tmp_path
-        )
+        result = await ensure_project_importable("nonexistent_pkg_xyz", tmp_path)
         assert result is False
 
     @pytest.mark.asyncio
@@ -68,9 +64,7 @@ class TestEnsureProjectImportable:
             mock_proc.communicate = AsyncMock(return_value=(b"", b""))
             mock_exec.return_value = mock_proc
 
-            result = await ensure_project_importable(
-                "nonexistent_pkg_xyz", tmp_path
-            )
+            result = await ensure_project_importable("nonexistent_pkg_xyz", tmp_path)
 
         # pip install was called
         mock_exec.assert_called_once()
@@ -87,12 +81,8 @@ class TestEnsureProjectImportable:
         with patch("asyncio.create_subprocess_exec") as mock_exec:
             mock_proc = AsyncMock()
             mock_proc.returncode = 1
-            mock_proc.communicate = AsyncMock(
-                return_value=(b"", b"error: bad setup")
-            )
+            mock_proc.communicate = AsyncMock(return_value=(b"", b"error: bad setup"))
             mock_exec.return_value = mock_proc
 
-            result = await ensure_project_importable(
-                "nonexistent_pkg_xyz", tmp_path
-            )
+            result = await ensure_project_importable("nonexistent_pkg_xyz", tmp_path)
             assert result is False

@@ -160,9 +160,7 @@ class TeamSpec:
             "description": self.description,
             "vertical": self.vertical,
             "formation": (
-                self.formation.value
-                if hasattr(self.formation, "value")
-                else str(self.formation)
+                self.formation.value if hasattr(self.formation, "value") else str(self.formation)
             ),
             "members": [
                 {

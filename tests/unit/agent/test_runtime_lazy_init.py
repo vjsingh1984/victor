@@ -43,9 +43,7 @@ class TestRuntimeLazyInitialization:
             assert coordination_runtime is not None, "coordination_runtime should exist"
 
             # Check that components are NOT initialized (lazy)
-            recovery_coordinator = getattr(
-                coordination_runtime, "recovery_coordinator", None
-            )
+            recovery_coordinator = getattr(coordination_runtime, "recovery_coordinator", None)
             chunk_generator = getattr(coordination_runtime, "chunk_generator", None)
             tool_planner = getattr(coordination_runtime, "tool_planner", None)
             task_coordinator = getattr(coordination_runtime, "task_coordinator", None)
@@ -86,9 +84,7 @@ class TestRuntimeLazyInitialization:
             # Check that components are NOT initialized (lazy)
             chat_coordinator = getattr(interaction_runtime, "chat_coordinator", None)
             tool_coordinator = getattr(interaction_runtime, "tool_coordinator", None)
-            session_coordinator = getattr(
-                interaction_runtime, "session_coordinator", None
-            )
+            session_coordinator = getattr(interaction_runtime, "session_coordinator", None)
 
             # All should be LazyRuntimeProxy instances
             # Note: With service layer feature flags enabled, tool_coordinator
@@ -127,9 +123,7 @@ class TestRuntimeLazyInitialization:
             assert resilience_runtime is not None, "resilience_runtime should exist"
 
             recovery_handler = getattr(resilience_runtime, "recovery_handler", None)
-            recovery_integration = getattr(
-                resilience_runtime, "recovery_integration", None
-            )
+            recovery_integration = getattr(resilience_runtime, "recovery_integration", None)
 
             for component_name, component in [
                 ("recovery_handler", recovery_handler),
@@ -161,9 +155,7 @@ class TestRuntimeLazyInitialization:
             assert coordination_runtime is not None
 
             # Get the LazyRuntimeProxy for recovery_coordinator
-            recovery_coordinator = getattr(
-                coordination_runtime, "recovery_coordinator", None
-            )
+            recovery_coordinator = getattr(coordination_runtime, "recovery_coordinator", None)
             assert recovery_coordinator is not None
 
             # Verify it's NOT initialized initially
@@ -199,9 +191,7 @@ class TestRuntimeLazyInitialization:
             assert provider_runtime is not None, "provider_runtime should exist"
 
             # Check that components are NOT initialized (lazy)
-            provider_coordinator = getattr(
-                provider_runtime, "provider_coordinator", None
-            )
+            provider_coordinator = getattr(provider_runtime, "provider_coordinator", None)
             provider_switch_coordinator = getattr(
                 provider_runtime, "provider_switch_coordinator", None
             )
@@ -271,9 +261,7 @@ class TestRuntimeLazyInitialization:
             metrics_collector = getattr(metrics_runtime, "metrics_collector", None)
             assert metrics_collector is not None, "metrics_collector should exist"
             initialized = getattr(metrics_collector, "initialized", False)
-            assert (
-                initialized
-            ), "metrics_collector should be initialized after Agent.create()"
+            assert initialized, "metrics_collector should be initialized after Agent.create()"
 
         finally:
             await agent.close()
@@ -291,23 +279,13 @@ class TestRuntimeLazyInitialization:
             orchestrator = agent.get_orchestrator()
 
             # All runtimes should exist
-            assert hasattr(
-                orchestrator, "_provider_runtime"
-            ), "provider_runtime missing"
+            assert hasattr(orchestrator, "_provider_runtime"), "provider_runtime missing"
             assert hasattr(orchestrator, "_memory_runtime"), "memory_runtime missing"
             assert hasattr(orchestrator, "_metrics_runtime"), "metrics_runtime missing"
-            assert hasattr(
-                orchestrator, "_workflow_runtime"
-            ), "workflow_runtime missing"
-            assert hasattr(
-                orchestrator, "_coordination_runtime"
-            ), "coordination_runtime missing"
-            assert hasattr(
-                orchestrator, "_interaction_runtime"
-            ), "interaction_runtime missing"
-            assert hasattr(
-                orchestrator, "_resilience_runtime"
-            ), "resilience_runtime missing"
+            assert hasattr(orchestrator, "_workflow_runtime"), "workflow_runtime missing"
+            assert hasattr(orchestrator, "_coordination_runtime"), "coordination_runtime missing"
+            assert hasattr(orchestrator, "_interaction_runtime"), "interaction_runtime missing"
+            assert hasattr(orchestrator, "_resilience_runtime"), "resilience_runtime missing"
 
         finally:
             await agent.close()

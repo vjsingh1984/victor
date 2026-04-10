@@ -132,9 +132,7 @@ class FactoryAwareBuilder(ComponentBuilder):
         _factory: Optional OrchestratorFactory instance (created lazily)
     """
 
-    def __init__(
-        self, settings: Settings, factory: Optional["OrchestratorFactory"] = None
-    ):
+    def __init__(self, settings: Settings, factory: Optional["OrchestratorFactory"] = None):
         """Initialize the factory-aware builder.
 
         Args:
@@ -178,9 +176,7 @@ class FactoryAwareBuilder(ComponentBuilder):
         """
         if self._factory is None:
             if provider is None or model is None:
-                raise ValueError(
-                    "provider and model are required when factory is not provided"
-                )
+                raise ValueError("provider and model are required when factory is not provided")
             from victor.agent.orchestrator_factory import OrchestratorFactory
 
             self._factory = OrchestratorFactory(

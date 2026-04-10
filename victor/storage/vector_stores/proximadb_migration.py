@@ -81,9 +81,7 @@ class SqliteLanceDBMigration:
             else (project_paths.project_victor_dir / "project.db")
         )
         self.lancedb_dir = (
-            Path(lancedb_dir).expanduser()
-            if lancedb_dir
-            else project_paths.embeddings_dir
+            Path(lancedb_dir).expanduser() if lancedb_dir else project_paths.embeddings_dir
         )
         self.lancedb_table = lancedb_table or "embeddings"
         self.symbol_store_db_path = (
@@ -108,14 +106,10 @@ class SqliteLanceDBMigration:
 
         vector_count, vector_files = self._migrate_vectors()
         summary.vector_records_migrated = vector_count
-        file_languages.update(
-            {path: lang for path, lang in vector_files.items() if lang}
-        )
+        file_languages.update({path: lang for path, lang in vector_files.items() if lang})
 
         symbol_files = self._load_symbol_store_files()
-        file_languages.update(
-            {path: lang for path, lang in symbol_files.items() if lang}
-        )
+        file_languages.update({path: lang for path, lang in symbol_files.items() if lang})
 
         backfill_counts = self._backfill_documents_and_metrics(file_languages)
         summary.files_scanned = backfill_counts[0]
@@ -272,9 +266,7 @@ class SqliteLanceDBMigration:
                 batch = []
 
         if batch:
-            self.provider._client.insert_vectors(
-                self.provider._vector_collection, records=batch
-            )
+            self.provider._client.insert_vectors(self.provider._vector_collection, records=batch)
             migrated += len(batch)
 
         return migrated, file_languages
@@ -351,13 +343,9 @@ class SqliteLanceDBMigration:
             if not self._table_exists(conn, "files"):
                 return {}
             rows = conn.execute("SELECT path, language FROM files").fetchall()
-            return {
-                str(row["path"]): str(row["language"]) for row in rows if row["path"]
-            }
+            return {str(row["path"]): str(row["language"]) for row in rows if row["path"]}
         except Exception:
-            logger.debug(
-                "Failed to read file metadata from %s", self.symbol_store_db_path
-            )
+            logger.debug("Failed to read file metadata from %s", self.symbol_store_db_path)
             return {}
         finally:
             conn.close()

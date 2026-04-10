@@ -33,21 +33,13 @@ from pydantic import BaseModel, Field
 class EmbeddingModelConfig(BaseModel):
     """Configuration for embedding model."""
 
-    model_type: str = Field(
-        description="Model type (sentence-transformers, openai, cohere, etc.)"
-    )
-    model_name: str = Field(
-        default="all-MiniLM-L6-v2", description="Specific model name"
-    )
+    model_type: str = Field(description="Model type (sentence-transformers, openai, cohere, etc.)")
+    model_name: str = Field(default="all-MiniLM-L6-v2", description="Specific model name")
     dimension: int = Field(
         default=384, description="Embedding dimension (auto-detected if possible)"
     )
-    api_key: Optional[str] = Field(
-        default=None, description="API key for cloud providers"
-    )
-    batch_size: int = Field(
-        default=32, description="Batch size for embedding generation"
-    )
+    api_key: Optional[str] = Field(default=None, description="API key for cloud providers")
+    batch_size: int = Field(default=32, description="Batch size for embedding generation")
 
 
 class BaseEmbeddingModel(ABC):
@@ -148,17 +140,13 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Use shared EmbeddingService singleton for memory efficiency
         # This shares the model with IntentClassifier and SemanticToolSelector
-        self._embedding_service = EmbeddingService.get_instance(
-            model_name=self.config.model_name
-        )
+        self._embedding_service = EmbeddingService.get_instance(model_name=self.config.model_name)
 
         # Ensure model is loaded (lazy loading)
         self._embedding_service._ensure_model_loaded()
 
         self._initialized = True
-        print(
-            f"✅ Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}"
-        )
+        print(f"✅ Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text."""
@@ -240,9 +228,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         if not self._initialized:
             await self.initialize()
 
-        response = await self.client.embeddings.create(
-            model=self.config.model_name, input=text
-        )
+        response = await self.client.embeddings.create(model=self.config.model_name, input=text)
         return response.data[0].embedding
 
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
@@ -251,9 +237,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             await self.initialize()
 
         # OpenAI API handles batching internally (up to 2048 texts per request)
-        response = await self.client.embeddings.create(
-            model=self.config.model_name, input=texts
-        )
+        response = await self.client.embeddings.create(model=self.config.model_name, input=texts)
         return [item.embedding for item in response.data]
 
     def get_dimension(self) -> int:
@@ -501,10 +485,7 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
 
         # Check for partial match (e.g., "qwen3-embedding" matches "qwen3-embedding:8b")
         for model_key, dim in dimensions.items():
-            if (
-                self.config.model_name in model_key
-                or model_key in self.config.model_name
-            ):
+            if self.config.model_name in model_key or model_key in self.config.model_name:
                 return dim
 
         # Fall back to config dimension
@@ -543,8 +524,7 @@ def create_embedding_model(config: EmbeddingModelConfig) -> BaseEmbeddingModel:
     if not model_class:
         available = ", ".join(_embedding_models.keys())
         raise ValueError(
-            f"Unknown embedding model type: {config.model_type}. "
-            f"Available: {available}"
+            f"Unknown embedding model type: {config.model_type}. " f"Available: {available}"
         )
 
     return model_class(config)

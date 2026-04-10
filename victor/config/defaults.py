@@ -268,9 +268,7 @@ class WorkflowDefaults:
 # =============================================================================
 
 
-def get_default(
-    settings: object, attr: str, default_class: type, attr_name: str
-) -> any:
+def get_default(settings: object, attr: str, default_class: type, attr_name: str) -> any:
     """Get a configuration value with fallback to defaults.
 
     This helper function provides a clean way to access settings with

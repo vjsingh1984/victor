@@ -224,9 +224,7 @@ class TestCanonicalWorkflowAPI:
                 provider, "compile_workflow"
             ), f"{name} provider missing compile_workflow"
             # Verify it's callable
-            assert callable(
-                provider.compile_workflow
-            ), f"{name} compile_workflow not callable"
+            assert callable(provider.compile_workflow), f"{name} compile_workflow not callable"
 
     def test_compile_workflow_returns_compiled_graph(self, all_providers):
         """Test compile_workflow returns a CompiledGraph instance."""
@@ -245,9 +243,7 @@ class TestCanonicalWorkflowAPI:
                     continue
 
             if compiled is None:
-                pytest.skip(
-                    f"{name} provider has no compileable workflows in this environment"
-                )
+                pytest.skip(f"{name} provider has no compileable workflows in this environment")
 
             # CompiledGraph should have invoke and stream methods
             assert hasattr(compiled, "invoke"), f"{name} compiled graph missing invoke"
@@ -256,18 +252,14 @@ class TestCanonicalWorkflowAPI:
             assert callable(compiled.stream), f"{name} stream not callable"
 
     @pytest.mark.asyncio
-    async def test_run_compiled_workflow_raises_for_unknown_workflow(
-        self, all_providers
-    ):
+    async def test_run_compiled_workflow_raises_for_unknown_workflow(self, all_providers):
         """Test run_compiled_workflow raises ValueError for unknown workflow."""
         for name, provider in all_providers:
             with pytest.raises(ValueError, match="Workflow not found: nonexistent"):
                 await provider.run_compiled_workflow("nonexistent", {})
 
     @pytest.mark.asyncio
-    async def test_stream_compiled_workflow_raises_for_unknown_workflow(
-        self, all_providers
-    ):
+    async def test_stream_compiled_workflow_raises_for_unknown_workflow(self, all_providers):
         """Test stream_compiled_workflow raises ValueError for unknown workflow."""
         for name, provider in all_providers:
             try:

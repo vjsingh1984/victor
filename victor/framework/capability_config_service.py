@@ -47,9 +47,7 @@ class CapabilityConfigService:
         """Return True if a config key exists."""
         return name in self._get_scope_bucket(scope_key)
 
-    def get_config(
-        self, name: str, default: Any = None, *, scope_key: Optional[str] = None
-    ) -> Any:
+    def get_config(self, name: str, default: Any = None, *, scope_key: Optional[str] = None) -> Any:
         """Get config value by name."""
         return self._get_scope_bucket(scope_key).get(name, default)
 
@@ -85,9 +83,7 @@ class CapabilityConfigService:
     ) -> None:
         """Apply multiple configs with a uniform merge policy."""
         for name, config in configs.items():
-            self.set_config(
-                name, config, merge_policy=merge_policy, scope_key=scope_key
-            )
+            self.set_config(name, config, merge_policy=merge_policy, scope_key=scope_key)
 
     def list_names(self, *, scope_key: Optional[str] = None) -> list[str]:
         """List known config names."""
@@ -126,9 +122,7 @@ class CapabilityConfigService:
 
     def snapshot_all_scopes(self) -> Dict[str, Dict[str, Any]]:
         """Return a shallow copy of all scope buckets for diagnostics."""
-        return {
-            scope: dict(configs) for scope, configs in self._configs_by_scope.items()
-        }
+        return {scope: dict(configs) for scope, configs in self._configs_by_scope.items()}
 
 
 __all__ = [

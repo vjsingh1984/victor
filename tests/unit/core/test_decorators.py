@@ -214,9 +214,7 @@ class TestCreateToolClass:
     def test_create_tool_class_with_typed_parameters(self):
         """Test creating tool class with type annotations."""
 
-        def typed_function(
-            str_param: str, int_param: int, float_param: float, bool_param: bool
-        ):
+        def typed_function(str_param: str, int_param: int, float_param: float, bool_param: bool):
             """Function with typed parameters.
 
             Args:
@@ -470,8 +468,7 @@ class TestToolNameResolution:
 
             assert result == "read"
             assert any(
-                "Legacy tool name 'read_file' used" in record.message
-                for record in caplog.records
+                "Legacy tool name 'read_file' used" in record.message for record in caplog.records
             )
         finally:
             decorators_module._WARN_ON_LEGACY_NAMES = original_value
@@ -490,9 +487,7 @@ class TestToolNameResolution:
 
             assert result == "shell"
             # Should not have any legacy name warnings
-            assert not any(
-                "Legacy tool name" in record.message for record in caplog.records
-            )
+            assert not any("Legacy tool name" in record.message for record in caplog.records)
         finally:
             decorators_module._WARN_ON_LEGACY_NAMES = original_value
 

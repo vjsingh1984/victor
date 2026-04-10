@@ -319,9 +319,7 @@ def parse_model_metadata(
     is_moe = any(re.search(pattern, model_lower) for pattern in _MOE_PATTERNS)
 
     # 6. Detect reasoning models
-    is_reasoning = any(
-        re.search(pattern, model_lower) for pattern in _REASONING_PATTERNS
-    )
+    is_reasoning = any(re.search(pattern, model_lower) for pattern in _REASONING_PATTERNS)
 
     return ModelMetadata(
         model_family=model_family,
@@ -420,8 +418,7 @@ class ConversationMessage:
         base = {
             "role": (
                 self.role.value
-                if self.role
-                in (MessageRole.USER, MessageRole.ASSISTANT, MessageRole.SYSTEM)
+                if self.role in (MessageRole.USER, MessageRole.ASSISTANT, MessageRole.SYSTEM)
                 else "assistant"
             ),
             "content": self.content,
@@ -968,16 +965,12 @@ class ConversationStore:
             # Check if column exists in table definition
             if col_name not in table_sql:
                 try:
-                    conn.execute(
-                        f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}"
-                    )
+                    conn.execute(f"ALTER TABLE sessions ADD COLUMN {col_name} {col_def}")
                     columns_added.append(col_name)
                 except sqlite3.OperationalError as e:
                     # Column might already exist (race condition or partial migration)
                     if "duplicate column name" not in str(e).lower():
-                        logger.warning(
-                            f"Failed to add column {col_name} to sessions: {e}"
-                        )
+                        logger.warning(f"Failed to add column {col_name} to sessions: {e}")
 
         if columns_added:
             logger.info(f"Migrated sessions table: added columns {columns_added}")
@@ -1475,9 +1468,7 @@ class ConversationStore:
             "tool_usage_count": session.tool_usage_count,
             "created_at": session.created_at.isoformat(),
             "last_activity": session.last_activity.isoformat(),
-            "duration_seconds": (
-                session.last_activity - session.created_at
-            ).total_seconds(),
+            "duration_seconds": (session.last_activity - session.created_at).total_seconds(),
         }
 
     # =========================================================================
@@ -1742,9 +1733,7 @@ class ConversationStore:
         )
 
         # Separate by priority
-        critical = [
-            m for m in session.messages if m.priority == MessagePriority.CRITICAL
-        ]
+        critical = [m for m in session.messages if m.priority == MessagePriority.CRITICAL]
         others = [m for m in session.messages if m.priority != MessagePriority.CRITICAL]
 
         # Sort others by score
@@ -1908,9 +1897,7 @@ class ConversationStore:
 
         # Parse model family from joined lookup table
         model_family = None
-        family_name = (
-            row["model_family_name"] if "model_family_name" in row_keys else None
-        )
+        family_name = row["model_family_name"] if "model_family_name" in row_keys else None
         if family_name:
             try:
                 model_family = ModelFamily(family_name)
@@ -1949,20 +1936,12 @@ class ConversationStore:
             profile=row["profile"] if "profile" in row_keys else None,
             model_family=model_family,
             model_size=model_size,
-            model_params_b=(
-                row["model_params_b"] if "model_params_b" in row_keys else None
-            ),
+            model_params_b=(row["model_params_b"] if "model_params_b" in row_keys else None),
             context_size=context_size,
-            context_tokens=(
-                row["context_tokens"] if "context_tokens" in row_keys else None
-            ),
-            tool_capable=(
-                bool(row["tool_capable"]) if "tool_capable" in row_keys else False
-            ),
+            context_tokens=(row["context_tokens"] if "context_tokens" in row_keys else None),
+            tool_capable=(bool(row["tool_capable"]) if "tool_capable" in row_keys else False),
             is_moe=bool(row["is_moe"]) if "is_moe" in row_keys else False,
-            is_reasoning=(
-                bool(row["is_reasoning"]) if "is_reasoning" in row_keys else False
-            ),
+            is_reasoning=(bool(row["is_reasoning"]) if "is_reasoning" in row_keys else False),
         )
 
     def _message_from_row(self, row: sqlite3.Row) -> ConversationMessage:
@@ -2108,9 +2087,7 @@ class ConversationStore:
             )
         )
 
-    def _get_excluded_message_ids(
-        self, session_id: str, exclude_recent: int
-    ) -> List[str]:
+    def _get_excluded_message_ids(self, session_id: str, exclude_recent: int) -> List[str]:
         """Fetch recent message IDs that should be excluded from semantic search."""
         # Get recent message IDs to exclude
         exclude_ids: List[str] = []
@@ -2226,9 +2203,7 @@ class ConversationStore:
                     continue
 
                 # Compute similarity
-                msg_embedding = self._embedding_service.embed_text_sync(
-                    message.content[:2000]
-                )
+                msg_embedding = self._embedding_service.embed_text_sync(message.content[:2000])
                 similarity = self._cosine_similarity(
                     query_embedding.tolist(), msg_embedding.tolist()
                 )
@@ -2460,9 +2435,7 @@ class ConversationStore:
             except sqlite3.OperationalError as e:
                 # FTS5 may not be available in all SQLite builds
                 logger.warning(f"FTS5 search failed, falling back to LIKE: {e}")
-                return self._fallback_content_search(
-                    conn, session_id, query, limit, roles
-                )
+                return self._fallback_content_search(conn, session_id, query, limit, roles)
 
     def _fallback_content_search(
         self,

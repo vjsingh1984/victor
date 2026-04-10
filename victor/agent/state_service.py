@@ -151,16 +151,12 @@ class StateService:
                 else None
             ),
             "safety_patterns_json": (
-                json.dumps(
-                    [self._serialize_safety_pattern(p) for p in context.safety_patterns]
-                )
+                json.dumps([self._serialize_safety_pattern(p) for p in context.safety_patterns])
                 if context.safety_patterns
                 else None
             ),
             "enabled_tools_json": (
-                json.dumps(list(context.enabled_tools))
-                if context.enabled_tools
-                else None
+                json.dumps(list(context.enabled_tools)) if context.enabled_tools else None
             ),
             "mode_configs_json": (
                 json.dumps(context.mode_configs) if context.mode_configs else None
@@ -189,9 +185,7 @@ class StateService:
 
             # Save negotiation results separately if present
             if context.capability_negotiation_results:
-                self._save_negotiation_results(
-                    state_id, context.capability_negotiation_results
-                )
+                self._save_negotiation_results(state_id, context.capability_negotiation_results)
 
             logger.info(f"Saved vertical state: {state_id} ({vertical_name})")
             return state_id
@@ -279,27 +273,18 @@ class StateService:
                     json.dumps(context.config) if context.config else None,
                     json.dumps(context.stages) if context.stages else None,
                     (
-                        json.dumps(
-                            [self._serialize_middleware(m) for m in context.middleware]
-                        )
+                        json.dumps([self._serialize_middleware(m) for m in context.middleware])
                         if context.middleware
                         else None
                     ),
                     (
                         json.dumps(
-                            [
-                                self._serialize_safety_pattern(p)
-                                for p in context.safety_patterns
-                            ]
+                            [self._serialize_safety_pattern(p) for p in context.safety_patterns]
                         )
                         if context.safety_patterns
                         else None
                     ),
-                    (
-                        json.dumps(list(context.enabled_tools))
-                        if context.enabled_tools
-                        else None
-                    ),
+                    (json.dumps(list(context.enabled_tools)) if context.enabled_tools else None),
                     json.dumps(context.mode_configs) if context.mode_configs else None,
                     (
                         json.dumps(context.capability_negotiation_results)
@@ -319,9 +304,7 @@ class StateService:
                     (state_id,),
                 )
                 # Insert new results
-                self._save_negotiation_results(
-                    state_id, context.capability_negotiation_results
-                )
+                self._save_negotiation_results(state_id, context.capability_negotiation_results)
 
             logger.info(f"Updated vertical state: {state_id}")
             return True

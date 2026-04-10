@@ -136,9 +136,7 @@ def _extract_tool_capable_patterns(data: Dict, result: Dict[str, List[str]]) -> 
         # Check for native_tool_calls in the providers section of each model
         model_providers = model_config.get("providers", {})
         for provider, provider_caps in model_providers.items():
-            if isinstance(provider_caps, dict) and provider_caps.get(
-                "native_tool_calls", False
-            ):
+            if isinstance(provider_caps, dict) and provider_caps.get("native_tool_calls", False):
                 provider_l = provider.lower()
                 if pattern not in result.get(provider_l, []):
                     result.setdefault(provider_l, []).append(pattern)
@@ -208,8 +206,7 @@ class ToolCallingMatrix:
 
         # Normalize to lowercase for matching
         self.manifest: Dict[str, List[str]] = {
-            provider.lower(): [m.lower() for m in models]
-            for provider, models in base.items()
+            provider.lower(): [m.lower() for m in models] for provider, models in base.items()
         }
         self.always_allow = {p.lower() for p in (always_allow_providers or [])}
 

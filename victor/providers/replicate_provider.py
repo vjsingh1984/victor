@@ -372,9 +372,13 @@ class ReplicateProvider(BaseProvider):
 
         for msg in messages:
             if msg.role == "user":
-                full_prompt += f"<|start_header_id|>user<|end_header_id|>\n\n{msg.content}<|eot_id|>"
+                full_prompt += (
+                    f"<|start_header_id|>user<|end_header_id|>\n\n{msg.content}<|eot_id|>"
+                )
             elif msg.role == "assistant":
-                full_prompt += f"<|start_header_id|>assistant<|end_header_id|>\n\n{msg.content}<|eot_id|>"
+                full_prompt += (
+                    f"<|start_header_id|>assistant<|end_header_id|>\n\n{msg.content}<|eot_id|>"
+                )
 
         full_prompt += "<|start_header_id|>assistant<|end_header_id|>\n\n"
         return full_prompt

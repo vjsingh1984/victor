@@ -289,9 +289,7 @@ class TestToolCoordinator:
 
         assert coordinator.get_available_tools() == {"read", "write"}
 
-    def test_is_tool_enabled_with_registry_tool_instances(
-        self, mock_pipeline, mock_selector
-    ):
+    def test_is_tool_enabled_with_registry_tool_instances(self, mock_pipeline, mock_selector):
         """Enabled-tool fallback should work when registry.list_tools returns tool instances."""
         read_tool = MagicMock()
         read_tool.name = "read"

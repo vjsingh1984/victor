@@ -139,9 +139,7 @@ class ProjectContext:
                 if not force_reload and cache_key in _context_cache:
                     self._content, self._parsed_sections = _context_cache[cache_key]
                     _last_cache_check[root_key] = now
-                    logger.debug(
-                        f"Using cached project context for {self._context_file}"
-                    )
+                    logger.debug(f"Using cached project context for {self._context_file}")
                     return True
 
                 # Load from file
@@ -183,9 +181,7 @@ class ProjectContext:
             if line.startswith("## "):
                 # Save previous section
                 if current_content:
-                    self._parsed_sections[current_section] = "\n".join(
-                        current_content
-                    ).strip()
+                    self._parsed_sections[current_section] = "\n".join(current_content).strip()
                 # Start new section
                 current_section = line[3:].strip().lower().replace(" ", "_")
                 current_content = []
@@ -228,9 +224,7 @@ class ProjectContext:
             return ""
 
         # Use actual file name or default to configured name
-        file_name = (
-            self._context_file.name if self._context_file else VICTOR_CONTEXT_FILE
-        )
+        file_name = self._context_file.name if self._context_file else VICTOR_CONTEXT_FILE
 
         return f"""
 <project-context>
@@ -298,8 +292,7 @@ The following is project-specific context from {file_name}:
             dirs = sorted(
                 d.name
                 for d in root.iterdir()
-                if d.is_dir()
-                and not d.name.startswith((".", "_", "venv", "env", "node_modules"))
+                if d.is_dir() and not d.name.startswith((".", "_", "venv", "env", "node_modules"))
             )[:20]
             if dirs:
                 sections.append("## Structure\n")
@@ -436,13 +429,9 @@ def generate_victor_md(root_path: Optional[str] = None) -> str:
             layout_hints.append("- **Legacy/Deprecated**: `src/` (DO NOT USE)")
     elif has_src:
         # Only src/ exists, check if it has nested packages
-        src_packages = [
-            d.name for d in (root / "src").iterdir() if is_python_package(d)
-        ]
+        src_packages = [d.name for d in (root / "src").iterdir() if is_python_package(d)]
         if src_packages:
-            layout_hints.append(
-                f"- **Source code**: `src/{src_packages[0]}/` (src layout)"
-            )
+            layout_hints.append(f"- **Source code**: `src/{src_packages[0]}/` (src layout)")
         else:
             layout_hints.append("- **Source code**: `src/` (src layout)")
     elif (root / expected_pkg).is_dir():
@@ -516,9 +505,7 @@ def generate_victor_md(root_path: Optional[str] = None) -> str:
     return "\n".join(sections)
 
 
-def init_victor_md(
-    root_path: Optional[str] = None, force: bool = False
-) -> Optional[Path]:
+def init_victor_md(root_path: Optional[str] = None, force: bool = False) -> Optional[Path]:
     """Initialize project context file in .victor/init.md.
 
     Creates the file at the configured location (default: .victor/init.md).

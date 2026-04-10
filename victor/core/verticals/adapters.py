@@ -56,8 +56,7 @@ def _to_runtime_stages(stages: Dict[str, Any]) -> Dict[str, StageDefinition]:
     """Convert a stage mapping to the core runtime shape."""
 
     return {
-        stage_name: _to_runtime_stage(stage_name, stage)
-        for stage_name, stage in stages.items()
+        stage_name: _to_runtime_stage(stage_name, stage) for stage_name, stage in stages.items()
     }
 
 
@@ -70,9 +69,7 @@ def _to_runtime_toolset(tools: Any) -> ToolSet:
         return ToolSet.from_sdk_toolset(tools)
     if isinstance(tools, list):
         return ToolSet.from_tools(tools)
-    raise TypeError(
-        f"Unsupported tool configuration for runtime adaptation: {type(tools)!r}"
-    )
+    raise TypeError(f"Unsupported tool configuration for runtime adaptation: {type(tools)!r}")
 
 
 class VerticalRuntimeAdapter(VerticalBase):
@@ -100,9 +97,7 @@ class VerticalRuntimeAdapter(VerticalBase):
                     vertical_cls.__name__,
                     (cls,),
                     {
-                        "__module__": getattr(
-                            vertical_cls, "__module__", cls.__module__
-                        ),
+                        "__module__": getattr(vertical_cls, "__module__", cls.__module__),
                         "__doc__": getattr(vertical_cls, "__doc__", cls.__doc__),
                         "_sdk_vertical_cls": vertical_cls,
                         "name": getattr(vertical_cls, "name", vertical_cls.get_name()),
@@ -111,9 +106,7 @@ class VerticalRuntimeAdapter(VerticalBase):
                             "description",
                             vertical_cls.get_description(),
                         ),
-                        "version": getattr(
-                            vertical_cls, "version", vertical_cls.get_version()
-                        ),
+                        "version": getattr(vertical_cls, "version", vertical_cls.get_version()),
                         "VERTICAL_API_VERSION": getattr(
                             vertical_cls,
                             "VERTICAL_API_VERSION",
@@ -268,9 +261,7 @@ class VerticalRuntimeAdapter(VerticalBase):
                 tools=_to_runtime_toolset(sdk_config.tools),
                 system_prompt=sdk_config.system_prompt,
                 stages=(
-                    _to_runtime_stages(sdk_config.stages)
-                    if sdk_config.stages
-                    else cls.get_stages()
+                    _to_runtime_stages(sdk_config.stages) if sdk_config.stages else cls.get_stages()
                 ),
                 provider_hints=cls.get_provider_hints(),
                 evaluation_criteria=cls.get_evaluation_criteria(),

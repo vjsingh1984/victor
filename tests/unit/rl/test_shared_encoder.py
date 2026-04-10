@@ -93,9 +93,7 @@ class TestSharedEncoder:
 
         assert e1 is e2  # Same object from cache
 
-    def test_different_contexts_different_embeddings(
-        self, encoder: SharedEncoder
-    ) -> None:
+    def test_different_contexts_different_embeddings(self, encoder: SharedEncoder) -> None:
         """Test that different contexts get different embeddings."""
         e1 = encoder.encode("analysis", "anthropic", "claude-3", "coding")
         e2 = encoder.encode("action", "openai", "gpt-4", "devops")

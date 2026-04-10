@@ -213,9 +213,7 @@ class DependencyGraph:
 
     root_packages: list[Dependency] = field(default_factory=list)
     all_packages: dict[str, Dependency] = field(default_factory=dict)
-    edges: dict[str, list[str]] = field(
-        default_factory=dict
-    )  # package -> [dependencies]
+    edges: dict[str, list[str]] = field(default_factory=dict)  # package -> [dependencies]
 
     def get_dependents(self, package: str) -> list[str]:
         """Get packages that depend on the given package."""

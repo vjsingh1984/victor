@@ -279,9 +279,7 @@ class PromptCoordinator:
             if self._policy:
                 self._policy.enforce(builder, context)
         except Exception:
-            logger.exception(
-                "System prompt policy enforcement failed. Continuing without policy."
-            )
+            logger.exception("System prompt policy enforcement failed. Continuing without policy.")
 
         # Build the prompt with fallback handling
         try:
@@ -299,8 +297,7 @@ class PromptCoordinator:
             self._on_prompt_built(prompt, context)
 
         logger.debug(
-            f"Built system prompt for task_type={context.task_type}, "
-            f"length={len(prompt)} chars"
+            f"Built system prompt for task_type={context.task_type}, " f"length={len(prompt)} chars"
         )
 
         return prompt

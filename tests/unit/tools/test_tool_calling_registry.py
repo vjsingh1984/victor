@@ -79,9 +79,7 @@ class TestToolCallingAdapterRegistry:
 
     def test_get_adapter_lmstudio(self):
         """Test getting LMStudio adapter (dedicated adapter)."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "lmstudio", model="local-model"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("lmstudio", model="local-model")
         assert isinstance(adapter, LMStudioToolCallingAdapter)
         assert adapter.provider_name == "lmstudio"
 
@@ -103,23 +101,17 @@ class TestToolCallingAdapterRegistry:
 
     def test_get_adapter_deepseek(self):
         """Test getting DeepSeek adapter uses dedicated adapter."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "deepseek", model="deepseek-chat"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("deepseek", model="deepseek-chat")
         assert isinstance(adapter, DeepSeekToolCallingAdapter)
 
     def test_get_adapter_cerebras(self):
         """Test getting Cerebras adapter uses OpenAI format."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "cerebras", model="gpt-oss-120b"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("cerebras", model="gpt-oss-120b")
         assert isinstance(adapter, OpenAIToolCallingAdapter)
 
     def test_get_adapter_unknown_provider(self):
         """Test unknown provider falls back to OpenAI-compatible."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "unknown_provider", model="some-model"
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("unknown_provider", model="some-model")
         assert isinstance(adapter, OpenAICompatToolCallingAdapter)
         assert adapter.provider_name == "unknown_provider"
 
@@ -224,9 +216,7 @@ class TestToolCallingAdapterRegistryEdgeCases:
 
     def test_get_adapter_none_config(self):
         """Test get_adapter with None config."""
-        adapter = ToolCallingAdapterRegistry.get_adapter(
-            "anthropic", model="claude-3", config=None
-        )
+        adapter = ToolCallingAdapterRegistry.get_adapter("anthropic", model="claude-3", config=None)
         assert isinstance(adapter, AnthropicToolCallingAdapter)
 
     def test_multiple_unknown_providers(self):

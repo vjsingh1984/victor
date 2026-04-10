@@ -141,9 +141,7 @@ class AutonomousPlanner:
 
     def _default_approval(self, message: str) -> bool:
         """Default approval callback (always returns False for safety)."""
-        logger.warning(
-            f"Step requires approval but no callback set: {message[:100]}..."
-        )
+        logger.warning(f"Step requires approval but no callback set: {message[:100]}...")
         return False
 
     async def plan_for_goal(
@@ -396,13 +394,9 @@ class AutonomousPlanner:
 
         try:
             if parallel and self.sub_agent_orchestrator:
-                await self._execute_parallel(
-                    plan, result, max_concurrent, progress_callback
-                )
+                await self._execute_parallel(plan, result, max_concurrent, progress_callback)
             else:
-                await self._execute_sequential(
-                    plan, result, auto_approve, progress_callback
-                )
+                await self._execute_sequential(plan, result, auto_approve, progress_callback)
 
         except Exception as e:
             logger.error(f"Plan execution failed: {e}", exc_info=True)
@@ -413,9 +407,7 @@ class AutonomousPlanner:
             result.total_duration = time.time() - start_time
             result.steps_completed = len(plan.get_completed_steps())
             result.steps_failed = len(plan.get_failed_steps())
-            result.success = result.steps_failed == 0 and result.steps_completed == len(
-                plan.steps
-            )
+            result.success = result.steps_failed == 0 and result.steps_completed == len(plan.steps)
 
             self.active_plan = None
 
@@ -467,9 +459,7 @@ class AutonomousPlanner:
             else:
                 step_result = await self._execute_step(step)
             step.result = step_result
-            step.status = (
-                StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
-            )
+            step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
 
             result.step_results[step.id] = step_result
             result.total_tool_calls += step_result.tool_calls_used
@@ -518,9 +508,7 @@ class AutonomousPlanner:
                         )
                     )
 
-                fan_out_result = await self.sub_agent_orchestrator.fan_out(
-                    tasks, max_concurrent
-                )
+                fan_out_result = await self.sub_agent_orchestrator.fan_out(tasks, max_concurrent)
 
                 # Process results
                 for step, subagent_result in zip(
@@ -534,11 +522,7 @@ class AutonomousPlanner:
                         duration_seconds=subagent_result.duration_seconds,
                     )
                     step.result = step_result
-                    step.status = (
-                        StepStatus.COMPLETED
-                        if step_result.success
-                        else StepStatus.FAILED
-                    )
+                    step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                     result.step_results[step.id] = step_result
                     result.total_tool_calls += step_result.tool_calls_used
 
@@ -556,9 +540,7 @@ class AutonomousPlanner:
 
                 step_result = await self._execute_step(step)
                 step.result = step_result
-                step.status = (
-                    StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
-                )
+                step.status = StepStatus.COMPLETED if step_result.success else StepStatus.FAILED
                 result.step_results[step.id] = step_result
                 result.total_tool_calls += step_result.tool_calls_used
 
@@ -639,9 +621,7 @@ class AutonomousPlanner:
             response = await self.orchestrator.chat(prompt)
             output = response.content if hasattr(response, "content") else str(response)
 
-            tool_calls = (
-                getattr(self.orchestrator, "tool_calls_used", 0) - tool_calls_before
-            )
+            tool_calls = getattr(self.orchestrator, "tool_calls_used", 0) - tool_calls_before
 
             return StepResult(
                 success=True,
@@ -694,9 +674,7 @@ class AutonomousPlanner:
         for step in plan.steps:
             if failed_step_id in step.depends_on and step.status == StepStatus.PENDING:
                 step.status = StepStatus.SKIPPED
-                logger.info(
-                    f"Skipping step {step.id} due to failed dependency {failed_step_id}"
-                )
+                logger.info(f"Skipping step {step.id} due to failed dependency {failed_step_id}")
 
     def get_active_plan(self) -> Optional[ExecutionPlan]:
         """Get the currently active plan, if any."""

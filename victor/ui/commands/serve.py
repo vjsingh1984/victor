@@ -260,9 +260,7 @@ def serve_hitl(
         )
     )
 
-    run_sync(
-        _run_hitl_server(host, port, require_auth, auth_token, persistent, db_path)
-    )
+    run_sync(_run_hitl_server(host, port, require_auth, auth_token, persistent, db_path))
 
 
 async def _run_hitl_server(

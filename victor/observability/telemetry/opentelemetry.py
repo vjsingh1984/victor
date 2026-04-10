@@ -113,9 +113,7 @@ def setup_opentelemetry(
         return None, None
 
     if _otel_configured:
-        logger.debug(
-            "OpenTelemetry already configured, returning existing tracer/meter"
-        )
+        logger.debug("OpenTelemetry already configured, returning existing tracer/meter")
         return _tracer, _meter
 
     # Get endpoint from args or environment
@@ -146,9 +144,7 @@ def setup_opentelemetry(
                 tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
                 logger.info(f"OpenTelemetry tracing enabled, exporting to {endpoint}")
             else:
-                logger.debug(
-                    "OpenTelemetry tracing enabled without exporter (no endpoint)"
-                )
+                logger.debug("OpenTelemetry tracing enabled without exporter (no endpoint)")
 
             _tracer = trace.get_tracer(service_name, service_version)
 
@@ -160,17 +156,13 @@ def setup_opentelemetry(
                     metric_exporter,
                     export_interval_millis=60000,  # Export every 60 seconds
                 )
-                meter_provider = MeterProvider(
-                    resource=resource, metric_readers=[metric_reader]
-                )
+                meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
                 metrics.set_meter_provider(meter_provider)
                 logger.info(f"OpenTelemetry metrics enabled, exporting to {endpoint}")
             else:
                 meter_provider = MeterProvider(resource=resource)
                 metrics.set_meter_provider(meter_provider)
-                logger.debug(
-                    "OpenTelemetry metrics enabled without exporter (no endpoint)"
-                )
+                logger.debug("OpenTelemetry metrics enabled without exporter (no endpoint)")
 
             _meter = metrics.get_meter(service_name, service_version)
 

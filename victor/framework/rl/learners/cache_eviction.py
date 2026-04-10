@@ -103,21 +103,13 @@ class CacheEvictionLearner(BaseLearner):
         self.epsilon = epsilon
 
         # In-memory caches for fast access
-        self._q_values: Dict[str, Dict[str, float]] = (
-            {}
-        )  # state_key -> {action -> Q-value}
-        self._visit_counts: Dict[str, Dict[str, int]] = (
-            {}
-        )  # state_key -> {action -> count}
-        self._tool_value_estimates: Dict[str, float] = (
-            {}
-        )  # tool_name -> estimated value
+        self._q_values: Dict[str, Dict[str, float]] = {}  # state_key -> {action -> Q-value}
+        self._visit_counts: Dict[str, Dict[str, int]] = {}  # state_key -> {action -> count}
+        self._tool_value_estimates: Dict[str, float] = {}  # tool_name -> estimated value
         self._total_decisions: int = 0
 
         # Hit rate tracking per tool type
-        self._tool_hit_rates: Dict[str, Tuple[int, int]] = (
-            {}
-        )  # tool_name -> (hits, misses)
+        self._tool_hit_rates: Dict[str, Tuple[int, int]] = {}  # tool_name -> (hits, misses)
 
         # Load state from database
         self._load_state()
@@ -210,9 +202,7 @@ class CacheEvictionLearner(BaseLearner):
             logger.debug(f"RL: Could not load tool values: {e}")
 
         if self._q_values:
-            logger.info(
-                f"RL: Loaded {len(self._q_values)} cache eviction states from database"
-            )
+            logger.info(f"RL: Loaded {len(self._q_values)} cache eviction states from database")
 
     def record_outcome(self, outcome: RLOutcome) -> None:
         """Record cache eviction outcome and update Q-values.
@@ -251,9 +241,7 @@ class CacheEvictionLearner(BaseLearner):
             self._visit_counts[state_key] = {}
 
         self._q_values[state_key][action] = new_q
-        self._visit_counts[state_key][action] = (
-            self._visit_counts[state_key].get(action, 0) + 1
-        )
+        self._visit_counts[state_key][action] = self._visit_counts[state_key].get(action, 0) + 1
         self._total_decisions += 1
 
         # Update tool value estimate

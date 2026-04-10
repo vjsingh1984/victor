@@ -222,9 +222,7 @@ class StandardTaskHints:
         return cls._STANDARD_HINTS.copy()
 
     @classmethod
-    def merge_with(
-        cls, vertical_hints: Dict[str, TaskTypeHint]
-    ) -> Dict[str, TaskTypeHint]:
+    def merge_with(cls, vertical_hints: Dict[str, TaskTypeHint]) -> Dict[str, TaskTypeHint]:
         """Merge standard hints with vertical-specific hints.
 
         Vertical-specific hints override standard hints with the same key.
@@ -377,9 +375,7 @@ class TieredToolConfig:
     advanced_tools: List[str] = field(default_factory=list)
     mandatory: Set[str] = field(default_factory=set)
     vertical_core: Set[str] = field(default_factory=set)
-    semantic_pool: Set[str] = field(
-        default_factory=set
-    )  # DEPRECATED: derive from registry
+    semantic_pool: Set[str] = field(default_factory=set)  # DEPRECATED: derive from registry
     stage_tools: Dict[str, Set[str]] = field(
         default_factory=dict
     )  # DEPRECATED: use @tool(stages=[])
@@ -393,8 +389,7 @@ class TieredToolConfig:
         normalized_vertical_core = set(self.vertical_core) or set(self.standard_tools)
         normalized_semantic_pool = set(self.semantic_pool) or set(self.advanced_tools)
         normalized_stage_tools = {
-            stage_name: set(tool_names)
-            for stage_name, tool_names in self.stage_tools.items()
+            stage_name: set(tool_names) for stage_name, tool_names in self.stage_tools.items()
         }
 
         self.mandatory = normalized_mandatory
@@ -409,10 +404,7 @@ class TieredToolConfig:
         if not self.advanced_tools:
             self.advanced_tools = sorted(normalized_semantic_pool)
 
-        if (
-            explicit_semantic_pool
-            and "semantic_pool" not in TieredToolConfig._deprecation_warned
-        ):
+        if explicit_semantic_pool and "semantic_pool" not in TieredToolConfig._deprecation_warned:
             warnings.warn(
                 "TieredToolConfig.semantic_pool is deprecated. "
                 "Use get_effective_semantic_pool() instead. "
@@ -421,10 +413,7 @@ class TieredToolConfig:
                 stacklevel=2,
             )
             TieredToolConfig._deprecation_warned.add("semantic_pool")
-        if (
-            explicit_stage_tools
-            and "stage_tools" not in TieredToolConfig._deprecation_warned
-        ):
+        if explicit_stage_tools and "stage_tools" not in TieredToolConfig._deprecation_warned:
             warnings.warn(
                 "TieredToolConfig.stage_tools is deprecated. "
                 "Use get_tools_for_stage_from_registry() instead. "
@@ -640,9 +629,7 @@ class TieredToolTemplate:
             Configured TieredToolConfig
         """
         return TieredToolConfig(
-            mandatory=(
-                mandatory if mandatory is not None else cls.DEFAULT_MANDATORY.copy()
-            ),
+            mandatory=(mandatory if mandatory is not None else cls.DEFAULT_MANDATORY.copy()),
             vertical_core=vertical_core,
             semantic_pool=semantic_pool or set(),
             stage_tools=stage_tools or {},
@@ -664,9 +651,7 @@ class TieredToolTemplate:
 
         return cls.create(
             vertical_core=cls.VERTICAL_CORES[vertical].copy(),
-            readonly_only_for_analysis=cls.VERTICAL_READONLY_DEFAULTS.get(
-                vertical, True
-            ),
+            readonly_only_for_analysis=cls.VERTICAL_READONLY_DEFAULTS.get(vertical, True),
         )
 
     @classmethod

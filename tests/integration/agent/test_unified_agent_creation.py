@@ -221,14 +221,8 @@ class TestMigrationAndCompatibility:
         # Verify all fields match
         assert converted_config.tool_budget == original_config.tool_budget
         assert converted_config.max_iterations == original_config.max_iterations
-        assert (
-            converted_config.enable_parallel_tools
-            == original_config.enable_parallel_tools
-        )
-        assert (
-            converted_config.enable_semantic_search
-            == original_config.enable_semantic_search
-        )
+        assert converted_config.enable_parallel_tools == original_config.enable_parallel_tools
+        assert converted_config.enable_semantic_search == original_config.enable_semantic_search
         assert converted_config.streaming_timeout == original_config.streaming_timeout
 
     def test_unified_config_preserves_extra_fields(self):

@@ -1,7 +1,8 @@
 # Victor SWE-bench Lite Benchmark Results
 
 > Multi-provider, GEPA-enhanced benchmark evaluation  
-> Date: April 9, 2026 | Framework: Victor v0.7.x | Tasks: SWE-bench Lite (20 tasks)
+> Date: April 9-10, 2026 | Framework: Victor v0.7.x | Tasks: SWE-bench Lite (20 tasks)  
+> GEPA Generations: Gen-1 + Gen-2 evolved prompts (gemma4 reflection)
 
 ---
 
@@ -306,6 +307,67 @@ The official SWE-bench Lite leaderboard (full 300 tasks) top scores:
 Our 70% on 20 tasks is not directly comparable (subset, not full 300).
 The first 20 tasks skew toward astropy (easier) and early django issues.
 Full 300-task evaluation planned for leaderboard submission.
+
+---
+
+## GEPA Gen-2 Evolution Results
+
+Gen-2 prompts were evolved from Gen-1 using gemma4 LLM reflection on
+the Gen-1 benchmark traces. Each provider gets its own evolved prompt.
+
+### Gen-1 vs Gen-2 Comparison
+
+```
+  Provider     Gen-1         Gen-2         Delta
+  ──────────── ───────────── ───────────── ──────
+  openai       14/20 (70%)   14/20 (70%)     =     (66 fewer tools)
+  xai          13/20 (65%)   13/20 (65%)     =
+  deepseek      6/20 (30%)    5/20 (25%)    -1
+  anthropic     4/20 (20%)    5/20 (25%)    +1     (JSON fix helped)
+  ──────────── ───────────── ───────────── ──────
+  TOTAL        37/80 (46%)   37/80 (46%)     =
+```
+
+### Gen-2 Per-Task Matrix
+
+```
+Task                openai  xai    deep   haiku
+─────────────────── ─────── ────── ────── ──────
+astro-12907          ✓ 16t  ✓  6t  ✓ 12t  ✗  9t
+astro-14182          ✓ 40t  ✓  3t  ✓ 19t  ✗ 17t
+astro-14365          ✓  4t  ✓  7t  ✓ 19t  ✓ 14t
+astro-14995          ✓ 19t  ✓ 11t  ✗  7t  ✗  9t
+astro-6938           ✗ 11t  ✓ 10t  ✓ 25t  ✓ 12t
+astro-7746           ✓  8t  ✓  5t  ✓ 19t  ✗ 13t
+django-10914         ✓ 56t  ✓  6t  ✗  3t  ✗ 12t
+django-10924         ✗ 28t  ✗ 32t  ✗ 25t  ✗ 15t
+django-11001         ✓  8t  ✗ 14t  ✗ 17t  ✗ 11t
+django-11019         ✗ 45t  ✗ 19t  ✗ 18t  ✗  9t
+django-11039         ✓ 22t  ✗  9t  ✗ 21t  ✗ 15t
+django-11049         ✓ 34t  ✓  2t  ✗ 23t  ✗ 16t
+django-11099         ✓ 14t  ✓  4t  ✗ 26t  ✓ 11t
+django-11133         ✗ 23t  ✓  6t  ✗  6t  ✗ 10t
+django-11179         ✓ 32t  ✓ 10t  ✗ 20t  ✓  7t
+django-11283         ✓ 12t  ✓  7t  ✗ 14t  ✓  5t
+django-11422         ✗ 18t  ✗  9t  ✗ 35t  ✗  9t
+django-11564         ✓ 46t  ✓  6t  ✗  4t  ✗ 10t
+django-11583         ✓ 35t  ✗  8t  ✗ 22t  ✗ 14t
+django-11620         ✗ 35t  ✗ 10t  ✗ 10t  ✗  9t
+─────────────────── ─────── ────── ────── ──────
+TOTAL               14/20  13/20   5/20   5/20
+```
+
+### Convergence Analysis
+
+Gen-2 shows **convergence** — aggregate scores unchanged at 46% (37/80).
+Individual task composition shifts but total remains stable, indicating
+the prompt guidance has reached near-optimal for the current tool set.
+
+Further improvements require **framework-level changes**:
+- Better tool calling reliability for DeepSeek/Haiku
+- JSON formatting guidance in tool adapter (Haiku-specific)
+- Longer timeouts for complex django tasks
+- Ensemble strategy (combining all 4 models would solve 17/20 = 85%)
 
 ---
 

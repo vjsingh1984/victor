@@ -386,9 +386,7 @@ class EntityMemory:
                     name=row["name"],
                     entity_type=EntityType(row["entity_type"]),
                     description=row["description"],
-                    attributes=(
-                        json.loads(row["attributes"]) if row["attributes"] else {}
-                    ),
+                    attributes=(json.loads(row["attributes"]) if row["attributes"] else {}),
                     source=row["source"],
                     confidence=row["confidence"],
                     mentions=row["mentions"],
@@ -514,10 +512,7 @@ class EntityMemory:
                 for row in cursor:
                     rel = EntityRelation.from_dict(dict(row))
                     if rel.id not in self._relations:
-                        if (
-                            relation_types is None
-                            or rel.relation_type in relation_types
-                        ):
+                        if relation_types is None or rel.relation_type in relation_types:
                             target = await self.get(rel.target_id)
                             if target:
                                 results.append((target, rel))
@@ -530,10 +525,7 @@ class EntityMemory:
                 for row in cursor:
                     rel = EntityRelation.from_dict(dict(row))
                     if rel.id not in self._relations:
-                        if (
-                            relation_types is None
-                            or rel.relation_type in relation_types
-                        ):
+                        if relation_types is None or rel.relation_type in relation_types:
                             source = await self.get(rel.source_id)
                             if source:
                                 results.append((source, rel))

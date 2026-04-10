@@ -115,8 +115,7 @@ def extract_code_blocks(text: str) -> List[str]:
             if non_empty:
                 min_indent = min(len(line) - len(line.lstrip()) for line in non_empty)
                 dedented = "\n".join(
-                    line[min_indent:] if len(line) > min_indent else line
-                    for line in lines
+                    line[min_indent:] if len(line) > min_indent else line for line in lines
                 )
                 blocks.append(dedented.strip())
 

@@ -290,14 +290,10 @@ class BasicWorkflowGraph:
             InvalidEdgeError: If source or target node doesn't exist.
         """
         if edge.source_id not in self._nodes:
-            raise InvalidEdgeError(
-                f"Source node '{edge.source_id}' does not exist in the graph"
-            )
+            raise InvalidEdgeError(f"Source node '{edge.source_id}' does not exist in the graph")
 
         if edge.target_id not in self._nodes:
-            raise InvalidEdgeError(
-                f"Target node '{edge.target_id}' does not exist in the graph"
-            )
+            raise InvalidEdgeError(f"Target node '{edge.target_id}' does not exist in the graph")
 
         self._edges.append(edge)
         return self
@@ -335,9 +331,7 @@ class BasicWorkflowGraph:
             )
         """
         if source_id not in self._nodes:
-            raise InvalidEdgeError(
-                f"Source node '{source_id}' does not exist in the graph"
-            )
+            raise InvalidEdgeError(f"Source node '{source_id}' does not exist in the graph")
 
         for route_key, target_id in targets.items():
             if target_id not in self._nodes:
@@ -368,9 +362,7 @@ class BasicWorkflowGraph:
             InvalidEdgeError: If node doesn't exist.
         """
         if node_id not in self._nodes:
-            raise InvalidEdgeError(
-                f"Entry node '{node_id}' does not exist in the graph"
-            )
+            raise InvalidEdgeError(f"Entry node '{node_id}' does not exist in the graph")
 
         self._entry_node_id = node_id
         return self
@@ -389,9 +381,7 @@ class BasicWorkflowGraph:
         """
         for node_id in node_ids:
             if node_id not in self._nodes:
-                raise InvalidEdgeError(
-                    f"Exit node '{node_id}' does not exist in the graph"
-                )
+                raise InvalidEdgeError(f"Exit node '{node_id}' does not exist in the graph")
 
         self._exit_node_ids = set(node_ids)
         return self
@@ -423,15 +413,9 @@ class BasicWorkflowGraph:
         Returns:
             List of exit nodes.
         """
-        return [
-            self._nodes[node_id]
-            for node_id in self._exit_node_ids
-            if node_id in self._nodes
-        ]
+        return [self._nodes[node_id] for node_id in self._exit_node_ids if node_id in self._nodes]
 
-    def get_next_nodes(
-        self, node_id: str, state: Dict[str, Any]
-    ) -> List[IWorkflowNode]:
+    def get_next_nodes(self, node_id: str, state: Dict[str, Any]) -> List[IWorkflowNode]:
         """Get the next nodes to execute after the given node.
 
         Evaluates all edges from the node and returns nodes whose

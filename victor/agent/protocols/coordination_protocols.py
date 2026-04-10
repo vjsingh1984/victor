@@ -107,9 +107,7 @@ class TaskCoordinatorProtocol(Protocol):
         """
         ...
 
-    def apply_intent_guard(
-        self, user_message: str, conversation_controller: Any
-    ) -> None:
+    def apply_intent_guard(self, user_message: str, conversation_controller: Any) -> None:
         """Detect intent and inject prompt guards for read-only tasks.
 
         Args:

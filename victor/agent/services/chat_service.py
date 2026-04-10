@@ -192,9 +192,7 @@ class ChatService:
             # Recovery failed, re-raise
             raise
 
-    async def stream_chat(
-        self, user_message: str, **kwargs
-    ) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(self, user_message: str, **kwargs) -> AsyncIterator["StreamChunk"]:
         """Stream chat response in chunks.
 
         Provides incremental response chunks as they're generated,
@@ -271,9 +269,7 @@ class ChatService:
     # Private Methods
     # ==========================================================================
 
-    async def _run_agentic_loop(
-        self, user_message: str, **kwargs
-    ) -> "CompletionResponse":
+    async def _run_agentic_loop(self, user_message: str, **kwargs) -> "CompletionResponse":
         """Run the agentic loop for chat processing.
 
         The agentic loop handles tool execution and response generation
@@ -359,9 +355,7 @@ class ChatService:
         async for chunk in stream:
             yield chunk
 
-    async def _get_completion(
-        self, messages: List[Any], **kwargs
-    ) -> "CompletionResponse":
+    async def _get_completion(self, messages: List[Any], **kwargs) -> "CompletionResponse":
         """Get completion from provider.
 
         Args:
@@ -496,8 +490,7 @@ class ChatService:
         content = "".join(chunk.content for chunk in chunks)
         # StreamChunk has optional usage field, handle safely
         total_tokens = sum(
-            (chunk.usage.get("total_tokens", 0) if chunk.usage else 0)
-            for chunk in chunks
+            (chunk.usage.get("total_tokens", 0) if chunk.usage else 0) for chunk in chunks
         )
 
         return CompletionResponse(

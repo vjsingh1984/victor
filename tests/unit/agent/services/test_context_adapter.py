@@ -10,9 +10,7 @@ from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
 @pytest.fixture
 def mock_conversation_controller():
     controller = MagicMock()
-    controller.get_context_metrics.return_value = MagicMock(
-        total_tokens=5000, message_count=10
-    )
+    controller.get_context_metrics.return_value = MagicMock(total_tokens=5000, message_count=10)
     controller.messages = [
         MagicMock(role="user", content="hello"),
         MagicMock(role="assistant", content="hi"),
@@ -53,9 +51,7 @@ async def test_compact_context_no_compactor(mock_conversation_controller):
 
 def test_add_message(context_adapter, mock_conversation_controller):
     context_adapter.add_message("user", "test message")
-    mock_conversation_controller.add_message.assert_called_once_with(
-        "user", "test message"
-    )
+    mock_conversation_controller.add_message.assert_called_once_with("user", "test message")
 
 
 def test_get_messages(context_adapter):

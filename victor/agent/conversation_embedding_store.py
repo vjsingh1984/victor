@@ -129,9 +129,7 @@ class ConversationEmbeddingStore:
             lancedb_path: Path to LanceDB directory. Defaults to {project}/.victor/embeddings/conversations/
         """
         if not LANCEDB_AVAILABLE:
-            raise ImportError(
-                "LanceDB not available. Install with: pip install lancedb pyarrow"
-            )
+            raise ImportError("LanceDB not available. Install with: pip install lancedb pyarrow")
 
         self._embedding_service = embedding_service
         self._sqlite_db_path = sqlite_db_path
@@ -170,9 +168,7 @@ class ConversationEmbeddingStore:
         self._lancedb_path.mkdir(parents=True, exist_ok=True)
 
         # Connect to LanceDB
-        logger.info(
-            f"[ConversationEmbeddingStore] Connecting to LanceDB at {self._lancedb_path}"
-        )
+        logger.info(f"[ConversationEmbeddingStore] Connecting to LanceDB at {self._lancedb_path}")
         self._db = lancedb.connect(str(self._lancedb_path))
 
         # Open or create table
@@ -181,9 +177,7 @@ class ConversationEmbeddingStore:
         existing_tables = get_table_names(self._db)
         if self.TABLE_NAME in existing_tables:
             self._table = self._db.open_table(self.TABLE_NAME)
-            logger.info(
-                f"[ConversationEmbeddingStore] Opened existing table '{self.TABLE_NAME}'"
-            )
+            logger.info(f"[ConversationEmbeddingStore] Opened existing table '{self.TABLE_NAME}'")
         else:
             logger.info(
                 f"[ConversationEmbeddingStore] Table '{self.TABLE_NAME}' will be created on first search"
@@ -197,9 +191,7 @@ class ConversationEmbeddingStore:
         self._table = self._db.create_table(self.TABLE_NAME, data=[record])
         logger.info(f"[ConversationEmbeddingStore] Created table '{self.TABLE_NAME}'")
 
-    def _get_max_embedded_timestamp(
-        self, session_id: Optional[str] = None
-    ) -> Optional[str]:
+    def _get_max_embedded_timestamp(self, session_id: Optional[str] = None) -> Optional[str]:
         """Get the maximum timestamp of embedded messages.
 
         Uses LanceDB's native Lance dataset to compute MAX(timestamp)
@@ -228,9 +220,7 @@ class ConversationEmbeddingStore:
             return str(max_ts) if max_ts else None
 
         except Exception as e:
-            logger.warning(
-                f"[ConversationEmbeddingStore] Failed to get max timestamp: {e}"
-            )
+            logger.warning(f"[ConversationEmbeddingStore] Failed to get max timestamp: {e}")
             return None
 
     def _get_unembedded_messages_from_sqlite(
@@ -283,9 +273,7 @@ class ConversationEmbeddingStore:
                 ]
 
         except Exception as e:
-            logger.warning(
-                f"[ConversationEmbeddingStore] Failed to fetch from SQLite: {e}"
-            )
+            logger.warning(f"[ConversationEmbeddingStore] Failed to fetch from SQLite: {e}")
             return []
 
     async def _ensure_embeddings(self, session_id: Optional[str] = None) -> int:
@@ -572,9 +560,7 @@ class ConversationEmbeddingStore:
         """
         logger.info("[ConversationEmbeddingStore] Starting eager rebuild...")
         count = await self._ensure_embeddings(session_id)
-        logger.info(
-            f"[ConversationEmbeddingStore] Rebuild complete: {count} embeddings created"
-        )
+        logger.info(f"[ConversationEmbeddingStore] Rebuild complete: {count} embeddings created")
         return count
 
     async def get_stats(self) -> Dict[str, Any]:
@@ -595,9 +581,7 @@ class ConversationEmbeddingStore:
             "mode": "lazy",
             "total_embeddings": count,
             "max_embeddings": self.MAX_EMBEDDINGS,
-            "usage_pct": (
-                (count / self.MAX_EMBEDDINGS * 100) if self.MAX_EMBEDDINGS > 0 else 0
-            ),
+            "usage_pct": ((count / self.MAX_EMBEDDINGS * 100) if self.MAX_EMBEDDINGS > 0 else 0),
             "embedding_dimension": self.dimension,
             "embedding_model": self._embedding_service.model_name,
             "lancedb_path": str(self._lancedb_path),

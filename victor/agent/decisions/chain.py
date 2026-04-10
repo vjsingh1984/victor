@@ -60,9 +60,7 @@ def get_decision_chain(decision_type: str) -> List[str]:
                 return chain
 
             # Fall back to global default
-            chain = getattr(
-                pipeline, "decision_chain_default", ["heuristic", "llm"]
-            )
+            chain = getattr(pipeline, "decision_chain_default", ["heuristic", "llm"])
             _chain_cache[decision_type] = chain
             return chain
     except Exception:

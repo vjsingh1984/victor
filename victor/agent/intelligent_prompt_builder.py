@@ -156,28 +156,18 @@ class ProfileMetrics:
         adherence = 1.0 if tool_calls <= tool_budget else tool_budget / tool_calls
         grounding_score = float(grounded)
 
-        self.tool_call_success_rate = (
-            beta * self.tool_call_success_rate + alpha * current_rate
-        )
+        self.tool_call_success_rate = beta * self.tool_call_success_rate + alpha * current_rate
         self.avg_quality_score = beta * self.avg_quality_score + alpha * quality_score
-        self.avg_response_time_ms = (
-            beta * self.avg_response_time_ms + alpha * response_time_ms
-        )
+        self.avg_response_time_ms = beta * self.avg_response_time_ms + alpha * response_time_ms
         self.avg_tool_calls_per_request = (
             beta * self.avg_tool_calls_per_request + alpha * tool_calls
         )
-        self.tool_budget_adherence = (
-            beta * self.tool_budget_adherence + alpha * adherence
-        )
-        self.grounding_accuracy = (
-            beta * self.grounding_accuracy + alpha * grounding_score
-        )
+        self.tool_budget_adherence = beta * self.tool_budget_adherence + alpha * adherence
+        self.grounding_accuracy = beta * self.grounding_accuracy + alpha * grounding_score
 
         # Update derived metrics
         if success and tool_calls > 0:
-            self.optimal_tool_budget = int(
-                beta * self.optimal_tool_budget + alpha * tool_calls
-            )
+            self.optimal_tool_budget = int(beta * self.optimal_tool_budget + alpha * tool_calls)
         if success and quality_score > 0.7:
             self.prefers_structured_prompts = tool_calls > 3
         self.needs_strict_grounding = self.grounding_accuracy < 0.8
@@ -323,9 +313,7 @@ class ProfileLearningStore:
                 ),
             )
 
-    def load_metrics(
-        self, profile_name: str, provider: str, model: str
-    ) -> ProfileMetrics:
+    def load_metrics(self, profile_name: str, provider: str, model: str) -> ProfileMetrics:
         """Load profile metrics from database."""
         self._ensure_initialized()
 
@@ -346,35 +334,21 @@ class ProfileLearningStore:
                     provider=provider,
                     model=model,
                     total_requests=metrics_dict.get("total_requests", 0),
-                    successful_completions=metrics_dict.get(
-                        "successful_completions", 0
-                    ),
-                    tool_call_success_rate=metrics_dict.get(
-                        "tool_call_success_rate", 0.0
-                    ),
+                    successful_completions=metrics_dict.get("successful_completions", 0),
+                    tool_call_success_rate=metrics_dict.get("tool_call_success_rate", 0.0),
                     grounding_accuracy=metrics_dict.get("grounding_accuracy", 0.0),
                     avg_quality_score=metrics_dict.get("avg_quality_score", 0.5),
                     avg_response_time_ms=metrics_dict.get("avg_response_time_ms", 0.0),
                     avg_token_usage=metrics_dict.get("avg_token_usage", 0),
-                    avg_tool_calls_per_request=metrics_dict.get(
-                        "avg_tool_calls_per_request", 0.0
-                    ),
-                    tool_budget_adherence=metrics_dict.get(
-                        "tool_budget_adherence", 1.0
-                    ),
-                    mode_transition_success=metrics_dict.get(
-                        "mode_transition_success", 0.0
-                    ),
+                    avg_tool_calls_per_request=metrics_dict.get("avg_tool_calls_per_request", 0.0),
+                    tool_budget_adherence=metrics_dict.get("tool_budget_adherence", 1.0),
+                    mode_transition_success=metrics_dict.get("mode_transition_success", 0.0),
                     optimal_tool_budget=metrics_dict.get("optimal_tool_budget", 10),
                     prefers_structured_prompts=metrics_dict.get(
                         "prefers_structured_prompts", False
                     ),
-                    needs_strict_grounding=metrics_dict.get(
-                        "needs_strict_grounding", True
-                    ),
-                    supports_parallel_tools=metrics_dict.get(
-                        "supports_parallel_tools", False
-                    ),
+                    needs_strict_grounding=metrics_dict.get("needs_strict_grounding", True),
+                    supports_parallel_tools=metrics_dict.get("supports_parallel_tools", False),
                     last_updated=datetime.fromisoformat(row["updated_at"]),
                 )
 
@@ -512,9 +486,7 @@ class EmbeddingScheduler:
         if self._background_task and not self._background_task.done():
             return
 
-        self._background_task = asyncio.create_task(
-            self._background_refresh_loop(session_id)
-        )
+        self._background_task = asyncio.create_task(self._background_refresh_loop(session_id))
 
     async def _background_refresh_loop(self, session_id: Optional[str] = None) -> None:
         """Background loop to keep cache fresh."""
@@ -959,9 +931,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
 
         lines = ["RELEVANT CONTEXT (from previous interactions):"]
         for i, frag in enumerate(fragments[:3], 1):
-            lines.append(
-                f"{i}. [{frag.source}] (relevance: {frag.relevance_score:.2f})"
-            )
+            lines.append(f"{i}. [{frag.source}] (relevance: {frag.relevance_score:.2f})")
 
         return "\n".join(lines)
 
@@ -1054,9 +1024,7 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             model=self.model,
         )
         self._learning_store.save_metrics(self._metrics)
-        logger.info(
-            f"[IntelligentPromptBuilder] Reset learning for {self.profile_name}"
-        )
+        logger.info(f"[IntelligentPromptBuilder] Reset learning for {self.profile_name}")
 
 
 # Convenience function for backward compatibility

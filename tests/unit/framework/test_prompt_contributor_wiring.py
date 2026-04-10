@@ -205,9 +205,7 @@ class TestPromptContributorAdapterWiring:
             assert isinstance(
                 hint, TaskTypeHint
             ), f"Hint '{hint_name}' should be TaskTypeHint after adapter normalization"
-            assert (
-                hint.task_type == hint_name
-            ), f"Hint task_type should be '{hint_name}'"
+            assert hint.task_type == hint_name, f"Hint task_type should be '{hint_name}'"
 
     def test_adapter_wrap_preserves_existing_contributor(self):
         """Wrapping existing contributor via adapter should preserve data."""
@@ -274,9 +272,7 @@ class TestPromptStepHandlerIntegration:
             def get_priority(self):
                 return 50
 
-        handler.apply_contributors(
-            orchestrator, [LegacyDictContributor()], context, result
-        )
+        handler.apply_contributors(orchestrator, [LegacyDictContributor()], context, result)
 
         # Context should have normalized TaskTypeHint
         hint = context.get_task_hint("task1")

@@ -159,9 +159,7 @@ class SignatureStore:
                 conn.executescript(self._get_schema())
 
                 # Check/set schema version
-                cursor = conn.execute(
-                    f"SELECT version FROM {Tables.SYS_SCHEMA_VERSION} LIMIT 1"
-                )
+                cursor = conn.execute(f"SELECT version FROM {Tables.SYS_SCHEMA_VERSION} LIMIT 1")
                 row = cursor.fetchone()
                 if row is None:
                     conn.execute(
@@ -205,9 +203,7 @@ class SignatureStore:
                     (now,),
                 )
                 self._cache = {
-                    self._make_signature_key(row["tool_name"], row["args_hash"]): row[
-                        "expires_at"
-                    ]
+                    self._make_signature_key(row["tool_name"], row["args_hash"]): row["expires_at"]
                     for row in cursor
                 }
                 self._cache_time = now
@@ -484,19 +480,14 @@ class SignatureStore:
                 f"SELECT tool_name, COUNT(*), SUM(failure_count) "
                 f"FROM {Tables.UI_FAILED_CALL} GROUP BY tool_name"
             )
-            by_tool = {
-                row[0]: {"signatures": row[1], "total_failures": row[2]}
-                for row in cursor
-            }
+            by_tool = {row[0]: {"signatures": row[1], "total_failures": row[2]} for row in cursor}
 
             # Most failing
             cursor = conn.execute(
                 f"SELECT tool_name, args_hash, failure_count "
                 f"FROM {Tables.UI_FAILED_CALL} ORDER BY failure_count DESC LIMIT 5"
             )
-            most_failing = [
-                {"tool": row[0], "hash": row[1], "count": row[2]} for row in cursor
-            ]
+            most_failing = [{"tool": row[0], "hash": row[1], "count": row[2]} for row in cursor]
 
         return {
             "total_signatures": total,

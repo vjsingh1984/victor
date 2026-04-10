@@ -254,9 +254,7 @@ class MultiTaskLearner(BaseLearner):
                 self._global_sample_counts[context_key] = row_dict["sample_count"]
 
             if self._heads:
-                logger.info(
-                    f"RL: Loaded multi-task state for {len(self._heads)} verticals"
-                )
+                logger.info(f"RL: Loaded multi-task state for {len(self._heads)} verticals")
 
         except Exception as e:
             logger.debug(f"RL: Could not load multi-task state: {e}")
@@ -271,9 +269,7 @@ class MultiTaskLearner(BaseLearner):
             outcome: Outcome with provider, model, task, success
         """
         vertical = outcome.vertical
-        context_key = self._get_context_key(
-            outcome.provider, outcome.model, outcome.task_type
-        )
+        context_key = self._get_context_key(outcome.provider, outcome.model, outcome.task_type)
 
         # Compute reward
         reward = self._compute_reward(outcome)
@@ -292,9 +288,7 @@ class MultiTaskLearner(BaseLearner):
         self._global_q_values[context_key] = current_global + self.learning_rate * (
             reward - current_global
         )
-        self._global_sample_counts[context_key] = (
-            self._global_sample_counts.get(context_key, 0) + 1
-        )
+        self._global_sample_counts[context_key] = self._global_sample_counts.get(context_key, 0) + 1
 
         # Perform transfer learning update
         self._transfer_update(outcome, reward)
@@ -303,8 +297,7 @@ class MultiTaskLearner(BaseLearner):
         self._save_to_db(vertical, context_key, head)
 
         logger.debug(
-            f"RL: multi_task recorded for {vertical}:{context_key} "
-            f"(reward={reward:.3f})"
+            f"RL: multi_task recorded for {vertical}:{context_key} " f"(reward={reward:.3f})"
         )
 
     def _compute_reward(self, outcome: RLOutcome) -> float:
@@ -350,10 +343,7 @@ class MultiTaskLearner(BaseLearner):
 
             for context_key, q_value in head.q_values.items():
                 # Check if enough samples for transfer
-                if (
-                    head.sample_counts.get(context_key, 0)
-                    < self.MIN_SAMPLES_FOR_TRANSFER
-                ):
+                if head.sample_counts.get(context_key, 0) < self.MIN_SAMPLES_FOR_TRANSFER:
                     continue
 
                 # Parse context key to get embedding
@@ -369,17 +359,13 @@ class MultiTaskLearner(BaseLearner):
                 )
 
                 # Compute transfer weight
-                transfer_weight = self._compute_transfer_weight(
-                    embedding, other_embedding
-                )
+                transfer_weight = self._compute_transfer_weight(embedding, other_embedding)
 
                 if transfer_weight > 0:
                     # Apply transfer update (smaller rate)
                     transfer_lr = self.learning_rate * transfer_weight * 0.5
                     current_q = head.q_values.get(context_key, 0.5)
-                    head.q_values[context_key] = current_q + transfer_lr * (
-                        reward - current_q
-                    )
+                    head.q_values[context_key] = current_q + transfer_lr * (reward - current_q)
 
     def _compute_transfer_weight(
         self,
@@ -535,9 +521,7 @@ class MultiTaskLearner(BaseLearner):
                     vertical=other_vertical,
                 )
 
-                transfer_weight = self._compute_transfer_weight(
-                    other_embedding, target_embedding
-                )
+                transfer_weight = self._compute_transfer_weight(other_embedding, target_embedding)
 
                 if transfer_weight > 0:
                     transferred_values.append((q_value, transfer_weight, samples))
@@ -648,9 +632,7 @@ class MultiTaskLearner(BaseLearner):
             "total_samples": total_samples,
             "avg_success_rate": avg_success,
             "avg_q_value": (
-                sum(head.q_values.values()) / len(head.q_values)
-                if head.q_values
-                else 0.5
+                sum(head.q_values.values()) / len(head.q_values) if head.q_values else 0.5
             ),
         }
 
@@ -682,9 +664,7 @@ class MultiTaskLearner(BaseLearner):
         Returns:
             Dictionary with learner stats
         """
-        total_samples = sum(
-            sum(head.sample_counts.values()) for head in self._heads.values()
-        )
+        total_samples = sum(sum(head.sample_counts.values()) for head in self._heads.values())
 
         vertical_stats = {v: self.get_vertical_stats(v) for v in self._heads}
 

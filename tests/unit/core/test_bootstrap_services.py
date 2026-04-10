@@ -62,9 +62,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = (
-                lambda flag: flag == FeatureFlag.USE_NEW_CONTEXT_SERVICE
-            )
+            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_CONTEXT_SERVICE
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -90,9 +88,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = (
-                lambda flag: flag == FeatureFlag.USE_NEW_PROVIDER_SERVICE
-            )
+            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_PROVIDER_SERVICE
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -118,9 +114,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = (
-                lambda flag: flag == FeatureFlag.USE_NEW_TOOL_SERVICE
-            )
+            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_TOOL_SERVICE
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -146,9 +140,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = (
-                lambda flag: flag == FeatureFlag.USE_NEW_RECOVERY_SERVICE
-            )
+            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_RECOVERY_SERVICE
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -174,9 +166,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = (
-                lambda flag: flag == FeatureFlag.USE_NEW_SESSION_SERVICE
-            )
+            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_SESSION_SERVICE
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -202,9 +192,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = (
-                lambda flag: flag == FeatureFlag.USE_NEW_CHAT_SERVICE
-            )
+            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_CHAT_SERVICE
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(
@@ -275,9 +263,7 @@ class TestBootstrapServices:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_mgr:
             mgr = MagicMock()
-            mgr.is_enabled.side_effect = (
-                lambda flag: flag == FeatureFlag.USE_NEW_TOOL_SERVICE
-            )
+            mgr.is_enabled.side_effect = lambda flag: flag == FeatureFlag.USE_NEW_TOOL_SERVICE
             mock_mgr.return_value = mgr
 
             bootstrap_new_services(

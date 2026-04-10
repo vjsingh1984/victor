@@ -36,20 +36,14 @@ class TestResourceCalculator:
 
     def test_complex_task_full_budget(self):
         """Complex tasks → full exploration budget."""
-        budget = calculate_exploration_budget(
-            complexity="complex", provider="anthropic"
-        )
+        budget = calculate_exploration_budget(complexity="complex", provider="anthropic")
         assert budget.exploration_timeout >= 90
         assert budget.tool_budget_per_agent >= 5
 
     def test_ollama_timeout_longer(self):
         """Local models get longer timeout (speed multiplier)."""
-        cloud = calculate_exploration_budget(
-            complexity="action", provider="anthropic"
-        )
-        local = calculate_exploration_budget(
-            complexity="action", provider="ollama"
-        )
+        cloud = calculate_exploration_budget(complexity="action", provider="anthropic")
+        local = calculate_exploration_budget(complexity="action", provider="ollama")
         assert local.exploration_timeout > cloud.exploration_timeout
 
     def test_analysis_task_longer_timeout(self):

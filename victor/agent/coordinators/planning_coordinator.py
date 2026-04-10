@@ -96,9 +96,7 @@ class PlanningConfig:
     # Thresholds for detecting multi-step tasks
     min_steps_threshold: int = DEFAULT_MIN_STEPS_THRESHOLD
     min_keyword_matches: int = DEFAULT_MIN_KEYWORD_MATCHES
-    complexity_keywords: List[str] = field(
-        default_factory=lambda: list(COMPLEXITY_KEYWORDS)
-    )
+    complexity_keywords: List[str] = field(default_factory=lambda: list(COMPLEXITY_KEYWORDS))
     step_indicators: List[str] = field(default_factory=lambda: list(STEP_INDICATORS))
 
     # Planning behavior
@@ -107,9 +105,7 @@ class PlanningConfig:
     max_parallel_steps: int = 1  # Max steps to execute in parallel (future)
 
     # Fallback behavior
-    fallback_on_planning_failure: bool = (
-        True  # Fall back to direct chat if planning fails
-    )
+    fallback_on_planning_failure: bool = True  # Fall back to direct chat if planning fails
     max_planning_retries: int = 1  # Number of retries for plan generation
 
 
@@ -223,9 +219,7 @@ class PlanningCoordinator:
 
         return response
 
-    def _map_complexity(
-        self, framework_complexity: TaskComplexity
-    ) -> PlanningTaskComplexity:
+    def _map_complexity(self, framework_complexity: TaskComplexity) -> PlanningTaskComplexity:
         """Map framework TaskComplexity to planning TaskComplexity.
 
         Args:
@@ -276,21 +270,15 @@ class PlanningCoordinator:
         if task_analysis:
             # Map framework complexity to planning complexity for threshold comparison
             planning_complexity = self._map_complexity(task_analysis.complexity)
-            min_planning_complexity = self._map_complexity(
-                self.config.min_planning_complexity
-            )
+            min_planning_complexity = self._map_complexity(self.config.min_planning_complexity)
 
             if planning_complexity.value >= min_planning_complexity.value:
-                logger.info(
-                    f"Planning triggered by complexity: {planning_complexity.value}"
-                )
+                logger.info(f"Planning triggered by complexity: {planning_complexity.value}")
                 return True
 
         # Check for multi-step keywords
         message_lower = user_message.lower()
-        keyword_matches = sum(
-            1 for kw in self.config.complexity_keywords if kw in message_lower
-        )
+        keyword_matches = sum(1 for kw in self.config.complexity_keywords if kw in message_lower)
         if keyword_matches >= self.config.min_keyword_matches:
             logger.info(f"Planning triggered by keywords: {keyword_matches} matches")
             return True
@@ -336,9 +324,7 @@ class PlanningCoordinator:
                 logger.info(f"Using CLI planning model override: {cli_planning_model}")
                 # Parse planning model (format: "model" or "provider:model")
                 if ":" in cli_planning_model:
-                    planning_provider_name, planning_model = cli_planning_model.split(
-                        ":", 1
-                    )
+                    planning_provider_name, planning_model = cli_planning_model.split(":", 1)
                     from victor.providers.provider_factory import get_provider
 
                     try:

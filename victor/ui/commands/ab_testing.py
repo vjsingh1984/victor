@@ -117,9 +117,7 @@ def show_status(
 @ab_app.command("results")
 def show_results(
     experiment_id: str = typer.Argument(..., help="Experiment ID"),
-    detailed: bool = typer.Option(
-        False, "--detailed", "-d", help="Show detailed statistics"
-    ),
+    detailed: bool = typer.Option(False, "--detailed", "-d", help="Show detailed statistics"),
 ):
     """Show experiment results.
 
@@ -272,9 +270,7 @@ async def _stop_experiment_async(experiment_id: str) -> None:
     await manager.stop_experiment(experiment_id)
     console.print(
         Panel(
-            f"[bold yellow]Experiment Stopped[/]\n\n"
-            f"ID: {experiment_id}\n"
-            f"Status: completed",
+            f"[bold yellow]Experiment Stopped[/]\n\n" f"ID: {experiment_id}\n" f"Status: completed",
             title="A/B Test",
         )
     )
@@ -303,9 +299,7 @@ async def _show_status_async(experiment_id: str) -> None:
     if status.started_at:
         from datetime import datetime
 
-        started = datetime.fromtimestamp(status.started_at).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        started = datetime.fromtimestamp(status.started_at).strftime("%Y-%m-%d %H:%M:%S")
         table.add_row("Started", started)
 
     console.print(table)
@@ -317,9 +311,7 @@ async def _show_status_async(experiment_id: str) -> None:
         variant_table.add_column("Percentage", style="yellow")
 
         for variant_id, count in status.variant_samples.items():
-            percentage = (
-                (count / status.total_samples * 100) if status.total_samples > 0 else 0
-            )
+            percentage = (count / status.total_samples * 100) if status.total_samples > 0 else 0
             variant_table.add_row(variant_id, str(count), f"{percentage:.1f}%")
 
         console.print(variant_table)

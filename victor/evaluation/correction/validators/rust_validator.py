@@ -255,9 +255,7 @@ class RustCodeValidator(BaseCodeValidator):
 
         # Add missing use statements
         if validation.missing_imports:
-            fixed_code = self._add_missing_imports(
-                fixed_code, list(validation.missing_imports)
-            )
+            fixed_code = self._add_missing_imports(fixed_code, list(validation.missing_imports))
 
         return fixed_code
 
@@ -324,9 +322,7 @@ class RustCodeValidator(BaseCodeValidator):
                 if "std::collections" not in declared_uses:
                     if type_name not in missing:
                         missing.append(f"std::collections::{type_name}")
-                        errors.append(
-                            f"Type '{type_name}' used but std::collections not imported"
-                        )
+                        errors.append(f"Type '{type_name}' used but std::collections not imported")
 
         return errors, missing
 

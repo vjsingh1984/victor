@@ -696,12 +696,8 @@ class TestCanonicalizeDependencies:
     def test_multiple_dependencies(self):
         """Handles multiple dependencies."""
         deps = [
-            ToolDependency(
-                tool_name="edit_files", depends_on={"read_file"}, enables=set()
-            ),
-            ToolDependency(
-                tool_name="run_tests", depends_on={"edit_files"}, enables=set()
-            ),
+            ToolDependency(tool_name="edit_files", depends_on={"read_file"}, enables=set()),
+            ToolDependency(tool_name="run_tests", depends_on={"edit_files"}, enables=set()),
         ]
         result = canonicalize_dependencies(deps)
         assert len(result) == 2

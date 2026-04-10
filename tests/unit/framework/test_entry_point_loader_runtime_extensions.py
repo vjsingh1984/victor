@@ -67,9 +67,7 @@ def test_load_runtime_extension_returns_prebuilt_instances(mock_registry_cls) ->
     """Generic runtime-extension loading should preserve non-callable entry-point values."""
     contributor = object()
 
-    mock_registry = _mock_registry_get(
-        {("victor.prompt_contributors", "coding"): contributor}
-    )
+    mock_registry = _mock_registry_get({("victor.prompt_contributors", "coding"): contributor})
     mock_registry_cls.get_instance.return_value = mock_registry
 
     resolved = load_runtime_extension_from_entry_points(
@@ -88,9 +86,7 @@ def test_load_rl_config_provider_returns_provider_instance(mock_registry_cls) ->
         def get_rl_config(self) -> dict[str, bool]:
             return {"enabled": True}
 
-    mock_registry = _mock_registry_get(
-        {("victor.rl_configs", "coding"): RLConfigProvider}
-    )
+    mock_registry = _mock_registry_get({("victor.rl_configs", "coding"): RLConfigProvider})
     mock_registry_cls.get_instance.return_value = mock_registry
 
     resolved = load_rl_config_provider_from_entry_points("coding")

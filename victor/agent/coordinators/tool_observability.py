@@ -95,10 +95,7 @@ class ToolObservabilityHandler:
         """
         metrics_collector.on_tool_complete(result)
         follow_up_suggestions = self._extract_follow_up_suggestions(result.result)
-        tool_id = (
-            getattr(result, "tool_id", None)
-            or f"tool-{max(pipeline_calls_used - 1, 0)}"
-        )
+        tool_id = getattr(result, "tool_id", None) or f"tool-{max(pipeline_calls_used - 1, 0)}"
 
         # Emit tool complete event
         from victor.core.events import get_observability_bus
@@ -114,9 +111,7 @@ class ToolObservabilityHandler:
                         "tool_id": tool_id,
                         "tool_name": result.tool_name,
                         "success": result.success,
-                        "result_length": (
-                            len(str(result.result or "")) if result.result else 0
-                        ),
+                        "result_length": (len(str(result.result or "")) if result.result else 0),
                         "error": str(result.error) if result.error else None,
                         "category": "tool",
                         "arguments": self._sanitize_arguments(result.arguments or {}),
@@ -142,9 +137,7 @@ class ToolObservabilityHandler:
             and read_files_session is not None
         ):
             if result.arguments:
-                file_path = result.arguments.get("path") or result.arguments.get(
-                    "file_path"
-                )
+                file_path = result.arguments.get("path") or result.arguments.get("file_path")
                 if file_path:
                     read_files_session.add(file_path)
                     logger.debug(f"Tracked read file: {file_path}")
@@ -271,9 +264,7 @@ class ToolObservabilityHandler:
         """Clear the failed tool signatures cache."""
         self._coordinator._failed_tool_signatures.clear()
 
-    def _extract_follow_up_suggestions(
-        self, result_value: Any
-    ) -> Optional[List[Dict[str, Any]]]:
+    def _extract_follow_up_suggestions(self, result_value: Any) -> Optional[List[Dict[str, Any]]]:
         """Extract normalized follow-up suggestions from a tool result payload."""
         if not isinstance(result_value, dict):
             return None

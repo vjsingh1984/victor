@@ -205,9 +205,7 @@ class ToolCallTracer:
         except Exception as e:
             logger.warning(f"Failed to publish tool_call_started event: {e}")
 
-        logger.debug(
-            f"Tool call started: {call_id} (tool={tool_name}, span={parent_span_id})"
-        )
+        logger.debug(f"Tool call started: {call_id} (tool={tool_name}, span={parent_span_id})")
 
         return call_id
 
@@ -243,9 +241,7 @@ class ToolCallTracer:
         except Exception as e:
             logger.warning(f"Failed to publish tool_call_completed event: {e}")
 
-        logger.debug(
-            f"Tool call completed: {call_id} (duration={record.duration_ms:.2f}ms)"
-        )
+        logger.debug(f"Tool call completed: {call_id} (duration={record.duration_ms:.2f}ms)")
 
     def fail_call(self, call_id: str, error: str) -> None:
         """Mark a tool call as failed.
@@ -386,17 +382,13 @@ class ToolCallTracer:
 
         # Count by status
         successful = len([c for c in self._calls.values() if c.is_successful])
-        failed = len(
-            [c for c in self._calls.values() if c.is_complete and not c.is_successful]
-        )
+        failed = len([c for c in self._calls.values() if c.is_complete and not c.is_successful])
         running = len([c for c in self._calls.values() if not c.is_complete])
 
         # Calculate durations for completed calls
         completed_calls = [c for c in self._calls.values() if c.duration_ms is not None]
         if completed_calls:
-            durations = [
-                c.duration_ms for c in completed_calls if c.duration_ms is not None
-            ]
+            durations = [c.duration_ms for c in completed_calls if c.duration_ms is not None]
             if durations:
                 avg_duration = sum(durations) / len(durations)
                 max_duration = max(durations)

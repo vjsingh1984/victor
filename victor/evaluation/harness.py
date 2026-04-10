@@ -202,9 +202,7 @@ class TaskEnvironment:
 
             if result.returncode != 0:
                 # Try full clone if shallow clone failed
-                logger.warning(
-                    f"Shallow clone failed, trying full clone: {stderr.decode()}"
-                )
+                logger.warning(f"Shallow clone failed, trying full clone: {stderr.decode()}")
                 clone_cmd = ["git", "clone", self.task.repo, str(repo_dir)]
                 result = await asyncio.create_subprocess_exec(
                     *clone_cmd,
@@ -242,9 +240,7 @@ class TaskEnvironment:
                 )
                 stdout, stderr = await result.communicate()
                 if result.returncode != 0:
-                    logger.warning(
-                        f"Failed to checkout {self.task.base_commit}: {stderr.decode()}"
-                    )
+                    logger.warning(f"Failed to checkout {self.task.base_commit}: {stderr.decode()}")
                 else:
                     logger.info(f"Checked out {self.task.base_commit}")
 
@@ -297,11 +293,7 @@ class TaskEnvironment:
         if not self._temp_dir:
             return 0, 0, "", "Environment not set up"
 
-        test_dir = (
-            self._temp_dir / "repo"
-            if (self._temp_dir / "repo").exists()
-            else self._temp_dir
-        )
+        test_dir = self._temp_dir / "repo" if (self._temp_dir / "repo").exists() else self._temp_dir
 
         if self.use_docker:
             return await self._run_tests_docker(test_dir, timeout)
@@ -461,9 +453,7 @@ class EvaluationHarness:
             self._checkpoint_dir = checkpoint_dir or victor_dir / "checkpoints"
         except ImportError:
             self._results_dir = Path.home() / ".victor" / "evaluations"
-            self._checkpoint_dir = (
-                checkpoint_dir or Path.home() / ".victor" / "checkpoints"
-            )
+            self._checkpoint_dir = checkpoint_dir or Path.home() / ".victor" / "checkpoints"
         self._results_dir.mkdir(parents=True, exist_ok=True)
         self._checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
@@ -475,9 +465,7 @@ class EvaluationHarness:
         """
         self._runners[runner.benchmark_type] = runner
 
-    def get_runner(
-        self, benchmark_type: BenchmarkType
-    ) -> Optional[BaseBenchmarkRunner]:
+    def get_runner(self, benchmark_type: BenchmarkType) -> Optional[BaseBenchmarkRunner]:
         """Get a runner by benchmark type.
 
         Args:
@@ -501,10 +489,7 @@ class EvaluationHarness:
             config_str += "_" + "_".join(sorted(config.task_ids))
         checkpoint_id = hashlib.md5(config_str.encode()).hexdigest()[:12]
 
-        return (
-            self._checkpoint_dir
-            / f"checkpoint_{config.benchmark.value}_{checkpoint_id}.json"
-        )
+        return self._checkpoint_dir / f"checkpoint_{config.benchmark.value}_{checkpoint_id}.json"
 
     def _save_checkpoint(
         self,
@@ -621,9 +606,7 @@ class EvaluationHarness:
         self,
         config: EvaluationConfig,
         agent_callback: Any,  # Callable that takes task and returns output
-        progress_callback: Optional[
-            Any
-        ] = None,  # Callable(task_idx, total, TaskResult)
+        progress_callback: Optional[Any] = None,  # Callable(task_idx, total, TaskResult)
         retry_callback: Optional[Any] = None,  # Callable for self-correction retries
         resume: bool = False,  # Resume from checkpoint if available
     ) -> EvaluationResult:
@@ -759,9 +742,7 @@ class EvaluationHarness:
 
         for i, task in enumerate(tasks):
             effective_idx = start_idx + i
-            logger.info(
-                f"Running task {effective_idx + 1}/{effective_total}: {task.task_id}"
-            )
+            logger.info(f"Running task {effective_idx + 1}/{effective_total}: {task.task_id}")
 
             try:
                 task_result = await self._run_single_task(
@@ -870,9 +851,7 @@ class EvaluationHarness:
                     # Save checkpoint after each completion
                     if checkpoint_path:
                         completed_ids = {r.task_id for r in all_results}
-                        remaining_ids = [
-                            t.task_id for t in tasks if t.task_id not in completed_ids
-                        ]
+                        remaining_ids = [t.task_id for t in tasks if t.task_id not in completed_ids]
                         self._save_checkpoint(
                             checkpoint_path,
                             config,
@@ -887,9 +866,7 @@ class EvaluationHarness:
 
                 return result
 
-        await asyncio.gather(
-            *[run_with_semaphore(i, task) for i, task in enumerate(tasks)]
-        )
+        await asyncio.gather(*[run_with_semaphore(i, task) for i, task in enumerate(tasks)])
         return new_results
 
     async def _run_single_task(
@@ -1008,9 +985,7 @@ class EvaluationHarness:
             task_result.traceback = traceback.format_exc()
 
         task_result.end_time = datetime.now()
-        task_result.duration_seconds = (
-            task_result.end_time - start_time
-        ).total_seconds()
+        task_result.duration_seconds = (task_result.end_time - start_time).total_seconds()
 
         return task_result
 
@@ -1099,10 +1074,7 @@ class EvaluationHarness:
                     )
 
             # Track best result
-            if (
-                best_result is None
-                or eval_result.tests_passed > best_result.tests_passed
-            ):
+            if best_result is None or eval_result.tests_passed > best_result.tests_passed:
                 best_output = agent_output
                 best_result = eval_result
 
@@ -1277,9 +1249,7 @@ class EvaluationHarness:
         lines.append("RESULTS")
         lines.append("-" * 40)
         lines.append(f"Total Tasks:    {metrics['total_tasks']}")
-        lines.append(
-            f"Passed:         {metrics['passed']} ({metrics['pass_rate']:.1%})"
-        )
+        lines.append(f"Passed:         {metrics['passed']} ({metrics['pass_rate']:.1%})")
         lines.append(f"Failed:         {metrics['failed']}")
         lines.append(f"Errors:         {metrics['errors']}")
         lines.append(f"Timeouts:       {metrics['timeouts']}")

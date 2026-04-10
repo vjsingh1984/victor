@@ -79,9 +79,7 @@ def detect_test_runner(
                 labels = _files_to_django_labels(test_files)
                 cmd.extend(labels)
             env = {"DJANGO_SETTINGS_MODULE": django_settings}
-            logger.info(
-                "Detected Django project (settings=%s)", django_settings
-            )
+            logger.info("Detected Django project (settings=%s)", django_settings)
         return TestRunnerConfig(command=cmd, env=env, runner_type="django")
 
     # 2. Check for pytest (Python)
@@ -231,9 +229,7 @@ def _detect_non_python_runner(
         return TestRunnerConfig(command=cmd, runner_type="go")
 
     # Java / Gradle
-    if (project_root / "build.gradle").exists() or (
-        project_root / "build.gradle.kts"
-    ).exists():
+    if (project_root / "build.gradle").exists() or (project_root / "build.gradle.kts").exists():
         cmd = ["./gradlew", "test"]
         logger.info("Detected Gradle project")
         return TestRunnerConfig(command=cmd, runner_type="gradle")

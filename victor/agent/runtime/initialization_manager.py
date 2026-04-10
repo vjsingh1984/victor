@@ -176,8 +176,7 @@ class InitializationPhaseManager:
             missing_deps = [dep for dep in dependencies if dep not in succeeded_phases]
             if missing_deps:
                 reason = (
-                    f"skipped due to failed/skipped dependencies: "
-                    f"{', '.join(missing_deps)}"
+                    f"skipped due to failed/skipped dependencies: " f"{', '.join(missing_deps)}"
                 )
                 phase_result = PhaseResult(
                     name=name,

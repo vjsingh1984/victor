@@ -77,13 +77,8 @@ def work(item: list[str], enabled: bool = True, *args, **kwargs) -> dict[str, in
     class_node = _parse("class Child(Parent, mixins.Base):\n    pass\n").body[0]
     assert isinstance(class_node, ast.ClassDef)
 
-    assert (
-        ast_helpers.get_decorator_name(function_node.decorator_list[0]) == "@retry(3)"
-    )
-    assert (
-        ast_helpers.get_annotation_str(function_node.args.args[0].annotation)
-        == "list[str]"
-    )
+    assert ast_helpers.get_decorator_name(function_node.decorator_list[0]) == "@retry(3)"
+    assert ast_helpers.get_annotation_str(function_node.args.args[0].annotation) == "list[str]"
     assert ast_helpers.extract_parameters(function_node) == [
         ("item", "list[str]"),
         ("enabled", "bool"),

@@ -94,9 +94,7 @@ class CapabilityNegotiator:
         unknown_provided = manifest.provides - self._capabilities
         if unknown_provided:
             names = ", ".join(sorted(e.value for e in unknown_provided))
-            result.warnings.append(
-                f"Vertical provides unknown extension types (ignored): {names}"
-            )
+            result.warnings.append(f"Vertical provides unknown extension types (ignored): {names}")
             result.degraded_features.update(unknown_provided)
 
         # 4. Extension dependencies validation
@@ -137,15 +135,11 @@ class CapabilityNegotiator:
 
             framework_version = get_version("victor-ai")
         except Exception:
-            logger.debug(
-                "Cannot determine victor-ai version; skipping version skew check"
-            )
+            logger.debug("Cannot determine victor-ai version; skipping version skew check")
             return
 
         # Treat plain version strings as >=X.Y.Z
-        specifier_str = (
-            min_ver if any(c in min_ver for c in "<>=!~") else f">={min_ver}"
-        )
+        specifier_str = min_ver if any(c in min_ver for c in "<>=!~") else f">={min_ver}"
         try:
             spec = SpecifierSet(specifier_str)
             if parse_version(framework_version) not in spec:
@@ -155,9 +149,7 @@ class CapabilityNegotiator:
                     f"min_framework_version {specifier_str} for vertical '{manifest.name}'"
                 )
         except Exception as exc:
-            result.warnings.append(
-                f"Could not parse min_framework_version '{min_ver}': {exc}"
-            )
+            result.warnings.append(f"Could not parse min_framework_version '{min_ver}': {exc}")
 
     def _validate_extension_dependencies(
         self, manifest: ExtensionManifest, result: NegotiationResult

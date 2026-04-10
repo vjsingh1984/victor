@@ -363,9 +363,7 @@ class NodeExecutorProtocol(Protocol):
     - OCP compliance: Add new node types by creating new executor classes
     """
 
-    async def execute(
-        self, node: "WorkflowNode", state: "WorkflowState"
-    ) -> "WorkflowState":
+    async def execute(self, node: "WorkflowNode", state: "WorkflowState") -> "WorkflowState":
         """Execute a workflow node.
 
         Args:

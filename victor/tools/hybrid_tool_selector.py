@@ -71,29 +71,17 @@ class HybridSelectorConfig:
     def __post_init__(self):
         """Validate configuration."""
         if not 0.0 <= self.semantic_weight <= 1.0:
-            raise ValueError(
-                f"semantic_weight must be in [0.0, 1.0], got {self.semantic_weight}"
-            )
+            raise ValueError(f"semantic_weight must be in [0.0, 1.0], got {self.semantic_weight}")
         if not 0.0 <= self.keyword_weight <= 1.0:
-            raise ValueError(
-                f"keyword_weight must be in [0.0, 1.0], got {self.keyword_weight}"
-            )
+            raise ValueError(f"keyword_weight must be in [0.0, 1.0], got {self.keyword_weight}")
         if self.min_semantic_tools < 0:
-            raise ValueError(
-                f"min_semantic_tools must be >= 0, got {self.min_semantic_tools}"
-            )
+            raise ValueError(f"min_semantic_tools must be >= 0, got {self.min_semantic_tools}")
         if self.min_keyword_tools < 0:
-            raise ValueError(
-                f"min_keyword_tools must be >= 0, got {self.min_keyword_tools}"
-            )
+            raise ValueError(f"min_keyword_tools must be >= 0, got {self.min_keyword_tools}")
         if self.max_total_tools < 1:
-            raise ValueError(
-                f"max_total_tools must be >= 1, got {self.max_total_tools}"
-            )
+            raise ValueError(f"max_total_tools must be >= 1, got {self.max_total_tools}")
         if not 0.0 <= self.rl_boost_weight <= 0.5:
-            raise ValueError(
-                f"rl_boost_weight must be in [0.0, 0.5], got {self.rl_boost_weight}"
-            )
+            raise ValueError(f"rl_boost_weight must be in [0.0, 0.5], got {self.rl_boost_weight}")
 
 
 class HybridToolSelector:
@@ -231,9 +219,7 @@ class HybridToolSelector:
             blended = blended[: self.config.max_total_tools]
 
         tool_names = [t.name for t in blended]
-        logger.info(
-            f"Hybrid selection: {len(blended)} tools selected: {', '.join(tool_names)}"
-        )
+        logger.info(f"Hybrid selection: {len(blended)} tools selected: {', '.join(tool_names)}")
 
         return blended
 
@@ -460,12 +446,8 @@ class HybridToolSelector:
         existing_names = {t.name for t in blended}
 
         # Count how many semantic and keyword tools are in blended
-        semantic_count = sum(
-            1 for t in blended if t.name in {s.name for s in semantic_tools}
-        )
-        keyword_count = sum(
-            1 for t in blended if t.name in {k.name for k in keyword_tools}
-        )
+        semantic_count = sum(1 for t in blended if t.name in {s.name for s in semantic_tools})
+        keyword_count = sum(1 for t in blended if t.name in {k.name for k in keyword_tools})
 
         # Add more semantic tools if below minimum
         if semantic_count < self.config.min_semantic_tools:

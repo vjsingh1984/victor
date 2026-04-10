@@ -287,9 +287,7 @@ class CompositionStats:
         Returns:
             Key like "sequential:researcher=2,executor=1"
         """
-        role_str = ",".join(
-            f"{role}={count}" for role, count in sorted(self.role_counts.items())
-        )
+        role_str = ",".join(f"{role}={count}" for role, count in sorted(self.role_counts.items()))
         return f"{self.formation.value}:{role_str}"
 
     def update(self, metrics: TeamMetrics) -> None:
@@ -394,21 +392,15 @@ def categorize_task(task_description: str) -> TaskCategory:
         return TaskCategory.TESTING
 
     # Review/validation - check before implementation
-    if any(
-        kw in task_lower for kw in ["review", "check", "validate", "audit", "quality"]
-    ):
+    if any(kw in task_lower for kw in ["review", "check", "validate", "audit", "quality"]):
         return TaskCategory.REVIEW
 
     # Debugging - check before generic "fix"
-    if any(
-        kw in task_lower for kw in ["debug", "bug", "error", "issue", "troubleshoot"]
-    ):
+    if any(kw in task_lower for kw in ["debug", "bug", "error", "issue", "troubleshoot"]):
         return TaskCategory.DEBUGGING
 
     # Refactoring
-    if any(
-        kw in task_lower for kw in ["refactor", "restructure", "reorganize", "clean up"]
-    ):
+    if any(kw in task_lower for kw in ["refactor", "restructure", "reorganize", "clean up"]):
         return TaskCategory.REFACTORING
 
     # Documentation
@@ -420,16 +412,11 @@ def categorize_task(task_description: str) -> TaskCategory:
         return TaskCategory.PLANNING
 
     # Exploration - broad search terms
-    if any(
-        kw in task_lower for kw in ["search", "find", "explore", "research", "discover"]
-    ):
+    if any(kw in task_lower for kw in ["search", "find", "explore", "research", "discover"]):
         return TaskCategory.EXPLORATION
 
     # Implementation - most general, checked last
-    if any(
-        kw in task_lower
-        for kw in ["implement", "create", "build", "write", "add", "fix"]
-    ):
+    if any(kw in task_lower for kw in ["implement", "create", "build", "write", "add", "fix"]):
         return TaskCategory.IMPLEMENTATION
 
     return TaskCategory.MIXED

@@ -170,9 +170,7 @@ TOOL EFFECTIVENESS (from execution data):
 # Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.
 
 
-def get_task_type_hint(
-    task_type: str, prompt_contributors: Optional[list] = None
-) -> str:
+def get_task_type_hint(task_type: str, prompt_contributors: Optional[list] = None) -> str:
     """Get prompt hint for a specific task type.
 
     Hints come from vertical prompt contributors (the canonical source).
@@ -329,9 +327,7 @@ class SystemPromptBuilder:
         merged: dict = {}  # Populated by vertical contributors below
 
         # Override with vertical contributors (sorted by priority)
-        for contributor in sorted(
-            self.prompt_contributors, key=lambda c: c.get_priority()
-        ):
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
             hints = contributor.get_task_type_hints()
             for task_type, task_hint in hints.items():
                 # Extract hint string from TaskTypeHint objects
@@ -357,9 +353,7 @@ class SystemPromptBuilder:
 
         # Collect grounding rules from all contributors
         rules = []
-        for contributor in sorted(
-            self.prompt_contributors, key=lambda c: c.get_priority()
-        ):
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
             grounding = contributor.get_grounding_rules()
             if grounding:
                 rules.append(grounding)
@@ -385,9 +379,7 @@ class SystemPromptBuilder:
 
         # Collect sections from all contributors
         sections = []
-        for contributor in sorted(
-            self.prompt_contributors, key=lambda c: c.get_priority()
-        ):
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
             section = contributor.get_system_prompt_section()
             if section:
                 sections.append(section)
@@ -611,9 +603,7 @@ class SystemPromptBuilder:
                 base_prompt = f"{base_prompt}\n\n{tool_constraint}"
 
         if "completion" in sections_to_include:
-            optimized_completion = self._get_optimized_section(
-                "COMPLETION_GUIDANCE"
-            )
+            optimized_completion = self._get_optimized_section("COMPLETION_GUIDANCE")
             completion = optimized_completion or COMPLETION_GUIDANCE
             base_prompt = f"{base_prompt}\n\n{completion}"
 
@@ -625,16 +615,12 @@ class SystemPromptBuilder:
         # GEPA: Replace static GROUNDING_RULES with evolved version if available
         optimized_grounding = self._get_optimized_section("GROUNDING_RULES")
         if optimized_grounding:
-            base_prompt = base_prompt.replace(
-                GROUNDING_RULES, optimized_grounding
-            )
+            base_prompt = base_prompt.replace(GROUNDING_RULES, optimized_grounding)
 
         # ASI-derived tool effectiveness guidance (GEPA-inspired)
         # Check if prompt optimizer has an evolved version, else use static default
         if "tool_guidance" in sections_to_include:
-            optimized = self._get_optimized_section(
-                "ASI_TOOL_EFFECTIVENESS_GUIDANCE"
-            )
+            optimized = self._get_optimized_section("ASI_TOOL_EFFECTIVENESS_GUIDANCE")
             guidance = optimized or ASI_TOOL_EFFECTIVENESS_GUIDANCE
             base_prompt = f"{base_prompt}\n\n{guidance}"
 
@@ -645,13 +631,18 @@ class SystemPromptBuilder:
 
         Returns the evolved text if a candidate exists with sufficient
         confidence, otherwise None (caller uses the static default).
-        Gated by USE_GEPA master flag — returns None when GEPA is disabled.
+        Gated by prompt_optimization.enabled setting.
+        Checks section_strategies to skip sections with empty strategy list.
         """
         try:
             from victor.config.settings import get_settings
 
             po = getattr(get_settings(), "prompt_optimization", None)
             if po is None or not po.enabled:
+                return None
+            # Check if this section has strategies assigned
+            strategies = po.get_strategies_for_section(section_name)
+            if not strategies:
                 return None
         except Exception:
             return None
@@ -725,9 +716,7 @@ class SystemPromptBuilder:
             if selected:
                 # Always include completion guidance (required for detection)
                 result = set(selected) | {"completion"}
-                logger.debug(
-                    f"Edge prompt focus: {len(result)}/{len(all_sections)} sections"
-                )
+                logger.debug(f"Edge prompt focus: {len(result)}/{len(all_sections)} sections")
                 return result
 
         except Exception:
@@ -748,9 +737,7 @@ class SystemPromptBuilder:
         )
 
         # Get adapter-specific hints
-        hints = (
-            self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
-        )
+        hints = self.tool_adapter.get_system_prompt_hints() if self.tool_adapter else None
 
         if hints:
             return f"{base_prompt}\n\n{hints}\n\n{GROUNDING_RULES}"

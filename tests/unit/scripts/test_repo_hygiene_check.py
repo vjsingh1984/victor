@@ -7,9 +7,7 @@ from types import SimpleNamespace
 
 
 def load_repo_hygiene_module():
-    module_path = (
-        Path(__file__).resolve().parents[3] / "scripts" / "ci" / "repo_hygiene_check.py"
-    )
+    module_path = Path(__file__).resolve().parents[3] / "scripts" / "ci" / "repo_hygiene_check.py"
     spec = importlib.util.spec_from_file_location("repo_hygiene_check", module_path)
     assert spec is not None
     assert spec.loader is not None
@@ -41,9 +39,7 @@ def test_load_toml_module_falls_back_to_tomli(monkeypatch) -> None:
             return tomli_module
         raise AssertionError(f"unexpected import: {name}")
 
-    monkeypatch.setattr(
-        repo_hygiene_check.importlib, "import_module", fake_import_module
-    )
+    monkeypatch.setattr(repo_hygiene_check.importlib, "import_module", fake_import_module)
 
     loaded = repo_hygiene_check._load_toml_module()
 
@@ -94,9 +90,7 @@ verticals = ["victor-coding>=0.6.0", "victor-research>=0.6.0", "victor-devops>=0
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "extracted vertical extra 'coding'" in finding.message for finding in findings
-    )
+    assert any("extracted vertical extra 'coding'" in finding.message for finding in findings)
 
 
 def test_legacy_noop_vertical_extras_are_rejected(tmp_path: Path) -> None:
@@ -125,9 +119,7 @@ rag = []
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "legacy no-op vertical extra 'rag'" in finding.message for finding in findings
-    )
+    assert any("legacy no-op vertical extra 'rag'" in finding.message for finding in findings)
 
 
 def test_self_referential_ci_extra_is_rejected(tmp_path: Path) -> None:
@@ -156,9 +148,7 @@ ci = ["victor-ai[dev]", "pytest-split>=0.8"]
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "must not self-reference victor-ai" in finding.message for finding in findings
-    )
+    assert any("must not self-reference victor-ai" in finding.message for finding in findings)
 
 
 def test_primary_vertical_contract_docs_reject_legacy_entry_point_guidance(
@@ -195,8 +185,7 @@ benchmark = "victor.benchmark:plugin"
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any(
-        "victor_sdk.VerticalBase" in finding.message
-        or "victor.plugins" in finding.message
+        "victor_sdk.VerticalBase" in finding.message or "victor.plugins" in finding.message
         for finding in findings
     )
 
@@ -260,9 +249,7 @@ tool = "my_package.plugin:plugin"
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "nested victor.plugins.* groups" in finding.message for finding in findings
-    )
+    assert any("nested victor.plugins.* groups" in finding.message for finding in findings)
 
 
 def test_primary_vertical_contract_docs_reject_framework_shim_examples(
@@ -299,9 +286,7 @@ from victor.framework.vertical_base import VerticalBase
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "victor.framework.vertical_base" in finding.message for finding in findings
-    )
+    assert any("victor.framework.vertical_base" in finding.message for finding in findings)
 
 
 def test_primary_vertical_contract_docs_reject_core_register_vertical_imports(
@@ -328,12 +313,9 @@ victor.core.verticals.registration.register_vertical
     findings = repo_hygiene_check.run_checks(tmp_path)
 
     assert any(
-        "import register_vertical from victor_sdk" in finding.message
-        for finding in findings
+        "import register_vertical from victor_sdk" in finding.message for finding in findings
     )
-    assert any(
-        "victor_sdk.register_vertical" in finding.message for finding in findings
-    )
+    assert any("victor_sdk.register_vertical" in finding.message for finding in findings)
 
 
 def test_primary_vertical_contract_docs_reject_framework_extensions_definition_imports(
@@ -416,10 +398,7 @@ VerticalRegistry.register(MyVertical)
     assert any("victor_sdk.VerticalBase" in finding.message for finding in findings)
     assert any("victor_sdk.StageDefinition" in finding.message for finding in findings)
     assert any("victor_sdk.VerticalConfig" in finding.message for finding in findings)
-    assert any(
-        "VictorPlugin/context.register_vertical" in finding.message
-        for finding in findings
-    )
+    assert any("VictorPlugin/context.register_vertical" in finding.message for finding in findings)
 
 
 def test_banned_repo_url_is_flagged(tmp_path: Path) -> None:
@@ -453,17 +432,13 @@ def test_uppercase_roadmap_markdown_link_is_flagged(tmp_path: Path) -> None:
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "non-canonical roadmap link target" in finding.message for finding in findings
-    )
+    assert any("non-canonical roadmap link target" in finding.message for finding in findings)
 
 
 def test_archived_doc_requires_banner(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
-    write_file(
-        tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "# Missing banner\n"
-    )
+    write_file(tmp_path, "docs/COMPREHENSIVE_IMPROVEMENT_ROADMAP.md", "# Missing banner\n")
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
@@ -482,16 +457,12 @@ def test_legacy_monolithic_protocol_module_is_flagged(tmp_path: Path) -> None:
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "legacy monolithic protocol module" in finding.message for finding in findings
-    )
+    assert any("legacy monolithic protocol module" in finding.message for finding in findings)
 
 
 def test_makefile_lint_gate_rejects_advisory_mypy(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
-    write_file(
-        tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n"
-    )
+    write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
     write_file(
         tmp_path,
         ".github/workflows/security.yml",
@@ -515,16 +486,12 @@ def test_makefile_lint_gate_rejects_advisory_mypy(tmp_path: Path) -> None:
 
     findings = repo_hygiene_check.run_checks(tmp_path)
 
-    assert any(
-        "must not suppress mypy failure" in finding.message for finding in findings
-    )
+    assert any("must not suppress mypy failure" in finding.message for finding in findings)
 
 
 def test_security_baseline_requires_blocking_trivy_path(tmp_path: Path) -> None:
     write_file(tmp_path, ".github/workflows/test.yml", "name: OK\non: push\n")
-    write_file(
-        tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n"
-    )
+    write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
     write_file(
         tmp_path,
         ".github/workflows/security.yml",
@@ -554,9 +521,7 @@ def test_security_baseline_requires_blocking_pip_audit_path(tmp_path: Path) -> N
         ".github/workflows/security.yml",
         "name: Security\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@master\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n",
     )
-    write_file(
-        tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n"
-    )
+    write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
         tmp_path,
@@ -581,9 +546,7 @@ def test_security_baseline_requires_blocking_bandit_high_path(tmp_path: Path) ->
         ".github/workflows/security.yml",
         "name: Security\non: push\njobs:\n  sec:\n    steps:\n      - uses: aquasecurity/trivy-action@master\n        with:\n          severity: CRITICAL\n          exit-code: '1'\n          ignore-unfixed: 'true'\n      - uses: pypa/gh-action-pip-audit@v1.0.8\n",
     )
-    write_file(
-        tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n"
-    )
+    write_file(tmp_path, ".github/workflows/ci-fast.yml", "name: CI\non: push\njobs: {}\n")
     write_file(tmp_path, "Makefile", "lint:\n\tmypy victor\n")
     write_file(
         tmp_path,

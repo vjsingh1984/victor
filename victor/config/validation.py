@@ -478,9 +478,7 @@ def format_validation_result(result: ValidationResult) -> str:
     if result.is_valid:
         lines.append("✓ Configuration is valid!")
     else:
-        lines.append(
-            f"✗ Configuration validation failed ({result.error_count} error(s):"
-        )
+        lines.append(f"✗ Configuration validation failed ({result.error_count} error(s):")
         lines.append("")
         for i, error in enumerate(result.errors, 1):
             lines.append(f"\n{i}. {error.message}")

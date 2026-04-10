@@ -105,9 +105,7 @@ class NodeMetrics:
             "execution_count": self.execution_count,
             "total_duration": self.total_duration,
             "avg_duration": self.avg_duration,
-            "min_duration": (
-                self.min_duration if self.min_duration != float("inf") else 0.0
-            ),
+            "min_duration": (self.min_duration if self.min_duration != float("inf") else 0.0),
             "max_duration": self.max_duration,
             "success_count": self.success_count,
             "failure_count": self.failure_count,
@@ -311,9 +309,7 @@ class WorkflowMetricsCollector:
         # Initialize storage
         if storage_backend != "memory":
             if not storage_path:
-                raise ValueError(
-                    f"storage_path required for backend '{storage_backend}'"
-                )
+                raise ValueError(f"storage_path required for backend '{storage_backend}'")
 
             if storage_backend == "json":
                 self._load_from_json()
@@ -441,9 +437,7 @@ class WorkflowMetricsCollector:
 
         # Update workflow metrics
         if workflow_id in self._workflows:
-            self._workflows[workflow_id].update_execution(
-                duration=duration, success=success
-            )
+            self._workflows[workflow_id].update_execution(duration=duration, success=success)
 
         # Clean up active execution
         del self._active_executions[workflow_id]
@@ -486,9 +480,7 @@ class WorkflowMetricsCollector:
             return None
         return workflow.node_metrics.get(node_id)
 
-    def get_tool_metrics(
-        self, workflow_id: str, tool_name: str
-    ) -> Optional[ToolUsageMetrics]:
+    def get_tool_metrics(self, workflow_id: str, tool_name: str) -> Optional[ToolUsageMetrics]:
         """Get metrics for a specific tool.
 
         Args:
@@ -546,8 +538,7 @@ class WorkflowMetricsCollector:
 
             data = {
                 "workflows": {
-                    wf_id: metrics.to_dict()
-                    for wf_id, metrics in self._workflows.items()
+                    wf_id: metrics.to_dict() for wf_id, metrics in self._workflows.items()
                 },
                 "saved_at": datetime.now().isoformat(),
             }
@@ -602,9 +593,7 @@ class WorkflowMetricsCollector:
                     workflow_metrics.node_metrics[node_id] = node_metrics
 
                 # Recreate tool metrics
-                for tool_name, tool_dict in metrics_dict.get(
-                    "tool_metrics", {}
-                ).items():
+                for tool_name, tool_dict in metrics_dict.get("tool_metrics", {}).items():
                     tool_metrics = ToolUsageMetrics(tool_name=tool_name)
                     tool_metrics.call_count = tool_dict.get("call_count", 0)
                     tool_metrics.total_duration = tool_dict.get("total_duration", 0.0)
@@ -717,12 +706,8 @@ class WorkflowMetricsCollector:
                 )
 
                 # Delete existing node/tool metrics for this workflow
-                cursor.execute(
-                    "DELETE FROM node_metrics WHERE workflow_id = ?", (workflow_id,)
-                )
-                cursor.execute(
-                    "DELETE FROM tool_metrics WHERE workflow_id = ?", (workflow_id,)
-                )
+                cursor.execute("DELETE FROM node_metrics WHERE workflow_id = ?", (workflow_id,))
+                cursor.execute("DELETE FROM tool_metrics WHERE workflow_id = ?", (workflow_id,))
 
                 # Insert node metrics
                 for node_id, node_metrics in metrics.node_metrics.items():

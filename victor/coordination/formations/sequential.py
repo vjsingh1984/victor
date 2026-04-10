@@ -52,9 +52,7 @@ class SequentialFormation(BaseFormationStrategy):
         previous_agent_id = None
 
         for i, agent in enumerate(agents):
-            logger.debug(
-                f"SequentialFormation: executing agent {i+1}/{len(agents)}: {agent.id}"
-            )
+            logger.debug(f"SequentialFormation: executing agent {i+1}/{len(agents)}: {agent.id}")
 
             # Add previous output and agent to context
             if previous_output:

@@ -181,12 +181,8 @@ class MergeConflictTool(BaseTool):
                     success=True,
                     output=self._format_resolutions(resolutions),
                     metadata={
-                        "resolved_count": sum(
-                            1 for r in resolutions if r.fully_resolved
-                        ),
-                        "needs_manual": sum(
-                            1 for r in resolutions if r.needs_manual_review
-                        ),
+                        "resolved_count": sum(1 for r in resolutions if r.fully_resolved),
+                        "needs_manual": sum(1 for r in resolutions if r.needs_manual_review),
                     },
                 )
 
@@ -283,17 +279,13 @@ class MergeConflictTool(BaseTool):
             "high": _get_icon("level_critical"),
         }.get(summary["estimated_effort"], _get_icon("level_unknown"))
 
-        lines.append(
-            f"**Effort Required:** {effort_icon} {summary['estimated_effort']}"
-        )
+        lines.append(f"**Effort Required:** {effort_icon} {summary['estimated_effort']}")
         lines.append(f"**Total Files:** {summary['total_files']}")
         lines.append(f"**Total Hunks:** {summary['total_hunks']}")
         lines.append("")
 
         lines.append("**Resolution Outlook:**")
-        lines.append(
-            f"- {_get_icon('success')} Auto-resolvable: {summary['auto_resolvable']}"
-        )
+        lines.append(f"- {_get_icon('success')} Auto-resolvable: {summary['auto_resolvable']}")
         lines.append(f"- {_get_icon('person')} Needs Manual: {summary['needs_manual']}")
         lines.append("")
 

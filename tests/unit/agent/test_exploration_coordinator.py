@@ -21,9 +21,7 @@ class TestExplorationCoordinator:
     def test_extract_search_terms_from_camelcase(self):
         """Extracts CamelCase identifiers."""
         coord = ExplorationCoordinator()
-        terms = coord._extract_search_terms(
-            "Fix the bug in SeparabilityMatrix for CompoundModel"
-        )
+        terms = coord._extract_search_terms("Fix the bug in SeparabilityMatrix for CompoundModel")
         assert "SeparabilityMatrix" in terms
         assert "CompoundModel" in terms
 
@@ -38,9 +36,7 @@ class TestExplorationCoordinator:
     def test_extract_search_terms_from_backticks(self):
         """Extracts backtick-quoted terms."""
         coord = ExplorationCoordinator()
-        terms = coord._extract_search_terms(
-            "Fix the `compute_matrix` function in `core.py`"
-        )
+        terms = coord._extract_search_terms("Fix the `compute_matrix` function in `core.py`")
         assert "compute_matrix" in terms
 
     def test_extract_no_terms_from_generic(self):

@@ -29,12 +29,8 @@ class TestExecutionContextWrapperSyncBridge:
         wrapper._manager.get = MagicMock(return_value=coro)
 
         with (
-            patch.object(
-                context_module.asyncio, "get_running_loop", side_effect=RuntimeError
-            ),
-            patch.object(
-                context_module, "run_sync", return_value="remote"
-            ) as mock_run_sync,
+            patch.object(context_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(context_module, "run_sync", return_value="remote") as mock_run_sync,
         ):
             result = wrapper.get("answer", "default")
 
@@ -49,9 +45,7 @@ class TestExecutionContextWrapperSyncBridge:
         wrapper._manager = MagicMock()
 
         with (
-            patch.object(
-                context_module.asyncio, "get_running_loop", return_value=object()
-            ),
+            patch.object(context_module.asyncio, "get_running_loop", return_value=object()),
             patch.object(context_module, "run_sync") as mock_run_sync,
         ):
             result = wrapper.get("fallback", "default")
@@ -60,20 +54,14 @@ class TestExecutionContextWrapperSyncBridge:
         mock_run_sync.assert_not_called()
 
     def test_set_uses_shared_sync_bridge_without_running_loop(self) -> None:
-        wrapper = context_module.ExecutionContextWrapper(
-            context_module.create_execution_context()
-        )
+        wrapper = context_module.ExecutionContextWrapper(context_module.create_execution_context())
         wrapper._manager = MagicMock()
         coro = object()
         wrapper._manager.set = MagicMock(return_value=coro)
 
         with (
-            patch.object(
-                context_module.asyncio, "get_running_loop", side_effect=RuntimeError
-            ),
-            patch.object(
-                context_module, "run_sync", return_value=None
-            ) as mock_run_sync,
+            patch.object(context_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(context_module, "run_sync", return_value=None) as mock_run_sync,
         ):
             wrapper.set("answer", 42)
 
@@ -82,21 +70,15 @@ class TestExecutionContextWrapperSyncBridge:
         assert wrapper.state["data"]["answer"] == 42
 
     def test_update_uses_shared_sync_bridge_without_running_loop(self) -> None:
-        wrapper = context_module.ExecutionContextWrapper(
-            context_module.create_execution_context()
-        )
+        wrapper = context_module.ExecutionContextWrapper(context_module.create_execution_context())
         wrapper._manager = MagicMock()
         coro = object()
         wrapper._manager.update = MagicMock(return_value=coro)
         values = {"answer": 42, "status": "ok"}
 
         with (
-            patch.object(
-                context_module.asyncio, "get_running_loop", side_effect=RuntimeError
-            ),
-            patch.object(
-                context_module, "run_sync", return_value=None
-            ) as mock_run_sync,
+            patch.object(context_module.asyncio, "get_running_loop", side_effect=RuntimeError),
+            patch.object(context_module, "run_sync", return_value=None) as mock_run_sync,
         ):
             wrapper.update(values)
 

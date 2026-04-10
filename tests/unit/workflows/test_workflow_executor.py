@@ -62,9 +62,7 @@ class TestWorkflowContext:
 
     def test_add_and_get_result(self):
         ctx = WorkflowContext()
-        result = NodeResult(
-            node_id="n1", status=ExecutorNodeStatus.COMPLETED, output="x"
-        )
+        result = NodeResult(node_id="n1", status=ExecutorNodeStatus.COMPLETED, output="x")
         ctx.add_result(result)
         assert ctx.get_result("n1") is result
 
@@ -72,21 +70,15 @@ class TestWorkflowContext:
         ctx = WorkflowContext()
         ctx.add_result(NodeResult(node_id="n1", status=ExecutorNodeStatus.COMPLETED))
         assert ctx.has_failures() is False
-        ctx.add_result(
-            NodeResult(node_id="n2", status=ExecutorNodeStatus.FAILED, error="e")
-        )
+        ctx.add_result(NodeResult(node_id="n2", status=ExecutorNodeStatus.FAILED, error="e"))
         assert ctx.has_failures() is True
 
     def test_get_outputs(self):
         ctx = WorkflowContext()
         ctx.add_result(
-            NodeResult(
-                node_id="n1", status=ExecutorNodeStatus.COMPLETED, output="data1"
-            )
+            NodeResult(node_id="n1", status=ExecutorNodeStatus.COMPLETED, output="data1")
         )
-        ctx.add_result(
-            NodeResult(node_id="n2", status=ExecutorNodeStatus.FAILED, error="e")
-        )
+        ctx.add_result(NodeResult(node_id="n2", status=ExecutorNodeStatus.FAILED, error="e"))
         outputs = ctx.get_outputs()
         assert "n1" in outputs
         assert "n2" not in outputs
@@ -96,9 +88,7 @@ class TestWorkflowResult:
     def test_get_output(self):
         ctx = WorkflowContext()
         ctx.add_result(
-            NodeResult(
-                node_id="analyze", status=ExecutorNodeStatus.COMPLETED, output="result"
-            )
+            NodeResult(node_id="analyze", status=ExecutorNodeStatus.COMPLETED, output="result")
         )
         wr = WorkflowResult(workflow_name="test", success=True, context=ctx)
         assert wr.get_output("analyze") == "result"
@@ -106,9 +96,7 @@ class TestWorkflowResult:
 
     def test_to_dict(self):
         ctx = WorkflowContext()
-        wr = WorkflowResult(
-            workflow_name="wf", success=True, context=ctx, total_duration=1.5
-        )
+        wr = WorkflowResult(workflow_name="wf", success=True, context=ctx, total_duration=1.5)
         d = wr.to_dict()
         assert d["workflow_name"] == "wf"
         assert d["success"] is True
@@ -149,9 +137,7 @@ class TestWorkflowExecutorInit:
 
         async def mock_execute_node(n, ctx):
             captured_ctx.update(ctx.data)
-            return NodeResult(
-                node_id=n.id, status=ExecutorNodeStatus.COMPLETED, output="done"
-            )
+            return NodeResult(node_id=n.id, status=ExecutorNodeStatus.COMPLETED, output="done")
 
         with patch.object(executor, "_execute_node", side_effect=mock_execute_node):
             with patch.object(executor, "_get_next_nodes", return_value=[]):
@@ -166,9 +152,7 @@ class TestWorkflowExecutorInit:
 
 class TestWorkflowExecutorChainHandlers:
     @pytest.mark.asyncio
-    async def test_execute_chain_handler_uses_asyncio_to_thread_for_sync_invoke(
-        self, executor
-    ):
+    async def test_execute_chain_handler_uses_asyncio_to_thread_for_sync_invoke(self, executor):
         node = MagicMock()
         node.id = "compute_sync_invoke"
         node.output_key = "chain_output"
@@ -184,17 +168,13 @@ class TestWorkflowExecutorChainHandlers:
             return func(*args, **kwargs)
 
         with (
-            patch(
-                "victor.workflows.executor.get_chain_registry", return_value=registry
-            ),
+            patch("victor.workflows.executor.get_chain_registry", return_value=registry),
             patch(
                 "victor.workflows.executor.asyncio.to_thread",
                 side_effect=call_to_thread,
             ) as mock_to_thread,
         ):
-            result = await executor._execute_chain_handler(
-                node, context, "analysis_chain", 0.0
-            )
+            result = await executor._execute_chain_handler(node, context, "analysis_chain", 0.0)
 
         assert result.status is ExecutorNodeStatus.COMPLETED
         assert result.output == {"result": "ok"}
@@ -205,9 +185,7 @@ class TestWorkflowExecutorChainHandlers:
         assert called.args[1] == {"payload": 42}
 
     @pytest.mark.asyncio
-    async def test_execute_chain_handler_uses_asyncio_to_thread_for_sync_callable(
-        self, executor
-    ):
+    async def test_execute_chain_handler_uses_asyncio_to_thread_for_sync_callable(self, executor):
         node = MagicMock()
         node.id = "compute_sync_callable"
         node.output_key = "callable_output"
@@ -224,17 +202,13 @@ class TestWorkflowExecutorChainHandlers:
             return func(*args, **kwargs)
 
         with (
-            patch(
-                "victor.workflows.executor.get_chain_registry", return_value=registry
-            ),
+            patch("victor.workflows.executor.get_chain_registry", return_value=registry),
             patch(
                 "victor.workflows.executor.asyncio.to_thread",
                 side_effect=call_to_thread,
             ) as mock_to_thread,
         ):
-            result = await executor._execute_chain_handler(
-                node, context, "callable_chain", 0.0
-            )
+            result = await executor._execute_chain_handler(node, context, "callable_chain", 0.0)
 
         assert result.status is ExecutorNodeStatus.COMPLETED
         assert result.output == {"seen": {"payload": "repo"}}

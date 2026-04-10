@@ -292,9 +292,7 @@ class TestCompilationFromYAML:
     """Tests for compiling workflows from YAML sources."""
 
     @pytest.mark.asyncio
-    async def test_compile_from_yaml_path(
-        self, yaml_workflow_file: Path, reset_workflow_caches
-    ):
+    async def test_compile_from_yaml_path(self, yaml_workflow_file: Path, reset_workflow_caches):
         """Test compiling a YAML file path to CompiledGraph."""
         from victor.workflows.unified_compiler import (
             UnifiedWorkflowCompiler,
@@ -302,9 +300,7 @@ class TestCompilationFromYAML:
         )
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
-        compiled = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Verify it returns a CachedCompiledGraph
         assert isinstance(compiled, CachedCompiledGraph)
@@ -317,9 +313,7 @@ class TestCompilationFromYAML:
         assert compiled.source_path == yaml_workflow_file
 
     @pytest.mark.asyncio
-    async def test_compile_from_yaml_content(
-        self, sample_yaml_content: str, tmp_path: Path
-    ):
+    async def test_compile_from_yaml_content(self, sample_yaml_content: str, tmp_path: Path):
         """Test compiling YAML string content via file to CompiledGraph."""
         from victor.workflows.unified_compiler import (
             UnifiedWorkflowCompiler,
@@ -346,9 +340,7 @@ class TestCompilationFromYAML:
         )
 
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml_content(
-            sample_yaml_content, workflow_name="test_workflow"
-        )
+        compiled = compiler.compile_yaml_content(sample_yaml_content, workflow_name="test_workflow")
 
         assert isinstance(compiled, CachedCompiledGraph)
         assert compiled.workflow_name == "test_workflow"
@@ -406,9 +398,7 @@ class TestCompilationFromYAML:
 
         # Verify YAML loader parses workflow-level limits
         config = YAMLWorkflowConfig()
-        workflows = load_workflow_from_yaml(
-            workflow_execution_limits_yaml_content, config=config
-        )
+        workflows = load_workflow_from_yaml(workflow_execution_limits_yaml_content, config=config)
 
         workflow_def = workflows.get("limited_workflow")
         assert workflow_def is not None
@@ -438,9 +428,7 @@ class TestCompilationFromYAML:
         )
 
         config = YAMLWorkflowConfig()
-        workflows = load_workflow_from_yaml(
-            workflow_execution_block_yaml_content, config=config
-        )
+        workflows = load_workflow_from_yaml(workflow_execution_block_yaml_content, config=config)
 
         workflow_def = workflows.get("execution_block_workflow")
         assert workflow_def is not None
@@ -517,9 +505,7 @@ class TestCompilationFromDefinition:
             register_workflow_node_executor("custom_plugin", CustomExecutor)
 
             compiler = UnifiedWorkflowCompiler()
-            compiled = compiler.compile_definition(
-                workflow, cache_key="custom-workflow"
-            )
+            compiled = compiler.compile_definition(workflow, cache_key="custom-workflow")
             result = await compiled.invoke({})
 
             assert result.success is True
@@ -577,14 +563,10 @@ class TestCompilationWithCaching:
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
         # First compilation
-        compiled1 = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled1 = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Second compilation should use cache
-        compiled2 = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled2 = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Both should be valid
         assert compiled1.compiled_graph is not None
@@ -595,9 +577,7 @@ class TestCompilationWithCaching:
         assert stats.get("caching_enabled") is True
 
     @pytest.mark.asyncio
-    async def test_compile_cache_hit(
-        self, yaml_workflow_file: Path, reset_workflow_caches
-    ):
+    async def test_compile_cache_hit(self, yaml_workflow_file: Path, reset_workflow_caches):
         """Test that cached compilation is returned for identical inputs."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -1190,9 +1170,7 @@ class TestCachingIntegration:
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
         # First compile
-        compiled1 = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled1 = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Get cache stats
         stats = compiler.get_cache_stats()
@@ -1201,9 +1179,7 @@ class TestCachingIntegration:
         assert stats.get("definition_cache", {}).get("enabled", False) is True
 
         # Second compile should hit cache
-        compiled2 = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled2 = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         stats_after = compiler.get_cache_stats()
         assert stats_after.get("definition_cache", {}).get("hits", 0) >= 1
@@ -1250,9 +1226,7 @@ class TestCachingIntegration:
         assert stats.get("caching_enabled", False) is True
 
     @pytest.mark.asyncio
-    async def test_cache_cascade_invalidation(
-        self, tmp_path: Path, reset_workflow_caches
-    ):
+    async def test_cache_cascade_invalidation(self, tmp_path: Path, reset_workflow_caches):
         """Test that cache invalidation works correctly."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
@@ -1334,11 +1308,7 @@ workflows:
 
         # Should indicate the missing node
         error_msg = str(exc_info.value).lower()
-        assert (
-            "nonexistent" in error_msg
-            or "not found" in error_msg
-            or "invalid" in error_msg
-        )
+        assert "nonexistent" in error_msg or "not found" in error_msg or "invalid" in error_msg
 
     def test_circular_dependency_detection(self, tmp_path: Path):
         """Test that circular dependencies are handled."""
@@ -1435,9 +1405,7 @@ class TestObservability:
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Should be able to get graph schema for observability
         schema = compiled.get_graph_schema()
@@ -1452,9 +1420,7 @@ class TestObservability:
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         compiler = UnifiedWorkflowCompiler()
-        compiled = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Check metadata
         assert compiled.workflow_name == "test_workflow"
@@ -1487,16 +1453,12 @@ class TestAPIConsistency:
         compiler = UnifiedWorkflowCompiler()
 
         # Method 1: From YAML path - returns CachedCompiledGraph
-        compiled1 = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        compiled1 = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
         assert isinstance(compiled1, CachedCompiledGraph)
         assert compiled1.compiled_graph is not None
 
         # Method 2: From WorkflowDefinition - returns CachedCompiledGraph
-        workflow_def = (
-            WorkflowBuilder("api_test").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow_def = WorkflowBuilder("api_test").add_transform("step", lambda ctx: ctx).build()
         compiled2 = compiler.compile_definition(workflow_def)
         assert isinstance(compiled2, CachedCompiledGraph)
         assert compiled2.compiled_graph is not None
@@ -1603,9 +1565,7 @@ class TestEdgeCases:
         assert compiled.compiled_graph is not None
 
     @pytest.mark.asyncio
-    async def test_concurrent_compilation(
-        self, yaml_workflow_file: Path, reset_workflow_caches
-    ):
+    async def test_concurrent_compilation(self, yaml_workflow_file: Path, reset_workflow_caches):
         """Test thread safety of concurrent compilations."""
         from victor.workflows.unified_compiler import (
             UnifiedWorkflowCompiler,
@@ -1615,9 +1575,7 @@ class TestEdgeCases:
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
         async def compile_workflow():
-            return compiler.compile_yaml(
-                yaml_workflow_file, workflow_name="test_workflow"
-            )
+            return compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Run multiple compilations concurrently
         tasks = [compile_workflow() for _ in range(5)]
@@ -1720,9 +1678,7 @@ class TestCachedCompiledGraph:
         )
 
         compiler = UnifiedWorkflowCompiler()
-        cached = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        cached = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         # Check properties
         assert isinstance(cached, CachedCompiledGraph)
@@ -1733,16 +1689,12 @@ class TestCachedCompiledGraph:
         assert cached.compiled_graph is not None
 
     @pytest.mark.asyncio
-    async def test_cached_graph_get_schema(
-        self, yaml_workflow_file: Path, reset_workflow_caches
-    ):
+    async def test_cached_graph_get_schema(self, yaml_workflow_file: Path, reset_workflow_caches):
         """Test CachedCompiledGraph can return schema."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
 
         compiler = UnifiedWorkflowCompiler()
-        cached = compiler.compile_yaml(
-            yaml_workflow_file, workflow_name="test_workflow"
-        )
+        cached = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
 
         schema = cached.get_graph_schema()
         assert isinstance(schema, dict)

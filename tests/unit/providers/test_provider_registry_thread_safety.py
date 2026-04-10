@@ -56,9 +56,7 @@ class TestProviderRegistryThreadSafety:
             except Exception as e:
                 errors.append(e)
 
-        with patch(
-            "victor.providers.registry.importlib.import_module", side_effect=fake_import
-        ):
+        with patch("victor.providers.registry.importlib.import_module", side_effect=fake_import):
             threads = [threading.Thread(target=get_provider) for _ in range(10)]
             for t in threads:
                 t.start()

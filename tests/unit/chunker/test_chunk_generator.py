@@ -54,9 +54,7 @@ def mock_streaming_handler():
     handler.generate_force_response_error_chunk.return_value = StreamChunk(
         content="Force response", metadata={"type": "error"}
     )
-    handler.generate_final_marker_chunk.return_value = StreamChunk(
-        content="", is_final=True
-    )
+    handler.generate_final_marker_chunk.return_value = StreamChunk(content="", is_final=True)
     handler.generate_metrics_chunk.return_value = StreamChunk(
         content="metrics", metadata={"type": "metrics"}
     )
@@ -88,9 +86,7 @@ class TestToolRelatedChunks:
         tool_args = {"path": "/test/file.txt"}
         status_msg = "Reading file..."
 
-        chunk = chunk_generator.generate_tool_start_chunk(
-            tool_name, tool_args, status_msg
-        )
+        chunk = chunk_generator.generate_tool_start_chunk(tool_name, tool_args, status_msg)
 
         # Verify delegation to streaming handler
         mock_streaming_handler.generate_tool_start_chunk.assert_called_once_with(
@@ -108,9 +104,7 @@ class TestToolRelatedChunks:
         chunks = chunk_generator.generate_tool_result_chunks(result)
 
         # Verify delegation to streaming handler
-        mock_streaming_handler.generate_tool_result_chunks.assert_called_once_with(
-            result
-        )
+        mock_streaming_handler.generate_tool_result_chunks.assert_called_once_with(result)
 
         # Verify chunks returned
         assert isinstance(chunks, list)
@@ -132,9 +126,7 @@ class TestToolRelatedChunks:
 class TestStatusChunks:
     """Tests for status chunk generation."""
 
-    def test_generate_thinking_status_chunk(
-        self, chunk_generator, mock_streaming_handler
-    ):
+    def test_generate_thinking_status_chunk(self, chunk_generator, mock_streaming_handler):
         """Test generating thinking status chunk."""
         chunk = chunk_generator.generate_thinking_status_chunk()
 
@@ -157,9 +149,7 @@ class TestStatusChunks:
         assert chunk.metadata["type"] == "error"
         assert "Budget" in chunk.content
 
-    def test_generate_force_response_error_chunk(
-        self, chunk_generator, mock_streaming_handler
-    ):
+    def test_generate_force_response_error_chunk(self, chunk_generator, mock_streaming_handler):
         """Test generating force response error chunk."""
         chunk = chunk_generator.generate_force_response_error_chunk()
 
@@ -206,9 +196,7 @@ class TestContentChunks:
         """Test generating metrics chunk with custom parameters."""
         metrics_line = "Final metrics"
 
-        chunk = chunk_generator.generate_metrics_chunk(
-            metrics_line, is_final=True, prefix="\n"
-        )
+        chunk = chunk_generator.generate_metrics_chunk(metrics_line, is_final=True, prefix="\n")
 
         # Verify delegation with custom params
         mock_streaming_handler.generate_metrics_chunk.assert_called_once_with(
@@ -236,9 +224,7 @@ class TestContentChunks:
         """Test generating content chunk with custom parameters."""
         content = "Final content"
 
-        chunk = chunk_generator.generate_content_chunk(
-            content, is_final=True, suffix="\n\n"
-        )
+        chunk = chunk_generator.generate_content_chunk(content, is_final=True, suffix="\n\n")
 
         # Verify delegation with custom params
         mock_streaming_handler.generate_content_chunk.assert_called_once_with(
@@ -257,9 +243,7 @@ class TestBudgetChunks:
         chunks = chunk_generator.get_budget_exhausted_chunks(stream_ctx)
 
         # Verify delegation
-        mock_streaming_handler.get_budget_exhausted_chunks.assert_called_once_with(
-            stream_ctx
-        )
+        mock_streaming_handler.get_budget_exhausted_chunks.assert_called_once_with(stream_ctx)
 
         # Verify chunks
         assert isinstance(chunks, list)
@@ -291,22 +275,16 @@ class TestEdgeCases:
         chunks = chunk_generator.generate_tool_result_chunks(result)
 
         # Should still delegate
-        mock_streaming_handler.generate_tool_result_chunks.assert_called_once_with(
-            result
-        )
+        mock_streaming_handler.generate_tool_result_chunks.assert_called_once_with(result)
 
-    def test_generate_metrics_chunk_empty_string(
-        self, chunk_generator, mock_streaming_handler
-    ):
+    def test_generate_metrics_chunk_empty_string(self, chunk_generator, mock_streaming_handler):
         """Test generating metrics chunk with empty string."""
         chunk = chunk_generator.generate_metrics_chunk("")
 
         # Should still delegate
         mock_streaming_handler.generate_metrics_chunk.assert_called_once()
 
-    def test_generate_content_chunk_empty_string(
-        self, chunk_generator, mock_streaming_handler
-    ):
+    def test_generate_content_chunk_empty_string(self, chunk_generator, mock_streaming_handler):
         """Test generating content chunk with empty string."""
         chunk = chunk_generator.generate_content_chunk("")
 
@@ -317,9 +295,7 @@ class TestEdgeCases:
 class TestChunkGeneratorInitialization:
     """Tests for ChunkGenerator initialization."""
 
-    def test_initialization_with_valid_dependencies(
-        self, mock_streaming_handler, mock_settings
-    ):
+    def test_initialization_with_valid_dependencies(self, mock_streaming_handler, mock_settings):
         """Test successful initialization with valid dependencies."""
         chunk_generator = ChunkGenerator(
             streaming_handler=mock_streaming_handler,
@@ -329,9 +305,7 @@ class TestChunkGeneratorInitialization:
         assert chunk_generator.streaming_handler is mock_streaming_handler
         assert chunk_generator.settings is mock_settings
 
-    def test_initialization_stores_dependencies(
-        self, mock_streaming_handler, mock_settings
-    ):
+    def test_initialization_stores_dependencies(self, mock_streaming_handler, mock_settings):
         """Test that initialization stores all dependencies."""
         chunk_generator = ChunkGenerator(
             streaming_handler=mock_streaming_handler,

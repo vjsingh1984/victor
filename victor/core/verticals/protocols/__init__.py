@@ -152,9 +152,7 @@ def _load_sdk_vertical_extensions() -> Optional[type[Any]]:
     """Resolve the SDK VerticalExtensions type across compatible SDK layouts."""
 
     try:
-        return importlib.import_module(
-            "victor_sdk.verticals.extensions"
-        ).VerticalExtensions
+        return importlib.import_module("victor_sdk.verticals.extensions").VerticalExtensions
     except (AttributeError, ImportError, ModuleNotFoundError):
         pass
 
@@ -389,9 +387,7 @@ class _VerticalExtensionsFallback:
     def get_all_task_hints(self) -> Dict[str, "TaskTypeHint"]:
         """Merge task hints from all contributors."""
         merged: Dict[str, Any] = {}
-        for contributor in sorted(
-            self.prompt_contributors, key=lambda c: c.get_priority()
-        ):
+        for contributor in sorted(self.prompt_contributors, key=lambda c: c.get_priority()):
             merged.update(contributor.get_task_type_hints())
         return merged
 

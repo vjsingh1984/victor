@@ -223,9 +223,7 @@ class HITLController:
         # Callbacks
         self._on_pause_callbacks: List[Callable[[str, Dict[str, Any]], None]] = []
         self._on_resume_callbacks: List[Callable[[str], None]] = []
-        self._on_approval_request_callbacks: List[Callable[[ApprovalRequest], None]] = (
-            []
-        )
+        self._on_approval_request_callbacks: List[Callable[[ApprovalRequest], None]] = []
 
     # =========================================================================
     # Pause/Resume Properties and Methods
@@ -364,11 +362,7 @@ class HITLController:
         Returns:
             List of pending ApprovalRequest objects
         """
-        return [
-            req
-            for req in self._requests.values()
-            if req.status == ApprovalStatus.PENDING
-        ]
+        return [req for req in self._requests.values() if req.status == ApprovalStatus.PENDING]
 
     def respond_to_request(
         self,

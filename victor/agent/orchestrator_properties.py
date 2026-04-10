@@ -300,16 +300,13 @@ def _intelligent_integration(
                 config=self._intelligent_integration_config,
             )
             logger.info(
-                f"IntelligentPipeline initialized for "
-                f"{self.provider_name}:{self.model}"
+                f"IntelligentPipeline initialized for " f"{self.provider_name}:{self.model}"
             )
         except ImportError as e:
             logger.debug(f"IntelligentPipeline dependencies not available: {e}")
             self._intelligent_pipeline_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(
-                f"Failed to initialize IntelligentPipeline (config error): {e}"
-            )
+            logger.warning(f"Failed to initialize IntelligentPipeline (config error): {e}")
             self._intelligent_pipeline_enabled = False
 
     return self._intelligent_integration
@@ -330,9 +327,7 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
             logger.debug(f"SubAgentOrchestrator module not available: {e}")
             self._subagent_orchestration_enabled = False
         except (ValueError, TypeError, AttributeError) as e:
-            logger.warning(
-                f"Failed to initialize SubAgentOrchestrator (config error): {e}"
-            )
+            logger.warning(f"Failed to initialize SubAgentOrchestrator (config error): {e}")
             self._subagent_orchestration_enabled = False
 
     return self._subagent_orchestrator
@@ -341,8 +336,8 @@ def _subagent_orchestrator(self: "AgentOrchestrator") -> Optional[Any]:
 def _coordination(self: "AgentOrchestrator") -> Any:
     """Get the mode-workflow-team coordinator (lazy init)."""
     if self._mode_workflow_team_coordinator is None:
-        self._mode_workflow_team_coordinator = (
-            self._factory.create_mode_workflow_team_coordinator(self._vertical_context)
+        self._mode_workflow_team_coordinator = self._factory.create_mode_workflow_team_coordinator(
+            self._vertical_context
         )
         logger.debug("ModeWorkflowTeamCoordinator initialized on first access")
 

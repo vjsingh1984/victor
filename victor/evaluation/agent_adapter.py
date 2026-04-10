@@ -144,13 +144,9 @@ class VictorAgentAdapter:
                 critical=False,
                 name="AgentAdapter.tool_complete",
             )
-            logger.info(
-                "[AgentAdapter] Registered ToolRegistry hooks for tool call tracking"
-            )
+            logger.info("[AgentAdapter] Registered ToolRegistry hooks for tool call tracking")
         else:
-            logger.warning(
-                "[AgentAdapter] Could not register hooks - ToolRegistry not found"
-            )
+            logger.warning("[AgentAdapter] Could not register hooks - ToolRegistry not found")
 
     def _on_tool_start_hook(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Hook called by ToolRegistry before tool execution."""
@@ -203,9 +199,7 @@ class VictorAgentAdapter:
         # Update last tool call with result
         if self._tool_calls:
             tool_name = self._tool_calls[-1].name
-            success = (
-                getattr(result, "success", True) if hasattr(result, "success") else True
-            )
+            success = getattr(result, "success", True) if hasattr(result, "success") else True
             logger.info(
                 f"[AgentAdapter] Tool completed: {tool_name} "
                 f"(duration={duration_ms}ms, success={success})"
@@ -213,9 +207,7 @@ class VictorAgentAdapter:
             last_call = self._tool_calls[-1]
             if hasattr(result, "success"):
                 last_call.success = result.success
-                last_call.result = (
-                    str(result.result) if hasattr(result, "result") else None
-                )
+                last_call.result = str(result.result) if hasattr(result, "result") else None
             elif hasattr(result, "tool_name"):
                 last_call.success = getattr(result, "success", True)
                 last_call.result = getattr(result, "result", None)
@@ -223,8 +215,7 @@ class VictorAgentAdapter:
             # Record tool result for completion detection (framework integration)
             result_dict = {
                 "success": getattr(result, "success", True),
-                "path": last_call.arguments.get("path")
-                or last_call.arguments.get("file_path"),
+                "path": last_call.arguments.get("path") or last_call.arguments.get("file_path"),
             }
             self._completion_detector.record_tool_result(last_call.name, result_dict)
 
@@ -232,9 +223,7 @@ class VictorAgentAdapter:
         if self.config.track_file_edits and self._tool_calls:
             last_call = self._tool_calls[-1]
             if last_call.name in ("file_write", "file_edit", "edit_file", "patch"):
-                path = last_call.arguments.get("path") or last_call.arguments.get(
-                    "file_path", ""
-                )
+                path = last_call.arguments.get("path") or last_call.arguments.get("file_path", "")
                 if path and self.config.working_dir:
                     self._capture_file_edit(path, last_call.name)
 
@@ -479,9 +468,7 @@ class VictorAgentAdapter:
             if not orch_detector._state.expected_deliverables:
                 from victor.agent.task_completion import DeliverableType
 
-                orch_detector._state.expected_deliverables = [
-                    DeliverableType.FILE_MODIFIED
-                ]
+                orch_detector._state.expected_deliverables = [DeliverableType.FILE_MODIFIED]
 
             # High continuation budget — adapter controls stopping
             orch_detector._state.max_continuation_requests = 999
@@ -557,9 +544,7 @@ class VictorAgentAdapter:
                     logger.warning(f"[AgentAdapter] Turn {self._turns} timed out")
                     break
                 except Exception as e:
-                    logger.error(
-                        "[AgentAdapter] Turn %d provider error: %s", self._turns, e
-                    )
+                    logger.error("[AgentAdapter] Turn %d provider error: %s", self._turns, e)
                     # Provider error (disconnect, SSL, etc.) — don't retry,
                     # record what we have and move on
                     break
@@ -583,8 +568,7 @@ class VictorAgentAdapter:
                     self._turns,
                     len(assistant_content),
                     len(response.tool_calls) if response and response.tool_calls else 0,
-                    assistant_content[:300]
-                    + ("..." if len(assistant_content) > 300 else ""),
+                    assistant_content[:300] + ("..." if len(assistant_content) > 300 else ""),
                 )
 
                 self._messages.append(
@@ -685,9 +669,7 @@ class VictorAgentAdapter:
         """
         # Priority 1: Explicit override (caller knows best)
         if task.complexity_override:
-            logger.info(
-                f"Using explicit complexity override: {task.complexity_override}"
-            )
+            logger.info(f"Using explicit complexity override: {task.complexity_override}")
             return task.complexity_override
 
         # Priority 2: Inference from task description
@@ -730,9 +712,7 @@ class VictorAgentAdapter:
         context_sections = []
 
         # Add working directory context
-        context_sections.append(
-            f"## Working Directory\nYou are working in: {workspace_dir}"
-        )
+        context_sections.append(f"## Working Directory\nYou are working in: {workspace_dir}")
 
         # Add repository context if available
         if task.repo:
@@ -793,9 +773,7 @@ class VictorAgentAdapter:
         profiles = settings.load_profiles()
 
         if profile not in profiles:
-            raise ValueError(
-                f"Profile '{profile}' not found. Available: {list(profiles.keys())}"
-            )
+            raise ValueError(f"Profile '{profile}' not found. Available: {list(profiles.keys())}")
 
         profile_config = profiles[profile]
 
@@ -871,9 +849,7 @@ def create_victor_agent_callback(
         Async callback function for benchmark runner
     """
 
-    async def callback(
-        task: BenchmarkTask, workspace_dir: Path
-    ) -> AgenticExecutionTrace:
+    async def callback(task: BenchmarkTask, workspace_dir: Path) -> AgenticExecutionTrace:
         return await adapter.execute_task(task, workspace_dir)
 
     return callback

@@ -112,9 +112,7 @@ class TestToolSelection:
             "jira",
             "scan",
         ]
-        result = select_tools_with_edge_model(
-            service, "Fix the auth bug", available, "execution"
-        )
+        result = select_tools_with_edge_model(service, "Fix the auth bug", available, "execution")
         assert result is not None
         assert "read" in result
         assert "edit" in result
@@ -202,9 +200,7 @@ class TestPromptSectionSelection:
     def test_returns_none_on_error(self):
         service = MagicMock()
         service.decide_sync.side_effect = Exception("timeout")
-        result = select_prompt_sections_with_edge_model(
-            service, "test", "action", ["completion"]
-        )
+        result = select_prompt_sections_with_edge_model(service, "test", "action", ["completion"])
         assert result is None
 
 
@@ -263,9 +259,7 @@ class TestStageDetectionEdge:
         machine.state.observed_files = {"auth.py"}
         # "fix" (0.5) + "change" (0.5) + "modify" would be needed for ≥2
         # Use strong keywords to ensure EXECUTION
-        result = machine._detect_stage_from_content(
-            "modify and implement the auth module"
-        )
+        result = machine._detect_stage_from_content("modify and implement the auth module")
         from victor.core.shared_types import ConversationStage
 
         assert result == ConversationStage.EXECUTION

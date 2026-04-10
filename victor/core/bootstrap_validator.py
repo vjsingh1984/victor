@@ -58,8 +58,7 @@ def validate_container(
             dep_name = getattr(dep, "__name__", str(dep))
             if not container.is_registered(dep):
                 errors.append(
-                    f"{name} declares dependency on {dep_name} "
-                    f"which is not registered"
+                    f"{name} declares dependency on {dep_name} " f"which is not registered"
                 )
 
     return errors
@@ -88,6 +87,5 @@ def validate_and_report(
 
     if raise_on_critical:
         raise RuntimeError(
-            f"Bootstrap validation failed with {len(errors)} error(s): "
-            + "; ".join(errors[:3])
+            f"Bootstrap validation failed with {len(errors)} error(s): " + "; ".join(errors[:3])
         )

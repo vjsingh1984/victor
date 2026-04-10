@@ -730,9 +730,7 @@ class HITLExecutor:
         request = node.create_request(context)
         workflow_id = workflow_id or context.get("_workflow_id", "workflow")
 
-        logger.info(
-            f"HITL request {request.request_id}: {node.hitl_type.value} - {node.prompt}"
-        )
+        logger.info(f"HITL request {request.request_id}: {node.hitl_type.value} - {node.prompt}")
 
         # Handle auto modes first
         if self.mode == HITLMode.AUTO_APPROVE:
@@ -768,9 +766,7 @@ class HITLExecutor:
 
             # Validate response
             if not node.validate_response(response):
-                logger.warning(
-                    f"HITL response validation failed for {request.request_id}"
-                )
+                logger.warning(f"HITL response validation failed for {request.request_id}")
                 response = HITLResponse(
                     request_id=request.request_id,
                     status=HITLStatus.REJECTED,
@@ -781,9 +777,7 @@ class HITLExecutor:
             return response
 
         except asyncio.TimeoutError:
-            logger.warning(
-                f"HITL request {request.request_id} timed out after {node.timeout}s"
-            )
+            logger.warning(f"HITL request {request.request_id} timed out after {node.timeout}s")
             return self._handle_timeout(request, node)
 
     async def _execute_via_transport(
@@ -810,9 +804,7 @@ class HITLExecutor:
         external_ref = await transport.send(request, workflow_id)
         self._external_refs[request.request_id] = external_ref
 
-        logger.info(
-            f"HITL request {request.request_id} sent via {self.mode.value}: {external_ref}"
-        )
+        logger.info(f"HITL request {request.request_id} sent via {self.mode.value}: {external_ref}")
 
         # Wait for response with polling
         response = await transport.wait_for_response(
@@ -980,9 +972,7 @@ class DefaultHITLHandler:
 
     async def _handle_confirmation(self, request: HITLRequest) -> HITLResponse:
         """Handle simple confirmation."""
-        response = await asyncio.to_thread(
-            input, "Press Enter to continue or 'q' to abort: "
-        )
+        response = await asyncio.to_thread(input, "Press Enter to continue or 'q' to abort: ")
         if response.strip().lower() == "q":
             return HITLResponse(
                 request_id=request.request_id,
@@ -999,9 +989,7 @@ class DefaultHITLHandler:
     async def _handle_review(self, request: HITLRequest) -> HITLResponse:
         """Handle review with modification."""
         print("Review the context above.")
-        response = await asyncio.to_thread(
-            input, "Approve as-is [a], modify [m], or reject [r]: "
-        )
+        response = await asyncio.to_thread(input, "Approve as-is [a], modify [m], or reject [r]: ")
         response = response.strip().lower()
 
         if response == "a":

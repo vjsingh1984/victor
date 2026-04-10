@@ -99,9 +99,7 @@ class ToolDeduplicationTracker:
         self.recent_calls.append(call)
         logger.debug(f"Tracking tool call: {tool_name}({self._format_args(args)})")
 
-    def is_redundant(
-        self, tool_name: str, args: Dict[str, Any], explain: bool = False
-    ) -> bool:
+    def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
         """Check if a tool call is redundant given recent history.
 
         Args:
@@ -219,9 +217,7 @@ class ToolDeduplicationTracker:
                 continue
 
             recent_path = (
-                recent.args.get("path")
-                or recent.args.get("file_path")
-                or recent.args.get("file")
+                recent.args.get("path") or recent.args.get("file_path") or recent.args.get("file")
             )
             if not recent_path:
                 continue

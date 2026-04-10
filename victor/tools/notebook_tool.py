@@ -127,8 +127,7 @@ def _resolve_cell_index(
     if cell_index is not None:
         if cell_index < 0 or cell_index >= len(cells):
             raise ValueError(
-                f"cell_index {cell_index} out of range "
-                f"(notebook has {len(cells)} cells)"
+                f"cell_index {cell_index} out of range " f"(notebook has {len(cells)} cells)"
             )
         return cell_index
 
@@ -291,9 +290,7 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
         # given, append to the end.
         if input_data.cell_id is not None or input_data.cell_index is not None:
             try:
-                insert_idx = _resolve_cell_index(
-                    cells, input_data.cell_id, input_data.cell_index
-                )
+                insert_idx = _resolve_cell_index(cells, input_data.cell_id, input_data.cell_index)
             except ValueError as exc:
                 return NotebookEditResult(
                     success=False,

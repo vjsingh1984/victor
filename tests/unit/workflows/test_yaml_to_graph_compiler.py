@@ -31,9 +31,7 @@ def suppress_compiler_logging(caplog):
     """Suppress expected warnings during edge-case tests."""
     # Set workflow compiler logging to ERROR to reduce noise
     # from intentional edge-case testing (no orchestrator, unknown branch, etc.)
-    logging.getLogger("victor.workflows.yaml_to_graph_compiler").setLevel(
-        logging.CRITICAL
-    )
+    logging.getLogger("victor.workflows.yaml_to_graph_compiler").setLevel(logging.CRITICAL)
 
 
 from victor.workflows.definition import (
@@ -205,17 +203,9 @@ class TestNodeExecutorFactory:
         context = factory._resolve_execution_context()
 
         assert context.orchestrator is default_orchestrator
-        assert (
-            context.orchestrator_pool.get_default_orchestrator() is default_orchestrator
-        )
-        assert (
-            context.orchestrator_pool.get_orchestrator("analysis")
-            is profile_orchestrator
-        )
-        assert (
-            context.orchestrator_pool.get_orchestrator("missing")
-            is default_orchestrator
-        )
+        assert context.orchestrator_pool.get_default_orchestrator() is default_orchestrator
+        assert context.orchestrator_pool.get_orchestrator("analysis") is profile_orchestrator
+        assert context.orchestrator_pool.get_orchestrator("missing") is default_orchestrator
 
     @pytest.mark.asyncio
     async def test_agent_executor_without_orchestrator(self):
@@ -430,9 +420,7 @@ class TestYAMLToStateGraphCompiler:
 
     def test_compile_uses_shared_native_backend(self, monkeypatch):
         """Compile should route through the shared native workflow backend."""
-        workflow = (
-            WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
         checkpointer = MemoryCheckpointer()
         config = CompilerConfig(
             max_iterations=77,
@@ -627,18 +615,14 @@ class TestConvenienceFunctions:
 
     def test_compile_yaml_workflow(self):
         """Test compile_yaml_workflow function."""
-        workflow = (
-            WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
 
         compiled = compile_yaml_workflow(workflow)
         assert compiled is not None
 
     def test_compile_yaml_workflow_passes_keyword_dependencies(self, monkeypatch):
         """Test compile helper preserves tool registry and config keyword binding."""
-        workflow = (
-            WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
         orchestrator = object()
         tool_registry = object()
         config = CompilerConfig(max_iterations=77)
@@ -684,9 +668,7 @@ class TestConvenienceFunctions:
     async def test_execute_yaml_workflow(self):
         """Test execute_yaml_workflow function."""
         workflow = (
-            WorkflowBuilder("test")
-            .add_transform("step", lambda ctx: {**ctx, "done": True})
-            .build()
+            WorkflowBuilder("test").add_transform("step", lambda ctx: {**ctx, "done": True}).build()
         )
 
         result = await execute_yaml_workflow(
@@ -700,9 +682,7 @@ class TestConvenienceFunctions:
     @pytest.mark.asyncio
     async def test_execute_yaml_workflow_passes_keyword_dependencies(self, monkeypatch):
         """Test execute helper preserves tool registry and config keyword binding."""
-        workflow = (
-            WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
         orchestrator = object()
         tool_registry = object()
         config = CompilerConfig(timeout=12.0)
@@ -803,9 +783,7 @@ workflows:
                 "check_quality": ConditionNode(
                     id="check_quality",
                     name="Check Quality",
-                    condition=lambda ctx: (
-                        "good" if ctx.get("quality_score", 0) > 0.8 else "bad"
-                    ),
+                    condition=lambda ctx: ("good" if ctx.get("quality_score", 0) > 0.8 else "bad"),
                     branches={"good": "analyze", "bad": "cleanup"},
                 ),
                 "cleanup": AgentNode(

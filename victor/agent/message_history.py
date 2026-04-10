@@ -115,9 +115,7 @@ class MessageHistory:
         Returns:
             The created Message object
         """
-        return self.add_message(
-            "tool", content, tool_call_id=tool_call_id, name=tool_name
-        )
+        return self.add_message("tool", content, tool_call_id=tool_call_id, name=tool_name)
 
     def ensure_system_prompt(self) -> None:
         """Ensure system prompt is added to the beginning of conversation."""

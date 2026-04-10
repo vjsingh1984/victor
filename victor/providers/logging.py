@@ -195,9 +195,7 @@ class ProviderLogger:
         try:
             yield _log_success
         except Exception as e:
-            self._log_api_call_error(
-                call_id, endpoint, model, start_time, e, **extra_context
-            )
+            self._log_api_call_error(call_id, endpoint, model, start_time, e, **extra_context)
             raise
         else:
             # Auto-log success if the provider didn't call the callback

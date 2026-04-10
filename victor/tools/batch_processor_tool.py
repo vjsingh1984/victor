@@ -374,14 +374,10 @@ async def batch(
         # Build report
         report = []
         mode = "DRY RUN" if dry_run else "EXECUTED"
-        report.append(
-            f"Batch Replace Results ({mode}): '{find}' → '{replace}' in {path}"
-        )
+        report.append(f"Batch Replace Results ({mode}): '{find}' → '{replace}' in {path}")
         report.append("=" * 70)
         report.append("")
-        report.append(
-            f"Modified {len(results)} files ({total_replacements} replacements)"
-        )
+        report.append(f"Modified {len(results)} files ({total_replacements} replacements)")
         report.append("")
 
         for result in results[:30]:
@@ -400,9 +396,7 @@ async def batch(
 
         if dry_run:
             report.append("")
-            report.append(
-                f"{_get_icon('warning')}  This was a DRY RUN - no files were modified"
-            )
+            report.append(f"{_get_icon('warning')}  This was a DRY RUN - no files were modified")
             report.append("   Run with dry_run=False to apply changes")
 
         return {
@@ -444,9 +438,7 @@ async def batch(
         report.append(f"Total size: {total_size / 1024:.2f} KB")
         report.append("")
         report.append("By file type:")
-        for ext, stats in sorted(
-            by_ext.items(), key=lambda x: x[1]["count"], reverse=True
-        ):
+        for ext, stats in sorted(by_ext.items(), key=lambda x: x[1]["count"], reverse=True):
             report.append(
                 f"  {ext}: {stats['count']} files, {stats['lines']:,} lines, {stats['size'] / 1024:.2f} KB"
             )

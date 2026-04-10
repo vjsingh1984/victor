@@ -6,9 +6,7 @@ from victor.tools.cicd_tool import cicd
 
 def test_cicd_generate_and_validate(tmp_path: Path):
     out_file = tmp_path / "workflow.yml"
-    result = asyncio.run(
-        cicd(operation="generate", workflow="python-test", output=str(out_file))
-    )
+    result = asyncio.run(cicd(operation="generate", workflow="python-test", output=str(out_file)))
     assert result["success"]
     assert out_file.exists()
 

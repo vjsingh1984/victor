@@ -89,10 +89,7 @@ class TestManagerRole:
         prompt_section = role.get_system_prompt_section()
         assert isinstance(prompt_section, str)
         assert len(prompt_section) > 0
-        assert (
-            "manager" in prompt_section.lower()
-            or "coordinate" in prompt_section.lower()
-        )
+        assert "manager" in prompt_section.lower() or "coordinate" in prompt_section.lower()
 
     def test_manager_role_satisfies_protocol(self):
         """ManagerRole should satisfy IAgentRole protocol."""
@@ -171,9 +168,7 @@ class TestResearcherRole:
         prompt_section = role.get_system_prompt_section()
         assert isinstance(prompt_section, str)
         assert len(prompt_section) > 0
-        assert (
-            "research" in prompt_section.lower() or "analyze" in prompt_section.lower()
-        )
+        assert "research" in prompt_section.lower() or "analyze" in prompt_section.lower()
 
     def test_researcher_role_satisfies_protocol(self):
         """ResearcherRole should satisfy IAgentRole protocol."""
@@ -251,9 +246,7 @@ class TestExecutorRole:
         prompt_section = role.get_system_prompt_section()
         assert isinstance(prompt_section, str)
         assert len(prompt_section) > 0
-        assert (
-            "implement" in prompt_section.lower() or "execute" in prompt_section.lower()
-        )
+        assert "implement" in prompt_section.lower() or "execute" in prompt_section.lower()
 
     def test_executor_role_satisfies_protocol(self):
         """ExecutorRole should satisfy IAgentRole protocol."""

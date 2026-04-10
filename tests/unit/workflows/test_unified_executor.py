@@ -175,9 +175,7 @@ class TestStateGraphExecutor:
         executor = StateGraphExecutor(config=ExecutorConfig(enable_checkpointing=True))
 
         workflow = (
-            WorkflowBuilder("test")
-            .add_transform("step", lambda ctx: {**ctx, "done": True})
-            .build()
+            WorkflowBuilder("test").add_transform("step", lambda ctx: {**ctx, "done": True}).build()
         )
 
         result = await executor.execute(
@@ -193,9 +191,7 @@ class TestStateGraphExecutor:
     async def test_execute_uses_shared_initial_state_shape(self):
         """Execute should seed the compiled graph with the canonical workflow state."""
         executor = StateGraphExecutor()
-        workflow = (
-            WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
-        )
+        workflow = WorkflowBuilder("test").add_transform("step", lambda ctx: ctx).build()
         captured = {}
 
         class FakeCompiledGraph:
@@ -241,9 +237,7 @@ class TestStateGraphExecutor:
         def failing_transform(ctx):
             raise ValueError("Intentional failure")
 
-        workflow = (
-            WorkflowBuilder("failing").add_transform("fail", failing_transform).build()
-        )
+        workflow = WorkflowBuilder("failing").add_transform("fail", failing_transform).build()
 
         result = await executor.execute(workflow, {})
 
@@ -379,12 +373,8 @@ class TestWorkflowPatterns:
 
         workflow = (
             WorkflowBuilder("compute")
-            .add_transform(
-                "double", lambda ctx: {**ctx, "value": ctx.get("value", 0) * 2}
-            )
-            .add_transform(
-                "add_ten", lambda ctx: {**ctx, "value": ctx.get("value", 0) + 10}
-            )
+            .add_transform("double", lambda ctx: {**ctx, "value": ctx.get("value", 0) * 2})
+            .add_transform("add_ten", lambda ctx: {**ctx, "value": ctx.get("value", 0) + 10})
             .build()
         )
 

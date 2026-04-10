@@ -33,9 +33,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_status(self):
         """Test git status operation."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "clean", "")
             result = await git(operation="status")
             assert result["success"] is True
@@ -43,9 +41,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_diff(self):
         """Test git diff operation."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "diff output", "")
             result = await git(operation="diff")
             assert result["success"] is True
@@ -53,9 +49,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_log(self):
         """Test git log operation."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "commit logs", "")
             result = await git(operation="log", limit=5)
             assert result["success"] is True
@@ -63,9 +57,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_branch(self):
         """Test git branch operation."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "* main", "")
             result = await git(operation="branch")
             assert result["success"] is True
@@ -73,9 +65,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_stage_all(self):
         """Test git stage operation (add all)."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "", "")
             result = await git(operation="stage")
             assert result["success"] is True
@@ -84,9 +74,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_stage_files(self):
         """Test git stage with specific files."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "", "")
             result = await git(operation="stage", files=["test.py", "other.py"])
             assert result["success"] is True
@@ -94,9 +82,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_commit(self):
         """Test git commit operation."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "committed", "")
             result = await git(operation="commit", message="test commit")
             assert result["success"] is True
@@ -111,9 +97,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_diff_staged(self):
         """Test git diff with staged option."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "staged diff", "")
             result = await git(operation="diff", staged=True)
             assert result["success"] is True
@@ -121,9 +105,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_diff_with_files(self):
         """Test git diff with specific files."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "file diff", "")
             result = await git(operation="diff", files=["test.py"])
             assert result["success"] is True
@@ -131,9 +113,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_branch_create(self):
         """Test git branch create operation."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "", "")
             result = await git(operation="branch", branch="new-feature")
             assert result["success"] is True
@@ -141,9 +121,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_log_with_limit(self):
         """Test git log with custom limit."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "log entries", "")
             result = await git(operation="log", limit=20)
             assert result["success"] is True
@@ -158,9 +136,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_status_failure(self):
         """Test git status when git fails."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "not a git repository")
             result = await git(operation="status")
             assert result["success"] is False
@@ -169,9 +145,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_diff_no_changes(self):
         """Test git diff when no changes."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "", "")
             result = await git(operation="diff")
             assert result["success"] is True
@@ -180,9 +154,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_diff_staged_no_changes(self):
         """Test git diff --staged when no staged changes."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "", "")
             result = await git(operation="diff", staged=True)
             assert result["success"] is True
@@ -191,9 +163,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_diff_failure(self):
         """Test git diff when git fails."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error running diff")
             result = await git(operation="diff")
             assert result["success"] is False
@@ -201,9 +171,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_stage_failure(self):
         """Test git stage when git fails."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error staging")
             result = await git(operation="stage")
             assert result["success"] is False
@@ -211,9 +179,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_commit_with_custom_author(self):
         """Test git commit with custom author name and email."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "committed", "")
             result = await git(
                 operation="commit",
@@ -228,21 +194,14 @@ class TestGitTool:
             call_kwargs = mock.call_args.kwargs
             assert call_kwargs.get("env_overrides") is not None
             assert call_kwargs["env_overrides"]["GIT_AUTHOR_NAME"] == "Custom Author"
-            assert (
-                call_kwargs["env_overrides"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
-            )
+            assert call_kwargs["env_overrides"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
             assert call_kwargs["env_overrides"]["GIT_COMMITTER_NAME"] == "Custom Author"
-            assert (
-                call_kwargs["env_overrides"]["GIT_COMMITTER_EMAIL"]
-                == "custom@example.com"
-            )
+            assert call_kwargs["env_overrides"]["GIT_COMMITTER_EMAIL"] == "custom@example.com"
 
     @pytest.mark.asyncio
     async def test_git_commit_with_author_name_only(self):
         """Test git commit with only author name."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "committed", "")
             result = await git(
                 operation="commit", message="test commit", author_name="Custom Author"
@@ -256,9 +215,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_commit_with_author_email_only(self):
         """Test git commit with only author email."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "committed", "")
             result = await git(
                 operation="commit",
@@ -268,17 +225,13 @@ class TestGitTool:
             assert result["success"] is True
             call_kwargs = mock.call_args.kwargs
             assert call_kwargs.get("env_overrides") is not None
-            assert (
-                call_kwargs["env_overrides"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
-            )
+            assert call_kwargs["env_overrides"]["GIT_AUTHOR_EMAIL"] == "custom@example.com"
             assert "GIT_AUTHOR_NAME" not in call_kwargs["env_overrides"]
 
     @pytest.mark.asyncio
     async def test_git_commit_without_custom_author(self):
         """Test git commit without custom author uses default."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "committed", "")
             result = await git(operation="commit", message="test commit")
             assert result["success"] is True
@@ -289,9 +242,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_commit_failure(self):
         """Test git commit when git fails."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "nothing to commit")
             result = await git(operation="commit", message="test")
             assert result["success"] is False
@@ -299,9 +250,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_log_failure(self):
         """Test git log when git fails."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error")
             result = await git(operation="log")
             assert result["success"] is False
@@ -309,9 +258,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_branch_failure(self):
         """Test git branch when git fails."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error")
             result = await git(operation="branch")
             assert result["success"] is False
@@ -319,9 +266,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_branch_create_when_not_exist(self):
         """Test git branch creates new branch when doesn't exist."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             # First call fails (checkout fails), second call creates branch
             mock.side_effect = [
                 (False, "", "error: pathspec did not match any file"),
@@ -334,9 +279,7 @@ class TestGitTool:
     @pytest.mark.asyncio
     async def test_git_with_options(self):
         """Test git with options parameter."""
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "output", "")
             result = await git(operation="status", options={"verbose": True})
             assert result["success"] is True
@@ -359,9 +302,7 @@ class TestRunGitAsync:
             error_type=CommandErrorType.SUCCESS,
         )
 
-        with patch(
-            "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock:
             mock.return_value = mock_result
             success, stdout, stderr = await _run_git_async("status")
             assert success is True
@@ -381,9 +322,7 @@ class TestRunGitAsync:
             error_type=CommandErrorType.EXECUTION_ERROR,
         )
 
-        with patch(
-            "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock:
             mock.return_value = mock_result
             success, stdout, stderr = await _run_git_async("invalid")
             assert success is False
@@ -404,9 +343,7 @@ class TestRunGitAsync:
             error_message="Command timed out after 30 seconds",
         )
 
-        with patch(
-            "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock:
             mock.return_value = mock_result
             success, stdout, stderr = await _run_git_async("status")
             assert success is False
@@ -430,9 +367,7 @@ class TestRunGitAsync:
             "GIT_AUTHOR_EMAIL": "custom@example.com",
         }
 
-        with patch(
-            "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock:
             mock.return_value = mock_result
             success, stdout, stderr = await _run_git_async(
                 "commit", "-m", "test", env_overrides=env_overrides
@@ -459,9 +394,7 @@ class TestRunGitAsync:
             error_type=CommandErrorType.SUCCESS,
         )
 
-        with patch(
-            "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock:
             mock.return_value = mock_result
             success, stdout, stderr = await _run_git_async("status")
             assert success is True
@@ -485,9 +418,7 @@ class TestRunGitAsync:
             error_message="unexpected error",
         )
 
-        with patch(
-            "victor.tools.git_tool.run_command_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool.run_command_async", new_callable=AsyncMock) as mock:
             mock.return_value = mock_result
             success, stdout, stderr = await _run_git_async("status")
             assert success is False
@@ -541,9 +472,7 @@ class TestGitSuggestCommit:
         config = ToolConfig(provider=mock_provider, model="test-model")
         context = {"tool_config": config}
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error getting diff")
             result = await commit_msg(context=context)
             assert result["success"] is False
@@ -559,9 +488,7 @@ class TestGitSuggestCommit:
         config = ToolConfig(provider=mock_provider, model="test-model")
         context = {"tool_config": config}
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "", "")  # Empty diff
             result = await commit_msg(context=context)
             assert result["success"] is False
@@ -580,9 +507,7 @@ class TestGitSuggestCommit:
         config = ToolConfig(provider=mock_provider, model="test-model")
         context = {"tool_config": config}
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.side_effect = [
                 (True, "+ new line\n- old line", ""),  # diff --staged
                 (True, "test.py\napi.py", ""),  # diff --staged --name-only
@@ -603,9 +528,7 @@ class TestGitSuggestCommit:
         config = ToolConfig(provider=mock_provider, model="test-model")
         context = {"tool_config": config}
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.side_effect = [
                 (True, "+ new line", ""),  # diff --staged
                 (True, "test.py", ""),  # diff --staged --name-only
@@ -623,9 +546,7 @@ class TestGitCreatePR:
         """Test pr when getting branch fails."""
         from victor.tools.git_tool import pr
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "not a git repo")
             result = await pr()
             assert result["success"] is False
@@ -637,9 +558,7 @@ class TestGitCreatePR:
         from victor.tools.git_tool import pr
         from victor.tools.subprocess_executor import CommandResult, CommandErrorType
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.side_effect = [
                 (True, "feature-branch\n", ""),  # branch --show-current
                 (False, "", "push rejected"),  # push
@@ -654,9 +573,7 @@ class TestGitCreatePR:
         from victor.tools.git_tool import pr
         from victor.tools.subprocess_executor import CommandResult, CommandErrorType
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock_git:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock_git:
             mock_git.side_effect = [
                 (True, "feature-branch\n", ""),  # branch --show-current
                 (True, "", ""),  # push
@@ -684,9 +601,7 @@ class TestGitCreatePR:
         from victor.tools.git_tool import pr
         from victor.tools.subprocess_executor import CommandResult, CommandErrorType
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock_git:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock_git:
             mock_git.side_effect = [
                 (True, "feature-branch\n", ""),  # branch --show-current
                 (True, "", ""),  # push
@@ -713,9 +628,7 @@ class TestGitCreatePR:
         from victor.tools.git_tool import pr
         from victor.tools.subprocess_executor import CommandResult, CommandErrorType
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock_git:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock_git:
             mock_git.side_effect = [
                 (True, "feature-branch\n", ""),  # branch
                 (True, "", ""),  # push
@@ -745,9 +658,7 @@ class TestGitAnalyzeConflicts:
         """Test conflicts when status fails."""
         from victor.tools.git_tool import conflicts
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (False, "", "error")
             result = await conflicts()
             assert result["success"] is False
@@ -757,9 +668,7 @@ class TestGitAnalyzeConflicts:
         """Test conflicts with no conflicts."""
         from victor.tools.git_tool import conflicts
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, " M test.py\n", "")
             result = await conflicts()
             assert result["success"] is True
@@ -770,12 +679,12 @@ class TestGitAnalyzeConflicts:
         """Test conflicts with conflicts."""
         from victor.tools.git_tool import conflicts
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "UU conflict.py\n", "")
             with patch("builtins.open") as mock_open:
-                mock_open.return_value.__enter__.return_value.read.return_value = "<<<<<<< HEAD\nour content\n=======\ntheir content\n>>>>>>> branch\n"
+                mock_open.return_value.__enter__.return_value.read.return_value = (
+                    "<<<<<<< HEAD\nour content\n=======\ntheir content\n>>>>>>> branch\n"
+                )
                 result = await conflicts()
                 assert result["success"] is True
                 assert "1 conflicted file" in result["output"]
@@ -785,9 +694,7 @@ class TestGitAnalyzeConflicts:
         """Test conflicts when file read fails."""
         from victor.tools.git_tool import conflicts
 
-        with patch(
-            "victor.tools.git_tool._run_git_async", new_callable=AsyncMock
-        ) as mock:
+        with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "UU missing.py\n", "")
             with patch("builtins.open") as mock_open:
                 mock_open.side_effect = FileNotFoundError("file not found")

@@ -38,7 +38,4 @@ def test_pyproject_enables_setuptools_package_data_for_vertical_assets() -> None
 def test_manifest_includes_vertical_contrib_assets() -> None:
     """Source distributions should include vertical runtime assets."""
     manifest = (_repo_root() / "MANIFEST.in").read_text(encoding="utf-8")
-    assert (
-        "recursive-include victor/verticals/contrib *.yaml *.yml *.toml *.svg"
-        in manifest
-    )
+    assert "recursive-include victor/verticals/contrib *.yaml *.yml *.toml *.svg" in manifest

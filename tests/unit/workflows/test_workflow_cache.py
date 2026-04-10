@@ -542,9 +542,7 @@ class TestWorkflowExecutorWithCache:
         assert stats["enabled"] is False
 
     @pytest.mark.asyncio
-    async def test_execute_caches_transform_node(
-        self, mock_orchestrator, mock_sub_agent_result
-    ):
+    async def test_execute_caches_transform_node(self, mock_orchestrator, mock_sub_agent_result):
         """Transform node results are cached."""
         config = WorkflowCacheConfig(enabled=True)
         executor = WorkflowExecutor(mock_orchestrator, cache_config=config)
@@ -619,11 +617,7 @@ class TestWorkflowExecutorWithCache:
         mock_sub_agents.spawn = AsyncMock(return_value=mock_sub_agent_result)
         executor._sub_agents = mock_sub_agents
 
-        workflow = (
-            WorkflowBuilder("test")
-            .add_agent("agent", "executor", "Do something")
-            .build()
-        )
+        workflow = WorkflowBuilder("test").add_agent("agent", "executor", "Do something").build()
 
         # Execute twice
         await executor.execute(workflow, {"task": "analyze"})
@@ -637,9 +631,7 @@ class TestWorkflowExecutorWithCache:
         assert stats["skipped_non_cacheable"] >= 2
 
     @pytest.mark.asyncio
-    async def test_execute_caches_condition_node(
-        self, mock_orchestrator, mock_sub_agent_result
-    ):
+    async def test_execute_caches_condition_node(self, mock_orchestrator, mock_sub_agent_result):
         """Condition node results are cached (test cache directly)."""
         config = WorkflowCacheConfig(enabled=True)
         cache = WorkflowCache(config)

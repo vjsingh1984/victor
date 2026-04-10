@@ -100,9 +100,7 @@ async def test_partial_content_saved_on_stream_failure() -> None:
     assert len(collected) == 3
 
     # Partial content must be saved with the interrupted suffix
-    chat_ctx.add_message.assert_any_call(
-        "assistant", "Hello cruel world\n\n[Stream interrupted]"
-    )
+    chat_ctx.add_message.assert_any_call("assistant", "Hello cruel world\n\n[Stream interrupted]")
 
 
 async def test_normal_completion_no_suffix() -> None:

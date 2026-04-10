@@ -327,9 +327,7 @@ class PromptContributorAdapter(PromptContributorProtocol):
     # Composition Methods
     # =========================================================================
 
-    def with_hints(
-        self, additional_hints: Dict[str, TaskTypeHint]
-    ) -> "PromptContributorAdapter":
+    def with_hints(self, additional_hints: Dict[str, TaskTypeHint]) -> "PromptContributorAdapter":
         """Create new adapter with additional hints.
 
         Args:

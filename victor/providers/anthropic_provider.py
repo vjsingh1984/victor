@@ -212,17 +212,13 @@ class AnthropicProvider(BaseProvider):
 
                 error_str = str(e).lower()
                 if any(
-                    term in error_str
-                    for term in ["auth", "unauthorized", "invalid key", "401"]
+                    term in error_str for term in ["auth", "unauthorized", "invalid key", "401"]
                 ):
                     raise ProviderAuthError(
                         message=f"Authentication failed: {str(e)}",
                         provider=self.name,
                     ) from e
-                elif any(
-                    term in error_str
-                    for term in ["rate limit", "429", "too many requests"]
-                ):
+                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
                     raise ProviderRateLimitError(
                         message=f"Rate limit exceeded: {str(e)}",
                         provider=self.name,
@@ -311,35 +307,24 @@ class AnthropicProvider(BaseProvider):
                             msg_usage = getattr(message, "usage", None)
                             if msg_usage:
                                 usage = {
-                                    "prompt_tokens": getattr(
-                                        msg_usage, "input_tokens", 0
-                                    ),
+                                    "prompt_tokens": getattr(msg_usage, "input_tokens", 0),
                                     "completion_tokens": 0,
-                                    "total_tokens": getattr(
-                                        msg_usage, "input_tokens", 0
-                                    ),
+                                    "total_tokens": getattr(msg_usage, "input_tokens", 0),
                                 }
                                 # Capture cache tokens if present
                                 cache_creation = getattr(
                                     msg_usage, "cache_creation_input_tokens", None
                                 )
-                                cache_read = getattr(
-                                    msg_usage, "cache_read_input_tokens", None
-                                )
+                                cache_read = getattr(msg_usage, "cache_read_input_tokens", None)
                                 if cache_creation is not None:
-                                    usage["cache_creation_input_tokens"] = (
-                                        cache_creation
-                                    )
+                                    usage["cache_creation_input_tokens"] = cache_creation
                                 if cache_read is not None:
                                     usage["cache_read_input_tokens"] = cache_read
 
                     elif event_type == "content_block_start":
                         block = getattr(event, "content_block", None)
                         if block and getattr(block, "type", "") == "tool_use":
-                            tc_id = (
-                                getattr(block, "id", None)
-                                or f"tool_{len(tool_calls) + 1}"
-                            )
+                            tc_id = getattr(block, "id", None) or f"tool_{len(tool_calls) + 1}"
                             tool_calls[tc_id] = {
                                 "id": tc_id,
                                 "name": getattr(block, "name", ""),
@@ -372,9 +357,7 @@ class AnthropicProvider(BaseProvider):
                                 if existing_args in ({}, None):
                                     tool_calls[tc_id]["arguments"] = partial
                                 elif isinstance(existing_args, str):
-                                    tool_calls[tc_id]["arguments"] = (
-                                        existing_args + partial
-                                    )
+                                    tool_calls[tc_id]["arguments"] = existing_args + partial
                                 else:
                                     tool_calls[tc_id]["arguments"] = (
                                         json.dumps(existing_args) + partial
@@ -409,9 +392,7 @@ class AnthropicProvider(BaseProvider):
 
                     elif event_type == "message_stop":
                         for tc in tool_calls.values():
-                            tc["arguments"] = self._parse_json_arguments(
-                                tc.get("arguments")
-                            )
+                            tc["arguments"] = self._parse_json_arguments(tc.get("arguments"))
 
                         # Log streaming success
                         total_tokens = usage.get("total_tokens") if usage else None
@@ -438,9 +419,7 @@ class AnthropicProvider(BaseProvider):
         """Convert standard tools to Anthropic format."""
         return convert_tools_to_anthropic_format(tools)
 
-    def _parse_response(
-        self, response: AnthropicMessage, model: str
-    ) -> CompletionResponse:
+    def _parse_response(self, response: AnthropicMessage, model: str) -> CompletionResponse:
         """Parse Anthropic API response.
 
         Args:
@@ -472,8 +451,7 @@ class AnthropicProvider(BaseProvider):
             usage = {
                 "prompt_tokens": response.usage.input_tokens,
                 "completion_tokens": response.usage.output_tokens,
-                "total_tokens": response.usage.input_tokens
-                + response.usage.output_tokens,
+                "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
             }
 
         return CompletionResponse(
@@ -483,9 +461,7 @@ class AnthropicProvider(BaseProvider):
             stop_reason=response.stop_reason,
             usage=usage,
             model=model,
-            raw_response=(
-                response.model_dump() if hasattr(response, "model_dump") else None
-            ),
+            raw_response=(response.model_dump() if hasattr(response, "model_dump") else None),
         )
 
     @staticmethod

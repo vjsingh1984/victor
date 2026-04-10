@@ -172,10 +172,7 @@ class SchemaRefiner:
             return self._fix_type_conversion(schema, error)
 
         # Invalid value (out of range)
-        if (
-            "should be between" in error.message.lower()
-            or "exceeds" in error.message.lower()
-        ):
+        if "should be between" in error.message.lower() or "exceeds" in error.message.lower():
             return self._fix_range_clamp(schema, error)
 
         # Invalid enum value
@@ -404,9 +401,7 @@ class SchemaRefiner:
                 "analyst": "analyst",
             }
 
-            new_value = role_mapping.get(
-                invalid_value.lower(), "executor"
-            )  # Default fallback
+            new_value = role_mapping.get(invalid_value.lower(), "executor")  # Default fallback
 
             node[field_name] = new_value
 
@@ -489,10 +484,7 @@ class StructureRefiner:
             return self._fix_orphan_node(schema, nodes_map, error)
 
         # Missing entry point
-        if (
-            "entry point" in error.message.lower()
-            and "not found" in error.message.lower()
-        ):
+        if "entry point" in error.message.lower() and "not found" in error.message.lower():
             return self._fix_entry_point(schema, nodes_map, error)
 
         # Invalid cycle
@@ -636,10 +628,7 @@ class SemanticRefiner:
     ) -> Optional[WorkflowFix]:
         """Fix a single semantic error."""
         # Unknown tool
-        if (
-            "not found in registry" in error.message.lower()
-            or "tool" in error.message.lower()
-        ):
+        if "not found in registry" in error.message.lower() or "tool" in error.message.lower():
             return self._fix_unknown_tool(schema, error)
 
         # Invalid role
@@ -866,9 +855,7 @@ class WorkflowRefiner:
 
         self.schema_refiner = SchemaRefiner(conservative=conservative)
         self.structure_refiner = StructureRefiner(conservative=conservative)
-        self.semantic_refiner = SemanticRefiner(
-            conservative=conservative, strict_mode=strict_mode
-        )
+        self.semantic_refiner = SemanticRefiner(conservative=conservative, strict_mode=strict_mode)
         self.security_refiner = SecurityRefiner(conservative=conservative)
 
     def refine(

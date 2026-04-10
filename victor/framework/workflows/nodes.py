@@ -349,9 +349,7 @@ class TeamNode:
         """
         # Exclude internal keys
         return {
-            k: v
-            for k, v in graph_state.items()
-            if not k.startswith("_") or k in ["_task", "_goal"]
+            k: v for k, v in graph_state.items() if not k.startswith("_") or k in ["_task", "_goal"]
         }
 
     async def _execute_team(
@@ -553,9 +551,7 @@ class TeamNode:
             "pipeline": TeamFormation.PIPELINE,
             "consensus": TeamFormation.CONSENSUS,
         }
-        formation = formation_map.get(
-            data["team_formation"].lower(), TeamFormation.SEQUENTIAL
-        )
+        formation = formation_map.get(data["team_formation"].lower(), TeamFormation.SEQUENTIAL)
 
         return cls(
             id=data["id"],

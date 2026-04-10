@@ -80,11 +80,7 @@ class MultiplierCalculator(IMultiplierCalculator):
         Returns:
             Effective maximum after multipliers
         """
-        combined = (
-            self._model_multiplier
-            * self._mode_multiplier
-            * self._productivity_multiplier
-        )
+        combined = self._model_multiplier * self._mode_multiplier * self._productivity_multiplier
         return max(1, int(base_max * combined))
 
     def set_model_multiplier(self, multiplier: float) -> None:
@@ -103,9 +99,7 @@ class MultiplierCalculator(IMultiplierCalculator):
         self._model_multiplier = max(0.5, min(3.0, multiplier))
 
         if old_multiplier != self._model_multiplier:
-            logger.debug(
-                f"MultiplierCalculator: model_multiplier={self._model_multiplier}"
-            )
+            logger.debug(f"MultiplierCalculator: model_multiplier={self._model_multiplier}")
 
     def set_mode_multiplier(self, multiplier: float) -> None:
         """Set the mode-specific multiplier.
@@ -122,9 +116,7 @@ class MultiplierCalculator(IMultiplierCalculator):
         self._mode_multiplier = max(0.5, min(5.0, multiplier))
 
         if old_multiplier != self._mode_multiplier:
-            logger.debug(
-                f"MultiplierCalculator: mode_multiplier={self._mode_multiplier}"
-            )
+            logger.debug(f"MultiplierCalculator: mode_multiplier={self._mode_multiplier}")
 
     def set_productivity_multiplier(self, multiplier: float) -> None:
         """Set the productivity multiplier.
@@ -178,8 +170,4 @@ class MultiplierCalculator(IMultiplierCalculator):
         Returns:
             Combined multiplier (model × mode × productivity)
         """
-        return (
-            self._model_multiplier
-            * self._mode_multiplier
-            * self._productivity_multiplier
-        )
+        return self._model_multiplier * self._mode_multiplier * self._productivity_multiplier

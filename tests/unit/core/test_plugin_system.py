@@ -65,9 +65,7 @@ class TestPluginSystem(unittest.TestCase):
         self.assertEqual(len(plugins), 1)
         self.assertEqual(plugins[0].name, "test_plugin")
         # discover() scans victor.plugins
-        mock_cache.get_entry_points.assert_any_call(
-            "victor.plugins", force_refresh=True
-        )
+        mock_cache.get_entry_points.assert_any_call("victor.plugins", force_refresh=True)
         self.assertEqual(mock_cache.get_entry_points.call_count, 1)
 
     def test_plugin_registration(self):

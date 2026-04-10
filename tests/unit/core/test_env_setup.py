@@ -228,9 +228,7 @@ class TestEnvironmentSetup:
 
             # Mock npm/yarn availability and subprocess
             with patch("shutil.which") as mock_which:
-                mock_which.side_effect = lambda cmd: (
-                    "/usr/bin/npm" if cmd == "npm" else None
-                )
+                mock_which.side_effect = lambda cmd: ("/usr/bin/npm" if cmd == "npm" else None)
 
                 with patch("asyncio.create_subprocess_shell") as mock_proc:
                     mock_process = AsyncMock()
@@ -330,9 +328,7 @@ class TestValidateEnvironment:
     def test_validate_go(self):
         """Test validating Go environment."""
         with patch("shutil.which") as mock_which:
-            mock_which.side_effect = lambda cmd: (
-                "/usr/local/go/bin/go" if cmd == "go" else None
-            )
+            mock_which.side_effect = lambda cmd: ("/usr/local/go/bin/go" if cmd == "go" else None)
 
             result = validate_environment(Language.GO)
             assert result["go"] is True
@@ -383,11 +379,7 @@ class TestGetPythonRequirements:
         with tempfile.TemporaryDirectory() as tmpdir:
             project_dir = Path(tmpdir)
             (project_dir / "requirements.txt").write_text(
-                "pytest>=7.0.0\n"
-                "requests==2.28.0\n"
-                "# comment\n"
-                "-r other.txt\n"
-                "flask\n"
+                "pytest>=7.0.0\n" "requests==2.28.0\n" "# comment\n" "-r other.txt\n" "flask\n"
             )
 
             reqs = get_python_requirements(project_dir)
@@ -473,9 +465,7 @@ class TestQuickSetup:
     async def test_quick_setup_failure(self):
         """Test failed quick setup."""
         with patch.object(EnvironmentSetup, "setup_environment") as mock_setup:
-            mock_setup.return_value = SetupResult(
-                success=False, error_message="Setup failed"
-            )
+            mock_setup.return_value = SetupResult(success=False, error_message="Setup failed")
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 result = await quick_setup(Path(tmpdir))

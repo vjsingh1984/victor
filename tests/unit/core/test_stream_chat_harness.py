@@ -27,9 +27,7 @@ class FakeStreamChunk:
 
 
 class FakeProvider:
-    def __init__(
-        self, *, stream_chunks: List[FakeStreamChunk], supports_tools: bool = True
-    ):
+    def __init__(self, *, stream_chunks: List[FakeStreamChunk], supports_tools: bool = True):
         self._stream_chunks = stream_chunks
         self._supports_tools = supports_tools
         self.called_chat = False

@@ -35,9 +35,7 @@ from victor.config.settings import Settings, ProfileConfig
 @pytest.fixture
 def settings():
     """Create test settings."""
-    return Settings(
-        analytics_enabled=False, tool_cache_enabled=False, provider_health_checks=False
-    )
+    return Settings(analytics_enabled=False, tool_cache_enabled=False, provider_health_checks=False)
 
 
 @pytest.fixture
@@ -197,9 +195,7 @@ class TestProviderSwitchingIntegration:
             assert orchestrator.provider_name == "mock2"
 
     @pytest.mark.asyncio
-    async def test_switch_provider_with_custom_settings(
-        self, orchestrator, mock_provider2
-    ):
+    async def test_switch_provider_with_custom_settings(self, orchestrator, mock_provider2):
         """Test switching provider with custom provider settings."""
         custom_settings = {"base_url": "http://localhost:8080", "timeout": 60}
 
@@ -222,9 +218,7 @@ class TestProviderModelCombinedSwitching:
     """Integration tests for combined provider + model switching."""
 
     @pytest.mark.asyncio
-    async def test_switch_provider_and_model_together(
-        self, orchestrator, mock_provider2
-    ):
+    async def test_switch_provider_and_model_together(self, orchestrator, mock_provider2):
         """Test switching provider and model simultaneously."""
         initial_provider = orchestrator.provider_name
         initial_model = orchestrator.model
@@ -284,9 +278,7 @@ class TestProfileBasedSwitching:
         }
 
     @pytest.mark.asyncio
-    async def test_switch_between_profiles(
-        self, orchestrator, profiles_config, mock_provider2
-    ):
+    async def test_switch_between_profiles(self, orchestrator, profiles_config, mock_provider2):
         """Test switching between different profiles."""
         with patch("victor.agent.provider.switcher.ProviderRegistry") as mock_registry:
             mock_registry.create.return_value = mock_provider2
@@ -346,9 +338,7 @@ class TestSwitchSequencePreservation:
         assert messages[1].content == "Answer 1"
 
     @pytest.mark.asyncio
-    async def test_provider_switch_preserves_conversation_state(
-        self, orchestrator, mock_provider2
-    ):
+    async def test_provider_switch_preserves_conversation_state(self, orchestrator, mock_provider2):
         """Test that provider switch preserves conversation state."""
         # Build conversation using the correct API
         orchestrator.add_message("user", "Question 1")
@@ -371,9 +361,7 @@ class TestSwitchSequencePreservation:
             assert messages[2].content == "Question 2"
 
     @pytest.mark.asyncio
-    async def test_multiple_switches_preserve_context(
-        self, orchestrator, mock_provider2
-    ):
+    async def test_multiple_switches_preserve_context(self, orchestrator, mock_provider2):
         """Test that multiple switches preserve conversation context."""
         # Build conversation using the correct API
         orchestrator.add_message("user", "Initial question")

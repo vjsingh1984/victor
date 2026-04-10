@@ -164,9 +164,7 @@ class TestCLIFrameworkIntegration:
             assert orchestrator.observability == shim.observability
 
     @pytest.mark.asyncio
-    async def test_framework_path_without_vertical(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_framework_path_without_vertical(self, mock_settings, mock_orchestrator):
         """Test framework path works without specifying a vertical."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",
@@ -194,9 +192,7 @@ class TestCLIFrameworkIntegration:
             assert shim.vertical_config is None
 
     @pytest.mark.asyncio
-    async def test_vertical_configuration_applied(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_vertical_configuration_applied(self, mock_settings, mock_orchestrator):
         """Test that vertical configuration is properly applied.
 
         This test verifies that:
@@ -231,9 +227,7 @@ class TestCLIFrameworkIntegration:
 
             # Verify vertical config was captured
             # The shim stores vertical_config from the integration result
-            assert (
-                shim.vertical_config is not None or shim._integration_result is not None
-            )
+            assert shim.vertical_config is not None or shim._integration_result is not None
 
             # Verify stages were applied via vertical context
             assert mock_orchestrator._vertical_context is not None
@@ -241,9 +235,7 @@ class TestCLIFrameworkIntegration:
             assert "TESTING" in mock_orchestrator._vertical_context.stages
 
     @pytest.mark.asyncio
-    async def test_vertical_lookup_by_string_name(
-        self, mock_settings, mock_orchestrator
-    ):
+    async def test_vertical_lookup_by_string_name(self, mock_settings, mock_orchestrator):
         """Test vertical lookup by string name."""
         with patch(
             "victor.agent.orchestrator.AgentOrchestrator.from_settings",

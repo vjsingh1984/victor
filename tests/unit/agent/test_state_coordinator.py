@@ -285,9 +285,7 @@ class TestCreateStateCoordinator:
     def test_create_basic(self):
         """Test basic factory creation."""
         mock_controller = MagicMock()
-        type(mock_controller).stage = PropertyMock(
-            return_value=ConversationStage.INITIAL
-        )
+        type(mock_controller).stage = PropertyMock(return_value=ConversationStage.INITIAL)
 
         coordinator = create_state_coordinator(conversation_controller=mock_controller)
 
@@ -296,9 +294,7 @@ class TestCreateStateCoordinator:
     def test_create_with_config(self):
         """Test factory creation with config."""
         mock_controller = MagicMock()
-        type(mock_controller).stage = PropertyMock(
-            return_value=ConversationStage.INITIAL
-        )
+        type(mock_controller).stage = PropertyMock(return_value=ConversationStage.INITIAL)
         config = StateCoordinatorConfig(enable_auto_transitions=False)
 
         coordinator = create_state_coordinator(

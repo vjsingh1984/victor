@@ -249,8 +249,7 @@ class SlidingWindowRateLimiter:
         self._lock = asyncio.Lock()
 
         logger.debug(
-            f"SlidingWindowRateLimiter initialized. "
-            f"Max: {max_requests} per {window_seconds}s"
+            f"SlidingWindowRateLimiter initialized. " f"Max: {max_requests} per {window_seconds}s"
         )
 
     async def acquire(self) -> float:
@@ -546,8 +545,7 @@ class RequestQueue:
             import warnings
 
             warnings.warn(
-                "RequestQueue was not shut down. "
-                "Call shutdown() or use 'async with'.",
+                "RequestQueue was not shut down. " "Call shutdown() or use 'async with'.",
                 ResourceWarning,
                 stacklevel=2,
             )
@@ -673,11 +671,7 @@ class RequestQueue:
         Returns:
             List of results in same order as input
         """
-        semaphore = (
-            asyncio.Semaphore(max_concurrency)
-            if max_concurrency
-            else self._tool_semaphore
-        )
+        semaphore = asyncio.Semaphore(max_concurrency) if max_concurrency else self._tool_semaphore
 
         async def execute_with_semaphore(tool_call: Dict[str, Any]) -> Any:
             async with semaphore:
@@ -700,8 +694,7 @@ class RequestQueue:
 
             if total_wait > 0:
                 logger.debug(
-                    f"Request {request.request_id} waited {total_wait:.2f}s "
-                    f"for rate limit"
+                    f"Request {request.request_id} waited {total_wait:.2f}s " f"for rate limit"
                 )
 
             # Acquire concurrency semaphore
@@ -742,8 +735,7 @@ class RequestQueue:
             "active_requests": len(self._active_requests),
             "request_capacity": self._request_limiter.available_capacity,
             "token_capacity": self._token_limiter.available_tokens,
-            "queue_utilization": len(self._pending_requests)
-            / self.config.max_queue_size,
+            "queue_utilization": len(self._pending_requests) / self.config.max_queue_size,
             "avg_wait_time": (
                 self._stats["total_wait_time"] / self._stats["total_submitted"]
                 if self._stats["total_submitted"] > 0

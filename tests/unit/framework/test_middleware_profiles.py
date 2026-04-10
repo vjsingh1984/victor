@@ -219,10 +219,7 @@ class TestMiddlewareProfileBuilder:
     def test_build_minimal_profile(self):
         """Test building minimal profile."""
         profile = (
-            MiddlewareProfileBuilder()
-            .set_name("test")
-            .set_description("Test profile")
-            .build()
+            MiddlewareProfileBuilder().set_name("test").set_description("Test profile").build()
         )
 
         assert profile.name == "test"
@@ -234,12 +231,7 @@ class TestMiddlewareProfileBuilder:
         """Test building profile with middleware."""
         middleware = MockMiddleware("logging")
 
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_name("test")
-            .add_middleware(middleware)
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_name("test").add_middleware(middleware).build()
 
         assert len(profile.middlewares) == 1
         assert profile.middlewares[0] is middleware
@@ -268,12 +260,7 @@ class TestMiddlewareProfileBuilder:
             MockMiddleware("metrics"),
         ]
 
-        profile = (
-            MiddlewareProfileBuilder()
-            .set_name("test")
-            .add_middlewares(middlewares)
-            .build()
-        )
+        profile = MiddlewareProfileBuilder().set_name("test").add_middlewares(middlewares).build()
 
         assert len(profile.middlewares) == 2
 
@@ -328,8 +315,7 @@ class TestMiddlewareProfileIntegration:
         production_profiles = [
             name
             for name in profile_names
-            if "production" in name
-            or "production" in get_profile(name).description.lower()
+            if "production" in name or "production" in get_profile(name).description.lower()
         ]
 
         assert "production" in production_profiles

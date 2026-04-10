@@ -207,9 +207,7 @@ class StreamingRecoveryCoordinatorProtocol(Protocol):
         """
         ...
 
-    def check_blocked_threshold(
-        self, ctx: Any, all_blocked: bool
-    ) -> Optional[Tuple[Any, bool]]:
+    def check_blocked_threshold(self, ctx: Any, all_blocked: bool) -> Optional[Tuple[Any, bool]]:
         """Check if too many tools have been blocked.
 
         Returns:
@@ -448,9 +446,7 @@ class ChunkGeneratorProtocol(Protocol):
         """
         ...
 
-    def generate_content_chunk(
-        self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> Any:
+    def generate_content_chunk(self, content: str, is_final: bool = False, suffix: str = "") -> Any:
         """Generate chunk for content display.
 
         Args:

@@ -133,9 +133,7 @@ GRAPH_FOLLOW_UP_SYMBOL_TYPES = {"function", "method"}
 ENTRYPOINT_SYMBOL_NAMES = {"main", "run", "start", "serve", "cli", "bootstrap"}
 
 
-def _calculate_importance_score(
-    file_path: str, symbol_type: Optional[str] = None
-) -> float:
+def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = None) -> float:
     """Calculate importance score for a search result.
 
     Higher scores = more architecturally important.
@@ -211,9 +209,7 @@ def _gather_files(root: str, exts: Optional[List[str]], max_files: int) -> List[
     ext_set: Set[str] = _normalize_extensions(exts)
     files: List[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [
-            d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")
-        ]
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS and not d.startswith(".")]
         for fname in filenames:
             if os.path.splitext(fname)[1] in ext_set:
                 files.append(os.path.join(dirpath, fname))
@@ -251,8 +247,7 @@ def _prepare_ranked_results(
         content = result_dict.get("content", "")
         if isinstance(content, str) and len(content) > max_content_chars:
             result_dict["content"] = (
-                content[:max_content_chars]
-                + f"... [truncated, {len(content)} chars total]"
+                content[:max_content_chars] + f"... [truncated, {len(content)} chars total]"
             )
             result_dict["content_truncated"] = True
 
@@ -497,9 +492,7 @@ async def _get_or_build_index(
         # the persisted data without triggering a full rebuild.
         if hasattr(index, "_is_indexed"):
             index._is_indexed = True
-        logger.info(
-            "Using persistent embeddings from %s (skip full rebuild)", persist_path
-        )
+        logger.info("Using persistent embeddings from %s (skip full rebuild)", persist_path)
         # Validate integrity — corrupt LanceDB data will fail silently
         rebuilt = await _probe_index_integrity(index)
 
@@ -556,7 +549,9 @@ async def _literal_search(
                 search_query = f"def {method}"
                 logger.info(
                     "Dotted notation detected: %s → searching for '%s' in files with 'class %s'",
-                    query, search_query, dotted_class,
+                    query,
+                    search_query,
+                    dotted_class,
                 )
 
         logger.info(
@@ -629,7 +624,8 @@ async def _literal_search(
                 file_matches = filtered
                 logger.info(
                     "Dotted notation filter: %d files contain 'class %s'",
-                    len(filtered), dotted_class,
+                    len(filtered),
+                    dotted_class,
                 )
 
         # Sort by number of matches (most matches = most relevant)
@@ -790,9 +786,7 @@ async def code_search(
             parent_path = root_path.parent
             if parent_path.exists() and parent_path.is_dir():
                 root_path = parent_path
-                logger.debug(
-                    f"Path '{search_root}' not found, using parent: {root_path}"
-                )
+                logger.debug(f"Path '{search_root}' not found, using parent: {root_path}")
             else:
                 # Path and parent don't exist - return error with helpful message
                 return {
@@ -808,13 +802,9 @@ async def code_search(
             }
 
         # Check if embeddings are disabled for this agent (workflow-level service mode)
-        disable_embeddings = (
-            _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
-        )
+        disable_embeddings = _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
         if disable_embeddings:
-            logger.info(
-                "Embeddings disabled for this agent, falling back to literal search"
-            )
+            logger.info("Embeddings disabled for this agent, falling back to literal search")
             return await _literal_search(query, path, k, exts)
 
         # Build metadata filter from optional parameters
@@ -838,15 +828,11 @@ async def code_search(
 
         try:
             index, rebuilt = await asyncio.wait_for(
-                _get_or_build_index(
-                    root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx
-                ),
+                _get_or_build_index(root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx),
                 timeout=30.0,
             )
         except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning(
-                "Semantic index build failed (%s), falling back to literal search", exc
-            )
+            logger.warning("Semantic index build failed (%s), falling back to literal search", exc)
             result = await _literal_search(query, path, k, exts)
             result["fallback"] = "semantic_index_timeout"
             return result
@@ -874,9 +860,7 @@ async def code_search(
                 }
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
-                follow_up_suggestions = _build_graph_follow_up_suggestions(
-                    ranked_results
-                )
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
                 return _build_search_response(
                     results=ranked_results,
                     mode="bugs",
@@ -913,13 +897,16 @@ async def code_search(
         # Strip filter fields not in the index schema to avoid LanceDB errors.
         # The index has: file_path, symbol_name, symbol_type, line_number, end_line.
         # Fields like "language", "is_test_file" may not exist in all index backends.
-        _INDEX_FILTER_FIELDS = {"file_path", "symbol_name", "symbol_type", "line_number", "end_line"}
+        _INDEX_FILTER_FIELDS = {
+            "file_path",
+            "symbol_name",
+            "symbol_type",
+            "line_number",
+            "end_line",
+        }
         safe_filter = None
         if filter_metadata:
-            safe_filter = {
-                k: v for k, v in filter_metadata.items()
-                if k in _INDEX_FILTER_FIELDS
-            }
+            safe_filter = {k: v for k, v in filter_metadata.items() if k in _INDEX_FILTER_FIELDS}
             dropped = set(filter_metadata) - set(safe_filter)
             if dropped:
                 logger.debug("Dropped unsupported filter fields: %s", dropped)
@@ -939,9 +926,7 @@ async def code_search(
                 timeout=15.0,
             )
         except (asyncio.TimeoutError, Exception) as exc:
-            logger.warning(
-                "Semantic search failed (%s), falling back to literal search", exc
-            )
+            logger.warning("Semantic search failed (%s), falling back to literal search", exc)
             result = await _literal_search(query, path, k, exts)
             result["fallback"] = "semantic_search_timeout"
             return result
@@ -962,9 +947,7 @@ async def code_search(
                 )
 
                 # Get task type from execution context (default to "search")
-                task_type = (
-                    _exec_ctx.get("task_type", "search") if _exec_ctx else "search"
-                )
+                task_type = _exec_ctx.get("task_type", "search") if _exec_ctx else "search"
 
                 # Create outcome with semantic search metadata
                 outcome = RLOutcome(
@@ -1013,9 +996,7 @@ async def code_search(
                 from victor.framework.search import create_hybrid_search_engine
 
                 # Get keyword search results
-                keyword_results = await _literal_search(
-                    query, str(root_path), k * 2, exts=None
-                )
+                keyword_results = await _literal_search(query, str(root_path), k * 2, exts=None)
 
                 if keyword_results.get("success"):
                     # Convert semantic results to dict format for hybrid engine
@@ -1031,15 +1012,9 @@ async def code_search(
                     ]
 
                     # Create hybrid search engine with configured weights
-                    semantic_weight = getattr(
-                        settings, "hybrid_search_semantic_weight", 0.6
-                    )
-                    keyword_weight = getattr(
-                        settings, "hybrid_search_keyword_weight", 0.4
-                    )
-                    engine = create_hybrid_search_engine(
-                        semantic_weight, keyword_weight
-                    )
+                    semantic_weight = getattr(settings, "hybrid_search_semantic_weight", 0.6)
+                    keyword_weight = getattr(settings, "hybrid_search_keyword_weight", 0.4)
+                    engine = create_hybrid_search_engine(semantic_weight, keyword_weight)
 
                     # Combine results using RRF
                     hybrid_results = engine.combine_results(

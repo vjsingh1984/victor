@@ -114,9 +114,7 @@ class SemanticThresholdLearner(BaseLearner):
         embedding_model = outcome.metadata.get("embedding_model", "unknown")
         tool_name = outcome.metadata.get("tool_name", "code_search")
 
-        context_key = self._get_context_key(
-            embedding_model, outcome.task_type, tool_name
-        )
+        context_key = self._get_context_key(embedding_model, outcome.task_type, tool_name)
 
         cursor = self.db.cursor()
 
@@ -185,11 +183,7 @@ class SemanticThresholdLearner(BaseLearner):
             prev_stats = dict(zip(column_names, row))
             prev_rec = prev_stats.get("recommended_threshold")
             new_rec = stats.get("recommended_threshold")
-            if (
-                prev_rec is not None
-                and new_rec is not None
-                and abs(new_rec - prev_rec) < 0.01
-            ):
+            if prev_rec is not None and new_rec is not None and abs(new_rec - prev_rec) < 0.01:
                 logger.debug(
                     "RL: semantic_threshold recommendation unchanged for %s, skipping",
                     context_key,

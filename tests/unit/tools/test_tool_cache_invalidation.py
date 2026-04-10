@@ -41,18 +41,14 @@ async def _run_with_invalidation(tmpdir: str) -> int:
         tool_cache_allowlist=["code_search"],
         tool_cache_dir=tmpdir,  # Use correct setting name
     )
-    orch = AgentOrchestrator(
-        settings=settings, provider=_DummyProvider(), model="dummy"
-    )
+    orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
     call_count = {"count": 0}
 
     async def fake_execute(name: str, context: Dict, **kwargs) -> ToolResult:
         if name == "code_search":
             call_count["count"] += 1
-        return ToolResult(
-            success=True, output={"ok": True}, error=None, metadata={"name": name}
-        )
+        return ToolResult(success=True, output={"ok": True}, error=None, metadata={"name": name})
 
     orch.tools.execute = fake_execute  # type: ignore[assignment]
 
@@ -77,6 +73,4 @@ async def _run_with_invalidation(tmpdir: str) -> int:
 
 def test_cache_invalidates_on_write(tmp_path):
     call_count = asyncio.run(_run_with_invalidation(str(tmp_path)))
-    assert (
-        call_count == 2
-    ), "cache should be cleared after write_file and force re-execution"
+    assert call_count == 2, "cache should be cleared after write_file and force re-execution"

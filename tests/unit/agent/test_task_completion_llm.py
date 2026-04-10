@@ -22,9 +22,7 @@ def _make_decision_service(
     service = MagicMock()
     result = DecisionResult(
         decision_type=DecisionType.TASK_COMPLETION,
-        result=TaskCompletionDecision(
-            is_complete=is_complete, confidence=confidence, phase=phase
-        ),
+        result=TaskCompletionDecision(is_complete=is_complete, confidence=confidence, phase=phase),
         source=source,
         confidence=confidence,
     )
@@ -76,9 +74,7 @@ class TestTaskCompletionWithLLMService:
 
     def test_llm_says_not_complete(self):
         """When LLM says not complete, stays NONE."""
-        service = _make_decision_service(
-            is_complete=False, confidence=0.9, phase="working"
-        )
+        service = _make_decision_service(is_complete=False, confidence=0.9, phase="working")
         detector = TaskCompletionDetector(decision_service=service)
 
         assert detector.get_completion_confidence() == CompletionConfidence.NONE
@@ -100,23 +96,17 @@ class TestTaskCompletionWithLLMService:
         detector = TaskCompletionDetector(decision_service=service)
 
         # Ambiguous response with no clear signals
-        detector.analyze_response(
-            "I have completed all the requested changes to the codebase."
-        )
+        detector.analyze_response("I have completed all the requested changes to the codebase.")
 
         # LLM should have added a completion signal
         assert "llm:task_complete" in detector._state.completion_signals
 
     def test_llm_analyze_response_detects_stuck(self):
         """LLM detects stuck phase and increments continuation requests."""
-        service = _make_decision_service(
-            is_complete=False, confidence=0.8, phase="stuck"
-        )
+        service = _make_decision_service(is_complete=False, confidence=0.8, phase="stuck")
         detector = TaskCompletionDetector(decision_service=service)
 
-        detector.analyze_response(
-            "I'm not sure what to do next. Let me think about this."
-        )
+        detector.analyze_response("I'm not sure what to do next. Let me think about this.")
         assert detector._state.continuation_requests >= 1
 
     def test_llm_failure_graceful(self):

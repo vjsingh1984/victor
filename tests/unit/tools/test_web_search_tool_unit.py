@@ -180,9 +180,7 @@ class TestRuntimeInfraIntegration:
         monkeypatch.setattr(web_search_tool_module, "_GENERIC_WEB_CACHE", None)
         html = "<html><body><main>" + ("content " * 30) + "</main></body></html>"
         url = f"https://example.com/{uuid.uuid4().hex}"
-        tool_config = ToolConfig(
-            generic_result_cache_enabled=True, generic_result_cache_ttl=120
-        )
+        tool_config = ToolConfig(generic_result_cache_enabled=True, generic_result_cache_ttl=120)
         context = {"tool_config": tool_config}
 
         with patch(

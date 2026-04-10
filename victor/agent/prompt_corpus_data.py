@@ -1469,9 +1469,7 @@ def load_humaneval_prompts() -> List[Tuple[str, str, str]]:
         return prompts
 
     except ImportError:
-        raise ImportError(
-            "datasets library required. Install with: pip install datasets"
-        )
+        raise ImportError("datasets library required. Install with: pip install datasets")
 
 
 def load_mbpp_prompts() -> List[Tuple[str, str, str]]:
@@ -1500,9 +1498,7 @@ def load_mbpp_prompts() -> List[Tuple[str, str, str]]:
         return prompts
 
     except ImportError:
-        raise ImportError(
-            "datasets library required. Install with: pip install datasets"
-        )
+        raise ImportError("datasets library required. Install with: pip install datasets")
 
 
 def _classify_humaneval_prompt(prompt: str) -> str:
@@ -1519,19 +1515,11 @@ def _classify_humaneval_prompt(prompt: str) -> str:
     # Classify based on keywords in the prompt
     if any(kw in prompt_lower for kw in ["sort", "sorted", "order", "arrange"]):
         return "algorithm_implementation"
-    elif any(
-        kw in prompt_lower
-        for kw in ["list", "array", "tuple", "dict", "stack", "queue"]
-    ):
+    elif any(kw in prompt_lower for kw in ["list", "array", "tuple", "dict", "stack", "queue"]):
         return "data_structure"
-    elif any(
-        kw in prompt_lower for kw in ["string", "char", "substr", "concat", "split"]
-    ):
+    elif any(kw in prompt_lower for kw in ["string", "char", "substr", "concat", "split"]):
         return "string_manipulation"
-    elif any(
-        kw in prompt_lower
-        for kw in ["math", "sum", "product", "prime", "factor", "gcd"]
-    ):
+    elif any(kw in prompt_lower for kw in ["math", "sum", "product", "prime", "factor", "gcd"]):
         return "mathematical"
     elif any(kw in prompt_lower for kw in ["file", "read", "write", "path"]):
         return "file_io"

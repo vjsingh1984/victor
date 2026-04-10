@@ -221,9 +221,7 @@ def setup_observability_integration(
     # Ensure reference is stored through public observability ports.
     if isinstance(orchestrator, ObservabilityPortProtocol):
         orchestrator.set_observability(integration)
-    elif hasattr(orchestrator, "set_observability") and callable(
-        orchestrator.set_observability
-    ):
+    elif hasattr(orchestrator, "set_observability") and callable(orchestrator.set_observability):
         orchestrator.set_observability(integration)
     elif hasattr(orchestrator, "observability"):
         orchestrator.observability = integration
@@ -257,9 +255,7 @@ def apply_system_prompt(orchestrator: Any, system_prompt: str) -> None:
         if prompt_builder:
             if hasattr(prompt_builder, "set_custom_prompt"):
                 prompt_builder.set_custom_prompt(system_prompt)
-                logger.debug(
-                    "Applied system prompt via prompt_builder.set_custom_prompt"
-                )
+                logger.debug("Applied system prompt via prompt_builder.set_custom_prompt")
             else:
                 logger.warning(
                     "Cannot set custom prompt: prompt_builder lacks set_custom_prompt method. "

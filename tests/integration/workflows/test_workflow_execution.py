@@ -74,9 +74,7 @@ class TestWorkflowExecution:
     """Integration tests for workflow execution."""
 
     @pytest.mark.asyncio
-    async def test_simple_linear_workflow(
-        self, mock_orchestrator, mock_subagent_result
-    ):
+    async def test_simple_linear_workflow(self, mock_orchestrator, mock_subagent_result):
         """Test execution of a simple linear workflow."""
         from victor.workflows import NodeResult
 
@@ -107,14 +105,11 @@ class TestWorkflowExecution:
         assert result.workflow_name == "test_linear"
         assert len(result.context.node_results) == 3
         assert all(
-            r.status == ExecutorNodeStatus.COMPLETED
-            for r in result.context.node_results.values()
+            r.status == ExecutorNodeStatus.COMPLETED for r in result.context.node_results.values()
         )
 
     @pytest.mark.asyncio
-    async def test_workflow_with_condition(
-        self, mock_orchestrator, mock_subagent_result
-    ):
+    async def test_workflow_with_condition(self, mock_orchestrator, mock_subagent_result):
         """Test workflow with conditional branching."""
         from victor.workflows import NodeResult
 
@@ -123,12 +118,8 @@ class TestWorkflowExecution:
 
         workflow = (
             WorkflowBuilder("test_condition", "Conditional workflow")
-            .add_agent(
-                "analyze", "analyst", "Analyze for issues", output_key="analysis"
-            )
-            .add_condition(
-                "decide", check_issues, {"fix": "fix_step", "skip": "report"}
-            )
+            .add_agent("analyze", "analyst", "Analyze for issues", output_key="analysis")
+            .add_condition("decide", check_issues, {"fix": "fix_step", "skip": "report"})
             .add_agent("fix_step", "executor", "Fix issues", next_nodes=["report"])
             .add_agent("report", "writer", "Generate report")
             .build()
@@ -166,9 +157,7 @@ class TestWorkflowExecution:
         workflow = (
             WorkflowBuilder("test_skip", "Skip branch test")
             .add_agent("analyze", "analyst", "Analyze")
-            .add_condition(
-                "decide", check_issues, {"fix": "fix_step", "skip": "report"}
-            )
+            .add_condition("decide", check_issues, {"fix": "fix_step", "skip": "report"})
             .add_agent("fix_step", "executor", "Fix", next_nodes=["report"])
             .add_agent("report", "writer", "Report")
             .build()
@@ -195,9 +184,7 @@ class TestWorkflowExecution:
         assert "fix_step" not in result.context.node_results
 
     @pytest.mark.asyncio
-    async def test_workflow_with_transform(
-        self, mock_orchestrator, mock_subagent_result
-    ):
+    async def test_workflow_with_transform(self, mock_orchestrator, mock_subagent_result):
         """Test workflow with transform node."""
         from victor.workflows import NodeResult
 
@@ -382,9 +369,7 @@ class TestVerticalWorkflowIntegration:
 
         provider = CodingAssistant.get_workflow_provider()
         if provider is None:
-            pytest.skip(
-                "CodingAssistant workflow provider not implemented (external package)"
-            )
+            pytest.skip("CodingAssistant workflow provider not implemented (external package)")
 
         workflows = provider.get_workflows()
         assert len(workflows) > 0
@@ -476,9 +461,7 @@ class TestWorkflowBuilderIntegration:
                 categorize,
                 {"excellent": "celebrate", "good": "report", "needs_work": "improve"},
             )
-            .add_agent(
-                "celebrate", "writer", "Write celebration", next_nodes=["finish"]
-            )
+            .add_agent("celebrate", "writer", "Write celebration", next_nodes=["finish"])
             .add_agent("report", "writer", "Write report", next_nodes=["finish"])
             .add_agent("improve", "executor", "Improve work", next_nodes=["finish"])
             .add_agent("finish", "planner", "Final steps")

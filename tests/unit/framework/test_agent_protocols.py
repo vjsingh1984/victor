@@ -212,9 +212,7 @@ class TestIAgentRoleProtocol:
         from victor.framework.agent_protocols import IAgentRole
 
         # Protocol should define allowed_tools
-        assert "allowed_tools" in dir(IAgentRole) or hasattr(
-            IAgentRole, "allowed_tools"
-        )
+        assert "allowed_tools" in dir(IAgentRole) or hasattr(IAgentRole, "allowed_tools")
 
     def test_role_has_tool_budget(self):
         """IAgentRole should have tool_budget property."""
@@ -260,9 +258,7 @@ class TestIAgentPersonaProtocol:
         """IAgentPersona should have background property."""
         from victor.framework.agent_protocols import IAgentPersona
 
-        assert "background" in dir(IAgentPersona) or hasattr(
-            IAgentPersona, "background"
-        )
+        assert "background" in dir(IAgentPersona) or hasattr(IAgentPersona, "background")
 
     def test_persona_has_communication_style(self):
         """IAgentPersona should have communication_style property."""
@@ -276,9 +272,7 @@ class TestIAgentPersonaProtocol:
         """IAgentPersona should have format_message method."""
         from victor.framework.agent_protocols import IAgentPersona
 
-        assert "format_message" in dir(IAgentPersona) or hasattr(
-            IAgentPersona, "format_message"
-        )
+        assert "format_message" in dir(IAgentPersona) or hasattr(IAgentPersona, "format_message")
 
     def test_persona_protocol_is_runtime_checkable(self):
         """IAgentPersona should be runtime checkable."""
@@ -317,17 +311,13 @@ class TestITeamMemberProtocol:
         """ITeamMember should have execute_task method."""
         from victor.framework.agent_protocols import ITeamMember
 
-        assert "execute_task" in dir(ITeamMember) or hasattr(
-            ITeamMember, "execute_task"
-        )
+        assert "execute_task" in dir(ITeamMember) or hasattr(ITeamMember, "execute_task")
 
     def test_member_has_receive_message(self):
         """ITeamMember should have receive_message method."""
         from victor.framework.agent_protocols import ITeamMember
 
-        assert "receive_message" in dir(ITeamMember) or hasattr(
-            ITeamMember, "receive_message"
-        )
+        assert "receive_message" in dir(ITeamMember) or hasattr(ITeamMember, "receive_message")
 
     def test_member_protocol_is_runtime_checkable(self):
         """ITeamMember should be runtime checkable."""
@@ -348,9 +338,7 @@ class TestITeamCoordinatorProtocol:
         """ITeamCoordinator should have add_member method."""
         from victor.framework.agent_protocols import ITeamCoordinator
 
-        assert "add_member" in dir(ITeamCoordinator) or hasattr(
-            ITeamCoordinator, "add_member"
-        )
+        assert "add_member" in dir(ITeamCoordinator) or hasattr(ITeamCoordinator, "add_member")
 
     def test_coordinator_has_set_formation(self):
         """ITeamCoordinator should have set_formation method."""
@@ -364,17 +352,13 @@ class TestITeamCoordinatorProtocol:
         """ITeamCoordinator should have execute_task method."""
         from victor.framework.agent_protocols import ITeamCoordinator
 
-        assert "execute_task" in dir(ITeamCoordinator) or hasattr(
-            ITeamCoordinator, "execute_task"
-        )
+        assert "execute_task" in dir(ITeamCoordinator) or hasattr(ITeamCoordinator, "execute_task")
 
     def test_coordinator_has_broadcast(self):
         """ITeamCoordinator should have broadcast method."""
         from victor.framework.agent_protocols import ITeamCoordinator
 
-        assert "broadcast" in dir(ITeamCoordinator) or hasattr(
-            ITeamCoordinator, "broadcast"
-        )
+        assert "broadcast" in dir(ITeamCoordinator) or hasattr(ITeamCoordinator, "broadcast")
 
     def test_coordinator_protocol_is_runtime_checkable(self):
         """ITeamCoordinator should be runtime checkable."""
@@ -527,9 +511,7 @@ class TestProtocolImplementationCompliance:
             async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
                 return f"Executed: {task}"
 
-            async def receive_message(
-                self, message: AgentMessage
-            ) -> Optional[AgentMessage]:
+            async def receive_message(self, message: AgentMessage) -> Optional[AgentMessage]:
                 return AgentMessage(
                     sender_id=self.id,
                     recipient_id=message.sender_id,

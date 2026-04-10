@@ -46,29 +46,21 @@ class TestTestDependencyLearner:
         )
         assert cursor.fetchone() is not None
 
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='test_history'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='test_history'")
         assert cursor.fetchone() is not None
 
-    def test_get_failure_probability_no_data(
-        self, learner: TestDependencyLearner
-    ) -> None:
+    def test_get_failure_probability_no_data(self, learner: TestDependencyLearner) -> None:
         """Test failure probability with no historical data."""
         prob = learner.get_failure_probability("test_foo", ["src/foo.py"])
         # Default probability for unknown tests
         assert prob == 0.1
 
-    def test_get_failure_probability_no_files(
-        self, learner: TestDependencyLearner
-    ) -> None:
+    def test_get_failure_probability_no_files(self, learner: TestDependencyLearner) -> None:
         """Test failure probability with no changed files."""
         prob = learner.get_failure_probability("test_foo", [])
         assert prob == 0.0
 
-    def test_record_outcome_creates_history(
-        self, learner: TestDependencyLearner
-    ) -> None:
+    def test_record_outcome_creates_history(self, learner: TestDependencyLearner) -> None:
         """Test that recording outcome creates history entry."""
         learner.record_outcome(
             test_name="test_bar",
@@ -84,9 +76,7 @@ class TestTestDependencyLearner:
         assert row["passed"] == 1
         assert row["duration_ms"] == 100.0
 
-    def test_record_outcome_updates_q_value(
-        self, learner: TestDependencyLearner
-    ) -> None:
+    def test_record_outcome_updates_q_value(self, learner: TestDependencyLearner) -> None:
         """Test that recording outcome updates Q-value."""
         # Record a failure
         learner.record_outcome(
@@ -168,9 +158,7 @@ class TestTestPrioritizer:
         results = prioritizer.prioritize(test_names=test_names, max_tests=2)
         assert len(results) == 2
 
-    def test_prioritize_with_historical_failures(
-        self, prioritizer: TestPrioritizer
-    ) -> None:
+    def test_prioritize_with_historical_failures(self, prioritizer: TestPrioritizer) -> None:
         """Test that tests with historical failures are prioritized."""
         # Record failures for test_fail
         for _ in range(5):

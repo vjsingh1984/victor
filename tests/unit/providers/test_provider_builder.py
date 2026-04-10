@@ -126,9 +126,7 @@ def test_provider_builder_build_creates_provider_manager(
     assert "tool_calling_caps" in components
 
 
-def test_provider_builder_build_creates_prompt_builder(
-    mock_settings, mock_factory, mock_provider
-):
+def test_provider_builder_build_creates_prompt_builder(mock_settings, mock_factory, mock_provider):
     """Test that build() creates system prompt builder."""
     mock_prompt_builder = Mock(name="prompt_builder")
     mock_factory.create_system_prompt_builder.return_value = mock_prompt_builder
@@ -149,9 +147,7 @@ def test_provider_builder_build_creates_prompt_builder(
     assert components["prompt_builder"] is mock_prompt_builder
 
 
-def test_provider_builder_build_registers_components(
-    mock_settings, mock_factory, mock_provider
-):
+def test_provider_builder_build_registers_components(mock_settings, mock_factory, mock_provider):
     """Test that build() registers all built components."""
     mock_factory.create_provider_manager_with_adapter.return_value = (
         Mock(),
@@ -190,9 +186,7 @@ def test_provider_builder_get_tool_adapter(mock_settings, mock_factory, mock_pro
     assert builder.get_tool_adapter() is mock_adapter
 
 
-def test_provider_builder_get_tool_calling_caps(
-    mock_settings, mock_factory, mock_provider
-):
+def test_provider_builder_get_tool_calling_caps(mock_settings, mock_factory, mock_provider):
     """Test getting tool calling capabilities from built components."""
     mock_caps = Mock(name="tool_calling_caps")
     mock_factory.create_provider_manager_with_adapter.return_value = (
@@ -227,9 +221,7 @@ def test_provider_builder_get_provider(mock_settings, mock_factory, mock_provide
     assert builder.get_provider() is mock_provider
 
 
-def test_provider_builder_get_provider_manager(
-    mock_settings, mock_factory, mock_provider
-):
+def test_provider_builder_get_provider_manager(mock_settings, mock_factory, mock_provider):
     """Test getting provider manager from built components."""
     mock_manager = Mock(name="provider_manager")
     mock_factory.create_provider_manager_with_adapter.return_value = (

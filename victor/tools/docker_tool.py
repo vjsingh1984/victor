@@ -47,9 +47,7 @@ SAFE_OPERATIONS = frozenset(
 DANGEROUS_OPERATIONS = frozenset({"exec", "rm", "rmi", "pull", "run"})
 
 
-async def _run_docker_command_async(
-    args: List[str], timeout: int = 30
-) -> Tuple[bool, str, str]:
+async def _run_docker_command_async(args: List[str], timeout: int = 30) -> Tuple[bool, str, str]:
     """Run Docker command asynchronously.
 
     Args:
@@ -161,9 +159,7 @@ async def docker(
             from victor.config.settings import get_settings
 
             settings = get_settings()
-            allow_dangerous = getattr(
-                settings, "docker_allow_dangerous_operations", False
-            )
+            allow_dangerous = getattr(settings, "docker_allow_dangerous_operations", False)
         except Exception:
             allow_dangerous = False
         if not allow_dangerous:
@@ -289,9 +285,7 @@ async def docker(
             "success": success,
             "result": {"stdout": stdout, "stderr": stderr},
             "message": (
-                f"Executed command in {resource_id}"
-                if success
-                else f"Exec failed: {stderr}"
+                f"Executed command in {resource_id}" if success else f"Exec failed: {stderr}"
             ),
         }
 

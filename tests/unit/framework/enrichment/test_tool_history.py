@@ -156,9 +156,7 @@ class TestGetRelevantToolResults:
             {"tool": "web_fetch", "result": {"success": True, "content": "y" * 60}},
             {"tool": "file_read", "result": {"success": True, "content": "z" * 60}},
         ]
-        result = get_relevant_tool_results(
-            history, tool_names={"web_search", "web_fetch"}
-        )
+        result = get_relevant_tool_results(history, tool_names={"web_search", "web_fetch"})
         assert len(result) == 2
         tools = [r["tool"] for r in result]
         assert "web_search" in tools
@@ -190,43 +188,33 @@ class TestExtractToolContext:
 
     def test_formats_with_default_header(self):
         """Test formats with default header."""
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": "x" * 60}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": "x" * 60}}]
         result = extract_tool_context(history)
         assert "Prior results in this session:" in result
 
     def test_formats_with_custom_header(self):
         """Test formats with custom header."""
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": "x" * 60}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": "x" * 60}}]
         result = extract_tool_context(history, header="Custom Header:")
         assert "Custom Header:" in result
 
     def test_includes_tool_name(self):
         """Test formatted result includes tool name."""
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": "x" * 60}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": "x" * 60}}]
         result = extract_tool_context(history)
         assert "web_search" in result
 
     def test_includes_content(self):
         """Test formatted result includes content."""
         content = "This is the result content. " * 3  # At least 50 chars
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": content}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": content}}]
         result = extract_tool_context(history)
         assert "This is the result content" in result
 
     def test_truncates_long_content(self):
         """Test long content is truncated."""
         long_content = "x" * 500
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": long_content}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": long_content}}]
         result = extract_tool_context(history, max_content_length=100)
         assert "..." in result
         assert len(result) < 500
@@ -302,9 +290,7 @@ class TestToolHistoryExtractor:
     def test_extract_with_results(self):
         """Test extract with results."""
         extractor = ToolHistoryExtractor()
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": "x" * 60}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": "x" * 60}}]
         result = extractor.extract(history)
         assert "web_search" in result
 
@@ -328,9 +314,7 @@ class TestToolHistoryExtractor:
     def test_get_relevant_results_with_data(self):
         """Test get_relevant_results with data."""
         extractor = ToolHistoryExtractor()
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": "x" * 60}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": "x" * 60}}]
         result = extractor.get_relevant_results(history)
         assert len(result) == 1
         assert result[0]["tool"] == "web_search"
@@ -479,27 +463,21 @@ class TestEdgeCases:
     def test_content_at_exact_min_length(self):
         """Test content at exactly min_content_length."""
         content = "x" * 50  # Exactly 50 chars (default min)
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": content}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": content}}]
         result = get_relevant_tool_results(history, min_content_length=50)
         assert len(result) == 1
 
     def test_content_below_min_length(self):
         """Test content below min_content_length."""
         content = "x" * 49  # Just below 50 chars
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": content}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": content}}]
         result = get_relevant_tool_results(history, min_content_length=50)
         assert len(result) == 0
 
     def test_content_at_exact_max_length(self):
         """Test content at exactly max_content_length (no truncation needed)."""
         content = "x" * 300  # Exactly default max
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": content}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": content}}]
         result = extract_tool_context(history, max_content_length=300)
         # Should not have truncation indicator
         assert "..." not in result
@@ -507,9 +485,7 @@ class TestEdgeCases:
     def test_content_just_above_max_length(self):
         """Test content just above max_content_length."""
         content = "x" * 301  # Just above default max
-        history = [
-            {"tool": "web_search", "result": {"success": True, "content": content}}
-        ]
+        history = [{"tool": "web_search", "result": {"success": True, "content": content}}]
         result = extract_tool_context(history, max_content_length=300)
         # Should have truncation indicator
         assert "..." in result

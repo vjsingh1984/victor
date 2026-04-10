@@ -387,9 +387,7 @@ def stream_end_event(
     Returns:
         AgentExecutionEvent with type=STREAM_END
     """
-    return AgentExecutionEvent(
-        type=EventType.STREAM_END, success=success, error=error, **kwargs
-    )
+    return AgentExecutionEvent(type=EventType.STREAM_END, success=success, error=error, **kwargs)
 
 
 def progress_event(progress: float, **kwargs: Any) -> AgentExecutionEvent:

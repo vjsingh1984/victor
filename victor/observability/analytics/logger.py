@@ -35,9 +35,7 @@ class UsageLogger:
             self._log_file.parent.mkdir(parents=True, exist_ok=True)
             self._log_file.touch(exist_ok=True)
         except Exception as e:
-            self._logger.error(
-                f"Failed to create log directory or file {self._log_file}: {e}"
-            )
+            self._logger.error(f"Failed to create log directory or file {self._log_file}: {e}")
             self._enabled = False
 
     def is_enabled(self) -> bool:

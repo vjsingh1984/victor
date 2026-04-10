@@ -298,9 +298,7 @@ class TestRegisterPlugin(TestMockPlugin):
     def test_register_plugin_init_fails(self, mock_plugin):
         """Test register when plugin init fails (covers lines 251-253)."""
         manager = ToolPluginRegistry()
-        mock_plugin._do_initialize = lambda: (_ for _ in ()).throw(
-            Exception("Init failed")
-        )
+        mock_plugin._do_initialize = lambda: (_ for _ in ()).throw(Exception("Init failed"))
 
         result = manager.register_plugin(mock_plugin)
 
@@ -332,9 +330,7 @@ class TestUnloadPlugin(TestMockPlugin):
         """Test unload when cleanup fails (covers lines 276-278)."""
         manager = ToolPluginRegistry()
         manager.register_plugin(mock_plugin)
-        mock_plugin._do_cleanup = lambda: (_ for _ in ()).throw(
-            Exception("Cleanup failed")
-        )
+        mock_plugin._do_cleanup = lambda: (_ for _ in ()).throw(Exception("Cleanup failed"))
 
         result = manager.unload_plugin("test_plugin")
 

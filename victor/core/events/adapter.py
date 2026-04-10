@@ -145,9 +145,7 @@ class EventBusAdapter:
 
         if self._forward_to_new:
             # Subscribe to all legacy events
-            self._unsubscribe_legacy = self._legacy_bus.subscribe_all(
-                self._on_legacy_event
-            )
+            self._unsubscribe_legacy = self._legacy_bus.subscribe_all(self._on_legacy_event)
 
         self._enabled = True
         logger.debug("EventBusAdapter forwarding enabled")

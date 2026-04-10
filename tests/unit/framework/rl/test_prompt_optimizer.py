@@ -60,25 +60,11 @@ class TestPromptCandidate:
         assert 0.0 <= sample <= 1.0
 
 
-class TestGEPAStrategy:
-    """Tests for GEPAStrategy."""
+class TestGEPAStrategyHeuristic:
+    """Tests for GEPAStrategy heuristic paths (no Ollama required).
 
-    def test_reflect_produces_analysis(self):
-        strategy = GEPAStrategy()
-        traces = [
-            ExecutionTrace("s1", "action", "ollama", "qwen", 5,
-                           {"file_not_found": 3}, False, 0.3, 1000),
-            ExecutionTrace("s2", "action", "ollama", "qwen", 3,
-                           {}, True, 0.9, 800),
-        ]
-        reflection = strategy.reflect(traces, "TEST_SECTION", "current text")
-        assert "2 execution traces" in reflection
-        assert "file_not_found" in reflection
-
-    def test_reflect_empty_traces(self):
-        strategy = GEPAStrategy()
-        reflection = strategy.reflect([], "TEST_SECTION", "current text")
-        assert "0 execution traces" in reflection
+    LLM-dependent tests moved to tests/integration/framework/rl/test_gepa_integration.py
+    """
 
     def test_mutate_adds_guidance_for_file_failures(self):
         """Heuristic mutation adds file verification guidance."""
@@ -112,9 +98,7 @@ class TestPromptOptimizerLearner:
     """Tests for PromptOptimizerLearner."""
 
     def test_init_creates_tables(self, learner):
-        cursor = learner.db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        )
+        cursor = learner.db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = {row[0] for row in cursor.fetchall()}
         assert "agent_prompt_candidate" in tables
 
@@ -125,7 +109,9 @@ class TestPromptOptimizerLearner:
 
     def test_get_recommendation_no_candidates(self, learner):
         rec = learner.get_recommendation(
-            "ollama", "qwen", "action",
+            "ollama",
+            "qwen",
+            "action",
             section_name="ASI_TOOL_EFFECTIVENESS_GUIDANCE",
         )
         assert rec is None
@@ -169,9 +155,7 @@ class TestPromptOptimizerLearner:
         key = learner._candidate_key("TEST", "ollama")
         learner._candidates[key] = [candidate]
 
-        rec = learner.get_recommendation(
-            "ollama", "qwen", "action", section_name="TEST"
-        )
+        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
         assert rec is not None
         assert rec.value == "Better prompt"
         assert rec.confidence > 0
@@ -192,9 +176,7 @@ class TestPromptOptimizerLearner:
         learner._candidates[key] = [candidate]
 
         # Query with a provider that has no specific candidates
-        rec = learner.get_recommendation(
-            "xai", "grok", "action", section_name="TEST"
-        )
+        rec = learner.get_recommendation("xai", "grok", "action", section_name="TEST")
         assert rec is not None
         assert rec.value == "Default prompt"
 
@@ -229,18 +211,18 @@ class TestPromptOptimizerLearner:
         assert metrics["total_candidates"] == 0
 
     def test_categorize_failure(self):
-        assert PromptOptimizerLearner._categorize_failure(
-            "File not found: foo.py"
-        ) == "file_not_found"
-        assert PromptOptimizerLearner._categorize_failure(
-            "old_str not found in bar.py"
-        ) == "edit_mismatch"
-        assert PromptOptimizerLearner._categorize_failure(
-            "Ambiguous match - found 2 times"
-        ) == "edit_ambiguous"
-        assert PromptOptimizerLearner._categorize_failure(
-            "something else"
-        ) == "other"
+        assert (
+            PromptOptimizerLearner._categorize_failure("File not found: foo.py") == "file_not_found"
+        )
+        assert (
+            PromptOptimizerLearner._categorize_failure("old_str not found in bar.py")
+            == "edit_mismatch"
+        )
+        assert (
+            PromptOptimizerLearner._categorize_failure("Ambiguous match - found 2 times")
+            == "edit_ambiguous"
+        )
+        assert PromptOptimizerLearner._categorize_failure("something else") == "other"
 
     def test_evolve_completion_guidance_section(self, db):
         """Verify COMPLETION_GUIDANCE can be evolved like other sections."""
@@ -262,7 +244,9 @@ class TestPromptOptimizerLearner:
         learner._candidates[key] = [candidate]
 
         rec = learner.get_recommendation(
-            "anthropic", "claude", "action",
+            "anthropic",
+            "claude",
+            "action",
             section_name="COMPLETION_GUIDANCE",
         )
         assert rec is not None

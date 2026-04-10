@@ -112,9 +112,7 @@ class StatusBar(Static):
             status_label = Label(self.status, classes="status-indicator")
             status_label.add_class("idle")
             yield status_label
-            follow_label = Label(
-                "Following", classes="follow-indicator", id="follow-indicator"
-            )
+            follow_label = Label("Following", classes="follow-indicator", id="follow-indicator")
             follow_label.add_class("following")
             yield follow_label
             yield Label("", classes="unread-indicator", id="unread-indicator")
@@ -378,9 +376,7 @@ class InputWidget(Static):
     ]
 
     _BUSY_HINT = "Working…"
-    _IDLE_HINT = (
-        "Enter: send  Shift+Enter: newline  ↑/↓: history  Ctrl+C: exit  /help: commands"
-    )
+    _IDLE_HINT = "Enter: send  Shift+Enter: newline  ↑/↓: history  Ctrl+C: exit  /help: commands"
 
     # Class-level history shared across instances (persists across sessions)
     _history: list[str] = []
@@ -481,10 +477,7 @@ class InputWidget(Static):
         elif event.key == "down":
             # Allow "down" to navigate history only if already browsing
             if self._history_index != -1:
-                is_at_bottom = (
-                    self._input.cursor_location[0]
-                    == len(self._input.document.lines) - 1
-                )
+                is_at_bottom = self._input.cursor_location[0] == len(self._input.document.lines) - 1
                 if is_at_bottom:
                     self._history_next()
                     event.prevent_default()
@@ -633,9 +626,7 @@ class ToolCallWidget(Static):
         self.arguments = arguments or {}
         self.status = status
         self.elapsed = elapsed
-        self.follow_up_suggestions = self._normalize_follow_up_suggestions(
-            follow_up_suggestions
-        )
+        self.follow_up_suggestions = self._normalize_follow_up_suggestions(follow_up_suggestions)
         self.add_class(status)
 
     @staticmethod
@@ -1472,9 +1463,7 @@ class EnhancedConversationLog(VerticalScroll):
     def on_resize(self, event) -> None:
         """Set a short guard after resize to suppress transient scroll events."""
         if not self._auto_scroll:
-            self._ignore_resize_scroll_update_until = (
-                time.monotonic() + self._RESIZE_GUARD_SECONDS
-            )
+            self._ignore_resize_scroll_update_until = time.monotonic() + self._RESIZE_GUARD_SECONDS
         else:
             self._ignore_resize_scroll_update_until = 0.0
 
@@ -1560,15 +1549,11 @@ class EnhancedConversationLog(VerticalScroll):
         """
         if force or self._auto_scroll:
             self.scroll_end(animate=False)
-            self._ignore_scroll_update_until = (
-                time.monotonic() + self._PROGRAMMATIC_GUARD_SECONDS
-            )
+            self._ignore_scroll_update_until = time.monotonic() + self._PROGRAMMATIC_GUARD_SECONDS
 
     def _is_at_bottom(self) -> bool:
         try:
             return self.scroll_y >= self.max_scroll_y - 1
         except Exception as e:
-            logger.debug(
-                f"Failed to determine scroll position, assuming at bottom: {e}"
-            )
+            logger.debug(f"Failed to determine scroll position, assuming at bottom: {e}")
             return True

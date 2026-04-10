@@ -95,9 +95,7 @@ def _parse_backend_type(raw: Any) -> BackendType:
     normalized = str(raw).strip().lower()
     backend_type = _BACKEND_TYPE_MAP.get(normalized)
     if backend_type is None:
-        logger.warning(
-            "Unknown event_backend_type '%s'; defaulting to '%s'", raw, "in_memory"
-        )
+        logger.warning("Unknown event_backend_type '%s'; defaulting to '%s'", raw, "in_memory")
         return BackendType.IN_MEMORY
     return backend_type
 
@@ -190,13 +188,9 @@ def _normalize_topic_block_timeout_overrides(raw: Any) -> Dict[str, float]:
 
 def build_backend_config_from_settings(settings: Any) -> BackendConfig:
     """Build backend config from settings object with normalized defaults."""
-    backend_type = _parse_backend_type(
-        getattr(settings, "event_backend_type", "in_memory")
-    )
+    backend_type = _parse_backend_type(getattr(settings, "event_backend_type", "in_memory"))
     delivery_guarantee = _parse_delivery_guarantee(
-        getattr(
-            settings, "event_delivery_guarantee", DeliveryGuarantee.AT_MOST_ONCE.value
-        )
+        getattr(settings, "event_delivery_guarantee", DeliveryGuarantee.AT_MOST_ONCE.value)
     )
     max_batch_size = _parse_int_setting(
         getattr(settings, "event_max_batch_size", 100),
@@ -325,9 +319,7 @@ class InMemoryEventBackend:
         self._queue_maxsize = resolved_queue_maxsize
 
         overflow_policy = (
-            str(extra.get("queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST))
-            .strip()
-            .lower()
+            str(extra.get("queue_overflow_policy", _QUEUE_POLICY_DROP_NEWEST)).strip().lower()
         )
         if overflow_policy not in _VALID_QUEUE_POLICIES:
             logger.warning(
@@ -352,10 +344,8 @@ class InMemoryEventBackend:
             self._queue_overflow_topic_policies.items(),
             key=lambda item: (item[0].count("*"), -len(item[0])),
         )
-        self._queue_overflow_topic_block_timeout_ms = (
-            _normalize_topic_block_timeout_overrides(
-                extra.get("queue_overflow_topic_block_timeout_ms", {})
-            )
+        self._queue_overflow_topic_block_timeout_ms = _normalize_topic_block_timeout_overrides(
+            extra.get("queue_overflow_topic_block_timeout_ms", {})
         )
         self._overflow_durable_sink = extra.get("overflow_durable_sink")
 
@@ -412,9 +402,7 @@ class InMemoryEventBackend:
         """Add subscription to the appropriate index."""
         if "*" in subscription.pattern:
             self._wildcard_subscriptions.append(subscription.id)
-            self._compiled_patterns[subscription.id] = self._compile_pattern(
-                subscription.pattern
-            )
+            self._compiled_patterns[subscription.id] = self._compile_pattern(subscription.pattern)
             self._invalidate_dispatch_caches()
         else:
             # Exact topic match - O(1) lookup
@@ -456,9 +444,7 @@ class InMemoryEventBackend:
                     return False
                 return all(
                     p == "*" or p == t
-                    for p, t in zip(
-                        pattern_parts[:-1], topic_parts[: len(pattern_parts) - 1]
-                    )
+                    for p, t in zip(pattern_parts[:-1], topic_parts[: len(pattern_parts) - 1])
                 )
             if len(pattern_parts) != len(topic_parts):
                 return False
@@ -542,9 +528,7 @@ class InMemoryEventBackend:
             elif hasattr(sink, "persist") and callable(sink.persist):
                 sink.persist(event=event, reason=reason)
             else:
-                raise TypeError(
-                    "overflow_durable_sink must be callable/write/persist compatible"
-                )
+                raise TypeError("overflow_durable_sink must be callable/write/persist compatible")
             self._increment_publish_stat("durable_sink_success")
         except Exception as e:
             self._increment_publish_stat("durable_sink_failures")
@@ -594,8 +578,8 @@ class InMemoryEventBackend:
             self._update_max_queue_depth()
             return True
         except asyncio.QueueFull:
-            effective_policy, effective_block_timeout_ms = (
-                self._resolve_overflow_policy_for_topic(event.topic)
+            effective_policy, effective_block_timeout_ms = self._resolve_overflow_policy_for_topic(
+                event.topic
             )
             if (
                 effective_policy != self._queue_overflow_policy
@@ -628,9 +612,7 @@ class InMemoryEventBackend:
             if effective_policy == _QUEUE_POLICY_BLOCK_WITH_TIMEOUT:
                 timeout_s = effective_block_timeout_ms / 1000.0
                 try:
-                    await asyncio.wait_for(
-                        self._event_queue.put(event), timeout=timeout_s
-                    )
+                    await asyncio.wait_for(self._event_queue.put(event), timeout=timeout_s)
                     self._increment_publish_stat("blocked_success")
                     self._increment_publish_stat("queued")
                     self._update_max_queue_depth()
@@ -760,17 +742,14 @@ class InMemoryEventBackend:
                         wildcard_matches = [
                             sid
                             for sid in self._wildcard_subscriptions
-                            if self._compiled_patterns.get(sid, lambda t: False)(
-                                event.topic
-                            )
+                            if self._compiled_patterns.get(sid, lambda t: False)(event.topic)
                         ]
                         self._wildcard_match_cache[event.topic] = wildcard_matches
                         matched_ids.extend(wildcard_matches)
                     subscriptions = [
                         self._subscriptions[sid]
                         for sid in matched_ids
-                        if sid in self._subscriptions
-                        and self._subscriptions[sid].is_active
+                        if sid in self._subscriptions and self._subscriptions[sid].is_active
                     ]
 
                 # Dispatch to handlers concurrently
@@ -795,9 +774,7 @@ class InMemoryEventBackend:
                     exc_info=True,
                 )
 
-    async def _safe_call_handler(
-        self, handler: EventHandler, event: MessagingEvent
-    ) -> None:
+    async def _safe_call_handler(self, handler: EventHandler, event: MessagingEvent) -> None:
         """Safely call a handler, catching exceptions."""
         try:
             await handler(event)
@@ -982,8 +959,7 @@ def create_event_backend(
     factory = _backend_factories.get(selected_type)
     if factory is None and selected_type != BackendType.IN_MEMORY:
         logger.warning(
-            f"Backend type '{selected_type.value}' not registered, "
-            f"falling back to IN_MEMORY"
+            f"Backend type '{selected_type.value}' not registered, " f"falling back to IN_MEMORY"
         )
         selected_type = BackendType.IN_MEMORY
         factory = _backend_factories.get(BackendType.IN_MEMORY)
@@ -1191,9 +1167,7 @@ class ObservabilityBus:
         """
         # Process pending exporter subscriptions
         if self._pending_exporters:
-            pending = list(
-                self._pending_exporters
-            )  # Copy to avoid modification during iteration
+            pending = list(self._pending_exporters)  # Copy to avoid modification during iteration
             for exporter, handler in pending:
                 await self._subscribe_exporter(exporter, handler)
 

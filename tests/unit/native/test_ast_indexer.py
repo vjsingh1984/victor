@@ -54,9 +54,7 @@ class TestStdlibModuleDetection:
             "dataclasses",
         ]
         for module in core_modules:
-            assert (
-                ast_indexer.is_stdlib_module(module) is True
-            ), f"{module} should be stdlib"
+            assert ast_indexer.is_stdlib_module(module) is True, f"{module} should be stdlib"
 
     def test_stdlib_submodules(self, ast_indexer):
         """Test detection of stdlib submodules (e.g., os.path)."""
@@ -69,9 +67,7 @@ class TestStdlibModuleDetection:
             "xml.etree",
         ]
         for module in submodules:
-            assert (
-                ast_indexer.is_stdlib_module(module) is True
-            ), f"{module} should be stdlib"
+            assert ast_indexer.is_stdlib_module(module) is True, f"{module} should be stdlib"
 
     def test_common_third_party_modules(self, ast_indexer):
         """Test detection of common third-party modules (excluded from graph)."""
@@ -98,9 +94,7 @@ class TestStdlibModuleDetection:
             "my_app.models",
         ]
         for module in project_modules:
-            assert (
-                ast_indexer.is_stdlib_module(module) is False
-            ), f"{module} should NOT be stdlib"
+            assert ast_indexer.is_stdlib_module(module) is False, f"{module} should NOT be stdlib"
 
     def test_empty_module_name(self, ast_indexer):
         """Test handling of empty module name."""

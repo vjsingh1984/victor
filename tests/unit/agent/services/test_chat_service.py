@@ -418,9 +418,7 @@ class TestToolService:
         config = ToolServiceConfig()
         selector = mock.Mock()
         executor = mock.Mock()
-        executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="Success")
-        )
+        executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="Success"))
         registrar = mock.Mock()
 
         service = ToolService(
@@ -449,9 +447,7 @@ class TestToolService:
         config = ToolServiceConfig(default_tool_budget=2)
         selector = mock.Mock()
         executor = mock.Mock()
-        executor.execute = mock.AsyncMock(
-            return_value=ToolResult(success=True, output="Success")
-        )
+        executor.execute = mock.AsyncMock(return_value=ToolResult(success=True, output="Success"))
         registrar = mock.Mock()
 
         service = ToolService(

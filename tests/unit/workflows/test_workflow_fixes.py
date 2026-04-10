@@ -373,9 +373,7 @@ class TestContextAwareLoopSignatures:
 
         tracker = UnifiedTaskTracker()
 
-        sig = tracker._get_signature(
-            "read_file", {"path": "/test.py"}, include_stage=False
-        )
+        sig = tracker._get_signature("read_file", {"path": "/test.py"}, include_stage=False)
 
         assert "stage:" not in sig
 

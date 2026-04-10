@@ -162,15 +162,11 @@ class TestDefaultSafetyExtension:
         assert ext.get_category() == "default"
 
     def test_force_push_pattern_matches(self, ext):
-        pattern = next(
-            p for p in ext.get_bash_patterns() if "force" in p.description.lower()
-        )
+        pattern = next(p for p in ext.get_bash_patterns() if "force" in p.description.lower())
         assert re.search(pattern.pattern, "git push origin main --force")
 
     def test_hard_reset_pattern_matches(self, ext):
-        pattern = next(
-            p for p in ext.get_bash_patterns() if "hard reset" in p.description.lower()
-        )
+        pattern = next(p for p in ext.get_bash_patterns() if "hard reset" in p.description.lower())
         assert re.search(pattern.pattern, "git reset --hard HEAD~3")
 
     def test_rm_rf_root_pattern_matches(self, ext):
@@ -182,15 +178,11 @@ class TestDefaultSafetyExtension:
         assert re.search(pattern.pattern, "rm -rf /")
 
     def test_env_file_pattern_matches(self, ext):
-        pattern = next(
-            p for p in ext.get_file_patterns() if "environment" in p.description.lower()
-        )
+        pattern = next(p for p in ext.get_file_patterns() if "environment" in p.description.lower())
         assert re.search(pattern.pattern, "config/.env")
 
     def test_key_file_pattern_matches(self, ext):
-        pattern = next(
-            p for p in ext.get_file_patterns() if "certificate" in p.description.lower()
-        )
+        pattern = next(p for p in ext.get_file_patterns() if "certificate" in p.description.lower())
         assert re.search(pattern.pattern, "server.key")
         assert re.search(pattern.pattern, "cert.pem")
 

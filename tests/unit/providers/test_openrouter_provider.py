@@ -134,9 +134,7 @@ class TestOpenRouterProviderInitialization:
             mock_result.source = "keyring"
             mock_result.source_detail = "System keyring"
             mock_result.sources_attempted = [
-                KeySource(
-                    source="explicit", description="Explicit parameter", found=False
-                ),
+                KeySource(source="explicit", description="Explicit parameter", found=False),
                 KeySource(
                     source="environment",
                     description="OPENROUTER_API_KEY env var",
@@ -214,9 +212,7 @@ class TestOpenRouterRequestPayload:
         assert len(payload["messages"]) == 1
         assert payload["messages"][0]["role"] == "user"
 
-    def test_build_payload_with_tools(
-        self, openrouter_provider, sample_messages, sample_tools
-    ):
+    def test_build_payload_with_tools(self, openrouter_provider, sample_messages, sample_tools):
         """Test payload building with tools."""
         payload = openrouter_provider._build_request_payload(
             messages=sample_messages,

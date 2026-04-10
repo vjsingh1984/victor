@@ -86,9 +86,7 @@ class TestRetryPolicyAdapter:
 
     def test_delay_seconds_preserved(self):
         """delay_seconds should be preserved in strategy."""
-        policy = RetryPolicy(
-            max_retries=3, delay_seconds=2.5, exponential_backoff=False
-        )
+        policy = RetryPolicy(max_retries=3, delay_seconds=2.5, exponential_backoff=False)
         strategy = retry_policy_to_strategy(policy)
         assert strategy.delay == 2.5
 
@@ -103,16 +101,12 @@ class TestNodeRetryStrategy:
 
     def test_exponential_true(self):
         """exponential=True should create ExponentialBackoffStrategy."""
-        strategy = node_retry_strategy(
-            max_retries=3, delay_seconds=1.0, exponential=True
-        )
+        strategy = node_retry_strategy(max_retries=3, delay_seconds=1.0, exponential=True)
         assert isinstance(strategy, ExponentialBackoffStrategy)
 
     def test_exponential_false(self):
         """exponential=False should create FixedDelayStrategy."""
-        strategy = node_retry_strategy(
-            max_retries=3, delay_seconds=1.0, exponential=False
-        )
+        strategy = node_retry_strategy(max_retries=3, delay_seconds=1.0, exponential=False)
         assert isinstance(strategy, FixedDelayStrategy)
 
     def test_custom_max_retries(self):

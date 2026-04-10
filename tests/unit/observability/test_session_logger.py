@@ -96,9 +96,7 @@ class TestSessionLoggerIntegration:
         agent = MockAgent(session_id)
 
         # Logger should use agent's active_session_id
-        logger_name = (
-            f"victor.{agent.active_session_id}" if agent.active_session_id else "victor"
-        )
+        logger_name = f"victor.{agent.active_session_id}" if agent.active_session_id else "victor"
         logger = logging.getLogger(logger_name)
 
         # Verify logger name
@@ -207,9 +205,7 @@ class TestSessionLoggingInWorkflow:
                     "logger": record.name,
                     "level": record.levelname,
                     "message": record.getMessage(),
-                    "session_id": (
-                        record.name.split(".")[-1] if "." in record.name else None
-                    ),
+                    "session_id": (record.name.split(".")[-1] if "." in record.name else None),
                 }
                 return json.dumps(log_obj)
 

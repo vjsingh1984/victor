@@ -212,9 +212,7 @@ class TestImplicitFeedbackCollector:
 
         assert session.total_retries == 1
 
-    def test_record_grounding_result(
-        self, collector: ImplicitFeedbackCollector
-    ) -> None:
+    def test_record_grounding_result(self, collector: ImplicitFeedbackCollector) -> None:
         """Test recording grounding results."""
         session = collector.start_session("sess_1", "analysis")
 
@@ -236,9 +234,7 @@ class TestImplicitFeedbackCollector:
 
     def test_end_session_completed(self, collector: ImplicitFeedbackCollector) -> None:
         """Test ending a completed session."""
-        session = collector.start_session(
-            "sess_1", "analysis", provider="openai", model="gpt-4"
-        )
+        session = collector.start_session("sess_1", "analysis", provider="openai", model="gpt-4")
 
         # Simulate some activity
         collector.record_tool_execution(session, "search", True, 100.0)
@@ -270,9 +266,7 @@ class TestImplicitFeedbackCollector:
         assert feedback.tool_success_rate == 0.0  # 0/2 successful
         assert feedback.retry_count == 1
 
-    def test_efficiency_score_calculation(
-        self, collector: ImplicitFeedbackCollector
-    ) -> None:
+    def test_efficiency_score_calculation(self, collector: ImplicitFeedbackCollector) -> None:
         """Test efficiency score based on duration."""
         # Quick session (should be efficient)
         session = collector.start_session("sess_quick", "search")
@@ -290,9 +284,7 @@ class TestImplicitFeedbackCollector:
 
         assert quick_efficiency > slow_efficiency
 
-    def test_workflow_pattern_tracking(
-        self, collector: ImplicitFeedbackCollector
-    ) -> None:
+    def test_workflow_pattern_tracking(self, collector: ImplicitFeedbackCollector) -> None:
         """Test workflow pattern tracking."""
         session = collector.start_session("sess_1", "action")
 
@@ -353,9 +345,7 @@ class TestImplicitFeedbackCollector:
         assert export[0]["task_completed"] is True
         assert "reward" in export[0]
 
-    def test_session_removed_after_end(
-        self, collector: ImplicitFeedbackCollector
-    ) -> None:
+    def test_session_removed_after_end(self, collector: ImplicitFeedbackCollector) -> None:
         """Test that sessions are removed from active sessions after ending."""
         session = collector.start_session("sess_1", "analysis")
 
@@ -365,9 +355,7 @@ class TestImplicitFeedbackCollector:
 
         assert collector.get_session("sess_1") is None
 
-    def test_no_tools_neutral_success_rate(
-        self, collector: ImplicitFeedbackCollector
-    ) -> None:
+    def test_no_tools_neutral_success_rate(self, collector: ImplicitFeedbackCollector) -> None:
         """Test that sessions with no tools have neutral success rate."""
         session = collector.start_session("sess_1", "analysis")
 

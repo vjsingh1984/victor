@@ -119,9 +119,7 @@ class ITeamMember(IAgent, Protocol):
         """
         ...
 
-    async def receive_message(
-        self, message: "AgentMessage"
-    ) -> Optional["AgentMessage"]:
+    async def receive_message(self, message: "AgentMessage") -> Optional["AgentMessage"]:
         """Receive and optionally respond to a message.
 
         Args:
@@ -175,9 +173,7 @@ class ITeamCoordinator(Protocol):
         """
         ...
 
-    async def broadcast(
-        self, message: "AgentMessage"
-    ) -> List[Optional["AgentMessage"]]:
+    async def broadcast(self, message: "AgentMessage") -> List[Optional["AgentMessage"]]:
         """Broadcast a message to all team members.
 
         Args:

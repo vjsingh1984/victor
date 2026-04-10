@@ -752,9 +752,7 @@ class TestProviderAwareQualityAssessor:
 
     def test_init_with_provider(self):
         """Initialize with provider name."""
-        assessor = ProviderAwareQualityAssessor(
-            provider_name="openai", provider_threshold=0.75
-        )
+        assessor = ProviderAwareQualityAssessor(provider_name="openai", provider_threshold=0.75)
         assert assessor._provider_name == "openai"
         assert assessor._threshold == 0.75
 
@@ -819,17 +817,13 @@ class TestCompositeQualityAssessor:
 
     def test_assess_max_strategy(self):
         """Assess with max strategy."""
-        composite = CompositeQualityAssessor(
-            assessors=[SimpleQualityAssessor()], strategy="max"
-        )
+        composite = CompositeQualityAssessor(assessors=[SimpleQualityAssessor()], strategy="max")
         result = composite.assess("Test response", {"query": "Test?"})
         assert isinstance(result, QualityScore)
 
     def test_assess_min_strategy(self):
         """Assess with min strategy."""
-        composite = CompositeQualityAssessor(
-            assessors=[SimpleQualityAssessor()], strategy="min"
-        )
+        composite = CompositeQualityAssessor(assessors=[SimpleQualityAssessor()], strategy="min")
         result = composite.assess("Test response", {"query": "Test?"})
         assert isinstance(result, QualityScore)
 

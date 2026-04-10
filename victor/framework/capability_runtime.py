@@ -58,9 +58,7 @@ def invoke_capability(
     """Invoke a capability on an object via registry or mapped public method."""
     if isinstance(obj, CapabilityRegistryProtocol):
         try:
-            return obj.invoke_capability(
-                capability_name, *args, min_version=min_version, **kwargs
-            )
+            return obj.invoke_capability(capability_name, *args, min_version=min_version, **kwargs)
         except (KeyError, TypeError) as e:
             logger.debug("Registry invoke failed for '%s': %s", capability_name, e)
 

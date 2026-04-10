@@ -374,9 +374,7 @@ class JavaScriptCodeValidator(BaseCodeValidator):
 
         # Check for relative imports that might be wrong
         if re.search(r"from\s+['\"]\.{3,}", code):
-            warnings.append(
-                "Deep relative import path detected - consider using aliases"
-            )
+            warnings.append("Deep relative import path detected - consider using aliases")
 
         return warnings
 

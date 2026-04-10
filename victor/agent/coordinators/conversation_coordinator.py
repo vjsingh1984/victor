@@ -118,9 +118,7 @@ class ConversationStats:
             "total_tokens": self.total_tokens,
             "start_time": self.start_time,
             "last_activity": self.last_activity,
-            "duration_seconds": (
-                self.last_activity - self.start_time if self.start_time else 0
-            ),
+            "duration_seconds": (self.last_activity - self.start_time if self.start_time else 0),
         }
 
 
@@ -368,12 +366,8 @@ class ConversationCoordinator:
                 # Update stats
                 if self._enable_statistics and removed.turn_type == TurnType.USER:
                     self._stats.user_turns = max(0, self._stats.user_turns - 1)
-                elif (
-                    self._enable_statistics and removed.turn_type == TurnType.ASSISTANT
-                ):
-                    self._stats.assistant_turns = max(
-                        0, self._stats.assistant_turns - 1
-                    )
+                elif self._enable_statistics and removed.turn_type == TurnType.ASSISTANT:
+                    self._stats.assistant_turns = max(0, self._stats.assistant_turns - 1)
 
                 logger.debug(f"Removed turn {turn_id}")
                 return True

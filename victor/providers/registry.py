@@ -70,9 +70,7 @@ def _register_lazy_provider(
     preflight: Optional[Callable[[str], Optional[str]]] = None,
 ) -> None:
     """Register aliases that should be materialized on first use."""
-    spec = _LazyProviderSpec(
-        module_path=module_path, class_name=class_name, preflight=preflight
-    )
+    spec = _LazyProviderSpec(module_path=module_path, class_name=class_name, preflight=preflight)
     for alias in aliases:
         _lazy_provider_specs[alias] = spec
 

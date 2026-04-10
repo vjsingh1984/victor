@@ -145,18 +145,13 @@ class PlanStore:
                 if plan:
                     completed = len(plan.get_completed_steps())
                     total = len(plan.steps)
-                    status = (
-                        "completed" if plan.is_complete() else f"{completed}/{total}"
-                    )
+                    status = "completed" if plan.is_complete() else f"{completed}/{total}"
 
                     plans.append(
                         {
                             "id": plan.id,
-                            "goal": plan.goal[:50]
-                            + ("..." if len(plan.goal) > 50 else ""),
-                            "created_at": datetime.fromtimestamp(
-                                plan.created_at
-                            ).isoformat(),
+                            "goal": plan.goal[:50] + ("..." if len(plan.goal) > 50 else ""),
+                            "created_at": datetime.fromtimestamp(plan.created_at).isoformat(),
                             "status": status,
                             "filepath": str(filepath),
                         }

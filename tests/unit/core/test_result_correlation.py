@@ -228,9 +228,7 @@ class TestResultCorrelator:
     def test_categorize_assertion_error(self):
         """Test categorizing assertion errors."""
         correlator = ResultCorrelator()
-        category = correlator.categorize_failure(
-            "AssertionError: expected True got False"
-        )
+        category = correlator.categorize_failure("AssertionError: expected True got False")
         assert category == FailureCategory.ASSERTION_ERROR
 
     def test_categorize_import_error(self):
@@ -239,9 +237,7 @@ class TestResultCorrelator:
         category = correlator.categorize_failure("ImportError: No module named 'foo'")
         assert category == FailureCategory.IMPORT_ERROR
 
-        category = correlator.categorize_failure(
-            "ModuleNotFoundError: No module named 'bar'"
-        )
+        category = correlator.categorize_failure("ModuleNotFoundError: No module named 'bar'")
         assert category == FailureCategory.IMPORT_ERROR
 
     def test_categorize_syntax_error(self):
@@ -259,9 +255,7 @@ class TestResultCorrelator:
     def test_categorize_attribute_error(self):
         """Test categorizing attribute errors."""
         correlator = ResultCorrelator()
-        category = correlator.categorize_failure(
-            "AttributeError: 'Foo' has no attribute 'bar'"
-        )
+        category = correlator.categorize_failure("AttributeError: 'Foo' has no attribute 'bar'")
         assert category == FailureCategory.ATTRIBUTE_ERROR
 
     def test_categorize_timeout(self):

@@ -197,9 +197,7 @@ class TestURLResolver:
             # Create mock session instance
             mock_session_instance = MagicMock()
             mock_session_instance.get = MockGetContextManager
-            mock_session_instance.__aenter__ = AsyncMock(
-                return_value=mock_session_instance
-            )
+            mock_session_instance.__aenter__ = AsyncMock(return_value=mock_session_instance)
             mock_session_instance.__aexit__ = AsyncMock(return_value=None)
 
             mock_session.return_value = mock_session_instance
@@ -221,9 +219,7 @@ class TestFileResolver:
     @pytest.mark.asyncio
     async def test_file_not_found(self, resolver):
         """Test file not found error."""
-        item = await resolver.resolve(
-            "/nonexistent/file.py", {"working_directory": "."}
-        )
+        item = await resolver.resolve("/nonexistent/file.py", {"working_directory": "."})
         assert item.success is False
         assert "not found" in item.error.lower()
 

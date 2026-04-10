@@ -106,9 +106,7 @@ class TestNormalizeParameterAliases:
 
     def test_multiple_aliases(self):
         """Test multiple aliases applied."""
-        config = {
-            "parameter_aliases": {"read": {"line_start": "offset", "line_end": "limit"}}
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "limit"}}}
         normalizer = ArgumentNormalizer(config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
         result, was_aliased = normalizer.normalize_parameter_aliases(args, "read")
@@ -514,9 +512,7 @@ class TestIntegration:
     def test_ollama_python_syntax(self):
         """Test Ollama-style Python syntax is handled."""
         normalizer = ArgumentNormalizer(provider_name="ollama")
-        args = {
-            "operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"
-        }
+        args = {"operations": "[{'type': 'modify', 'path': 'test.sh', 'content': 'echo hello'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
 
         # Should successfully normalize
@@ -529,11 +525,7 @@ class TestIntegration:
 
     def test_gpt_oss_aliases(self):
         """Test gpt-oss style parameter aliases are handled."""
-        config = {
-            "parameter_aliases": {
-                "read": {"line_start": "offset", "line_end": "_line_end"}
-            }
-        }
+        config = {"parameter_aliases": {"read": {"line_start": "offset", "line_end": "_line_end"}}}
         normalizer = ArgumentNormalizer(provider_name="ollama", config=config)
         args = {"path": "test.py", "line_start": 10, "line_end": 50}
 
@@ -555,10 +547,7 @@ class TestIntegration:
 
         stats = normalizer.get_stats()
         assert stats["total_calls"] == 2
-        assert (
-            stats["normalizations"]["direct"] >= 1
-            or stats["normalizations"]["python_ast"] >= 1
-        )
+        assert stats["normalizations"]["direct"] >= 1 or stats["normalizations"]["python_ast"] >= 1
 
 
 class TestNativeFallback:

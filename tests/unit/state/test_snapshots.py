@@ -249,9 +249,7 @@ class TestFileSnapshotStore:
         # Create multiple snapshots
         id1 = snapshot_manager.create_snapshot(files=["file1.py"], description="First")
         id2 = snapshot_manager.create_snapshot(files=["file2.py"], description="Second")
-        id3 = snapshot_manager.create_snapshot(
-            files=["file1.py", "file2.py"], description="Third"
-        )
+        id3 = snapshot_manager.create_snapshot(files=["file1.py", "file2.py"], description="Third")
 
         snapshots = snapshot_manager.list_snapshots(limit=10)
         assert len(snapshots) == 3
@@ -264,9 +262,7 @@ class TestFileSnapshotStore:
     def test_list_snapshots_with_limit(self, snapshot_manager):
         """list_snapshots should respect limit parameter."""
         for i in range(5):
-            snapshot_manager.create_snapshot(
-                files=["file1.py"], description=f"Snap {i}"
-            )
+            snapshot_manager.create_snapshot(files=["file1.py"], description=f"Snap {i}")
 
         snapshots = snapshot_manager.list_snapshots(limit=2)
         assert len(snapshots) == 2
@@ -296,9 +292,7 @@ class TestFileSnapshotStore:
 
         ids = []
         for i in range(5):
-            ids.append(
-                manager.create_snapshot(files=["file1.py"], description=f"Snap {i}")
-            )
+            ids.append(manager.create_snapshot(files=["file1.py"], description=f"Snap {i}"))
 
         # Should only have 3 snapshots
         assert len(manager.list_snapshots(limit=10)) == 3
@@ -313,9 +307,7 @@ class TestFileSnapshotStore:
     def test_clear_all(self, snapshot_manager):
         """clear_all should remove all snapshots."""
         for i in range(3):
-            snapshot_manager.create_snapshot(
-                files=["file1.py"], description=f"Snap {i}"
-            )
+            snapshot_manager.create_snapshot(files=["file1.py"], description=f"Snap {i}")
 
         count = snapshot_manager.clear_all()
         assert count == 3

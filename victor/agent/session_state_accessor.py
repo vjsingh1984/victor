@@ -56,9 +56,7 @@ class SessionStateAccessor:
     @observed_files.setter
     def observed_files(self, value: Set[str]) -> None:
         """Set observed files (for checkpoint restore)."""
-        self._session_state.execution_state.observed_files = (
-            set(value) if value else set()
-        )
+        self._session_state.execution_state.observed_files = set(value) if value else set()
 
     @property
     def executed_tools(self) -> List[str]:
@@ -71,9 +69,7 @@ class SessionStateAccessor:
     @executed_tools.setter
     def executed_tools(self, value: List[str]) -> None:
         """Set executed tools (for checkpoint restore)."""
-        self._session_state.execution_state.executed_tools = (
-            list(value) if value else []
-        )
+        self._session_state.execution_state.executed_tools = list(value) if value else []
 
     @property
     def failed_tool_signatures(self) -> Set[Tuple[str, str]]:
@@ -86,9 +82,7 @@ class SessionStateAccessor:
     @failed_tool_signatures.setter
     def failed_tool_signatures(self, value: Set[Tuple[str, str]]) -> None:
         """Set failed tool signatures (for checkpoint restore)."""
-        self._session_state.execution_state.failed_tool_signatures = (
-            set(value) if value else set()
-        )
+        self._session_state.execution_state.failed_tool_signatures = set(value) if value else set()
 
     @property
     def tool_capability_warned(self) -> bool:

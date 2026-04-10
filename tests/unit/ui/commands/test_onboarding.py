@@ -153,9 +153,7 @@ class TestProfileYAMLGeneration:
     def test_apply_configuration(self, mock_install):
         """Applying configuration calls install_profile."""
         wizard = OnboardingWizard()
-        wizard.state["selected_profile"] = MagicMock(
-            name="test", display_name="Test Profile"
-        )
+        wizard.state["selected_profile"] = MagicMock(name="test", display_name="Test Profile")
         wizard.state["provider"] = "ollama"
         wizard.state["model"] = "qwen2.5-coder:7b"
 

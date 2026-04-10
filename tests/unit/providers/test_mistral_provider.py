@@ -169,9 +169,7 @@ class TestMistralRequestPayload:
         assert len(payload["messages"]) == 1
         assert payload["messages"][0]["role"] == "user"
 
-    def test_build_payload_with_tools(
-        self, mistral_provider, sample_messages, sample_tools
-    ):
+    def test_build_payload_with_tools(self, mistral_provider, sample_messages, sample_tools):
         """Test payload building with tools."""
         payload = mistral_provider._build_request_payload(
             messages=sample_messages,
@@ -238,9 +236,7 @@ class TestMistralResponseParsing:
             },
         }
 
-        response = mistral_provider._parse_response(
-            raw_response, "mistral-small-latest"
-        )
+        response = mistral_provider._parse_response(raw_response, "mistral-small-latest")
         assert response.content == "4"
         assert response.role == "assistant"
         assert response.stop_reason == "stop"
@@ -274,9 +270,7 @@ class TestMistralResponseParsing:
             ],
         }
 
-        response = mistral_provider._parse_response(
-            raw_response, "mistral-large-latest"
-        )
+        response = mistral_provider._parse_response(raw_response, "mistral-large-latest")
         assert response.tool_calls is not None
         assert len(response.tool_calls) == 1
         assert response.tool_calls[0]["name"] == "calculator"

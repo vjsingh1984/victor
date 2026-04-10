@@ -250,25 +250,19 @@ class ProviderPayloadLimiter:
             elif role == "tool":
                 tool_result_bytes += msg_bytes
 
-        messages_bytes = len(
-            json.dumps(messages_data, ensure_ascii=False).encode("utf-8")
-        )
+        messages_bytes = len(json.dumps(messages_data, ensure_ascii=False).encode("utf-8"))
 
         # Estimate tools size
         tools_bytes = 0
         if tools:
             tools_data = [self._tool_to_dict(t) for t in tools]
-            tools_bytes = len(
-                json.dumps(tools_data, ensure_ascii=False).encode("utf-8")
-            )
+            tools_bytes = len(json.dumps(tools_data, ensure_ascii=False).encode("utf-8"))
 
         # Estimate overhead (model name, params, etc.)
         overhead_bytes = 200  # Base overhead for typical params
         for key, value in kwargs.items():
             if value is not None:
-                overhead_bytes += len(
-                    json.dumps({key: value}, ensure_ascii=False).encode("utf-8")
-                )
+                overhead_bytes += len(json.dumps({key: value}, ensure_ascii=False).encode("utf-8"))
 
         total_bytes = messages_bytes + tools_bytes + overhead_bytes
 
@@ -403,9 +397,7 @@ class ProviderPayloadLimiter:
         original_bytes = estimate.total_bytes
 
         # Find where to start truncating (after system message if present)
-        start_idx = (
-            1 if messages and getattr(messages[0], "role", "") == "system" else 0
-        )
+        start_idx = 1 if messages and getattr(messages[0], "role", "") == "system" else 0
 
         while True:
             current_estimate = self.estimate_size(truncated_messages, tools, **kwargs)
@@ -421,8 +413,7 @@ class ProviderPayloadLimiter:
             messages_removed += 1
 
         bytes_saved = (
-            original_bytes
-            - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
+            original_bytes - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
         )
 
         logger.info(
@@ -462,9 +453,7 @@ class ProviderPayloadLimiter:
                 content = getattr(msg, "content", "")
                 if len(content) > max_tool_result_size:
                     # Truncate and add indicator
-                    truncated_content = (
-                        content[:max_tool_result_size] + "\n...[truncated]"
-                    )
+                    truncated_content = content[:max_tool_result_size] + "\n...[truncated]"
                     # Create new message with truncated content
                     new_msg = BaseMessage(
                         role="tool",
@@ -479,8 +468,7 @@ class ProviderPayloadLimiter:
                 truncated_messages.append(msg)
 
         bytes_saved = (
-            original_bytes
-            - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
+            original_bytes - self.estimate_size(truncated_messages, tools, **kwargs).total_bytes
         )
 
         return TruncationResult(
@@ -502,9 +490,7 @@ class ProviderPayloadLimiter:
         """Summarize tool results (placeholder - would need LLM call)."""
         # For now, fall back to truncation
         # A full implementation would call a small/fast LLM to summarize
-        logger.warning(
-            "summarize_tool_results not fully implemented, falling back to truncate"
-        )
+        logger.warning("summarize_tool_results not fully implemented, falling back to truncate")
         return self._truncate_tool_results(messages, tools, estimate, **kwargs)
 
     def _reduce_tools(
@@ -529,9 +515,7 @@ class ProviderPayloadLimiter:
         new_estimate = self.estimate_size(messages, reduced_tools, **kwargs)
         if new_estimate.exceeds_limit:
             # Still exceeds, combine with message truncation
-            result = self._truncate_oldest(
-                messages, reduced_tools, new_estimate, **kwargs
-            )
+            result = self._truncate_oldest(messages, reduced_tools, new_estimate, **kwargs)
             result.tools_removed = tools_removed
             return result
 

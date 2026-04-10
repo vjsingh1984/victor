@@ -137,15 +137,11 @@ class ExecutionCoordinator:
         # Initialize tracking for this conversation turn
         self._tool_context.tool_calls_used = 0
         failure_context = ToolFailureContext()
-        max_iterations_setting = getattr(
-            self._chat_context.settings, "chat_max_iterations", 10
-        )
+        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
         iteration = 0
 
         # Classify task complexity for appropriate budgeting
-        task_classification = self._provider_context.task_classifier.classify(
-            user_message
-        )
+        task_classification = self._provider_context.task_classifier.classify(user_message)
         # Ensure at least 1 iteration is always allowed
         task_iteration_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(
@@ -206,9 +202,7 @@ class ExecutionCoordinator:
                 consecutive_zero_tool_turns = 0
 
                 # Track read-heavy turns for search nudge
-                turn_tools = {
-                    tc.get("name", "") for tc in response.tool_calls
-                }
+                turn_tools = {tc.get("name", "") for tc in response.tool_calls}
                 if "code_search" in turn_tools:
                     has_used_code_search = True
                 if turn_tools.issubset(_READ_ONLY_TOOLS):
@@ -226,9 +220,7 @@ class ExecutionCoordinator:
                     consecutive_read_only_turns = 0
 
                 # Handle tool calls and track results
-                tool_results = await self._tool_context._handle_tool_calls(
-                    response.tool_calls
-                )
+                tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
 
                 # Update failure context
                 for result in tool_results:
@@ -287,9 +279,7 @@ class ExecutionCoordinator:
             continue
 
         # Ensure we have a complete response
-        final_response = await self._ensure_complete_response(
-            final_response, failure_context
-        )
+        final_response = await self._ensure_complete_response(final_response, failure_context)
 
         return final_response
 
@@ -383,15 +373,11 @@ class ExecutionCoordinator:
                 calculate_exploration_budget,
             )
 
-            provider_name = getattr(
-                self._provider_context, "provider_name", "ollama"
-            )
+            provider_name = getattr(self._provider_context, "provider_name", "ollama")
             if hasattr(provider_name, "__call__"):
                 provider_name = "ollama"  # Mock fallback
             model_name = getattr(self._provider_context, "model", None)
-            complexity_str = getattr(
-                task_classification, "complexity", "action"
-            )
+            complexity_str = getattr(task_classification, "complexity", "action")
             if hasattr(complexity_str, "value"):
                 complexity_str = complexity_str.value
 
@@ -467,9 +453,7 @@ class ExecutionCoordinator:
         )
 
         # Prioritize by stage
-        tools = self._tool_context.tool_selector.prioritize_by_stage(
-            user_message, tools
-        )
+        tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
         return tools
 
@@ -510,15 +494,15 @@ class ExecutionCoordinator:
             if self._token_tracker is not None:
                 self._token_tracker.accumulate(response.usage)
             else:
-                self._chat_context._cumulative_token_usage[
-                    "prompt_tokens"
-                ] += response.usage.get("prompt_tokens", 0)
+                self._chat_context._cumulative_token_usage["prompt_tokens"] += response.usage.get(
+                    "prompt_tokens", 0
+                )
                 self._chat_context._cumulative_token_usage[
                     "completion_tokens"
                 ] += response.usage.get("completion_tokens", 0)
-                self._chat_context._cumulative_token_usage[
-                    "total_tokens"
-                ] += response.usage.get("total_tokens", 0)
+                self._chat_context._cumulative_token_usage["total_tokens"] += response.usage.get(
+                    "total_tokens", 0
+                )
 
     async def _check_context_compaction(
         self,
@@ -565,16 +549,12 @@ class ExecutionCoordinator:
             return final_response
 
         # Use response completer to generate a response
-        completion_result = (
-            await self._provider_context.response_completer.ensure_response(
-                messages=self._chat_context.messages,
-                model=self._provider_context.model,
-                temperature=self._provider_context.temperature,
-                max_tokens=self._provider_context.max_tokens,
-                failure_context=(
-                    failure_context if failure_context.failed_tools else None
-                ),
-            )
+        completion_result = await self._provider_context.response_completer.ensure_response(
+            messages=self._chat_context.messages,
+            model=self._provider_context.model,
+            temperature=self._provider_context.temperature,
+            max_tokens=self._provider_context.max_tokens,
+            failure_context=(failure_context if failure_context.failed_tools else None),
         )
 
         if completion_result.content:
@@ -587,8 +567,7 @@ class ExecutionCoordinator:
 
         # Last resort fallback
         fallback_content = (
-            "I was unable to generate a complete response. "
-            "Please try rephrasing your request."
+            "I was unable to generate a complete response. " "Please try rephrasing your request."
         )
         if failure_context.failed_tools:
             fallback_content = (

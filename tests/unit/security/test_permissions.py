@@ -34,77 +34,43 @@ class TestPermissionMode:
 
     def test_from_string(self):
         assert PermissionMode.from_string("read-only") == PermissionMode.READ_ONLY
-        assert (
-            PermissionMode.from_string("workspace-write")
-            == PermissionMode.WORKSPACE_WRITE
-        )
-        assert (
-            PermissionMode.from_string("danger-full-access")
-            == PermissionMode.DANGER_FULL_ACCESS
-        )
+        assert PermissionMode.from_string("workspace-write") == PermissionMode.WORKSPACE_WRITE
+        assert PermissionMode.from_string("danger-full-access") == PermissionMode.DANGER_FULL_ACCESS
         with pytest.raises(ValueError):
             PermissionMode.from_string("invalid")
 
     def test_from_string_alternate_forms(self):
         assert PermissionMode.from_string("readonly") == PermissionMode.READ_ONLY
-        assert (
-            PermissionMode.from_string("workspacewrite")
-            == PermissionMode.WORKSPACE_WRITE
-        )
-        assert (
-            PermissionMode.from_string("dangerfullaccess")
-            == PermissionMode.DANGER_FULL_ACCESS
-        )
+        assert PermissionMode.from_string("workspacewrite") == PermissionMode.WORKSPACE_WRITE
+        assert PermissionMode.from_string("dangerfullaccess") == PermissionMode.DANGER_FULL_ACCESS
 
     def test_from_string_case_insensitive(self):
         assert PermissionMode.from_string("READ-ONLY") == PermissionMode.READ_ONLY
-        assert (
-            PermissionMode.from_string("Workspace-Write")
-            == PermissionMode.WORKSPACE_WRITE
-        )
+        assert PermissionMode.from_string("Workspace-Write") == PermissionMode.WORKSPACE_WRITE
 
     def test_from_access_mode(self):
         from victor.tools.enums import AccessMode
 
+        assert PermissionMode.from_access_mode(AccessMode.READONLY) == PermissionMode.READ_ONLY
+        assert PermissionMode.from_access_mode(AccessMode.WRITE) == PermissionMode.WORKSPACE_WRITE
         assert (
-            PermissionMode.from_access_mode(AccessMode.READONLY)
-            == PermissionMode.READ_ONLY
+            PermissionMode.from_access_mode(AccessMode.EXECUTE) == PermissionMode.DANGER_FULL_ACCESS
         )
+        assert PermissionMode.from_access_mode(AccessMode.NETWORK) == PermissionMode.READ_ONLY
         assert (
-            PermissionMode.from_access_mode(AccessMode.WRITE)
-            == PermissionMode.WORKSPACE_WRITE
-        )
-        assert (
-            PermissionMode.from_access_mode(AccessMode.EXECUTE)
-            == PermissionMode.DANGER_FULL_ACCESS
-        )
-        assert (
-            PermissionMode.from_access_mode(AccessMode.NETWORK)
-            == PermissionMode.READ_ONLY
-        )
-        assert (
-            PermissionMode.from_access_mode(AccessMode.MIXED)
-            == PermissionMode.DANGER_FULL_ACCESS
+            PermissionMode.from_access_mode(AccessMode.MIXED) == PermissionMode.DANGER_FULL_ACCESS
         )
 
     def test_from_danger_level(self):
         from victor.tools.enums import DangerLevel
 
+        assert PermissionMode.from_danger_level(DangerLevel.SAFE) == PermissionMode.READ_ONLY
+        assert PermissionMode.from_danger_level(DangerLevel.LOW) == PermissionMode.WORKSPACE_WRITE
         assert (
-            PermissionMode.from_danger_level(DangerLevel.SAFE)
-            == PermissionMode.READ_ONLY
+            PermissionMode.from_danger_level(DangerLevel.MEDIUM) == PermissionMode.WORKSPACE_WRITE
         )
         assert (
-            PermissionMode.from_danger_level(DangerLevel.LOW)
-            == PermissionMode.WORKSPACE_WRITE
-        )
-        assert (
-            PermissionMode.from_danger_level(DangerLevel.MEDIUM)
-            == PermissionMode.WORKSPACE_WRITE
-        )
-        assert (
-            PermissionMode.from_danger_level(DangerLevel.HIGH)
-            == PermissionMode.DANGER_FULL_ACCESS
+            PermissionMode.from_danger_level(DangerLevel.HIGH) == PermissionMode.DANGER_FULL_ACCESS
         )
         assert (
             PermissionMode.from_danger_level(DangerLevel.CRITICAL)
@@ -216,14 +182,9 @@ class TestPermissionPolicy:
         policy = PermissionPolicy(PermissionMode.READ_ONLY)
         assert policy.get_required_permission("read") == PermissionMode.READ_ONLY
         assert policy.get_required_permission("write") == PermissionMode.WORKSPACE_WRITE
-        assert (
-            policy.get_required_permission("bash") == PermissionMode.DANGER_FULL_ACCESS
-        )
+        assert policy.get_required_permission("bash") == PermissionMode.DANGER_FULL_ACCESS
         # Unknown defaults to DANGER_FULL_ACCESS
-        assert (
-            policy.get_required_permission("unknown")
-            == PermissionMode.DANGER_FULL_ACCESS
-        )
+        assert policy.get_required_permission("unknown") == PermissionMode.DANGER_FULL_ACCESS
 
     def test_active_mode_property(self):
         policy = PermissionPolicy(PermissionMode.READ_ONLY)

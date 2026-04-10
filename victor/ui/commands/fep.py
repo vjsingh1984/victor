@@ -149,9 +149,7 @@ def create_fep(
             if result.returncode == 0:
                 github_username = result.stdout.strip()
     except FileNotFoundError:
-        console.print(
-            "[yellow]Warning:[/] Git not found. Specify author info manually.\n"
-        )
+        console.print("[yellow]Warning:[/] Git not found. Specify author info manually.\n")
 
     if not author_name:
         console.print("[bold red]Error:[/] Author name required (use --author)")
@@ -234,9 +232,7 @@ implementation: null
 @fep_app.command("validate")
 def validate_fep_command(
     fep_path: Path = typer.Argument(..., help="Path to FEP markdown file"),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Show detailed validation output"
-    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed validation output"),
 ) -> None:
     """Validate FEP structure and content.
 
@@ -297,9 +293,7 @@ def submit_fep(
     result = validator.validate_file(fep_path)
 
     if not result.is_valid:
-        console.print(
-            "[bold red]✗[/] FEP validation failed. Fix errors before submitting."
-        )
+        console.print("[bold red]✗[/] FEP validation failed. Fix errors before submitting.")
         console.print()
         console.print("Errors:")
         for error in result.errors:
@@ -448,9 +442,7 @@ This PR proposes {metadata.title.lower()}.
 
 @fep_app.command("list")
 def list_feps(
-    status: Optional[str] = typer.Option(
-        None, "--status", "-s", help="Filter by status"
-    ),
+    status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
     fep_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by type"),
     sort_by: str = typer.Option(
         "number", "--sort", help="Sort by field (number, created, modified, title)"
@@ -618,9 +610,7 @@ def view_fep(
             panel_content += f"\n[bold]Implementation:[/] {metadata.implementation}"
 
         console.print()
-        console.print(
-            Panel(panel_content, title=f"FEP-{metadata.fep:04d}", border_style="cyan")
-        )
+        console.print(Panel(panel_content, title=f"FEP-{metadata.fep:04d}", border_style="cyan"))
         console.print()
 
         # Extract and show summary

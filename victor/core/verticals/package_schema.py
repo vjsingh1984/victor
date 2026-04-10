@@ -254,9 +254,7 @@ class VerticalPackageMetadata(BaseModel):
             lines.append("authors = [")
             for author in self.authors:
                 if author.email:
-                    lines.append(
-                        f'    {{name = "{author.name}", email = "{author.email}"}},'
-                    )
+                    lines.append(f'    {{name = "{author.name}", email = "{author.email}"}},')
                 else:
                     lines.append(f'    {{name = "{author.name}"}},')
             lines.append("]")
@@ -290,15 +288,11 @@ class VerticalPackageMetadata(BaseModel):
                 lines.append(f"provides_tools = [{tools_str}]")
 
             if self.class_spec.provides_workflows:
-                workflows_str = ", ".join(
-                    f'"{w}"' for w in self.class_spec.provides_workflows
-                )
+                workflows_str = ", ".join(f'"{w}"' for w in self.class_spec.provides_workflows)
                 lines.append(f"provides_workflows = [{workflows_str}]")
 
             if self.class_spec.provides_capabilities:
-                caps_str = ", ".join(
-                    f'"{c}"' for c in self.class_spec.provides_capabilities
-                )
+                caps_str = ", ".join(f'"{c}"' for c in self.class_spec.provides_capabilities)
                 lines.append(f"provides_capabilities = [{caps_str}]")
 
         return "\n".join(lines)

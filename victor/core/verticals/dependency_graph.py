@@ -46,10 +46,7 @@ class DependencyCycleError(Exception):
 
     def __init__(self, cycle: List[str], message: str = "") -> None:
         self.cycle = cycle
-        self.message = (
-            message
-            or f"Circular dependency detected: {' -> '.join(cycle + [cycle[0]])}"
-        )
+        self.message = message or f"Circular dependency detected: {' -> '.join(cycle + [cycle[0]])}"
         super().__init__(self.message)
 
 
@@ -183,9 +180,7 @@ class ExtensionDependencyGraph:
                         self._nodes[dependent_name].dependencies.discard(vertical_name)
 
                 del self._nodes[vertical_name]
-                logger.debug(
-                    f"Removed vertical '{vertical_name}' from dependency graph"
-                )
+                logger.debug(f"Removed vertical '{vertical_name}' from dependency graph")
 
     def add_dependency(
         self,
@@ -208,9 +203,7 @@ class ExtensionDependencyGraph:
                 raise ValueError(f"Vertical '{vertical_name}' not in graph")
             if dependency_name not in self._nodes:
                 if required:
-                    raise ValueError(
-                        f"Required dependency '{dependency_name}' not in graph"
-                    )
+                    raise ValueError(f"Required dependency '{dependency_name}' not in graph")
                 # Optional dependency - track it but don't fail
                 logger.debug(
                     f"Optional dependency '{dependency_name}' not in graph for '{vertical_name}'"
@@ -310,9 +303,7 @@ class ExtensionDependencyGraph:
             # Check if all nodes were processed (should be true if no cycles)
             if len(order) != len(self._nodes):
                 # This shouldn't happen if cycle detection works
-                logger.warning(
-                    f"Load order incomplete: {len(order)}/{len(self._nodes)} nodes"
-                )
+                logger.warning(f"Load order incomplete: {len(order)}/{len(self._nodes)} nodes")
 
             return LoadOrder(order=order)
 

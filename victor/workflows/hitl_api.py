@@ -495,9 +495,7 @@ class SQLiteHITLStore:
 
         context = json.loads(row["context"]) if row["context"] else {}
         choices = json.loads(row["choices"]) if row["choices"] else None
-        default_value = (
-            json.loads(row["default_value"]) if row["default_value"] else None
-        )
+        default_value = json.loads(row["default_value"]) if row["default_value"] else None
 
         request = HITLRequest(
             request_id=row["id"],
@@ -536,9 +534,7 @@ class SQLiteHITLStore:
             status=row["status"],
             response=response,
             created_at=datetime.fromisoformat(row["created_at"]),
-            expires_at=(
-                datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None
-            ),
+            expires_at=(datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None),
         )
 
     async def store_request(
@@ -561,9 +557,7 @@ class SQLiteHITLStore:
 
         async with self._lock:
             now = _utc_now()
-            expires_at = datetime.fromtimestamp(
-                now.timestamp() + request.timeout, tz=timezone.utc
-            )
+            expires_at = datetime.fromtimestamp(now.timestamp() + request.timeout, tz=timezone.utc)
 
             conn = self._get_connection()
             try:
@@ -696,9 +690,7 @@ class SQLiteHITLStore:
                 ).fetchone()
 
                 if not row:
-                    logger.warning(
-                        f"HITL request {request_id} not found or not pending"
-                    )
+                    logger.warning(f"HITL request {request_id} not found or not pending")
                     return None
 
                 # Determine status
@@ -1076,9 +1068,7 @@ def create_hitl_router(
         from fastapi import APIRouter, Body, HTTPException, Header
         from fastapi.responses import HTMLResponse
     except ImportError:
-        raise ImportError(
-            "FastAPI is required for HITL API. Install with: pip install fastapi"
-        )
+        raise ImportError("FastAPI is required for HITL API. Install with: pip install fastapi")
 
     router = APIRouter(tags=["hitl"])
     hitl_store = store or get_global_store()
@@ -1130,9 +1120,7 @@ def create_hitl_router(
             reason=body.reason,
         )
         if not response:
-            raise HTTPException(
-                status_code=404, detail="Request not found or already processed"
-            )
+            raise HTTPException(status_code=404, detail="Request not found or already processed")
         return {"success": True, "response": response.to_dict()}
 
     @router.get("/ui", response_class=HTMLResponse)
@@ -1154,9 +1142,7 @@ def create_hitl_router(
         """Get approval history for audit purposes."""
         await verify_auth(authorization)
         if hasattr(hitl_store, "get_request_history"):
-            history = await hitl_store.get_request_history(
-                workflow_id=workflow_id, limit=limit
-            )
+            history = await hitl_store.get_request_history(workflow_id=workflow_id, limit=limit)
             return {"history": [r.to_dict() for r in history], "count": len(history)}
         return {"history": [], "count": 0, "note": "History requires SQLite store"}
 
@@ -2525,9 +2511,7 @@ def create_hitl_app(
         from fastapi import FastAPI
         from fastapi.middleware.cors import CORSMiddleware
     except ImportError:
-        raise ImportError(
-            "FastAPI is required for HITL API. Install with: pip install fastapi"
-        )
+        raise ImportError("FastAPI is required for HITL API. Install with: pip install fastapi")
 
     hitl_store = store or get_global_store()
 
@@ -2620,9 +2604,7 @@ async def run_hitl_server(
     try:
         import uvicorn
     except ImportError:
-        raise ImportError(
-            "uvicorn is required for HITL server. Install with: pip install uvicorn"
-        )
+        raise ImportError("uvicorn is required for HITL server. Install with: pip install uvicorn")
 
     if app is None:
         app = create_hitl_app()

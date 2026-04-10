@@ -85,15 +85,11 @@ class EventLogWidget(RichLog):
         timestamp = event.timestamp.strftime("%H:%M:%S.%f")[:-3]
         color = CATEGORY_COLORS.get(event.topic.split(".")[0], "white")
         category_name = (
-            event.topic.split(".")[0].upper()
-            if event.topic.split(".")[0]
-            else "UNKNOWN"
+            event.topic.split(".")[0].upper() if event.topic.split(".")[0] else "UNKNOWN"
         )
 
         # Main event line
-        self.write(
-            f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] [bold]{event.topic}[/]"
-        )
+        self.write(f"[dim]{timestamp}[/] [{color}]{category_name:10}[/] [bold]{event.topic}[/]")
 
         # Optional data preview
         if self._show_data and event.data:
@@ -134,9 +130,7 @@ class EventLogWidget(RichLog):
                 if isinstance(value, str) and len(value) > 30:
                     value = value[:30] + "..."
                 elif isinstance(value, (list, dict)):
-                    value = (
-                        f"[{len(value)} items]" if isinstance(value, list) else "{...}"
-                    )
+                    value = f"[{len(value)} items]" if isinstance(value, list) else "{...}"
                 parts.append(f"{key}={value}")
 
         result = ", ".join(parts)

@@ -185,9 +185,7 @@ class UnitOfWork(UnitOfWorkProtocol):
         self._committed = False
         self._lock = asyncio.Lock()
 
-    def register_repository(
-        self, repository: Repository[T], entity_type: Type[T]
-    ) -> None:
+    def register_repository(self, repository: Repository[T], entity_type: Type[T]) -> None:
         """Register a repository for an entity type.
 
         Args:
@@ -201,9 +199,7 @@ class UnitOfWork(UnitOfWorkProtocol):
         """Get repository for entity type."""
         entity_type = type(entity)
         if entity_type not in self._repositories:
-            raise UnitOfWorkError(
-                f"No repository registered for {entity_type.__name__}"
-            )
+            raise UnitOfWorkError(f"No repository registered for {entity_type.__name__}")
         return self._repositories[entity_type]
 
     def get(self, entity_id: str) -> Optional[Entity]:
@@ -389,11 +385,7 @@ class UnitOfWork(UnitOfWorkProtocol):
     @property
     def pending_count(self) -> int:
         """Get count of pending changes."""
-        return (
-            len(self._new_entities)
-            + len(self._modified_entities)
-            + len(self._deleted_entities)
-        )
+        return len(self._new_entities) + len(self._modified_entities) + len(self._deleted_entities)
 
     async def __aenter__(self) -> "UnitOfWork":
         """Enter async context."""

@@ -346,9 +346,7 @@ class WorkflowContext:
 
     def has_failures(self) -> bool:
         """Check if any nodes failed."""
-        return any(
-            r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values()
-        )
+        return any(r.status == ExecutorNodeStatus.FAILED for r in self.node_results.values())
 
     def get_outputs(self) -> Dict[str, Any]:
         """Get all successful node outputs."""
@@ -388,9 +386,7 @@ class WorkflowResult:
             "total_tool_calls": self.total_tool_calls,
             "error": self.error,
             "outputs": self.context.get_outputs(),
-            "node_results": {
-                nid: r.to_dict() for nid, r in self.context.node_results.items()
-            },
+            "node_results": {nid: r.to_dict() for nid, r in self.context.node_results.items()},
         }
 
     def get_output(self, node_id: str) -> Optional[Any]:
@@ -656,9 +652,7 @@ class WorkflowExecutor:
         # Check for checkpoint to resume from
         resume_from_node: Optional[str] = None
         if self._checkpointer:
-            checkpoint = self._checkpointer.get_latest_checkpoint(
-                f"workflow_{thread_id}"
-            )
+            checkpoint = self._checkpointer.get_latest_checkpoint(f"workflow_{thread_id}")
             if checkpoint:
                 logger.info(
                     f"Resuming from checkpoint at node: {checkpoint.state.get('last_node')}"
@@ -668,9 +662,7 @@ class WorkflowExecutor:
 
         # Build temporal context from workflow metadata if not provided
         if temporal_context is None and "temporal_context" in workflow.metadata:
-            temporal_context = TemporalContext.from_dict(
-                workflow.metadata["temporal_context"]
-            )
+            temporal_context = TemporalContext.from_dict(workflow.metadata["temporal_context"])
 
         context = WorkflowContext(
             data=initial_context.copy() if initial_context else {},
@@ -691,20 +683,14 @@ class WorkflowExecutor:
 
             if timeout:
                 await asyncio.wait_for(
-                    self._execute_workflow(
-                        workflow, context, thread_id, resume_from_node
-                    ),
+                    self._execute_workflow(workflow, context, thread_id, resume_from_node),
                     timeout=timeout,
                 )
             else:
-                await self._execute_workflow(
-                    workflow, context, thread_id, resume_from_node
-                )
+                await self._execute_workflow(workflow, context, thread_id, resume_from_node)
 
             total_duration = time.time() - start_time
-            total_tool_calls = sum(
-                r.tool_calls_used for r in context.node_results.values()
-            )
+            total_tool_calls = sum(r.tool_calls_used for r in context.node_results.values())
 
             success = not context.has_failures()
 
@@ -811,9 +797,7 @@ class WorkflowExecutor:
             self._emit_workflow_step_event(
                 workflow_name=workflow.name,
                 node_id=node_id,
-                node_type=(
-                    node.node_type.value if hasattr(node, "node_type") else "unknown"
-                ),
+                node_type=(node.node_type.value if hasattr(node, "node_type") else "unknown"),
                 success=result.status == ExecutorNodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )
@@ -909,9 +893,7 @@ class WorkflowExecutor:
         # Execute with or without retry policy
         retry_policy = getattr(node, "retry_policy", None)
         if retry_policy:
-            result = await self._execute_node_with_retry(
-                node, context, start_time, retry_policy
-            )
+            result = await self._execute_node_with_retry(node, context, start_time, retry_policy)
         else:
             result = await self._execute_node_inner(node, context, start_time)
 
@@ -957,9 +939,7 @@ class WorkflowExecutor:
         retry_result = await executor.execute(execute_func)
 
         if retry_result.success:
-            logger.debug(
-                f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)"
-            )
+            logger.debug(f"Node '{node.id}' succeeded after {retry_result.attempts} attempt(s)")
             return retry_result.result
         else:
             logger.warning(
@@ -1074,11 +1054,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=(
-                ExecutorNodeStatus.COMPLETED
-                if result.success
-                else ExecutorNodeStatus.FAILED
-            ),
+            status=(ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED),
             output=result.summary,
             error=result.error,
             duration_seconds=time.time() - start_time,
@@ -1229,9 +1205,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=(
-                ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED
-            ),
+            status=(ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED),
             output={"results": [r.output for r in node_results if r.output]},
             duration_seconds=time.time() - start_time,
             tool_calls_used=total_tools,
@@ -1312,15 +1286,11 @@ class WorkflowExecutor:
                 if node.handler.startswith(CHAIN_HANDLER_PREFIX):
                     chain_name = node.handler[len(CHAIN_HANDLER_PREFIX) :]
                     logger.debug(f"Executing chain '{chain_name}' for node {node.id}")
-                    return await self._execute_chain_handler(
-                        node, context, chain_name, start_time
-                    )
+                    return await self._execute_chain_handler(node, context, chain_name, start_time)
 
                 handler = get_compute_handler(node.handler)
                 if handler:
-                    logger.debug(
-                        f"Using custom handler '{node.handler}' for node {node.id}"
-                    )
+                    logger.debug(f"Using custom handler '{node.handler}' for node {node.id}")
                     return await handler(node, context, self.tool_registry)
                 else:
                     logger.warning(
@@ -1341,9 +1311,7 @@ class WorkflowExecutor:
                 if constraints.allows_tool(tool_name):
                     allowed_tools.append(tool_name)
                 else:
-                    logger.warning(
-                        f"Tool '{tool_name}' blocked by constraints for node {node.id}"
-                    )
+                    logger.warning(f"Tool '{tool_name}' blocked by constraints for node {node.id}")
 
             if not allowed_tools and node.tools:
                 return NodeResult(
@@ -1391,9 +1359,7 @@ class WorkflowExecutor:
                             error=str(e),
                         )
 
-                tasks = [
-                    execute_tool(tool_name, exec_ctx) for tool_name in allowed_tools
-                ]
+                tasks = [execute_tool(tool_name, exec_ctx) for tool_name in allowed_tools]
                 results = await asyncio.gather(*tasks)
 
                 for tool_name, result in results:
@@ -1601,9 +1567,7 @@ class WorkflowExecutor:
             output_key = node.output_key or node.id
             context.set(output_key, result)
 
-            logger.debug(
-                f"Chain '{chain_name}' executed successfully for node {node.id}"
-            )
+            logger.debug(f"Chain '{chain_name}' executed successfully for node {node.id}")
 
             return NodeResult(
                 node_id=node.id,
@@ -1613,9 +1577,7 @@ class WorkflowExecutor:
             )
 
         except Exception as e:
-            logger.error(
-                f"Chain execution failed for node {node.id}: {e}", exc_info=True
-            )
+            logger.error(f"Chain execution failed for node {node.id}: {e}", exc_info=True)
             return NodeResult(
                 node_id=node.id,
                 status=ExecutorNodeStatus.FAILED,

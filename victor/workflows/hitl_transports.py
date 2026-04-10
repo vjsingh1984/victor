@@ -306,9 +306,7 @@ class CustomHookConfig(BaseTransportConfig):
     """Configuration for custom hook-based approvals."""
 
     send_hook: Optional[Callable] = None  # async def send(request) -> str
-    poll_hook: Optional[Callable] = (
-        None  # async def poll(request_id) -> Optional[Response]
-    )
+    poll_hook: Optional[Callable] = None  # async def poll(request_id) -> Optional[Response]
     cancel_hook: Optional[Callable] = None  # async def cancel(request_id) -> bool
 
 
@@ -513,8 +511,7 @@ class EmailTransport(BaseTransport):
         context_html = ""
         if request.context:
             context_items = "".join(
-                f"<li><strong>{k}:</strong> {v}</li>"
-                for k, v in request.context.items()
+                f"<li><strong>{k}:</strong> {v}</li>" for k, v in request.context.items()
             )
             context_html = f"<ul>{context_items}</ul>"
 
@@ -628,12 +625,8 @@ class SlackTransport(BaseTransport):
 
         # Add context
         if request.context:
-            context_text = "\n".join(
-                f"• *{k}:* {v}" for k, v in request.context.items()
-            )
-            blocks.append(
-                {"type": "section", "text": {"type": "mrkdwn", "text": context_text}}
-            )
+            context_text = "\n".join(f"• *{k}:* {v}" for k, v in request.context.items())
+            blocks.append({"type": "section", "text": {"type": "mrkdwn", "text": context_text}})
 
         # Add action buttons
         blocks.append(
@@ -779,9 +772,7 @@ class GitHubPRTransport(BaseTransport):
 
             # Request review from specified reviewers
             if self.github_config.required_reviewers:
-                review_path = (
-                    f"/repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers"
-                )
+                review_path = f"/repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers"
                 review_url = f"{base_url}{review_path}"
                 await session.post(
                     review_url,
@@ -837,9 +828,7 @@ class GitHubPRTransport(BaseTransport):
                         request_id=request_id,
                         status=HITLStatus.REJECTED,
                         approved=False,
-                        reason=review.get(
-                            "body", "Changes requested via GitHub PR review"
-                        ),
+                        reason=review.get("body", "Changes requested via GitHub PR review"),
                     )
 
         return None
@@ -848,9 +837,7 @@ class GitHubPRTransport(BaseTransport):
         """Build PR comment body."""
         context_md = ""
         if request.context:
-            context_items = "\n".join(
-                f"- **{k}:** {v}" for k, v in request.context.items()
-            )
+            context_items = "\n".join(f"- **{k}:** {v}" for k, v in request.context.items())
             context_md = f"\n\n**Context:**\n{context_items}"
 
         return f"""
@@ -952,9 +939,7 @@ class GitHubCheckTransport(BaseTransport):
         """Build check run details markdown."""
         context_md = ""
         if request.context:
-            context_items = "\n".join(
-                f"| {k} | {v} |" for k, v in request.context.items()
-            )
+            context_items = "\n".join(f"| {k} | {v} |" for k, v in request.context.items())
             context_md = f"\n| Key | Value |\n|-----|-------|\n{context_items}\n"
 
         return f"""

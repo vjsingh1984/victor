@@ -330,8 +330,7 @@ class FileContentCache:
 
         # Check total bytes (soft limit - only evict if significantly over)
         while (
-            self._stats.total_bytes_cached + incoming_bytes
-            > self._max_total_bytes * 1.2
+            self._stats.total_bytes_cached + incoming_bytes > self._max_total_bytes * 1.2
             and self._access_order
         ):
             oldest = self._access_order.pop(0)
@@ -405,8 +404,7 @@ def get_sandbox_path() -> Optional[Path]:
             # Sandbox is enabled for this mode
             return Path.cwd() / config.sandbox_dir
         elif not config.allow_all_tools and (
-            "write_file" in config.disallowed_tools
-            or "edit_files" in config.disallowed_tools
+            "write_file" in config.disallowed_tools or "edit_files" in config.disallowed_tools
         ):
             # Writing is disallowed in this mode (no sandbox exception)
             return None
@@ -891,9 +889,7 @@ def check_extension_magic_mismatch(
         return None
 
     # Extension doesn't match magic bytes - potential mismatch
-    expected_exts = (
-        ", ".join(magic_type.extensions) if magic_type.extensions else "(none)"
-    )
+    expected_exts = ", ".join(magic_type.extensions) if magic_type.extensions else "(none)"
     return (
         f"Warning: File extension '{ext}' doesn't match detected content type.\n"
         f"Detected: {magic_type.description} (mime: {magic_type.mime_type})\n"
@@ -1233,9 +1229,7 @@ async def read(
                     matches = [
                         m
                         for m in cwd.rglob(basename)
-                        if m.is_file()
-                        and ".victor" not in str(m)
-                        and ".git" not in str(m)
+                        if m.is_file() and ".victor" not in str(m) and ".git" not in str(m)
                     ]
                     if len(matches) == 1:
                         file_path = matches[0]
@@ -1271,10 +1265,7 @@ async def read(
             logger.info(f"Auto-converting read('{path}') → ls('{path}')")
             try:
                 dir_result = await ls(path=path, depth=1)
-                return (
-                    f"Note: '{path}' is a directory, showing contents:\n\n"
-                    f"{dir_result}"
-                )
+                return f"Note: '{path}' is a directory, showing contents:\n\n" f"{dir_result}"
             except Exception as e:
                 logger.warning("ls() fallback failed for directory '%s': %s", path, e)
                 return (
@@ -1287,10 +1278,7 @@ async def read(
             logger.info(f"Auto-converting read('{path}') → ls('{path}')")
             try:
                 dir_result = await ls(path=path, depth=1)
-                return (
-                    f"Note: '{path}' is a directory, showing contents:\n\n"
-                    f"{dir_result}"
-                )
+                return f"Note: '{path}' is a directory, showing contents:\n\n" f"{dir_result}"
             except Exception as e:
                 logger.warning("ls() fallback failed for directory '%s': %s", path, e)
                 return (
@@ -1452,11 +1440,7 @@ async def read(
                 f"Detected type: {magic_type.description}\n"
                 f"MIME type: {magic_type.mime_type}\n"
                 f"Category: {magic_type.category.name}\n"
-                + (
-                    f"Suggestion: {magic_type.suggestion}"
-                    if magic_type.suggestion
-                    else ""
-                )
+                + (f"Suggestion: {magic_type.suggestion}" if magic_type.suggestion else "")
                 + (f"\n\n{mismatch_warning}" if mismatch_warning else "")
             )
 
@@ -1582,21 +1566,15 @@ async def read(
                     if context_window > 0:
                         # For local models with 64K+ context, use ~25% for reads (~16K tokens)
                         # This gives good file reading while leaving room for the rest of the conversation
-                        max_tokens = (
-                            context_window // 4
-                        )  # Use 25% of context for file reads
+                        max_tokens = context_window // 4  # Use 25% of context for file reads
                         # Estimate ~3 bytes per token (average), ~40 chars per line
                         max_lines = min(
                             1500, max(100, max_tokens // 3)
                         )  # Ensure at least 100 lines
-                        max_bytes = min(
-                            65536, max_tokens * 3
-                        )  # ~3 bytes per token average
+                        max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
                 except Exception as e:
-                    logger.debug(
-                        "Failed to compute context-aware truncation limits: %s", e
-                    )
+                    logger.debug("Failed to compute context-aware truncation limits: %s", e)
                 return 1500, 65536  # Fallback for local models: 1500, 64KB
 
             # Cloud models get higher limits (large context windows)
@@ -1605,9 +1583,7 @@ async def read(
             return 1500, 65536  # ~2500 lines, 100KB for cloud models
         except Exception as e:
             # Default to cloud limits if settings unavailable
-            logger.debug(
-                "Settings unavailable for truncation limits, using defaults: %s", e
-            )
+            logger.debug("Settings unavailable for truncation limits, using defaults: %s", e)
             return 1500, 65536  # ~1500 lines, 64KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
@@ -1641,9 +1617,7 @@ async def read(
     )
 
     # Format with line numbers (1-indexed, adjusted for offset)
-    numbered_content = format_with_line_numbers(
-        truncated_content, start_line=offset + 1
-    )
+    numbered_content = format_with_line_numbers(truncated_content, start_line=offset + 1)
 
     # Build informative header
     actual_end_line = offset + info.lines_returned
@@ -1825,26 +1799,20 @@ async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
 
                 if result.success:
                     # Build success message with LSP info
-                    action = (
-                        "created" if result.original_content is None else "modified"
-                    )
+                    action = "created" if result.original_content is None else "modified"
                     lsp_info = []
 
                     if result.formatted:
                         lsp_info.append(f"formatted with {result.formatter_used}")
 
                     if result.validated:
-                        error_count = sum(
-                            1 for d in result.diagnostics if d.severity == "error"
-                        )
+                        error_count = sum(1 for d in result.diagnostics if d.severity == "error")
                         warning_count = sum(
                             1 for d in result.diagnostics if d.severity == "warning"
                         )
 
                         if error_count > 0 or warning_count > 0:
-                            lsp_info.append(
-                                f"{error_count} errors, {warning_count} warnings"
-                            )
+                            lsp_info.append(f"{error_count} errors, {warning_count} warnings")
                         else:
                             lsp_info.append("validation passed")
 
@@ -1853,9 +1821,7 @@ async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
 
             except Exception as lsp_error:
                 # LSP enhancement failed, fall back to regular write
-                logger.debug(
-                    f"LSP enhancement failed, falling back to regular write: {lsp_error}"
-                )
+                logger.debug(f"LSP enhancement failed, falling back to regular write: {lsp_error}")
 
     # Regular write (fallback or when use_lsp=False)
     # Track the change for undo/redo
@@ -2392,16 +2358,13 @@ async def find(
                 d
                 for d in dirs
                 if not d.startswith(".")
-                and d
-                not in {"node_modules", "__pycache__", "venv", ".venv", "build", "dist"}
+                and d not in {"node_modules", "__pycache__", "venv", ".venv", "build", "dist"}
             ]
 
             # Check directories if type allows
             if type in ("all", "dir"):
                 for d in dirs:
-                    if fnmatch.fnmatch(d, name) or fnmatch.fnmatch(
-                        d.lower(), name.lower()
-                    ):
+                    if fnmatch.fnmatch(d, name) or fnmatch.fnmatch(d.lower(), name.lower()):
                         dir_path = root / d
                         results.append(
                             {
@@ -2417,9 +2380,7 @@ async def find(
             # Check files if type allows
             if type in ("all", "file") and count < limit:
                 for f in files:
-                    if fnmatch.fnmatch(f, name) or fnmatch.fnmatch(
-                        f.lower(), name.lower()
-                    ):
+                    if fnmatch.fnmatch(f, name) or fnmatch.fnmatch(f.lower(), name.lower()):
                         file_path = root / f
                         try:
                             size = file_path.stat().st_size

@@ -266,9 +266,7 @@ class TestCreateVictorAgentCallback:
         mock_orchestrator._on_tool_start_callback = None
         mock_orchestrator._on_tool_complete_callback = None
         mock_orchestrator.reset_conversation = MagicMock()
-        mock_orchestrator.chat = AsyncMock(
-            return_value=MagicMock(content="TASK COMPLETE")
-        )
+        mock_orchestrator.chat = AsyncMock(return_value=MagicMock(content="TASK COMPLETE"))
 
         adapter = VictorAgentAdapter(mock_orchestrator)
         callback = create_victor_agent_callback(adapter)

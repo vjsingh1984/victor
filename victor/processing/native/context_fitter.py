@@ -70,9 +70,7 @@ def fit_context(
             # Build MessageSlot objects for Rust
             slots = []
             for i, msg in enumerate(messages):
-                token_count = msg.get(
-                    "token_count", len(msg.get("content", "").split()) * 13 // 10
-                )
+                token_count = msg.get("token_count", len(msg.get("content", "").split()) * 13 // 10)
                 priority = msg.get("priority", 1.0)
                 role = msg.get("role", "user")
                 recency = float(i) / max(len(messages), 1)
@@ -117,9 +115,7 @@ def _fit_context_python(
         FitResult with fitting results
     """
     if not messages:
-        return FitResult(
-            kept_indices=[], total_tokens=0, dropped_count=0, freed_tokens=0
-        )
+        return FitResult(kept_indices=[], total_tokens=0, dropped_count=0, freed_tokens=0)
 
     # Calculate token counts for each message
     token_counts = []

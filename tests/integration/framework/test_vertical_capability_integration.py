@@ -384,16 +384,11 @@ class TestDevOpsVerticalCapabilities:
         orchestrator = MockOrchestrator()
 
         # Apply deployment safety
-        cap_provider.apply_deployment_safety(
-            orchestrator, require_approval_for_production=True
-        )
+        cap_provider.apply_deployment_safety(orchestrator, require_approval_for_production=True)
 
         assert orchestrator.safety_config is not None
         assert "deployment" in orchestrator.safety_config
-        assert (
-            orchestrator.safety_config["deployment"]["require_approval_for_production"]
-            is True
-        )
+        assert orchestrator.safety_config["deployment"]["require_approval_for_production"] is True
 
         # Apply container settings
         cap_provider.apply_container_settings(orchestrator, runtime="podman")
@@ -511,10 +506,7 @@ class TestDataAnalysisVerticalCapabilities:
         # Verify delegation worked - should have framework privacy config
         assert config is not None
         # The framework privacy capability sets config on orchestrator
-        assert (
-            hasattr(orchestrator, "privacy_config")
-            or config.get("anonymize_pii") is True
-        )
+        assert hasattr(orchestrator, "privacy_config") or config.get("anonymize_pii") is True
 
     def test_dataanalysis_capability_application(self):
         """Test that DataAnalysis capabilities can be applied to orchestrator."""
@@ -985,9 +977,7 @@ class TestCapabilityProviderLazyLoading:
         assert cap1 is not cap2
 
         # But should have same capabilities
-        assert set(cap1.get_capabilities().keys()) == set(
-            cap2.get_capabilities().keys()
-        )
+        assert set(cap1.get_capabilities().keys()) == set(cap2.get_capabilities().keys())
 
 
 class TestCapabilityMetadataConsistency:
@@ -1153,9 +1143,7 @@ class TestCrossVerticalCapabilityIntegration:
         # research_quality depends on source_verification
         assert "source_verification" in research_meta["research_quality"].dependencies
         # literature_analysis depends on source_verification
-        assert (
-            "source_verification" in research_meta["literature_analysis"].dependencies
-        )
+        assert "source_verification" in research_meta["literature_analysis"].dependencies
 
         # DevOps dependencies
         devops_provider = DevOpsCapabilityProvider()
@@ -1227,9 +1215,7 @@ class TestServiceBackedCapabilityConfigFlow:
         service = CapabilityConfigService()
         orchestrator = ServiceBackedOrchestrator(service)
 
-        configure_container_settings(
-            orchestrator, runtime="podman", max_image_size_mb=1024
-        )
+        configure_container_settings(orchestrator, runtime="podman", max_image_size_mb=1024)
 
         assert service.get_config("container_config")["runtime"] == "podman"
         assert get_container_settings(orchestrator)["max_image_size_mb"] == 1024

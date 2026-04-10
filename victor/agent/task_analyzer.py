@@ -225,14 +225,10 @@ class TaskAnalyzer:
             requires_confirmation=action_result.intent == ActionIntent.AMBIGUOUS,
             matched_patterns=complexity_result.matched_patterns,
             analysis_details={
-                "complexity_hint": self._get_complexity_hint(
-                    complexity_result.complexity
-                ),
+                "complexity_hint": self._get_complexity_hint(complexity_result.complexity),
                 "action_signals": action_result.matched_signals,
                 "unified_source": unified_result.source,
-                "unified_matched_keywords": [
-                    m.keyword for m in unified_result.matched_keywords
-                ],
+                "unified_matched_keywords": [m.keyword for m in unified_result.matched_keywords],
             },
         )
 
@@ -251,9 +247,7 @@ class TaskAnalyzer:
                 intent_result = self.intent_classifier.classify_intent_sync(message)
                 analysis.intent_type = intent_result.intent_type
                 analysis.continuation_needed = intent_result.needs_continuation
-                analysis.analysis_details["intent_confidence"] = (
-                    intent_result.confidence
-                )
+                analysis.analysis_details["intent_confidence"] = intent_result.confidence
             except Exception as e:
                 logger.warning(f"Intent classification failed: {e}")
 
@@ -324,21 +318,13 @@ class TaskAnalyzer:
         return self.complexity_classifier.classify(message)
 
     def check_write_authorization(self, message: str) -> bool:
-        return (
-            self.action_authorizer.detect(message).intent == ActionIntent.WRITE_ALLOWED
-        )
+        return self.action_authorizer.detect(message).intent == ActionIntent.WRITE_ALLOWED
 
     def is_simple_query(self, message: str) -> bool:
-        return (
-            self.complexity_classifier.classify(message).complexity
-            == TaskComplexity.SIMPLE
-        )
+        return self.complexity_classifier.classify(message).complexity == TaskComplexity.SIMPLE
 
     def is_generation_task(self, message: str) -> bool:
-        return (
-            self.complexity_classifier.classify(message).complexity
-            == TaskComplexity.GENERATION
-        )
+        return self.complexity_classifier.classify(message).complexity == TaskComplexity.GENERATION
 
     def get_tool_budget(self, message: str) -> int:
         return self.complexity_classifier.classify(message).tool_budget
@@ -359,10 +345,7 @@ class TaskAnalyzer:
         return self.unified_classifier.classify(message).is_action_task
 
     def get_negated_keywords(self, message: str) -> List[str]:
-        return [
-            m.keyword
-            for m in self.unified_classifier.classify(message).negated_keywords
-        ]
+        return [m.keyword for m in self.unified_classifier.classify(message).negated_keywords]
 
     def detect_intent(self, message: str) -> Any:
         """Detect user intent from message using action authorizer.
@@ -429,9 +412,7 @@ class TaskAnalyzer:
             but with potential context boosting applied)
         """
         if history:
-            result = self.unified_classifier.classify_with_context(
-                user_message, history
-            )
+            result = self.unified_classifier.classify_with_context(user_message, history)
         else:
             result = self.unified_classifier.classify(user_message)
 
@@ -479,8 +460,7 @@ class TaskAnalyzer:
 
         # Also look for explicit "read", "analyze", "audit" + file patterns
         explicit_pattern = re.compile(
-            r"(?:read|analyze|audit|check|review|examine)\s+"
-            r"([/\w.-]+(?:/[\w.-]+)+)",
+            r"(?:read|analyze|audit|check|review|examine)\s+" r"([/\w.-]+(?:/[\w.-]+)+)",
             re.IGNORECASE,
         )
         for match in explicit_pattern.finditer(user_message):
@@ -516,9 +496,7 @@ class TaskAnalyzer:
             required_outputs.append("findings table")
 
         # Check for top-N fixes requirement
-        if re.search(
-            r"top[-\s]?\d+\s+fix(es)?|recommend\s+\d+\s+fix(es)?", message_lower
-        ):
+        if re.search(r"top[-\s]?\d+\s+fix(es)?|recommend\s+\d+\s+fix(es)?", message_lower):
             required_outputs.append("top-3 fixes")
 
         # Check for summary requirement

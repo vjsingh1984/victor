@@ -392,9 +392,7 @@ def load_tool_dependency_provider_from_entry_points(
                 return provider_factory()
     except Exception as e:
         _increment_loader_stat("tool_dependency_failures")
-        logger.debug(
-            f"No tool dependency provider found for '{vertical}' via entry points: {e}"
-        )
+        logger.debug(f"No tool dependency provider found for '{vertical}' via entry points: {e}")
 
     # Compatibility fallback for extracted verticals (core + external packages).
     try:
@@ -411,9 +409,7 @@ def load_tool_dependency_provider_from_entry_points(
         return provider
     except ValueError:
         _increment_loader_stat("tool_dependency_none_returns")
-        logger.debug(
-            "Unknown vertical '%s' for tool dependency provider resolution", vertical
-        )
+        logger.debug("Unknown vertical '%s' for tool dependency provider resolution", vertical)
     except Exception as e:
         _increment_loader_stat("tool_dependency_failures")
         logger.debug(
@@ -518,9 +514,7 @@ def register_escape_hatches_from_entry_points(
                 logger.debug(f"Registered escape hatches from '{ep.name}' vertical")
             except Exception as e:
                 _increment_loader_stat("escape_hatch_failures")
-                logger.warning(
-                    f"Failed to register escape hatches from '{ep.name}': {e}"
-                )
+                logger.warning(f"Failed to register escape hatches from '{ep.name}': {e}")
     except Exception as e:
         _increment_loader_stat("escape_hatch_failures")
         logger.debug(f"No escape hatch entry points found: {e}")

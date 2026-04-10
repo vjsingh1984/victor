@@ -342,8 +342,7 @@ class CheckpointStore:
         self._cleanup_old_checkpoints(learner_name)
 
         logger.info(
-            f"CheckpointStore: Created checkpoint {checkpoint_id} "
-            f"for {learner_name} v{version}"
+            f"CheckpointStore: Created checkpoint {checkpoint_id} " f"for {learner_name} v{version}"
         )
 
         return checkpoint
@@ -430,15 +429,11 @@ class CheckpointStore:
             self.db.commit()
         else:
             safe_version = checkpoint.version.replace("/", "_").replace("\\", "_")
-            filepath = (
-                self.storage_path / checkpoint.learner_name / f"{safe_version}.json.gz"
-            )
+            filepath = self.storage_path / checkpoint.learner_name / f"{safe_version}.json.gz"
             if filepath.exists():
                 filepath.unlink()
 
-    def get_checkpoint(
-        self, learner_name: str, version: str
-    ) -> Optional[PolicyCheckpoint]:
+    def get_checkpoint(self, learner_name: str, version: str) -> Optional[PolicyCheckpoint]:
         """Get a specific checkpoint.
 
         Args:
@@ -485,9 +480,7 @@ class CheckpointStore:
             checkpoints = list(self._cache.get(learner_name, {}).values())
         else:
             checkpoints = [
-                cp
-                for learner_cps in self._cache.values()
-                for cp in learner_cps.values()
+                cp for learner_cps in self._cache.values() for cp in learner_cps.values()
             ]
 
         for checkpoint in checkpoints:

@@ -166,8 +166,7 @@ class GoogleProvider(BaseProvider):
         # Configure safety settings using string-based thresholds
         threshold = SAFETY_LEVELS.get(safety_level, "BLOCK_NONE")
         self.safety_settings = [
-            types.SafetySetting(category=cat, threshold=threshold)
-            for cat in HARM_CATEGORIES
+            types.SafetySetting(category=cat, threshold=threshold) for cat in HARM_CATEGORIES
         ]
 
     @property
@@ -261,16 +260,13 @@ class GoogleProvider(BaseProvider):
                                 if hasattr(part, "text") and part.text
                                 else (
                                     "function_call"
-                                    if hasattr(part, "function_call")
-                                    and part.function_call
+                                    if hasattr(part, "function_call") and part.function_call
                                     else "other"
                                 )
                             )
                             if part_type == "function_call":
                                 fc = part.function_call
-                                logger.info(
-                                    f"Gemini part[{i}]: NATIVE FUNCTION CALL: {fc.name}"
-                                )
+                                logger.info(f"Gemini part[{i}]: NATIVE FUNCTION CALL: {fc.name}")
                             else:
                                 logger.debug(f"Gemini part[{i}]: type={part_type}")
             else:
@@ -353,9 +349,7 @@ class GoogleProvider(BaseProvider):
             # Convert messages
             contents = self._convert_messages(messages)
 
-            logger.debug(
-                f"Gemini stream (no tools): model={model}, messages={len(contents)}"
-            )
+            logger.debug(f"Gemini stream (no tools): model={model}, messages={len(contents)}")
 
             # Stream response using the new client pattern
             response_stream = self.client.aio.models.generate_content_stream(
@@ -575,15 +569,9 @@ class GoogleProvider(BaseProvider):
         usage = None
         if hasattr(response, "usage_metadata") and response.usage_metadata:
             usage = {
-                "prompt_tokens": getattr(
-                    response.usage_metadata, "prompt_token_count", 0
-                ),
-                "completion_tokens": getattr(
-                    response.usage_metadata, "candidates_token_count", 0
-                ),
-                "total_tokens": getattr(
-                    response.usage_metadata, "total_token_count", 0
-                ),
+                "prompt_tokens": getattr(response.usage_metadata, "prompt_token_count", 0),
+                "completion_tokens": getattr(response.usage_metadata, "candidates_token_count", 0),
+                "total_tokens": getattr(response.usage_metadata, "total_token_count", 0),
             }
 
         return CompletionResponse(
@@ -664,9 +652,7 @@ class GoogleProvider(BaseProvider):
                             "name": getattr(model, "display_name", model_name),
                             "description": getattr(model, "description", ""),
                             "input_token_limit": getattr(model, "input_token_limit", 0),
-                            "output_token_limit": getattr(
-                                model, "output_token_limit", 0
-                            ),
+                            "output_token_limit": getattr(model, "output_token_limit", 0),
                             "supported_methods": supported_methods,
                         }
                     )

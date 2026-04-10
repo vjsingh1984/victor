@@ -42,9 +42,7 @@ def _make_coordinator(query_classifier=None, orchestrator=None):
     )
 
     mock_exec = AsyncMock()
-    mock_exec.execute_agentic_loop = AsyncMock(
-        return_value=MagicMock(content="direct response")
-    )
+    mock_exec.execute_agentic_loop = AsyncMock(return_value=MagicMock(content="direct response"))
 
     coordinator = SyncChatCoordinator(
         chat_context=mock_chat_ctx,
@@ -66,9 +64,7 @@ class TestAutoPlanning:
         )
         coordinator, mock_exec = _make_coordinator(query_classifier=mock_classifier)
 
-        with patch.object(
-            coordinator, "_chat_with_planning", new_callable=AsyncMock
-        ) as mock_plan:
+        with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
             mock_plan.return_value = MagicMock(content="planned response")
             result = await coordinator.chat("Implement JWT auth", use_planning=None)
             mock_plan.assert_called_once()
@@ -122,15 +118,11 @@ class TestAutoPlanning:
     @pytest.mark.asyncio
     async def test_classification_passed_to_planning_coordinator(self):
         mock_classifier = MagicMock(spec=QueryClassifier)
-        classification = _make_classification(
-            QueryType.IMPLEMENTATION, should_plan=True
-        )
+        classification = _make_classification(QueryType.IMPLEMENTATION, should_plan=True)
         mock_classifier.classify.return_value = classification
         coordinator, _ = _make_coordinator(query_classifier=mock_classifier)
 
-        with patch.object(
-            coordinator, "_chat_with_planning", new_callable=AsyncMock
-        ) as mock_plan:
+        with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
             mock_plan.return_value = MagicMock(content="planned")
             await coordinator.chat("Implement feature X", use_planning=None)
             # Verify the planning method was called

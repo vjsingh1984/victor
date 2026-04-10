@@ -153,8 +153,7 @@ class HierarchicalCompactionManager:
             epoch_threshold=data.get("epoch_threshold", 6),
         )
         manager._individual_summaries = [
-            (item["summary"], item["turn_index"])
-            for item in data.get("individual_summaries", [])
+            (item["summary"], item["turn_index"]) for item in data.get("individual_summaries", [])
         ]
         manager._epochs = [
             CompactionEpoch(

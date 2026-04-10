@@ -128,9 +128,7 @@ class MockEntityMemory:
         results = []
         for rel in self._relations.values():
             if rel.source_id == entity_id or rel.target_id == entity_id:
-                related_id = (
-                    rel.target_id if rel.source_id == entity_id else rel.source_id
-                )
+                related_id = rel.target_id if rel.source_id == entity_id else rel.source_id
                 if related_id in self._entities:
                     results.append((self._entities[related_id], rel))
         return results[:limit]

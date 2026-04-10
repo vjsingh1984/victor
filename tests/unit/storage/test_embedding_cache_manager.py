@@ -40,9 +40,7 @@ class TestEmbeddingCacheManagerSyncBridge:
         manager = object.__new__(EmbeddingCacheManager)
         manager.rebuild_task_classifiers = AsyncMock(return_value=17)
 
-        with pytest.raises(
-            RuntimeError, match="Cannot call rebuild_task_classifiers_sync"
-        ):
+        with pytest.raises(RuntimeError, match="Cannot call rebuild_task_classifiers_sync"):
             manager.rebuild_task_classifiers_sync()
 
         manager.rebuild_task_classifiers.assert_not_called()

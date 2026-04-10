@@ -31,9 +31,7 @@ def _load_vertical_attr(module_path: str, attr_name: str):
     """Resolve a vertical attribute and skip test when unavailable."""
     module, _resolved = import_module_with_fallback(module_path)
     if module is None or not hasattr(module, attr_name):
-        pytest.skip(
-            f"Vertical module or attribute unavailable: {module_path}:{attr_name}"
-        )
+        pytest.skip(f"Vertical module or attribute unavailable: {module_path}:{attr_name}")
     return getattr(module, attr_name)
 
 
@@ -118,9 +116,7 @@ class TestTUISessionInitialization:
                 await handler.start_tui(session_config, agent=None)
 
         # Verify custom settings were applied
-        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(
-            200, user_override=True
-        )
+        mock_agent.unified_tracker.set_tool_budget.assert_called_once_with(200, user_override=True)
         mock_agent.unified_tracker.set_max_iterations.assert_called_once_with(
             100, user_override=True
         )
@@ -216,9 +212,7 @@ class TestTUIWithVerticals:
     @pytest.mark.integration
     async def test_tui_with_coding_vertical(self):
         """Test TUI with coding vertical integration."""
-        CodingAssistant = _load_vertical_attr(
-            "victor.coding.assistant", "CodingAssistant"
-        )
+        CodingAssistant = _load_vertical_attr("victor.coding.assistant", "CodingAssistant")
 
         config = SessionConfig(
             mode=SessionMode.TUI,
@@ -254,9 +248,7 @@ class TestTUIWithVerticals:
     @pytest.mark.integration
     async def test_tui_with_research_vertical(self):
         """Test TUI with research vertical integration."""
-        ResearchAssistant = _load_vertical_attr(
-            "victor.research.assistant", "ResearchAssistant"
-        )
+        ResearchAssistant = _load_vertical_attr("victor.research.assistant", "ResearchAssistant")
 
         config = SessionConfig(
             mode=SessionMode.TUI,
@@ -382,9 +374,7 @@ class TestTUIErrorHandling:
 
         with patch("victor.framework.shim.FrameworkShim", return_value=mock_shim):
             with patch("victor.ui.tui.VictorTUI", return_value=mock_tui):
-                with patch(
-                    "victor.ui.commands.utils.graceful_shutdown"
-                ) as mock_shutdown:
+                with patch("victor.ui.commands.utils.graceful_shutdown") as mock_shutdown:
                     try:
                         await handler.start_tui(config, agent=None)
                     except Exception:

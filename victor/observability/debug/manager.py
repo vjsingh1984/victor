@@ -140,8 +140,7 @@ class DebugManager:
             language = self._detect_language(program_path)
             if language is None:
                 raise ValueError(
-                    f"Cannot detect language for {program}. "
-                    f"Please specify language explicitly."
+                    f"Cannot detect language for {program}. " f"Please specify language explicitly."
                 )
 
         # Get adapter for language
@@ -284,9 +283,7 @@ class DebugManager:
         location = SourceLocation(path=file_path, line=line)
         conditions = {line: condition} if condition else None
 
-        breakpoints = await adapter.set_breakpoints(
-            session_id, file_path, [location], conditions
-        )
+        breakpoints = await adapter.set_breakpoints(session_id, file_path, [location], conditions)
 
         if breakpoints:
             bp = breakpoints[0]

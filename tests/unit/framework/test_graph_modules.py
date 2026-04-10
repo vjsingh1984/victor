@@ -197,12 +197,8 @@ class TestMemoryGraphStore:
     def sample_nodes(self):
         """Create sample nodes for testing."""
         return [
-            GraphNode(
-                node_id="n1", type="function", name="func1", file="a.py", line=10
-            ),
-            GraphNode(
-                node_id="n2", type="function", name="func2", file="a.py", line=20
-            ),
+            GraphNode(node_id="n1", type="function", name="func1", file="a.py", line=10),
+            GraphNode(node_id="n2", type="function", name="func2", file="a.py", line=20),
             GraphNode(node_id="n3", type="class", name="MyClass", file="b.py", line=5),
         ]
 
@@ -285,9 +281,7 @@ class TestMemoryGraphStore:
         assert len(edges) >= 1
 
     @pytest.mark.asyncio
-    async def test_get_neighbors_with_edge_types(
-        self, store, sample_nodes, sample_edges
-    ):
+    async def test_get_neighbors_with_edge_types(self, store, sample_nodes, sample_edges):
         """Test getting neighbors filtered by edge type."""
         await store.upsert_nodes(sample_nodes)
         await store.upsert_edges(sample_edges)
@@ -348,9 +342,7 @@ class TestGraphAnalyzer:
 
     def test_add_node(self, analyzer):
         """Test adding nodes."""
-        node = GraphNode(
-            node_id="test", type="function", name="test_func", file="test.py"
-        )
+        node = GraphNode(node_id="test", type="function", name="test_func", file="test.py")
         analyzer.add_node(node)
         assert "test" in analyzer.nodes
 
@@ -405,9 +397,7 @@ class TestGraphAnalyzer:
         for edge in sample_edges:
             analyzer.add_edge(edge)
 
-        result = analyzer.get_neighbors(
-            "a", direction="out", edge_types=["CALLS"], max_depth=1
-        )
+        result = analyzer.get_neighbors("a", direction="out", edge_types=["CALLS"], max_depth=1)
         for depth_neighbors in result["neighbors_by_depth"].values():
             for neighbor in depth_neighbors:
                 assert neighbor["edge_type"] == "CALLS"
@@ -519,9 +509,7 @@ class TestGraphAnalyzerPath:
             GraphNode(node_id="start", type="function", name="start", file="test.py"),
             GraphNode(node_id="mid", type="function", name="mid", file="test.py"),
             GraphNode(node_id="end", type="function", name="end", file="test.py"),
-            GraphNode(
-                node_id="isolated", type="function", name="isolated", file="test.py"
-            ),
+            GraphNode(node_id="isolated", type="function", name="isolated", file="test.py"),
         ]
         for node in nodes:
             analyzer.add_node(node)
@@ -561,10 +549,7 @@ class TestGraphStoreProtocol:
 
         # Get all abstract methods from protocol
         methods = [
-            name
-            for name, _ in inspect.getmembers(
-                GraphStoreProtocol, predicate=inspect.isfunction
-            )
+            name for name, _ in inspect.getmembers(GraphStoreProtocol, predicate=inspect.isfunction)
         ]
 
         expected_methods = [

@@ -122,9 +122,7 @@ class QualityResult:
     improvement_suggestions: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def get_dimension_score(
-        self, dimension: ResponseQualityDimension
-    ) -> Optional[float]:
+    def get_dimension_score(self, dimension: ResponseQualityDimension) -> Optional[float]:
         """Get score for a specific dimension."""
         for ds in self.dimension_scores:
             if ds.dimension == dimension:

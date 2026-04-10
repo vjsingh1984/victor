@@ -190,9 +190,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
         Returns:
             List of tool names in recommended order
         """
-        return list(
-            self._config.sequences.get(task_type, self._config.default_sequence)
-        )
+        return list(self._config.sequences.get(task_type, self._config.default_sequence))
 
     def get_required_tools(self) -> Set[str]:
         """Get tools essential for this vertical.
@@ -272,11 +270,7 @@ class BaseToolDependencyProvider(ToolDependencyProviderProtocol):
                 dep = self._dependency_map[current_tool]
                 if dep.enables:
                     return next(iter(dep.enables))
-            return (
-                self._config.default_sequence[0]
-                if self._config.default_sequence
-                else "read"
-            )
+            return self._config.default_sequence[0] if self._config.default_sequence else "read"
 
         # Avoid recently used tools (prevent loops)
         recent = set(used_tools[-3:]) if len(used_tools) >= 3 else set(used_tools)

@@ -307,16 +307,12 @@ class SemanticToolSelector:
         try:
             import victor_native
 
-            vectors = [
-                embedding.tolist() for embedding in self._tool_embedding_cache.values()
-            ]
+            vectors = [embedding.tolist() for embedding in self._tool_embedding_cache.values()]
             labels = list(self._tool_embedding_cache.keys())
             self._embedding_index = victor_native.EmbeddingIndex(vectors, labels)
         except Exception as exc:
             self._embedding_index = None
-            logger.debug(
-                "Native EmbeddingIndex unavailable, using batch fallback: %s", exc
-            )
+            logger.debug("Native EmbeddingIndex unavailable, using batch fallback: %s", exc)
 
     def _query_embedding_index(
         self, query_embedding: np.ndarray, k: int, threshold: float
@@ -330,9 +326,7 @@ class SemanticToolSelector:
                 query_embedding.tolist(), k=k, threshold=threshold
             )
         except Exception as exc:
-            logger.debug(
-                "Native EmbeddingIndex query failed, using batch fallback: %s", exc
-            )
+            logger.debug("Native EmbeddingIndex query failed, using batch fallback: %s", exc)
             return None
 
         return {name: float(score) for name, score in results}
@@ -477,9 +471,7 @@ class SemanticToolSelector:
             expected_dim = None
             for tool_name, embedding in embeddings.items():
                 if not isinstance(embedding, numpy.ndarray):
-                    logger.warning(
-                        f"Tool embeddings: '{tool_name}' is not a numpy array"
-                    )
+                    logger.warning(f"Tool embeddings: '{tool_name}' is not a numpy array")
                     self._delete_cache("invalid type")
                     return False
 
@@ -502,9 +494,7 @@ class SemanticToolSelector:
 
                 # Check for NaN or Inf (corruption detection)
                 if not numpy.isfinite(embedding).all():
-                    logger.warning(
-                        f"Tool embeddings: '{tool_name}' contains NaN or Inf values"
-                    )
+                    logger.warning(f"Tool embeddings: '{tool_name}' contains NaN or Inf values")
                     self._delete_cache("corrupted embeddings")
                     return False
 
@@ -519,9 +509,7 @@ class SemanticToolSelector:
             self._delete_cache("unpickling error")
             return False
         except Exception as e:
-            logger.warning(
-                f"Failed to load embedding cache (corrupted?): {e}, will rebuild"
-            )
+            logger.warning(f"Failed to load embedding cache (corrupted?): {e}, will rebuild")
             self._delete_cache("load error")
             return False
 
@@ -671,9 +659,7 @@ class SemanticToolSelector:
                     fallback.append(tool_name)
                 if len(fallback) >= max_tools:
                     break
-            logger.debug(
-                f"Using CONCEPTUAL fallback tools ({len(fallback)}): {fallback}"
-            )
+            logger.debug(f"Using CONCEPTUAL fallback tools ({len(fallback)}): {fallback}")
             return fallback
 
         # Standard fallback for non-conceptual queries
@@ -747,16 +733,12 @@ class SemanticToolSelector:
             logger.debug("Multi-step task detected, including file_ops and git_ops")
 
         # Analysis keywords
-        if any(
-            kw in query_lower for kw in ["analyze", "review", "check", "scan", "audit"]
-        ):
+        if any(kw in query_lower for kw in ["analyze", "review", "check", "scan", "audit"]):
             relevant_tools.extend(self.get_tools_for_logical_category("analysis"))
             logger.debug("Analysis task detected")
 
         # Editing keywords
-        if any(
-            kw in query_lower for kw in ["edit", "modify", "change", "update", "fix"]
-        ):
+        if any(kw in query_lower for kw in ["edit", "modify", "change", "update", "fix"]):
             relevant_tools.extend(self.get_tools_for_logical_category("file_ops"))
             relevant_tools.extend(self.get_tools_for_logical_category("refactoring"))
             logger.debug("Editing task detected")
@@ -775,9 +757,7 @@ class SemanticToolSelector:
             # For conceptual queries, exclude code_search to prefer semantic_code_search
             if self._is_conceptual_query(query):
                 code_intel_tools = [t for t in code_intel_tools if t != "code_search"]
-                logger.debug(
-                    "Code navigation detected (conceptual - excluding code_search)"
-                )
+                logger.debug("Code navigation detected (conceptual - excluding code_search)")
             else:
                 logger.debug("Code navigation detected")
             relevant_tools.extend(code_intel_tools)
@@ -810,9 +790,7 @@ class SemanticToolSelector:
         ]
         return any(kw in query_lower for kw in analysis_keywords)
 
-    def _extract_pending_actions(
-        self, conversation_history: List[Dict[str, Any]]
-    ) -> List[str]:
+    def _extract_pending_actions(self, conversation_history: List[Dict[str, Any]]) -> List[str]:
         """Extract actions mentioned in original request but not yet completed.
 
         Args:
@@ -865,9 +843,7 @@ class SemanticToolSelector:
         for action_type, keywords in action_patterns.items():
             if any(self._keyword_in_text(original_lower, kw) for kw in keywords):
                 # Check if this action was completed by looking at tool results
-                completed = self._was_action_completed(
-                    action_type, conversation_history
-                )
+                completed = self._was_action_completed(action_type, conversation_history)
                 if not completed:
                     pending.append(action_type)
                     logger.log(TRACE, f"Pending action detected: {action_type}")
@@ -904,17 +880,13 @@ class SemanticToolSelector:
                 # Check tool_calls in the message (handle None explicitly)
                 tool_calls = msg.get("tool_calls") or []
                 for tc in tool_calls:
-                    tool_name = tc.get("name", "") or tc.get("function", {}).get(
-                        "name", ""
-                    )
+                    tool_name = tc.get("name", "") or tc.get("function", {}).get("name", "")
                     if tool_name in tools_for_action:
                         return True
 
                 # Also check content for tool result markers
                 content = str(msg.get("content", "")).lower()
-                if action == "show_diff" and (
-                    "diff" in content or "git diff" in content
-                ):
+                if action == "show_diff" and ("diff" in content or "git diff" in content):
                     return True
                 elif (
                     action == "test"
@@ -930,10 +902,7 @@ class SemanticToolSelector:
                 if "<TOOL_OUTPUT" in content:
                     # Check if any relevant tool output exists
                     for tool_name in tools_for_action:
-                        if (
-                            f'tool="{tool_name}"' in content
-                            or f"tool='{tool_name}'" in content
-                        ):
+                        if f'tool="{tool_name}"' in content or f"tool='{tool_name}'" in content:
                             return True
 
         return False
@@ -1050,9 +1019,7 @@ class SemanticToolSelector:
             )
             self._usage_cache_dirty = True  # Mark dirty, save on shutdown
 
-    def _record_tool_usage(
-        self, tool_name: str, query: str, success: bool = True
-    ) -> None:
+    def _record_tool_usage(self, tool_name: str, query: str, success: bool = True) -> None:
         """Record tool selection for learning (Phase 3).
 
         NOTE: This records tool SELECTION, not execution. Actual execution
@@ -1127,9 +1094,7 @@ class SemanticToolSelector:
 
         # Boost from success rate
         success_rate = (
-            stats["success_count"] / stats["usage_count"]
-            if stats["usage_count"] > 0
-            else 0
+            stats["success_count"] / stats["usage_count"] if stats["usage_count"] > 0 else 0
         )
         success_boost = success_rate * 0.05  # Max 0.05
 
@@ -1153,9 +1118,7 @@ class SemanticToolSelector:
                     context_similarities.append(sim)
 
                 if context_similarities:
-                    avg_context_sim = sum(context_similarities) / len(
-                        context_similarities
-                    )
+                    avg_context_sim = sum(context_similarities) / len(context_similarities)
                     context_boost = avg_context_sim * 0.05  # Max 0.05
 
             except Exception as e:
@@ -1384,19 +1347,14 @@ class SemanticToolSelector:
 
         for tool in tools.list_tools():
             # Skip if not in relevant categories and not mandatory
-            if (
-                tool.name not in category_tools
-                and tool.name not in mandatory_tool_names
-            ):
+            if tool.name not in category_tools and tool.name not in mandatory_tool_names:
                 continue
 
             relevant_tools.append(tool)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in await self._score_candidate_tools(
-            query_embedding, relevant_tools
-        ):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
@@ -1420,9 +1378,7 @@ class SemanticToolSelector:
         similarities.sort(key=lambda x: x[1], reverse=True)
 
         # Ensure all mandatory tools are included
-        mandatory_tools = [
-            tool for tool in tools.list_tools() if tool.name in mandatory_tool_names
-        ]
+        mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
 
         # Combine mandatory + top semantic matches
         selected_tools = []
@@ -1431,9 +1387,7 @@ class SemanticToolSelector:
         # First, add all mandatory tools
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append(
-                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
-                )
+                selected_tools.append((tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE))
                 selected_names.add(tool.name)
 
         # Then add top semantic matches
@@ -1479,9 +1433,7 @@ class SemanticToolSelector:
         # Phase 6: Generate and store cost warnings for high-cost tools
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
-            logger.debug(
-                f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected"
-            )
+            logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
         # Emit semantic match event for RL learning
         self._emit_semantic_match_event(
@@ -1494,9 +1446,7 @@ class SemanticToolSelector:
 
         # Convert to ToolDefinition
         return [
-            ToolDefinition(
-                name=tool.name, description=tool.description, parameters=tool.parameters
-            )
+            ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
             for tool, _ in selected_tools
         ]
 
@@ -1542,19 +1492,14 @@ class SemanticToolSelector:
 
         for tool in tools.list_tools():
             # Skip if not in relevant categories and not mandatory
-            if (
-                tool.name not in category_tools
-                and tool.name not in mandatory_tool_names
-            ):
+            if tool.name not in category_tools and tool.name not in mandatory_tool_names:
                 continue
 
             relevant_tools.append(tool)
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in await self._score_candidate_tools(
-            query_embedding, relevant_tools
-        ):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)  # Ensure mandatory tools rank high
@@ -1574,9 +1519,7 @@ class SemanticToolSelector:
         similarities.sort(key=lambda x: x[1], reverse=True)
 
         # Ensure all mandatory tools are included
-        mandatory_tools = [
-            tool for tool in tools.list_tools() if tool.name in mandatory_tool_names
-        ]
+        mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
 
         # Combine mandatory + top semantic matches
         selected_tools = []
@@ -1585,9 +1528,7 @@ class SemanticToolSelector:
         # First, add all mandatory tools
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append(
-                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
-                )
+                selected_tools.append((tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE))
                 selected_names.add(tool.name)
 
         # Then add top semantic matches
@@ -1629,9 +1570,7 @@ class SemanticToolSelector:
         # Phase 6: Generate and store cost warnings for high-cost tools
         self._last_cost_warnings = self._generate_cost_warnings(selected_tools, tools)
         if self._last_cost_warnings:
-            logger.debug(
-                f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected"
-            )
+            logger.debug(f"Cost info: {len(self._last_cost_warnings)} high-cost tools selected")
 
         # Emit semantic match event for RL learning
         self._emit_semantic_match_event(
@@ -1644,9 +1583,7 @@ class SemanticToolSelector:
 
         # Convert to ToolDefinition
         return [
-            ToolDefinition(
-                name=tool.name, description=tool.description, parameters=tool.parameters
-            )
+            ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
             for tool, _ in selected_tools
         ]
 
@@ -1664,9 +1601,7 @@ class SemanticToolSelector:
         elif self.embedding_provider in ["ollama", "vllm", "lmstudio"]:
             return await self._get_api_embedding(text)
         else:
-            raise NotImplementedError(
-                f"Provider {self.embedding_provider} not yet supported"
-            )
+            raise NotImplementedError(f"Provider {self.embedding_provider} not yet supported")
 
     async def _get_sentence_transformer_embedding(self, text: str) -> np.ndarray:
         """Get embedding from sentence-transformers using shared EmbeddingService.
@@ -1714,9 +1649,7 @@ class SemanticToolSelector:
             return np.array(data["embedding"], dtype=np.float32)
 
         except Exception as e:
-            logger.warning(
-                f"Failed to get embedding from {self.embedding_provider}: {e}"
-            )
+            logger.warning(f"Failed to get embedding from {self.embedding_provider}: {e}")
             # Fallback to random embedding (better than crashing)
             np = _ensure_numpy()
             return np.random.randn(768).astype(np.float32)
@@ -1749,9 +1682,7 @@ class SemanticToolSelector:
                 else:
                     tool_text = self._create_tool_text(tool)
                     tool_embedding = await self._get_embedding(tool_text)
-                    similarity = self._cosine_similarity(
-                        query_embedding, tool_embedding
-                    )
+                    similarity = self._cosine_similarity(query_embedding, tool_embedding)
                 similarities.append((tool, similarity))
             return similarities
 
@@ -1764,9 +1695,7 @@ class SemanticToolSelector:
                 tool_embedding = await self._get_embedding(tool_text)
             tool_embeddings.append(tool_embedding)
 
-        all_similarities = self._batch_cosine_similarity(
-            query_embedding, tool_embeddings
-        )
+        all_similarities = self._batch_cosine_similarity(query_embedding, tool_embeddings)
         return list(zip(candidate_tools, all_similarities))
 
     @staticmethod
@@ -1995,8 +1924,7 @@ class SemanticToolSelector:
         confidence = classification_result.confidence
 
         logger.debug(
-            f"Classification-aware selection: type={task_type_str}, "
-            f"confidence={confidence:.2f}"
+            f"Classification-aware selection: type={task_type_str}, " f"confidence={confidence:.2f}"
         )
 
         # Get tools excluded by negated keywords
@@ -2020,9 +1948,7 @@ class SemanticToolSelector:
         mandatory_tool_names = self._get_mandatory_tools(user_message)
 
         # Remove negated tools from mandatory
-        mandatory_tool_names = [
-            t for t in mandatory_tool_names if t not in excluded_tools
-        ]
+        mandatory_tool_names = [t for t in mandatory_tool_names if t not in excluded_tools]
 
         # Get query embedding
         query_embedding = await self._get_embedding(user_message)
@@ -2046,9 +1972,7 @@ class SemanticToolSelector:
 
         # Apply boosts/penalties and filter by threshold
         similarities: List[Tuple[Any, float]] = []
-        for tool, similarity in await self._score_candidate_tools(
-            query_embedding, relevant_tools
-        ):
+        for tool, similarity in await self._score_candidate_tools(query_embedding, relevant_tools):
             # Boost mandatory tools
             if tool.name in mandatory_tool_names:
                 similarity = max(similarity, 0.9)
@@ -2080,14 +2004,10 @@ class SemanticToolSelector:
         selected_names = set()
 
         # Add mandatory tools first
-        mandatory_tools = [
-            tool for tool in tools.list_tools() if tool.name in mandatory_tool_names
-        ]
+        mandatory_tools = [tool for tool in tools.list_tools() if tool.name in mandatory_tool_names]
         for tool in mandatory_tools:
             if tool.name not in selected_names:
-                selected_tools.append(
-                    (tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE)
-                )
+                selected_tools.append((tool, SemanticSelectorDefaults.MANDATORY_TOOL_SCORE))
                 selected_names.add(tool.name)
 
         # Add top semantic matches
@@ -2103,10 +2023,7 @@ class SemanticToolSelector:
                 tools, max_tools - len(selected_tools), query=user_message
             )
             for fallback_name in fallback_names:
-                if (
-                    fallback_name not in selected_names
-                    and fallback_name not in excluded_tools
-                ):
+                if fallback_name not in selected_names and fallback_name not in excluded_tools:
                     fallback_tool = tools.get(fallback_name)
                     if fallback_tool:
                         selected_tools.append(
@@ -2144,9 +2061,7 @@ class SemanticToolSelector:
 
         # Convert to ToolDefinition
         return [
-            ToolDefinition(
-                name=tool.name, description=tool.description, parameters=tool.parameters
-            )
+            ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
             for tool, _ in selected_tools
         ]
 

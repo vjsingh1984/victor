@@ -163,9 +163,7 @@ async def teams(
                 return await _list_channels(client, team_id)
 
             elif operation == "create_channel":
-                return await _create_channel(
-                    client, team_id, channel_name, channel_description
-                )
+                return await _create_channel(client, team_id, channel_name, channel_description)
 
             else:
                 return {

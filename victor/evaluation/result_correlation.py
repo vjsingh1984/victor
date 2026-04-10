@@ -88,9 +88,7 @@ class TestCorrelation:
             "expected_status": self.expected_status.value,
             "actual_status": self.actual_status.value,
             "matches_expectation": self.matches_expectation,
-            "failure_category": (
-                self.failure_category.value if self.failure_category else None
-            ),
+            "failure_category": (self.failure_category.value if self.failure_category else None),
             "error_message": self.error_message,
             "is_flaky": self.is_flaky,
             "context": self.context,
@@ -189,9 +187,7 @@ class CorrelationReport:
                 "partial": self.partial_count,
                 "failed": self.failed_count,
                 "resolve_rate": (
-                    self.resolved_count / self.total_instances
-                    if self.total_instances
-                    else 0
+                    self.resolved_count / self.total_instances if self.total_instances else 0
                 ),
             },
             "scores": {
@@ -344,9 +340,7 @@ class ResultCorrelator:
         """Initialize result correlator."""
         self._compiled_patterns = {}
         for category, patterns in self.FAILURE_PATTERNS.items():
-            self._compiled_patterns[category] = [
-                re.compile(p, re.IGNORECASE) for p in patterns
-            ]
+            self._compiled_patterns[category] = [re.compile(p, re.IGNORECASE) for p in patterns]
 
     def categorize_failure(self, error_message: str) -> FailureCategory:
         """Categorize a test failure based on error message.
@@ -479,9 +473,7 @@ class ResultCorrelator:
         )
 
         # Determine resolution status
-        score.resolved = (
-            score.tests_fixed == score.total_fail_to_pass and score.tests_broken == 0
-        )
+        score.resolved = score.tests_fixed == score.total_fail_to_pass and score.tests_broken == 0
         score.partial = score.tests_fixed > 0 and not score.resolved
 
         # Add metadata

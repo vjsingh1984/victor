@@ -76,9 +76,7 @@ class Tables:
     RL_OUTCOME = "rl_outcome"  # All learner outcomes (central fact table)
     RL_METRIC = "rl_metric"  # Telemetry and monitoring
     RL_Q_VALUE = "rl_q_value"  # Unified Q-values (partitioned by learner_id)
-    RL_TRANSITION = (
-        "rl_transition"  # Unified state transitions (partitioned by learner_id)
-    )
+    RL_TRANSITION = "rl_transition"  # Unified state transitions (partitioned by learner_id)
     RL_PARAM = "rl_param"  # Unified parameters (partitioned by learner_id)
     RL_TASK_STAT = "rl_task_stat"  # Unified task statistics (partitioned by learner_id)
 
@@ -165,12 +163,8 @@ class Tables:
     GRAPH_FILE_MTIME = "graph_file_mtime"  # File modification times for staleness
 
     # Module-level metrics (WS-1: graph analysis)
-    GRAPH_MODULE_METRIC = (
-        "graph_module_metric"  # Module coupling/cohesion/hotspot metrics
-    )
-    GRAPH_MODULE_METRIC_HISTORY = (
-        "graph_module_metric_history"  # Historical metric snapshots
-    )
+    GRAPH_MODULE_METRIC = "graph_module_metric"  # Module coupling/cohesion/hotspot metrics
+    GRAPH_MODULE_METRIC_HISTORY = "graph_module_metric_history"  # Historical metric snapshots
 
     # ===========================================
     # UI DOMAIN (ui_)

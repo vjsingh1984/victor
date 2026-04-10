@@ -287,11 +287,7 @@ class TestBuilderPresets:
 
     def test_multiple_presets(self):
         """Test applying multiple presets."""
-        builder = (
-            AgentBuilder()
-            .preset(BuilderPreset.DEFAULT)
-            .preset(BuilderPreset.HIGH_BUDGET)
-        )
+        builder = AgentBuilder().preset(BuilderPreset.DEFAULT).preset(BuilderPreset.HIGH_BUDGET)
         assert len(builder._presets_applied) == 2
         assert BuilderPreset.DEFAULT in builder._presets_applied
         assert BuilderPreset.HIGH_BUDGET in builder._presets_applied
@@ -356,10 +352,7 @@ class TestBuilderStateHooks:
         trans_cb = MagicMock()
 
         builder = (
-            AgentBuilder()
-            .on_enter_stage(enter_cb)
-            .on_exit_stage(exit_cb)
-            .on_transition(trans_cb)
+            AgentBuilder().on_enter_stage(enter_cb).on_exit_stage(exit_cb).on_transition(trans_cb)
         )
 
         assert builder._options.state_hooks["on_enter"] is enter_cb
@@ -721,11 +714,7 @@ class TestAgentBuilderIntegration:
             mock_agent_class.create = AsyncMock(return_value=mock_agent)
 
             builder = (
-                AgentBuilder()
-                .provider("openai")
-                .model("gpt-4")
-                .temperature(0.5)
-                .thinking(True)
+                AgentBuilder().provider("openai").model("gpt-4").temperature(0.5).thinking(True)
             )
 
             await builder.build()

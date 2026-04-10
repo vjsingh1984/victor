@@ -148,9 +148,7 @@ class VerticalMetadata:
                                 "api_version",
                                 getattr(vertical_class, "VERTICAL_API_VERSION", 1),
                             ),
-                            module_path=getattr(
-                                vertical_class, "__module__", "<unknown>"
-                            ),
+                            module_path=getattr(vertical_class, "__module__", "<unknown>"),
                             qualname=getattr(
                                 vertical_class, "__qualname__", vertical_class.__name__
                             ),
@@ -278,8 +276,7 @@ class VerticalMetadata:
         )
 
         logger.debug(
-            f"Using classname '{classname}' as vertical name "
-            f"(no recognized suffix pattern)"
+            f"Using classname '{classname}' as vertical name " f"(no recognized suffix pattern)"
         )
         return classname.lower()
 

@@ -207,9 +207,7 @@ async def run_demo_dashboard(
         while True:
             try:
                 # Generate random event
-                event_type = random.choice(
-                    ["tool", "state", "model", "vertical", "error"]
-                )
+                event_type = random.choice(["tool", "state", "model", "vertical", "error"])
 
                 if event_type == "tool":
                     tool = random.choice(tool_names)

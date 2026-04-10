@@ -28,9 +28,7 @@ class TestRunWorkflow:
         """Test successful workflow execution."""
         # Mock workflow and registry
         mock_workflow = MagicMock()
-        mock_workflow.run = AsyncMock(
-            return_value={"success": True, "result": "completed"}
-        )
+        mock_workflow.run = AsyncMock(return_value={"success": True, "result": "completed"})
 
         mock_registry = MagicMock()
         mock_registry.get.return_value = mock_workflow
@@ -50,9 +48,7 @@ class TestRunWorkflow:
     async def test_run_workflow_no_registry(self):
         """Test handling of missing workflow registry."""
         context = {}
-        result = await workflow(
-            workflow_name="test_workflow", context=context, workflow_args={}
-        )
+        result = await workflow(workflow_name="test_workflow", context=context, workflow_args={})
 
         assert "error" in result
         assert "WorkflowRegistry not found" in result["error"]
@@ -82,9 +78,7 @@ class TestRunWorkflow:
         mock_registry.get.return_value = mock_workflow
 
         context = {"workflow_registry": mock_registry}
-        result = await workflow(
-            workflow_name="failing_workflow", context=context, workflow_args={}
-        )
+        result = await workflow(workflow_name="failing_workflow", context=context, workflow_args={})
 
         assert "error" in result
         assert "unexpected error" in result["error"]

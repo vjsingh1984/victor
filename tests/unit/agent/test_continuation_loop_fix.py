@@ -278,10 +278,7 @@ class TestCumulativeInterventionTracking:
 
         # Should force synthesis with request_summary
         assert result["action"] == "request_summary"
-        assert (
-            "Excessive" in result["reason"]
-            or "prompt interventions" in result["reason"]
-        )
+        assert "Excessive" in result["reason"] or "prompt interventions" in result["reason"]
 
     def test_no_intervention_on_low_count(self):
         """Should not trigger intervention nudge when cumulative count is low."""
@@ -440,9 +437,7 @@ class TestFileReadDedup:
 
         # Simulate old read (beyond TTL)
         file_path = "/path/to/file.py"
-        pipeline._read_file_timestamps[file_path] = (
-            time.monotonic() - 400
-        )  # 400 seconds ago
+        pipeline._read_file_timestamps[file_path] = time.monotonic() - 400  # 400 seconds ago
 
         # Should not be considered duplicate (TTL is 300 seconds)
         assert not pipeline._is_duplicate_read(file_path, max_age_seconds=300)
@@ -501,9 +496,7 @@ class TestBestEffortFinalize:
         pipeline._grounding_verifier = mock_verifier
 
         # Mock the lazy initializer to return True
-        with patch.object(
-            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
-        ) as mock_get:
+        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = True
 
             result = await pipeline.process_response(
@@ -539,9 +532,7 @@ class TestBestEffortFinalize:
         )
         pipeline._grounding_verifier = mock_verifier
 
-        with patch.object(
-            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
-        ) as mock_get:
+        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = True
 
             result = await pipeline.process_response(
@@ -576,9 +567,7 @@ class TestBestEffortFinalize:
         )
         pipeline._grounding_verifier = mock_verifier
 
-        with patch.object(
-            pipeline, "_get_grounding_verifier", new_callable=AsyncMock
-        ) as mock_get:
+        with patch.object(pipeline, "_get_grounding_verifier", new_callable=AsyncMock) as mock_get:
             mock_get.return_value = True
 
             await pipeline.process_response(

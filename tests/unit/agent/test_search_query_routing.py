@@ -39,9 +39,7 @@ def test_get_recommended_search_tool_uses_bug_route_tool_name() -> None:
     """Bug/regression routes should still recommend code_search as the tool name."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.get_recommended_search_tool(
-        "find similar regressions in auth"
-    )
+    result = orchestrator.get_recommended_search_tool("find similar regressions in auth")
 
     assert result == "code_search"
 

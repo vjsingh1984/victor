@@ -161,9 +161,7 @@ class EmbeddingService:
                 # Double-checked locking
                 if cls._instance is None:
                     cls._instance = cls(model_name=model_name, device=device)
-                    logger.info(
-                        f"Created EmbeddingService singleton with model: {model_name}"
-                    )
+                    logger.info(f"Created EmbeddingService singleton with model: {model_name}")
         return cls._instance
 
     @classmethod
@@ -184,9 +182,7 @@ class EmbeddingService:
         embedding operations from running after shutdown is initiated.
         """
         self._shutdown = True
-        logger.debug(
-            "[EmbeddingService] Shutdown signaled, new operations will be skipped"
-        )
+        logger.debug("[EmbeddingService] Shutdown signaled, new operations will be skipped")
 
     def _ensure_model_loaded(self) -> None:
         """Ensure the model is loaded (lazy loading)."""
@@ -207,9 +203,7 @@ class EmbeddingService:
 
                         # Also suppress transformers library logging
                         logging.getLogger("transformers").setLevel(logging.ERROR)
-                        logging.getLogger("sentence_transformers").setLevel(
-                            logging.ERROR
-                        )
+                        logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
 
                         load_start = time.perf_counter()
                         logger.info(
@@ -312,9 +306,7 @@ class EmbeddingService:
         evicted = 0
         target_memory = self._max_cache_memory_bytes - needed_bytes
 
-        while (
-            self._current_cache_memory_bytes > target_memory and self._embedding_cache
-        ):
+        while self._current_cache_memory_bytes > target_memory and self._embedding_cache:
             # Pop oldest entry (from front of OrderedDict)
             key, embedding = self._embedding_cache.popitem(last=False)
             freed_bytes = self._estimate_embedding_memory(embedding)
@@ -378,10 +370,7 @@ class EmbeddingService:
                 entry_bytes = self._estimate_embedding_memory(result)
 
                 # Check if we need to evict entries to make room
-                if (
-                    self._current_cache_memory_bytes + entry_bytes
-                    > self._max_cache_memory_bytes
-                ):
+                if self._current_cache_memory_bytes + entry_bytes > self._max_cache_memory_bytes:
                     self._evict_cache_for_memory(entry_bytes)
 
                 # Add to cache and update memory tracking
@@ -609,9 +598,7 @@ class EmbeddingService:
             corpus = corpus.reshape(1, -1)
         elif corpus.ndim != 2:
             # Unexpected dimensionality - return empty
-            logger.warning(
-                f"Unexpected corpus shape: {corpus.shape}, returning empty similarities"
-            )
+            logger.warning(f"Unexpected corpus shape: {corpus.shape}, returning empty similarities")
             return np.array([])
 
         # NumPy with BLAS is faster than Rust for vectorized operations

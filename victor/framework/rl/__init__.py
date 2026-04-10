@@ -455,9 +455,7 @@ class RLManager:
         """
         stats = RLStats(
             database_path=(
-                str(self._coordinator.db_path)
-                if hasattr(self._coordinator, "db_path")
-                else None
+                str(self._coordinator.db_path) if hasattr(self._coordinator, "db_path") else None
             ),
         )
 
@@ -477,9 +475,7 @@ class RLManager:
 
         return stats
 
-    def get_learner_stats(
-        self, learner: Union[LearnerType, str]
-    ) -> Optional[LearnerStats]:
+    def get_learner_stats(self, learner: Union[LearnerType, str]) -> Optional[LearnerStats]:
         """Get statistics for a specific learner.
 
         Args:

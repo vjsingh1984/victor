@@ -88,9 +88,7 @@ class RustAstIndexer(InstrumentedAccelerator):
         with self._timed_call("extract_identifiers"):
             return victor_native.extract_identifiers(source)
 
-    def extract_identifiers_with_positions(
-        self, source: str
-    ) -> List[Tuple[str, int, int]]:
+    def extract_identifiers_with_positions(self, source: str) -> List[Tuple[str, int, int]]:
         """Extract identifiers with their positions.
 
         Delegates to Rust implementation.

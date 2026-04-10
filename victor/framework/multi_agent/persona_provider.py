@@ -227,9 +227,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
 
             logger.debug(f"Registered persona: {name}@{version} (category={category})")
 
-    def get_persona(
-        self, name: str, version: Optional[str] = None
-    ) -> Optional["PersonaTraits"]:
+    def get_persona(self, name: str, version: Optional[str] = None) -> Optional["PersonaTraits"]:
         """Get a persona by name and optional version.
 
         Args:
@@ -320,9 +318,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
             if name not in self._personas:
                 return []
 
-            return sorted(
-                self._personas[name].keys(), key=self._semver_key, reverse=True
-            )
+            return sorted(self._personas[name].keys(), key=self._semver_key, reverse=True)
 
     def get_capabilities(self) -> Dict[str, "PersonaTraits"]:
         """Return all registered personas (as capabilities).
@@ -368,8 +364,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
             total_versions = sum(len(versions) for versions in self._personas.values())
 
             category_counts = {
-                category: len(personas)
-                for category, personas in self._categories.items()
+                category: len(personas) for category, personas in self._categories.items()
             }
 
             return {

@@ -184,9 +184,7 @@ class TestVerticalService:
         get_vertical_integration_pipeline(reset=True)
 
         with ThreadPoolExecutor(max_workers=8) as executor:
-            futures = [
-                executor.submit(get_vertical_integration_pipeline) for _ in range(24)
-            ]
+            futures = [executor.submit(get_vertical_integration_pipeline) for _ in range(24)]
             instances = [f.result() for f in futures]
 
         assert len({id(instance) for instance in instances}) == 1
@@ -203,9 +201,7 @@ class TestVerticalService:
             pipeline.apply.return_value = expected
             mock_get.return_value = pipeline
 
-            result = apply_vertical_configuration(
-                orchestrator, DummyVertical, source="sdk"
-            )
+            result = apply_vertical_configuration(orchestrator, DummyVertical, source="sdk")
 
         assert result is expected
         pipeline.apply.assert_called_once_with(orchestrator, DummyVertical)
@@ -267,9 +263,7 @@ class TestVerticalService:
         assert resolutions[0]["available"] is True
         assert resolutions[1]["capability_id"] == "not_registered_capability"
         assert resolutions[1]["available"] is False
-        assert any(
-            "not_registered_capability" in warning for warning in result.warnings
-        )
+        assert any("not_registered_capability" in warning for warning in result.warnings)
 
     def test_apply_vertical_configuration_supports_legacy_config_only_verticals(self):
         """VerticalBase verticals should work with the direct protocol path."""

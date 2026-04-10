@@ -237,9 +237,7 @@ class MatchingMetrics:
 
     def record_category_hit(self, category: str) -> None:
         """Record a category-based lookup."""
-        self.category_hit_counts[category] = (
-            self.category_hit_counts.get(category, 0) + 1
-        )
+        self.category_hit_counts[category] = self.category_hit_counts.get(category, 0) + 1
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert metrics to dictionary for logging/export."""
@@ -287,21 +285,15 @@ class ToolMetadataEntry:
     cost_tier: CostTier
     aliases: Set[str] = field(default_factory=set)
     keywords: Set[str] = field(default_factory=set)
-    stages: Set[str] = field(
-        default_factory=set
-    )  # Conversation stages where tool is relevant
+    stages: Set[str] = field(default_factory=set)  # Conversation stages where tool is relevant
     description: str = ""
     # NEW: Decorator-driven semantic selection fields
-    mandatory_keywords: Set[str] = field(
-        default_factory=set
-    )  # Keywords that force inclusion
+    mandatory_keywords: Set[str] = field(default_factory=set)  # Keywords that force inclusion
     task_types: Set[str] = field(
         default_factory=set
     )  # Task types for classification-aware selection
     progress_params: Set[str] = field(default_factory=set)  # Params for loop detection
-    execution_category: ExecutionCategory = (
-        ExecutionCategory.READ_ONLY
-    )  # For parallel execution
+    execution_category: ExecutionCategory = ExecutionCategory.READ_ONLY  # For parallel execution
     # NEW: Availability check for optional tools
     _availability_check: Optional[Callable[[], bool]] = field(default=None, repr=False)
 
@@ -346,9 +338,7 @@ class ToolMetadataEntry:
         try:
             return self._availability_check()
         except Exception as e:
-            logger.warning(
-                f"Availability check for tool '{self.name}' raised exception: {e}"
-            )
+            logger.warning(f"Availability check for tool '{self.name}' raised exception: {e}")
             return False
 
     @classmethod
@@ -382,9 +372,7 @@ class ToolMetadataEntry:
 
         # NEW: Extract mandatory keywords (lowercased for matching)
         raw_mandatory = getattr(tool, "mandatory_keywords", None) or []
-        mandatory_keywords = (
-            {k.lower() for k in raw_mandatory} if raw_mandatory else set()
-        )
+        mandatory_keywords = {k.lower() for k in raw_mandatory} if raw_mandatory else set()
 
         # NEW: Extract task types (lowercased for consistency)
         raw_task_types = getattr(tool, "task_types", None) or []
@@ -423,10 +411,7 @@ class ToolMetadataEntry:
     @property
     def requires_approval(self) -> bool:
         """Check if this tool requires approval."""
-        return (
-            self.access_mode.requires_approval
-            or self.danger_level.requires_confirmation
-        )
+        return self.access_mode.requires_approval or self.danger_level.requires_confirmation
 
     @property
     def is_safe(self) -> bool:
@@ -483,21 +468,15 @@ class ToolMetadataRegistry:
         """
         self._entries: Dict[str, ToolMetadataEntry] = {}
         self._by_priority: Dict[Priority, Set[str]] = {p: set() for p in Priority}
-        self._by_access_mode: Dict[AccessMode, Set[str]] = {
-            a: set() for a in AccessMode
-        }
-        self._by_danger_level: Dict[DangerLevel, Set[str]] = {
-            d: set() for d in DangerLevel
-        }
+        self._by_access_mode: Dict[AccessMode, Set[str]] = {a: set() for a in AccessMode}
+        self._by_danger_level: Dict[DangerLevel, Set[str]] = {d: set() for d in DangerLevel}
         self._by_category: Dict[str, Set[str]] = {}
         self._by_keyword: Dict[str, Set[str]] = {}  # keyword -> set of tool names
         self._by_stage: Dict[str, Set[str]] = {}  # stage -> set of tool names
         self._alias_map: Dict[str, str] = {}  # alias -> canonical name
         self._metrics: MatchingMetrics = MatchingMetrics()
         # NEW: Indexes for decorator-driven semantic selection
-        self._by_mandatory_keyword: Dict[str, Set[str]] = (
-            {}
-        )  # mandatory_keyword -> tools
+        self._by_mandatory_keyword: Dict[str, Set[str]] = {}  # mandatory_keyword -> tools
         self._by_task_type: Dict[str, Set[str]] = {}  # task_type -> tools
         self._by_execution_category: Dict[ExecutionCategory, Set[str]] = {
             ec: set() for ec in ExecutionCategory
@@ -619,18 +598,14 @@ class ToolMetadataRegistry:
                 try:
                     parsed = _json.loads(env_raw_stripped)
                     if isinstance(parsed, list):
-                        core_readonly.extend(
-                            str(item).strip() for item in parsed if item
-                        )
+                        core_readonly.extend(str(item).strip() for item in parsed if item)
                 except (ValueError, TypeError):
                     # Fallback to comma-separated if JSON parse fails
                     core_readonly.extend(
                         [item.strip() for item in env_raw.split(",") if item.strip()]
                     )
             else:
-                core_readonly.extend(
-                    [item.strip() for item in env_raw.split(",") if item.strip()]
-                )
+                core_readonly.extend([item.strip() for item in env_raw.split(",") if item.strip()])
 
         # Runtime override/extension via settings (env: CORE_READONLY_TOOLS)
         try:
@@ -707,9 +682,7 @@ class ToolMetadataRegistry:
         Returns:
             List of matching tool entries
         """
-        return [
-            self._entries[name] for name in self._by_access_mode.get(access_mode, set())
-        ]
+        return [self._entries[name] for name in self._by_access_mode.get(access_mode, set())]
 
     def get_by_danger_level(self, danger_level: DangerLevel) -> List[ToolMetadataEntry]:
         """Get all tools with specified danger level.
@@ -720,10 +693,7 @@ class ToolMetadataRegistry:
         Returns:
             List of matching tool entries
         """
-        return [
-            self._entries[name]
-            for name in self._by_danger_level.get(danger_level, set())
-        ]
+        return [self._entries[name] for name in self._by_danger_level.get(danger_level, set())]
 
     def get_by_category(self, category: str) -> List[ToolMetadataEntry]:
         """Get all tools in specified category.
@@ -784,9 +754,7 @@ class ToolMetadataRegistry:
         Returns:
             Dictionary mapping category names to sets of keywords
         """
-        return {
-            cat: self.get_category_keywords(cat) for cat in self._by_category.keys()
-        }
+        return {cat: self.get_category_keywords(cat) for cat in self._by_category.keys()}
 
     def detect_categories_from_text(self, text: str) -> Set[str]:
         """Detect relevant categories from keywords in text.
@@ -829,9 +797,7 @@ class ToolMetadataRegistry:
             List of matching tool entries
         """
         keyword_lower = keyword.lower()
-        return [
-            self._entries[name] for name in self._by_keyword.get(keyword_lower, set())
-        ]
+        return [self._entries[name] for name in self._by_keyword.get(keyword_lower, set())]
 
     def get_tools_by_keywords(self, keywords: List[str]) -> Set[str]:
         """Get tool names matching any of the given keywords.
@@ -954,9 +920,7 @@ class ToolMetadataRegistry:
         """
         return self._by_task_type.get(task_type.lower(), set()).copy()
 
-    def get_tools_for_task_classification(
-        self, task_type: str
-    ) -> List[ToolMetadataEntry]:
+    def get_tools_for_task_classification(self, task_type: str) -> List[ToolMetadataEntry]:
         """Get tool entries relevant for the specified task classification.
 
         Returns full metadata entries for task-type matching, enabling
@@ -1081,10 +1045,7 @@ class ToolMetadataRegistry:
         Returns:
             Dictionary mapping execution category values to sets of tool names
         """
-        return {
-            cat.value: tools.copy()
-            for cat, tools in self._by_execution_category.items()
-        }
+        return {cat.value: tools.copy() for cat, tools in self._by_execution_category.items()}
 
     # =========================================================================
     # Access mode-based tool discovery (replaces static WRITE_TOOL_NAMES, etc.)
@@ -1302,9 +1263,7 @@ class ToolMetadataRegistry:
                 tools = self.get_by_category(fallback)
                 if tools:
                     self._metrics.record_category_hit(fallback)
-                    logger.debug(
-                        f"Category '{category}' empty, using fallback '{fallback}'"
-                    )
+                    logger.debug(f"Category '{category}' empty, using fallback '{fallback}'")
                     return tools
 
         return []
@@ -1355,9 +1314,7 @@ class ToolMetadataRegistry:
         }
 
         if category in CATEGORY_TO_EXECUTION:
-            return self._by_execution_category.get(
-                CATEGORY_TO_EXECUTION[category], set()
-            ).copy()
+            return self._by_execution_category.get(CATEGORY_TO_EXECUTION[category], set()).copy()
 
         # Try direct category lookup
         return self._by_category.get(category, set()).copy()
@@ -1390,14 +1347,10 @@ class ToolMetadataRegistry:
             List of tools that should be included for this task
         """
         return [
-            entry
-            for entry in self._entries.values()
-            if entry.should_include_for_task(task_type)
+            entry for entry in self._entries.values() if entry.should_include_for_task(task_type)
         ]
 
-    def get_tools_up_to_priority(
-        self, max_priority: Priority
-    ) -> List[ToolMetadataEntry]:
+    def get_tools_up_to_priority(self, max_priority: Priority) -> List[ToolMetadataEntry]:
         """Get all tools with priority <= max_priority (lower value = higher priority).
 
         Args:
@@ -1407,9 +1360,7 @@ class ToolMetadataRegistry:
             List of tools at or above this priority
         """
         return [
-            entry
-            for entry in self._entries.values()
-            if entry.priority.value <= max_priority.value
+            entry for entry in self._entries.values() if entry.priority.value <= max_priority.value
         ]
 
     def filter(
@@ -1500,9 +1451,7 @@ class ToolMetadataRegistry:
         Returns:
             List of ToolMetadataEntry for tools with availability_check
         """
-        return [
-            entry for entry in self._entries.values() if entry.requires_configuration
-        ]
+        return [entry for entry in self._entries.values() if entry.requires_configuration]
 
     def get_available_tool_names(self) -> Set[str]:
         """Get names of all currently available tools.
@@ -1550,26 +1499,15 @@ class ToolMetadataRegistry:
         """
         return {
             "total": len(self._entries),
-            "by_priority": {
-                p.name: len(names) for p, names in self._by_priority.items()
-            },
-            "by_access_mode": {
-                a.name: len(names) for a, names in self._by_access_mode.items()
-            },
-            "by_danger_level": {
-                d.name: len(names) for d, names in self._by_danger_level.items()
-            },
-            "by_category": {
-                cat: len(names) for cat, names in self._by_category.items()
-            },
+            "by_priority": {p.name: len(names) for p, names in self._by_priority.items()},
+            "by_access_mode": {a.name: len(names) for a, names in self._by_access_mode.items()},
+            "by_danger_level": {d.name: len(names) for d, names in self._by_danger_level.items()},
+            "by_category": {cat: len(names) for cat, names in self._by_category.items()},
             "by_stage": {stage: len(names) for stage, names in self._by_stage.items()},
             # NEW: Additional semantic selection statistics
-            "by_task_type": {
-                tt: len(names) for tt, names in self._by_task_type.items()
-            },
+            "by_task_type": {tt: len(names) for tt, names in self._by_task_type.items()},
             "by_execution_category": {
-                ec.value: len(names)
-                for ec, names in self._by_execution_category.items()
+                ec.value: len(names) for ec, names in self._by_execution_category.items()
             },
             "mandatory_keywords_count": len(self._by_mandatory_keyword),
             "tools_with_progress_params": len(
@@ -1582,9 +1520,7 @@ class ToolMetadataRegistry:
             # Availability statistics
             "available_tools": len(self.get_available_tools()),
             "unavailable_tools": len(self.get_unavailable_tools()),
-            "tools_requiring_configuration": len(
-                self.get_tools_requiring_configuration()
-            ),
+            "tools_requiring_configuration": len(self.get_tools_requiring_configuration()),
         }
 
 

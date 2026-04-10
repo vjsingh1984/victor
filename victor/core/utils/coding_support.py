@@ -60,9 +60,7 @@ def load_codebase_analyzer_attr(name: str) -> object:
     try:
         return getattr(module, name)
     except AttributeError as exc:
-        raise ImportError(
-            f"codebase_analyzer does not expose required symbol '{name}'"
-        ) from exc
+        raise ImportError(f"codebase_analyzer does not expose required symbol '{name}'") from exc
 
 
 def _load_extracted_tree_sitter_manager() -> ModuleType:

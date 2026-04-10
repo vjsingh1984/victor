@@ -158,9 +158,7 @@ class TestContinuationPatienceLearner:
         assert rec.reason.startswith("Insufficient data")
         assert rec.sample_size == 1
 
-    def test_get_recommendation_with_baseline(
-        self, learner: ContinuationPatienceLearner
-    ) -> None:
+    def test_get_recommendation_with_baseline(self, learner: ContinuationPatienceLearner) -> None:
         """Should return baseline if no data, and provider adapter is mocked."""
         # Mock provider adapter to return a baseline patience
         mock_adapter = MagicMock()

@@ -150,9 +150,7 @@ class TestEscapeHatchRegistry:
 
         registry.register_transform("my_trans", sample_transform, vertical="research")
 
-        assert (
-            registry.get_transform("my_trans", vertical="research") is sample_transform
-        )
+        assert registry.get_transform("my_trans", vertical="research") is sample_transform
         # Should not be in global
         assert registry.get_transform("my_trans") is None
 
@@ -337,10 +335,7 @@ class TestEscapeHatchRegistry:
         assert registry.get_transform("shared")({})["source"] == "global"
 
         # With vertical, returns vertical-specific
-        assert (
-            registry.get_transform("shared", vertical="research")({})["source"]
-            == "vertical"
-        )
+        assert registry.get_transform("shared", vertical="research")({})["source"] == "vertical"
 
     # --- List Tests ---
 
@@ -552,9 +547,7 @@ class TestTransformDecorator:
             return {"result": "test"}
 
         registry = get_escape_hatch_registry()
-        assert (
-            registry.get_transform("my_test_trans", vertical="research") is my_transform
-        )
+        assert registry.get_transform("my_test_trans", vertical="research") is my_transform
         assert registry.get_transform("my_test_trans") is None
 
     def test_transform_decorator_returns_original_function(self):

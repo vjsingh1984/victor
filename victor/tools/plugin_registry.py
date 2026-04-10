@@ -142,9 +142,7 @@ class ToolPluginRegistry:
             if direct_plugin.exists():
                 discovered.append(plugin_dir)
 
-        logger.info(
-            f"Discovered {len(discovered)} plugins in {len(self.plugin_dirs)} directories"
-        )
+        logger.info(f"Discovered {len(discovered)} plugins in {len(self.plugin_dirs)} directories")
         return discovered
 
     def load_plugin_from_path(self, plugin_path: Path) -> Optional[ToolPlugin]:
@@ -180,9 +178,7 @@ class ToolPluginRegistry:
 
             plugin_class = module.Plugin
             if not issubclass(plugin_class, ToolPlugin):
-                raise PluginLoadError(
-                    f"Plugin class must extend ToolPlugin: {plugin_file}"
-                )
+                raise PluginLoadError(f"Plugin class must extend ToolPlugin: {plugin_file}")
 
             # Get plugin-specific config
             plugin_config = self.config.get(plugin_class.name, {})
@@ -191,9 +187,7 @@ class ToolPluginRegistry:
             plugin = plugin_class(config=plugin_config)
             plugin.get_metadata().path = plugin_path
 
-            logger.info(
-                f"Loaded plugin: {plugin.name} v{plugin.version} from {plugin_path}"
-            )
+            logger.info(f"Loaded plugin: {plugin.name} v{plugin.version} from {plugin_path}")
             return plugin
 
         except Exception as e:
@@ -224,9 +218,7 @@ class ToolPluginRegistry:
 
             plugin_class = module.Plugin
             if not issubclass(plugin_class, ToolPlugin):
-                raise PluginLoadError(
-                    f"Plugin class must extend ToolPlugin: {package_name}"
-                )
+                raise PluginLoadError(f"Plugin class must extend ToolPlugin: {package_name}")
 
             # Get plugin-specific config
             plugin_config = self.config.get(plugin_class.name, {})
@@ -346,9 +338,7 @@ class ToolPluginRegistry:
                         f"Failed to register tool '{tool.name}' from plugin '{plugin.name}': {e}"
                     )
 
-        logger.info(
-            f"Registered {registered} tools from {len(self.loaded_plugins)} plugins"
-        )
+        logger.info(f"Registered {registered} tools from {len(self.loaded_plugins)} plugins")
         return registered
 
     def get_plugin_info(self) -> List[PluginMetadata]:
@@ -439,15 +429,11 @@ class ToolPluginRegistry:
         file_path_resolved = file_path.resolve()
         for name, plugin in self.loaded_plugins.items():
             plugin_path = plugin.get_metadata().path
-            if plugin_path and str(file_path_resolved).startswith(
-                str(plugin_path.resolve())
-            ):
+            if plugin_path and str(file_path_resolved).startswith(str(plugin_path.resolve())):
                 return name
         return None
 
-    def watch_plugins(
-        self, callback: Optional[Callable[[str, str], None]] = None
-    ) -> bool:
+    def watch_plugins(self, callback: Optional[Callable[[str, str], None]] = None) -> bool:
         """Start watching plugin directories for changes.
 
         When a plugin file changes, automatically reload the affected plugin.

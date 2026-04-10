@@ -181,9 +181,7 @@ class VariantEvaluator:
 
         # Determine recommendation
         baseline_score = 1.0  # Baseline is original workflow
-        improvement = (result.overall_score - baseline_score) / max(
-            baseline_score, 1e-6
-        )
+        improvement = (result.overall_score - baseline_score) / max(baseline_score, 1e-6)
         result.recommendation = improvement > self.recommendation_threshold
 
         logger.info(
@@ -219,9 +217,7 @@ class VariantEvaluator:
         # For MVP, use variant metadata as estimates
         duration_score = 1.0 / (1.0 + variant.estimated_duration_reduction)
         cost_score = 1.0 / (1.0 + variant.estimated_cost_reduction)
-        quality_score = 1.0 - (
-            variant.expected_improvement * 0.1
-        )  # Assume slight quality risk
+        quality_score = 1.0 - (variant.expected_improvement * 0.1)  # Assume slight quality risk
 
         return EvaluationResult(
             variant_id=variant.variant_id,
@@ -323,9 +319,7 @@ class VariantEvaluator:
         # Estimate scores from improvement
         duration_score = 1.0 + (expected_improvement * 0.5)
         cost_score = 1.0 + (expected_improvement * 0.3)
-        quality_score = 1.0 - (
-            expected_improvement * 0.05
-        )  # Assume slight quality risk
+        quality_score = 1.0 - (expected_improvement * 0.05)  # Assume slight quality risk
 
         # Adjust based on risk level
         risk_multipliers = {

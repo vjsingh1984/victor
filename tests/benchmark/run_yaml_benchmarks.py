@@ -117,9 +117,7 @@ workflows:
             current, peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
-            node_count = (
-                len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
-            )
+            node_count = len(workflow_def.workflows) if hasattr(workflow_def, "workflows") else 1
 
             return {
                 "name": name,
@@ -225,12 +223,12 @@ workflows:
         print(f"Failed:         {analysis['failed']}")
 
         if analysis["successful"] > 0:
-            print(f"\nTime Performance:")
+            print("\nTime Performance:")
             print(f"  Min:  {analysis['time_min_ms']:6.2f}ms")
             print(f"  Max:  {analysis['time_max_ms']:6.2f}ms")
             print(f"  Avg:  {analysis['time_avg_ms']:6.2f}ms")
 
-            print(f"\nMemory Performance:")
+            print("\nMemory Performance:")
             print(f"  Min:  {analysis['memory_min_mb']:5.2f}MB")
             print(f"  Max:  {analysis['memory_max_mb']:5.2f}MB")
             print(f"  Avg:  {analysis['memory_avg_mb']:5.2f}MB")
@@ -259,7 +257,7 @@ workflows:
                 print("\n⚠️  SOME BENCHMARKS DID NOT MEET CRITERIA")
 
         if analysis["failed"] > 0:
-            print(f"\nErrors:")
+            print("\nErrors:")
             for error in analysis.get("errors", []):
                 print(f"  - {error}")
 

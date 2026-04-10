@@ -94,9 +94,7 @@ class MarkdownChunkingStrategy(ChunkingStrategy):
 
             # If section is too large, sub-chunk it
             if len(section) > self.config.max_chunk_size:
-                sub_chunks = self._chunk_large_section(
-                    section, start, header_level, header_text
-                )
+                sub_chunks = self._chunk_large_section(section, start, header_level, header_text)
                 chunks.extend(sub_chunks)
             elif len(section) >= self.config.min_chunk_size:
                 chunks.append(

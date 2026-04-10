@@ -151,9 +151,7 @@ def bootstrap_new_services(
             tool_executor=tool_executor,
         )
         services_created["tool"] = tool_service
-        container.register(
-            ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON
-        )
+        container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
         logger.info("Bootstrapped ToolService")
 
     # Bootstrap SessionService if enabled
@@ -173,9 +171,7 @@ def bootstrap_new_services(
         if decision_service is not None:
             logger.info("Bootstrapped LLMDecisionService with edge model")
 
-    if decision_service is None and feature_flags.is_enabled(
-        FeatureFlag.USE_LLM_DECISION_SERVICE
-    ):
+    if decision_service is None and feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
         decision_service = _create_llm_decision_service(container)
         if decision_service is not None:
             logger.info("Bootstrapped LLMDecisionService with cloud provider")
@@ -203,9 +199,7 @@ def bootstrap_new_services(
             context_service=services_created.get("context"),
             recovery_service=services_created.get("recovery"),
         )
-        container.register(
-            ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON
-        )
+        container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
         logger.info("Bootstrapped ChatService")
 
 
@@ -432,11 +426,7 @@ def _create_llm_decision_service(container: ServiceContainer) -> Optional[Any]:
             return None
 
         # Get model name from provider if available
-        model = (
-            getattr(provider, "model", None)
-            or getattr(provider, "model_name", None)
-            or ""
-        )
+        model = getattr(provider, "model", None) or getattr(provider, "model_name", None) or ""
 
         config = LLMDecisionServiceConfig(
             confidence_threshold=0.7,

@@ -172,9 +172,7 @@ class TestOllamaCapabilityDetector:
 
     def test_init_with_custom_url(self):
         """Test initialization with custom URL."""
-        detector = OllamaCapabilityDetector(
-            base_url="http://192.168.1.100:11434", timeout=60
-        )
+        detector = OllamaCapabilityDetector(base_url="http://192.168.1.100:11434", timeout=60)
         assert detector.base_url == "http://192.168.1.100:11434"
         assert detector.timeout == 60
 

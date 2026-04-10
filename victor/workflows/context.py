@@ -445,9 +445,7 @@ def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
         node_results[node_id] = {
             "node_id": result.node_id,
             "status": (
-                result.status.value
-                if hasattr(result.status, "value")
-                else str(result.status)
+                result.status.value if hasattr(result.status, "value") else str(result.status)
             ),
             "success": result.success,
             "output": result.output,

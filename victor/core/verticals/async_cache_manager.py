@@ -268,9 +268,7 @@ class AsyncSafeCacheManager:
 
             return value
 
-    def invalidate(
-        self, namespace: Optional[str] = None, key: Optional[str] = None
-    ) -> int:
+    def invalidate(self, namespace: Optional[str] = None, key: Optional[str] = None) -> int:
         """Invalidate cache entries.
 
         Args:

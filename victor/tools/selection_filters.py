@@ -137,9 +137,7 @@ def blend_tool_results(
     return blended
 
 
-def cap_tools_to_max(
-    tools: List["ToolDefinition"], max_tools: int
-) -> List["ToolDefinition"]:
+def cap_tools_to_max(tools: List["ToolDefinition"], max_tools: int) -> List["ToolDefinition"]:
     """Cap tool list to maximum length.
 
     Extracted from tool_selection.py lines 1298-1299.

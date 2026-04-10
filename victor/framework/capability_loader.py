@@ -200,9 +200,7 @@ class CapabilityLoader(DynamicModuleLoader):
         super().__init__(watch_dirs=plugin_dirs or [])
 
         self._capabilities: Dict[str, CapabilityEntry] = {}
-        self._module_capabilities: Dict[str, Set[str]] = (
-            {}
-        )  # module -> capability names
+        self._module_capabilities: Dict[str, Set[str]] = {}  # module -> capability names
         self._plugin_dirs = plugin_dirs or []
         self._watchers: List[Callable[[str, str], None]] = []  # change callbacks
 
@@ -310,9 +308,7 @@ class CapabilityLoader(DynamicModuleLoader):
                         if name:
                             loaded_names.append(name)
                     except Exception as e:
-                        logger.warning(
-                            f"Failed to instantiate capability class {attr_name}: {e}"
-                        )
+                        logger.warning(f"Failed to instantiate capability class {attr_name}: {e}")
 
             logger.info(
                 f"Loaded {len(loaded_names)} capabilities from '{module_name}': "
@@ -781,9 +777,7 @@ class CapabilityLoader(DynamicModuleLoader):
         """
         return name in self._capabilities
 
-    def get_capabilities_by_type(
-        self, capability_type: CapabilityType
-    ) -> List[CapabilityEntry]:
+    def get_capabilities_by_type(self, capability_type: CapabilityType) -> List[CapabilityEntry]:
         """Get all capabilities of a specific type.
 
         Args:
@@ -808,9 +802,7 @@ class CapabilityLoader(DynamicModuleLoader):
             List of capability entries from that module
         """
         cap_names = self._module_capabilities.get(module_name, set())
-        return [
-            self._capabilities[name] for name in cap_names if name in self._capabilities
-        ]
+        return [self._capabilities[name] for name in cap_names if name in self._capabilities]
 
     def list_loaded_modules(self) -> List[str]:
         """Get list of all loaded module names.
@@ -861,9 +853,7 @@ class CapabilityLoader(DynamicModuleLoader):
 
         # Strict mode blocks private registration fallback paths.
         if not use_public_registration:
-            ensure_not_private_fallback(
-                "_register_capability", operation="capability registration"
-            )
+            ensure_not_private_fallback("_register_capability", operation="capability registration")
 
         names_to_apply = capability_names or list(self._capabilities.keys())
 

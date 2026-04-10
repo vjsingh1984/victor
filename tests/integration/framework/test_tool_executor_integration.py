@@ -108,9 +108,7 @@ class TestToolExecutorIntegration:
             execution_time=0.01,
         )
 
-        with patch.object(
-            orchestrator.tool_executor, "execute", return_value=mock_result
-        ):
+        with patch.object(orchestrator.tool_executor, "execute", return_value=mock_result):
             tool_calls = [{"name": "read_file", "arguments": {"path": "/nonexistent"}}]
             results = await orchestrator._handle_tool_calls(tool_calls)
 
@@ -165,7 +163,4 @@ class TestToolExecutorCaching:
     def test_tool_executor_has_cache(self, orchestrator_with_cache):
         """Verify ToolExecutor receives cache from orchestrator."""
         assert orchestrator_with_cache.tool_executor.cache is not None
-        assert (
-            orchestrator_with_cache.tool_executor.cache
-            is orchestrator_with_cache.tool_cache
-        )
+        assert orchestrator_with_cache.tool_executor.cache is orchestrator_with_cache.tool_cache

@@ -128,9 +128,7 @@ class TestDashboardReport:
     def test_to_dict(self):
         """Test converting report to dictionary."""
         report = DashboardReport(
-            circuit_breakers={
-                "test": CircuitBreakerMetrics(name="test", state="closed")
-            }
+            circuit_breakers={"test": CircuitBreakerMetrics(name="test", state="closed")}
         )
 
         d = report.to_dict()

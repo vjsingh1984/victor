@@ -169,13 +169,9 @@ class HandlerRegistry:
                 self._vertical_handlers[vertical_name] = {}
             self._vertical_handlers[vertical_name][handler_name] = handler_instance
 
-        logger.debug(
-            f"Registered {len(handlers)} handlers from vertical '{vertical_name}'"
-        )
+        logger.debug(f"Registered {len(handlers)} handlers from vertical '{vertical_name}'")
 
-    def register_global(
-        self, name: str, handler: Any, category: str = "global"
-    ) -> None:
+    def register_global(self, name: str, handler: Any, category: str = "global") -> None:
         """Register a global handler accessible to all verticals.
 
         Args:
@@ -227,9 +223,7 @@ class HandlerRegistry:
         """
         return self._vertical_handlers.get(vertical_name, {}).copy()
 
-    def list_handlers(
-        self, vertical_name: Optional[str] = None
-    ) -> Dict[str, List[str]]:
+    def list_handlers(self, vertical_name: Optional[str] = None) -> Dict[str, List[str]]:
         """List available handlers.
 
         Args:
@@ -239,11 +233,7 @@ class HandlerRegistry:
             Dict mapping vertical names to lists of handler names
         """
         if vertical_name:
-            return {
-                vertical_name: list(
-                    self._vertical_handlers.get(vertical_name, {}).keys()
-                )
-            }
+            return {vertical_name: list(self._vertical_handlers.get(vertical_name, {}).keys())}
 
         return {
             vertical: list(handlers.keys())

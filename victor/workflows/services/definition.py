@@ -620,8 +620,7 @@ class ServiceConfig:
             "image": self.image,
             "command": self.command,
             "ports": [
-                {"container_port": p.container_port, "host_port": p.host_port}
-                for p in self.ports
+                {"container_port": p.container_port, "host_port": p.host_port} for p in self.ports
             ],
             "environment": self.environment,
             "volumes": [
@@ -651,9 +650,7 @@ class ServiceConfig:
             volumes=data.get("volumes", []),
             working_dir=data.get("working_dir"),
             user=data.get("user"),
-            health_check=(
-                HealthCheckConfig.from_dict(health_data) if health_data else None
-            ),
+            health_check=(HealthCheckConfig.from_dict(health_data) if health_data else None),
             lifecycle=LifecycleConfig.from_dict(lifecycle_data),
             exports=data.get("exports", {}),
             labels=data.get("labels", {}),

@@ -426,9 +426,7 @@ class TestAutonomousPlanner:
             approvals.append(msg)
             return True
 
-        planner = AutonomousPlanner(
-            mock_orchestrator, approval_callback=custom_approval
-        )
+        planner = AutonomousPlanner(mock_orchestrator, approval_callback=custom_approval)
         result = planner.approval_callback("Approve this?")
         assert result is True
         assert "Approve this?" in approvals
@@ -612,9 +610,7 @@ class TestPlanningIntegration:
                 PlanStep(id="setup", description="Setup"),
                 PlanStep(id="task_a", description="Task A", depends_on=["setup"]),
                 PlanStep(id="task_b", description="Task B", depends_on=["setup"]),
-                PlanStep(
-                    id="merge", description="Merge", depends_on=["task_a", "task_b"]
-                ),
+                PlanStep(id="merge", description="Merge", depends_on=["task_a", "task_b"]),
             ],
         )
 

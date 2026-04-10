@@ -76,9 +76,7 @@ class MetricsAggregator:
         """
         self._storage = storage
 
-    def get_metric_statistics(
-        self, run_id: str, metric_name: str
-    ) -> Optional[MetricStatistics]:
+    def get_metric_statistics(self, run_id: str, metric_name: str) -> Optional[MetricStatistics]:
         """Get statistics for a specific metric.
 
         Args:

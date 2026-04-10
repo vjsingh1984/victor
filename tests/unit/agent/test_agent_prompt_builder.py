@@ -133,9 +133,7 @@ class TestSystemPromptBuilder:
 
     def test_build_lmstudio_prompt_native_support(self):
         """Test LMStudio prompt for models with native support."""
-        builder = SystemPromptBuilder(
-            provider_name="lmstudio", model="qwen2.5-coder:7b"
-        )
+        builder = SystemPromptBuilder(provider_name="lmstudio", model="qwen2.5-coder:7b")
         result = builder._build_lmstudio_prompt()
         # Native support models get the expanded capabilities prompt
         assert "CAPABILITIES:" in result

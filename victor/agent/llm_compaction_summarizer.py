@@ -57,9 +57,7 @@ class LLMCompactionSummarizer:
         self._timeout_seconds = timeout_seconds
         self._fallback = fallback
 
-    def summarize(
-        self, removed_messages: List[Message], ledger: Optional[object] = None
-    ) -> str:
+    def summarize(self, removed_messages: List[Message], ledger: Optional[object] = None) -> str:
         """Implements CompactionSummaryStrategy protocol.
 
         Builds prompt from messages + ledger, calls provider.chat() with short timeout.
@@ -147,9 +145,7 @@ class LLMCompactionSummarizer:
             if entries:
                 ledger_parts = []
                 for entry in entries[:20]:
-                    ledger_parts.append(
-                        f"- [{entry.category}] {entry.key}: {entry.summary}"
-                    )
+                    ledger_parts.append(f"- [{entry.category}] {entry.key}: {entry.summary}")
                 parts.append("\nLedger entries:\n" + "\n".join(ledger_parts))
 
         return "\n".join(parts)

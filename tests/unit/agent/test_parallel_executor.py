@@ -209,9 +209,7 @@ class TestParallelToolExecutor:
         def callback(tool_name: str, status: str, success: bool):
             callback_calls.append((tool_name, status, success))
 
-        executor = ParallelToolExecutor(
-            self.mock_tool_executor, progress_callback=callback
-        )
+        executor = ParallelToolExecutor(self.mock_tool_executor, progress_callback=callback)
         tool_calls = [{"name": "read_file", "arguments": {"path": "/test.py"}}]
 
         await executor.execute_parallel(tool_calls)

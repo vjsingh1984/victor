@@ -132,9 +132,7 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
 
     # Check branch coverage
     if branch_coverage < min_branch:
-        logger.info(
-            f"Branch coverage {branch_coverage:.1%} below threshold {min_branch:.1%}"
-        )
+        logger.info(f"Branch coverage {branch_coverage:.1%} below threshold {min_branch:.1%}")
         return "needs_more_tests"
 
     # Check edge case coverage
@@ -254,12 +252,8 @@ def extract_patch(ctx: Dict[str, Any]) -> Dict[str, Any]:
     patch = "".join(diff_lines)
 
     # Calculate statistics
-    additions = sum(
-        1 for line in diff_lines if line.startswith("+") and not line.startswith("+++")
-    )
-    deletions = sum(
-        1 for line in diff_lines if line.startswith("-") and not line.startswith("---")
-    )
+    additions = sum(1 for line in diff_lines if line.startswith("+") and not line.startswith("+++"))
+    deletions = sum(1 for line in diff_lines if line.startswith("-") and not line.startswith("---"))
 
     # Extract hunks (sections of changes)
     hunks: List[str] = []
@@ -343,9 +337,7 @@ def merge_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "combined_output": combined_output,
         "success": all_success and not errors,
         "errors": errors,
-        "execution_order": (
-            execution_order if preserve_order else sorted(execution_order)
-        ),
+        "execution_order": (execution_order if preserve_order else sorted(execution_order)),
         "tool_count": len(tool_results),
     }
 
@@ -479,9 +471,7 @@ class RunTestsHandler:
             cmd = f"python {test_file}"
 
         try:
-            result = await tool_registry.execute(
-                "shell", command=cmd, timeout=timeout + 10
-            )
+            result = await tool_registry.execute("shell", command=cmd, timeout=timeout + 10)
 
             # Parse test output
             output_text = result.output if hasattr(result, "output") else str(result)
@@ -500,9 +490,7 @@ class RunTestsHandler:
             context.set(output_key, output)
 
             status = (
-                ExecutorNodeStatus.COMPLETED
-                if output["success"]
-                else ExecutorNodeStatus.FAILED
+                ExecutorNodeStatus.COMPLETED if output["success"] else ExecutorNodeStatus.FAILED
             )
 
             return NodeResult(
@@ -898,18 +886,14 @@ def extract_error_patterns(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     for failure in failures:
-        error_msg = (
-            failure.get("error", "") if isinstance(failure, dict) else str(failure)
-        )
+        error_msg = failure.get("error", "") if isinstance(failure, dict) else str(failure)
         error_msg_lower = error_msg.lower()
 
         if "syntaxerror" in error_msg_lower:
             patterns["syntax_errors"].append(error_msg)
         elif "typeerror" in error_msg_lower:
             patterns["type_errors"].append(error_msg)
-        elif (
-            "importerror" in error_msg_lower or "modulenotfounderror" in error_msg_lower
-        ):
+        elif "importerror" in error_msg_lower or "modulenotfounderror" in error_msg_lower:
             patterns["import_errors"].append(error_msg)
         elif "assertionerror" in error_msg_lower:
             patterns["assertion_errors"].append(error_msg)
@@ -928,9 +912,7 @@ def extract_error_patterns(ctx: Dict[str, Any]) -> Dict[str, Any]:
             patterns["syntax_errors"].append(error_output[:500])
 
     dominant = (
-        max(patterns.keys(), key=lambda k: len(patterns[k]))
-        if any(patterns.values())
-        else "none"
+        max(patterns.keys(), key=lambda k: len(patterns[k])) if any(patterns.values()) else "none"
     )
 
     return {

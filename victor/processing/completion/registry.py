@@ -156,15 +156,9 @@ class CompletionProviderRegistry:
         Returns:
             List of supporting providers sorted by priority
         """
-        return [
-            p
-            for p in self.get_all_providers()
-            if p.enabled and p.supports_language(language)
-        ]
+        return [p for p in self.get_all_providers() if p.enabled and p.supports_language(language)]
 
-    def get_providers_with_capability(
-        self, capability: str
-    ) -> list[BaseCompletionProvider]:
+    def get_providers_with_capability(self, capability: str) -> list[BaseCompletionProvider]:
         """Get providers with a specific capability.
 
         Args:

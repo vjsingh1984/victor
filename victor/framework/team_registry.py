@@ -147,8 +147,7 @@ class TeamSpecRegistry:
         with self._lock:
             if name in self._teams and not replace:
                 raise ValueError(
-                    f"Team spec '{name}' already registered. "
-                    f"Use replace=True to overwrite."
+                    f"Team spec '{name}' already registered. " f"Use replace=True to overwrite."
                 )
 
             # Auto-detect vertical from namespaced name
@@ -251,11 +250,7 @@ class TeamSpecRegistry:
             Dict mapping names to team specs
         """
         with self._lock:
-            return {
-                name: entry.spec
-                for name, entry in self._teams.items()
-                if tag in entry.tags
-            }
+            return {name: entry.spec for name, entry in self._teams.items() if tag in entry.tags}
 
     def find_by_tags(self, tags: Set[str], match_all: bool = False) -> Dict[str, Any]:
         """Find team specs matching multiple tags.
@@ -353,11 +348,7 @@ class TeamSpecRegistry:
             # If no hints, search all verticals
             if not verticals_to_check:
                 verticals_to_check = list(
-                    set(
-                        entry.vertical
-                        for entry in self._teams.values()
-                        if entry.vertical
-                    )
+                    set(entry.vertical for entry in self._teams.values() if entry.vertical)
                 )
 
             # Search each vertical for a matching team
@@ -370,18 +361,12 @@ class TeamSpecRegistry:
                     # Check if the team spec has a task type that matches
                     # Team names often contain the task type
                     short_name = entry.short_name
-                    if (
-                        task_lower in short_name
-                        or short_name.replace("_team", "") == task_lower
-                    ):
+                    if task_lower in short_name or short_name.replace("_team", "") == task_lower:
                         return entry.spec
 
             # Fallback: try exact match on team short name
             for entry in self._teams.values():
-                if (
-                    entry.short_name == task_lower
-                    or entry.short_name == f"{task_lower}_team"
-                ):
+                if entry.short_name == task_lower or entry.short_name == f"{task_lower}_team":
                     return entry.spec
 
             return None
@@ -452,9 +437,7 @@ class TeamSpecRegistry:
             tools = getattr(member, "tools", None)
             if tools and isinstance(tools, list):
                 # Validate and warn about legacy names
-                legacy = validate_tool_names(
-                    tools, context=f"team {team_name}", warn=True
-                )
+                legacy = validate_tool_names(tools, context=f"team {team_name}", warn=True)
 
                 # Canonicalize tool names
                 canonical_tools = canonicalize_tool_list(tools)

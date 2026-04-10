@@ -565,18 +565,14 @@ class TestScorePatterns:
     def test_score_patterns_no_match(self):
         """Test scoring when no patterns match."""
         detector = IntentDetector()
-        score, matched = detector._score_patterns(
-            "hello world", detector._write_patterns
-        )
+        score, matched = detector._score_patterns("hello world", detector._write_patterns)
         assert score == 0.0
         assert matched == []
 
     def test_score_patterns_single_match(self):
         """Test scoring with a single matching pattern."""
         detector = IntentDetector()
-        score, matched = detector._score_patterns(
-            "show me the code", detector._display_patterns
-        )
+        score, matched = detector._score_patterns("show me the code", detector._display_patterns)
         assert score > 0
         assert "show_me" in matched
 
@@ -875,10 +871,7 @@ class TestToolCategories:
         )
 
         assert INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY] == WRITE_TOOLS
-        assert (
-            INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
-            == WRITE_TOOLS | GENERATION_TOOLS
-        )
+        assert INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY] == WRITE_TOOLS | GENERATION_TOOLS
         assert INTENT_BLOCKED_TOOLS[ActionIntent.WRITE_ALLOWED] == frozenset()
         assert INTENT_BLOCKED_TOOLS[ActionIntent.AMBIGUOUS] == frozenset()
 

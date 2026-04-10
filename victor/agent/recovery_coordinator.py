@@ -351,9 +351,7 @@ class StreamingRecoveryCoordinator:
         Returns:
             Tuple of (chunk, should_clear_tools) if threshold exceeded, None otherwise
         """
-        consecutive_limit = getattr(
-            self.settings, "recovery_blocked_consecutive_threshold", 4
-        )
+        consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
         total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
 
         result = self.streaming_handler.check_blocked_threshold(
@@ -604,9 +602,7 @@ class StreamingRecoveryCoordinator:
 
         if self.recovery_integration is None or not self.recovery_integration.enabled:
             # Return a continue action if recovery not enabled
-            return OrchestratorRecoveryAction(
-                action="continue", reason="Recovery disabled"
-            )
+            return OrchestratorRecoveryAction(action="continue", reason="Recovery disabled")
 
         # Get context utilization for recovery decisions
         context_utilization = None
@@ -793,9 +789,7 @@ class StreamingRecoveryCoordinator:
         if len(tool_calls) <= max_calls:
             return tool_calls, False
 
-        logger.warning(
-            f"Truncating {len(tool_calls)} tool calls to budget limit of {max_calls}"
-        )
+        logger.warning(f"Truncating {len(tool_calls)} tool calls to budget limit of {max_calls}")
         return tool_calls[:max_calls], True
 
     # =====================================================================

@@ -199,10 +199,7 @@ class TestResponseSanitizerEdgeCases:
 
         caplog.set_level(logging.WARNING)
         # Create text > 100 chars that will be mostly garbage
-        garbage = (
-            "<function>test</function>" * 10
-            + '{"name": "tool", "arguments": {"x": "test"}}'
-        )
+        garbage = "<function>test</function>" * 10 + '{"name": "tool", "arguments": {"x": "test"}}'
         assert len(garbage) > 100
         result = sanitizer.sanitize(garbage)
         # Result should be shorter after removing garbage

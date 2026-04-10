@@ -62,9 +62,7 @@ class PipelineFormation(BaseFormationStrategy):
                 results.append(result)
 
                 if not result.success:
-                    logger.error(
-                        f"PipelineFormation: stage {i} failed, stopping pipeline"
-                    )
+                    logger.error(f"PipelineFormation: stage {i} failed, stopping pipeline")
                     # Stop pipeline on failure
                     break
 

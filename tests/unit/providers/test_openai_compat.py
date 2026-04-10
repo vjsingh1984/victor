@@ -189,9 +189,7 @@ class TestParseOpenAIStreamChunk:
         chunk = {
             "choices": [
                 {
-                    "delta": {
-                        "tool_calls": [{"index": 0, "function": {"name": "test"}}]
-                    },
+                    "delta": {"tool_calls": [{"index": 0, "function": {"name": "test"}}]},
                     "finish_reason": None,
                 }
             ]

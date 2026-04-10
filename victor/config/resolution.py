@@ -357,9 +357,7 @@ class ProviderResolver:
             name="cli-ad-hoc",
             provider=context.cli_provider,
             model=context.cli_model or "default",
-            auth=AuthConfig(
-                method=auth_method, source=auth_source, value=context.cli_api_key
-            ),
+            auth=AuthConfig(method=auth_method, source=auth_source, value=context.cli_api_key),
             endpoint=context.cli_endpoint,
             tags=["cli", "ad-hoc"],
         )

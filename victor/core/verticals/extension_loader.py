@@ -146,9 +146,7 @@ def _build_team_spec_provider_from_definition(definition: Any) -> Optional[Any]:
     for team in definition.team_metadata.teams:
         members = []
         for member in team.members:
-            memory_config = (
-                MemoryConfig(**member.memory_config) if member.memory_config else None
-            )
+            memory_config = MemoryConfig(**member.memory_config) if member.memory_config else None
             members.append(
                 TeamMemberSpec(
                     role=member.role,
@@ -299,15 +297,9 @@ class ExtensionLoaderPressureMonitor:
 
     def pressure_level(self, *, queued: int, in_flight: int) -> str:
         """Return pressure level for current loader queue and in-flight counts."""
-        if (
-            queued >= self.error_queue_threshold
-            or in_flight >= self.error_in_flight_threshold
-        ):
+        if queued >= self.error_queue_threshold or in_flight >= self.error_in_flight_threshold:
             return "error"
-        if (
-            queued >= self.warn_queue_threshold
-            or in_flight >= self.warn_in_flight_threshold
-        ):
+        if queued >= self.warn_queue_threshold or in_flight >= self.warn_in_flight_threshold:
             return "warn"
         return "ok"
 
@@ -315,9 +307,7 @@ class ExtensionLoaderPressureMonitor:
     # Pressure event emission
     # ------------------------------------------------------------------
 
-    def emit_pressure_event(
-        self, level: str, snapshot: Dict[str, Any], reason: str
-    ) -> None:
+    def emit_pressure_event(self, level: str, snapshot: Dict[str, Any], reason: str) -> None:
         """Emit queue-pressure signal for extension loader saturation."""
         try:
             from victor.core.events import get_observability_bus
@@ -463,9 +453,7 @@ class ExtensionLoaderPressureMonitor:
 
                 bus = get_observability_bus()
             except Exception as e:
-                logger.debug(
-                    "Failed resolving observability bus for loader metrics: %s", e
-                )
+                logger.debug("Failed resolving observability bus for loader metrics: %s", e)
                 bus = None
 
         if bus is not None:
@@ -536,22 +524,16 @@ class VerticalExtensionLoader(ABC):
     _extension_executor_max_workers: ClassVar[int] = 8
     _extension_executor_queue_limit: ClassVar[int] = 32
     _extension_load_timeout: ClassVar[float] = 10.0
-    _extension_executor: ClassVar[Optional[concurrent.futures.ThreadPoolExecutor]] = (
-        None
-    )
+    _extension_executor: ClassVar[Optional[concurrent.futures.ThreadPoolExecutor]] = None
     _extension_executor_lock: ClassVar[threading.RLock] = threading.RLock()
     _extension_executor_semaphores: ClassVar[Dict[int, asyncio.Semaphore]] = {}
 
     # Pressure monitoring (metrics, thresholds, cooldown, missing-module tracking).
-    _pressure_monitor: ClassVar[ExtensionLoaderPressureMonitor] = (
-        ExtensionLoaderPressureMonitor()
-    )
+    _pressure_monitor: ClassVar[ExtensionLoaderPressureMonitor] = ExtensionLoaderPressureMonitor()
 
     # Module resolver (delegates candidate resolution, availability checks,
     # attribute loading, and class-name generation).
-    _module_resolver: ClassVar[ExtensionModuleResolver] = ExtensionModuleResolver(
-        _pressure_monitor
-    )
+    _module_resolver: ClassVar[ExtensionModuleResolver] = ExtensionModuleResolver(_pressure_monitor)
 
     @classmethod
     def _cache_namespace(cls) -> str:
@@ -712,9 +694,7 @@ class VerticalExtensionLoader(ABC):
             Extension instance or None if not found.
         """
         if class_name is None:
-            class_name = cls._module_resolver.auto_generate_class_name(
-                cls.__name__, extension_key
-            )
+            class_name = cls._module_resolver.auto_generate_class_name(cls.__name__, extension_key)
         candidate_paths = cls._find_available_candidates(suffix)
         if not candidate_paths:
             return None
@@ -778,13 +758,9 @@ class VerticalExtensionLoader(ABC):
         )
 
     @classmethod
-    def _emit_pressure_event(
-        cls, level: str, snapshot: Dict[str, Any], reason: str
-    ) -> None:
+    def _emit_pressure_event(cls, level: str, snapshot: Dict[str, Any], reason: str) -> None:
         """Emit queue-pressure signal for extension loader saturation."""
-        VerticalExtensionLoader._pressure_monitor.emit_pressure_event(
-            level, snapshot, reason
-        )
+        VerticalExtensionLoader._pressure_monitor.emit_pressure_event(level, snapshot, reason)
 
     @classmethod
     def _check_pressure(cls, *, reason: str) -> None:
@@ -862,9 +838,7 @@ class VerticalExtensionLoader(ABC):
         loader: Callable[[], Optional[Any]],
     ) -> Optional[Any]:
         """Load an optional extension while caching hits but not misses."""
-        return cls._cache_manager.load_optional(
-            cls._cache_namespace(), extension_key, loader
-        )
+        return cls._cache_manager.load_optional(cls._cache_namespace(), extension_key, loader)
 
     @classmethod
     def _load_named_entry_point_extension(
@@ -931,9 +905,7 @@ class VerticalExtensionLoader(ABC):
         def _create():
             # Determine the class name to import
             if attribute_name is None:
-                class_name = resolver.auto_generate_class_name(
-                    cls.__name__, extension_key
-                )
+                class_name = resolver.auto_generate_class_name(cls.__name__, extension_key)
             else:
                 class_name = attribute_name
 
@@ -1372,9 +1344,7 @@ class VerticalExtensionLoader(ABC):
         if not candidate_paths:
             return {}
 
-        constant_name = (
-            f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_CHAINS"
-        )
+        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_CHAINS"
         last_error: Optional[Exception] = None
         for module_path in candidate_paths:
             try:
@@ -1408,9 +1378,7 @@ class VerticalExtensionLoader(ABC):
         if not candidate_paths:
             return {}
 
-        constant_name = (
-            f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_PERSONAS"
-        )
+        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_PERSONAS"
         last_error: Optional[Exception] = None
         for module_path in candidate_paths:
             try:
@@ -1584,34 +1552,18 @@ class VerticalExtensionLoader(ABC):
 
         extensions = VerticalExtensions(
             middleware=_make_list_factory("middleware", cls.get_middleware),
-            safety_extensions=_make_wrapped_list_factory(
-                "safety", cls.get_safety_extension
-            ),
-            prompt_contributors=_make_wrapped_list_factory(
-                "prompt", cls.get_prompt_contributor
-            ),
-            mode_config_provider=_make_single_factory(
-                "mode_config", cls.get_mode_config_provider
-            ),
+            safety_extensions=_make_wrapped_list_factory("safety", cls.get_safety_extension),
+            prompt_contributors=_make_wrapped_list_factory("prompt", cls.get_prompt_contributor),
+            mode_config_provider=_make_single_factory("mode_config", cls.get_mode_config_provider),
             tool_dependency_provider=_make_single_factory(
                 "tool_deps", cls.get_tool_dependency_provider
             ),
-            workflow_provider=_make_single_factory(
-                "workflow", cls.get_workflow_provider
-            ),
+            workflow_provider=_make_single_factory("workflow", cls.get_workflow_provider),
             service_provider=_make_single_factory("service", cls.get_service_provider),
-            rl_config_provider=_make_single_factory(
-                "rl_config", cls.get_rl_config_provider
-            ),
-            team_spec_provider=_make_single_factory(
-                "team_spec", cls.get_team_spec_provider
-            ),
-            enrichment_strategy=_make_single_factory(
-                "enrichment", cls.get_enrichment_strategy
-            ),
-            tiered_tool_config=_make_single_factory(
-                "tiered_tools", cls.get_tiered_tool_config
-            ),
+            rl_config_provider=_make_single_factory("rl_config", cls.get_rl_config_provider),
+            team_spec_provider=_make_single_factory("team_spec", cls.get_team_spec_provider),
+            enrichment_strategy=_make_single_factory("enrichment", cls.get_enrichment_strategy),
+            tiered_tool_config=_make_single_factory("tiered_tools", cls.get_tiered_tool_config),
         )
 
         # Cache the extensions
@@ -1707,9 +1659,7 @@ class VerticalExtensionLoader(ABC):
             "middleware": asyncio.create_task(
                 _submit_with_limits("middleware", cls.get_middleware, True)
             ),
-            "safety": asyncio.create_task(
-                _submit_with_limits("safety", cls.get_safety_extension)
-            ),
+            "safety": asyncio.create_task(_submit_with_limits("safety", cls.get_safety_extension)),
             "prompt": asyncio.create_task(
                 _submit_with_limits("prompt", cls.get_prompt_contributor)
             ),
@@ -1941,9 +1891,7 @@ class VerticalExtensionLoader(ABC):
                 # Clear namespaced cache entries
                 cls._cache_manager._cache.pop(namespaced_key, None)
                 namespaced_keys = [
-                    k
-                    for k in cls._cache_manager._cache
-                    if k.startswith(namespaced_prefix)
+                    k for k in cls._cache_manager._cache if k.startswith(namespaced_prefix)
                 ]
                 for key in namespaced_keys:
                     cls._cache_manager._cache.pop(key, None)

@@ -45,12 +45,8 @@ class TestCompactionStrategy:
         """Test all compaction strategy values exist."""
         assert CompactionStrategy.NONE.name == "NONE"
         assert CompactionStrategy.TRUNCATE_OLD_MESSAGES.name == "TRUNCATE_OLD_MESSAGES"
-        assert (
-            CompactionStrategy.SUMMARIZE_TOOL_OUTPUTS.name == "SUMMARIZE_TOOL_OUTPUTS"
-        )
-        assert (
-            CompactionStrategy.SUMMARIZE_CONVERSATION.name == "SUMMARIZE_CONVERSATION"
-        )
+        assert CompactionStrategy.SUMMARIZE_TOOL_OUTPUTS.name == "SUMMARIZE_TOOL_OUTPUTS"
+        assert CompactionStrategy.SUMMARIZE_CONVERSATION.name == "SUMMARIZE_CONVERSATION"
         assert CompactionStrategy.REMOVE_REDUNDANT.name == "REMOVE_REDUNDANT"
         assert CompactionStrategy.AGGRESSIVE.name == "AGGRESSIVE"
 
@@ -215,9 +211,7 @@ class TestContextWindowMonitor:
     def test_update_metrics_with_system_prompt(self):
         """Test updating metrics with system prompt."""
         monitor = ContextWindowMonitor()
-        metrics = monitor.update_metrics(
-            [], system_prompt="You are a helpful assistant."
-        )
+        metrics = monitor.update_metrics([], system_prompt="You are a helpful assistant.")
         assert metrics.system_prompt_tokens > 0
 
     def test_update_metrics_with_messages(self):

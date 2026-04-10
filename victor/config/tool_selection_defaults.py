@@ -316,9 +316,7 @@ class CategoryAliases:
     GIT_OPS: Final[Set[str]] = frozenset({"git", "version_control", "vcs", "scm"})
 
     # Code analysis
-    CODE_ANALYSIS: Final[Set[str]] = frozenset(
-        {"code", "analysis", "ast", "lint", "parse"}
-    )
+    CODE_ANALYSIS: Final[Set[str]] = frozenset({"code", "analysis", "ast", "lint", "parse"})
 
     # Search operations
     SEARCH: Final[Set[str]] = frozenset({"search", "find", "grep", "locate", "query"})

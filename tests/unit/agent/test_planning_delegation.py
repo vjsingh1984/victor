@@ -97,9 +97,7 @@ class TestStepDelegation:
             step_results={},
         )
 
-        await planner._execute_sequential(
-            plan, result, auto_approve=True, progress_callback=None
-        )
+        await planner._execute_sequential(plan, result, auto_approve=True, progress_callback=None)
         mock_sub.spawn.assert_called_once()
 
     @pytest.mark.asyncio
@@ -117,9 +115,7 @@ class TestStepDelegation:
             step_results={},
         )
 
-        await planner._execute_sequential(
-            plan, result, auto_approve=True, progress_callback=None
-        )
+        await planner._execute_sequential(plan, result, auto_approve=True, progress_callback=None)
         mock_orch.chat.assert_called_once()
         mock_sub.spawn.assert_not_called()
 

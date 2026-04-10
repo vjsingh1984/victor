@@ -69,13 +69,8 @@ class TestCompactorConfig:
         config = CompactorConfig()
 
         # These now come from centralized orchestrator_constants
-        assert (
-            config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
-        )
-        assert (
-            config.min_messages_after_compact
-            == COMPACTION_CONFIG.min_messages_after_compact
-        )
+        assert config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
+        assert config.min_messages_after_compact == COMPACTION_CONFIG.min_messages_after_compact
         assert config.tool_result_max_chars == COMPACTION_CONFIG.tool_result_max_chars
         assert config.tool_result_max_lines == COMPACTION_CONFIG.tool_result_max_lines
         assert config.truncation_strategy == TruncationStrategy.SMART
@@ -135,10 +130,7 @@ class TestContextCompactorInit:
         compactor = ContextCompactor(mock_controller)
 
         assert compactor.controller is mock_controller
-        assert (
-            compactor.config.proactive_threshold
-            == CONTEXT_LIMITS.proactive_compaction_threshold
-        )
+        assert compactor.config.proactive_threshold == CONTEXT_LIMITS.proactive_compaction_threshold
         assert compactor._compaction_count == 0
 
     def test_custom_config(self, mock_controller):
@@ -582,10 +574,7 @@ class TestParallelReadBudget:
         assert budget.usable_tokens > 0
         assert budget.max_parallel_files == COMPACTION_CONFIG.parallel_read_target_files
         assert budget.chars_per_file >= 4096  # Minimum useful read size
-        assert (
-            budget.total_read_budget
-            == budget.chars_per_file * budget.max_parallel_files
-        )
+        assert budget.total_read_budget == budget.chars_per_file * budget.max_parallel_files
 
     def test_calculate_parallel_read_budget_custom(self):
         """Test calculate_parallel_read_budget with custom parameters."""
@@ -627,16 +616,9 @@ class TestMessagePriorityAssignment:
 
         # Test various pinned patterns
         assert compactor._is_pinned_requirement("You must output a JSON file") is True
-        assert (
-            compactor._is_pinned_requirement("Required format: markdown table") is True
-        )
-        assert (
-            compactor._is_pinned_requirement("Create a findings table with results")
-            is True
-        )
-        assert (
-            compactor._is_pinned_requirement("Provide top 10 recommendations") is True
-        )
+        assert compactor._is_pinned_requirement("Required format: markdown table") is True
+        assert compactor._is_pinned_requirement("Create a findings table with results") is True
+        assert compactor._is_pinned_requirement("Provide top 10 recommendations") is True
         assert compactor._is_pinned_requirement("Deliverables: summary report") is True
         assert compactor._is_pinned_requirement("Output must include the diff") is True
         assert compactor._is_pinned_requirement("Required outputs: metrics") is True
@@ -1089,10 +1071,7 @@ class TestTruncationStrategies:
         result = compactor.truncate_tool_result(content)
 
         assert result.truncated is True
-        assert (
-            "[content truncated]" in result.content
-            or "truncated" in result.content.lower()
-        )
+        assert "[content truncated]" in result.content or "truncated" in result.content.lower()
 
     def test_smart_truncation_preserves_file_paths(self, mock_controller):
         """Test smart truncation preserves file paths."""

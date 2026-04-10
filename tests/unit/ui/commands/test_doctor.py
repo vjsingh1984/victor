@@ -110,8 +110,7 @@ class TestDoctorChecks:
 
         # Should have checks for dependencies
         has_checks = any(
-            "Dependency:" in check.name or "Optional:" in check.name
-            for check in doctor.checks
+            "Dependency:" in check.name or "Optional:" in check.name for check in doctor.checks
         )
         assert has_checks
 

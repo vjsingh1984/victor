@@ -155,12 +155,8 @@ class YAMLWorkflowCoordinator:
             Hash value for cache key
         """
         # Hash based on function names in registries
-        condition_names = (
-            tuple(sorted(condition_registry.keys())) if condition_registry else ()
-        )
-        transform_names = (
-            tuple(sorted(transform_registry.keys())) if transform_registry else ()
-        )
+        condition_names = tuple(sorted(condition_registry.keys())) if condition_registry else ()
+        transform_names = tuple(sorted(transform_registry.keys())) if transform_registry else ()
         return hash((condition_names, transform_names))
 
     def load_workflow(
@@ -280,9 +276,7 @@ class YAMLWorkflowCoordinator:
                 # Handle polymorphic result types (LSP compliance)
                 if hasattr(result, "state"):
                     final_state = (
-                        result.state
-                        if isinstance(result.state, dict)
-                        else {"result": result.state}
+                        result.state if isinstance(result.state, dict) else {"result": result.state}
                     )
                     nodes_executed = getattr(result, "node_history", [])
                     success = getattr(result, "success", True)
@@ -290,9 +284,7 @@ class YAMLWorkflowCoordinator:
                 elif isinstance(result, dict):
                     final_state = result
                     nodes_executed = (
-                        result.pop("_nodes_executed", [])
-                        if "_nodes_executed" in result
-                        else []
+                        result.pop("_nodes_executed", []) if "_nodes_executed" in result else []
                     )
                     success = True
                     error = None

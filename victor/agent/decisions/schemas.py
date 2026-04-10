@@ -32,9 +32,7 @@ class TaskCompletionDecision(BaseModel):
     """Is the task done?"""
 
     is_complete: bool = Field(description="Whether the task appears complete")
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the assessment"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the assessment")
     phase: Literal["working", "finalizing", "done", "stuck"] = Field(
         description="Current phase of task execution"
     )
@@ -46,9 +44,7 @@ class IntentDecision(BaseModel):
     intent: Literal["continuation", "completion", "asking_input", "stuck_loop"] = Field(
         description="Classified intent of the model's response"
     )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
 class TaskTypeDecision(BaseModel):
@@ -57,9 +53,7 @@ class TaskTypeDecision(BaseModel):
     task_type: Literal["analysis", "action", "generation", "search", "edit"] = Field(
         description="Classified type of the task"
     )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
     deliverables: list[
         Literal[
             "file_created",
@@ -78,12 +72,10 @@ class TaskTypeDecision(BaseModel):
 class QuestionTypeDecision(BaseModel):
     """Should we auto-continue past this question?"""
 
-    question_type: Literal["rhetorical", "continuation", "clarification", "info"] = (
-        Field(description="Type of question being asked")
+    question_type: Literal["rhetorical", "continuation", "clarification", "info"] = Field(
+        description="Type of question being asked"
     )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
 class LoopDetection(BaseModel):
@@ -101,9 +93,7 @@ class ErrorClassDecision(BaseModel):
     error_type: Literal["permanent", "transient", "retryable"] = Field(
         description="Classification of the error"
     )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="Confidence in the classification"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
 class ToolSelectionDecision(BaseModel):
@@ -123,18 +113,16 @@ class PromptFocusDecision(BaseModel):
 class StageDetectionDecision(BaseModel):
     """What conversation stage is this?"""
 
-    stage: Literal[
-        "initial", "planning", "reading", "analysis", "execution", "verification"
-    ] = Field(description="Detected conversation stage")
+    stage: Literal["initial", "planning", "reading", "analysis", "execution", "verification"] = (
+        Field(description="Detected conversation stage")
+    )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in detection")
 
 
 class ContinuationDecision(BaseModel):
     """What action should we take next?"""
 
-    action: Literal[
-        "finish", "prompt_tool_call", "request_summary", "return_to_user"
-    ] = Field(description="Recommended next action")
-    reason: str = Field(
-        max_length=100, description="Brief reason for the recommendation"
+    action: Literal["finish", "prompt_tool_call", "request_summary", "return_to_user"] = Field(
+        description="Recommended next action"
     )
+    reason: str = Field(max_length=100, description="Brief reason for the recommendation")

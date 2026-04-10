@@ -81,9 +81,7 @@ def _external_package_candidates(vertical_name: str) -> List[str]:
     normalized = normalize_vertical_name(vertical_name)
 
     candidates: List[str] = []
-    override = _PACKAGE_OVERRIDES.get(normalized) or _PACKAGE_OVERRIDES.get(
-        vertical_name
-    )
+    override = _PACKAGE_OVERRIDES.get(normalized) or _PACKAGE_OVERRIDES.get(vertical_name)
     if override:
         candidates.append(override)
     else:
@@ -129,15 +127,11 @@ def vertical_module_candidates(vertical_name: str, module_suffix: str) -> List[s
 
     normalized = normalize_vertical_name(vertical_name)
     candidates.append(_join_module_path(f"victor.{normalized}", suffix))
-    candidates.append(
-        _join_module_path(f"victor.verticals.contrib.{normalized}", suffix)
-    )
+    candidates.append(_join_module_path(f"victor.verticals.contrib.{normalized}", suffix))
     return _dedupe(candidates)
 
 
-def vertical_runtime_module_candidates(
-    vertical_name: str, module_suffix: str
-) -> List[str]:
+def vertical_runtime_module_candidates(vertical_name: str, module_suffix: str) -> List[str]:
     """Build mixed-mode import candidates for runtime-owned vertical modules.
 
     Runtime modules are resolved with this order per namespace:

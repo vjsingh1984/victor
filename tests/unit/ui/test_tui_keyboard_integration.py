@@ -38,10 +38,7 @@ def test_enter_submits_to_transcript_and_shows_busy_feedback() -> None:
 
             # Enter should send the prompt and clear the input field.
             assert input_widget.value == ""
-            assert any(
-                msg.role == "user" and msg.content == "hi"
-                for msg in app._session_messages
-            )
+            assert any(msg.role == "user" and msg.content == "hi" for msg in app._session_messages)
             assert any(
                 msg.role == "assistant" and msg.content == "echo:hi"
                 for msg in app._session_messages

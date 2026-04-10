@@ -210,9 +210,7 @@ class UnifiedEntryPointRegistry:
                 self._metrics.total_entry_points = sum(
                     len(g.entry_points) for g in self._groups.values()
                 )
-                self._metrics.scan_duration_ms = (
-                    time.perf_counter() - start_time
-                ) * 1000
+                self._metrics.scan_duration_ms = (time.perf_counter() - start_time) * 1000
 
                 logger.info(
                     f"Entry point scan complete: {self._metrics.total_groups} groups, "
@@ -440,8 +438,7 @@ def _cached_entry_points(group: str) -> tuple:
         Tuple of entry point objects for the group
     """
     logger.warning(
-        f"_cached_entry_points('{group}') is deprecated. "
-        f"Use UnifiedEntryPointRegistry instead."
+        f"_cached_entry_points('{group}') is deprecated. " f"Use UnifiedEntryPointRegistry instead."
     )
 
     registry = get_entry_point_registry()

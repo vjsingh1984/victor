@@ -56,9 +56,7 @@ class TestValidateVictorDirName:
         assert is_valid is True
         assert result == "custom_dir"
         # Should have logged a warning about not starting with '.'
-        assert any(
-            "doesn't start with '.'" in record.message for record in caplog.records
-        )
+        assert any("doesn't start with '.'" in record.message for record in caplog.records)
 
     def test_blocks_parent_traversal(self):
         """Test that parent directory traversal is blocked."""
@@ -902,9 +900,7 @@ class TestPluginSandbox:
 
         # Strict policy blocks network
         strict_policy = PluginSandboxPolicy(allow_network=False)
-        is_allowed, reason = check_sandbox_action(
-            "test_plugin", "network", policy=strict_policy
-        )
+        is_allowed, reason = check_sandbox_action("test_plugin", "network", policy=strict_policy)
         assert is_allowed is False
         assert reason == "network_not_allowed"
 
@@ -918,9 +914,7 @@ class TestPluginSandbox:
 
         # Strict policy blocks subprocess
         strict_policy = PluginSandboxPolicy(allow_subprocess=False)
-        is_allowed, reason = check_sandbox_action(
-            "test_plugin", "subprocess", policy=strict_policy
-        )
+        is_allowed, reason = check_sandbox_action("test_plugin", "subprocess", policy=strict_policy)
         assert is_allowed is False
         assert reason == "subprocess_not_allowed"
 
@@ -934,9 +928,7 @@ class TestPluginSandbox:
 
         # Strict policy blocks file write
         strict_policy = PluginSandboxPolicy(allow_file_write=False)
-        is_allowed, reason = check_sandbox_action(
-            "test_plugin", "file_write", policy=strict_policy
-        )
+        is_allowed, reason = check_sandbox_action("test_plugin", "file_write", policy=strict_policy)
         assert is_allowed is False
         assert reason == "file_write_not_allowed"
 

@@ -437,9 +437,7 @@ class SafetyCoordinator:
                 matched_rules.append(rule)
 
                 # Update stats
-                self._stats.rule_hits[rule.rule_id] = (
-                    self._stats.rule_hits.get(rule.rule_id, 0) + 1
-                )
+                self._stats.rule_hits[rule.rule_id] = self._stats.rule_hits.get(rule.rule_id, 0) + 1
 
                 # Collect warnings
                 if rule.action == SafetyAction.WARN:
@@ -462,10 +460,7 @@ class SafetyCoordinator:
             action = SafetyAction.BLOCK
 
         # Check if we should block based on severity
-        if (
-            action != SafetyAction.BLOCK
-            and most_severe_rule.severity > self._max_severity_to_allow
-        ):
+        if action != SafetyAction.BLOCK and most_severe_rule.severity > self._max_severity_to_allow:
             action = SafetyAction.BLOCK
 
         # Generate result

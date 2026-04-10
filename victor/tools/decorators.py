@@ -68,14 +68,10 @@ def _auto_register_tool(tool_instance: BaseTool) -> None:
         from victor.tools.metadata_registry import register_tool_metadata
 
         register_tool_metadata(tool_instance)
-        logger.debug(
-            f"Auto-registered tool '{tool_instance.name}' with metadata registry"
-        )
+        logger.debug(f"Auto-registered tool '{tool_instance.name}' with metadata registry")
     except ImportError:
         # metadata_registry not available (e.g., during early import stages)
-        logger.debug(
-            f"Could not auto-register tool '{tool_instance.name}': registry not available"
-        )
+        logger.debug(f"Could not auto-register tool '{tool_instance.name}': registry not available")
 
 
 logger = logging.getLogger(__name__)
@@ -579,9 +575,7 @@ def _create_tool_class(
             self._mandatory_keywords = _mandatory_keywords
             self._task_types = _task_types
             self._progress_params = _progress_params
-            self._execution_category = (
-                _execution_category or ExecutionCategory.READ_ONLY
-            )
+            self._execution_category = _execution_category or ExecutionCategory.READ_ONLY
             # Availability check for optional tools requiring configuration
             self._availability_check = _availability_check
 
@@ -708,10 +702,7 @@ def _create_tool_class(
         @property
         def requires_approval(self) -> bool:
             """Check if this tool requires user approval before execution."""
-            return (
-                self._access_mode.requires_approval
-                or self._danger_level.requires_confirmation
-            )
+            return self._access_mode.requires_approval or self._danger_level.requires_confirmation
 
         @property
         def is_safe(self) -> bool:
@@ -744,9 +735,7 @@ def _create_tool_class(
             try:
                 return self._availability_check()
             except Exception as e:
-                logger.warning(
-                    f"Availability check for tool '{self._name}' raised exception: {e}"
-                )
+                logger.warning(f"Availability check for tool '{self._name}' raised exception: {e}")
                 return False
 
         def get_warning_message(self) -> str:
@@ -812,11 +801,7 @@ def _create_tool_class(
                             metadata=result.get("metadata"),
                         )
                     # Some tools return {"error": "..."} without success field
-                    if (
-                        "error" in result
-                        and "success" not in result
-                        and len(result) <= 2
-                    ):
+                    if "error" in result and "success" not in result and len(result) <= 2:
                         return ToolResult(
                             success=False,
                             output=None,

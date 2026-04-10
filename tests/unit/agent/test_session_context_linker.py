@@ -150,9 +150,7 @@ class TestSessionContextLinker:
         self, linker, mock_persistence, sample_session_data
     ):
         """compaction_summaries is empty when session has no persisted hierarchy."""
-        mock_persistence.load_session.return_value = (
-            sample_session_data  # no hierarchy key
-        )
+        mock_persistence.load_session.return_value = sample_session_data  # no hierarchy key
 
         ctx = linker.build_resume_context("test-session-123")
 

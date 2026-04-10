@@ -150,9 +150,7 @@ class SlashCommandHandler:
 
         # Check if command requires agent
         if command.metadata.requires_agent and self.agent is None:
-            self.console.print(
-                f"[yellow]Command /{cmd_name} requires an active session[/]"
-            )
+            self.console.print(f"[yellow]Command /{cmd_name} requires an active session[/]")
             return True
 
         # Build execution context
@@ -193,9 +191,7 @@ class SlashCommandHandler:
             command = self._registry.get(command_name)
             if command:
                 meta = command.metadata
-                aliases = (
-                    ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
-                )
+                aliases = ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
                 return (
                     f"[bold]/{meta.name}[/]\n\n"
                     f"{meta.description}\n\n"
@@ -220,9 +216,7 @@ class SlashCommandHandler:
                 for cmd in commands:
                     meta = cmd.metadata
                     aliases = (
-                        f" ({', '.join('/' + a for a in meta.aliases)})"
-                        if meta.aliases
-                        else ""
+                        f" ({', '.join('/' + a for a in meta.aliases)})" if meta.aliases else ""
                     )
                     lines.append(f"  /{meta.name}{aliases} - {meta.description}")
 
@@ -235,9 +229,7 @@ class SlashCommandHandler:
             command = self._registry.get(command_name)
             if command:
                 meta = command.metadata
-                aliases = (
-                    ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
-                )
+                aliases = ", ".join(f"/{a}" for a in meta.aliases) if meta.aliases else "none"
                 self.console.print(
                     Panel(
                         f"[bold]/{meta.name}[/]\n\n"
@@ -254,9 +246,7 @@ class SlashCommandHandler:
                 tool_help = get_builtin_tool_help(command_name)
                 if tool_help:
                     title, content = tool_help
-                    self.console.print(
-                        Panel(content, title=f"Help: {title}", border_style="blue")
-                    )
+                    self.console.print(Panel(content, title=f"Help: {title}", border_style="blue"))
                     return
                 self.console.print(f"[yellow]Unknown command:[/] /{command_name}")
             return

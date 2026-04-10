@@ -208,9 +208,7 @@ class DeepSeekProvider(BaseProvider):
             # Filter tools if model doesn't support them
             effective_tools = tools if self._model_supports_tools(model) else None
             if tools and not self._model_supports_tools(model):
-                logger.debug(
-                    f"Model {model} doesn't support tools, ignoring tools parameter"
-                )
+                logger.debug(f"Model {model} doesn't support tools, ignoring tools parameter")
 
             payload = self._build_request_payload(
                 messages=messages,
@@ -281,9 +279,7 @@ class DeepSeekProvider(BaseProvider):
                 f"DeepSeek streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
 
-            async with self.client.stream(
-                "POST", "/chat/completions", json=payload
-            ) as response:
+            async with self.client.stream("POST", "/chat/completions", json=payload) as response:
                 response.raise_for_status()
 
                 accumulated_content = ""
@@ -303,9 +299,7 @@ class DeepSeekProvider(BaseProvider):
                             yield StreamChunk(
                                 content="",
                                 tool_calls=(
-                                    accumulated_tool_calls
-                                    if accumulated_tool_calls
-                                    else None
+                                    accumulated_tool_calls if accumulated_tool_calls else None
                                 ),
                                 stop_reason="stop",
                                 is_final=True,
@@ -328,15 +322,11 @@ class DeepSeekProvider(BaseProvider):
                                 accumulated_content += chunk.content
                             # Track reasoning content
                             if chunk.metadata and "reasoning_content" in chunk.metadata:
-                                accumulated_reasoning = chunk.metadata[
-                                    "reasoning_content"
-                                ]
+                                accumulated_reasoning = chunk.metadata["reasoning_content"]
                             yield chunk
 
                         except json.JSONDecodeError:
-                            logger.warning(
-                                f"DeepSeek JSON decode error on line: {line[:100]}"
-                            )
+                            logger.warning(f"DeepSeek JSON decode error on line: {line[:100]}")
 
         except httpx.TimeoutException as e:
             raise ProviderTimeoutError(
@@ -498,9 +488,7 @@ class DeepSeekProvider(BaseProvider):
         metadata = {}
         if reasoning_content:
             metadata["reasoning_content"] = reasoning_content
-            logger.debug(
-                f"DeepSeek: Extracted reasoning content ({len(reasoning_content)} chars)"
-            )
+            logger.debug(f"DeepSeek: Extracted reasoning content ({len(reasoning_content)} chars)")
 
         # Parse usage stats
         usage = None
@@ -574,22 +562,16 @@ class DeepSeekProvider(BaseProvider):
 
         # Finalize tool calls on stream end
         final_tool_calls = None
-        if finish_reason == "tool_calls" or (
-            finish_reason == "stop" and accumulated_tool_calls
-        ):
+        if finish_reason == "tool_calls" or (finish_reason == "stop" and accumulated_tool_calls):
             final_tool_calls = []
             for tc in accumulated_tool_calls:
                 if tc.get("name"):
                     args = tc.get("arguments", "{}")
                     try:
-                        parsed_args = (
-                            json.loads(args) if isinstance(args, str) else args
-                        )
+                        parsed_args = json.loads(args) if isinstance(args, str) else args
                     except json.JSONDecodeError:
                         parsed_args = {}
-                    final_tool_calls.append(
-                        {"name": tc["name"], "arguments": parsed_args}
-                    )
+                    final_tool_calls.append({"name": tc["name"], "arguments": parsed_args})
 
         return StreamChunk(
             content=content,

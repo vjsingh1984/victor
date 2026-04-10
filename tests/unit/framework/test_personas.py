@@ -342,8 +342,7 @@ class TestPersonaRegistry:
 
         assert persona is not None
         assert (
-            "friendly" in persona.name.lower()
-            or "friendly" in persona.communication_style.lower()
+            "friendly" in persona.name.lower() or "friendly" in persona.communication_style.lower()
         )
 
     def test_get_persona_senior_developer(self):
@@ -362,9 +361,7 @@ class TestPersonaRegistry:
         persona = get_persona("code_reviewer")
 
         assert persona is not None
-        assert (
-            "review" in persona.name.lower() or "reviewer" in persona.background.lower()
-        )
+        assert "review" in persona.name.lower() or "reviewer" in persona.background.lower()
 
     def test_get_persona_mentor(self):
         """mentor persona should be available."""
@@ -373,9 +370,7 @@ class TestPersonaRegistry:
         persona = get_persona("mentor")
 
         assert persona is not None
-        assert (
-            "mentor" in persona.name.lower() or "mentor" in persona.background.lower()
-        )
+        assert "mentor" in persona.name.lower() or "mentor" in persona.background.lower()
 
     def test_get_persona_unknown_returns_none(self):
         """get_persona should return None for unknown persona."""

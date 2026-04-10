@@ -60,16 +60,10 @@ class TestRBACFailOpenToolAccess:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", DeprecationWarning)
-            assert (
-                rbac.check_tool_access("alice", "shell", "execute", AccessMode.EXECUTE)
-                is True
-            )
+            assert rbac.check_tool_access("alice", "shell", "execute", AccessMode.EXECUTE) is True
 
     def test_fail_open_false_denies_tool_access(self):
         rbac = RBACManager(enabled=False, fail_open=False)
         from victor.tools.base import AccessMode
 
-        assert (
-            rbac.check_tool_access("alice", "shell", "execute", AccessMode.EXECUTE)
-            is False
-        )
+        assert rbac.check_tool_access("alice", "shell", "execute", AccessMode.EXECUTE) is False

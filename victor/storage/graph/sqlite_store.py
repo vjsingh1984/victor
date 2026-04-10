@@ -147,9 +147,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         for col_name, col_type in new_columns:
             if col_name not in columns:
                 try:
-                    conn.execute(
-                        f"ALTER TABLE {_NODE_TABLE} ADD COLUMN {col_name} {col_type}"
-                    )
+                    conn.execute(f"ALTER TABLE {_NODE_TABLE} ADD COLUMN {col_name} {col_type}")
                 except sqlite3.OperationalError:
                     pass  # Column already exists
 
@@ -236,7 +234,9 @@ class SqliteGraphStore(GraphStoreProtocol):
             placeholders = ",".join("?" for _ in edge_types)
             type_clause = f" AND type IN ({placeholders})"
             params.extend(edge_types)
-        query = f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE} WHERE src=?{type_clause}"
+        query = (
+            f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE} WHERE src=?{type_clause}"
+        )
         async with self._lock:
             conn = self._connect()
             cur = conn.execute(query, params)
@@ -425,9 +425,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         async with self._lock:
             conn = self._connect()
             for file, current_mtime in file_mtimes.items():
-                cur = conn.execute(
-                    f"SELECT mtime FROM {_MTIME_TABLE} WHERE file = ?", (file,)
-                )
+                cur = conn.execute(f"SELECT mtime FROM {_MTIME_TABLE} WHERE file = ?", (file,))
                 row = cur.fetchone()
                 if row is None or row[0] < current_mtime:
                     stale.append(file)
@@ -438,19 +436,13 @@ class SqliteGraphStore(GraphStoreProtocol):
         async with self._lock:
             conn = self._connect()
             # Get node IDs for this file
-            cur = conn.execute(
-                f"SELECT node_id FROM {_NODE_TABLE} WHERE file = ?", (file,)
-            )
+            cur = conn.execute(f"SELECT node_id FROM {_NODE_TABLE} WHERE file = ?", (file,))
             node_ids = [row[0] for row in cur.fetchall()]
 
             if node_ids:
                 placeholders = ",".join("?" for _ in node_ids)
-                conn.execute(
-                    f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids
-                )
-                conn.execute(
-                    f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids
-                )
+                conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids)
+                conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids)
                 conn.execute(
                     f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})",
                     node_ids,
@@ -463,9 +455,7 @@ class SqliteGraphStore(GraphStoreProtocol):
         """Get all edges in the graph (bulk retrieval for loading into memory)."""
         async with self._lock:
             conn = self._connect()
-            cur = conn.execute(
-                f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE}"
-            )
+            cur = conn.execute(f"SELECT src, dst, type, weight, metadata FROM {_EDGE_TABLE}")
             return [
                 GraphEdge(
                     src=row[0],

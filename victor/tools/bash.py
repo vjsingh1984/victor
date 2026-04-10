@@ -311,9 +311,7 @@ def _optimize_grep_to_rg(cmd: str) -> str:
     because it respects .gitignore, uses memory-mapped I/O, and parallelizes.
     Basic grep flags (-n, -i, -l, -c, -w, -e) are compatible with rg.
     """
-    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(
-        r"^grep\s+-[a-zA-Z]*[rR]", cmd
-    ):
+    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(r"^grep\s+-[a-zA-Z]*[rR]", cmd):
         return cmd
 
     if not shutil.which("rg"):
@@ -484,17 +482,13 @@ async def shell(
                 # Truncate stderr if too long, keeping first and last parts
                 stderr_preview = stderr_str.strip()
                 if len(stderr_preview) > 500:
-                    stderr_preview = (
-                        stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
-                    )
+                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
                 error_parts.append(f"stderr: {stderr_preview}")
             elif stdout_str.strip():
                 # Some commands output errors to stdout
                 stdout_preview = stdout_str.strip()
                 if len(stdout_preview) > 300:
-                    stdout_preview = (
-                        stdout_preview[:150] + "..." + stdout_preview[-150:]
-                    )
+                    stdout_preview = stdout_preview[:150] + "..." + stdout_preview[-150:]
                 error_parts.append(f"output: {stdout_preview}")
             result["error"] = "\n".join(error_parts)
 
@@ -715,9 +709,7 @@ async def shell_readonly(
             if stderr_str.strip():
                 stderr_preview = stderr_str.strip()
                 if len(stderr_preview) > 500:
-                    stderr_preview = (
-                        stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
-                    )
+                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
                 error_parts.append(f"stderr: {stderr_preview}")
             result["error"] = "\n".join(error_parts)
 

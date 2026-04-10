@@ -149,9 +149,7 @@ def _list_tools_lightweight() -> None:
 
         console.print(table)
         console.print(f"\n[dim]Found {len(unique_tools)} tools[/]")
-        console.print(
-            "[dim]Note: Use without --lightweight for enabled/disabled status[/]"
-        )
+        console.print("[dim]Note: Use without --lightweight for enabled/disabled status[/]")
 
     except Exception as e:
         console.print(f"[red]Error discovering tools:[/] {e}")
@@ -165,9 +163,7 @@ async def _list_tools_async(profile: str) -> None:
     """List tools with full agent initialization (shows enabled/disabled status)."""
     from victor.agent.orchestrator import AgentOrchestrator
 
-    console.print(
-        f"[dim]Initializing agent with profile '{profile}' to list tools...[/]"
-    )
+    console.print(f"[dim]Initializing agent with profile '{profile}' to list tools...[/]")
     settings = load_settings()
     agent = None
     try:
@@ -200,9 +196,7 @@ async def _list_tools_async(profile: str) -> None:
             )
             # Check the actual enabled status from the tool_states map
             enabled_status = (
-                "[green]✓ Yes[/]"
-                if tool_states.get(tool.name, False)
-                else "[dim]✗ No[/]"
+                "[green]✓ Yes[/]" if tool_states.get(tool.name, False) else "[dim]✗ No[/]"
             )
             table.add_row(tool.name, description, enabled_status)
 
@@ -342,9 +336,7 @@ def cleanup_containers(
             table.add_row(short_id, name, ctype)
 
         console.print(table)
-        console.print(
-            f"\n[bold]Found {len(containers_to_clean)} container(s) to remove.[/]"
-        )
+        console.print(f"\n[bold]Found {len(containers_to_clean)} container(s) to remove.[/]")
 
         if dry_run:
             console.print("[dim]Dry run - no containers removed.[/]")

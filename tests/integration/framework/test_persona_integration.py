@@ -279,15 +279,9 @@ class TestPersonaDiscoveryAPIs:
         registry = get_persona_registry()
 
         # Register personas with different expertise
-        spec1 = PersonaSpec(
-            name="python_expert", role="Python Dev", expertise=["python", "api"]
-        )
-        spec2 = PersonaSpec(
-            name="js_expert", role="JS Dev", expertise=["javascript", "frontend"]
-        )
-        spec3 = PersonaSpec(
-            name="fullstack", role="Full Stack", expertise=["python", "javascript"]
-        )
+        spec1 = PersonaSpec(name="python_expert", role="Python Dev", expertise=["python", "api"])
+        spec2 = PersonaSpec(name="js_expert", role="JS Dev", expertise=["javascript", "frontend"])
+        spec3 = PersonaSpec(name="fullstack", role="Full Stack", expertise=["python", "javascript"])
 
         registry.register("python_expert", spec1, vertical="coding")
         registry.register("js_expert", spec2, vertical="coding")
@@ -307,12 +301,8 @@ class TestPersonaDiscoveryAPIs:
 
         registry = get_persona_registry()
 
-        spec1 = PersonaSpec(
-            name="senior_dev", role="Senior Developer", expertise=["coding"]
-        )
-        spec2 = PersonaSpec(
-            name="junior_dev", role="Junior Developer", expertise=["coding"]
-        )
+        spec1 = PersonaSpec(name="senior_dev", role="Senior Developer", expertise=["coding"])
+        spec2 = PersonaSpec(name="junior_dev", role="Junior Developer", expertise=["coding"])
         spec3 = PersonaSpec(name="analyst", role="Data Analyst", expertise=["data"])
 
         registry.register("senior_dev", spec1, vertical="coding")
@@ -333,15 +323,9 @@ class TestPersonaDiscoveryAPIs:
 
         registry = get_persona_registry()
 
-        spec1 = PersonaSpec(
-            name="p1", role="P1", expertise=["t1"], tags=["backend", "api"]
-        )
-        spec2 = PersonaSpec(
-            name="p2", role="P2", expertise=["t2"], tags=["frontend", "ui"]
-        )
-        spec3 = PersonaSpec(
-            name="p3", role="P3", expertise=["t3"], tags=["backend", "database"]
-        )
+        spec1 = PersonaSpec(name="p1", role="P1", expertise=["t1"], tags=["backend", "api"])
+        spec2 = PersonaSpec(name="p2", role="P2", expertise=["t2"], tags=["frontend", "ui"])
+        spec3 = PersonaSpec(name="p3", role="P3", expertise=["t3"], tags=["backend", "database"])
 
         registry.register("p1", spec1, vertical="coding")
         registry.register("p2", spec2, vertical="coding")
@@ -672,18 +656,10 @@ class TestPersonaIntegrationScenarios:
 
         # Register personas across verticals
         personas = [
-            PersonaSpec(
-                name="expert1", role="Expert 1", expertise=["python"], tags=["backend"]
-            ),
-            PersonaSpec(
-                name="expert2", role="Expert 2", expertise=["python"], tags=["backend"]
-            ),
-            PersonaSpec(
-                name="analyst1", role="Analyst 1", expertise=["data"], tags=["analysis"]
-            ),
-            PersonaSpec(
-                name="analyst2", role="Analyst 2", expertise=["data"], tags=["analysis"]
-            ),
+            PersonaSpec(name="expert1", role="Expert 1", expertise=["python"], tags=["backend"]),
+            PersonaSpec(name="expert2", role="Expert 2", expertise=["python"], tags=["backend"]),
+            PersonaSpec(name="analyst1", role="Analyst 1", expertise=["data"], tags=["analysis"]),
+            PersonaSpec(name="analyst2", role="Analyst 2", expertise=["data"], tags=["analysis"]),
         ]
 
         registry.register("expert1", personas[0], vertical="coding")

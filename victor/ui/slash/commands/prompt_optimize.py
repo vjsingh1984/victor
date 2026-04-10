@@ -83,8 +83,7 @@ class PromptOptimizeCommand(BaseSlashCommand):
                     sections = matched
                 else:
                     ctx.console.print(
-                        f"[red]Unknown section '{args[0]}'.[/] "
-                        f"Available: {', '.join(sections)}"
+                        f"[red]Unknown section '{args[0]}'.[/] " f"Available: {', '.join(sections)}"
                     )
                     return
 

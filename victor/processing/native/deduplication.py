@@ -49,9 +49,7 @@ def normalize_block(block: str) -> str:
     return normalized.lower()
 
 
-def rolling_hash_blocks(
-    content: str, min_block_length: int = 50
-) -> List[Tuple[str, str, bool]]:
+def rolling_hash_blocks(content: str, min_block_length: int = 50) -> List[Tuple[str, str, bool]]:
     """Process content and compute hashes for all blocks.
 
     Args:
@@ -84,9 +82,7 @@ def rolling_hash_blocks(
     return results
 
 
-def find_duplicate_blocks(
-    content: str, min_block_length: int = 50
-) -> List[Tuple[int, str]]:
+def find_duplicate_blocks(content: str, min_block_length: int = 50) -> List[Tuple[int, str]]:
     """Find duplicate blocks in content and return their indices.
 
     Args:

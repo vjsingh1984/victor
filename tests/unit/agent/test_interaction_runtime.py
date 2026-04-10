@@ -26,12 +26,8 @@ def test_create_interaction_runtime_components_lazy_materialization():
     pipeline = MagicMock()
     factory.create_streaming_chat_pipeline.return_value = pipeline
 
-    with patch(
-        "victor.agent.coordinators.chat_coordinator.ChatCoordinator"
-    ) as chat_cls:
-        with patch(
-            "victor.agent.coordinators.tool_coordinator.ToolCoordinator"
-        ) as tool_cls:
+    with patch("victor.agent.coordinators.chat_coordinator.ChatCoordinator") as chat_cls:
+        with patch("victor.agent.coordinators.tool_coordinator.ToolCoordinator") as tool_cls:
             with patch(
                 "victor.agent.coordinators.session_coordinator.create_session_coordinator"
             ) as session_factory:

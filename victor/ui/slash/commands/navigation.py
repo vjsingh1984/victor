@@ -299,9 +299,7 @@ class SnapshotsCommand(BaseSlashCommand):
                 ctx.console.print("\n[dim]Use /snapshots restore <id> to restore[/]")
 
             elif subcommand == "create":
-                description = (
-                    " ".join(ctx.args[1:]) if len(ctx.args) > 1 else "Manual snapshot"
-                )
+                description = " ".join(ctx.args[1:]) if len(ctx.args) > 1 else "Manual snapshot"
                 snapshot_id = store.create_snapshot(description=description)
                 ctx.console.print(f"[green]Snapshot created:[/] {snapshot_id[:8]}")
 
@@ -384,9 +382,7 @@ class CommitCommand(BaseSlashCommand):
                 ctx.console.print("[yellow]No changes to commit[/]")
                 return
 
-            ctx.console.print(
-                f"[dim]Found {len(changes.splitlines())} changed files[/]"
-            )
+            ctx.console.print(f"[dim]Found {len(changes.splitlines())} changed files[/]")
 
         except FileNotFoundError:
             ctx.console.print("[red]Git not available[/]")
@@ -485,11 +481,7 @@ class CopyCommand(BaseSlashCommand):
             import pyperclip
 
             pyperclip.copy(last_assistant)
-            preview = (
-                last_assistant[:100] + "..."
-                if len(last_assistant) > 100
-                else last_assistant
-            )
+            preview = last_assistant[:100] + "..." if len(last_assistant) > 100 else last_assistant
             ctx.console.print(f"[green]Copied to clipboard:[/] {preview}")
         except ImportError:
             ctx.console.print("[yellow]Clipboard not available (install pyperclip)[/]")

@@ -248,9 +248,7 @@ class TieredCache:
                 # Clear specific namespace
                 if self._memory_cache is not None:
                     keys_to_delete = [
-                        k
-                        for k in self._memory_cache.keys()
-                        if k.startswith(f"{namespace}:")
+                        k for k in self._memory_cache.keys() if k.startswith(f"{namespace}:")
                     ]
                     for key in keys_to_delete:
                         try:
@@ -262,9 +260,7 @@ class TieredCache:
                 if self._disk_cache is not None:
                     # diskcache namespace clear by iteration
                     to_delete = [
-                        k
-                        for k in self._disk_cache.iterkeys()
-                        if k.startswith(f"{namespace}:")
+                        k for k in self._disk_cache.iterkeys() if k.startswith(f"{namespace}:")
                     ]
                     for key in to_delete:
                         try:
@@ -301,9 +297,7 @@ class TieredCache:
             stats["memory_hit_rate"] = (
                 stats["memory_hits"] / total_memory if total_memory > 0 else 0
             )
-            stats["disk_hit_rate"] = (
-                stats["disk_hits"] / total_disk if total_disk > 0 else 0
-            )
+            stats["disk_hit_rate"] = stats["disk_hits"] / total_disk if total_disk > 0 else 0
 
             # Add size info
             if self._memory_cache is not None:
@@ -691,9 +685,7 @@ class ResponseCache:
         self.cache = cache or TieredCache()
         self.namespace = "responses"
 
-    def get_response(
-        self, prompt: str, model: str, temperature: float
-    ) -> Optional[str]:
+    def get_response(self, prompt: str, model: str, temperature: float) -> Optional[str]:
         """Get cached response.
 
         Args:

@@ -152,9 +152,7 @@ class ExplorationCoordinator:
 
         return terms[:5]
 
-    async def _search_codebase(
-        self, query: str, project_root: Path
-    ) -> Dict[str, Any]:
+    async def _search_codebase(self, query: str, project_root: Path) -> Dict[str, Any]:
         """Run code_search for a single query."""
         try:
             from victor.tools.code_search_tool import code_search

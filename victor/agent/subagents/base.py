@@ -60,7 +60,6 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
     Union,
 )
 
@@ -80,38 +79,7 @@ logger = logging.getLogger(__name__)
 from victor.core.shared_types import SubAgentRole  # noqa: F401
 
 
-# Local IAgent protocol to avoid circular import at runtime
-# The canonical IAgent is in victor.protocols.team but we can't import it
-# at module level due to circular dependencies
-class _IAgentProtocol(Protocol):
-    """Local IAgent protocol for type checking.
-
-    This protocol is used instead of importing IAgent from victor.protocols.team
-    to avoid circular import issues at module initialization time.
-    """
-
-    @property
-    def id(self) -> str:
-        """Unique identifier for this agent."""
-        ...
-
-    @property
-    def role(self) -> Any:
-        """Role of this agent."""
-        ...
-
-    @property
-    def persona(self) -> Optional[Any]:
-        """Persona of this agent."""
-        ...
-
-    async def execute_task(self, task: str, context: Dict[str, Any]) -> str:
-        """Execute a task using this agent."""
-        ...
-
-    async def receive_message(self, message: Any) -> Optional[Any]:
-        """Receive a message from another agent."""
-        ...
+from victor.protocols.team import IAgent
 
 
 @dataclass
@@ -185,7 +153,7 @@ class SubAgentResult:
         }
 
 
-class SubAgent(_IAgentProtocol):  # type: ignore[misc]
+class SubAgent(IAgent):  # type: ignore[misc]
     """Represents a spawned sub-agent instance.
 
     A sub-agent is a wrapper around AgentOrchestrator with:
@@ -356,9 +324,7 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                 f"   {gear_icon}  Setting disable_embeddings=True for {self.config.role.value} sub-agent"
             )
             if hasattr(orchestrator, "_session_state_manager"):
-                orchestrator._session_state_manager.execution_state.disable_embeddings = (
-                    True
-                )
+                orchestrator._session_state_manager.execution_state.disable_embeddings = True
 
         # Set role-specific system prompt
         system_prompt = self._get_role_prompt()
@@ -453,9 +419,7 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
         for attempt in range(1, max_attempts + 1):
             try:
                 if attempt > 1:
-                    logger.debug(
-                        f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}..."
-                    )
+                    logger.debug(f"   {refresh_icon} Retry attempt {attempt}/{max_attempts}...")
 
                 # Try to execute the chat
                 response = await self.orchestrator.chat(self.config.task)
@@ -504,9 +468,7 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                 raise
 
         # All retries exhausted
-        logger.error(
-            f"   {error_icon} All retry attempts exhausted for {self.config.role.value}"
-        )
+        logger.error(f"   {error_icon} All retry attempts exhausted for {self.config.role.value}")
         raise last_exception
 
     async def execute(self) -> SubAgentResult:
@@ -526,9 +488,7 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
             if self.orchestrator is None:
                 self.orchestrator = self._create_constrained_orchestrator()
 
-            logger.info(
-                f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}..."
-            )
+            logger.info(f"Executing {self.config.role.value} sub-agent: {self.config.task[:50]}...")
 
             # Run the task with retry on rate limits
             response = await self._execute_with_retry()
@@ -672,9 +632,7 @@ class SubAgent(_IAgentProtocol):  # type: ignore[misc]
                 try:
                     context_size = len(str(self.orchestrator.get_messages()))
                 except Exception as e:
-                    logger.debug(
-                        "Failed to compute sub-agent stream context size: %s", e
-                    )
+                    logger.debug("Failed to compute sub-agent stream context size: %s", e)
 
             # Yield error chunk with is_final=True
             yield StreamChunk(

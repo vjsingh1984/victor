@@ -67,9 +67,7 @@ class TestProviderSwitchCoordinator:
         assert coordinator._health_monitor is health_monitor
 
     @pytest.mark.asyncio
-    async def test_switch_provider_success(
-        self, coordinator, provider_switcher, health_monitor
-    ):
+    async def test_switch_provider_success(self, coordinator, provider_switcher, health_monitor):
         """Test successful provider switch."""
         # Setup switcher to return True
         provider_switcher.switch_provider = AsyncMock(return_value=True)
@@ -398,9 +396,7 @@ class TestProviderSwitchCoordinatorIntegration:
     async def test_switch_with_fallback_on_failure(self, coordinator):
         """Test fallback handling during switch failure."""
         # Setup: first switch fails, second succeeds
-        coordinator._provider_switcher.switch_provider = AsyncMock(
-            side_effect=[False, True]
-        )
+        coordinator._provider_switcher.switch_provider = AsyncMock(side_effect=[False, True])
 
         # First switch fails
         result1 = await coordinator.switch_provider(

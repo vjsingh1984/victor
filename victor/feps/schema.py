@@ -245,9 +245,7 @@ class FEPValidator:
         try:
             metadata = parse_fep_metadata(content)
         except ValueError as e:
-            errors.append(
-                FEPValidationError(severity="error", section="metadata", message=str(e))
-            )
+            errors.append(FEPValidationError(severity="error", section="metadata", message=str(e)))
             return FEPValidationResult(
                 is_valid=False,
                 metadata=None,
@@ -610,9 +608,7 @@ def parse_fep_metadata(content: str) -> FEPMetadata:
         raise ValueError(f"Missing required field in frontmatter: {e}")
 
 
-def validate_fep(
-    fep_path: Path, feps_dir: Optional[Path] = None
-) -> FEPValidationResult:
+def validate_fep(fep_path: Path, feps_dir: Optional[Path] = None) -> FEPValidationResult:
     """Validate a FEP file.
 
     Convenience function that creates a validator and validates.

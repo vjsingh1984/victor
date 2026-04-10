@@ -42,9 +42,7 @@ def create_router(server: "VictorFastAPIServer") -> APIRouter:
         switcher = get_model_switcher()
         switcher.switch(request.provider, request.model)
 
-        return JSONResponse(
-            {"success": True, "provider": request.provider, "model": request.model}
-        )
+        return JSONResponse({"success": True, "provider": request.provider, "model": request.model})
 
     @router.post("/mode/switch")
     async def switch_mode(request: SwitchModeRequest) -> JSONResponse:

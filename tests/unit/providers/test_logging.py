@@ -169,9 +169,7 @@ class TestLogProviderOperation:
                 pass
 
         # Should have logged to custom logger
-        assert any(
-            "PROVIDER_OPERATION_START" in record.message for record in caplog.records
-        )
+        assert any("PROVIDER_OPERATION_START" in record.message for record in caplog.records)
 
 
 class TestStructuredLogging:

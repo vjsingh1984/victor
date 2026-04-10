@@ -65,6 +65,4 @@ class TestPlanningWiring:
         mock_coordinator.chat.return_value = MagicMock(content="response")
 
         result = await mock_coordinator.chat("test message", use_planning=False)
-        mock_coordinator.chat.assert_called_once_with(
-            "test message", use_planning=False
-        )
+        mock_coordinator.chat.assert_called_once_with("test message", use_planning=False)

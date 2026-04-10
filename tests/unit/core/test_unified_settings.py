@@ -194,9 +194,7 @@ class TestVictorSettingsPrecedence:
         with open(profiles_yaml, "w") as f:
             yaml.dump(profiles_data, f)
 
-        settings = VictorSettings.from_sources(
-            profile_name="secure", config_dir=tmp_path
-        )
+        settings = VictorSettings.from_sources(profile_name="secure", config_dir=tmp_path)
 
         assert settings.prompt_policy_identity == "Secure Victor"
         assert settings.prompt_policy_max_section_chars == 9000

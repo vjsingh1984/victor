@@ -23,8 +23,7 @@ class TestDetectTestRunner:
     def test_detect_django_project(self, tmp_path):
         """Django project with manage.py detected correctly."""
         (tmp_path / "manage.py").write_text(
-            "import os\n"
-            "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myapp.settings')\n"
+            "import os\n" "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'myapp.settings')\n"
         )
         config = detect_test_runner(tmp_path)
         assert config.runner_type == "django"
@@ -40,9 +39,7 @@ class TestDetectTestRunner:
 
     def test_detect_pytest_from_pyproject(self, tmp_path):
         """Pytest detected from pyproject.toml [tool.pytest] section."""
-        (tmp_path / "pyproject.toml").write_text(
-            "[tool.pytest.ini_options]\nminversion = '6.0'\n"
-        )
+        (tmp_path / "pyproject.toml").write_text("[tool.pytest.ini_options]\nminversion = '6.0'\n")
         config = detect_test_runner(tmp_path)
         assert config.runner_type == "pytest"
 
@@ -54,9 +51,7 @@ class TestDetectTestRunner:
     def test_test_files_passed_to_command(self, tmp_path):
         """Test files are appended to command."""
         (tmp_path / "conftest.py").write_text("")
-        config = detect_test_runner(
-            tmp_path, test_files=["tests/test_foo.py"]
-        )
+        config = detect_test_runner(tmp_path, test_files=["tests/test_foo.py"])
         assert "tests/test_foo.py" in config.command
 
     def test_django_test_files_converted_to_labels(self, tmp_path):
@@ -64,9 +59,7 @@ class TestDetectTestRunner:
         (tmp_path / "manage.py").write_text(
             "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings')\n"
         )
-        config = detect_test_runner(
-            tmp_path, test_files=["tests/test_utils/tests.py"]
-        )
+        config = detect_test_runner(tmp_path, test_files=["tests/test_utils/tests.py"])
         assert config.runner_type == "django"
         # Should have dotted label, not file path
         assert "test_utils.tests" in config.command

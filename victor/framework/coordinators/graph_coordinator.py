@@ -146,9 +146,7 @@ class GraphExecutionCoordinator:
                     nodes_executed
                     if nodes_executed
                     else (
-                        list(graph._execution_order)
-                        if hasattr(graph, "_execution_order")
-                        else []
+                        list(graph._execution_order) if hasattr(graph, "_execution_order") else []
                     )
                 ),
                 duration_seconds=duration,

@@ -399,9 +399,7 @@ class IntentDetector:
         self,
         custom_display_signals: Optional[List[Tuple[str, float, str]]] = None,
         custom_write_signals: Optional[List[Tuple[str, float, str]]] = None,
-        custom_detectors: Optional[
-            List[Callable[[str], Optional[IntentClassification]]]
-        ] = None,
+        custom_detectors: Optional[List[Callable[[str], Optional[IntentClassification]]]] = None,
         default_intent: ActionIntent = ActionIntent.DISPLAY_ONLY,
     ):
         """Initialize the intent detector.
@@ -460,13 +458,9 @@ class IntentDetector:
                 return result
 
         # Score each intent type
-        display_score, display_matched = self._score_patterns(
-            message, self._display_patterns
-        )
+        display_score, display_matched = self._score_patterns(message, self._display_patterns)
         write_score, write_matched = self._score_patterns(message, self._write_patterns)
-        read_only_score, read_only_matched = self._score_patterns(
-            message, self._read_only_patterns
-        )
+        read_only_score, read_only_matched = self._score_patterns(message, self._read_only_patterns)
         compound_score, compound_matched = self._score_patterns(
             message, self._compound_write_patterns
         )

@@ -54,9 +54,7 @@ class TestCriticalPhaseFailure:
     """Critical phases (provider_runtime, interaction_runtime) must raise."""
 
     def test_provider_runtime_failure_raises(self):
-        orch = _make_orchestrator(
-            failing_phases={"provider_runtime": RuntimeError("no provider")}
-        )
+        orch = _make_orchestrator(failing_phases={"provider_runtime": RuntimeError("no provider")})
         manager = InitializationPhaseManager()
 
         with pytest.raises(InitializationError) as exc_info:
@@ -119,9 +117,7 @@ class TestNonCriticalPhaseFailure:
         assert len(result.phases) == 8
 
     def test_memory_runtime_failure_continues(self):
-        orch = _make_orchestrator(
-            failing_phases={"memory_runtime": RuntimeError("no memory")}
-        )
+        orch = _make_orchestrator(failing_phases={"memory_runtime": RuntimeError("no memory")})
         manager = InitializationPhaseManager()
 
         result = manager.run_all_phases(orch)
@@ -139,9 +135,7 @@ class TestDependencySkipping:
     """Phases with unmet dependencies are skipped."""
 
     def test_provider_failure_skips_resilience_and_coordination(self):
-        orch = _make_orchestrator(
-            failing_phases={"provider_runtime": RuntimeError("no provider")}
-        )
+        orch = _make_orchestrator(failing_phases={"provider_runtime": RuntimeError("no provider")})
         manager = InitializationPhaseManager()
 
         with pytest.raises(InitializationError):

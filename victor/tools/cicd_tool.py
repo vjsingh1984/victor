@@ -391,13 +391,10 @@ async def cicd(
                 # Check for best practices
                 if "steps" in job:
                     has_checkout = any(
-                        step.get("uses", "").startswith("actions/checkout")
-                        for step in job["steps"]
+                        step.get("uses", "").startswith("actions/checkout") for step in job["steps"]
                     )
                     if not has_checkout:
-                        warnings.append(
-                            f"Job '{job_name}': No checkout step (usually needed)"
-                        )
+                        warnings.append(f"Job '{job_name}': No checkout step (usually needed)")
 
         external_output = None
         if validate_command:

@@ -324,13 +324,9 @@ class SubAgentOrchestrator:
             effective_tools = allowed_tools
         else:
             # Use role provider for vertical-aware tool selection
-            effective_tools = self._role_provider.get_tools_for_role(
-                role_name, self._vertical
-            )
+            effective_tools = self._role_provider.get_tools_for_role(role_name, self._vertical)
 
-        effective_budget = tool_budget or self._role_provider.get_budget_for_role(
-            role_name
-        )
+        effective_budget = tool_budget or self._role_provider.get_budget_for_role(role_name)
         if context_limit:
             effective_context = context_limit
         else:
@@ -416,8 +412,7 @@ class SubAgentOrchestrator:
                 )
 
         logger.info(
-            f"Fan-out: spawning {len(tasks)} sub-agents "
-            f"(max concurrent: {max_concurrent})"
+            f"Fan-out: spawning {len(tasks)} sub-agents " f"(max concurrent: {max_concurrent})"
         )
 
         # Execute all tasks
@@ -434,7 +429,9 @@ class SubAgentOrchestrator:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 # Convert exception to failed result
-                error_msg = f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
+                error_msg = (
+                    f"Task {i} ({tasks[i].role.value}): {type(result).__name__}: {str(result)}"
+                )
                 errors.append(error_msg)
                 processed_results.append(
                     SubAgentResult(

@@ -65,9 +65,7 @@ class IaCManager:
         self.root_path = Path(root_path) if root_path else Path.cwd()
         self._settings = load_settings()
         self._paths = get_project_paths(self.root_path)
-        self._findings_history_file = (
-            self._paths.project_victor_dir / "iac_findings.json"
-        )
+        self._findings_history_file = self._paths.project_victor_dir / "iac_findings.json"
         self._policy_file = self._paths.project_victor_dir / "iac_policy.json"
 
     async def detect_platforms(self) -> list[IaCPlatform]:
@@ -127,9 +125,7 @@ class IaCManager:
 
             # Filter by excluded paths
             config_files = [
-                f
-                for f in config_files
-                if not any(excl in str(f) for excl in policy.excluded_paths)
+                f for f in config_files if not any(excl in str(f) for excl in policy.excluded_paths)
             ]
 
             for config_file in config_files:
@@ -224,9 +220,7 @@ class IaCManager:
             )
         ]
 
-    def _filter_findings(
-        self, findings: list[IaCFinding], policy: ScanPolicy
-    ) -> list[IaCFinding]:
+    def _filter_findings(self, findings: list[IaCFinding], policy: ScanPolicy) -> list[IaCFinding]:
         """Filter findings based on policy.
 
         Args:
@@ -284,9 +278,7 @@ class IaCManager:
         baseline_rules = {f.rule_id for f in baseline.findings}
 
         new_findings = [f for f in current.findings if f.rule_id not in baseline_rules]
-        resolved_findings = [
-            f for f in baseline.findings if f.rule_id not in current_rules
-        ]
+        resolved_findings = [f for f in baseline.findings if f.rule_id not in current_rules]
 
         return {
             "current_total": len(current.findings),
@@ -311,9 +303,7 @@ class IaCManager:
         # Group findings by category
         by_category: dict[str, int] = {}
         for finding in result.findings:
-            by_category[finding.category.value] = (
-                by_category.get(finding.category.value, 0) + 1
-            )
+            by_category[finding.category.value] = by_category.get(finding.category.value, 0) + 1
 
         # Group by file
         by_file: dict[str, int] = {}
@@ -340,9 +330,7 @@ class IaCManager:
                 "info": result.info_count,
             },
             "by_category": by_category,
-            "by_file": dict(
-                sorted(by_file.items(), key=lambda x: x[1], reverse=True)[:5]
-            ),
+            "by_file": dict(sorted(by_file.items(), key=lambda x: x[1], reverse=True)[:5]),
             "top_rules": top_rules,
             "risk_score": self._calculate_risk_score(result),
         }
@@ -382,9 +370,7 @@ class IaCManager:
             with open(self._policy_file, encoding="utf-8") as f:
                 data = json.load(f)
                 return ScanPolicy(
-                    enabled_platforms=[
-                        IaCPlatform(p) for p in data.get("enabled_platforms", [])
-                    ],
+                    enabled_platforms=[IaCPlatform(p) for p in data.get("enabled_platforms", [])],
                     min_severity=Severity(data.get("min_severity", "low")),
                     excluded_rules=data.get("excluded_rules", []),
                     excluded_paths=data.get("excluded_paths", []),
@@ -468,9 +454,7 @@ class IaCManager:
             logger.warning(f"Failed to load previous scan: {e}")
             return None
 
-    async def should_fail_ci(
-        self, result: ScanResult | None = None
-    ) -> tuple[bool, str]:
+    async def should_fail_ci(self, result: ScanResult | None = None) -> tuple[bool, str]:
         """Determine if CI should fail based on findings.
 
         Args:

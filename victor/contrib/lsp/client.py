@@ -88,9 +88,7 @@ class BasicLSPClient(LanguageServerProtocol):
         Returns:
             False - full LSP requires victor-coding
         """
-        logger.debug(
-            f"LSP server not started for {language} - requires victor-coding package"
-        )
+        logger.debug(f"LSP server not started for {language} - requires victor-coding package")
         return False
 
     async def stop_server(

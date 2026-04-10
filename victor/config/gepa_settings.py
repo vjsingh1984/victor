@@ -38,14 +38,10 @@ class GEPASettings(BaseModel):
 
     # --- Tiered models for reflection/mutation ---
     economic_model: GEPAModelSpec = Field(
-        default_factory=lambda: GEPAModelSpec(
-            provider="ollama", model="gemma4"
-        )
+        default_factory=lambda: GEPAModelSpec(provider="ollama", model="gemma4")
     )
     balanced_model: GEPAModelSpec = Field(
-        default_factory=lambda: GEPAModelSpec(
-            provider="openai", model="gpt-4.1-mini"
-        )
+        default_factory=lambda: GEPAModelSpec(provider="openai", model="gpt-4.1-mini")
     )
     performance_model: GEPAModelSpec = Field(
         default_factory=lambda: GEPAModelSpec(

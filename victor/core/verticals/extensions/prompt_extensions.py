@@ -75,9 +75,7 @@ class PromptExtensions:
         sections = prompt_ext.get_combined_system_prompt_sections()
     """
 
-    prompt_contributors: List[Any] = field(
-        default_factory=list
-    )  # List[PromptContributorProtocol]
+    prompt_contributors: List[Any] = field(default_factory=list)  # List[PromptContributorProtocol]
     enrichment_strategy: Optional[Any] = None  # EnrichmentStrategyProtocol
 
     def get_all_task_hints(self) -> Dict[str, TaskTypeHint]:
@@ -186,9 +184,7 @@ class PromptExtensions:
         Returns:
             Priority value (default 50) or 100 if no strategy
         """
-        if self.enrichment_strategy and hasattr(
-            self.enrichment_strategy, "get_priority"
-        ):
+        if self.enrichment_strategy and hasattr(self.enrichment_strategy, "get_priority"):
             return self.enrichment_strategy.get_priority()
         return 100  # Low priority if not configured
 
@@ -198,9 +194,7 @@ class PromptExtensions:
         Returns:
             Float between 0.0 and 1.0 (default 0.0 if no strategy)
         """
-        if self.enrichment_strategy and hasattr(
-            self.enrichment_strategy, "get_token_allocation"
-        ):
+        if self.enrichment_strategy and hasattr(self.enrichment_strategy, "get_token_allocation"):
             return self.enrichment_strategy.get_token_allocation()
         return 0.0
 

@@ -218,9 +218,7 @@ class TestChatCoordinatorProtocolInjection:
         # Verify execution_coordinator is a property on the class
         # (It's lazily created when first accessed, but requires setup_streaming_pipeline first)
         assert "execution_coordinator" in dir(ChatCoordinator)
-        assert isinstance(
-            getattr(ChatCoordinator, "execution_coordinator", None), property
-        )
+        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)
 
     @pytest.mark.asyncio
     async def test_chat_coordinator_with_mock_provider_response(self):
@@ -406,6 +404,4 @@ class TestProtocolBasedInjectionBenefits:
         # Verify execution_coordinator exists as a property on the class
         # (lazy initialization requires set_streaming_pipeline to be called first)
         assert "execution_coordinator" in dir(ChatCoordinator)
-        assert isinstance(
-            getattr(ChatCoordinator, "execution_coordinator", None), property
-        )
+        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)

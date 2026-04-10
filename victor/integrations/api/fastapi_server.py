@@ -512,9 +512,7 @@ class VictorFastAPIServer:
 
         Routers are discovered via `victor.api_routers` entry points.
         """
-        registrations = load_fastapi_router_registrations(
-            workspace_root=self.workspace_root
-        )
+        registrations = load_fastapi_router_registrations(workspace_root=self.workspace_root)
         for registration in registrations:
             try:
                 self.app.include_router(registration.router, prefix=registration.prefix)
@@ -689,9 +687,7 @@ class VictorFastAPIServer:
 
             # Get updated Q-value for logging
             rankings = learner.get_provider_rankings()
-            provider_ranking = next(
-                (r for r in rankings if r["provider"] == provider.name), None
-            )
+            provider_ranking = next((r for r in rankings if r["provider"] == provider.name), None)
             new_q = provider_ranking["q_value"] if provider_ranking else 0.0
 
             logger.info(
@@ -715,17 +711,11 @@ class VictorFastAPIServer:
             orchestrator = await self._get_orchestrator()
 
             try:
-                async for chunk in orchestrator.stream_chat(
-                    messages[-1].get("content", "")
-                ):
+                async for chunk in orchestrator.stream_chat(messages[-1].get("content", "")):
                     if chunk.get("type") == "content":
-                        await ws.send_json(
-                            {"type": "content", "content": chunk["content"]}
-                        )
+                        await ws.send_json({"type": "content", "content": chunk["content"]})
                     elif chunk.get("type") == "tool_call":
-                        await ws.send_json(
-                            {"type": "tool_call", "tool_call": chunk["tool_call"]}
-                        )
+                        await ws.send_json({"type": "tool_call", "tool_call": chunk["tool_call"]})
 
                 await ws.send_json({"type": "done"})
             except Exception as e:
@@ -749,15 +739,11 @@ class VictorFastAPIServer:
                     logger.debug("WebSocket client authenticated via message")
                     await ws.send_json({"type": "auth_success"})
                 else:
-                    await ws.send_json(
-                        {"type": "auth_failed", "message": "Invalid API key"}
-                    )
+                    await ws.send_json({"type": "auth_failed", "message": "Invalid API key"})
             elif not self.api_keys:
                 await ws.send_json({"type": "auth_success"})
             else:
-                await ws.send_json(
-                    {"type": "auth_failed", "message": "No API key provided"}
-                )
+                await ws.send_json({"type": "auth_failed", "message": "No API key provided"})
 
         elif msg_type == "subscribe":
             channel = data.get("channel", "")
@@ -771,9 +757,7 @@ class VictorFastAPIServer:
             except Exception:
                 pass
 
-    async def _broadcast_agent_event(
-        self, event_type: str, data: Dict[str, Any]
-    ) -> None:
+    async def _broadcast_agent_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Broadcast agent events to all connected WebSocket clients.
 
         Used by BackgroundAgentManager to send real-time updates.
@@ -850,9 +834,7 @@ class VictorFastAPIServer:
         """Start the server asynchronously and return self for cleanup."""
         import uvicorn
 
-        config = uvicorn.Config(
-            self.app, host=self.host, port=self.port, log_level="info"
-        )
+        config = uvicorn.Config(self.app, host=self.host, port=self.port, log_level="info")
         self._server = uvicorn.Server(config)
         asyncio.create_task(self._server.serve())
         logger.info(f"Victor FastAPI server running on {self.host}:{self.port}")

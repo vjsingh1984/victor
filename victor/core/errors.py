@@ -675,9 +675,7 @@ class ErrorHandler:
             original_exception=type(exception).__name__,
         )
 
-    def _categorize_exception(
-        self, exception: Exception
-    ) -> tuple[ErrorCategory, Optional[str]]:
+    def _categorize_exception(self, exception: Exception) -> tuple[ErrorCategory, Optional[str]]:
         """Categorize a standard exception and provide recovery hint."""
         # File errors
         if isinstance(exception, (FileNotFoundError, builtins_FileNotFoundError)):

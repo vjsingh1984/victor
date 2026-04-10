@@ -85,9 +85,7 @@ def test_register_workflows_skips_replay_and_tracks_metrics() -> None:
         create=True,
     ):
         first = service.register_workflows("coding", {"review": workflow}, replace=True)
-        second = service.register_workflows(
-            "coding", {"review": workflow}, replace=True
-        )
+        second = service.register_workflows("coding", {"review": workflow}, replace=True)
 
     assert first == 1
     assert second == 0

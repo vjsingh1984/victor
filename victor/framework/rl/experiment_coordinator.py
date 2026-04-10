@@ -105,9 +105,7 @@ class ExperimentConfig:
     control: Variant
     treatment: Variant
     traffic_split: float = 0.1  # 10% to treatment by default
-    metrics: List[str] = field(
-        default_factory=lambda: ["success_rate", "quality_score"]
-    )
+    metrics: List[str] = field(default_factory=lambda: ["success_rate", "quality_score"])
     min_samples_per_variant: int = 100
     significance_level: float = 0.05
     min_effect_size: float = 0.05  # 5% improvement
@@ -341,9 +339,7 @@ class ExperimentCoordinator:
                 )
 
                 self._experiments[row_dict["experiment_id"]] = experiment_config
-                self._status[row_dict["experiment_id"]] = ExperimentStatus(
-                    row_dict["status"]
-                )
+                self._status[row_dict["experiment_id"]] = ExperimentStatus(row_dict["status"])
 
             # Load metrics
             cursor.execute("SELECT * FROM experiment_metrics")
@@ -365,9 +361,7 @@ class ExperimentCoordinator:
                 )
 
             if self._experiments:
-                logger.info(
-                    f"ExperimentCoordinator: Loaded {len(self._experiments)} experiments"
-                )
+                logger.info(f"ExperimentCoordinator: Loaded {len(self._experiments)} experiments")
 
         except Exception as e:
             logger.debug(f"ExperimentCoordinator: Could not load state: {e}")
@@ -382,9 +376,7 @@ class ExperimentCoordinator:
             True if created successfully
         """
         if config.experiment_id in self._experiments:
-            logger.warning(
-                f"Experiment {config.experiment_id} already exists, skipping"
-            )
+            logger.warning(f"Experiment {config.experiment_id} already exists, skipping")
             return False
 
         self._experiments[config.experiment_id] = config
@@ -532,9 +524,7 @@ class ExperimentCoordinator:
                 metrics.metric_sums[name] = metrics.metric_sums.get(name, 0.0) + value
 
         # Save to database
-        self._save_outcome(
-            experiment_id, session_id, variant, success, quality_score, latency_ms
-        )
+        self._save_outcome(experiment_id, session_id, variant, success, quality_score, latency_ms)
         self._save_metrics(experiment_id, variant, metrics)
 
     def analyze_experiment(self, experiment_id: str) -> Optional[ExperimentResult]:
@@ -586,9 +576,7 @@ class ExperimentCoordinator:
         n_t = treatment_metrics.sample_count
 
         # Pooled proportion
-        p_pooled = (control_metrics.success_count + treatment_metrics.success_count) / (
-            n_c + n_t
-        )
+        p_pooled = (control_metrics.success_count + treatment_metrics.success_count) / (n_c + n_t)
 
         # Standard error
         se = math.sqrt(p_pooled * (1 - p_pooled) * (1 / n_c + 1 / n_t))
@@ -613,11 +601,7 @@ class ExperimentCoordinator:
         is_significant = p_value < config.significance_level
         treatment_better = p_t > p_c
 
-        if (
-            is_significant
-            and treatment_better
-            and effect_size >= config.min_effect_size
-        ):
+        if is_significant and treatment_better and effect_size >= config.min_effect_size:
             recommendation = "Roll out treatment - significant improvement detected"
         elif is_significant and not treatment_better:
             recommendation = "Keep control - treatment performed worse"
@@ -811,9 +795,7 @@ class ExperimentCoordinator:
 
         self.db.commit()
 
-    def _save_assignment(
-        self, experiment_id: str, session_id: str, variant: str
-    ) -> None:
+    def _save_assignment(self, experiment_id: str, session_id: str, variant: str) -> None:
         """Save variant assignment to database."""
         if not self.db:
             return
@@ -868,9 +850,7 @@ class ExperimentCoordinator:
 
         self.db.commit()
 
-    def _save_metrics(
-        self, experiment_id: str, variant: str, metrics: VariantMetrics
-    ) -> None:
+    def _save_metrics(self, experiment_id: str, variant: str, metrics: VariantMetrics) -> None:
         """Save metrics to database."""
         if not self.db:
             return
@@ -911,9 +891,7 @@ class ExperimentCoordinator:
                 status.value: sum(1 for s in self._status.values() if s == status)
                 for status in ExperimentStatus
             },
-            "total_assignments": sum(
-                len(assigns) for assigns in self._assignments.values()
-            ),
+            "total_assignments": sum(len(assigns) for assigns in self._assignments.values()),
         }
 
 
