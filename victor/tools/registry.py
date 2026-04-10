@@ -231,6 +231,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
             # Single argument: register(tool) - extract name automatically
             tool = args[0]
 
+            # LazyToolProxy — register directly (bypass strategy pattern)
+            if hasattr(tool, "is_loaded") and hasattr(tool, "execute"):
+                super().register(tool.name, tool)
+                self._tool_enabled[tool.name] = enabled
+                self._invalidate_schema_cache()
+                return
+
             # Check feature flag for strategy-based registration
             try:
                 from victor.core.feature_flags import (
@@ -253,9 +260,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
             elif isinstance(tool, self._BaseTool):  # It's a BaseTool instance
                 super().register(tool.name, tool)
                 self._tool_enabled[tool.name] = enabled
+            elif hasattr(tool, "name") and hasattr(tool, "execute"):
+                # LazyToolProxy or duck-typed tool with name + execute
+                super().register(tool.name, tool)
+                self._tool_enabled[tool.name] = enabled
             else:
                 raise TypeError(
-                    "Can only register BaseTool instances or functions decorated with @tool"
+                    "Can only register BaseTool instances, @tool functions, or LazyToolProxy"
                 )
         elif len(args) == 2:
             # Two arguments: register(key, value) - LSP-compatible

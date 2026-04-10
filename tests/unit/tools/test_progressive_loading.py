@@ -135,3 +135,65 @@ class TestProgressiveParams:
         pp.escalate()
         pp.reset()
         assert pp.current == 5
+
+
+class TestRegistryAcceptsLazyProxy:
+    """ToolRegistry.register() accepts LazyToolProxy."""
+
+    def test_register_lazy_proxy(self):
+        from victor.tools.progressive import LazyToolProxy
+        from victor.tools.registry import ToolRegistry
+
+        registry = ToolRegistry()
+        proxy = LazyToolProxy(
+            "lazy_tool",
+            lambda: None,
+            cost_tier=CostTier.LOW,
+            description="A lazy tool",
+        )
+
+        registry.register(proxy)
+        assert "lazy_tool" in registry._tools
+
+    def test_lazy_proxy_schema_without_loading(self):
+        from victor.tools.progressive import LazyToolProxy
+        from victor.tools.registry import ToolRegistry
+
+        registry = ToolRegistry()
+        proxy = LazyToolProxy(
+            "lazy_tool",
+            lambda: None,
+            cost_tier=CostTier.LOW,
+            description="A lazy tool",
+        )
+        registry.register(proxy)
+
+        # Schema should be available without loading the tool
+        assert not proxy.is_loaded
+
+    def test_decorated_tools_still_work(self):
+        """@tool decorated functions still register eagerly."""
+        from victor.tools.registry import ToolRegistry
+
+        registry = ToolRegistry()
+        # Verify registry accepts BaseTool instances (existing path unchanged)
+        from victor.tools.base import BaseTool, ToolResult
+
+        class EagerTool(BaseTool):
+            @property
+            def name(self):
+                return "eager_tool"
+
+            @property
+            def description(self):
+                return "Eager"
+
+            @property
+            def parameters(self):
+                return {"type": "object", "properties": {}}
+
+            async def execute(self, ctx, **kwargs):
+                return ToolResult(success=True, output="ok")
+
+        registry.register(EagerTool())
+        assert "eager_tool" in registry._tools
