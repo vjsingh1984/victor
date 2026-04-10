@@ -125,6 +125,10 @@ class SyncChatCoordinator:
         Returns:
             CompletionResponse with complete response
         """
+        # Clear previous turn's skill injection to prevent accumulation
+        if self._orchestrator and hasattr(self._orchestrator, "clear_active_skills"):
+            self._orchestrator.clear_active_skills()
+
         # Auto-select skill(s) if matcher is available on the orchestrator
         skill_match_info = None
         if (
