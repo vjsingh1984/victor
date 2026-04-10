@@ -85,6 +85,8 @@ class DeepSeekProvider(BaseProvider):
 
     # Cloud provider timeout
     DEFAULT_TIMEOUT = 120
+    # Retry attempts for transport errors (RemoteProtocolError under sustained load)
+    RETRY_ATTEMPTS = 5
 
     def __init__(
         self,
@@ -221,12 +223,13 @@ class DeepSeekProvider(BaseProvider):
             )
 
             # Retry on transient transport errors (RemoteProtocolError,
-            # ConnectionReset, etc.) — DeepSeek API occasionally drops
-            # connections under sustained load.
+            # ConnectionReset, etc.) — DeepSeek API drops connections under
+            # sustained load (observed: 22 errors across 8 consecutive tasks).
+            # 5 retries with exponential backoff: 2s, 5s, 10s, 17s, 34s
             import httpx as _httpx
 
             last_err = None
-            for _attempt in range(3):
+            for _attempt in range(self.RETRY_ATTEMPTS):
                 try:
                     response = await self._execute_with_circuit_breaker(
                         self.client.post, "/chat/completions", json=payload
@@ -236,17 +239,21 @@ class DeepSeekProvider(BaseProvider):
                     break
                 except (_httpx.RemoteProtocolError, _httpx.ReadError, _httpx.ConnectError) as e:
                     last_err = e
-                    if _attempt < 2:
+                    if _attempt < self.RETRY_ATTEMPTS - 1:
                         import asyncio as _aio
-                        delay = (2 ** _attempt) + 1  # 1s, 3s
+
+                        delay = (2 ** _attempt) + 1  # 2s, 5s, 10s, 17s
                         logger.warning(
-                            "DeepSeek transport error (attempt %d/3), retrying in %ds: %s",
-                            _attempt + 1, delay, e,
+                            "DeepSeek transport error (attempt %d/%d), retrying in %ds: %s",
+                            _attempt + 1,
+                            self.RETRY_ATTEMPTS,
+                            delay,
+                            e,
                         )
                         await _aio.sleep(delay)
             if last_err:
                 raise ProviderError(
-                    f"DeepSeek transport error after 3 retries: {last_err}"
+                    f"DeepSeek transport error after {self.RETRY_ATTEMPTS} retries: {last_err}"
                 ) from last_err
 
             result = response.json()
