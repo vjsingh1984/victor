@@ -711,6 +711,18 @@ class VictorAgentAdapter:
         """
         context_sections = []
 
+        # PIN the task description at the TOP of system context
+        # This ensures the model always knows what it's supposed to fix,
+        # even as the conversation grows and the user message fades.
+        task_desc = getattr(task, "issue_text", None) or task.prompt or task.description
+        if task_desc:
+            context_sections.append(
+                f"## YOUR TASK (focus ONLY on this issue)\n"
+                f"{task_desc[:2000]}\n\n"
+                f"IMPORTANT: Fix ONLY the issue described above. "
+                f"Do NOT fix other issues you notice in the code."
+            )
+
         # Add working directory context
         context_sections.append(f"## Working Directory\nYou are working in: {workspace_dir}")
 

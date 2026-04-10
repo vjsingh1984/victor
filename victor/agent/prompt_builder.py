@@ -164,6 +164,12 @@ TOOL EFFECTIVENESS (from execution data):
 - Use ls() for directories, read() for files. read('directory_name') will auto-convert
   but wastes a tool call.
 - Only access files within the current project. Never guess paths from other projects.
+  If read('victor') or read('../') fails, you are in the WRONG directory.
+  Use ls('.') to orient yourself in the workspace.
+- Do NOT use shell('rg ...') or shell('grep ...') to search code.
+  Use code_search(query='...') instead — it uses the semantic index.
+- After a failed edit (old_str not found), RE-READ the file at the exact location
+  and copy the text character-by-character. Do NOT guess from memory.
 """.strip()
 
 # Task-type hints are now in vertical prompt contributors (E5 M3).

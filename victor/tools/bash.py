@@ -413,6 +413,24 @@ async def shell(
     # Apply command optimizer pipeline (grep→rg, etc.)
     cmd = optimize_command(cmd)
 
+    # Redirect search commands to code_search (when available).
+    # Models bypass the semantic index by calling shell("rg ...") directly.
+    import re as _re
+
+    _base_cmd = cmd.strip().split("|")[0].strip()
+    if _re.match(r"^\s*(rg|grep|ag|ack)\s+", _base_cmd, _re.IGNORECASE):
+        return {
+            "success": False,
+            "error": (
+                "Use code_search(query='...') instead of shell search commands. "
+                "code_search uses the semantic index and is more reliable. "
+                "Example: code_search(query='FilePathField', mode='semantic')"
+            ),
+            "stdout": "",
+            "stderr": "",
+            "return_code": -1,
+        }
+
     # Check for dangerous commands
     if not dangerous and _is_dangerous(cmd):
         return {

@@ -607,6 +607,12 @@ async def edit(
                             f"Replace operation failed: old_str not found in {path}.{hint} "
                             f"Make sure the string matches exactly including whitespace. "
                             f"Searched for: {repr(old_str_preview)}{context_str}"
+                            + (
+                                "\n\nTo fix: Copy the EXACT text from the file content above "
+                                "as your old_str. Do NOT type it from memory."
+                                if context_str
+                                else ""
+                            )
                         ),
                     }
                 if occurrences > 1:
