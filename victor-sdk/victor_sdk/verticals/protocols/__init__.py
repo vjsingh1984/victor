@@ -103,6 +103,32 @@ from victor_sdk.verticals.protocols.promoted_types import (
 # Conversation management protocol
 from victor_sdk.verticals.protocols.conversation import ConversationManagerProtocol
 
+# Promoted storage protocols (from victor.storage.*)
+from victor_sdk.verticals.protocols.storage import (
+    GraphNodeData,
+    GraphEdgeData,
+    EmbeddingSearchResultData,
+    EmbeddingConfigData,
+    GraphStoreProtocol,
+    VectorStoreProtocol,
+    EmbeddingServiceProtocol,
+)
+
+# Promoted tool protocols (from victor.tools.* and victor.providers.*)
+from victor_sdk.verticals.protocols.tools import (
+    ToolResultData,
+    MessageData,
+    ToolRegistryProtocol,
+    ProviderRegistryProtocol,
+)
+
+# Promoted config protocols (from victor.config.*)
+from victor_sdk.verticals.protocols.config import (
+    ProjectPathsData,
+    SettingsProviderProtocol,
+    ApiKeyProviderProtocol,
+)
+
 # Extended vertical protocols: MCP, sandbox, hooks, permissions, compaction, plugins
 from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
 from victor_sdk.verticals.protocols.sandbox import SandboxProvider
@@ -181,4 +207,21 @@ __all__ = [
     "PermissionProvider",
     "CompactionProvider",
     "ExternalPluginProvider",
+    # Promoted storage protocols
+    "GraphNodeData",
+    "GraphEdgeData",
+    "EmbeddingSearchResultData",
+    "EmbeddingConfigData",
+    "GraphStoreProtocol",
+    "VectorStoreProtocol",
+    "EmbeddingServiceProtocol",
+    # Promoted tool protocols
+    "ToolResultData",
+    "MessageData",
+    "ToolRegistryProtocol",
+    "ProviderRegistryProtocol",
+    # Promoted config protocols
+    "ProjectPathsData",
+    "SettingsProviderProtocol",
+    "ApiKeyProviderProtocol",
 ]
