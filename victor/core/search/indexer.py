@@ -101,8 +101,14 @@ class EnhancedCodebaseIndexFactory(CodebaseIndexFactoryProtocol):
     """
 
     def create(self, root_path: str, **kwargs: Any) -> Any:
-        """Create a CodebaseIndex from victor-coding."""
-        from victor_coding.codebase.indexer import CodebaseIndex
+        """Create a CodebaseIndex from the installed coding vertical."""
+        try:
+            from victor_coding.codebase.indexer import CodebaseIndex
+        except ImportError as e:
+            raise ImportError(
+                "CodebaseIndex requires a codebase indexing provider "
+                "(e.g., pip install victor-coding)"
+            ) from e
 
         return CodebaseIndex(root_path=root_path, **kwargs)
 
