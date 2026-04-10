@@ -20,7 +20,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from victor.agent.coordinators.conversation_coordinator import (
+from victor.framework.extensions import (
     ConversationCoordinator,
     ConversationStats,
     TurnType,
