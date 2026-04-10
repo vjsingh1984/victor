@@ -54,18 +54,38 @@ class ExplorationCoordinator:
         task_description: str,
         project_root: Path,
         max_results: int = 5,
+        provider: str = "ollama",
+        model: Optional[str] = None,
+        complexity: str = "action",
     ) -> ExplorationResult:
         """Run parallel exploration and return aggregated findings.
+
+        Uses ResourceBudget to determine parallelism based on provider,
+        hardware, and task complexity.
 
         Args:
             task_description: The user's task/issue description
             project_root: Root directory of the project to explore
             max_results: Max search results to return
+            provider: LLM provider name (affects parallelism)
+            model: Optional model name
+            complexity: Task complexity level
 
         Returns:
             ExplorationResult with file paths, summary, and metrics
         """
+        from victor.agent.budget.resource_calculator import calculate_exploration_budget
+
         start = time.time()
+
+        # Calculate resource-aware budget
+        budget = calculate_exploration_budget(
+            complexity=complexity, provider=provider, model=model
+        )
+
+        if budget.max_parallel_agents == 0:
+            logger.debug("Resource budget: no exploration for this complexity")
+            return ExplorationResult(duration_seconds=time.time() - start)
 
         # Extract key terms from task for targeted search
         key_terms = self._extract_search_terms(task_description)
@@ -73,21 +93,31 @@ class ExplorationCoordinator:
             return ExplorationResult(duration_seconds=time.time() - start)
 
         logger.info(
-            "Parallel exploration: searching for %s in %s",
+            "Parallel exploration: %d agents, timeout=%ds, searching %s in %s",
+            budget.max_parallel_agents,
+            budget.exploration_timeout,
             key_terms[:2],
             project_root.name,
         )
 
-        # Run searches in parallel — direct tool calls, no SubAgent overhead
+        # Run searches in parallel — limited by resource budget
         tasks = []
-        for term in key_terms[:3]:  # Max 3 parallel searches
+        for term in key_terms[: budget.max_parallel_agents]:
             tasks.append(self._search_codebase(term, project_root))
 
         # Also get project structure
         tasks.append(self._list_project_structure(project_root))
 
         try:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            results = await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=budget.exploration_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Parallel exploration timed out after %ds", budget.exploration_timeout
+            )
+            return ExplorationResult(duration_seconds=time.time() - start)
         except Exception as e:
             logger.debug("Parallel exploration failed: %s", e)
             return ExplorationResult(duration_seconds=time.time() - start)
