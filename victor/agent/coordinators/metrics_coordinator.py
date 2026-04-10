@@ -202,6 +202,10 @@ class MetricsCoordinator:
             input_tokens=self._cumulative_token_usage.get("prompt_tokens", 0),
             output_tokens=self._cumulative_token_usage.get("completion_tokens", 0),
             total_tokens=self._cumulative_token_usage.get("total_tokens", 0),
+            cached_tokens=self._cumulative_token_usage.get("cached_tokens", 0),
+            cache_miss_tokens=self._cumulative_token_usage.get("cache_miss_tokens", 0),
+            reasoning_tokens=self._cumulative_token_usage.get("reasoning_tokens", 0),
+            cost_usd_micros=self._cumulative_token_usage.get("cost_usd_micros", 0),
         )
 
     def reset_token_usage(self) -> None:

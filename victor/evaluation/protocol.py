@@ -29,13 +29,25 @@ from typing import Any, Optional
 class TokenUsage:
     """Token usage metrics for evaluation tracking.
 
-    A minimal interface for token data needed by evaluations (ISP compliance).
+    Normalized across providers:
+    - DeepSeek: prompt_cache_hit_tokens, prompt_cache_miss_tokens
+    - OpenAI/xAI: prompt_tokens_details.cached_tokens, reasoning_tokens
+    - Anthropic: cache_creation_input_tokens, cache_read_input_tokens
+    - xAI: cost_in_usd_ticks (direct cost)
+
     Supports addition for aggregation across turns.
     """
 
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    # Cache tracking (normalized across providers)
+    cached_tokens: int = 0
+    cache_miss_tokens: int = 0
+    # Reasoning/thinking tokens (xAI, OpenAI o-series)
+    reasoning_tokens: int = 0
+    # Direct cost tracking (xAI provides this)
+    cost_usd_micros: int = 0  # Cost in millionths of USD (0 = not available)
 
     def __add__(self, other: "TokenUsage") -> "TokenUsage":
         """Add two TokenUsage instances for aggregation."""
@@ -43,6 +55,10 @@ class TokenUsage:
             input_tokens=self.input_tokens + other.input_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
             total_tokens=self.total_tokens + other.total_tokens,
+            cached_tokens=self.cached_tokens + other.cached_tokens,
+            cache_miss_tokens=self.cache_miss_tokens + other.cache_miss_tokens,
+            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
+            cost_usd_micros=self.cost_usd_micros + other.cost_usd_micros,
         )
 
     def __iadd__(self, other: "TokenUsage") -> "TokenUsage":
@@ -50,7 +66,40 @@ class TokenUsage:
         self.input_tokens += other.input_tokens
         self.output_tokens += other.output_tokens
         self.total_tokens += other.total_tokens
+        self.cached_tokens += other.cached_tokens
+        self.cache_miss_tokens += other.cache_miss_tokens
+        self.reasoning_tokens += other.reasoning_tokens
+        self.cost_usd_micros += other.cost_usd_micros
         return self
+
+    @staticmethod
+    def from_provider_usage(usage: dict, raw_usage: dict = None) -> "TokenUsage":
+        """Create TokenUsage from provider-specific usage dict.
+
+        Normalizes across DeepSeek, OpenAI, xAI, and Anthropic formats.
+        """
+        raw = raw_usage or {}
+        prompt_details = raw.get("prompt_tokens_details", {}) or {}
+        completion_details = raw.get("completion_tokens_details", {}) or {}
+
+        return TokenUsage(
+            input_tokens=usage.get("prompt_tokens", 0),
+            output_tokens=usage.get("completion_tokens", 0),
+            total_tokens=usage.get("total_tokens", 0),
+            # Cache: OpenAI/xAI use prompt_tokens_details.cached_tokens
+            # DeepSeek uses prompt_cache_hit_tokens
+            # Anthropic uses cache_read_input_tokens
+            cached_tokens=(
+                prompt_details.get("cached_tokens", 0)
+                or raw.get("prompt_cache_hit_tokens", 0)
+                or raw.get("cache_read_input_tokens", 0)
+            ),
+            cache_miss_tokens=raw.get("prompt_cache_miss_tokens", 0),
+            # Reasoning: xAI/OpenAI o-series
+            reasoning_tokens=completion_details.get("reasoning_tokens", 0),
+            # Direct cost: xAI provides cost_in_usd_ticks
+            cost_usd_micros=raw.get("cost_in_usd_ticks", 0),
+        )
 
 
 class BenchmarkType(Enum):

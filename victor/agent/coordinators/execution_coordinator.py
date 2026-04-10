@@ -494,14 +494,31 @@ class ExecutionCoordinator:
             if self._token_tracker is not None:
                 self._token_tracker.accumulate(response.usage)
             else:
-                self._chat_context._cumulative_token_usage["prompt_tokens"] += response.usage.get(
-                    "prompt_tokens", 0
+                cum = self._chat_context._cumulative_token_usage
+                cum["prompt_tokens"] += response.usage.get("prompt_tokens", 0)
+                cum["completion_tokens"] += response.usage.get("completion_tokens", 0)
+                cum["total_tokens"] += response.usage.get("total_tokens", 0)
+
+            # Extract extended token fields from raw_response
+            raw = getattr(response, "raw_response", None)
+            if raw and isinstance(raw, dict):
+                raw_usage = raw.get("usage", {}) or {}
+                cum = self._chat_context._cumulative_token_usage
+                prompt_details = raw_usage.get("prompt_tokens_details", {}) or {}
+                comp_details = raw_usage.get("completion_tokens_details", {}) or {}
+                cum["cached_tokens"] = cum.get("cached_tokens", 0) + (
+                    prompt_details.get("cached_tokens", 0)
+                    or raw_usage.get("prompt_cache_hit_tokens", 0)
+                    or raw_usage.get("cache_read_input_tokens", 0)
                 )
-                self._chat_context._cumulative_token_usage[
-                    "completion_tokens"
-                ] += response.usage.get("completion_tokens", 0)
-                self._chat_context._cumulative_token_usage["total_tokens"] += response.usage.get(
-                    "total_tokens", 0
+                cum["cache_miss_tokens"] = cum.get("cache_miss_tokens", 0) + (
+                    raw_usage.get("prompt_cache_miss_tokens", 0)
+                )
+                cum["reasoning_tokens"] = cum.get("reasoning_tokens", 0) + (
+                    comp_details.get("reasoning_tokens", 0)
+                )
+                cum["cost_usd_micros"] = cum.get("cost_usd_micros", 0) + (
+                    raw_usage.get("cost_in_usd_ticks", 0)
                 )
 
     async def _check_context_compaction(
