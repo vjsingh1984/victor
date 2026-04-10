@@ -75,15 +75,7 @@ def victor_event_to_event(victor_event: "VictorEvent") -> MessagingEvent:
 
 
 def event_to_victor_event(event: MessagingEvent) -> None:
-    """Convert MessagingEvent (protocol-based) to VictorEvent (legacy).
-
-    NOTE: VictorEvent has been removed. This function is kept for
-    backward compatibility but is no longer functional.
-
-    TODO: Remove this function once all migration is complete.
-    """
-    # VictorEvent, EventCategory, EventPriority removed - use canonical MessagingEvent
-    # This conversion is no longer needed as we've migrated to MessagingEvent
+    """No-op stub — VictorEvent was removed, migration to MessagingEvent is complete."""
     pass
 
 

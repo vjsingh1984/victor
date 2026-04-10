@@ -299,8 +299,7 @@ class Pipeline(Ensemble):
             prompt_parts
         )  # noqa: F841 - Built for future orchestrator integration
 
-        # TODO: Integrate with actual orchestrator
-        # For now, return mock output
+        # STUB: Orchestrator integration pending (#87) — returns mock until wired
         return f"[{agent.name}] Output for: {task}"
 
 

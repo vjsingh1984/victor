@@ -402,7 +402,7 @@ class PlanningCoordinator:
         Args:
             plan: Plan to display
         """
-        # TODO: Integrate with UI for interactive plan display
+        # Interactive plan display — tracked in #86
         # For now, log the plan structure
         logger.info(f"Plan: {plan.name}")
         logger.info(f"Complexity: {plan.complexity.value}")
@@ -434,7 +434,7 @@ class PlanningCoordinator:
         # Execute with auto-approval (can be made configurable)
         result = await planner.execute_plan(
             execution_plan,
-            auto_approve=True,  # TODO: Make this configurable
+            auto_approve=True,  # Configurable approval tracked in #86
         )
 
         logger.info(

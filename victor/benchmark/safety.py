@@ -120,7 +120,7 @@ class BenchmarkSafetyExtension(BaseSafetyExtension, VerticalSafetyMixin):
         Returns:
             List of custom SafetyRule instances
         """
-        # TODO: Add benchmark-specific safety rules here
+        # Benchmark safety rules — extend as needed (intentional empty default)
         return []
 
     def is_operation_safe(
