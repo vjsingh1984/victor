@@ -51,12 +51,12 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from victor.core.tool_dependency_base import ToolDependencyConfig
-from victor.core.tool_dependency_loader import (
+from victor.framework.extensions import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor.core.tool_types import ToolDependency
+from victor_sdk.verticals.tool_dependencies import ToolDependencyConfig
+from victor_sdk.verticals.protocols import ToolDependency
 
 logger = logging.getLogger(__name__)
 

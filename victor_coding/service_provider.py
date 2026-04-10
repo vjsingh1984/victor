@@ -185,7 +185,7 @@ class CodingServiceProvider(ServiceProviderProtocol):
         from victor.framework.extensions import ServiceLifetime
 
         def create_tool_deps(_):
-            from victor.core.tool_dependency_loader import (
+            from victor.framework.extensions import (
                 create_vertical_tool_dependency_provider,
             )
 
