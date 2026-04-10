@@ -12,22 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Ensemble orchestration patterns.
+"""Ensemble orchestration patterns (DEPRECATED).
 
-Provides composable patterns for coordinating multiple agents:
-- Pipeline: Sequential execution (A -> B -> C)
-- Parallel: Concurrent execution (A | B | C)
-- Hierarchical: Manager delegates to workers
+.. deprecated:: 0.6.0
+    Use ``victor.teams`` instead. The teams API provides the same patterns
+    (SEQUENTIAL, PARALLEL, HIERARCHICAL, PIPELINE, CONSENSUS) with full
+    orchestrator integration, formation switching, and team spec providers.
 
-Inspired by:
-- Prefect/Airflow task DAGs
-- Kubernetes Pod/Deployment patterns
-- MapReduce paradigms
+    Migration::
+
+        # Old (ensemble)
+        from victor.agent.specs.ensemble import Pipeline
+        pipeline = Pipeline([agent_a, agent_b])
+
+        # New (teams)
+        from victor.teams import UnifiedTeamCoordinator, TeamFormation
+        coordinator = UnifiedTeamCoordinator(orchestrator)
+        coordinator.set_formation(TeamFormation.PIPELINE)
+        result = await coordinator.execute(task)
+
+This module is kept for backward compatibility but will be removed in v1.0.
 """
 
 import asyncio
 import logging
+import warnings
 from abc import ABC, abstractmethod
+
+warnings.warn(
+    "victor.agent.specs.ensemble is deprecated. Use victor.teams instead. "
+    "See UnifiedTeamCoordinator for SEQUENTIAL/PARALLEL/HIERARCHICAL/PIPELINE patterns.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
