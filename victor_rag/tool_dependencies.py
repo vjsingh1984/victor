@@ -46,11 +46,11 @@ Example:
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from victor.core.tool_dependency_loader import (
+from victor.framework.extensions import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )
-from victor.core.tool_types import ToolDependency
+from victor_sdk.verticals.protocols import ToolDependency
 from victor.tools.tool_graph import ToolExecutionGraph
 
 # Path to the YAML configuration file
@@ -71,7 +71,7 @@ class RAGToolDependencyProvider(YAMLToolDependencyProvider):
 
     Example:
         # Preferred (new code):
-        from victor.core.tool_dependency_loader import create_vertical_tool_dependency_provider
+        from victor.framework.extensions import create_vertical_tool_dependency_provider
         provider = create_vertical_tool_dependency_provider("rag")
 
         # Deprecated (backward compatible):
