@@ -13,9 +13,7 @@ class TestModeConfigTypesInSDK:
     def test_import_mode_definition(self):
         from victor_sdk.verticals.mode_config import ModeDefinition
 
-        mode = ModeDefinition(
-            name="test", tool_budget=10, max_iterations=5
-        )
+        mode = ModeDefinition(name="test", tool_budget=10, max_iterations=5)
         assert mode.name == "test"
         assert mode.tool_budget == 10
 
