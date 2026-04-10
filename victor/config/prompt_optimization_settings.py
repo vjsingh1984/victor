@@ -26,6 +26,31 @@ from pydantic import BaseModel, Field
 from victor.config.gepa_settings import GEPASettings
 
 
+class MIPROv2Settings(BaseModel):
+    """MIPROv2 few-shot demonstration mining configuration."""
+
+    max_examples: int = 3
+    min_completion_score: float = 0.7
+    example_diversity: bool = True
+    max_example_chars: int = 500
+
+
+class CoTDistillationSettings(BaseModel):
+    """Chain-of-Thought distillation configuration.
+
+    Source and target providers are NOT hardcoded — they are determined
+    dynamically at runtime from benchmark data:
+    - source: auto-detected as the highest-scoring provider
+    - target: all providers scoring below source
+    - Can be overridden per call via evolve(source_provider=..., target_provider=...)
+    """
+
+    auto_detect_source: bool = True  # Auto-pick best provider as source
+    min_source_score: float = 0.7
+    max_steps: int = 5
+    min_score_gap: float = 0.15  # Only distill if source-target gap >= 15pp
+
+
 class PromptOptimizationSettings(BaseModel):
     """Top-level prompt optimization configuration."""
 
@@ -33,7 +58,7 @@ class PromptOptimizationSettings(BaseModel):
     enabled: bool = False
 
     # Default strategy list applied to all evolvable sections.
-    # Strategies are applied in order (layered). Currently only "gepa".
+    # Strategies are applied in order (layered).
     default_strategies: List[str] = Field(default_factory=lambda: ["gepa"])
 
     # Per-section overrides. Key = section name, value = strategy list.
@@ -43,6 +68,10 @@ class PromptOptimizationSettings(BaseModel):
 
     # Strategy-specific configurations (nested)
     gepa: GEPASettings = Field(default_factory=GEPASettings)
+    miprov2: MIPROv2Settings = Field(default_factory=MIPROv2Settings)
+    cot_distillation: CoTDistillationSettings = Field(
+        default_factory=CoTDistillationSettings
+    )
 
     def get_strategies_for_section(self, section_name: str) -> List[str]:
         """Resolve which strategies apply to a given section.

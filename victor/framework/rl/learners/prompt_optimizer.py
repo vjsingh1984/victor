@@ -371,6 +371,7 @@ class PromptOptimizerLearner(BaseLearner):
         "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
         "GROUNDING_RULES",
         "COMPLETION_GUIDANCE",
+        "FEW_SHOT_EXAMPLES",
     ]
 
     DEFAULT_OBJECTIVES = [

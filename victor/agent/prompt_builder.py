@@ -624,6 +624,12 @@ class SystemPromptBuilder:
             guidance = optimized or ASI_TOOL_EFFECTIVENESS_GUIDANCE
             base_prompt = f"{base_prompt}\n\n{guidance}"
 
+        # Few-shot examples (MIPROv2-mined from successful traces)
+        if "few_shot_examples" in sections_to_include:
+            examples = self._get_optimized_section("FEW_SHOT_EXAMPLES")
+            if examples:
+                base_prompt = f"{base_prompt}\n\n{examples}"
+
         return base_prompt
 
     def _get_optimized_section(self, section_name: str) -> Optional[str]:
@@ -685,6 +691,7 @@ class SystemPromptBuilder:
             "tool_constraint",
             "completion",
             "tool_guidance",
+            "few_shot_examples",
         }
 
         try:
