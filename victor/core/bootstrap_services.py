@@ -163,13 +163,20 @@ def bootstrap_new_services(
         )
         logger.info("Bootstrapped SessionService")
 
-    # Bootstrap LLMDecisionService — prefer edge model if available
+    # Bootstrap decision service — prefer tiered (edge+balanced+performance),
+    # fall back to single edge, then cloud
     decision_service = None
 
     if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
-        decision_service = _create_edge_decision_service()
+        # Try tiered service first (routes different DecisionTypes to different tiers)
+        decision_service = _create_tiered_decision_service()
         if decision_service is not None:
-            logger.info("Bootstrapped LLMDecisionService with edge model")
+            logger.info("Bootstrapped TieredDecisionService (edge/balanced/performance)")
+        else:
+            # Fall back to single edge model
+            decision_service = _create_edge_decision_service()
+            if decision_service is not None:
+                logger.info("Bootstrapped LLMDecisionService with edge model")
 
     if decision_service is None and feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
         decision_service = _create_llm_decision_service(container)
@@ -373,6 +380,29 @@ def _create_chat_service(
         conversation_controller=conversation_controller,
         streaming_coordinator=streaming_coordinator,
     )
+
+
+def _create_tiered_decision_service() -> Optional[Any]:
+    """Create TieredDecisionService with per-DecisionType tier routing.
+
+    Routes different decision types to different model tiers:
+    - edge (local): tool_selection, skill_selection, intent, completion
+    - balanced (cloud): task_type_classification, multi_skill_decomposition
+    - performance (frontier): opt-in only via settings
+
+    Returns None if creation fails (falls back to single edge service).
+    """
+    try:
+        from victor.agent.services.tiered_decision_service import (
+            create_tiered_decision_service,
+        )
+        from victor.config.decision_settings import DecisionServiceSettings
+
+        config = DecisionServiceSettings()
+        return create_tiered_decision_service(config)
+    except Exception as e:
+        logger.debug("Tiered decision service unavailable: %s", e)
+        return None
 
 
 def _create_edge_decision_service() -> Optional[Any]:
