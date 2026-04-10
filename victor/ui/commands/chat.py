@@ -230,6 +230,11 @@ def chat(
         "--show-reasoning",
         help="Show LLM reasoning/thinking content in output.",
     ),
+    auto_skill: Optional[bool] = typer.Option(
+        None,
+        "--auto-skill/--no-auto-skill",
+        help="Enable/disable automatic skill selection based on message content. Default: from settings.",
+    ),
     enable_planning: Optional[bool] = typer.Option(
         None,
         "--planning/--no-planning",
@@ -473,6 +478,10 @@ def chat(
             settings.load_profiles = lambda: {profile: override_profile}  # type: ignore[attr-defined]
             settings.provider.default_provider = provider
             settings.provider.default_model = model
+
+        # Apply auto-skill CLI override to settings
+        if auto_skill is not None:
+            settings.skill_auto_select_enabled = auto_skill
 
         if actual_message:
             run_sync(

@@ -1259,6 +1259,20 @@ class Settings(BaseSettings):
     serialization_debug_mode: bool = False  # Include data characteristics in output
 
     # ==========================================================================
+    # Skill Auto-Selection
+    # ==========================================================================
+    # Embedding-based skill detection in victor chat.
+    # When enabled, each user message is matched against skill definitions
+    # via cosine similarity. High-confidence matches inject the skill's
+    # prompt fragment automatically. Ambiguous matches can use the edge
+    # LLM for resolution when USE_EDGE_MODEL is enabled.
+    skill_auto_select_enabled: bool = True
+    skill_auto_select_high_threshold: float = 0.65  # Above: use skill directly
+    skill_auto_select_low_threshold: float = 0.45  # Below: no skill
+    skill_auto_select_use_edge_fallback: bool = True  # Edge LLM for ambiguous zone
+    skill_auto_select_log_selections: bool = True  # Log which skill was selected
+
+    # ==========================================================================
     # Event System Configuration (Canonical core/events)
     # ==========================================================================
     # Centralized configuration for the unified event system.
