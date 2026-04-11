@@ -981,11 +981,48 @@ def evolve_prompts(
         results.add_column("Mean", style="bold")
         results.add_column("Chars", style="dim")
 
+        # Load latest evaluation results to seed new candidates
+        import glob as _glob
+        from pathlib import Path as _Path
+
+        eval_dir = _Path.home() / ".victor" / "evaluations"
+        latest_scores = {}  # provider → (passed, failed)
+        for ef in sorted(_glob.glob(str(eval_dir / "eval_swe_bench_*.json"))):
+            try:
+                import json as _json
+
+                with open(ef) as _f:
+                    edata = _json.load(_f)
+                emodel = edata.get("config", {}).get("model", "")
+                etasks = edata.get("tasks", [])
+                if len(etasks) >= 10:
+                    ep = sum(1 for t in etasks if t.get("status") == "passed")
+                    ef_count = len(etasks) - ep
+                    if "gpt" in emodel:
+                        latest_scores["openai"] = (ep, ef_count)
+                    elif "grok" in emodel:
+                        latest_scores["xai"] = (ep, ef_count)
+                    elif "deepseek" in emodel:
+                        latest_scores["deepseek"] = (ep, ef_count)
+                    elif "haiku" in emodel or "claude" in emodel:
+                        latest_scores["anthropic"] = (ep, ef_count)
+            except Exception:
+                pass
+
         for p in providers:
             for s in sections:
                 current = section_text.get(s, "")
                 candidate = learner.evolve(s, current, provider=p)
                 if candidate:
+                    # Auto-seed from latest benchmark results
+                    scores = latest_scores.get(p)
+                    if scores:
+                        passes, fails = scores
+                        for _ in range(min(passes, 15)):
+                            candidate.update(True)
+                        for _ in range(min(fails, 15)):
+                            candidate.update(False)
+                        learner._save_candidate(candidate)
                     results.add_row(
                         p, s[:20], str(candidate.generation),
                         f"{candidate.mean:.2f}", str(len(candidate.text))
