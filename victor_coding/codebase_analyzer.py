@@ -2353,171 +2353,28 @@ async def generate_victor_md_from_index(
             sections.append(f"  - **Source**: {source_lines:,} LOC in {source_files} files")
             sections.append(f"  - **Config**: {config_lines:,} LOC in {config_files} files")
 
-        if loc.get("largest_file"):
+        sections.append("")
+
+    # Hub classes (high connectivity — useful for understanding architecture)
+    if graph_insights.get("has_graph") and graph_insights.get("hub_classes"):
+        sections.append("## Hub Classes\n")
+        for hub in graph_insights["hub_classes"][:5]:
+            line_ref = f":{hub['line']}" if hub.get("line") else ""
             sections.append(
-                f"- Largest file: `{loc['largest_file']}` ({loc.get('largest_file_lines', 0):,} lines)"
+                f"- `{hub['name']}` (`{hub['file']}{line_ref}`) — {hub['degree']} connections"
             )
-
-        # Show top 3 largest files
-        top_files = loc.get("top_files", [])[:3]
-        if top_files:
-            sections.append("- Top files by size:")
-            for path, lines in top_files:
-                sections.append(f"  - `{path}` ({lines:,} lines)")
         sections.append("")
 
-    analyzer_section = _build_analyzer_section(
-        stats=stats, graph_insights=graph_insights, embedding_status=embedding_status
-    )
-    if analyzer_section:
-        sections.extend(analyzer_section)
-
-    if graph_insights.get("has_graph"):
-        graph_stats = graph_insights.get("stats", {})
-        edge_types = graph_stats.get("edge_types", {})
-        sections.append("## Graph Health\n")
-        sections.append(
-            f"- Nodes: {graph_stats.get('total_nodes', 0)}, Edges: {graph_stats.get('total_edges', 0)} "
-            f"(CALLS: {edge_types.get('CALLS', 0)}, REFERENCES: {edge_types.get('REFERENCES', 0)}, "
-            f"IMPORTS: {edge_types.get('IMPORTS', 0)}, INHERITS: {edge_types.get('INHERITS', 0)}, "
-            f"COMPOSED_OF: {edge_types.get('COMPOSED_OF', 0)})"
-        )
-        if graph_insights.get("languages"):
-            lang_preview = ", ".join(
-                f"{lang} ({count})" for lang, count in graph_insights["languages"][:4]
-            )
-            sections.append(f"- Language coverage: {lang_preview}")
-        if graph_insights.get("edge_gaps"):
-            sections.append(
-                f"- Missing edge types: {', '.join(graph_insights['edge_gaps'])} "
-                "(install tree-sitter deps and re-run `victor index`)"
-            )
-        if graph_insights.get("hub_classes"):
-            hubs = ", ".join(
-                f"{hub['name']} ({hub['degree']} links)"
-                for hub in graph_insights["hub_classes"][:3]
-            )
-            sections.append(f"- Hub classes: {hubs}")
-        if graph_insights.get("important_modules"):
-            mods = ", ".join(
-                f"{mod['module']} ({mod['role']})"
-                for mod in graph_insights["important_modules"][:3]
-            )
-            sections.append(f"- Module leaders: {mods}")
-        if graph_insights.get("pagerank"):
-            pr_preview = ", ".join(
-                f"{pr['name']} ({pr['in_degree']}↓/{pr['out_degree']}↑)"
-                for pr in graph_insights["pagerank"][:3]
-            )
-            sections.append(f"- PageRank leaders: {pr_preview}")
-        if graph_insights.get("centrality"):
-            dc_preview = ", ".join(
-                f"{dc['name']} ({dc['degree']} deg)" for dc in graph_insights["centrality"][:3]
-            )
-            sections.append(f"- Centrality leaders: {dc_preview}")
-        if graph_insights.get("components"):
-            comp = graph_insights["components"]
-            details = f"largest {comp[0]} nodes" + (f", next {comp[1:3]}" if len(comp) > 1 else "")
-            sections.append(f"- Connected components: {details}")
+    # Key architectural modules
+    if graph_insights.get("has_graph") and graph_insights.get("important_modules"):
+        sections.append("## Key Modules\n")
+        for mod in graph_insights["important_modules"][:5]:
+            conns = f"↓{mod['in_degree']} ↑{mod['out_degree']}"
+            sections.append(f"- `{mod['module']}` ({mod['role']}, {conns})")
         sections.append("")
-
-    if embedding_status and embedding_status.get("code_embeddings"):
-        ce = embedding_status["code_embeddings"]
-        sections.append("## Embeddings & Chunking\n")
-        sections.append(
-            f"- Code embeddings: {ce.get('rows', 0)} vectors @ `{ce.get('path', '')}` (table: {ce.get('table', '')})"
-        )
-        if ce.get("metadata_keys"):
-            keys = ", ".join(k for k, _ in ce["metadata_keys"])
-            sections.append(f"- Metadata keys: {keys}")
-        if ce.get("chunk_types"):
-            sections.append(f"- Chunk types: {', '.join(ce['chunk_types'])}")
-        if ce.get("max_span"):
-            sections.append(f"- Max chunk span: {ce['max_span']} lines")
-        sections.append("")
-
-    # Top Imports (most used internal/external modules)
-    if enhanced_info.top_imports:
-        sections.append("## Most Imported Modules\n")
-        sections.append("*Non-stdlib modules imported most frequently*\n")
-        for module, count in enhanced_info.top_imports[:8]:
-            sections.append(f"- `{module}` ({count} imports)")
-        sections.append("")
-
-    # Named Implementations (grouped by domain)
-    if named_impls:
-        sections.append("## Named Implementations\n")
-        for domain, impls in sorted(named_impls.items()):
-            if impls:
-                sections.append(f"### {domain}\n")
-                sections.append("| Name | Location | Description |")
-                sections.append("|------|----------|-------------|")
-                for impl in sorted(impls, key=lambda x: x["name"]):
-                    desc = impl.get("description", "") or impl.get("primary_symbol", "")
-                    # Format: SymbolName (file.py:line) for LLM navigation
-                    line_ref = f":{impl['line']}" if impl.get("line") else ""
-                    location = f"`{impl['path']}{line_ref}`"
-                    sections.append(f"| **{impl['name']}** | {location} | {desc} |")
-                sections.append("")
-
-    # Performance Hints (extracted from docstrings)
-    if perf_hints:
-        sections.append("## Performance Hints\n")
-        sections.append("*Extracted from docstrings and comments*\n")
-        hint_count = 0
-        for file_path, hints in sorted(perf_hints.items())[:10]:
-            unique_hints = list({h["value"] for h in hints})[:3]
-            if unique_hints:
-                sections.append(f"- `{file_path}`: {', '.join(unique_hints)}")
-                hint_count += 1
-                if hint_count >= 8:
-                    break
-        sections.append("")
-
-    # Architecture Patterns (from detected patterns)
-    if patterns:
-        sections.append("## Architecture\n")
-        for i, pattern in enumerate(patterns[:8], 1):
-            sections.append(f"{i}. **{pattern['name']}**: {pattern['description']}")
-        sections.append("")
-
-    # Symbol Summary by Type
-    if stats.get("symbols_by_type"):
-        sections.append("## Code Structure\n")
-        for sym_type, count in stats["symbols_by_type"].items():
-            # Proper pluralization
-            plural = sym_type + "es" if sym_type.endswith("s") else sym_type + "s"
-            sections.append(f"- {count} {plural}")
-        sections.append("")
-
-    # Setup & Commands (inferred)
-    sections.append("## Setup & Commands\n")
-    sections.append("```bash")
-    py_requires = _infer_python_requires(root)
-    if py_requires:
-        sections.append(f"# Python >= {py_requires}")
-    for cmd in commands_inferred:
-        sections.append(cmd)
-    sections.append("```\n")
 
     # Important Notes
-    sections.append("## Important Notes\n")
-
-    # Show clear breakdown of what was indexed
-    total_files = stats.get("total_files", 0)
-    total_symbols = stats.get("total_symbols", 0)
-    graph_nodes = stats.get("graph_nodes", 0)
-    classes = stats.get("classes", 0)
-    functions = stats.get("functions", 0)
-
-    sections.append(f"- **Indexed {total_files} files**:")
-    sections.append(f"  - {classes} classes")
-    sections.append(f"  - {functions} functions")
-    sections.append(f"  - {total_symbols} total code symbols")
-    sections.append(f"  - {graph_nodes} total graph nodes (files + symbols + imports)")
-    sections.append("")
-
-    sections.append("- Check component paths above for exact file:line references")
+    sections.append("## Notes\n")
     sections.append("- Run `/init --update` to refresh after code changes")
     sections.append("")
 
@@ -2622,13 +2479,21 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         file_counter = Counter()
         file_pattern = re.compile(r"`([a-zA-Z_/]+\.(py|ts|js|go|rs))[:`]")
 
+        # Directories that indicate SWE-bench/benchmark test data, not project files
+        _BENCHMARK_PREFIXES = (
+            "astropy/", "django/", "flask/", "requests/", "sphinx/",
+            "sympy/", "matplotlib/", "scikit", "pandas/", "numpy/",
+            "pylint/", "pytest/", "httpx/", "pydantic/",
+        )
+
         for row in cursor.fetchall():
             matches = file_pattern.findall(row[0])
             for match in matches:
                 file_path = match[0]
-                # Normalize and count
+                # Normalize and count — skip benchmark/external repo files
                 if "/" in file_path and not file_path.startswith("/"):
-                    file_counter[file_path] += 1
+                    if not file_path.startswith(_BENCHMARK_PREFIXES):
+                        file_counter[file_path] += 1
 
         insights["hot_files"] = file_counter.most_common(15)
 
@@ -2644,13 +2509,18 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
         ]
 
         # Extract FAQ-like questions (questions asked multiple times)
+        # Filter out benchmark/test prompts and trivial questions
         cursor.execute("""
             SELECT content, COUNT(*) as times
             FROM messages
             WHERE role = 'user'
               AND content LIKE '%?%'
               AND content NOT LIKE '%Complete%function%'
-              AND length(content) BETWEEN 15 AND 200
+              AND content NOT LIKE '%What is 2 + 2%'
+              AND content NOT LIKE '%What is Python%'
+              AND content NOT LIKE '%Reply with just%'
+              AND content NOT LIKE '%<TOOL_OUTPUT%'
+              AND length(content) BETWEEN 30 AND 200
             GROUP BY content
             HAVING times > 1
             ORDER BY times DESC
@@ -3144,18 +3014,34 @@ async def generate_enhanced_init_md(
                     )
             graph_section.append("")
 
-        # Most important symbols (PageRank)
+        # Most important symbols (PageRank) — skip Python builtins
+        _BUILTIN_NAMES = {
+            "len", "get", "set", "append", "lower", "upper", "strip",
+            "split", "join", "format", "pop", "push", "keys", "values",
+            "items", "update", "copy", "clear", "add", "remove", "sort",
+            "extend", "insert", "count", "index", "replace", "find",
+            "startswith", "endswith", "encode", "decode", "read", "write",
+            "close", "open", "print", "str", "int", "float", "bool",
+            "list", "dict", "tuple", "type", "isinstance", "hasattr",
+            "getattr", "setattr", "patch",
+        }
         if graph_insights.get("important_symbols"):
-            graph_section.append("### Most Important Symbols (PageRank)\n")
-            graph_section.append("| Symbol | Type | Connections |")
-            graph_section.append("|--------|------|-------------|")
-            for sym in graph_insights["important_symbols"][:6]:
-                conns = f"↓{sym['in_degree']} ↑{sym['out_degree']}"
-                # Format: SymbolName (file.py:line) for LLM navigation
-                line_ref = f":{sym['line']}" if sym.get("line") else ""
-                location = f"({sym['file']}{line_ref})"
-                graph_section.append(f"| `{sym['name']}` {location} | {sym['type']} | {conns} |")
-            graph_section.append("")
+            filtered_symbols = [
+                sym for sym in graph_insights["important_symbols"]
+                if sym["name"] not in _BUILTIN_NAMES
+            ]
+            if filtered_symbols:
+                graph_section.append("### Most Important Symbols (PageRank)\n")
+                graph_section.append("| Symbol | Type | Connections |")
+                graph_section.append("|--------|------|-------------|")
+                for sym in filtered_symbols[:6]:
+                    conns = f"↓{sym['in_degree']} ↑{sym['out_degree']}"
+                    line_ref = f":{sym['line']}" if sym.get("line") else ""
+                    location = f"({sym['file']}{line_ref})"
+                    graph_section.append(
+                        f"| `{sym['name']}` {location} | {sym['type']} | {conns} |"
+                    )
+                graph_section.append("")
 
         # Hub classes
         if graph_insights.get("hub_classes"):
@@ -3219,11 +3105,11 @@ async def generate_enhanced_init_md(
                 "graph", "No graph data (run 'victor index' or enable auto_index)", complete=True
             )
 
-    # Step 3: Deep - Use LLM to enhance content
+    # Step 3: Deep - Use LLM to synthesize a compact init.md from the raw data
     if not use_llm:
         return base_content
 
-    progress("deep", "Enhancing with LLM analysis...")
+    progress("deep", "Synthesizing init.md with LLM...")
 
     try:
         from victor_coding.compat.settings import load_settings as _load
@@ -3239,44 +3125,57 @@ async def generate_enhanced_init_md(
             logger.warning(f"Could not get provider {provider_name}, skipping LLM")
             return base_content
 
-        enhance_prompt = f"""You are an expert software architect reviewing a project documentation file.
+        synthesize_prompt = f"""You are writing an init.md file — a compact system-prompt context
+file that an AI coding assistant reads at the start of every conversation about this codebase.
 
-Below is an auto-generated init.md file for a codebase. Your task is to:
-1. Improve the descriptions to be more specific and actionable
-2. Identify any key architectural patterns that were missed
-3. Add meaningful relationships between components
-4. Ensure the most important components are highlighted
-5. Keep the same markdown structure but enhance the content quality
+Below is raw auto-generated data about the project. Your job is to SYNTHESIZE it into a
+compact, high-signal init.md (target: 80–120 lines, under 2000 tokens).
 
-IMPORTANT RULES:
-- Keep all existing sections and their structure
-- Do NOT add generic advice - only project-specific insights
-- Do NOT remove any existing content, only enhance it
-- Keep the file concise - quality over quantity
-- Focus on what makes this project unique
+RULES:
+- Write project-specific content only. No generic advice.
+- Use these sections in order: Project Overview, Package Layout, Key Entry Points,
+  Development Commands, Dependencies, Configuration, Architecture Notes.
+- Project Overview: 2–3 sentences covering what the project is, its primary language,
+  and its key capabilities.
+- Package Layout: table with Path, Description. Only include directories that exist.
+  Omit archive/legacy dirs unless critical.
+- Key Entry Points: table with Component, Path, Description. Pick the 8–12 most
+  architecturally important classes/functions — entry points, facades, registries,
+  core abstractions. NOT alphabetically sorted Manager classes.
+- Development Commands: the essential build/test/run commands in a code block.
+- Dependencies: one line listing core deps count and top 5–8 packages.
+- Configuration: 1–2 lines on how config works.
+- Architecture Notes: 3–5 bullet points on the system's key architectural patterns,
+  data flow, or design decisions that would help a developer navigate the codebase.
+- OMIT these sections entirely (they waste tokens): Codebase Stats, Analyzer Coverage,
+  Graph Health, Performance Hints, Code Structure counts, Named Implementations,
+  Embeddings & Chunking, Frequently Asked Questions, raw PageRank data.
+- Do NOT include sections about the indexer or analysis tooling — this file is about
+  the PROJECT, not the tool that generated it.
+- End with a one-line note: "Run `/init --update` to refresh after code changes."
 
-Here is the current init.md content:
+RAW DATA:
 
 ```markdown
 {base_content}
 ```
 
-Return ONLY the enhanced markdown content, no explanations."""
+Return ONLY the final init.md markdown. No preamble, no explanation."""
 
-        messages = [Message(role="user", content=enhance_prompt)]
+        messages = [Message(role="user", content=synthesize_prompt)]
         response = await provider.chat(messages, model=model_name)
-        enhanced = response.content.strip()
-        progress("deep", "LLM enhancement complete", complete=True)
+        synthesized = response.content.strip()
+        progress("deep", "LLM synthesis complete", complete=True)
 
         # Validate and clean response
-        if enhanced.startswith("#") or enhanced.startswith("```"):
-            if enhanced.startswith("```"):
-                lines = enhanced.split("\n")
+        if synthesized.startswith("#") or synthesized.startswith("```"):
+            if synthesized.startswith("```"):
+                lines = synthesized.split("\n")
                 lines = lines[1:] if lines[0].startswith("```") else lines
                 lines = lines[:-1] if lines and lines[-1].strip() == "```" else lines
-                enhanced = "\n".join(lines)
+                synthesized = "\n".join(lines)
             await provider.close()
-            return enhanced
+            return synthesized
 
         logger.warning("LLM response doesn't look like valid markdown")
         await provider.close()
@@ -3284,5 +3183,5 @@ Return ONLY the enhanced markdown content, no explanations."""
 
     except Exception as e:
         progress("deep", f"LLM failed: {e}", complete=True)
-        logger.warning(f"LLM enhancement failed: {e}, using base content")
+        logger.warning(f"LLM synthesis failed: {e}, using template fallback")
         return base_content

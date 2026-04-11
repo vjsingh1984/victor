@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-coding"
-version = "0.6.0"
+version = "0.7.0"
 description = "Coding vertical for Victor AI - Software development, debugging, and code generation"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -36,13 +36,13 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "victor-sdk>=0.6.0,<1.0",  # Definition-layer contract for external verticals
+    "victor-sdk>=0.7.0,<1.0",  # Definition-layer contract for external verticals
     "numpy>=1.24",  # Required by victor.storage.embeddings (used by codebase search)
 ]
 
 [project.optional-dependencies]
 runtime = [
-    "victor-ai>=0.6.0,<1.0",
+    "victor-ai>=0.7.0,<1.0",
 ]
 dev = [
     "pytest>=8.0",

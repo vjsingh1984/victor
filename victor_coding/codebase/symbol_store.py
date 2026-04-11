@@ -1067,23 +1067,74 @@ class SymbolStore:
             return [self._row_to_symbol(row) for row in cursor]
 
     def find_key_components(self, limit: int = 20) -> List[SymbolInfo]:
-        """Find key architectural components (prioritized by category importance)."""
+        """Find key architectural components ranked by graph connectivity.
+
+        Uses ATTACH DATABASE to join the symbol index with the code graph,
+        ranking classes by in-degree (how many other symbols reference them).
+        Falls back to heuristic ranking if the graph database is unavailable.
+        """
+        graph_db = self._db_path.parent / "project.db"
+        use_graph = graph_db.exists()
+
         with sqlite3.connect(str(self._db_path)) as conn:
+            if use_graph:
+                try:
+                    conn.execute(
+                        "ATTACH DATABASE ? AS graph_db", (str(graph_db),)
+                    )
+                    cursor = conn.execute(
+                        """SELECT s.name, s.symbol_type, s.file_path, s.line_number,
+                                  s.language, s.category, s.docstring, s.signature,
+                                  s.parent_symbol, s.modifiers
+                           FROM symbols s
+                           LEFT JOIN graph_db.graph_node g
+                             ON g.name = s.name
+                             AND g.file = s.file_path
+                             AND g.type = 'class'
+                           LEFT JOIN (
+                             SELECT dst, COUNT(*) as in_deg
+                             FROM graph_db.graph_edge
+                             GROUP BY dst
+                           ) e ON e.dst = g.node_id
+                           WHERE s.symbol_type IN ('class', 'interface', 'struct', 'trait')
+                             AND s.file_path NOT LIKE 'tests/%'
+                             AND s.file_path NOT LIKE 'vscode-%/out/%'
+                             AND s.file_path NOT LIKE 'site/%'
+                             AND s.file_path NOT LIKE 'archive/%'
+                           ORDER BY COALESCE(e.in_deg, 0) DESC
+                           LIMIT ?""",
+                        (limit,),
+                    )
+                    results = [self._row_to_symbol(row) for row in cursor]
+                    conn.execute("DETACH DATABASE graph_db")
+                    if results:
+                        return results
+                except Exception:
+                    pass  # Fall through to heuristic
+
+            # Heuristic fallback: category + name pattern ranking
             cursor = conn.execute(
                 """SELECT name, symbol_type, file_path, line_number, language,
                           category, docstring, signature, parent_symbol, modifiers
                    FROM symbols
                    WHERE category IS NOT NULL
                    AND symbol_type IN ('class', 'interface', 'struct', 'trait')
+                   AND file_path NOT LIKE 'tests/%'
+                   AND file_path NOT LIKE 'vscode-%/out/%'
                    ORDER BY
                      CASE category
                        WHEN 'service' THEN 1
                        WHEN 'controller' THEN 2
-                       WHEN 'repository' THEN 3
-                       WHEN 'provider' THEN 4
-                       WHEN 'factory' THEN 5
-                       WHEN 'model' THEN 6
-                       ELSE 7
+                       WHEN 'provider' THEN 3
+                       WHEN 'factory' THEN 4
+                       WHEN 'model' THEN 5
+                       ELSE 6
+                     END,
+                     CASE
+                       WHEN name LIKE '%Agent%' OR name LIKE '%Orchestrat%'
+                         OR name LIKE '%Engine%' OR name LIKE '%Registry%'
+                         THEN 0
+                       ELSE 1
                      END,
                      name
                    LIMIT ?""",
