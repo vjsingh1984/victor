@@ -307,7 +307,9 @@ class ChatCoordinator:
         finally:
             # Update cumulative token usage after stream completes
             # This enables accurate token tracking for evaluations/benchmarks
-            if orch.has_capability("current_stream_context") and orch.get_capability_value("current_stream_context"):
+            if orch.has_capability("current_stream_context") and orch.get_capability_value(
+                "current_stream_context"
+            ):
                 ctx = orch.get_capability_value("current_stream_context")
                 if hasattr(ctx, "cumulative_usage"):
                     if self._token_tracker is not None:
@@ -378,7 +380,9 @@ class ChatCoordinator:
             orch.get_capability_value("usage_analytics").start_session()
 
         # Clear ToolSequenceTracker history for new conversation
-        if orch.has_capability("tool_sequence_tracker") and orch.get_capability_value("tool_sequence_tracker"):
+        if orch.has_capability("tool_sequence_tracker") and orch.get_capability_value(
+            "tool_sequence_tracker"
+        ):
             orch.get_capability_value("tool_sequence_tracker").clear_history()
 
         # PERF: Start background compaction for async context management

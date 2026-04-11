@@ -32,7 +32,6 @@ from pathlib import Path
 
 import pytest
 
-
 # =============================================================================
 # Regression guard: no hasattr/getattr on private orchestrator attributes
 # =============================================================================
@@ -49,19 +48,19 @@ COORDINATOR_FILES = [
 
 # Pattern: hasattr(something, "_private") or getattr(something, "_private"...)
 # This catches both `hasattr(orch, "_foo")` and `getattr(self._orchestrator, "_foo", ...)`
-_PRIVATE_ATTR_PATTERN = re.compile(
-    r"""(?:hasattr|getattr)\s*\(\s*[^,]+,\s*['"](_[a-z_]+)['"]\s*"""
-)
+_PRIVATE_ATTR_PATTERN = re.compile(r"""(?:hasattr|getattr)\s*\(\s*[^,]+,\s*['"](_[a-z_]+)['"]\s*""")
 
 # Attributes that are legitimate private-attribute access patterns:
 # - _cumulative_token_usage: internal state dict accessed via known pattern
 # - _context_manager: accessed for start_background_compaction (has hasattr guard on method)
 # - _middleware_chain: registered as capability with attribute= field
-ALLOWLISTED_ATTRS = frozenset({
-    "_cumulative_token_usage",
-    "_context_manager",
-    "_middleware_chain",
-})
+ALLOWLISTED_ATTRS = frozenset(
+    {
+        "_cumulative_token_usage",
+        "_context_manager",
+        "_middleware_chain",
+    }
+)
 
 
 class TestNoDIPViolationsInCoordinators:
@@ -94,8 +93,7 @@ class TestNoDIPViolationsInCoordinators:
 
         assert not violations, (
             "DIP violations found — use CapabilityRegistryMixin API instead "
-            "of hasattr/getattr on private attributes:\n"
-            + "\n".join(violations)
+            "of hasattr/getattr on private attributes:\n" + "\n".join(violations)
         )
 
 

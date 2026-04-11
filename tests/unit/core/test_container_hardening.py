@@ -24,7 +24,6 @@ from victor.core.container import (
     ServiceResolutionError,
 )
 
-
 # =========================================================================
 # Helper classes
 # =========================================================================
@@ -148,9 +147,7 @@ class TestResolvingThreadSafety:
             def __init__(self, dep):
                 self.dep = dep
 
-        container.register(
-            SharedDep, lambda c: SharedDep(), ServiceLifetime.TRANSIENT
-        )
+        container.register(SharedDep, lambda c: SharedDep(), ServiceLifetime.TRANSIENT)
         container.register(
             ServiceA,
             lambda c: ServiceA(c.get(SharedDep)),
@@ -195,9 +192,7 @@ class TestResolvingThreadSafety:
             time.sleep(0.05)
             return SlowService()
 
-        container.register(
-            SlowService, slow_factory, ServiceLifetime.TRANSIENT
-        )
+        container.register(SlowService, slow_factory, ServiceLifetime.TRANSIENT)
         container.register(
             FastService,
             lambda c: FastService(),
@@ -238,12 +233,8 @@ class TestResolvingThreadSafety:
         class B:
             pass
 
-        container.register(
-            A, lambda c: c.get(B), ServiceLifetime.TRANSIENT
-        )
-        container.register(
-            B, lambda c: c.get(A), ServiceLifetime.TRANSIENT
-        )
+        container.register(A, lambda c: c.get(B), ServiceLifetime.TRANSIENT)
+        container.register(B, lambda c: c.get(A), ServiceLifetime.TRANSIENT)
 
         with pytest.raises(ServiceResolutionError, match="Circular"):
             container.get(A)
@@ -264,9 +255,7 @@ class TestResolvingThreadSafety:
             time.sleep(0.03)
             return SameType()
 
-        container.register(
-            SameType, counting_factory, ServiceLifetime.TRANSIENT
-        )
+        container.register(SameType, counting_factory, ServiceLifetime.TRANSIENT)
 
         errors = []
         barrier = threading.Barrier(2)
@@ -329,9 +318,7 @@ class TestContainerFreeze:
 
     def test_freeze_allows_create_scope(self):
         container = ServiceContainer()
-        container.register(
-            str, lambda c: "scoped", ServiceLifetime.SCOPED
-        )
+        container.register(str, lambda c: "scoped", ServiceLifetime.SCOPED)
         container.freeze()
         with container.create_scope() as scope:
             assert scope.get(str) == "scoped"
@@ -397,12 +384,8 @@ class TestContainerValidate:
         class B:
             pass
 
-        container.register(
-            A, lambda c: c.get(B), ServiceLifetime.TRANSIENT
-        )
-        container.register(
-            B, lambda c: c.get(A), ServiceLifetime.TRANSIENT
-        )
+        container.register(A, lambda c: c.get(B), ServiceLifetime.TRANSIENT)
+        container.register(B, lambda c: c.get(A), ServiceLifetime.TRANSIENT)
 
         errors = container.validate()
         assert len(errors) >= 1
@@ -417,15 +400,11 @@ class TestContainerValidate:
         class Missing:
             pass
 
-        container.register(
-            Needs, lambda c: c.get(Missing), ServiceLifetime.TRANSIENT
-        )
+        container.register(Needs, lambda c: c.get(Missing), ServiceLifetime.TRANSIENT)
 
         errors = container.validate()
         assert len(errors) >= 1
-        assert any(
-            isinstance(e, ServiceNotFoundError) for e in errors
-        )
+        assert any(isinstance(e, ServiceNotFoundError) for e in errors)
 
     def test_validate_reports_multiple_errors(self):
         container = ServiceContainer()
@@ -442,12 +421,8 @@ class TestContainerValidate:
         class Missing2:
             pass
 
-        container.register(
-            Bad1, lambda c: c.get(Missing1), ServiceLifetime.TRANSIENT
-        )
-        container.register(
-            Bad2, lambda c: c.get(Missing2), ServiceLifetime.TRANSIENT
-        )
+        container.register(Bad1, lambda c: c.get(Missing1), ServiceLifetime.TRANSIENT)
+        container.register(Bad2, lambda c: c.get(Missing2), ServiceLifetime.TRANSIENT)
 
         errors = container.validate()
         assert len(errors) == 2
@@ -487,12 +462,8 @@ class TestContainerValidate:
         class B:
             pass
 
-        container.register(
-            A, lambda c: c.get(B), ServiceLifetime.TRANSIENT
-        )
-        container.register(
-            B, lambda c: c.get(A), ServiceLifetime.TRANSIENT
-        )
+        container.register(A, lambda c: c.get(B), ServiceLifetime.TRANSIENT)
+        container.register(B, lambda c: c.get(A), ServiceLifetime.TRANSIENT)
 
         errors = container.validate()
         assert len(errors) >= 1
@@ -562,9 +533,7 @@ class TestDecoratorDependencyInjection:
 
         @container.service(float)
         class Mixed:
-            def __init__(
-                self, logger: ILogger, name: str = "default"
-            ):
+            def __init__(self, logger: ILogger, name: str = "default"):
                 self.logger = logger
                 self.name = name
 
@@ -622,9 +591,7 @@ class TestAsyncDisposal:
         async_svc = AsyncDisposableService()
 
         container.register_instance(DisposableCounter, sync_svc)
-        container.register_instance(
-            AsyncDisposableService, async_svc
-        )
+        container.register_instance(AsyncDisposableService, async_svc)
 
         await container.adispose()
         assert sync_svc.dispose_count == 1
@@ -633,9 +600,7 @@ class TestAsyncDisposal:
     async def test_async_context_manager(self):
         svc = AsyncDisposableService()
         async with ServiceContainer() as container:
-            container.register_instance(
-                AsyncDisposableService, svc
-            )
+            container.register_instance(AsyncDisposableService, svc)
         assert svc.disposed
 
     async def test_scope_adispose(self):

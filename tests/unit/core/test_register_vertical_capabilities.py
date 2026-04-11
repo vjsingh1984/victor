@@ -27,10 +27,12 @@ class TestRegisterVerticalCapabilities:
 
     def setup_method(self):
         from victor.core.capability_registry import CapabilityRegistry
+
         CapabilityRegistry._instance = None
 
     def teardown_method(self):
         from victor.core.capability_registry import CapabilityRegistry
+
         CapabilityRegistry._instance = None
 
     def test_register_vertical_uses_get_capability_registrations(self):

@@ -32,10 +32,12 @@ class TestRegisterCapability:
 
     def setup_method(self):
         from victor.core.capability_registry import CapabilityRegistry
+
         CapabilityRegistry._instance = None
 
     def teardown_method(self):
         from victor.core.capability_registry import CapabilityRegistry
+
         CapabilityRegistry._instance = None
 
     def test_register_capability_appears_in_registry(self):
@@ -88,10 +90,12 @@ class TestRegisterCapability:
 
     def test_sdk_protocol_has_register_capability(self):
         from victor_sdk.core.plugins import PluginContext
+
         assert hasattr(PluginContext, "register_capability")
 
     def test_mock_plugin_context_has_register_capability(self):
         from victor_sdk.testing import MockPluginContext
+
         ctx = MockPluginContext()
         assert hasattr(ctx, "register_capability")
         # Should be callable without error
