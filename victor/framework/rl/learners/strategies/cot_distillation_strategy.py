@@ -76,9 +76,7 @@ class CoTDistillationStrategy:
 
         return self._distill_reasoning(best)
 
-    def mutate(
-        self, current_text: str, reflection: str, section_name: str
-    ) -> str:
+    def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
         """Append distilled reasoning template to the prompt."""
         if not reflection:
             return current_text
@@ -138,7 +136,5 @@ class CoTDistillationStrategy:
         # Limit to max_steps
         steps = steps[: self._max_steps]
 
-        header = (
-            f"STEP-BY-STEP APPROACH (distilled from {score:.0%} success rate):"
-        )
+        header = f"STEP-BY-STEP APPROACH (distilled from {score:.0%} success rate):"
         return f"{header}\n" + "\n".join(steps)

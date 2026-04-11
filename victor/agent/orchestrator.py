@@ -2149,8 +2149,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     self.inject_skills(matches)
                     self._last_skill_match_info = {
                         "auto_skills": [
-                            {"name": s.name, "score": round(sc, 2)}
-                            for s, sc in matches
+                            {"name": s.name, "score": round(sc, 2)} for s, sc in matches
                         ],
                     }
 
@@ -2160,9 +2159,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     if len(matches) == 1:
                         analytics.record_selection(matches[0][0].name, matches[0][1])
                     else:
-                        analytics.record_multi_selection(
-                            [(s.name, sc) for s, sc in matches]
-                        )
+                        analytics.record_multi_selection([(s.name, sc) for s, sc in matches])
             else:
                 analytics = getattr(self, "_skill_analytics", None)
                 if analytics:
@@ -2258,9 +2255,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         composed = (
             f"ACTIVE SKILLS ({len(skill_names)}): {' → '.join(skill_names)}\n"
-            f"Execute these skills in the listed order.\n\n"
-            + "\n".join(fragments)
-            + "\n"
+            f"Execute these skills in the listed order.\n\n" + "\n".join(fragments) + "\n"
         )
 
         # Save base prompt before first injection
@@ -2280,9 +2275,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         role="system", content=self._system_prompt
                     )
 
-        logger.info(
-            "Injected %d skills: %s", len(skill_names), " → ".join(skill_names)
-        )
+        logger.info("Injected %d skills: %s", len(skill_names), " → ".join(skill_names))
 
     def update_system_prompt_for_query(self, query_classification=None) -> None:
         """Rebuild system prompt with query-specific classification context.

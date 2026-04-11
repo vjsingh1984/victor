@@ -36,7 +36,16 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowCompiler:
-    """DI-facing compiler with explicit parsing and validation boundaries.
+    """DI-facing compile-only compiler with explicit parse/validate/compile stages.
+
+    This is a lean, SRP-compliant compiler for DI contexts that only need
+    compilation from YAML sources. It does **not** replace
+    ``UnifiedWorkflowCompiler`` (``victor.workflows.unified_compiler``), which
+    is the canonical compiler used by the framework layer and provides:
+    - Multi-source compilation (YAML files, strings, WorkflowDefinition, WorkflowGraph)
+    - Two-level caching (definition + execution)
+    - Built-in execution helpers (execute_yaml, compile_and_execute)
+    - Cache management APIs (get_cache_stats, clear_cache, invalidate_yaml)
 
     Responsibility (SRP):
     - Normalize source requests into parsed workflow definitions

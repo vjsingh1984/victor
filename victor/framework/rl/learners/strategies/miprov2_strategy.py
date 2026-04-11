@@ -76,9 +76,7 @@ class MIPROv2Strategy:
         # Format as few-shot examples
         return self._format_examples(selected)
 
-    def mutate(
-        self, current_text: str, reflection: str, section_name: str
-    ) -> str:
+    def mutate(self, current_text: str, reflection: str, section_name: str) -> str:
         """Append mined examples to the prompt section."""
         if not reflection:
             return current_text
@@ -121,30 +119,18 @@ class MIPROv2Strategy:
                 top_fail = max(failures.items(), key=lambda x: x[1])[0] if failures else ""
                 failure_str = f", recovered from {top_fail}" if top_fail else ""
 
-            lines.append(
-                f"\nExample {i} ({task_type}, score={score:.1f}):"
-            )
-            lines.append(
-                f"  Tools: {tools} calls{failure_str}"
-            )
+            lines.append(f"\nExample {i} ({task_type}, score={score:.1f}):")
+            lines.append(f"  Tools: {tools} calls{failure_str}")
 
             # Add tool sequence pattern based on failure/success profile
             if not failures:
-                lines.append(
-                    "  Pattern: code_search → read target → edit → verify"
-                )
+                lines.append("  Pattern: code_search → read target → edit → verify")
             elif "file_not_found" in failures:
-                lines.append(
-                    "  Pattern: ls → code_search → read (verified path) → edit"
-                )
+                lines.append("  Pattern: ls → code_search → read (verified path) → edit")
             elif "edit_mismatch" in failures:
-                lines.append(
-                    "  Pattern: read (full context) → edit (3+ lines) → verify"
-                )
+                lines.append("  Pattern: read (full context) → edit (3+ lines) → verify")
             else:
-                lines.append(
-                    "  Pattern: code_search → read → analyze → edit → verify"
-                )
+                lines.append("  Pattern: code_search → read → analyze → edit → verify")
 
         # Keep within char limit
         result = "\n".join(lines)

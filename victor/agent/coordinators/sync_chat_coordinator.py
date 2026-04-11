@@ -162,9 +162,7 @@ class SyncChatCoordinator:
 
         # Use execution coordinator for agentic loop
         response = await self._execution_coordinator.execute_agentic_loop(user_message)
-        return self._attach_skill_metadata(
-            response, self._orchestrator.get_last_skill_match_info()
-        )
+        return self._attach_skill_metadata(response, self._orchestrator.get_last_skill_match_info())
 
     # =====================================================================
     # Private Methods

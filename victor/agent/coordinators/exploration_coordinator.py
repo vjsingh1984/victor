@@ -79,9 +79,7 @@ class ExplorationCoordinator:
         start = time.time()
 
         # Calculate resource-aware budget
-        budget = calculate_exploration_budget(
-            complexity=complexity, provider=provider, model=model
-        )
+        budget = calculate_exploration_budget(complexity=complexity, provider=provider, model=model)
 
         if budget.max_parallel_agents == 0:
             logger.debug("Resource budget: no exploration for this complexity")
@@ -114,9 +112,7 @@ class ExplorationCoordinator:
                 timeout=budget.exploration_timeout,
             )
         except asyncio.TimeoutError:
-            logger.warning(
-                "Parallel exploration timed out after %ds", budget.exploration_timeout
-            )
+            logger.warning("Parallel exploration timed out after %ds", budget.exploration_timeout)
             return ExplorationResult(duration_seconds=time.time() - start)
         except Exception as e:
             logger.debug("Parallel exploration failed: %s", e)

@@ -28,6 +28,7 @@ except ImportError:
 
     class BaseToolDependencyProvider:  # type: ignore[no-redef]
         """Stub — install updated victor-sdk for full implementation."""
+
         def get_dependencies(self, tool_name: str) -> List[str]:
             return []
 
@@ -40,8 +41,11 @@ except ImportError:
     class ToolDependencyLoadError(Exception):  # type: ignore[no-redef]
         pass
 
-    def create_vertical_tool_dependency_provider(*args: Any, **kwargs: Any) -> BaseToolDependencyProvider:
+    def create_vertical_tool_dependency_provider(
+        *args: Any, **kwargs: Any
+    ) -> BaseToolDependencyProvider:
         return EmptyToolDependencyProvider()
+
 
 __all__ = [
     "BaseToolDependencyProvider",

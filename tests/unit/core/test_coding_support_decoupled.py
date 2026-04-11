@@ -32,15 +32,11 @@ class TestNoCodingImports:
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:
                 if node.module.startswith("victor_coding"):
-                    violations.append(
-                        f"Line {node.lineno}: from {node.module} import ..."
-                    )
+                    violations.append(f"Line {node.lineno}: from {node.module} import ...")
             elif isinstance(node, ast.Import):
                 for alias in node.names:
                     if alias.name.startswith("victor_coding"):
-                        violations.append(
-                            f"Line {node.lineno}: import {alias.name}"
-                        )
+                        violations.append(f"Line {node.lineno}: import {alias.name}")
 
         assert not violations, (
             "coding_support.py must not import from victor_coding directly.\n"

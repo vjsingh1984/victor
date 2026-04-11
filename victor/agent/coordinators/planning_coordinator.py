@@ -373,12 +373,8 @@ class PlanningCoordinator:
             if matcher and matcher._initialized and matcher._skills:
                 from victor.framework.skill_planner import build_skill_aware_plan_prompt
 
-                enriched_request = build_skill_aware_plan_prompt(
-                    user_message, matcher._skills
-                )
-                logger.debug(
-                    "Plan generation enriched with %d skills", len(matcher._skills)
-                )
+                enriched_request = build_skill_aware_plan_prompt(user_message, matcher._skills)
+                logger.debug("Plan generation enriched with %d skills", len(matcher._skills))
         except Exception:
             logger.debug("Skill-aware planning enrichment skipped", exc_info=True)
 
@@ -431,7 +427,9 @@ class PlanningCoordinator:
                 console.print(f"[dim]Estimated: {plan.duration}[/]")
         except Exception:
             # Fallback to logger if Rich unavailable
-            logger.info("Plan: %s (%s, %d steps)", plan.name, plan.complexity.value, len(plan.steps))
+            logger.info(
+                "Plan: %s (%s, %d steps)", plan.name, plan.complexity.value, len(plan.steps)
+            )
             for step in plan.steps:
                 logger.info("  %s. [%s] %s", step[0], step[1], step[2] if len(step) > 2 else "")
 

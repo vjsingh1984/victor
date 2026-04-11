@@ -84,9 +84,7 @@ def load_codebase_analyzer_attr(name: str) -> object:
     try:
         return getattr(module, name)
     except AttributeError as exc:
-        raise ImportError(
-            f"codebase_analyzer does not expose required symbol '{name}'"
-        ) from exc
+        raise ImportError(f"codebase_analyzer does not expose required symbol '{name}'") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -168,8 +166,7 @@ def load_coding_analyze_app() -> object:
             return app
 
     raise ImportError(
-        "coding analyze command requires victor-coding. "
-        "Install with: pip install victor-coding"
+        "coding analyze command requires victor-coding. " "Install with: pip install victor-coding"
     ) from last_error
 
 

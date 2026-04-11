@@ -629,7 +629,10 @@ async def _run_benchmark_async(
                 # Only do full pre-warm once per repo; subsequent tasks skip.
                 repo_key = str(work_dir) if work_dir else ""
                 if repo_key in _warmed_repos:
-                    logger.info("Index already warmed for %s, skipping pre-warm", work_dir.name if work_dir else "?")
+                    logger.info(
+                        "Index already warmed for %s, skipping pre-warm",
+                        work_dir.name if work_dir else "?",
+                    )
                     console.print("  Code search index pre-warmed (cached)")
                 else:
                     try:
@@ -644,7 +647,9 @@ async def _run_benchmark_async(
                         _warmed_repos.add(repo_key)
                         console.print("  Code search index pre-warmed")
                     except asyncio.TimeoutError:
-                        logger.warning("Index pre-warm timed out after 300s, code_search may be slow")
+                        logger.warning(
+                            "Index pre-warm timed out after 300s, code_search may be slow"
+                        )
                         _warmed_repos.add(repo_key)  # Don't retry on next task
                     except Exception as e:
                         logger.debug(f"Index pre-warm skipped: {e}")
@@ -923,15 +928,9 @@ def show_capabilities() -> None:
 
 @benchmark_app.command("evolve")
 def evolve_prompts(
-    provider: str = typer.Option(
-        "all", "--provider", "-p", help="Provider to evolve (or 'all')"
-    ),
-    section: str = typer.Option(
-        "all", "--section", "-s", help="Section to evolve (or 'all')"
-    ),
-    compliance: bool = typer.Option(
-        False, "--compliance", help="Show GEPA compliance scorecard"
-    ),
+    provider: str = typer.Option("all", "--provider", "-p", help="Provider to evolve (or 'all')"),
+    section: str = typer.Option("all", "--section", "-s", help="Section to evolve (or 'all')"),
+    compliance: bool = typer.Option(False, "--compliance", help="Show GEPA compliance scorecard"),
 ) -> None:
     """Evolve prompts using GEPA + benchmark trace data.
 
@@ -990,8 +989,11 @@ def evolve_prompts(
         eval_dir = _Path.home() / ".victor" / "evaluations"
         provider_agg = {}  # provider → {"pass": N, "fail": N}
         model_to_provider = {
-            "gpt": "openai", "grok": "xai", "deepseek": "deepseek",
-            "haiku": "anthropic", "claude": "anthropic",
+            "gpt": "openai",
+            "grok": "xai",
+            "deepseek": "deepseek",
+            "haiku": "anthropic",
+            "claude": "anthropic",
         }
         for ef in sorted(_glob.glob(str(eval_dir / "eval_swe_bench_*.json"))):
             try:
@@ -1051,8 +1053,11 @@ def evolve_prompts(
                         candidate.update(False)
                     learner._save_candidate(candidate)
                     results.add_row(
-                        p, s[:20], str(candidate.generation),
-                        f"{candidate.mean:.2f}", str(len(candidate.text))
+                        p,
+                        s[:20],
+                        str(candidate.generation),
+                        f"{candidate.mean:.2f}",
+                        str(len(candidate.text)),
                     )
                 else:
                     results.add_row(p, s[:20], "-", "-", "[dim]no change[/]")
@@ -1064,6 +1069,7 @@ def evolve_prompts(
     except Exception as e:
         console.print(f"[red]Evolution failed:[/] {e}")
         import traceback
+
         console.print(traceback.format_exc())
 
     if compliance:
@@ -1124,8 +1130,7 @@ def _show_compliance_scorecard() -> None:
     shell_total = sum(
         1
         for e in events
-        if e.get("event_type") == "tool_call"
-        and e.get("data", {}).get("tool_name") == "shell"
+        if e.get("event_type") == "tool_call" and e.get("data", {}).get("tool_name") == "shell"
     )
     shell_search = sum(
         1
@@ -1141,8 +1146,7 @@ def _show_compliance_scorecard() -> None:
     total_reads = sum(
         1
         for e in events
-        if e.get("event_type") == "tool_call"
-        and e.get("data", {}).get("tool_name") == "read"
+        if e.get("event_type") == "tool_call" and e.get("data", {}).get("tool_name") == "read"
     )
     victor_reads = sum(
         1
@@ -1174,13 +1178,29 @@ def _show_compliance_scorecard() -> None:
 
     rules = [
         ("Search first", search_first * 100 // max(total_sessions, 1), 50),
-        ("No shell search", (shell_total - shell_search) * 100 // max(shell_total, 1) if shell_total else 100, 80),
-        ("No workspace contamination", (total_reads - victor_reads) * 100 // max(total_reads, 1), 95),
-        ("Semantic search preferred", cs_semantic * 100 // max(cs_total, 1) if cs_total else 100, 80),
+        (
+            "No shell search",
+            (shell_total - shell_search) * 100 // max(shell_total, 1) if shell_total else 100,
+            80,
+        ),
+        (
+            "No workspace contamination",
+            (total_reads - victor_reads) * 100 // max(total_reads, 1),
+            95,
+        ),
+        (
+            "Semantic search preferred",
+            cs_semantic * 100 // max(cs_total, 1) if cs_total else 100,
+            80,
+        ),
     ]
 
     for name, pct, target in rules:
-        status = "[green]✓[/]" if pct >= target else "[yellow]⚠[/]" if pct >= target * 0.6 else "[red]✗[/]"
+        status = (
+            "[green]✓[/]"
+            if pct >= target
+            else "[yellow]⚠[/]" if pct >= target * 0.6 else "[red]✗[/]"
+        )
         table.add_row(f"{status} {name}", f"{pct}%", f"{target}%")
 
     console.print(f"\n")

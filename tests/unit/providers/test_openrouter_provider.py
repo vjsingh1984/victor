@@ -501,7 +501,10 @@ class TestOpenRouterErrorHandling:
                 )
 
             # Status code may be 429 directly or wrapped by retry logic
-            assert exc_info.value.status_code in (429, 401) or "rate limit" in str(exc_info.value).lower()
+            assert (
+                exc_info.value.status_code in (429, 401)
+                or "rate limit" in str(exc_info.value).lower()
+            )
 
 
 class TestOpenRouterListModels:

@@ -555,9 +555,7 @@ class PromptOptimizerLearner(BaseLearner):
             if frontier:
                 frontier_hashes = {e.text_hash for e in frontier.get_frontier()}
                 if frontier_hashes:
-                    frontier_candidates = [
-                        c for c in candidates if c.text_hash in frontier_hashes
-                    ]
+                    frontier_candidates = [c for c in candidates if c.text_hash in frontier_hashes]
                     if frontier_candidates:
                         candidates = frontier_candidates
                         logger.debug(
@@ -624,7 +622,9 @@ class PromptOptimizerLearner(BaseLearner):
             strat_name = type(strat).__name__
             reflection = strat.reflect(traces, section_name, new_text)
             if reflection:
-                logger.info("%s reflection for '%s':\n%s", strat_name, section_name, reflection[:200])
+                logger.info(
+                    "%s reflection for '%s':\n%s", strat_name, section_name, reflection[:200]
+                )
                 new_text = strat.mutate(new_text, reflection, section_name)
         if new_text == current_text:
             logger.info("Mutation produced no change for '%s'", section_name)
@@ -752,9 +752,7 @@ class PromptOptimizerLearner(BaseLearner):
                     score = 1.0 if task.get("status") == "passed" else 0.0
                     for frontier in self._pareto_frontiers.values():
                         for entry in frontier.get_frontier():
-                            frontier.update_instance_score(
-                                entry.text_hash, instance_id, score
-                            )
+                            frontier.update_instance_score(entry.text_hash, instance_id, score)
                             updated += 1
             except Exception:
                 continue

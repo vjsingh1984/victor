@@ -69,9 +69,7 @@ class PromptOptimizationSettings(BaseModel):
     # Strategy-specific configurations (nested)
     gepa: GEPASettings = Field(default_factory=GEPASettings)
     miprov2: MIPROv2Settings = Field(default_factory=MIPROv2Settings)
-    cot_distillation: CoTDistillationSettings = Field(
-        default_factory=CoTDistillationSettings
-    )
+    cot_distillation: CoTDistillationSettings = Field(default_factory=CoTDistillationSettings)
 
     def get_strategies_for_section(self, section_name: str) -> List[str]:
         """Resolve which strategies apply to a given section.

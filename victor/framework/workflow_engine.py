@@ -906,15 +906,15 @@ class WorkflowEngine:
     def _get_unified_compiler(self) -> "UnifiedWorkflowCompiler":
         """Get or create the unified compiler.
 
-        **Architecture Note**: WorkflowEngine uses UnifiedWorkflowCompiler (not the plugin API)
-        because it requires:
+        **Architecture Note**: UnifiedWorkflowCompiler is the canonical compiler API.
+        WorkflowEngine uses it for:
         - Two-level caching (definition + execution) for performance
         - Cache management APIs (clear_cache, get_cache_stats, invalidate_yaml)
         - Runner registry integration for custom node execution
         - Escape hatch integration (condition_registry, transform_registry)
 
-        The plugin API (create_compiler) provides a simpler facade for basic use cases
-        but doesn't support these advanced features needed by WorkflowEngine.
+        For DI-friendly compile-only usage without caching or execution,
+        see WorkflowCompiler in victor.workflows.compiler.
 
         Returns:
             UnifiedWorkflowCompiler instance with shared caches.

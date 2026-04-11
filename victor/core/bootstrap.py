@@ -942,9 +942,12 @@ def _register_workflow_compiler_plugins(
 
     Part of Plugin Architecture - registers built-in compiler plugins.
     This enables:
-    - URI-based compiler creation (create_compiler("yaml://"))
-    - Third-party plugin registration via entry points
-    - Gradual migration from legacy to SOLID architecture
+    - Third-party plugin registration via WorkflowCompilerRegistry
+    - Entry-point-based plugin discovery
+
+    Note: UnifiedWorkflowCompiler is the canonical compiler API for framework
+    use (caching, multi-source, execution). The plugin registry extends it
+    with third-party compiler backends (e.g., S3, security-specific).
 
     Plugins registered:
     - YamlCompilerPlugin: YAML workflow compilation

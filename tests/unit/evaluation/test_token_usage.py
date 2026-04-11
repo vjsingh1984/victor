@@ -25,10 +25,22 @@ class TestTokenUsage:
         assert t.cost_usd_micros == 0
 
     def test_addition(self):
-        t1 = TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150,
-                        cached_tokens=10, reasoning_tokens=20, cost_usd_micros=1000)
-        t2 = TokenUsage(input_tokens=200, output_tokens=80, total_tokens=280,
-                        cached_tokens=30, reasoning_tokens=40, cost_usd_micros=2000)
+        t1 = TokenUsage(
+            input_tokens=100,
+            output_tokens=50,
+            total_tokens=150,
+            cached_tokens=10,
+            reasoning_tokens=20,
+            cost_usd_micros=1000,
+        )
+        t2 = TokenUsage(
+            input_tokens=200,
+            output_tokens=80,
+            total_tokens=280,
+            cached_tokens=30,
+            reasoning_tokens=40,
+            cost_usd_micros=2000,
+        )
         result = t1 + t2
         assert result.input_tokens == 300
         assert result.output_tokens == 130
@@ -50,7 +62,9 @@ class TestFromProviderUsage:
     def test_deepseek_format(self):
         usage = {"prompt_tokens": 308, "completion_tokens": 9, "total_tokens": 317}
         raw = {
-            "prompt_tokens": 308, "completion_tokens": 9, "total_tokens": 317,
+            "prompt_tokens": 308,
+            "completion_tokens": 9,
+            "total_tokens": 317,
             "prompt_tokens_details": {"cached_tokens": 0},
             "prompt_cache_hit_tokens": 50,
             "prompt_cache_miss_tokens": 258,

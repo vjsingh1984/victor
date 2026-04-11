@@ -242,7 +242,7 @@ class DeepSeekProvider(BaseProvider):
                     if _attempt < self.RETRY_ATTEMPTS - 1:
                         import asyncio as _aio
 
-                        delay = (2 ** _attempt) + 1  # 2s, 5s, 10s, 17s
+                        delay = (2**_attempt) + 1  # 2s, 5s, 10s, 17s
                         logger.warning(
                             "DeepSeek transport error (attempt %d/%d), retrying in %ds: %s",
                             _attempt + 1,

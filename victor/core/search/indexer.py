@@ -109,7 +109,7 @@ class EnhancedCodebaseIndexFactory(CodebaseIndexFactoryProtocol):
 
         try:
             module = importlib.import_module("victor_coding.codebase.indexer")
-            CodebaseIndex = getattr(module, "CodebaseIndex")
+            CodebaseIndex = module.CodebaseIndex
         except (ImportError, AttributeError) as e:
             raise ImportError(
                 "CodebaseIndex requires a codebase indexing provider "

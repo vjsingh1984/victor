@@ -74,9 +74,7 @@ class TestContribImportBoundaries:
                 is_forbidden = any(imp.startswith(p) for p in FORBIDDEN_PREFIXES)
                 is_allowed = any(imp.startswith(p) for p in ALLOWED_PREFIXES)
                 if is_forbidden and not is_allowed:
-                    violations.append(
-                        f"{py_file.relative_to(contrib)}:{imp}"
-                    )
+                    violations.append(f"{py_file.relative_to(contrib)}:{imp}")
 
         assert not violations, (
             f"Contrib verticals must not import from victor internals. "
@@ -91,10 +89,9 @@ class TestContribImportBoundaries:
 
         imports = _extract_imports(init_file)
         forbidden = [
-            imp for imp in imports
+            imp
+            for imp in imports
             if any(imp.startswith(p) for p in FORBIDDEN_PREFIXES)
             and not any(imp.startswith(p) for p in ALLOWED_PREFIXES)
         ]
-        assert not forbidden, (
-            f"contrib/__init__.py has forbidden imports: {forbidden}"
-        )
+        assert not forbidden, f"contrib/__init__.py has forbidden imports: {forbidden}"

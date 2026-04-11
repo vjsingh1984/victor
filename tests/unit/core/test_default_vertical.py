@@ -18,6 +18,7 @@ class TestDefaultVertical:
         env = {k: v for k, v in os.environ.items() if k != "VICTOR_DEFAULT_VERTICAL"}
         with patch.dict(os.environ, env, clear=True):
             import victor.core.constants
+
             importlib.reload(victor.core.constants)
             assert victor.core.constants.DEFAULT_VERTICAL == "coding"
 
@@ -25,6 +26,7 @@ class TestDefaultVertical:
         """VICTOR_DEFAULT_VERTICAL env var overrides the default."""
         with patch.dict(os.environ, {"VICTOR_DEFAULT_VERTICAL": "research"}):
             import victor.core.constants
+
             importlib.reload(victor.core.constants)
             assert victor.core.constants.DEFAULT_VERTICAL == "research"
 
@@ -32,5 +34,6 @@ class TestDefaultVertical:
         """Empty env var falls back to 'coding'."""
         with patch.dict(os.environ, {"VICTOR_DEFAULT_VERTICAL": ""}):
             import victor.core.constants
+
             importlib.reload(victor.core.constants)
             assert victor.core.constants.DEFAULT_VERTICAL == "coding"
