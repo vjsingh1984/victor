@@ -2,7 +2,8 @@
 
 > Multi-provider, GEPA-enhanced benchmark evaluation  
 > Date: April 9-10, 2026 | Framework: Victor v0.7.x | Tasks: SWE-bench Lite (20 tasks)  
-> GEPA Generations: Gen-1 + Gen-2 evolved prompts (gemma4 reflection)
+> GEPA: Hybrid Pareto + Thompson Sampling, 3 strategies (GEPA + MIPROv2 + CoT)  
+> Memory Scaling: Auto-evolve, quality filtering, staleness decay, pruning
 
 ---
 
@@ -11,16 +12,19 @@
 ```
                     SWE-bench Lite Pass Rate (20 tasks)
 
-  DeepSeek Chat  ██████████████████████████████████████████████████████████████  75%  (15/20) ★ BEST
-  GPT-5.4 Mini   ██████████████████████████████████████████████████████████  70%  (14/20)
-  Grok 3 Mini    ████████████████████████████████████████████████████████    65%  (13/20)
-  Haiku 4.5      ████████████████                                           20%  ( 4/20)
+  GPT-5.4 Mini   ██████████████████████████████████████████████████████████████████  80%  (16/20) ★ BEST
+  DeepSeek Chat  ██████████████████████████████████████████████████████████████  75%  (15/20) ★ VALUE
+  Grok 4.1 Fast  ████████████████████████████████████████████████████████    65%  (13/20)
+  Haiku 4.5      ████████████████████████████████████████████████████████    65%  (13/20)
                  ├─────────┼─────────┼─────────┼─────────┼─────────┤
                  0%       20%       40%       60%       80%      100%
 ```
 
-**Best overall**: DeepSeek Chat (75%) — cheapest model, highest score with full fixes  
-**Best value**: DeepSeek Chat ($0.14/1M tokens, 75% = 536 pts/$)  
+**Best accuracy**: GPT-5.4 Mini (80%) — $0.089/resolved task  
+**Best value**: DeepSeek Chat (75%) — $0.010/resolved task (9x cheaper)  
+**GEPA A/B**: +10pp aggregate (36% → 46%), zero regressions  
+**Framework impact**: DeepSeek 10% → 75% through framework fixes alone  
+**Memory Scaling**: Auto-evolving prompts from every session + benchmark  
 **GEPA impact**: +10pp aggregate across 4 providers (36% → 46%)  
 **Infrastructure impact**: Working indexer + retry = +40pp for DeepSeek (35% → 75%)  
 **Key insight**: Framework fixes (indexer, retry) matter more than model choice
@@ -272,6 +276,24 @@ Same models, same tasks, same framework — only difference is GEPA on/off.
 | **TOTAL** | **29/80 (36%)** | **37/80 (46%)** | **+10pp** | **+8** |
 
 **GEPA improves every single provider. Zero regressions.**
+
+### Full Optimization Impact (GEPA + all framework fixes)
+
+```
+  No GEPA baseline     ████████████████████████                              36%  (29/80)
+  + GEPA only          ██████████████████████████████████                    46%  (37/80)  +10pp
+  + All fixes          ██████████████████████████████████████████████████    71%  (57/80)  +28pp
+                       ├─────────┼─────────┼─────────┼─────────┤
+                       0%       20%       40%       60%       80%
+```
+
+| Provider | No GEPA | With Everything | Delta |
+|----------|---------|----------------|-------|
+| OpenAI | 55% | **80%** | +25pp |
+| DeepSeek | 10% | **75%** | +65pp |
+| Anthropic | 20% | **65%** | +45pp |
+| xAI | 60% | **65%** | +5pp |
+| **AGGREGATE** | **36%** | **71%** | **+28pp (+96% relative)** |
 
 ### What GEPA Evolved
 
