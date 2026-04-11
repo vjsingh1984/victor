@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import AsyncIterator, List, TYPE_CHECKING
+from typing import Any, AsyncIterator, List, Optional, TYPE_CHECKING
 
 from victor.providers.base import StreamChunk
 
@@ -50,6 +50,30 @@ class StreamingChatPipeline:
 
     def __init__(self, coordinator: "ChatCoordinator") -> None:
         self._coordinator = coordinator
+        # Tool selection cache — avoids redundant selection within same turn
+        self._last_tool_context: Optional[str] = None
+        self._last_tools: Optional[Any] = None
+
+    async def _get_tools_cached(
+        self, orch: Any, context_msg: str, goals: Any
+    ) -> Any:
+        """Select tools with per-turn caching.
+
+        If context_msg hasn't changed since the last call, returns the
+        previously selected tools. This avoids redundant semantic search
+        and tool schema serialization within the same streaming turn.
+        """
+        if (
+            self._last_tool_context == context_msg
+            and self._last_tools is not None
+        ):
+            return self._last_tools
+
+        tools = await orch._select_tools_for_turn(context_msg, goals)
+        if tools is not None:
+            self._last_tool_context = context_msg
+            self._last_tools = tools
+        return tools
 
     async def run(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Run the streaming pipeline for the provided message."""
@@ -210,7 +234,7 @@ class StreamingChatPipeline:
             if handled:
                 break
 
-            tools = await orch._select_tools_for_turn(stream_ctx.context_msg, goals)
+            tools = await self._get_tools_cached(orch, stream_ctx.context_msg, goals)
 
             # Prepare optional thinking parameter for providers that support it
             provider_kwargs = {}

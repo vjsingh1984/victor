@@ -370,6 +370,55 @@ pub fn truncate_message(content: &str, max_tokens: usize, preserve_lines: usize)
 }
 
 // ---------------------------------------------------------------------------
+// Batch scoring for ConversationMemory._score_messages()
+// ---------------------------------------------------------------------------
+
+/// Score messages by priority (40%) and recency (60%), return sorted indices.
+///
+/// Formula: score = 0.4 * (priority / 100) + 0.6 * (1 - age / max_age)
+/// where age = max_timestamp - timestamp, max_age = max(ages) or 1.0
+///
+/// Returns Vec<(index, score)> sorted by score descending.
+#[pyfunction]
+#[pyo3(signature = (priorities, timestamps))]
+pub fn batch_score_messages(
+    priorities: Vec<u8>,
+    timestamps: Vec<f64>,
+) -> Vec<(usize, f32)> {
+    let n = priorities.len().min(timestamps.len());
+    if n == 0 {
+        return Vec::new();
+    }
+
+    // Find max timestamp (most recent) and compute max_age
+    let max_ts = timestamps[..n]
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    let max_age = timestamps[..n]
+        .iter()
+        .map(|&t| max_ts - t)
+        .fold(0.0_f64, f64::max)
+        .max(1e-9); // avoid division by zero
+
+    // Score each message
+    let mut scored: Vec<(usize, f32)> = (0..n)
+        .map(|i| {
+            let priority_score = priorities[i] as f32 / 100.0;
+            let age = (max_ts - timestamps[i]) as f32;
+            let recency_score = 1.0 - (age / max_age as f32);
+            let score = priority_score * 0.4 + recency_score * 0.6;
+            (i, score)
+        })
+        .collect();
+
+    // Sort descending by score, stable sort preserves insertion order for ties
+    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    scored
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

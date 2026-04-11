@@ -250,6 +250,7 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<context_fitter::FitResult>()?;
     m.add_function(wrap_pyfunction!(context_fitter::fit_context, m)?)?;
     m.add_function(wrap_pyfunction!(context_fitter::truncate_message, m)?)?;
+    m.add_function(wrap_pyfunction!(context_fitter::batch_score_messages, m)?)?;
 
     Ok(())
 }
