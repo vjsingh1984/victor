@@ -74,6 +74,8 @@ class ExecutionTrace:
     success: bool
     completion_score: float
     tokens_used: int
+    # Per-section token counts for efficiency tracking
+    section_tokens: Dict[str, int] = field(default_factory=dict)
     # GEPA v2: detailed per-call traces (ASI)
     tool_call_details: List["ToolCallTrace"] = field(default_factory=list)
 

@@ -49,6 +49,7 @@ mod ast_indexer;
 mod chunking;
 mod classifier;
 mod context_fitter;
+mod trace_scanner;
 mod dedup;
 mod embeddings;
 mod extractor;
@@ -251,6 +252,9 @@ fn victor_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(context_fitter::fit_context, m)?)?;
     m.add_function(wrap_pyfunction!(context_fitter::truncate_message, m)?)?;
     m.add_function(wrap_pyfunction!(context_fitter::batch_score_messages, m)?)?;
+    m.add_class::<trace_scanner::SessionStats>()?;
+    m.add_function(wrap_pyfunction!(trace_scanner::scan_usage_file, m)?)?;
+    m.add_function(wrap_pyfunction!(trace_scanner::scan_usage_files, m)?)?;
 
     Ok(())
 }

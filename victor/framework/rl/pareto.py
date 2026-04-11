@@ -45,6 +45,7 @@ class ParetoEntry:
     instance_scores: Dict[str, float] = field(default_factory=dict)
     coverage_count: int = 0  # Number of instances where this is best
     char_length: int = 0
+    token_count: int = 0  # Estimated token count for efficiency tracking
 
 
 class ParetoFrontier:
@@ -69,6 +70,7 @@ class ParetoFrontier:
         text: str,
         generation: int,
         instance_scores: Optional[Dict[str, float]] = None,
+        token_count: int = 0,
     ) -> bool:
         """Add a candidate to the pool. Returns True if it joins the frontier.
 
@@ -84,6 +86,7 @@ class ParetoFrontier:
             generation=generation,
             instance_scores=dict(scores),
             char_length=len(text),
+            token_count=token_count,
         )
 
         # Check if already present

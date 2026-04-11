@@ -46,6 +46,9 @@ serde = { version = "1.0", features = ["derive"] }
 # YAML parsing for workflow acceleration
 serde_yaml = "0.9"
 
+# Gzip decompression for usage.jsonl.gz trace scanning
+flate2 = "1.0"
+
 # Parallel processing
 rayon = "1.10"
 
