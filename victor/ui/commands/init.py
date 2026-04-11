@@ -221,6 +221,11 @@ def init(
     ),
 ) -> None:
     """Initialize project context and configuration."""
+    # Configure logging so init operations (LLM calls, graph analysis) go to victor.log
+    from victor.ui.commands.utils import setup_logging
+
+    setup_logging(command="init")
+
     # If wizard mode is requested, run the onboarding wizard instead
     if wizard:
         from victor.ui.commands.onboarding import run_onboarding
