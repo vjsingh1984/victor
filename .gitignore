@@ -238,3 +238,10 @@ victor-dataanalysis/
 victor-devops/
 victor-rag/
 victor-research/
+
+# Scratch / temp files
+*.bak
+*.orig
+*.tmp
+hello.txt
+answer.txt
