@@ -180,7 +180,7 @@ class StreamingChatCoordinator:
         # Prioritize by stage
         tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
-        # TEMPORARY: log which tools and metadata are sent to the LLM
+        # Log tool definitions sent to LLM (permanent, INFO level)
         if tools:
             tool_summaries = [
                 f"{t.name}: {(t.description or '')[:80]}" for t in tools

@@ -636,7 +636,7 @@ class SystemPromptBuilder:
             if examples:
                 base_prompt = f"{base_prompt}\n\n{examples}"
 
-        # TEMPORARY: log system prompt sections that tell the LLM about tools
+        # Log system prompt composition sent to LLM
         logger.info(
             "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
             "tool_guidance_len=%d prompt_total_len=%d",

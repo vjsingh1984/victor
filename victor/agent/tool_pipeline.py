@@ -1631,7 +1631,7 @@ class ToolPipeline:
                 logger.warning(f"on_tool_start callback failed: {e}")
 
         # Execute with per-tool timeout
-        # TEMPORARY: info log to see what flows to the LLM
+        # Log tool call sent to LLM
         logger.info(
             "[ToolCall→LLM] Executing tool=%s args=%s",
             tool_name,
@@ -1677,7 +1677,7 @@ class ToolPipeline:
             code_validation_errors=code_validation_errors,
         )
 
-        # TEMPORARY: info log to see what result flows back to LLM
+        # Log tool result returned to LLM
         result_preview = str(exec_result.result)[:500] if exec_result.result else "(empty)"
         logger.info(
             "[ToolResult→LLM] tool=%s success=%s time=%.0fms result_preview=%s",
