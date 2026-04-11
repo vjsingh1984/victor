@@ -2973,135 +2973,73 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.
 
-        Thin facade that delegates validation and normalization to
-        ToolCoordinator, keeping state mutations and message injection local.
+        Delegates execution to ToolPipeline (which provides retry, caching,
+        parallel execution, middleware, deduplication), then applies
+        orchestrator-only post-processing: state mutations, conversation
+        injection, output formatting, and GEPA trace enrichment.
 
         Args:
             tool_calls: List of tool call requests
+
+        Returns:
+            List of result dicts with keys: name, success, elapsed, args,
+            error, follow_up_suggestions.
         """
         if not tool_calls:
             return []
 
+        # Delegate execution to ToolPipeline
+        pipeline_result = await self._tool_pipeline.execute_tool_calls(
+            tool_calls=tool_calls,
+            context=self._get_tool_context(),
+        )
+
+        # Sync budget from pipeline
+        self.tool_calls_used = self._tool_pipeline.calls_used
+
+        # Post-process each result (orchestrator-only concerns)
         results: List[Dict[str, Any]] = []
-        warn_icon = self._presentation.icon("warning", with_color=False)
-
-        for tool_call in tool_calls:
-            # --- Validate via ToolCoordinator ---
-            validation = self._tool_coordinator.validate_tool_call(
-                tool_call, self.sanitizer, is_tool_enabled_fn=self.is_tool_enabled
-            )
-            if not validation.valid:
-                if validation.skip_reason:
-                    self.console.print(f"[yellow]{warn_icon} {validation.skip_reason}[/]")
-                if validation.error_result:
-                    results.append(validation.error_result)
+        for call_result in pipeline_result.results:
+            if call_result.skipped:
                 continue
 
-            # --- Budget check (reads orchestrator state) ---
-            if self.tool_calls_used >= self.tool_budget:
-                self.console.print(
-                    f"[yellow]{warn_icon} Tool budget reached ({self.tool_budget}); skipping remaining tool calls.[/]"
-                )
-                break
+            tool_name = call_result.tool_name
+            normalized_args = call_result.arguments or {}
+            output = call_result.result
+            success = call_result.success
+            error_msg = call_result.error
+            elapsed_ms = call_result.execution_time_ms
 
-            original_tool_name = validation.original_name
-            tool_name = validation.canonical_name
-
-            # --- Normalize via ToolCoordinator ---
-            norm = self._tool_coordinator.normalize_arguments_full(
-                tool_name,
-                original_tool_name,
-                tool_call.get("arguments", {}),
-                self.argument_normalizer,
-                self.tool_adapter,
-                failed_signatures=self.failed_tool_signatures,
-            )
-            normalized_args = norm.args
-
-            # Skip repeated failing calls (suppress from user output)
-            if norm.is_repeated_failure:
-                logger.debug(
-                    "Skipping repeated failing call to '%s' with same arguments",
-                    tool_name,
-                )
-                continue
-
-            # Log normalization if applied (debug-only, not user-facing)
-            if norm.strategy != NormalizationStrategy.DIRECT:
-                logger.debug(
-                    "Applied %s normalization to %s arguments",
-                    norm.strategy.value,
-                    tool_name,
-                )
-
-            # --- Execution (uses orchestrator context) ---
-            self.usage_logger.log_event(
-                "tool_call", {"tool_name": tool_name, "tool_args": normalized_args}
-            )
-            # TEMPORARY: log tool call metadata sent to LLM
-            import json as _json
-
-            logger.info(
-                "[ToolCall→LLM] tool=%s args=%s",
-                tool_name,
-                _json.dumps(normalized_args, default=str)[:500],
-            )
-
-            start = time.monotonic()
-
-            context = self._get_tool_context()
-
-            exec_result = await self.tool_executor.execute(
-                tool_name=tool_name,
-                arguments=normalized_args,
-                context=context,
-                skip_normalization=True,
-            )
-            success = exec_result.success
-            error_msg = exec_result.error
+            # --- State mutations (orchestrator-local) ---
+            self.executed_tools.append(tool_name)
+            if tool_name == "read" and "path" in normalized_args:
+                self.observed_files.add(str(normalized_args.get("path")))
 
             # Reset activity timer
             if hasattr(self, "_current_stream_context") and self._current_stream_context:
                 self._current_stream_context.reset_activity_timer()
 
-            # --- State updates (orchestrator-local) ---
-            self.tool_calls_used += 1
-            self.executed_tools.append(tool_name)
-            if tool_name == "read" and "path" in normalized_args:
-                self.observed_files.add(str(normalized_args.get("path")))
-
             # Reset continuation/input prompts on successful tool call
-            if hasattr(self, "_continuation_prompts") and self._continuation_prompts > 0:
-                logger.debug(
-                    f"Resetting continuation prompts counter (was {self._continuation_prompts}) after successful tool call"
-                )
-                self._continuation_prompts = 0
-                if hasattr(self, "_tool_calls_at_continuation_start"):
-                    self._tool_calls_at_continuation_start = self.tool_calls_used
-            if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:
-                logger.debug(
-                    f"Resetting asking input prompts counter (was {self._asking_input_prompts}) after successful tool call"
-                )
-                self._asking_input_prompts = 0
+            if success:
+                if hasattr(self, "_continuation_prompts") and self._continuation_prompts > 0:
+                    self._continuation_prompts = 0
+                    if hasattr(self, "_tool_calls_at_continuation_start"):
+                        self._tool_calls_at_continuation_start = self.tool_calls_used
+                if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:
+                    self._asking_input_prompts = 0
 
-            elapsed_ms = (time.monotonic() - start) * 1000
-
-            error_type = (
-                type(exec_result.error).__name__ if exec_result.error and not success else None
-            )
+            # --- Analytics ---
+            error_type = type(error_msg).__name__ if error_msg and not success else None
             self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
             self.conversation_state.record_tool_execution(tool_name, normalized_args)
 
             result_dict = {"success": success}
-            if hasattr(exec_result, "result") and exec_result.result:
-                result_dict["result"] = exec_result.result
+            if output is not None:
+                result_dict["result"] = output
             self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
 
-            # --- Result formatting + conversation injection ---
-            output = exec_result.result if success else None
+            # --- Semantic failure detection ---
             follow_up_suggestions = None
-
-            # Check for semantic failure
             semantic_success = success
             if success and isinstance(output, dict) and output.get("success") is False:
                 semantic_success = False
@@ -3115,7 +3053,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             error_display = None if semantic_success else (error_msg or "Unknown error")
 
-            # Set duration context for trace enricher (GEPA ASI)
+            # --- GEPA ASI trace enrichment ---
             if hasattr(self.usage_logger, "set_duration_context"):
                 self.usage_logger.set_duration_context(elapsed_ms)
 
@@ -3129,61 +3067,50 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 },
             )
 
-            # TEMPORARY: log tool result sent back to LLM
-            result_preview = str(output)[:300] if output else "(empty)"
-            logger.info(
-                "[ToolResult→LLM] tool=%s success=%s time=%.0fms result=%s",
-                tool_name,
-                semantic_success,
-                elapsed_ms,
-                result_preview,
-            )
-
+            # --- Conversation injection ---
             if semantic_success:
-                logger.debug(f"Tool {tool_name} executed successfully ({elapsed_ms:.0f}ms)")
                 formatted_output = self._format_tool_output(tool_name, normalized_args, output)
-                output_preview = str(output)[:500] if output else "<empty>"
-                if len(str(output)) > 500:
-                    output_preview += f"... [truncated, total {len(str(output))} chars]"
-                logger.debug(f"Tool '{tool_name}' actual output:\n{output_preview}")
-
                 self.add_message("user", formatted_output)
                 results.append(
                     {
                         "name": tool_name,
                         "success": True,
-                        "elapsed": time.monotonic() - start,
+                        "elapsed": elapsed_ms / 1000,
                         "args": normalized_args,
                         "follow_up_suggestions": follow_up_suggestions,
                     }
                 )
             else:
-                self.failed_tool_signatures.add(norm.signature)
-                # Only show "Tool not found" errors once per tool name
+                # Track failed signature for dedup
+                sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
+                self.failed_tool_signatures.add(sig)
+
+                # User-facing error (deduplicated)
                 _not_found = "not found" in str(error_display).lower()
                 _shown_key = f"notfound:{tool_name}" if _not_found else None
-                if _shown_key and _shown_key in self._shown_tool_errors:
-                    logger.debug("Suppressed repeated '%s' error display", tool_name)
-                else:
+                if not (_shown_key and _shown_key in self._shown_tool_errors):
                     if _shown_key and len(self._shown_tool_errors) < 500:
                         self._shown_tool_errors.add(_shown_key)
                     self.console.print(
-                        f"[red]{self._presentation.icon('error', with_color=False)} Tool execution failed: {error_display}[/] [dim]({elapsed_ms:.0f}ms)[/dim]"
+                        f"[red]{self._presentation.icon('error', with_color=False)} "
+                        f"Tool execution failed: {error_display}[/] "
+                        f"[dim]({elapsed_ms:.0f}ms)[/dim]"
                     )
 
                 error_output = output if isinstance(output, dict) else {"error": error_display}
-                formatted_error = self._format_tool_output(tool_name, normalized_args, error_output)
+                formatted_error = self._format_tool_output(
+                    tool_name, normalized_args, error_output
+                )
                 self.add_message("user", formatted_error)
-                logger.debug(f"Sent error feedback to model for {tool_name}: {error_display}")
-
                 results.append(
                     {
                         "name": tool_name,
                         "success": False,
-                        "elapsed": time.monotonic() - start,
+                        "elapsed": elapsed_ms / 1000,
                         "error": error_display,
                     }
                 )
+
         return results
 
     def _get_tool_context(self) -> dict:
