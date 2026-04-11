@@ -1205,4 +1205,24 @@ def _show_compliance_scorecard() -> None:
 
     console.print(f"\n")
     console.print(table)
+
+    # Efficiency scaling: tool calls per session over time
+    session_tools = []
+    for sid, evts in sessions.items():
+        tc = sum(1 for e in evts if e.get("event_type") == "tool_call")
+        if tc > 0:
+            session_tools.append(tc)
+
+    if len(session_tools) >= 4:
+        first_half = session_tools[: len(session_tools) // 2]
+        second_half = session_tools[len(session_tools) // 2 :]
+        avg_first = sum(first_half) / len(first_half)
+        avg_second = sum(second_half) / len(second_half)
+        delta = avg_second - avg_first
+        direction = "↓" if delta < 0 else "↑" if delta > 0 else "="
+        console.print(
+            f"[dim]Efficiency: {avg_first:.0f} → {avg_second:.0f} tools/session "
+            f"({direction}{abs(delta):.0f}) across {len(session_tools)} sessions[/]"
+        )
+
     console.print(f"[dim]Based on {len(events):,} events across {total_sessions} sessions[/]")

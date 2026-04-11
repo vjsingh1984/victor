@@ -100,8 +100,17 @@ class PromptCandidate:
     sample_count: int = 0
 
     def sample(self) -> float:
-        """Thompson Sampling: draw from Beta distribution."""
-        return random.betavariate(max(self.alpha, 0.01), max(self.beta_val, 0.01))
+        """Thompson Sampling: draw from Beta distribution with staleness decay.
+
+        Candidates with many samples have their posteriors slightly decayed
+        toward uncertainty (0.5), giving newer candidates a fair chance.
+        Decay factor: 0.95^(samples/20) — halves certainty after ~280 samples.
+        """
+        decay = 0.95 ** (self.sample_count / 20.0)
+        # Decay posteriors toward prior (1,1) — increases uncertainty
+        eff_alpha = 1.0 + (self.alpha - 1.0) * decay
+        eff_beta = 1.0 + (self.beta_val - 1.0) * decay
+        return random.betavariate(max(eff_alpha, 0.01), max(eff_beta, 0.01))
 
     def update(self, success: bool) -> None:
         """Update Beta posteriors."""
@@ -666,6 +675,28 @@ class PromptOptimizerLearner(BaseLearner):
         self._candidates.setdefault(key, []).append(candidate)
         self._save_candidate(candidate)
 
+        # Prune: keep only top N candidates per section (by mean score)
+        MAX_CANDIDATES_PER_SECTION = 10
+        section_candidates = self._candidates.get(key, [])
+        if len(section_candidates) > MAX_CANDIDATES_PER_SECTION:
+            # Keep the highest-mean candidates
+            section_candidates.sort(key=lambda c: -c.mean)
+            pruned = section_candidates[MAX_CANDIDATES_PER_SECTION:]
+            self._candidates[key] = section_candidates[:MAX_CANDIDATES_PER_SECTION]
+            # Remove pruned from DB
+            from victor.core.schema import Tables
+            for p_candidate in pruned:
+                try:
+                    self.db.execute(
+                        f"DELETE FROM {Tables.AGENT_PROMPT_CANDIDATE} WHERE text_hash = ?",
+                        (p_candidate.text_hash,),
+                    )
+                except Exception:
+                    pass
+            self.db.commit()
+            logger.info("Pruned %d candidates from %s (kept top %d)",
+                       len(pruned), key, MAX_CANDIDATES_PER_SECTION)
+
         # GEPA v2: Add to Pareto frontier
         if self._use_pareto:
             if section_name not in self._pareto_frontiers:
@@ -818,24 +849,36 @@ class PromptOptimizerLearner(BaseLearner):
             except Exception:
                 continue
 
-        # Convert to ExecutionTrace objects (most recent first)
+        # Convert to ExecutionTrace objects with quality scoring
+        # Quality filter: skip sessions with < 2 tool calls (likely API errors)
         for sid, data in list(sessions.items())[-limit:]:
-            if data["tool_calls"] > 0:
-                has_failures = bool(data["failures"])
-                traces.append(
-                    ExecutionTrace(
-                        session_id=sid,
-                        task_type=data["task_type"],
-                        provider=data.get("provider", "unknown"),
-                        model=data.get("model", "unknown"),
-                        tool_calls=data["tool_calls"],
-                        tool_failures=data["failures"],
-                        success=not has_failures,
-                        completion_score=0.5 if has_failures else 0.8,
-                        tokens_used=data.get("tokens", 0),
-                    )
-                )
+            if data["tool_calls"] < 2:
+                continue  # Skip trivially broken sessions
 
+            total_failures = sum(data["failures"].values())
+            total_calls = data["tool_calls"]
+            failure_rate = total_failures / max(total_calls, 1)
+
+            # Quality-based completion score (not just binary)
+            # Low failure rate = high quality trace, worth learning from
+            completion_score = max(0.0, 1.0 - failure_rate * 1.5)
+
+            traces.append(
+                ExecutionTrace(
+                    session_id=sid,
+                    task_type=data["task_type"],
+                    provider=data.get("provider", "unknown"),
+                    model=data.get("model", "unknown"),
+                    tool_calls=total_calls,
+                    tool_failures=data["failures"],
+                    success=failure_rate < 0.3,
+                    completion_score=completion_score,
+                    tokens_used=data.get("tokens", 0),
+                )
+            )
+
+        # Sort by quality — high-quality traces first for GEPA reflection
+        traces.sort(key=lambda t: -t.completion_score)
         return traces
 
     @staticmethod

@@ -83,18 +83,29 @@ class MIPROv2Strategy:
         return f"{current_text}\n\n{reflection}"
 
     def _select_diverse(self, traces: List[Any]) -> List[Any]:
-        """Select diverse examples covering different failure categories."""
+        """Select diverse examples covering different task types AND failure patterns.
+
+        Ensures examples span: different task_types, different recovery
+        patterns (clean success vs recovered from file_not_found vs
+        recovered from edit_mismatch). This teaches models multiple
+        successful approaches, not just one repeated pattern.
+        """
         if not self._diversity or len(traces) <= self._max_examples:
             return traces[: self._max_examples]
 
         selected = []
-        seen_types = set()
+        seen_keys = set()
 
         for trace in traces:
             task_type = getattr(trace, "task_type", "default")
-            if task_type not in seen_types or len(selected) < self._max_examples:
+            # Diversity key: task_type + failure category (if recovered)
+            failures = getattr(trace, "tool_failures", {})
+            recovery = next(iter(failures.keys()), "clean") if failures else "clean"
+            diversity_key = f"{task_type}::{recovery}"
+
+            if diversity_key not in seen_keys or len(selected) < self._max_examples:
                 selected.append(trace)
-                seen_types.add(task_type)
+                seen_keys.add(diversity_key)
                 if len(selected) >= self._max_examples:
                     break
 
