@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-rag"
-version = "0.5.7"
+version = "0.7.0"
 description = "RAG vertical for Victor AI - Document ingestion, vector search, and knowledge management"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -37,7 +37,7 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "victor-ai>=0.6.0,<1.0",
+    "victor-ai>=0.7.0,<1.0",
     "chromadb>=0.4.0",
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
