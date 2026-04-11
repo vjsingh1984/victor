@@ -31,7 +31,7 @@ flowchart TB
         MORE_CFG["+ 5 more groups"]
     end
 
-    subgraph Providers["PROVIDERS (22)"]
+    subgraph Providers["PROVIDERS (24)"]
         ANT["Anthropic"]
         OAI["OpenAI"]
         GGL["Google"]
@@ -100,7 +100,7 @@ flowchart TB
 | **AgentOrchestrator** | Conversation loop, tool routing, provider calls; delegates to service layer when `USE_SERVICE_LAYER` flag enabled | `victor/agent/orchestrator.py` |
 | **Service Layer** | 6 focused services (Chat, Tool, Context, Provider, Recovery, Session) behind feature flags | `victor/agent/services/` |
 | **Config** | Settings stratified into 7 nested groups (Provider, Tool, Search, Resilience, Security, Event, Pipeline) | `victor/config/settings.py` |
-| **Providers** | LLM I/O, auth, retry, streaming (22 backends) | `victor/providers/` |
+| **Providers** | LLM I/O, auth, retry, streaming (24 backends) | `victor/providers/` |
 | **Tools** | 33 tool modules across 9 categories | `victor/framework/tools.py` |
 | **StateGraph** | Typed-state execution engine with checkpointing | `victor/framework/graph.py` |
 | **WorkflowEngine** | YAML-to-StateGraph compiler | `victor/framework/workflow_engine.py` |
@@ -137,7 +137,7 @@ flowchart TB
 | **Facade pattern** | Orchestrator is a thin coordinator; delegates to services or coordinators |
 | **Protocol-based interfaces** | Python Protocols for ISP compliance (`VictorPlugin`, `VerticalBase`, `ChunkingStrategy`, etc.) |
 | **Stratified configuration** | 268 settings grouped into 7 typed nested models; flat access preserved for backward compat |
-| **Provider agnosticism** | 22 backends behind a unified interface; switch mid-conversation |
+| **Provider agnosticism** | 24 backends behind a unified interface; switch mid-conversation |
 | **Opt-in complexity** | Simple `agent.run()` by default; workflows, teams, plugins when needed |
 | **Air-gapped capable** | Full functionality with local models (Ollama, LM Studio, vLLM) |
 | **Dynamic CLI Discovery** | Subcommands discovered from plugins at runtime; no static imports in core CLI |
