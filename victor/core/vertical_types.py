@@ -589,23 +589,26 @@ class TieredToolTemplate:
     # Standard mandatory tools - essential for any task across all verticals
     DEFAULT_MANDATORY: Set[str] = {"read", "ls", "grep"}
 
-    # Pre-configured vertical cores (built-in defaults)
-    VERTICAL_CORES: Dict[str, Set[str]] = {
+    # Legacy built-in defaults — verticals should register via register_vertical_tools()
+    # These remain as migration fallbacks and will emit deprecation warnings.
+    _LEGACY_CORES: Dict[str, Set[str]] = {
         "coding": {"edit", "write", "shell", "git", "search", "overview"},
         "research": {"web_search", "web_fetch", "overview"},
         "devops": {"shell", "git", "docker", "overview"},
         "data_analysis": {"shell", "write", "overview"},
         "rag": {"rag_search", "rag_query", "rag_list", "rag_stats", "rag_delete"},
     }
-
-    # Vertical-specific readonly_only_for_analysis settings (built-in defaults)
-    VERTICAL_READONLY_DEFAULTS: Dict[str, bool] = {
-        "coding": False,  # Coding often needs write tools
-        "research": True,  # Research is primarily reading
-        "devops": False,  # DevOps needs execution tools
-        "data_analysis": False,  # Data analysis often writes results
-        "rag": True,  # RAG is primarily reading/retrieval
+    _LEGACY_READONLY: Dict[str, bool] = {
+        "coding": False,
+        "research": True,
+        "devops": False,
+        "data_analysis": False,
+        "rag": True,
     }
+
+    # Backward-compat aliases (deprecated)
+    VERTICAL_CORES = _LEGACY_CORES
+    VERTICAL_READONLY_DEFAULTS = _LEGACY_READONLY
 
     # Dynamic registry for vertical tool configs (OCP extension point)
     # Verticals register via register_vertical_tools() at activation time.
@@ -683,13 +686,22 @@ class TieredToolTemplate:
                 readonly_only_for_analysis=reg.get("readonly_for_analysis", True),
             )
 
-        # Fall back to built-in defaults
-        if vertical not in cls.VERTICAL_CORES:
+        # Fall back to legacy built-in defaults (deprecated)
+        if vertical not in cls._LEGACY_CORES:
             return None
 
+        import warnings
+
+        warnings.warn(
+            f"Vertical '{vertical}' is using legacy hardcoded tool defaults. "
+            f"Verticals should register tools via register_vertical_tools() "
+            f"during activation. Legacy defaults will be removed in v1.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return cls.create(
-            vertical_core=cls.VERTICAL_CORES[vertical].copy(),
-            readonly_only_for_analysis=cls.VERTICAL_READONLY_DEFAULTS.get(vertical, True),
+            vertical_core=cls._LEGACY_CORES[vertical].copy(),
+            readonly_only_for_analysis=cls._LEGACY_READONLY.get(vertical, True),
         )
 
     @classmethod

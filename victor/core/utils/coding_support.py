@@ -1,152 +1,175 @@
 """Compatibility helpers for extracted coding-package integrations.
 
 These helpers centralize the migration bridge from legacy in-tree coding
-modules to the extracted ``victor-coding`` package so runtime/UI surfaces do
-not duplicate fallback import logic.
+modules to the extracted ``victor-coding`` package. Discovery is done via
+entry points and importlib — core never imports ``victor_coding`` directly.
 
-Note: These functions are the only place in core that imports from
-victor_coding directly. All imports are lazy (inside functions) and
-wrapped in try/except with fallback chains. Core functions correctly
-without victor-coding installed.
+Discovery chain for each capability:
+1. Entry point: ``victor.sdk.capabilities`` group (registered by victor-coding)
+2. Importlib: Try ``victor_coding.*`` via importlib.import_module (no static import)
+3. Legacy: Try ``victor.verticals.contrib.coding.*`` fallback
+4. Raise ImportError with helpful message
 """
 
 from __future__ import annotations
 
+import importlib
+import logging
 from types import ModuleType
 from typing import Callable, TypeVar, cast
 
+logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 
-def _load_extracted_codebase_analyzer() -> ModuleType:
-    """Load the extracted analyzer from victor-coding."""
-
-    from victor_coding import codebase_analyzer as module
-
-    return module
+def _try_import(module_path: str) -> ModuleType:
+    """Import a module by dotted path. Raises ImportError on failure."""
+    return importlib.import_module(module_path)
 
 
-def _load_legacy_codebase_analyzer() -> ModuleType:
-    """Load the legacy in-tree analyzer as a compatibility fallback."""
+def _try_entry_point(group: str, name: str) -> object:
+    """Load a named entry point from a group. Returns None if not found."""
+    try:
+        from victor.framework.entry_point_registry import get_entry_point
 
-    from victor.verticals.contrib.coding import codebase_analyzer as module
+        return get_entry_point(group, name)
+    except Exception:
+        return None
 
-    return module
 
+# ---------------------------------------------------------------------------
+# Codebase Analyzer
+# ---------------------------------------------------------------------------
 
-_CODEBASE_ANALYZER_LOADERS = (
-    _load_extracted_codebase_analyzer,
-    _load_legacy_codebase_analyzer,
+_CODEBASE_ANALYZER_MODULES = (
+    "victor_coding.codebase_analyzer",
+    "victor.verticals.contrib.coding.codebase_analyzer",
 )
 
 
 def load_codebase_analyzer_module() -> ModuleType:
-    """Load the extracted codebase analyzer module, with legacy fallback."""
+    """Load the codebase analyzer module via discovery chain.
 
-    last_error: ImportError | None = None
-    for loader in _CODEBASE_ANALYZER_LOADERS:
+    Discovery order:
+    1. Entry point ``victor.sdk.capabilities::codebase_analyzer``
+    2. ``victor_coding.codebase_analyzer`` via importlib
+    3. Legacy ``victor.verticals.contrib.coding.codebase_analyzer``
+    """
+    # Try entry point first
+    ep = _try_entry_point("victor.sdk.capabilities", "codebase_analyzer")
+    if ep is not None and hasattr(ep, "__module__"):
         try:
-            module = loader()
+            return importlib.import_module(ep.__module__)
+        except ImportError:
+            pass
+
+    # Try module paths
+    last_error: ImportError | None = None
+    for module_path in _CODEBASE_ANALYZER_MODULES:
+        try:
+            return _try_import(module_path)
         except ImportError as exc:
             last_error = exc
             continue
-        return module
 
     raise ImportError(
-        "codebase_analyzer requires the victor-coding package to expose "
-        "'victor_coding.codebase_analyzer'"
+        "codebase_analyzer requires the victor-coding package. "
+        "Install with: pip install victor-coding"
     ) from last_error
 
 
 def load_codebase_analyzer_attr(name: str) -> object:
-    """Resolve a single analyzer export and raise ``ImportError`` when unavailable."""
-
+    """Resolve a single analyzer export and raise ImportError when unavailable."""
     module = load_codebase_analyzer_module()
     try:
         return getattr(module, name)
     except AttributeError as exc:
-        raise ImportError(f"codebase_analyzer does not expose required symbol '{name}'") from exc
+        raise ImportError(
+            f"codebase_analyzer does not expose required symbol '{name}'"
+        ) from exc
 
 
-def _load_extracted_tree_sitter_manager() -> ModuleType:
-    """Load the extracted tree-sitter manager from victor-coding."""
+# ---------------------------------------------------------------------------
+# Tree-Sitter Manager
+# ---------------------------------------------------------------------------
 
-    from victor_coding.codebase import tree_sitter_manager as module
-
-    return module
-
-
-def _load_legacy_tree_sitter_manager() -> ModuleType:
-    """Load the legacy in-tree tree-sitter manager as a compatibility fallback."""
-
-    from victor.verticals.contrib.coding.codebase import tree_sitter_manager as module
-
-    return module
-
-
-_TREE_SITTER_MANAGER_LOADERS = (
-    _load_extracted_tree_sitter_manager,
-    _load_legacy_tree_sitter_manager,
-)
-
-
-def _load_extracted_analyze_command_app() -> object:
-    """Load the extracted coding analyze CLI app from victor-coding."""
-
-    from victor_coding.commands.analyze import app as analyze_app
-
-    return analyze_app
-
-
-def _load_legacy_analyze_command_app() -> object:
-    """Load the legacy in-tree coding analyze CLI app as a compatibility fallback."""
-
-    from victor.verticals.contrib.coding.commands.analyze import app as analyze_app
-
-    return analyze_app
-
-
-_ANALYZE_COMMAND_APP_LOADERS = (
-    _load_extracted_analyze_command_app,
-    _load_legacy_analyze_command_app,
+_TREE_SITTER_MODULES = (
+    "victor_coding.codebase.tree_sitter_manager",
+    "victor.verticals.contrib.coding.codebase.tree_sitter_manager",
 )
 
 
 def load_tree_sitter_get_parser() -> Callable[[str], object]:
-    """Resolve the canonical ``get_parser`` function for coding tree-sitter support."""
+    """Resolve the canonical get_parser function for tree-sitter support.
 
+    Discovery order:
+    1. Entry point ``victor.sdk.capabilities::tree_sitter``
+    2. ``victor_coding.codebase.tree_sitter_manager`` via importlib
+    3. Legacy ``victor.verticals.contrib.coding.codebase.tree_sitter_manager``
+    """
+    # Try entry point first
+    ep = _try_entry_point("victor.sdk.capabilities", "tree_sitter")
+    if ep is not None:
+        get_parser = getattr(ep, "get_parser", None)
+        if callable(get_parser):
+            return cast(Callable[[str], object], get_parser)
+
+    # Try module paths
     last_error: ImportError | None = None
-    for loader in _TREE_SITTER_MANAGER_LOADERS:
+    for module_path in _TREE_SITTER_MODULES:
         try:
-            module = loader()
+            module = _try_import(module_path)
         except ImportError as exc:
             last_error = exc
             continue
-
         get_parser = getattr(module, "get_parser", None)
         if callable(get_parser):
             return cast(Callable[[str], object], get_parser)
 
     raise ImportError(
-        "tree_sitter_manager requires the victor-coding package to expose "
-        "'victor_coding.codebase.tree_sitter_manager.get_parser'"
+        "tree_sitter_manager requires the victor-coding package. "
+        "Install with: pip install victor-coding"
     ) from last_error
 
 
-def load_coding_analyze_app() -> object:
-    """Resolve the coding analyze CLI app, with extracted-first fallback order."""
+# ---------------------------------------------------------------------------
+# Coding Analyze CLI App
+# ---------------------------------------------------------------------------
 
+_ANALYZE_APP_MODULES = (
+    "victor_coding.commands.analyze",
+    "victor.verticals.contrib.coding.commands.analyze",
+)
+
+
+def load_coding_analyze_app() -> object:
+    """Resolve the coding analyze CLI app.
+
+    Discovery order:
+    1. Entry point ``victor.commands::analyze``
+    2. ``victor_coding.commands.analyze`` via importlib
+    3. Legacy ``victor.verticals.contrib.coding.commands.analyze``
+    """
+    # Try entry point first
+    ep = _try_entry_point("victor.commands", "analyze")
+    if ep is not None:
+        return ep
+
+    # Try module paths
     last_error: ImportError | None = None
-    for loader in _ANALYZE_COMMAND_APP_LOADERS:
+    for module_path in _ANALYZE_APP_MODULES:
         try:
-            return loader()
+            module = _try_import(module_path)
         except ImportError as exc:
             last_error = exc
             continue
+        app = getattr(module, "app", None)
+        if app is not None:
+            return app
 
     raise ImportError(
-        "coding analyze command requires victor-coding to expose "
-        "'victor_coding.commands.analyze.app'"
+        "coding analyze command requires victor-coding. "
+        "Install with: pip install victor-coding"
     ) from last_error
 
 
