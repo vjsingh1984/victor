@@ -360,6 +360,12 @@ providers:
         include_dirs: List[str] = []
         exclude_dirs: List[str] = []
 
+        # When --force is used, skip interactive prompts and use "." (current dir)
+        if force and interactive:
+            interactive = False
+            include_dirs = [str(Path.cwd())]
+            console.print("[dim]Using current directory (.) for analysis (--force skips prompts)[/]")
+
         if interactive and not quick:
             console.print("\n[bold]Interactive Project Scoping[/]")
 
