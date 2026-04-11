@@ -698,6 +698,11 @@ _AUTO_DETECT_SPECS: list[dict[str, Any]] = [
         "import_path": "victor_coding.editing.editor:FileEditor",
         "label": "FileEditor",
     },
+    {
+        "protocol_attr": "TreeSitterParserProtocol",
+        "factory": "victor.core.utils.coding_support:_load_tree_sitter_provider",
+        "label": "TreeSitterParser",
+    },
 ]
 
 

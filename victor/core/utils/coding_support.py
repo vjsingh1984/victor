@@ -170,6 +170,28 @@ def load_coding_analyze_app() -> object:
     ) from last_error
 
 
+def _load_tree_sitter_provider() -> object:
+    """Factory for auto-detection: returns a TreeSitterParserProtocol-compatible object.
+
+    Used by _AUTO_DETECT_SPECS in bootstrap.py to replace NullTreeSitterParser.
+    Returns None if no tree-sitter provider is available.
+    """
+    _TREE_SITTER_MODULES = (
+        "victor_coding.codebase.tree_sitter_manager",
+        "victor.verticals.contrib.coding.codebase.tree_sitter_manager",
+    )
+    for module_path in _TREE_SITTER_MODULES:
+        try:
+            module = _try_import(module_path)
+            # The module itself satisfies TreeSitterParserProtocol
+            # (has get_parser() and get_supported_languages())
+            if hasattr(module, "get_parser"):
+                return module
+        except ImportError:
+            continue
+    return None
+
+
 __all__ = [
     "load_codebase_analyzer_module",
     "load_codebase_analyzer_attr",
