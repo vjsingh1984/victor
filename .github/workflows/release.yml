@@ -134,8 +134,9 @@ jobs:
           # Linux x64
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-          # Linux ARM64 - skipped (cross-compile needs zig/special setup)
-          # Users on ARM64 Linux can use pure Python wheel
+          # Linux ARM64 (Graviton, Ampere, Raspberry Pi 5)
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
           # macOS ARM64 (M1/M2/M3)
           - os: macos-latest
             target: aarch64-apple-darwin
@@ -619,7 +620,7 @@ jobs:
           | macOS | ARM64 (M1/M2/M3) | \`victor-macos-arm64.tar.gz\` |
           | macOS | x64 (Intel) | \`victor-macos-x64.tar.gz\` |
           | Windows | x64 | \`victor-windows-x64.zip\` |
-          | Linux | Any | Use \`pip install victor-ai\` |
+          | Linux | x64 / ARM64 | Use \`pip install victor-ai\` (native wheels available) |
 
           ## Verification
 
