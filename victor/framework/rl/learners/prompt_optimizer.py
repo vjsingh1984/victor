@@ -548,7 +548,26 @@ class PromptOptimizerLearner(BaseLearner):
         if not candidates:
             return None
 
-        # Thompson Sampling: sample from each candidate's Beta distribution
+        # Hybrid: if Pareto enabled, restrict Thompson to frontier candidates
+        if self._use_pareto:
+            key = self._candidate_key(section_name, provider or "default")
+            frontier = self._pareto_frontiers.get(key)
+            if frontier:
+                frontier_hashes = {e.text_hash for e in frontier.get_frontier()}
+                if frontier_hashes:
+                    frontier_candidates = [
+                        c for c in candidates if c.text_hash in frontier_hashes
+                    ]
+                    if frontier_candidates:
+                        candidates = frontier_candidates
+                        logger.debug(
+                            "Pareto frontier filtered %d → %d candidates for %s",
+                            len(candidates) + len(frontier_candidates),
+                            len(frontier_candidates),
+                            section_name,
+                        )
+
+        # Thompson Sampling: sample from (frontier) candidates' Beta distributions
         best = max(candidates, key=lambda c: c.sample())
         confidence = min(best.sample_count / (MIN_SAMPLES_FOR_CONFIDENCE * 2), 1.0)
 
@@ -704,6 +723,45 @@ class PromptOptimizerLearner(BaseLearner):
             self.db.commit()
         except Exception as e:
             logger.warning("Failed to save prompt candidate: %s", e)
+
+    def seed_from_evaluations(self, eval_dir: Optional[Path] = None) -> int:
+        """Load evaluation results and update Pareto instance scores.
+
+        Reads eval_swe_bench_*.json files and updates each frontier
+        candidate's per-instance scores for multi-objective selection.
+
+        Returns:
+            Number of instance scores updated
+        """
+        if not self._use_pareto:
+            return 0
+
+        if eval_dir is None:
+            eval_dir = Path.home() / ".victor" / "evaluations"
+
+        import glob as _glob
+
+        updated = 0
+        for eval_file in sorted(_glob.glob(str(eval_dir / "eval_swe_bench_*.json"))):
+            try:
+                with open(eval_file) as f:
+                    data = json.load(f)
+                model = data.get("config", {}).get("model", "unknown")
+                for task in data.get("tasks", []):
+                    instance_id = f"{task['task_id']}::{model}"
+                    score = 1.0 if task.get("status") == "passed" else 0.0
+                    for frontier in self._pareto_frontiers.values():
+                        for entry in frontier.get_frontier():
+                            frontier.update_instance_score(
+                                entry.text_hash, instance_id, score
+                            )
+                            updated += 1
+            except Exception:
+                continue
+
+        if updated:
+            logger.info("Seeded %d Pareto instance scores from evaluations", updated)
+        return updated
 
     def _collect_traces(self, limit: int = 50) -> List[ExecutionTrace]:
         """Collect execution traces from usage.jsonl files."""

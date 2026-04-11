@@ -919,3 +919,206 @@ def show_capabilities() -> None:
         table.add_row(*row)
 
     console.print(table)
+
+
+@benchmark_app.command("evolve")
+def evolve_prompts(
+    provider: str = typer.Option(
+        "all", "--provider", "-p", help="Provider to evolve (or 'all')"
+    ),
+    section: str = typer.Option(
+        "all", "--section", "-s", help="Section to evolve (or 'all')"
+    ),
+    compliance: bool = typer.Option(
+        False, "--compliance", help="Show GEPA compliance scorecard"
+    ),
+) -> None:
+    """Evolve prompts using GEPA + benchmark trace data.
+
+    Reads execution traces from usage.jsonl and evaluation results,
+    then evolves prompt sections using the configured strategy
+    (GEPA, MIPROv2, CoT distillation).
+
+    Examples:
+        victor benchmark evolve                 # Evolve all
+        victor benchmark evolve -p openai       # Evolve for OpenAI
+        victor benchmark evolve --compliance    # Show compliance
+    """
+    from rich.table import Table
+
+    try:
+        from victor.framework.rl.coordinator import get_rl_coordinator
+
+        coordinator = get_rl_coordinator()
+        learner = coordinator.get_learner("prompt_optimizer")
+        if learner is None:
+            console.print("[yellow]Prompt optimizer not available[/]")
+            return
+
+        from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
+        from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
+
+        sections = PromptOptimizerLearner.EVOLVABLE_SECTIONS
+        if section != "all":
+            matched = [s for s in sections if section.upper() in s]
+            sections = matched if matched else sections
+
+        providers = ["openai", "xai", "deepseek", "anthropic"]
+        if provider != "all":
+            providers = [provider]
+
+        section_text = {
+            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+            "GROUNDING_RULES": "",
+            "COMPLETION_GUIDANCE": "",
+            "FEW_SHOT_EXAMPLES": "",
+        }
+
+        results = Table(title="GEPA Evolution Results")
+        results.add_column("Provider", style="cyan")
+        results.add_column("Section", style="dim")
+        results.add_column("Gen", style="green")
+        results.add_column("Mean", style="bold")
+        results.add_column("Chars", style="dim")
+
+        for p in providers:
+            for s in sections:
+                current = section_text.get(s, "")
+                candidate = learner.evolve(s, current, provider=p)
+                if candidate:
+                    results.add_row(
+                        p, s[:20], str(candidate.generation),
+                        f"{candidate.mean:.2f}", str(len(candidate.text))
+                    )
+                else:
+                    results.add_row(p, s[:20], "-", "-", "[dim]no change[/]")
+
+        console.print(results)
+        metrics = learner.export_metrics()
+        console.print(f"\n[dim]Total candidates: {metrics['total_candidates']}[/]")
+
+    except Exception as e:
+        console.print(f"[red]Evolution failed:[/] {e}")
+        import traceback
+        console.print(traceback.format_exc())
+
+    if compliance:
+        _show_compliance_scorecard()
+
+
+def _show_compliance_scorecard() -> None:
+    """Show GEPA prompt compliance analysis from usage.jsonl traces."""
+    import gzip
+    import json
+    from collections import defaultdict
+    from pathlib import Path
+    from rich.table import Table
+
+    events = []
+    logs_dir = Path.home() / ".victor" / "logs"
+    for path in sorted(logs_dir.glob("usage.*.jsonl.gz")) + [logs_dir / "usage.jsonl"]:
+        if not path.exists():
+            continue
+        try:
+            opener = gzip.open if path.suffix == ".gz" else open
+            mode = "rt" if path.suffix == ".gz" else "r"
+            with opener(str(path), mode) as f:
+                for line in f:
+                    try:
+                        events.append(json.loads(line))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    sessions = defaultdict(list)
+    for e in events:
+        if e.get("event_type") in ("tool_call", "tool_result"):
+            sessions[e.get("session_id", "?")].append(e)
+
+    # Rule checks
+    total_sessions = len(sessions)
+    search_first = sum(
+        1
+        for evts in sessions.values()
+        if any(
+            e.get("data", {}).get("tool_name") == "code_search"
+            for e in evts
+            if e.get("event_type") == "tool_call"
+        )
+        and next(
+            (
+                e.get("data", {}).get("tool_name")
+                for e in evts
+                if e.get("event_type") == "tool_call"
+            ),
+            None,
+        )
+        == "code_search"
+    )
+
+    shell_total = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "shell"
+    )
+    shell_search = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "shell"
+        and any(
+            s in str(e.get("data", {}).get("tool_args", {}).get("cmd", "")).lower()
+            for s in ["grep ", "rg ", " ag "]
+        )
+    )
+
+    total_reads = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "read"
+    )
+    victor_reads = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "read"
+        and "victor" in str(e.get("data", {}).get("tool_args", {}).get("path", "")).lower()
+        and "swe_bench" not in str(e.get("data", {}).get("tool_args", {}))
+    )
+
+    cs_total = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "code_search"
+    )
+    cs_semantic = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "code_search"
+        and e.get("data", {}).get("tool_args", {}).get("mode", "semantic") == "semantic"
+    )
+
+    table = Table(title="GEPA Compliance Scorecard")
+    table.add_column("Rule", style="cyan")
+    table.add_column("Compliance", style="bold")
+    table.add_column("Target", style="dim")
+
+    rules = [
+        ("Search first", search_first * 100 // max(total_sessions, 1), 50),
+        ("No shell search", (shell_total - shell_search) * 100 // max(shell_total, 1) if shell_total else 100, 80),
+        ("No workspace contamination", (total_reads - victor_reads) * 100 // max(total_reads, 1), 95),
+        ("Semantic search preferred", cs_semantic * 100 // max(cs_total, 1) if cs_total else 100, 80),
+    ]
+
+    for name, pct, target in rules:
+        status = "[green]✓[/]" if pct >= target else "[yellow]⚠[/]" if pct >= target * 0.6 else "[red]✗[/]"
+        table.add_row(f"{status} {name}", f"{pct}%", f"{target}%")
+
+    console.print(f"\n")
+    console.print(table)
+    console.print(f"[dim]Based on {len(events):,} events across {total_sessions} sessions[/]")
