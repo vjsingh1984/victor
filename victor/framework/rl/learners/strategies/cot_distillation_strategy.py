@@ -18,7 +18,7 @@ approach that works for stronger models.
 """
 
 import logging
-from typing import Any, List, Optional
+from typing import Any, List
 
 logger = logging.getLogger(__name__)
 

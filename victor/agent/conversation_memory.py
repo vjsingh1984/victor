@@ -829,6 +829,39 @@ class ConversationStore:
         # Load caches
         self._load_lookup_caches(conn)
 
+        # Auto-maintenance: vacuum if fragmented, cleanup stale sessions
+        self._auto_maintenance()
+
+    def _auto_maintenance(self) -> None:
+        """Run lightweight maintenance on startup.
+
+        - Purge test model sessions and empty sessions
+        - Reclaim space if freelist exceeds threshold
+        """
+        _FREELIST_VACUUM_THRESHOLD = 100  # pages (~400KB at 4KB/page)
+
+        try:
+            # Cleanup stale/test sessions
+            self.cleanup_stale_sessions(
+                max_age_days=0,  # don't TTL on startup — only purge junk
+                purge_test_models=True,
+                purge_empty=True,
+            )
+
+            # Auto-vacuum if fragmented
+            with sqlite3.connect(self.db_path) as conn:
+                freelist = conn.execute(
+                    "PRAGMA freelist_count"
+                ).fetchone()[0]
+                if freelist > _FREELIST_VACUUM_THRESHOLD:
+                    conn.execute("PRAGMA incremental_vacuum")
+                    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                    logger.info(
+                        f"Auto-vacuum: reclaimed {freelist} free pages"
+                    )
+        except sqlite3.Error as e:
+            logger.debug(f"Auto-maintenance skipped: {e}")
+
     def _populate_lookup_tables(self, conn: sqlite3.Connection) -> None:
         """Populate lookup tables with predefined enum values."""
         # Model families
@@ -1104,9 +1137,11 @@ class ConversationStore:
         self._sessions[session_id] = session
         self._persist_session(session)
 
+        fam = model_family.value if model_family else "unknown"
+        sz = model_size.value if model_size else "unknown"
         logger.info(
-            f"Created session {session_id} for project: {project_path} "
-            f"[{model_family.value if model_family else 'unknown'}/{model_size.value if model_size else 'unknown'}]"
+            f"Created session {session_id} for project: "
+            f"{project_path} [{fam}/{sz}]"
         )
 
         return session
@@ -1415,6 +1450,93 @@ class ConversationStore:
             "freed_bytes": freed,
         }
 
+    # =========================================================================
+    # DATABASE CLEANUP
+    # =========================================================================
+
+    # Known test model names that should not exist in production DB
+    TEST_MODEL_NAMES = frozenset({
+        "test-model", "dummy", "fake", "dummy-model",
+        "specific-tool-model", "unknown-model",
+        "totally-unknown-model-xyz", "mock-model",
+        "test-provider-model", "gpt-oss:20b",
+    })
+
+    def cleanup_stale_sessions(
+        self,
+        max_age_days: int = 30,
+        purge_test_models: bool = True,
+        purge_empty: bool = True,
+    ) -> Dict[str, int]:
+        """Remove stale, test, and empty sessions from SQLite.
+
+        This prevents unbounded database growth from test artifacts,
+        abandoned sessions, and expired history.
+
+        Args:
+            max_age_days: Delete sessions older than this (0 = skip)
+            purge_test_models: Delete sessions with test model names
+            purge_empty: Delete sessions that have zero messages
+
+        Returns:
+            Dictionary with counts of deleted sessions by category
+        """
+        deleted = {"test_models": 0, "empty": 0, "stale": 0}
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("PRAGMA foreign_keys = ON")
+
+                # 1. Purge test model sessions
+                if purge_test_models:
+                    placeholders = ",".join(
+                        "?" * len(self.TEST_MODEL_NAMES)
+                    )
+                    cursor = conn.execute(
+                        f"DELETE FROM sessions WHERE model IN "
+                        f"({placeholders})",
+                        list(self.TEST_MODEL_NAMES),
+                    )
+                    deleted["test_models"] = cursor.rowcount
+
+                # 2. Purge empty sessions (no messages)
+                if purge_empty:
+                    cursor = conn.execute(
+                        "DELETE FROM sessions WHERE session_id NOT IN "
+                        "(SELECT DISTINCT session_id FROM messages)"
+                    )
+                    deleted["empty"] = cursor.rowcount
+
+                # 3. Purge sessions older than max_age_days
+                if max_age_days > 0:
+                    from datetime import timedelta
+
+                    cutoff = (
+                        datetime.now() - timedelta(days=max_age_days)
+                    ).isoformat()
+                    cursor = conn.execute(
+                        "DELETE FROM sessions "
+                        "WHERE last_activity < ?",
+                        (cutoff,),
+                    )
+                    deleted["stale"] = cursor.rowcount
+
+            total = sum(deleted.values())
+            if total > 0:
+                logger.info(
+                    f"Cleaned up {total} sessions: "
+                    f"{deleted['test_models']} test, "
+                    f"{deleted['empty']} empty, "
+                    f"{deleted['stale']} stale"
+                )
+                # Also clear in-memory caches for deleted sessions
+                self._sessions.clear()
+
+        except sqlite3.Error as e:
+            logger.warning(f"Session cleanup failed: {e}")
+
+        return deleted
+
     def get_database_stats(self) -> Dict[str, Any]:
         """Get database statistics including file size and record counts.
 
@@ -1470,170 +1592,6 @@ class ConversationStore:
             "last_activity": session.last_activity.isoformat(),
             "duration_seconds": (session.last_activity - session.created_at).total_seconds(),
         }
-
-    # =========================================================================
-    # ML/RL AGGREGATION METHODS
-    # Efficient GROUP BY queries on normalized FK columns for learning
-    # =========================================================================
-
-    def get_model_family_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get aggregated statistics by model family for RL feature extraction.
-
-        Returns:
-            Dictionary mapping model family names to their stats:
-            - session_count: Number of sessions
-            - total_messages: Total messages across sessions
-            - avg_tool_usage: Average tool calls per session
-            - avg_context_tokens: Average context window used
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT
-                    mf.name AS family_name,
-                    COUNT(s.session_id) AS session_count,
-                    AVG(s.context_tokens) AS avg_context_tokens,
-                    AVG(s.model_params_b) AS avg_params_b,
-                    SUM(CASE WHEN s.tool_capable THEN 1 ELSE 0 END) AS tool_capable_count
-                FROM sessions s
-                LEFT JOIN model_families mf ON s.model_family_id = mf.id
-                WHERE mf.name IS NOT NULL
-                GROUP BY mf.id
-                ORDER BY session_count DESC
-                """).fetchall()
-
-            result = {}
-            for row in rows:
-                result[row["family_name"]] = {
-                    "session_count": row["session_count"],
-                    "avg_context_tokens": row["avg_context_tokens"],
-                    "avg_params_b": row["avg_params_b"],
-                    "tool_capable_count": row["tool_capable_count"],
-                }
-            return result
-
-    def get_provider_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get aggregated statistics by provider for RL feature extraction.
-
-        Returns:
-            Dictionary mapping provider names to their stats
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT
-                    p.name AS provider_name,
-                    COUNT(s.session_id) AS session_count,
-                    COUNT(DISTINCT s.model) AS unique_models,
-                    SUM(CASE WHEN s.tool_capable THEN 1 ELSE 0 END) AS tool_capable_count,
-                    SUM(CASE WHEN s.is_moe THEN 1 ELSE 0 END) AS moe_count
-                FROM sessions s
-                LEFT JOIN providers p ON s.provider_id = p.id
-                WHERE p.name IS NOT NULL
-                GROUP BY p.id
-                ORDER BY session_count DESC
-                """).fetchall()
-
-            result = {}
-            for row in rows:
-                result[row["provider_name"]] = {
-                    "session_count": row["session_count"],
-                    "unique_models": row["unique_models"],
-                    "tool_capable_count": row["tool_capable_count"],
-                    "moe_count": row["moe_count"],
-                }
-            return result
-
-    def get_model_size_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get aggregated statistics by model size for RL feature extraction.
-
-        Returns:
-            Dictionary mapping size categories to their stats
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("""
-                SELECT
-                    ms.name AS size_name,
-                    COUNT(s.session_id) AS session_count,
-                    AVG(s.model_params_b) AS avg_params_b,
-                    AVG(s.context_tokens) AS avg_context_tokens,
-                    SUM(CASE WHEN s.is_reasoning THEN 1 ELSE 0 END) AS reasoning_count
-                FROM sessions s
-                LEFT JOIN model_sizes ms ON s.model_size_id = ms.id
-                WHERE ms.name IS NOT NULL
-                GROUP BY ms.id
-                ORDER BY ms.id
-                """).fetchall()
-
-            result = {}
-            for row in rows:
-                result[row["size_name"]] = {
-                    "session_count": row["session_count"],
-                    "avg_params_b": row["avg_params_b"],
-                    "avg_context_tokens": row["avg_context_tokens"],
-                    "reasoning_count": row["reasoning_count"],
-                }
-            return result
-
-    def get_rl_training_data(
-        self,
-        limit: int = 1000,
-        filter_tool_capable: Optional[bool] = None,
-    ) -> List[Dict[str, Any]]:
-        """Get session data formatted for RL training.
-
-        Returns a list of feature vectors suitable for reinforcement learning.
-        Uses INTEGER FK columns for efficient filtering.
-
-        Args:
-            limit: Maximum records to return
-            filter_tool_capable: Optional filter for tool-capable models only
-
-        Returns:
-            List of dictionaries with normalized feature vectors
-        """
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-
-            where_clause = ""
-            params: List[Any] = [limit]
-
-            if filter_tool_capable is not None:
-                where_clause = "WHERE s.tool_capable = ?"
-                params = [1 if filter_tool_capable else 0, limit]
-
-            rows = conn.execute(
-                f"""
-                SELECT
-                    s.session_id,
-                    p.name AS provider,
-                    mf.name AS model_family,
-                    ms.name AS model_size,
-                    cs.name AS context_size,
-                    s.model_params_b,
-                    s.context_tokens,
-                    s.tool_capable,
-                    s.is_moe,
-                    s.is_reasoning,
-                    -- FK IDs for efficient embedding lookup
-                    s.provider_id,
-                    s.model_family_id,
-                    s.model_size_id,
-                    s.context_size_id
-                FROM sessions s
-                LEFT JOIN providers p ON s.provider_id = p.id
-                LEFT JOIN model_families mf ON s.model_family_id = mf.id
-                LEFT JOIN model_sizes ms ON s.model_size_id = ms.id
-                LEFT JOIN context_sizes cs ON s.context_size_id = cs.id
-                {where_clause}
-                ORDER BY s.last_activity DESC
-                LIMIT ?
-                """,
-                params,
-            ).fetchall()
-
-            return [dict(row) for row in rows]
 
     # =========================================================================
     # Private Methods
@@ -1724,6 +1682,7 @@ class ConversationStore:
         1. Keep all CRITICAL priority messages
         2. Score remaining messages
         3. Keep highest scoring messages within budget
+        4. Delete pruned messages from SQLite to prevent unbounded growth
         """
         target_tokens = int((session.max_tokens - session.reserved_tokens) * 0.8)
 
@@ -1741,24 +1700,56 @@ class ConversationStore:
 
         # Select within budget
         kept = list(critical)
+        kept_ids = {m.id for m in kept}
         current_tokens = sum(m.token_count for m in kept)
 
         for msg, _ in scored_others:
             if current_tokens + msg.token_count <= target_tokens:
                 kept.append(msg)
+                kept_ids.add(msg.id)
                 current_tokens += msg.token_count
 
-        # Calculate pruned count
-        pruned_count = len(session.messages) - len(kept)
+        # Identify pruned messages and delete from SQLite
+        pruned_ids = [m.id for m in session.messages if m.id not in kept_ids]
+        pruned_count = len(pruned_ids)
+
+        if pruned_ids:
+            self._delete_messages_from_db(session.session_id, pruned_ids)
 
         # Update session
         session.messages = sorted(kept, key=lambda m: m.timestamp)
         session.current_tokens = current_tokens
 
         logger.info(
-            f"Pruned {pruned_count} messages. "
+            f"Pruned {pruned_count} messages (deleted from DB). "
             f"Remaining: {len(session.messages)}, Tokens: {current_tokens}"
         )
+
+    def _delete_messages_from_db(
+        self, session_id: str, message_ids: List[str]
+    ) -> None:
+        """Delete pruned messages from SQLite in batches.
+
+        Args:
+            session_id: Session identifier (for logging)
+            message_ids: List of message IDs to delete
+        """
+        batch_size = 500
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                for i in range(0, len(message_ids), batch_size):
+                    batch = message_ids[i : i + batch_size]
+                    placeholders = ",".join("?" * len(batch))
+                    conn.execute(
+                        f"DELETE FROM messages WHERE id IN ({placeholders})",
+                        batch,
+                    )
+            logger.debug(
+                f"Deleted {len(message_ids)} pruned messages from DB "
+                f"for session {session_id}"
+            )
+        except sqlite3.Error as e:
+            logger.warning(f"Failed to delete pruned messages from DB: {e}")
 
     def _persist_session(self, session: ConversationSession):
         """Persist session to database using normalized FK columns."""
@@ -1809,8 +1800,34 @@ class ConversationStore:
                 ),
             )
 
+    # Max chars for tool output content stored in SQLite.
+    # Full content is only needed during the active session (in-memory).
+    # Historical records keep a truncated version to save space.
+    _TOOL_OUTPUT_STORE_LIMIT = 2000
+
     def _persist_message(self, session_id: str, message: ConversationMessage):
-        """Persist message to database."""
+        """Persist message to database.
+
+        Tool output messages (tool_call, tool_result, and user-role
+        TOOL_OUTPUT blocks) are truncated to _TOOL_OUTPUT_STORE_LIMIT
+        chars when stored, since full content is only needed during the
+        active session where it lives in memory.
+        """
+        content = message.content
+        # Truncate large tool outputs for storage
+        if len(content) > self._TOOL_OUTPUT_STORE_LIMIT and (
+            message.role in (MessageRole.TOOL_CALL, MessageRole.TOOL_RESULT)
+            or (
+                message.role == MessageRole.USER
+                and content.startswith("<TOOL_OUTPUT")
+            )
+        ):
+            content = (
+                content[: self._TOOL_OUTPUT_STORE_LIMIT]
+                + f"\n\n[... truncated from {len(message.content)} chars "
+                f"for storage]"
+            )
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """
@@ -1823,7 +1840,7 @@ class ConversationStore:
                     message.id,
                     session_id,
                     message.role.value,
-                    message.content,
+                    content,
                     message.timestamp.isoformat(),
                     message.token_count,
                     message.priority.value,
@@ -2543,8 +2560,10 @@ class ConversationStore:
                     p.name AS provider,
                     COUNT(DISTINCT s.session_id) AS session_count,
                     COUNT(m.id) AS total_messages,
-                    ROUND(COUNT(m.id) * 1.0 / COUNT(DISTINCT s.session_id), 1) AS avg_messages_per_session,
-                    ROUND(AVG(s.tool_capable) * 100, 1) AS tool_capable_pct
+                    ROUND(COUNT(m.id) * 1.0 / COUNT(DISTINCT s.session_id), 1)
+                        AS avg_messages_per_session,
+                    ROUND(AVG(s.tool_capable) * 100, 1)
+                        AS tool_capable_pct
                 FROM sessions s
                 LEFT JOIN providers p ON s.provider_id = p.id
                 LEFT JOIN messages m ON s.session_id = m.session_id
@@ -2666,7 +2685,8 @@ class ConversationStore:
                     COUNT(m.id) AS message_count,
                     SUM(CASE WHEN m.role = 'user' THEN 1 ELSE 0 END) AS user_messages,
                     SUM(CASE WHEN m.role = 'assistant' THEN 1 ELSE 0 END) AS assistant_messages,
-                    SUM(CASE WHEN m.role IN ('tool_call', 'tool_result') THEN 1 ELSE 0 END) AS tool_messages,
+                    SUM(CASE WHEN m.role IN ('tool_call', 'tool_result')
+                        THEN 1 ELSE 0 END) AS tool_messages,
                     ROUND(
                         (JULIANDAY(MAX(m.timestamp)) - JULIANDAY(MIN(m.timestamp))) * 24 * 60,
                         1

@@ -18,9 +18,8 @@ mine real successful tool-call sequences from execution history and
 rank by diversity + completion score.
 """
 
-import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, List
 
 logger = logging.getLogger(__name__)
 

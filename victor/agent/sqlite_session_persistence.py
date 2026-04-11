@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
-    from victor.providers.base import Message
+    pass  # Reserved for future type imports
 
 logger = logging.getLogger(__name__)
 
@@ -42,29 +42,18 @@ logger = logging.getLogger(__name__)
 class SQLiteSessionPersistence:
     """SQLite-based session persistence.
 
+    .. deprecated:: 0.7.0
+        Use ``ConversationStore`` from
+        ``victor.agent.conversation_memory`` instead. It provides
+        normalized schema, ML/RL-friendly aggregation, token-aware
+        pruning, and FTS search. This class will be removed in 0.9.0.
+
     Stores conversation sessions and messages in the project database,
     providing fast queries and eliminating JSON file duplication.
 
     Tables Used:
     - sessions: id, name, provider, model, profile, data, created_at, updated_at
     - messages: id, session_id, role, content, tool_calls, created_at
-
-    Example:
-        persistence = SQLiteSessionPersistence()
-
-        # Save session
-        session_id = persistence.save_session(
-            conversation=message_history,
-            model="claude-sonnet-4-20250514",
-            provider="anthropic",
-            title="Code refactoring session"
-        )
-
-        # List sessions
-        sessions = persistence.list_sessions(limit=10)
-
-        # Load session
-        session = persistence.load_session(session_id)
     """
 
     def __init__(self, db_path: Optional[Path] = None):
@@ -73,6 +62,16 @@ class SQLiteSessionPersistence:
         Args:
             db_path: Path to project database (default: .victor/project.db)
         """
+        import warnings
+
+        warnings.warn(
+            "SQLiteSessionPersistence is deprecated. "
+            "Use ConversationStore from victor.agent.conversation_memory "
+            "instead. This class will be removed in 0.9.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         from victor.config.settings import get_project_paths
         from victor.core.database import get_project_database
 
@@ -90,7 +89,8 @@ class SQLiteSessionPersistence:
         # Just verify connection
         try:
             result = self._db.query(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sessions', 'messages')"
+                "SELECT name FROM sqlite_master "
+                "WHERE type='table' AND name IN ('sessions', 'messages')"
             )
             tables = [row[0] for row in result] if result else []
 

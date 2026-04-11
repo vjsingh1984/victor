@@ -40,7 +40,7 @@ def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str
     Returns:
         OpenAI-formatted tools list
     """
-    return [
+    result = [
         {
             "type": "function",
             "function": {
@@ -51,6 +51,18 @@ def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str
         }
         for tool in tools
     ]
+    # TEMPORARY: log tool schemas sent to OpenAI-compatible providers
+    tool_sigs = []
+    for t in result:
+        fn = t["function"]
+        props = fn.get("parameters", {}).get("properties", {})
+        tool_sigs.append(f"{fn['name']}({list(props.keys())})")
+    logger.info(
+        "[ToolSchemas→LLM] OpenAI format: %d tools: %s",
+        len(result),
+        ", ".join(tool_sigs),
+    )
+    return result
 
 
 def convert_tools_to_anthropic_format(
@@ -64,7 +76,7 @@ def convert_tools_to_anthropic_format(
     Returns:
         Anthropic-formatted tools list
     """
-    return [
+    result = [
         {
             "name": tool.name,
             "description": tool.description,
@@ -72,6 +84,17 @@ def convert_tools_to_anthropic_format(
         }
         for tool in tools
     ]
+    # TEMPORARY: log tool schemas sent to Anthropic provider
+    tool_sigs = []
+    for t in result:
+        props = t.get("input_schema", {}).get("properties", {})
+        tool_sigs.append(f"{t['name']}({list(props.keys())})")
+    logger.info(
+        "[ToolSchemas→LLM] Anthropic format: %d tools: %s",
+        len(result),
+        ", ".join(tool_sigs),
+    )
+    return result
 
 
 def convert_messages_to_openai_format(messages: List[Message]) -> List[Dict[str, Any]]:

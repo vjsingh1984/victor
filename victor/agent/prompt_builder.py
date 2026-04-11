@@ -636,6 +636,17 @@ class SystemPromptBuilder:
             if examples:
                 base_prompt = f"{base_prompt}\n\n{examples}"
 
+        # TEMPORARY: log system prompt sections that tell the LLM about tools
+        logger.info(
+            "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
+            "tool_guidance_len=%d prompt_total_len=%d",
+            self.provider_name,
+            sorted(sections_to_include),
+            self._get_tool_constraint_section()[:300] if self.available_tools else "(none)",
+            len(self.get_provider_tool_guidance()),
+            len(base_prompt),
+        )
+
         return base_prompt
 
     def _get_optimized_section(self, section_name: str) -> Optional[str]:
@@ -765,7 +776,8 @@ class SystemPromptBuilder:
                 "Tool usage guidelines:\n"
                 "1. For code generation tasks: write the code directly in your response.\n"
                 "2. For exploration tasks: use list_directory and read_file to examine code.\n"
-                "3. For modification tasks: use write_file or edit_files after understanding context.\n"
+                "3. For modification tasks: use write_file or edit_files "
+                "after understanding context.\n"
                 "4. Provide clear, working solutions.\n\n"
                 f"{GROUNDING_RULES}"
             )
@@ -815,7 +827,8 @@ class SystemPromptBuilder:
             "You are an expert code analyst with access to tools for exploring "
             "and modifying code. Use them effectively:\n\n"
             "1. Use list_directory and read_file to examine code before conclusions.\n"
-            "2. If asked to modify code, use write_file or edit_files after understanding context.\n"
+            "2. If asked to modify code, use write_file or edit_files "
+            "after understanding context.\n"
             "3. For call-graph questions, prefer graph(mode='callers'|'callees'|'trace').\n"
             "4. Provide clear, actionable responses based on actual file contents.\n"
             "5. Always cite specific file paths and line numbers when referencing code.\n"
@@ -945,7 +958,8 @@ class SystemPromptBuilder:
         """Build prompt for LMStudio provider."""
         if self.has_native_tool_support():
             return (
-                "You are an expert coding assistant. You can analyze, explain, and generate code.\n\n"
+                "You are an expert coding assistant. "
+                "You can analyze, explain, and generate code.\n\n"
                 "CAPABILITIES:\n"
                 "- Code generation: Write working implementations directly in your response.\n"
                 "- Code analysis: Use tools to explore and understand existing code.\n"

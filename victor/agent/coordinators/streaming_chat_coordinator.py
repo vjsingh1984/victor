@@ -180,6 +180,18 @@ class StreamingChatCoordinator:
         # Prioritize by stage
         tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
+        # TEMPORARY: log which tools and metadata are sent to the LLM
+        if tools:
+            tool_summaries = [
+                f"{t.name}: {(t.description or '')[:80]}" for t in tools
+            ]
+            logger.info(
+                "[ToolDefs→LLM] %d tools selected for query=%s\n  %s",
+                len(tools),
+                user_message[:100],
+                "\n  ".join(tool_summaries),
+            )
+
         return tools
 
     async def _stream_from_provider(

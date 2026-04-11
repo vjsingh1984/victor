@@ -26,7 +26,6 @@ Usage:
                                                  section_name="ASI_TOOL_EFFECTIVENESS_GUIDANCE")
 """
 
-import glob
 import gzip
 import hashlib
 import json
@@ -608,11 +607,26 @@ class PromptOptimizerLearner(BaseLearner):
         Returns:
             New PromptCandidate, or None if insufficient data
         """
-        # Use v2 trace collection when Pareto mode is enabled
+        # Collect traces from JSONL logs (primary source)
         if self._use_pareto:
-            traces = self._collect_traces_v2(limit=50)
+            jsonl_traces = self._collect_traces_v2(limit=50)
         else:
-            traces = self._collect_traces(limit=50)
+            jsonl_traces = self._collect_traces(limit=50)
+
+        # Collect traces from ConversationStore (supplementary source)
+        conv_traces = self._collect_traces_from_conversations(limit=50)
+
+        # Merge + deduplicate: unique sessions, richest data wins
+        traces = self._merge_traces(jsonl_traces, conv_traces)
+
+        if conv_traces:
+            logger.info(
+                "Unified traces: %d from JSONL + %d from conversations "
+                "= %d unique",
+                len(jsonl_traces),
+                len(conv_traces),
+                len(traces),
+            )
 
         if len(traces) < MIN_TRACES_FOR_EVOLUTION:
             logger.info(
@@ -1035,6 +1049,139 @@ class PromptOptimizerLearner(BaseLearner):
                 )
 
         return traces
+
+    def _collect_traces_from_conversations(
+        self, limit: int = 50
+    ) -> List[ExecutionTrace]:
+        """Collect execution traces from ConversationStore SQLite DB.
+
+        Converts normalized session+message data into ExecutionTrace
+        objects that all prompt optimization strategies can consume.
+        This supplements JSONL-based traces with richer historical data
+        (provider metadata, model family, message counts, duration).
+        """
+        traces: List[ExecutionTrace] = []
+        try:
+            from victor.agent.conversation_memory import (
+                ConversationStore,
+                MessageRole,
+            )
+        except ImportError:
+            return traces
+
+        try:
+            store = ConversationStore()
+        except Exception:
+            logger.debug(
+                "ConversationStore unavailable for trace collection"
+            )
+            return traces
+
+        try:
+            # Get sessions with enough messages to be meaningful
+            sessions = store.get_rl_training_data(
+                limit=limit, min_messages=3
+            )
+        except Exception as e:
+            logger.debug("Failed to query RL training data: %s", e)
+            return traces
+
+        for sess in sessions:
+            session_id = sess.get("session_id", "")
+            provider = sess.get("provider") or "unknown"
+            model = sess.get("model") or "unknown"
+            tool_msg_count = sess.get("tool_messages") or 0
+
+            # Skip sessions with no tool usage
+            if tool_msg_count < 2:
+                continue
+
+            # Build tool call details from individual messages
+            details: List[ToolCallTrace] = []
+            failures: Dict[str, int] = {}
+            try:
+                session_obj = store.get_session(session_id)
+                if session_obj:
+                    for msg in session_obj.messages:
+                        if msg.role == MessageRole.TOOL_CALL:
+                            details.append(
+                                ToolCallTrace(
+                                    tool_name=msg.tool_name or "",
+                                    arguments_summary=msg.content[:200],
+                                    reasoning_before="",
+                                )
+                            )
+                        elif msg.role == MessageRole.TOOL_RESULT:
+                            is_error = (
+                                "error" in msg.content.lower()[:200]
+                            )
+                            if details:
+                                last = details[-1]
+                                last.success = not is_error
+                                last.result_summary = (
+                                    msg.content[:500]
+                                )
+                                if is_error:
+                                    last.error_detail = (
+                                        msg.content[:500]
+                                    )
+                            if is_error:
+                                cat = self._categorize_failure(
+                                    msg.content[:300]
+                                )
+                                failures[cat] = (
+                                    failures.get(cat, 0) + 1
+                                )
+            except Exception:
+                pass  # Fall back to aggregate-only
+
+            total_tool_calls = max(tool_msg_count // 2, 1)
+            total_failures = sum(failures.values())
+            failure_rate = total_failures / max(total_tool_calls, 1)
+
+            traces.append(
+                ExecutionTrace(
+                    session_id=session_id,
+                    task_type="default",
+                    provider=provider,
+                    model=model,
+                    tool_calls=total_tool_calls,
+                    tool_failures=failures,
+                    success=failure_rate < 0.3,
+                    completion_score=max(
+                        0.0, 1.0 - failure_rate * 1.5
+                    ),
+                    tokens_used=0,
+                    tool_call_details=details,
+                )
+            )
+
+        traces.sort(key=lambda t: -t.completion_score)
+        return traces
+
+    @staticmethod
+    def _merge_traces(
+        *trace_lists: List[ExecutionTrace],
+    ) -> List[ExecutionTrace]:
+        """Merge multiple trace lists, deduplicating by session_id.
+
+        When the same session_id appears in multiple sources, the
+        version with more tool_call_details wins (richer data).
+        """
+        by_id: Dict[str, ExecutionTrace] = {}
+        for traces in trace_lists:
+            for t in traces:
+                existing = by_id.get(t.session_id)
+                if existing is None:
+                    by_id[t.session_id] = t
+                elif len(t.tool_call_details) > len(
+                    existing.tool_call_details
+                ):
+                    # Prefer the richer trace
+                    by_id[t.session_id] = t
+        merged = list(by_id.values())
+        merged.sort(key=lambda t: -t.completion_score)
+        return merged
 
     def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward from outcome."""

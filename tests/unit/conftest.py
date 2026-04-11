@@ -199,6 +199,34 @@ def reset_feature_flags():
 
 
 @pytest.fixture(autouse=True)
+def isolate_conversation_database(tmp_path):
+    """Redirect conversation.db to a temp directory during tests.
+
+    Without this, any code path that instantiates ConversationStore
+    without an explicit db_path will write to the real project .victor/
+    directory, polluting it with test-model sessions (37K+ observed).
+
+    Only patches the conversation_db property — other ProjectPaths
+    properties (MCP config, context files) still resolve normally.
+    """
+    from unittest.mock import PropertyMock, patch
+
+    from victor.config.settings import ProjectPaths
+
+    temp_victor = tmp_path / ".victor"
+    temp_victor.mkdir(exist_ok=True)
+    temp_conv_db = temp_victor / "conversation.db"
+
+    with patch.object(
+        ProjectPaths,
+        "conversation_db",
+        new_callable=PropertyMock,
+        return_value=temp_conv_db,
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def reset_extension_cache():
     """Reset VerticalExtensionLoader caches between tests."""
     yield

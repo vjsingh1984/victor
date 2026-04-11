@@ -57,9 +57,7 @@ from victor.agent.output_aggregator import (
     AggregationState,
 )
 from victor.agent.synthesis_checkpoint import (
-    SynthesisCheckpoint,
     CompositeSynthesisCheckpoint,
-    CheckpointResult,
     get_checkpoint_for_complexity,
 )
 from victor.config.tool_selection_defaults import (
@@ -496,7 +494,8 @@ class ToolPipeline:
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
             code_correction_middleware: Optional middleware for code validation/fixing
-            signature_store: Optional persistent storage for failed signatures (cross-session learning)
+            signature_store: Optional persistent storage for failed
+                signatures (cross-session learning)
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
             deduplication_tracker: Optional tracker for detecting redundant tool calls
@@ -1174,7 +1173,7 @@ class ToolPipeline:
                 break
 
         # Add skipped results for duplicates (reuse first occurrence's result)
-        for original_idx, signature in duplicate_info:
+        for _original_idx, signature in duplicate_info:
             if signature in results_by_signature:
                 original_result = results_by_signature[signature]
                 # Create a copy marked as from deduplication
@@ -1632,6 +1631,12 @@ class ToolPipeline:
                 logger.warning(f"on_tool_start callback failed: {e}")
 
         # Execute with per-tool timeout
+        # TEMPORARY: info log to see what flows to the LLM
+        logger.info(
+            "[ToolCall→LLM] Executing tool=%s args=%s",
+            tool_name,
+            json.dumps(normalized_args, default=str)[:500],
+        )
         start_time = time.monotonic()
         try:
             exec_result = await asyncio.wait_for(
@@ -1670,6 +1675,16 @@ class ToolPipeline:
             normalization_applied=normalization_applied,
             code_corrected=code_corrected,
             code_validation_errors=code_validation_errors,
+        )
+
+        # TEMPORARY: info log to see what result flows back to LLM
+        result_preview = str(exec_result.result)[:500] if exec_result.result else "(empty)"
+        logger.info(
+            "[ToolResult→LLM] tool=%s success=%s time=%.0fms result_preview=%s",
+            tool_name,
+            exec_result.success,
+            execution_time_ms,
+            result_preview,
         )
 
         # Attempt error recovery fallback on failure
