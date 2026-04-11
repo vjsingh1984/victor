@@ -3038,7 +3038,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self.usage_logger.log_event(
                 "tool_call", {"tool_name": tool_name, "tool_args": normalized_args}
             )
-            logger.debug(f"Executing tool: {tool_name}")
+            # TEMPORARY: log tool call metadata sent to LLM
+            import json as _json
+
+            logger.info(
+                "[ToolCall→LLM] tool=%s args=%s",
+                tool_name,
+                _json.dumps(normalized_args, default=str)[:500],
+            )
 
             start = time.monotonic()
 
@@ -3120,6 +3127,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     "result": output,
                     "error": error_display,
                 },
+            )
+
+            # TEMPORARY: log tool result sent back to LLM
+            result_preview = str(output)[:300] if output else "(empty)"
+            logger.info(
+                "[ToolResult→LLM] tool=%s success=%s time=%.0fms result=%s",
+                tool_name,
+                semantic_success,
+                elapsed_ms,
+                result_preview,
             )
 
             if semantic_success:
