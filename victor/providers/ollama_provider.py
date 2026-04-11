@@ -590,13 +590,20 @@ class OllamaProvider(BaseProvider):
                 **kwargs,
             )
             num_tools = len(tools) if tools else 0
-            self._provider_logger.logger.debug(
+            self._provider_logger.logger.info(
                 f"Streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
-            # Debug: log first tool for inspection if tools are provided
+            # Log tool schemas sent to Ollama
             if tools and num_tools > 0:
-                self._provider_logger.logger.debug(
-                    f"First tool schema sample: {payload.get('tools', [{}])[0]}"
+                tool_sigs = [
+                    f"{t.get('function', {}).get('name', '?')}: "
+                    f"{(t.get('function', {}).get('description', ''))[:60]}"
+                    for t in payload.get("tools", [])
+                ]
+                self._provider_logger.logger.info(
+                    "[ToolSchemas→Ollama] %d tools:\n  %s",
+                    num_tools,
+                    "\n  ".join(tool_sigs),
                 )
 
             # Log the endpoint URL being used for connection
