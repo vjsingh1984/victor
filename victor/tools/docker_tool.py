@@ -81,7 +81,7 @@ async def docker(
     options: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
-    Unified Docker operations for container and image management.
+    Run Docker operations: build, run, stop, logs, exec on containers.
 
     Provides a single interface for all Docker operations, mirroring the
     Docker CLI structure. Consolidates 15 separate Docker tools into one.

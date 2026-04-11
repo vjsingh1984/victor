@@ -120,7 +120,7 @@ async def teams(
     channel_description: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Perform operations on Microsoft Teams.
+    """Send messages and manage channels in Microsoft Teams.
 
     Args:
         operation: The operation to perform: 'send_message', 'search_messages',

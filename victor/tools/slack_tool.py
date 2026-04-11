@@ -87,7 +87,7 @@ async def slack(
     thread_ts: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Perform operations on Slack.
+    """Send messages and search conversations in Slack channels.
 
     Args:
         operation: The operation to perform: 'send_message', 'search_messages', 'list_channels'.

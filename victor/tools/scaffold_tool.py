@@ -397,7 +397,7 @@ async def scaffold(
     variables: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Unified project scaffolding tool.
+    Create project scaffolds: generate files, directories, and boilerplate.
 
     Performs scaffolding operations including creating projects from templates,
     listing available templates, adding files, and initializing git repositories.

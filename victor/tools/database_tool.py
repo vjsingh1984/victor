@@ -505,7 +505,7 @@ async def database(
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Unified database tool for SQL operations. Supports SQLite, PostgreSQL, MySQL, SQL Server.
+    Execute SQL queries and manage database schemas.
 
     Actions:
     - connect: Connect to a database

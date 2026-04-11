@@ -227,7 +227,7 @@ async def cicd(
     validate_command: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Unified CI/CD tool for pipeline management.
+    Run CI/CD pipelines: trigger builds, check status, view logs.
 
     Performs CI/CD operations including generating configurations, validating
     pipelines, and listing available templates. Consolidates all CI/CD

@@ -176,7 +176,7 @@ async def cache(
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Unified cache management tool for Victor's tiered caching system.
+    Manage Victor caches: inspect, clear, and optimize cached data.
 
     Actions:
     - stats: Get cache statistics and performance metrics

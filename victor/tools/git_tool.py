@@ -181,7 +181,7 @@ async def git(
     author_email: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Unified git operations: status, diff, stage, commit, log, branch.
+    """Run git operations: status, diff, stash, log, branch, checkout.
 
     Operations: status, diff (staged=True for staged), stage (files or all),
     commit (message required), log (limit), branch (list/create/switch).
@@ -341,7 +341,7 @@ async def git(
     examples=["suggest a commit message", "generate commit message for staged changes"],
 )
 async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Generate an AI-powered commit message from staged changes.
+    """Generate a commit message from staged git changes.
 
     Analyzes the staged diff and generates a conventional commit message
     using the configured LLM provider. The generated message follows the
@@ -611,7 +611,7 @@ DESCRIPTION:
     examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
 )
 async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Analyze merge conflicts and provide resolution guidance.
+    """Analyze and resolve merge conflicts in the current branch.
 
     Detects files with merge conflicts (marked as UU in git status) and provides
     detailed information about each conflict, including previews of conflict

@@ -372,7 +372,7 @@ async def lsp(
     max_items: int = 20,
     max_results: int = 50,
 ) -> Dict[str, Any]:
-    """Language Server Protocol operations for code intelligence.
+    """Run Language Server operations: diagnostics, completions, formatting.
 
     Actions: status, start, stop, completions, hover, definition, references, diagnostics.
     Position-based actions require: file_path, line, character.

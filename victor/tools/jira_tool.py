@@ -88,7 +88,7 @@ async def jira(
     max_results: int = 10,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Perform operations on Jira issues.
+    """Create, update, and search Jira issues and projects.
 
     Args:
         operation: The operation to perform: 'search_issues', 'create_issue', 'get_issue', 'add_comment'.

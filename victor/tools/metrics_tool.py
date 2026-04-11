@@ -84,7 +84,7 @@ async def metrics(
     format: str = "summary",
 ) -> Dict[str, Any]:
     """
-    Comprehensive code metrics and quality analysis.
+    Analyze code quality: complexity, coverage, lint errors, and style.
 
     Analyzes code quality metrics including complexity, maintainability,
     technical debt, and code structure. Consolidates multiple metric types

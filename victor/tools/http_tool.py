@@ -176,7 +176,7 @@ async def http(
     timeout: int = 30,
     expected_status: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """Unified HTTP operations for requests and API testing.
+    """Send HTTP requests (GET/POST/PUT/DELETE) and inspect responses.
 
     Modes:
     - "request": Standard HTTP request (default)
