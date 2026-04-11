@@ -2536,6 +2536,34 @@ async def extract_conversation_insights(root_path: Optional[str] = None) -> Dict
     return insights
 
 
+def _get_init_usage_logger():
+    """Get or create a UsageLogger for init command operations.
+
+    Writes to the same usage.jsonl as chat sessions so GEPA can
+    learn from init LLM synthesis quality over time.
+    """
+    try:
+        from victor.observability.analytics.logger import UsageLogger
+        from victor_coding.compat.settings import get_project_paths
+
+        paths = get_project_paths()
+        logs_dir = paths.logs_dir if hasattr(paths, "logs_dir") else paths.victor_dir / "logs"
+        from pathlib import Path
+
+        logs_dir = Path(str(logs_dir))
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        return UsageLogger(log_file=logs_dir / "usage.jsonl", enabled=True)
+    except Exception:
+        # Fallback: no-op logger
+        class _NoOpLogger:
+            session_id = "init"
+
+            def log_event(self, *a, **kw):
+                pass
+
+        return _NoOpLogger()
+
+
 async def extract_graph_insights(root_path: Optional[str] = None) -> Dict[str, Any]:
     """Extract insights from the code graph for init.md enrichment.
 
@@ -3220,12 +3248,46 @@ RAW DATA:
 Return ONLY the final init.md markdown. No preamble, no explanation."""
 
         messages = [Message(role="user", content=synthesize_prompt)]
+
+        # Emit usage events for GEPA trace collection
+        import time as _time
+
+        _usage_logger = _get_init_usage_logger()
+        _start = _time.monotonic()
+        _usage_logger.log_event(
+            "tool_call",
+            {
+                "tool_name": "init_llm_synthesis",
+                "tool_args": {
+                    "provider": provider_name,
+                    "model": model_name,
+                    "prompt_chars": len(synthesize_prompt),
+                    "base_content_lines": len(base_content.splitlines()),
+                },
+            },
+        )
+
         response = await provider.chat(messages, model=model_name)
         synthesized = response.content.strip()
+        _elapsed = (_time.monotonic() - _start) * 1000
+
+        _success = synthesized.startswith("#") or synthesized.startswith("```")
+        _usage_logger.log_event(
+            "tool_result",
+            {
+                "tool_name": "init_llm_synthesis",
+                "success": _success,
+                "duration_ms": round(_elapsed, 1),
+                "result_lines": len(synthesized.splitlines()),
+                "provider": provider_name,
+                "model": model_name,
+            },
+        )
+
         progress("deep", "LLM synthesis complete", complete=True)
 
         # Validate and clean response
-        if synthesized.startswith("#") or synthesized.startswith("```"):
+        if _success:
             if synthesized.startswith("```"):
                 lines = synthesized.split("\n")
                 lines = lines[1:] if lines[0].startswith("```") else lines
