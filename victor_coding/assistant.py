@@ -428,6 +428,57 @@ You have access to 45+ tools. Use them efficiently to accomplish tasks."""
 
         return get_capability_configs()
 
+    @classmethod
+    def get_capability_registrations(cls):
+        """Return (protocol_type, provider) pairs for CapabilityRegistry.
+
+        These capabilities are auto-registered when the plugin calls
+        context.register_vertical(CodingAssistant). Lazy factories
+        defer heavy imports until first use.
+        """
+        registrations = []
+        try:
+            from victor.framework.vertical_protocols import (
+                TreeSitterParserProtocol,
+                EditorProtocol,
+                CodebaseIndexFactoryProtocol,
+            )
+            from victor.core.plugins.context import _LazyCapabilityProxy
+
+            # Tree-sitter parser (lazy — imports tree_sitter_manager on first access)
+            def _load_ts():
+                import importlib
+                mod = importlib.import_module("victor_coding.codebase.tree_sitter_manager")
+                return mod
+
+            registrations.append(
+                (TreeSitterParserProtocol, _LazyCapabilityProxy(_load_ts))
+            )
+
+            # Editor (lazy)
+            def _load_editor():
+                import importlib
+                mod = importlib.import_module("victor_coding.editing.editor")
+                return getattr(mod, "FileEditor")()
+
+            registrations.append(
+                (EditorProtocol, _LazyCapabilityProxy(_load_editor))
+            )
+
+            # Codebase index factory (lazy)
+            def _load_index_factory():
+                from victor.core.search.indexer import detect_enhanced_index_factory
+                return detect_enhanced_index_factory()
+
+            factory = _load_index_factory()
+            if factory is not None:
+                registrations.append((CodebaseIndexFactoryProtocol, factory))
+
+        except ImportError:
+            pass  # Framework protocols not available (SDK-only mode)
+
+        return registrations
+
     # NOTE: get_extensions() is inherited from VerticalBase with full caching support.
     # Individual extension getters use _get_cached_extension() from VerticalBase.
     # To clear all caches, use cls.clear_config_cache().
