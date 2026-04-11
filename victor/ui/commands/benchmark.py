@@ -201,7 +201,7 @@ def run_benchmark(
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for results (JSON)"
     ),
-    timeout: int = typer.Option(300, "--timeout", "-t", help="Timeout per task in seconds"),
+    timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
     resume: bool = typer.Option(
