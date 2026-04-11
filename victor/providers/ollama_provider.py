@@ -597,7 +597,7 @@ class OllamaProvider(BaseProvider):
             if tools and num_tools > 0:
                 tool_sigs = [
                     f"{t.get('function', {}).get('name', '?')}: "
-                    f"{(t.get('function', {}).get('description', ''))[:60]}"
+                    f"{t.get('function', {}).get('description', '')}"
                     for t in payload.get("tools", [])
                 ]
                 self._provider_logger.logger.info(
