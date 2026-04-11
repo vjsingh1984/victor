@@ -492,14 +492,16 @@ class MetricsCollector:
             }
 
         stats = self._tool_usage_stats[tool_name]
-        stats["total_calls"] += 1
-        stats["successful_calls"] += 1 if success else 0
-        stats["failed_calls"] += 0 if success else 1
-        stats["total_time_ms"] += elapsed_ms
-        stats["avg_time_ms"] = stats["total_time_ms"] / stats["total_calls"]
-        stats["min_time_ms"] = min(stats["min_time_ms"], elapsed_ms)
-        stats["max_time_ms"] = max(stats["max_time_ms"], elapsed_ms)
-        stats["total_cost_weight"] += cost_weight
+        # Use .get() for robustness — stats may have been pre-populated by
+        # ToolPipeline's on_tool_complete callback with different keys
+        stats["total_calls"] = stats.get("total_calls", 0) + 1
+        stats["successful_calls"] = stats.get("successful_calls", 0) + (1 if success else 0)
+        stats["failed_calls"] = stats.get("failed_calls", 0) + (0 if success else 1)
+        stats["total_time_ms"] = stats.get("total_time_ms", 0.0) + elapsed_ms
+        stats["avg_time_ms"] = stats["total_time_ms"] / max(stats["total_calls"], 1)
+        stats["min_time_ms"] = min(stats.get("min_time_ms", float("inf")), elapsed_ms)
+        stats["max_time_ms"] = max(stats.get("max_time_ms", 0.0), elapsed_ms)
+        stats["total_cost_weight"] = stats.get("total_cost_weight", 0.0) + cost_weight
 
         # Update global cost tracking
         self._cost_tracking.total_cost_weight += cost_weight
@@ -584,17 +586,22 @@ class MetricsCollector:
         # Update tool usage stats (simplified version, full stats via record_tool_execution)
         if result.tool_name not in self._tool_usage_stats:
             self._tool_usage_stats[result.tool_name] = {
-                "calls": 0,
-                "successes": 0,
-                "failures": 0,
+                "total_calls": 0,
+                "successful_calls": 0,
+                "failed_calls": 0,
                 "total_time_ms": 0.0,
+                "avg_time_ms": 0.0,
+                "min_time_ms": float("inf"),
+                "max_time_ms": 0.0,
+                "cost_tier": "free",
+                "total_cost_weight": 0.0,
             }
         stats = self._tool_usage_stats[result.tool_name]
-        stats["calls"] = stats.get("calls", 0) + 1
+        stats["total_calls"] = stats.get("total_calls", 0) + 1
         if result.success:
-            stats["successes"] = stats.get("successes", 0) + 1
+            stats["successful_calls"] = stats.get("successful_calls", 0) + 1
         else:
-            stats["failures"] = stats.get("failures", 0) + 1
+            stats["failed_calls"] = stats.get("failed_calls", 0) + 1
         stats["total_time_ms"] = stats.get("total_time_ms", 0.0) + result.execution_time_ms
 
     def on_streaming_session_complete(self, session: "StreamingSession") -> None:
