@@ -126,12 +126,12 @@ class SyncChatCoordinator:
             CompletionResponse with complete response
         """
         # Skill auto-selection (shared logic lives on orchestrator)
-        if self._orchestrator and hasattr(self._orchestrator, "_apply_skill_for_turn"):
-            self._orchestrator._apply_skill_for_turn(user_message)
+        if self._orchestrator and hasattr(self._orchestrator, "apply_skill_for_turn"):
+            self._orchestrator.apply_skill_for_turn(user_message)
 
         # Reset manual skill flag after use
-        if getattr(self._orchestrator, "_manual_skill_active", False):
-            self._orchestrator._manual_skill_active = False
+        if getattr(self._orchestrator, "manual_skill_active", False):
+            self._orchestrator.manual_skill_active = False
 
         # Auto-detect planning via QueryClassifier when use_planning is None
         if use_planning is None:

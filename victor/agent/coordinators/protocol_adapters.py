@@ -263,7 +263,11 @@ class OrchestratorProtocolAdapter:
             "model": self._orchestrator.model,
             "temperature": self._orchestrator.temperature,
             "max_tokens": self._orchestrator.max_tokens,
-            "_system_added": getattr(self._orchestrator, "_system_added", False),
+            "_system_added": (
+                self._orchestrator.get_capability_value("system_prompt_added")
+                if self._orchestrator.has_capability("system_prompt_added")
+                else False
+            ),
         }
 
     def clear_state(self) -> None:

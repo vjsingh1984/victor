@@ -114,6 +114,13 @@ class ProtocolRegistry:
     CAPABILITIES_GROUP = "victor.sdk.capabilities"
     VALIDATORS_GROUP = "victor.sdk.validators"
 
+    _KNOWN_GROUPS = frozenset({
+        VERTICALS_GROUP,
+        SDK_PROTOCOLS_GROUP,
+        CAPABILITIES_GROUP,
+        VALIDATORS_GROUP,
+    })
+
     def __init__(self, strict: bool = False) -> None:
         """Initialize the registry.
 
@@ -145,6 +152,10 @@ class ProtocolRegistry:
     def load_from_entry_points(self, *, reload: bool = False) -> DiscoveryStats:
         """Load all protocol implementations from installed packages.
 
+        Uses a single-pass scan of all entry points, then partitions by
+        group in-memory. This avoids 4 separate importlib.metadata.entry_points()
+        calls (one per group), reducing cold-start latency.
+
         Args:
             reload: If True, reload even if already loaded.
 
@@ -154,147 +165,161 @@ class ProtocolRegistry:
         if reload:
             self.clear()
 
-        # Load verticals
-        self._load_verticals()
+        grouped = self._scan_all_entry_points()
 
-        # Load protocol implementations
-        self._load_protocols()
-
-        # Load capability providers
-        self._load_capabilities()
-
-        # Load validators
-        self._load_validators()
+        self._load_verticals(grouped.get(self.VERTICALS_GROUP, []))
+        self._load_protocols(grouped.get(self.SDK_PROTOCOLS_GROUP, []))
+        self._load_capabilities(grouped.get(self.CAPABILITIES_GROUP, []))
+        self._load_validators(grouped.get(self.VALIDATORS_GROUP, []))
 
         return self._discovery_stats
 
-    def _load_verticals(self) -> None:
-        """Load verticals from victor.plugins entry point group."""
+    def _scan_all_entry_points(self) -> Dict[str, List[Any]]:
+        """Single-pass scan of all entry points, partitioned by group.
+
+        Calls importlib.metadata.entry_points() once without a group
+        filter, then partitions results into a dict keyed by group name.
+        Only groups in _KNOWN_GROUPS are retained.
+
+        Handles both Python 3.9 dict format and Python 3.12+ flat list.
+        """
         try:
-            for ep in importlib.metadata.entry_points(group=self.VERTICALS_GROUP):
-                try:
-                    candidate = ep.load()
-                    for (
-                        vertical_name,
-                        vertical_class,
-                    ) in collect_verticals_from_candidate(candidate).items():
-                        self._verticals[vertical_name] = vertical_class
-                        self._discovery_stats.total_verticals += 1
-                        self._track_metadata(
-                            name=vertical_name,
-                            entry_point=ep,
-                            protocol_type="vertical",
-                        )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "vertical", e)
+            all_eps = importlib.metadata.entry_points()
         except Exception:
-            logger.debug("No victor.plugins entry points found")
+            logger.debug("entry_points() scan failed")
+            return {}
 
-    def _load_protocols(self) -> None:
-        """Load protocol implementations from victor.sdk.protocols group."""
-        try:
-            for ep in importlib.metadata.entry_points(group=self.SDK_PROTOCOLS_GROUP):
-                try:
-                    provider_class_or_instance = ep.load()
+        grouped: Dict[str, List[Any]] = {g: [] for g in self._KNOWN_GROUPS}
 
-                    # Try to instantiate if it's a class
-                    if isinstance(provider_class_or_instance, type):
-                        try:
-                            instance = provider_class_or_instance()
-                        except Exception as e:
-                            self._handle_load_error(ep.name, "protocol", e)
-                            continue
-                    else:
-                        instance = provider_class_or_instance
+        if isinstance(all_eps, dict):
+            # Python 3.9: entry_points() returns dict[str, list[EntryPoint]]
+            for group_name, eps in all_eps.items():
+                if group_name in self._KNOWN_GROUPS:
+                    grouped[group_name].extend(eps)
+        else:
+            # Python 3.10+: entry_points() returns SelectableGroups / list
+            for ep in all_eps:
+                group = getattr(ep, "group", None)
+                if group in self._KNOWN_GROUPS:
+                    grouped[group].append(ep)
 
-                    # Register based on protocol type
-                    registered = False
-                    if isinstance(instance, ToolProvider):
-                        self._tool_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, SafetyProvider):
-                        self._safety_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, WorkflowProvider):
-                        self._workflow_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, PromptProvider):
-                        self._prompt_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, TeamProvider):
-                        self._team_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, MiddlewareProvider):
-                        self._middleware_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, ModeConfigProvider):
-                        self._mode_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, RLProvider):
-                        self._rl_providers.append(instance)
-                        registered = True
-                    if isinstance(instance, EnrichmentProvider):
-                        self._enrichment_providers.append(instance)
-                        registered = True
+        return grouped
 
-                    if registered:
-                        self._discovery_stats.total_protocols += 1
-                        self._track_metadata(
-                            name=ep.name,
-                            entry_point=ep,
-                            protocol_type="protocol",
-                        )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "protocol", e)
-        except Exception:
-            logger.debug("No victor.sdk.protocols entry points found")
+    def _load_verticals(self, entry_points_list: List[Any]) -> None:
+        """Load verticals from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                candidate = ep.load()
+                for (
+                    vertical_name,
+                    vertical_class,
+                ) in collect_verticals_from_candidate(candidate).items():
+                    self._verticals[vertical_name] = vertical_class
+                    self._discovery_stats.total_verticals += 1
+                    self._track_metadata(
+                        name=vertical_name,
+                        entry_point=ep,
+                        protocol_type="vertical",
+                    )
+            except Exception as e:
+                self._handle_load_error(ep.name, "vertical", e)
 
-    def _load_capabilities(self) -> None:
-        """Load capability providers from victor.sdk.capabilities group."""
-        try:
-            for ep in importlib.metadata.entry_points(group=self.CAPABILITIES_GROUP):
-                try:
-                    capability_class_or_instance = ep.load()
+    def _load_protocols(self, entry_points_list: List[Any]) -> None:
+        """Load protocol implementations from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                provider_class_or_instance = ep.load()
 
-                    # Try to instantiate if it's a class
-                    if isinstance(capability_class_or_instance, type):
-                        try:
-                            instance = capability_class_or_instance()
-                        except Exception as e:
-                            self._handle_load_error(ep.name, "capability", e)
-                            continue
-                    else:
-                        instance = capability_class_or_instance
+                # Try to instantiate if it's a class
+                if isinstance(provider_class_or_instance, type):
+                    try:
+                        instance = provider_class_or_instance()
+                    except Exception as e:
+                        self._handle_load_error(ep.name, "protocol", e)
+                        continue
+                else:
+                    instance = provider_class_or_instance
 
-                    self._capability_providers[ep.name] = instance
-                    self._discovery_stats.total_capabilities += 1
+                # Register based on protocol type
+                registered = False
+                if isinstance(instance, ToolProvider):
+                    self._tool_providers.append(instance)
+                    registered = True
+                if isinstance(instance, SafetyProvider):
+                    self._safety_providers.append(instance)
+                    registered = True
+                if isinstance(instance, WorkflowProvider):
+                    self._workflow_providers.append(instance)
+                    registered = True
+                if isinstance(instance, PromptProvider):
+                    self._prompt_providers.append(instance)
+                    registered = True
+                if isinstance(instance, TeamProvider):
+                    self._team_providers.append(instance)
+                    registered = True
+                if isinstance(instance, MiddlewareProvider):
+                    self._middleware_providers.append(instance)
+                    registered = True
+                if isinstance(instance, ModeConfigProvider):
+                    self._mode_providers.append(instance)
+                    registered = True
+                if isinstance(instance, RLProvider):
+                    self._rl_providers.append(instance)
+                    registered = True
+                if isinstance(instance, EnrichmentProvider):
+                    self._enrichment_providers.append(instance)
+                    registered = True
+
+                if registered:
+                    self._discovery_stats.total_protocols += 1
                     self._track_metadata(
                         name=ep.name,
                         entry_point=ep,
-                        protocol_type="capability",
+                        protocol_type="protocol",
                     )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "capability", e)
-        except Exception:
-            logger.debug("No victor.sdk.capabilities entry points found")
+            except Exception as e:
+                self._handle_load_error(ep.name, "protocol", e)
 
-    def _load_validators(self) -> None:
-        """Load validators from victor.sdk.validators group."""
-        try:
-            for ep in importlib.metadata.entry_points(group=self.VALIDATORS_GROUP):
-                try:
-                    validator = ep.load()
-                    self._validators[ep.name] = validator
-                    self._discovery_stats.total_validators += 1
-                    self._track_metadata(
-                        name=ep.name,
-                        entry_point=ep,
-                        protocol_type="validator",
-                    )
-                except Exception as e:
-                    self._handle_load_error(ep.name, "validator", e)
-        except Exception:
-            logger.debug("No victor.sdk.validators entry points found")
+    def _load_capabilities(self, entry_points_list: List[Any]) -> None:
+        """Load capability providers from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                capability_class_or_instance = ep.load()
+
+                # Try to instantiate if it's a class
+                if isinstance(capability_class_or_instance, type):
+                    try:
+                        instance = capability_class_or_instance()
+                    except Exception as e:
+                        self._handle_load_error(ep.name, "capability", e)
+                        continue
+                else:
+                    instance = capability_class_or_instance
+
+                self._capability_providers[ep.name] = instance
+                self._discovery_stats.total_capabilities += 1
+                self._track_metadata(
+                    name=ep.name,
+                    entry_point=ep,
+                    protocol_type="capability",
+                )
+            except Exception as e:
+                self._handle_load_error(ep.name, "capability", e)
+
+    def _load_validators(self, entry_points_list: List[Any]) -> None:
+        """Load validators from pre-scanned entry points."""
+        for ep in entry_points_list:
+            try:
+                validator = ep.load()
+                self._validators[ep.name] = validator
+                self._discovery_stats.total_validators += 1
+                self._track_metadata(
+                    name=ep.name,
+                    entry_point=ep,
+                    protocol_type="validator",
+                )
+            except Exception as e:
+                self._handle_load_error(ep.name, "validator", e)
 
     def _track_metadata(self, name: str, entry_point: Any, protocol_type: str) -> None:
         """Track metadata for a discovered protocol.

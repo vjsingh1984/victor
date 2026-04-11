@@ -878,7 +878,7 @@ class ToolCoordinator:
         Deprecated: Use set_enabled_tools() directly instead of passing
         the full orchestrator. Kept for backward compatibility.
         """
-        orch_tools = getattr(orchestrator, "_enabled_tools", None)
+        orch_tools = orchestrator.get_enabled_tools() if hasattr(orchestrator, "get_enabled_tools") else None
         if orch_tools:
             self.set_enabled_tools(orch_tools)
 

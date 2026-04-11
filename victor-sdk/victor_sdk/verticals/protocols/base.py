@@ -37,9 +37,23 @@ from victor_sdk.verticals.extensions import VerticalExtensions
 from victor_sdk.core.api_version import CURRENT_API_VERSION
 from victor_sdk.core.exceptions import VerticalConfigurationError
 from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+from victor_sdk.verticals.mixins import (
+    ExtensionProviderMixin,
+    PromptMetadataMixin,
+    RLMixin,
+    TeamMixin,
+    WorkflowMetadataMixin,
+)
 
 
-class VerticalBase(ABC):
+class VerticalBase(
+    RLMixin,
+    TeamMixin,
+    WorkflowMetadataMixin,
+    PromptMetadataMixin,
+    ExtensionProviderMixin,
+    ABC,
+):
     """Abstract base class for domain-specific assistants (verticals).
 
     This is the ONLY base class external verticals need to inherit from.
@@ -317,110 +331,8 @@ class VerticalBase(ABC):
             ),
         }
 
-    @classmethod
-    def get_middleware(cls) -> List[Any]:
-        """Return middleware implementations for this vertical."""
-
-        return []
-
-    @classmethod
-    def get_safety_extension(cls) -> Optional[Any]:
-        """Return the safety extension for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_prompt_contributor(cls) -> Optional[Any]:
-        """Return the prompt contributor for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_mode_config_provider(cls) -> Optional[Any]:
-        """Return the mode-config provider for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_tool_dependency_provider(cls) -> Optional[Any]:
-        """Return the tool-dependency provider for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_workflow_provider(cls) -> Optional[Any]:
-        """Return the workflow provider for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_service_provider(cls) -> Optional[Any]:
-        """Return the DI service provider for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_rl_config_provider(cls) -> Optional[Any]:
-        """Return the RL config provider for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_rl_hooks(cls) -> List[Any]:
-        """Return RL hooks for this vertical, if any."""
-
-        return []
-
-    @classmethod
-    def get_team_spec_provider(cls) -> Optional[Any]:
-        """Return the team-spec provider for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_enrichment_strategy(cls) -> Optional[Any]:
-        """Return the enrichment strategy for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_tool_selection_strategy(cls) -> Optional[Any]:
-        """Return the tool-selection strategy for this vertical, if any."""
-
-        return None
-
-    @classmethod
-    def get_tiered_tool_config(cls) -> Optional[Any]:
-        """Return the tiered tool config for this vertical, if any."""
-
-        return None
-
-    # -----------------------------------------------------------------
-    # Runtime integration hooks (no-op defaults for external verticals)
-    # -----------------------------------------------------------------
-    # The victor-ai framework calls these on verticals during runtime.
-    # External verticals inherit safe no-op defaults; the framework's
-    # own VerticalBase overrides them with full implementations.
-
-    @classmethod
-    def get_handlers(cls) -> Dict[str, Any]:
-        """Return workflow step handlers for this vertical."""
-        return {}
-
-    @classmethod
-    def get_capability_provider(cls) -> Optional[Any]:
-        """Return the capability provider for this vertical, if any."""
-        return None
-
-    @classmethod
-    def get_team_specs(cls) -> Dict[str, Any]:
-        """Return team specifications for this vertical."""
-        return {}
-
-    @classmethod
-    def get_tool_graph(cls) -> Optional[Any]:
-        """Return the tool dependency graph for this vertical, if any."""
-        return None
+    # Methods from RLMixin, TeamMixin, ExtensionProviderMixin are inherited.
+    # See victor_sdk.verticals.mixins for the implementations.
 
     @classmethod
     def register_tools(cls, registry: Any) -> None:
@@ -437,10 +349,7 @@ class VerticalBase(ABC):
         """Return capability configurations for this vertical."""
         return {}
 
-    @classmethod
-    def get_mode_config(cls) -> Dict[str, Any]:
-        """Return mode configurations for this vertical."""
-        return {}
+    # get_mode_config() inherited from ExtensionProviderMixin
 
     # -----------------------------------------------------------------
     # Extension container
@@ -503,97 +412,8 @@ class VerticalBase(ABC):
 
         return getattr(cls, "version", "1.0.0")
 
-    @classmethod
-    def get_tool_requirements(cls) -> List[ToolRequirementLike]:
-        """Return required tools for this vertical definition."""
-
-        return cls.get_tools()
-
-    @classmethod
-    def get_capability_requirements(cls) -> List[CapabilityRequirementLike]:
-        """Return required runtime capabilities for this vertical definition."""
-
-        return []
-
-    @classmethod
-    def get_prompt_templates(cls) -> Dict[str, Any]:
-        """Return task-specific prompt templates for this vertical."""
-
-        return {}
-
-    @classmethod
-    def get_task_type_hints(cls) -> Dict[str, Any]:
-        """Return task-type hints for this vertical."""
-
-        return {}
-
-    @classmethod
-    def get_prompt_metadata(cls) -> PromptMetadata:
-        """Return serializable prompt metadata for this vertical."""
-
-        return PromptMetadata(
-            templates=normalize_prompt_templates(cls.get_prompt_templates()),
-            task_type_hints=normalize_task_type_hints(cls.get_task_type_hints()),
-        )
-
-    @classmethod
-    def get_team_declarations(cls) -> Dict[str, TeamDefinitionLike]:
-        """Return declarative team definitions for this vertical."""
-
-        return {}
-
-    @classmethod
-    def get_default_team(cls) -> Optional[str]:
-        """Return the default declarative team for this vertical."""
-
-        return None
-
-    @classmethod
-    def get_team_metadata(cls) -> TeamMetadata:
-        """Return serializable team metadata for this vertical."""
-
-        return normalize_team_metadata(
-            {
-                "teams": normalize_team_definitions(cls.get_team_declarations()),
-                "default_team": cls.get_default_team(),
-            }
-        )
-
-    @classmethod
-    def get_initial_stage(cls) -> Optional[str]:
-        """Return the initial stage name for this vertical workflow."""
-
-        stages = cls.get_stages()
-        return next(iter(stages.keys()), None)
-
-    @classmethod
-    def get_workflow_spec(cls) -> Dict[str, Any]:
-        """Return serializable workflow metadata for this vertical."""
-
-        return {"stage_order": list(cls.get_stages().keys())}
-
-    @classmethod
-    def get_provider_hints(cls) -> Dict[str, Any]:
-        """Return provider selection hints for this vertical."""
-
-        return {}
-
-    @classmethod
-    def get_evaluation_criteria(cls) -> List[str]:
-        """Return evaluation criteria for this vertical."""
-
-        return []
-
-    @classmethod
-    def get_workflow_metadata(cls) -> WorkflowMetadata:
-        """Return serializable workflow metadata for this vertical."""
-
-        return WorkflowMetadata(
-            initial_stage=cls.get_initial_stage(),
-            workflow_spec=cls.get_workflow_spec(),
-            provider_hints=cls.get_provider_hints(),
-            evaluation_criteria=cls.get_evaluation_criteria(),
-        )
+    # Methods from PromptMetadataMixin, TeamMixin, WorkflowMetadataMixin
+    # are inherited via mixin composition. See victor_sdk.verticals.mixins.
 
     @classmethod
     def get_metadata(cls) -> Dict[str, Any]:

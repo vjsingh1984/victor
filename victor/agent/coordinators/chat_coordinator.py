@@ -307,8 +307,8 @@ class ChatCoordinator:
         finally:
             # Update cumulative token usage after stream completes
             # This enables accurate token tracking for evaluations/benchmarks
-            if hasattr(orch, "_current_stream_context") and orch._current_stream_context:
-                ctx = orch._current_stream_context
+            if orch.has_capability("current_stream_context") and orch.get_capability_value("current_stream_context"):
+                ctx = orch.get_capability_value("current_stream_context")
                 if hasattr(ctx, "cumulative_usage"):
                     if self._token_tracker is not None:
                         self._token_tracker.accumulate(ctx.cumulative_usage)
@@ -374,12 +374,12 @@ class ChatCoordinator:
         orch.reminder_manager.reset()
 
         # Start UsageAnalytics session for this conversation
-        if hasattr(orch, "_usage_analytics") and orch._usage_analytics:
-            orch._usage_analytics.start_session()
+        if orch.has_capability("usage_analytics") and orch.get_capability_value("usage_analytics"):
+            orch.get_capability_value("usage_analytics").start_session()
 
         # Clear ToolSequenceTracker history for new conversation
-        if hasattr(orch, "_sequence_tracker") and orch._sequence_tracker:
-            orch._sequence_tracker.clear_history()
+        if orch.has_capability("tool_sequence_tracker") and orch.get_capability_value("tool_sequence_tracker"):
+            orch.get_capability_value("tool_sequence_tracker").clear_history()
 
         # PERF: Start background compaction for async context management
         if orch._context_manager and hasattr(orch._context_manager, "start_background_compaction"):
@@ -394,8 +394,8 @@ class ChatCoordinator:
         orch.add_message("user", user_message)
 
         # Record this turn in UsageAnalytics
-        if hasattr(orch, "_usage_analytics") and orch._usage_analytics:
-            orch._usage_analytics.record_turn()
+        if orch.has_capability("usage_analytics") and orch.get_capability_value("usage_analytics"):
+            orch.get_capability_value("usage_analytics").record_turn()
 
         # Detect task type using unified tracker
         unified_task_type = orch.unified_tracker.detect_task_type(user_message)

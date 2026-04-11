@@ -318,63 +318,63 @@ class PlanningCoordinator:
         planning_provider = self.orchestrator.provider
         planning_model = self.orchestrator.model
 
-        # Try to get CLI override first (stored in orchestrator if set)
-        if hasattr(self.orchestrator, "_planning_model_override"):
-            cli_planning_model = self.orchestrator._planning_model_override
-            if cli_planning_model:
-                logger.info(f"Using CLI planning model override: {cli_planning_model}")
-                # Parse planning model (format: "model" or "provider:model")
-                if ":" in cli_planning_model:
-                    planning_provider_name, planning_model = cli_planning_model.split(":", 1)
-                    from victor.providers.provider_factory import get_provider
-
-                    try:
-                        planning_provider = get_provider(planning_provider_name)
-                        logger.info(
-                            f"Using planning provider from CLI override: {planning_provider_name}"
-                        )
-                    except Exception as e:
-                        logger.warning(
-                            f"Failed to get planning provider {planning_provider_name}: {e}"
-                        )
-                else:
-                    planning_model = cli_planning_model
-
-        # Try profile override if no CLI override
-        elif hasattr(self.orchestrator, "_profile") and self.orchestrator._profile:
-            profile = self.orchestrator._profile
-            planning_provider_override = getattr(profile, "planning_provider", None)
-            planning_model_override = getattr(profile, "planning_model", None)
-
-            if planning_provider_override:
-                logger.info(
-                    f"Using planning provider override from profile: {planning_provider_override}"
-                )
+        # Try to get CLI override first (public attribute, set by CLI arg parsing)
+        cli_planning_model = getattr(self.orchestrator, "planning_model_override", None)
+        if cli_planning_model:
+            logger.info(f"Using CLI planning model override: {cli_planning_model}")
+            # Parse planning model (format: "model" or "provider:model")
+            if ":" in cli_planning_model:
+                planning_provider_name, planning_model = cli_planning_model.split(":", 1)
                 from victor.providers.provider_factory import get_provider
 
                 try:
-                    planning_provider = get_provider(planning_provider_override)
+                    planning_provider = get_provider(planning_provider_name)
+                    logger.info(
+                        f"Using planning provider from CLI override: {planning_provider_name}"
+                    )
                 except Exception as e:
                     logger.warning(
-                        f"Failed to get planning provider {planning_provider_override}: {e}"
+                        f"Failed to get planning provider {planning_provider_name}: {e}"
                     )
-                    logger.info("Falling back to default provider for planning")
+            else:
+                planning_model = cli_planning_model
+        else:
+            # Try profile override if no CLI override
+            profile = getattr(self.orchestrator, "profile", None)
+            if profile:
+                planning_provider_override = getattr(profile, "planning_provider", None)
+                planning_model_override = getattr(profile, "planning_model", None)
 
-            if planning_model_override:
-                logger.info(
-                    f"Using planning model override from profile: {planning_model_override}"
-                )
-                planning_model = planning_model_override
+                if planning_provider_override:
+                    logger.info(
+                        f"Using planning provider override from profile: {planning_provider_override}"
+                    )
+                    from victor.providers.provider_factory import get_provider
+
+                    try:
+                        planning_provider = get_provider(planning_provider_override)
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to get planning provider {planning_provider_override}: {e}"
+                        )
+                        logger.info("Falling back to default provider for planning")
+
+                if planning_model_override:
+                    logger.info(
+                        f"Using planning model override from profile: {planning_model_override}"
+                    )
+                    planning_model = planning_model_override
 
         # Build skill-aware prompt if skills are available
         enriched_request = user_message
         try:
-            matcher = getattr(self.orchestrator, "_skill_matcher", None)
-            if matcher and matcher._initialized and matcher._skills:
+            matcher = getattr(self.orchestrator, "skill_matcher", None)
+            if matcher and getattr(matcher, "initialized", False) and getattr(matcher, "skills", None):
                 from victor.framework.skill_planner import build_skill_aware_plan_prompt
 
-                enriched_request = build_skill_aware_plan_prompt(user_message, matcher._skills)
-                logger.debug("Plan generation enriched with %d skills", len(matcher._skills))
+                skills = getattr(matcher, "skills", [])
+                enriched_request = build_skill_aware_plan_prompt(user_message, skills)
+                logger.debug("Plan generation enriched with %d skills", len(skills))
         except Exception:
             logger.debug("Skill-aware planning enrichment skipped", exc_info=True)
 
@@ -579,17 +579,16 @@ class PlanningCoordinator:
         This helps prevent context overflow during long planning sessions.
         """
         orch = self.orchestrator
-        if hasattr(orch, "_context_compactor") and orch._context_compactor:
+        if orch.has_capability("context_compactor") and orch.get_capability_value("context_compactor"):
             try:
-                # Get current query (user message)
-                current_query = (
-                    orch._conversation_history.get_latest_user_message()
-                    if hasattr(orch, "_conversation_history")
-                    else ""
-                )
+                # Get current query from public conversation API
+                current_query = ""
+                if hasattr(orch, "conversation") and orch.conversation:
+                    current_query = orch.conversation.get_latest_user_message() or ""
 
                 # Check and compact
-                compaction_result = orch._context_compactor.check_and_compact(
+                compactor = orch.get_capability_value("context_compactor")
+                compaction_result = compactor.check_and_compact(
                     current_query=current_query,
                     force=False,
                     tool_call_count=orch.tool_calls_used,
