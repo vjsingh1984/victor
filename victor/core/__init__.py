@@ -22,6 +22,8 @@ This package provides foundational infrastructure:
 """
 
 from victor.core.container import (
+    AsyncDisposable,
+    ContainerFrozenError,
     ServiceContainer,
     ServiceScope,
     ServiceLifetime,
@@ -224,6 +226,8 @@ from victor.core.schema import (
 
 __all__ = [
     # Container
+    "AsyncDisposable",
+    "ContainerFrozenError",
     "ServiceContainer",
     "ServiceScope",
     "ServiceLifetime",
