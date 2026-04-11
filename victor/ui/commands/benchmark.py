@@ -357,6 +357,49 @@ def run_benchmark(
 
     console.print(results_table)
 
+    # Auto-evolve: run GEPA evolution after benchmark completes
+    # This is the "post-session hook" from Memory Scaling — the agent
+    # improves its prompts automatically after each benchmark run.
+    if metrics["total_tasks"] >= 5:  # Only evolve with enough data
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("prompt_optimizer")
+            if learner:
+                from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
+
+                # Determine provider from model name
+                model_lower = (config.model or "").lower()
+                provider = "default"
+                for prefix, prov in [
+                    ("gpt", "openai"), ("grok", "xai"),
+                    ("deepseek", "deepseek"), ("haiku", "anthropic"),
+                    ("claude", "anthropic"),
+                ]:
+                    if prefix in model_lower:
+                        provider = prov
+                        break
+
+                candidate = learner.evolve(
+                    "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                    ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                    provider=provider,
+                )
+                if candidate:
+                    # Seed from this run's results
+                    for _ in range(metrics["passed"]):
+                        candidate.update(True)
+                    for _ in range(metrics["failed"] + metrics.get("errors", 0)):
+                        candidate.update(False)
+                    learner._save_candidate(candidate)
+                    console.print(
+                        f"\n[dim]Auto-evolved prompt gen-{candidate.generation} "
+                        f"for {provider} (mean={candidate.mean:.2f})[/]"
+                    )
+        except Exception as e:
+            logger.debug("Auto-evolve skipped: %s", e)
+
     # Save results if output specified
     if output:
         output_data = {
