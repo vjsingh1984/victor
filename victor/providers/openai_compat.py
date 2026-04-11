@@ -57,7 +57,7 @@ def convert_tools_to_openai_format(tools: List[ToolDefinition]) -> List[Dict[str
         fn = t["function"]
         props = fn.get("parameters", {}).get("properties", {})
         tool_sigs.append(f"{fn['name']}({list(props.keys())})")
-    logger.info(
+    logger.debug(
         "[ToolSchemas→LLM] OpenAI format: %d tools: %s",
         len(result),
         ", ".join(tool_sigs),
@@ -89,7 +89,7 @@ def convert_tools_to_anthropic_format(
     for t in result:
         props = t.get("input_schema", {}).get("properties", {})
         tool_sigs.append(f"{t['name']}({list(props.keys())})")
-    logger.info(
+    logger.debug(
         "[ToolSchemas→LLM] Anthropic format: %d tools: %s",
         len(result),
         ", ".join(tool_sigs),

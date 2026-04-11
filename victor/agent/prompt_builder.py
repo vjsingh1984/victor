@@ -637,7 +637,7 @@ class SystemPromptBuilder:
                 base_prompt = f"{base_prompt}\n\n{examples}"
 
         # Log system prompt composition sent to LLM
-        logger.info(
+        logger.debug(
             "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
             "tool_guidance_len=%d prompt_total_len=%d",
             self.provider_name,

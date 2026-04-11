@@ -1632,7 +1632,7 @@ class ToolPipeline:
 
         # Execute with per-tool timeout
         # Log tool call sent to LLM
-        logger.info(
+        logger.debug(
             "[ToolCall→LLM] Executing tool=%s args=%s",
             tool_name,
             json.dumps(normalized_args, default=str)[:500],
@@ -1679,7 +1679,7 @@ class ToolPipeline:
 
         # Log tool result returned to LLM
         result_preview = str(exec_result.result)[:500] if exec_result.result else "(empty)"
-        logger.info(
+        logger.debug(
             "[ToolResult→LLM] tool=%s success=%s time=%.0fms result_preview=%s",
             tool_name,
             exec_result.success,

@@ -590,7 +590,7 @@ class OllamaProvider(BaseProvider):
                 **kwargs,
             )
             num_tools = len(tools) if tools else 0
-            self._provider_logger.logger.info(
+            self._provider_logger.logger.debug(
                 f"Streaming request: model={model}, msgs={len(messages)}, tools={num_tools}"
             )
             # Log tool schemas sent to Ollama
@@ -600,7 +600,7 @@ class OllamaProvider(BaseProvider):
                     f"{t.get('function', {}).get('description', '')}"
                     for t in payload.get("tools", [])
                 ]
-                self._provider_logger.logger.info(
+                self._provider_logger.logger.debug(
                     "[ToolSchemas→Ollama] %d tools:\n  %s",
                     num_tools,
                     "\n  ".join(tool_sigs),

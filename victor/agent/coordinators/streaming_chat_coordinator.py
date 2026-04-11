@@ -185,7 +185,7 @@ class StreamingChatCoordinator:
             tool_summaries = [
                 f"{t.name}: {(t.description or '')[:80]}" for t in tools
             ]
-            logger.info(
+            logger.debug(
                 "[ToolDefs→LLM] %d tools selected for query=%s\n  %s",
                 len(tools),
                 user_message[:100],
