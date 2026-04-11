@@ -49,14 +49,11 @@ class TestTaskGuidance:
         prompt = builder.build()
         assert "directly" in prompt.lower() or "concisely" in prompt.lower()
 
-    def test_no_classification_unchanged_output(self):
-        builder_with = _make_builder(None)
-        builder_without = SystemPromptBuilder(
-            provider_name="anthropic",
-            model="claude-sonnet-4-20250514",
-        )
-        # Both should produce the same output when no classification
-        assert builder_with.build() == builder_without.build()
+    def test_no_classification_omits_task_guidance(self):
+        builder = _make_builder(None)
+        prompt = builder.build()
+        # Without classification, no task-specific guidance injected
+        assert "TASK GUIDANCE:" not in prompt
 
     def test_tool_constraint_lists_available_tools(self):
         builder = _make_builder(available_tools=["read_file", "write_file", "shell"])

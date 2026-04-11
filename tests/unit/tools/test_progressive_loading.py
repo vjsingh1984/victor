@@ -39,7 +39,7 @@ class TestLazyToolProxy:
 
         import asyncio
 
-        asyncio.get_event_loop().run_until_complete(proxy.execute({}, input="test"))
+        asyncio.run(proxy.execute({}, input="test"))
         factory.assert_called_once()
 
     def test_proxy_caches_after_first_use(self):
@@ -53,8 +53,9 @@ class TestLazyToolProxy:
 
         import asyncio
 
-        asyncio.get_event_loop().run_until_complete(proxy.execute({}, a="1"))
-        asyncio.get_event_loop().run_until_complete(proxy.execute({}, a="2"))
+        asyncio.run(proxy.execute({}, a="1"))
+        # Re-create since asyncio.run() closes the loop
+        asyncio.run(proxy.execute({}, a="2"))
         factory.assert_called_once()  # Only created once
 
     def test_proxy_exposes_metadata(self):
