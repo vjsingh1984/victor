@@ -72,6 +72,18 @@ class MockPluginContext:
         """Return mock settings dict."""
         return self._settings
 
+    def register_capability(
+        self,
+        protocol_type: Type[Any],
+        provider: Any,
+        *,
+        lazy: bool = False,
+    ) -> None:
+        """Register a capability provider (stores in _capabilities for testing)."""
+        if not hasattr(self, "_capabilities"):
+            self._capabilities: Dict[Type[Any], Any] = {}
+        self._capabilities[protocol_type] = provider
+
     # --- Test helpers (not part of PluginContext protocol) ---
 
     def set_service(self, service_type: Type[Any], instance: Any) -> None:

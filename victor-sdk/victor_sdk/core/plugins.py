@@ -105,6 +105,27 @@ class PluginContext(Protocol):
         """
         ...
 
+    def register_capability(
+        self,
+        protocol_type: Type[Any],
+        provider: Any,
+        *,
+        lazy: bool = False,
+    ) -> None:
+        """Register a capability provider with the framework.
+
+        This is the canonical way for plugins to register capabilities
+        (e.g., TreeSitterParser, Editor, CodebaseIndex) so they are
+        available to framework tools via CapabilityRegistry.
+
+        Args:
+            protocol_type: The protocol type to register against.
+            provider: The provider instance, or if lazy=True, a zero-arg
+                      callable that returns the provider on first access.
+            lazy: If True, provider is a factory called on first access.
+        """
+        ...
+
 
 @runtime_checkable
 class VictorPlugin(Protocol):
