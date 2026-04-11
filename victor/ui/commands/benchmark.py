@@ -981,48 +981,75 @@ def evolve_prompts(
         results.add_column("Mean", style="bold")
         results.add_column("Chars", style="dim")
 
-        # Load latest evaluation results to seed new candidates
+        # Load ALL evaluation results (not just latest) to compute
+        # aggregate pass rates per provider across all benchmark runs.
         import glob as _glob
+        import json as _json
         from pathlib import Path as _Path
 
         eval_dir = _Path.home() / ".victor" / "evaluations"
-        latest_scores = {}  # provider → (passed, failed)
+        provider_agg = {}  # provider → {"pass": N, "fail": N}
+        model_to_provider = {
+            "gpt": "openai", "grok": "xai", "deepseek": "deepseek",
+            "haiku": "anthropic", "claude": "anthropic",
+        }
         for ef in sorted(_glob.glob(str(eval_dir / "eval_swe_bench_*.json"))):
             try:
-                import json as _json
-
                 with open(ef) as _f:
                     edata = _json.load(_f)
                 emodel = edata.get("config", {}).get("model", "")
                 etasks = edata.get("tasks", [])
-                if len(etasks) >= 10:
-                    ep = sum(1 for t in etasks if t.get("status") == "passed")
-                    ef_count = len(etasks) - ep
-                    if "gpt" in emodel:
-                        latest_scores["openai"] = (ep, ef_count)
-                    elif "grok" in emodel:
-                        latest_scores["xai"] = (ep, ef_count)
-                    elif "deepseek" in emodel:
-                        latest_scores["deepseek"] = (ep, ef_count)
-                    elif "haiku" in emodel or "claude" in emodel:
-                        latest_scores["anthropic"] = (ep, ef_count)
+                # Map model to provider
+                p_name = None
+                for prefix, prov in model_to_provider.items():
+                    if prefix in emodel.lower():
+                        p_name = prov
+                        break
+                if not p_name or len(etasks) < 1:
+                    continue
+                if p_name not in provider_agg:
+                    provider_agg[p_name] = {"pass": 0, "fail": 0}
+                for t in etasks:
+                    if t.get("status") == "passed":
+                        provider_agg[p_name]["pass"] += 1
+                    else:
+                        provider_agg[p_name]["fail"] += 1
             except Exception:
                 pass
+
+        # Also collect trace-based success from usage.jsonl
+        traces = learner._collect_traces(limit=200)
+        trace_pass = sum(1 for t in traces if t.success)
+        trace_fail = len(traces) - trace_pass
+        console.print(
+            f"[dim]Seeding from {len(list(_glob.glob(str(eval_dir / 'eval_*.json'))))} "
+            f"eval files + {len(traces)} traces[/]"
+        )
+
+        # Default seed for providers without benchmark data
+        default_seed = (max(trace_pass, 5), max(trace_fail, 3))
 
         for p in providers:
             for s in sections:
                 current = section_text.get(s, "")
                 candidate = learner.evolve(s, current, provider=p)
                 if candidate:
-                    # Auto-seed from latest benchmark results
-                    scores = latest_scores.get(p)
-                    if scores:
-                        passes, fails = scores
-                        for _ in range(min(passes, 15)):
-                            candidate.update(True)
-                        for _ in range(min(fails, 15)):
-                            candidate.update(False)
-                        learner._save_candidate(candidate)
+                    # Seed from aggregate benchmark data or defaults
+                    agg = provider_agg.get(p)
+                    if agg and (agg["pass"] + agg["fail"]) > 0:
+                        # Scale to max 15 to avoid overwhelming priors
+                        total = agg["pass"] + agg["fail"]
+                        scale = min(15 / max(total, 1), 1.0)
+                        passes = max(1, int(agg["pass"] * scale))
+                        fails = max(1, int(agg["fail"] * scale))
+                    else:
+                        # No benchmark data — use trace-based defaults
+                        passes, fails = default_seed
+                    for _ in range(passes):
+                        candidate.update(True)
+                    for _ in range(fails):
+                        candidate.update(False)
+                    learner._save_candidate(candidate)
                     results.add_row(
                         p, s[:20], str(candidate.generation),
                         f"{candidate.mean:.2f}", str(len(candidate.text))
