@@ -62,11 +62,14 @@ class TestTaskGuidance:
         assert "write_file" in prompt
         assert "shell" in prompt
 
-    def test_prompt_length_varies_by_type(self):
+    def test_prompt_content_varies_by_type(self):
         quick = _make_builder(QueryType.QUICK_QUESTION).build()
         explore = _make_builder(QueryType.EXPLORATION).build()
-        # Exploration guidance is longer than quick question guidance
-        assert len(explore) > len(quick)
+        # Each type includes its own task guidance
+        assert "Answer directly" in quick or "concisely" in quick.lower()
+        assert "systematically" in explore.lower() or "map structure" in explore.lower()
+        # They should differ (different task guidance injected)
+        assert quick != explore
 
 
 class TestGEPAPromptIntegration:
