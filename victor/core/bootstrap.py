@@ -687,23 +687,11 @@ def bootstrap_capabilities() -> None:
 #
 # To add a new auto-detected capability, append an entry here — no new
 # function needed.
-_AUTO_DETECT_SPECS: list[dict[str, Any]] = [
-    {
-        "protocol_attr": "CodebaseIndexFactoryProtocol",
-        "factory": "victor.core.search.indexer:detect_enhanced_index_factory",
-        "label": "CodebaseIndexFactory",
-    },
-    {
-        "protocol_attr": "EditorProtocol",
-        "import_path": "victor_coding.editing.editor:FileEditor",
-        "label": "FileEditor",
-    },
-    {
-        "protocol_attr": "TreeSitterParserProtocol",
-        "factory": "victor.core.utils.coding_support:_load_tree_sitter_provider",
-        "label": "TreeSitterParser",
-    },
-]
+# DEPRECATED: Capabilities are now registered via the plugin system.
+# Plugins call context.register_capability() or declare them via
+# get_capability_registrations() on their VerticalBase subclass.
+# See HostPluginContext.register_vertical() for the bridge logic.
+_AUTO_DETECT_SPECS: list[dict[str, Any]] = []
 
 
 def _auto_detect_enhanced_capabilities(registry: Any) -> None:
