@@ -533,8 +533,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             po_cfg = getattr(self.settings, "prompt_optimization", None)
             gepa_cfg = po_cfg.gepa if po_cfg and po_cfg.enabled else None
             self.usage_logger = create_trace_enricher(self.usage_logger, gepa_settings=gepa_cfg)
-        except Exception:
-            pass  # Trace enrichment is best-effort
+        except Exception as exc:
+            logger.debug("Trace enrichment unavailable: %s", exc)
 
         self.streaming_metrics_collector = self._metrics_runtime.streaming_metrics_collector
         self._metrics_collector = self._metrics_runtime.metrics_collector
@@ -1111,8 +1111,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             coordinator = get_rl_coordinator()
             coordinator.set_repo_context(workspace_dir.name)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug(
+                "RL coordinator repo context unavailable: %s", exc
+            )
 
         # Rebuild system prompt with new workspace context (replaces old init.md)
         base_prompt = self._build_system_prompt_with_adapter()
@@ -2565,7 +2567,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self.conversation.add_message(role, content)
 
-        # Persist to memory manager if available
+        # Persist to memory manager if available.
+        # Offload blocking SQLite I/O to the thread pool when an
+        # event loop is running to avoid blocking async callers.
         if self.memory_manager and self._memory_session_id:
             try:
                 role_map = {
@@ -2574,13 +2578,30 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     "system": MessageRole.SYSTEM,
                 }
                 msg_role = role_map.get(role, MessageRole.USER)
-                self.memory_manager.add_message(
-                    session_id=self._memory_session_id,
-                    role=msg_role,
-                    content=content,
-                )
+
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop is not None and loop.is_running():
+                    loop.run_in_executor(
+                        None,
+                        self.memory_manager.add_message,
+                        self._memory_session_id,
+                        msg_role,
+                        content,
+                    )
+                else:
+                    self.memory_manager.add_message(
+                        session_id=self._memory_session_id,
+                        role=msg_role,
+                        content=content,
+                    )
             except Exception as e:
-                logger.debug(f"Failed to persist message to memory manager: {e}")
+                logger.debug(
+                    "Failed to persist message: %s", e
+                )
 
         if role == "user":
             self.usage_logger.log_event("user_prompt", {"content": content})

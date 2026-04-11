@@ -1854,9 +1854,79 @@ class ConversationStore:
         """Update session last activity timestamp."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "UPDATE sessions SET last_activity = ? WHERE session_id = ?",
+                "UPDATE sessions SET last_activity = ? "
+                "WHERE session_id = ?",
                 (datetime.now().isoformat(), session_id),
             )
+
+    # -----------------------------------------------------------------
+    # Async variants — offload blocking SQLite I/O to thread pool
+    # Use these from async contexts to avoid blocking the event loop.
+    # -----------------------------------------------------------------
+
+    async def add_message_async(
+        self,
+        session_id: str,
+        role: "MessageRole",
+        content: str,
+        priority: Optional["MessagePriority"] = None,
+        tool_name: Optional[str] = None,
+        tool_call_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> "ConversationMessage":
+        """Async variant of add_message.
+
+        In-memory work runs on the calling coroutine. Blocking
+        SQLite I/O is offloaded to the default thread executor.
+        """
+        session = self._get_or_create_session(session_id)
+
+        if priority is None:
+            priority = self._determine_priority(role, tool_name)
+
+        token_count = self._estimate_tokens(content)
+
+        message = ConversationMessage(
+            id=self._generate_message_id(),
+            role=role,
+            content=content,
+            timestamp=datetime.now(),
+            token_count=token_count,
+            priority=priority,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            metadata=metadata or {},
+        )
+
+        session.messages.append(message)
+        session.current_tokens += token_count
+        session.last_activity = datetime.now()
+
+        if role in (MessageRole.TOOL_CALL, MessageRole.TOOL_RESULT):
+            session.tool_usage_count += 1
+
+        if session.current_tokens > (
+            session.max_tokens - session.reserved_tokens
+        ):
+            self._prune_context(session)
+
+        # Offload blocking SQLite I/O to thread pool
+        await asyncio.to_thread(
+            self._persist_message, session_id, message
+        )
+        await asyncio.to_thread(
+            self._update_session_activity, session_id
+        )
+
+        logger.debug(
+            "Added %s message to %s (async). "
+            "Tokens: %d, Total: %d",
+            role.value,
+            session_id,
+            token_count,
+            session.current_tokens,
+        )
+        return message
 
     def _load_session(self, session_id: str) -> Optional[ConversationSession]:
         """Load session from database with JOINs to lookup tables."""
