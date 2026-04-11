@@ -211,9 +211,11 @@ class InitCommand(BaseSlashCommand):
 
         try:
             if deep or use_learn:
+                # Pass agent for orchestrator reuse (logging, events, GEPA)
                 new_content = await generate_enhanced_init_md(
                     use_llm=deep,
                     include_conversations=use_learn or deep,
+                    agent=ctx.agent,
                 )
             elif use_index:
                 new_content = await generate_victor_md_from_index()
