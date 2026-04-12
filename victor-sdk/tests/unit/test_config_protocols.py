@@ -35,6 +35,56 @@ class TestProjectPathsData:
         )
         assert p.victor_dir == "/proj/.myvictor"
 
+    def test_existing_properties(self):
+        """All existing properties return correct paths."""
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.embeddings_dir == "/home/user/project/.victor/embeddings"
+        assert paths.graph_dir == "/home/user/project/.victor/graph"
+        assert paths.sessions_dir == "/home/user/project/.victor/sessions"
+
+    def test_backups_dir(self):
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.backups_dir == "/home/user/project/.victor/backups"
+
+    def test_changes_dir(self):
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.changes_dir == "/home/user/project/.victor/changes"
+
+    def test_conversation_db(self):
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.conversation_db == "/home/user/project/.victor/conversation.db"
+
+    def test_conversations_export_dir(self):
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.conversations_export_dir == "/home/user/project/.victor/conversations"
+
+    def test_index_metadata(self):
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.index_metadata == "/home/user/project/.victor/index_metadata.json"
+
+    def test_mcp_config(self):
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.mcp_config == "/home/user/project/.victor/mcp.yaml"
+
+    def test_project_context_file(self):
+        paths = ProjectPathsData(project_root="/home/user/project")
+        assert paths.project_context_file == "/home/user/project/.victor/init.md"
+
+    def test_project_context_file_custom(self):
+        paths = ProjectPathsData(
+            project_root="/home/user/project",
+            context_file_name="custom.md",
+        )
+        assert paths.project_context_file == "/home/user/project/.victor/custom.md"
+
+    def test_custom_victor_dir_name_with_new_paths(self):
+        paths = ProjectPathsData(
+            project_root="/home/user/project",
+            victor_dir_name=".custom_victor",
+        )
+        assert paths.backups_dir == "/home/user/project/.custom_victor/backups"
+        assert paths.conversation_db == "/home/user/project/.custom_victor/conversation.db"
+
 
 class TestSettingsProviderProtocol:
     def test_structural_check(self):
