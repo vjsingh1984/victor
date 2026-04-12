@@ -636,19 +636,47 @@ class VerticalBase(
                     cls._config_cache.pop(cache_key, None)
                     cls._config_cache_timestamps.pop(cache_key, None)
 
-        # Build tool set
-        tool_names = cls.get_tools()
-        tools = _lazy_toolset_from_tools(tool_names)
+        # Build tool set — with crash containment for each hook
+        try:
+            tool_names = cls.get_tools()
+            tools = _lazy_toolset_from_tools(tool_names)
+        except Exception as e:
+            logger.warning("Vertical %s: get_tools() failed: %s", cls.name, e)
+            tools = _lazy_toolset()
+
+        try:
+            system_prompt = cls.get_system_prompt()
+        except Exception as e:
+            logger.warning("Vertical %s: get_system_prompt() failed: %s", cls.name, e)
+            system_prompt = ""
+
+        try:
+            stages = cls.get_stages()
+        except Exception as e:
+            logger.warning("Vertical %s: get_stages() failed: %s", cls.name, e)
+            stages = {}
+
+        try:
+            provider_hints = cls.get_provider_hints()
+        except Exception as e:
+            logger.warning("Vertical %s: get_provider_hints() failed: %s", cls.name, e)
+            provider_hints = {}
+
+        try:
+            evaluation_criteria = cls.get_evaluation_criteria()
+        except Exception as e:
+            logger.warning("Vertical %s: get_evaluation_criteria() failed: %s", cls.name, e)
+            evaluation_criteria = []
 
         # Build config
         config = VerticalConfig(
             name=cls.name,
             description=cls.description,
             tools=tools,
-            system_prompt=cls.get_system_prompt(),
-            stages=cls.get_stages(),
-            provider_hints=cls.get_provider_hints(),
-            evaluation_criteria=cls.get_evaluation_criteria(),
+            system_prompt=system_prompt,
+            stages=stages,
+            provider_hints=provider_hints,
+            evaluation_criteria=evaluation_criteria,
             metadata={
                 "vertical_name": cls.name,
                 "vertical_version": cls.version,
