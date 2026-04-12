@@ -296,6 +296,8 @@ class BaseStepHandler(ABC):
     parallel_safe: bool = False
     depends_on: tuple[str, ...] = ()
     side_effects: bool = True
+    # Per-capability version contracts (Phase 2 architecture hardening)
+    capability_contracts: tuple = ()
 
     @property
     @abstractmethod
@@ -408,6 +410,7 @@ class ToolStepHandler(BaseStepHandler):
     parallel_safe = True
     depends_on = ()
     side_effects = False
+    capability_contracts = (("tools", 2, ">=0.7.0"),)
 
     @property
     def name(self) -> str:
