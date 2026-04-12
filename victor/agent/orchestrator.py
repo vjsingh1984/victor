@@ -2348,7 +2348,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._active_skill_prompt = ""
 
         # Cache-friendly: system prompt was never mutated, nothing to restore
-        if self._cache_optimization_enabled:
+        if self._kv_optimization_enabled:
             return
 
         # Legacy: restore base system prompt
@@ -2398,7 +2398,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._active_skill_prompt = skill_prompt
 
         # Cache-friendly: store for user message injection, don't touch system prompt
-        if self._cache_optimization_enabled:
+        if self._kv_optimization_enabled:
             logger.info("Skill '%s' stored for user message injection (cache-friendly)", skill.name)
             return
 
@@ -2454,7 +2454,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._active_skill_prompt = composed
 
         # Cache-friendly: store for user message injection
-        if self._cache_optimization_enabled:
+        if self._kv_optimization_enabled:
             logger.info("Skills %s stored for user message injection", skill_names)
             return
 
