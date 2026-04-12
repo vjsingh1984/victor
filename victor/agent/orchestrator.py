@@ -1594,29 +1594,60 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         last N full turns + score-selected older messages within budget.
         Falls back to raw self.messages when assembler unavailable.
 
-        This is the preferred way to get messages for provider.chat()/stream()
-        calls — it respects token budgets and avoids O(n²) context growth.
+        When cache_optimization is enabled, dynamic content (skills, reminders,
+        task guidance) is prepended to the last user message instead of being
+        injected as system messages. This keeps the system prompt byte-identical
+        across turns for provider prefix caching (90% discount).
         """
         assembler = getattr(self, "_context_assembler", None)
         if assembler is None:
-            return self.messages
-
-        max_chars = self._get_max_context_chars()
-        assembled = assembler.assemble(
-            self.messages, max_chars, current_query=current_query
-        )
-
-        if len(assembled) < len(self.messages):
-            total_original = sum(len(m.content) for m in self.messages)
-            total_assembled = sum(len(m.content) for m in assembled)
-            logger.info(
-                "[context] Assembled %d/%d messages (%dK/%dK chars, budget=%dK)",
-                len(assembled), len(self.messages),
-                total_assembled // 1024, total_original // 1024,
-                max_chars // 1024,
+            messages = list(self.messages)
+        else:
+            max_chars = self._get_max_context_chars()
+            messages = assembler.assemble(
+                self.messages, max_chars, current_query=current_query
             )
 
-        return assembled
+            if len(messages) < len(self.messages):
+                total_original = sum(len(m.content) for m in self.messages)
+                total_assembled = sum(len(m.content) for m in messages)
+                logger.info(
+                    "[context] Assembled %d/%d messages (%dK/%dK chars, budget=%dK)",
+                    len(messages), len(self.messages),
+                    total_assembled // 1024, total_original // 1024,
+                    max_chars // 1024,
+                )
+
+        # Cache-friendly: prepend dynamic content to last user message
+        if self._cache_optimization_enabled and messages:
+            prefix_parts = []
+
+            # Active skill prompt (if any)
+            skill_prefix = self.get_skill_user_prefix()
+            if skill_prefix:
+                prefix_parts.append(skill_prefix.strip())
+
+            # Context reminders (files read, budget, progress)
+            reminder_mgr = getattr(self, "_reminder_manager", None)
+            if reminder_mgr:
+                reminder_prefix = reminder_mgr.get_user_message_prefix()
+                if reminder_prefix:
+                    prefix_parts.append(reminder_prefix.strip())
+
+            if prefix_parts:
+                # Find last user message and prepend
+                from victor.providers.base import Message as Msg
+
+                for i in range(len(messages) - 1, -1, -1):
+                    if messages[i].role == "user":
+                        prefix = "\n".join(prefix_parts) + "\n\n"
+                        messages[i] = Msg(
+                            role="user",
+                            content=prefix + messages[i].content,
+                        )
+                        break
+
+        return messages
 
     def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
         """Check if context is at risk of overflow.
@@ -2259,15 +2290,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return getattr(self, "_last_skill_match_info", None)
 
     def clear_active_skills(self) -> None:
-        """Remove any active skill injection, restoring the base system prompt.
+        """Remove any active skill injection.
 
-        Called at the start of each turn to ensure skills don't accumulate
-        across multi-turn conversations.
+        Called at the start of each turn to ensure skills don't accumulate.
+        When cache_optimization enabled: just clears _active_skill_prompt
+        (system prompt was never touched). Otherwise: restores base prompt.
         """
+        self._active_skill_prompt = ""
+
+        # Cache-friendly: system prompt was never mutated, nothing to restore
+        if self._cache_optimization_enabled:
+            return
+
+        # Legacy: restore base system prompt
         base = getattr(self, "_base_system_prompt", None)
         if base is not None:
             self._system_prompt = base
-        self._active_skill_prompt = ""
 
         if hasattr(self, "conversation") and self.conversation is not None:
             self.conversation.system_prompt = self._system_prompt
@@ -2279,26 +2317,46 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         role="system", content=self._system_prompt
                     )
 
-    def inject_skill(self, skill: Any) -> None:
-        """Inject a skill's prompt fragment into the current system prompt.
+    def get_skill_user_prefix(self) -> str:
+        """Get active skill prompt as user message prefix (cache-friendly).
 
-        Called by the chat coordinator when auto-skill-selection matches
-        a skill to the user's message. Stores the base prompt separately
-        so it can be restored on the next turn via clear_active_skills().
+        When cache_optimization is enabled, skills are injected into the
+        user message instead of mutating the system prompt. This keeps
+        the system prompt byte-identical across turns for prefix caching.
+
+        Returns:
+            Skill prompt prefix string, or empty string if no active skill.
+        """
+        return getattr(self, "_active_skill_prompt", "") or ""
+
+    def inject_skill(self, skill: Any) -> None:
+        """Inject a skill's prompt fragment.
+
+        When cache_optimization is enabled: stores skill text for user
+        message injection (via get_skill_user_prefix). System prompt
+        stays frozen.
+
+        When disabled: legacy behavior — prepends to system prompt.
 
         Args:
             skill: A SkillDefinition with name, description, prompt_fragment.
         """
-        # Save base prompt before first injection
-        if not getattr(self, "_base_system_prompt", None):
-            self._base_system_prompt = self._system_prompt or ""
-
         skill_prompt = (
             f"ACTIVE SKILL: {skill.name}\n"
             f"Description: {skill.description}\n"
             f"{skill.prompt_fragment}\n\n"
         )
         self._active_skill_prompt = skill_prompt
+
+        # Cache-friendly: store for user message injection, don't touch system prompt
+        if self._cache_optimization_enabled:
+            logger.info("Skill '%s' stored for user message injection (cache-friendly)", skill.name)
+            return
+
+        # Legacy: mutate system prompt directly
+        if not getattr(self, "_base_system_prompt", None):
+            self._base_system_prompt = self._system_prompt or ""
+
         self._system_prompt = skill_prompt + (self._base_system_prompt or "")
 
         # Sync to conversation's live message
@@ -2315,10 +2373,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         logger.info("Injected skill '%s' into system prompt", skill.name)
 
     def inject_skills(self, skills: List[Any]) -> None:
-        """Inject multiple skills' prompt fragments into the system prompt.
+        """Inject multiple skills' prompt fragments.
 
-        Skills are composed in order (first = highest priority). Caps at 3
-        to respect prompt budget. Uses arrow notation in header.
+        Cache-friendly: when cache_optimization enabled, stores for user
+        message injection. Otherwise, legacy system prompt mutation.
 
         Args:
             skills: List of (SkillDefinition, score) tuples.
@@ -2344,11 +2402,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             f"Execute these skills in the listed order.\n\n" + "\n".join(fragments) + "\n"
         )
 
-        # Save base prompt before first injection
+        self._active_skill_prompt = composed
+
+        # Cache-friendly: store for user message injection
+        if self._cache_optimization_enabled:
+            logger.info("Skills %s stored for user message injection", skill_names)
+            return
+
+        # Legacy: mutate system prompt
         if not getattr(self, "_base_system_prompt", None):
             self._base_system_prompt = self._system_prompt or ""
 
-        self._active_skill_prompt = composed
         self._system_prompt = composed + (self._base_system_prompt or "")
 
         if hasattr(self, "conversation") and self.conversation is not None:
