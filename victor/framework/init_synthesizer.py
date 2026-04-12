@@ -117,11 +117,13 @@ class InitSynthesizer:
         Used when victor-coding is not installed — no CodebaseAnalyzer or graph
         analysis available. The Agent uses tools (overview, ls, read) to explore
         the codebase and generate init.md in one pass.
+
+        Unlike synthesize(), this DOES use the agentic loop (needs tool calling).
         """
         if agent:
             return await self._run_with_orchestrator(agent, TOOLS_FALLBACK_PROMPT)
         else:
-            return await self._run_with_fresh_agent(
+            return await self._run_agent_with_tools(
                 TOOLS_FALLBACK_PROMPT, provider, model, vertical="coding"
             )
 
@@ -144,7 +146,50 @@ class InitSynthesizer:
         model: Optional[str],
         vertical: Optional[str] = None,
     ) -> str:
-        """Run synthesis using a fresh Agent (CLI path)."""
+        """Run synthesis using a direct provider call with framework logging.
+
+        Uses ProviderRegistry (not Agent.run()) to avoid the agentic loop:
+        - No tool calling, no continuation nudges, no multi-turn
+        - Single LLM call: prompt in → markdown out
+        - Still gets provider-level logging (API_CALL_START/SUCCESS)
+        """
+        try:
+            from victor.providers.base import Message
+            from victor.providers.registry import ProviderRegistry
+
+            if not provider:
+                from victor.config.settings import load_settings
+
+                settings = load_settings()
+                provider = getattr(settings, "default_provider", "ollama")
+                model = model or getattr(settings, "default_model", None)
+
+            provider_instance = ProviderRegistry.create(provider)
+            if not provider_instance:
+                logger.warning("Could not create provider %s", provider)
+                return ""
+
+            messages = [Message(role="user", content=prompt)]
+            response = await provider_instance.chat(
+                messages=messages,
+                model=model,
+                temperature=0.7,
+                max_tokens=4096,
+            )
+            await provider_instance.close()
+            return self._clean(response.content) if response else ""
+        except Exception as e:
+            logger.warning("Init synthesis via provider failed: %s", e)
+            return ""
+
+    async def _run_agent_with_tools(
+        self,
+        prompt: str,
+        provider: Optional[str],
+        model: Optional[str],
+        vertical: Optional[str] = None,
+    ) -> str:
+        """Run synthesis with Agent tools (fallback path — needs agentic loop)."""
         try:
             from victor.framework.agent import Agent
 
@@ -160,7 +205,7 @@ class InitSynthesizer:
             result = await agent.run(prompt)
             return self._clean(result.content) if result.success else ""
         except Exception as e:
-            logger.warning("Init synthesis via Agent.create() failed: %s", e)
+            logger.warning("Init synthesis with tools failed: %s", e)
             return ""
 
     @staticmethod
