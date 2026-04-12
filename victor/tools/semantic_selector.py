@@ -126,26 +126,6 @@ class SemanticToolSelector:
     - Self-improving with better tool descriptions
     """
 
-    # NOTE: _load_tool_knowledge() and related class variables were removed.
-    # All tools now provide metadata via get_metadata() which auto-generates
-    # from tool properties. Legacy tool_knowledge.yaml has been archived.
-
-    @classmethod
-    def _build_use_case_text(cls, tool_name: str) -> str:
-        """Build use case text for embedding (legacy method, returns empty).
-
-        NOTE: This method previously loaded from tool_knowledge.yaml which
-        has been archived. All metadata now comes from get_metadata().
-        Kept for API compatibility but always returns empty string.
-
-        Args:
-            tool_name: Name of the tool (unused)
-
-        Returns:
-            Empty string - use get_metadata() for tool metadata
-        """
-        return ""
-
     def __init__(
         self,
         embedding_model: str = "all-MiniLM-L6-v2",
@@ -1747,8 +1727,8 @@ class SemanticToolSelector:
 
         Uses the ToolMetadataProvider contract: tool.get_metadata() is guaranteed
         to return valid ToolMetadata (either explicit or auto-generated from
-        tool properties). Falls back to YAML only for legacy tools without
-        get_metadata().
+        tool properties). Legacy tools without get_metadata() rely on
+        name + description only.
 
         Args:
             tool: Tool object
@@ -1780,35 +1760,9 @@ class SemanticToolSelector:
                 parts.append(f"Common requests: {', '.join(metadata.keywords)}.")
             if metadata.examples:
                 parts.append(f"Examples: {', '.join(metadata.examples)}.")
-        else:
-            # Fallback for legacy tools without get_metadata()
-            use_cases = cls._get_tool_use_cases(tool.name)
-            if use_cases:
-                parts.append(use_cases)
+        # Legacy tools without get_metadata() rely on name + description only
 
         return ". ".join(parts)
-
-    @classmethod
-    def _get_tool_use_cases(cls, tool_name: str) -> str:
-        """Get common use cases for a tool to improve semantic matching.
-
-        Loads tool knowledge from YAML configuration file (tool_knowledge.yaml)
-        which is more maintainable than hardcoded dictionaries.
-
-        Args:
-            tool_name: Name of the tool
-
-        Returns:
-            String describing common use cases with rich keywords and examples
-        """
-        # Try to get from YAML-loaded knowledge first
-        use_case_text = cls._build_use_case_text(tool_name)
-        if use_case_text:
-            return use_case_text
-
-        # Fallback to empty string if not found in YAML
-        # The tool's description from the tool definition will still be used
-        return ""
 
     # ========================================================================
     # Classification-Aware Tool Selection (UnifiedTaskClassifier Integration)

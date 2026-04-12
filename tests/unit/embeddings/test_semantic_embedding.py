@@ -377,30 +377,6 @@ class TestToolSelectionWithEmbeddings:
                 assert "mock_tool" in tool_names
 
 
-class TestToolKnowledge:
-    """Tests for legacy tool knowledge methods.
-
-    NOTE: _load_tool_knowledge() was removed - it always returned {}.
-    All metadata now comes from get_metadata(). These tests verify
-    the legacy _build_use_case_text() API still works (returns empty).
-    """
-
-    def test_build_use_case_text_returns_empty(self):
-        """Test _build_use_case_text returns empty for any tool.
-
-        The legacy YAML-based tool knowledge has been removed.
-        This method now always returns empty string.
-        """
-        result = SemanticToolSelector._build_use_case_text("unknown_tool_xyz_123")
-        assert result == ""
-
-        result = SemanticToolSelector._build_use_case_text("read_file")
-        assert result == ""
-
-        result = SemanticToolSelector._build_use_case_text("code_search")
-        assert result == ""
-
-
 class TestCacheOperations:
     """Tests for cache loading and saving operations."""
 

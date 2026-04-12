@@ -780,13 +780,6 @@ class TestToolMetadata:
 class TestSemanticToolSelector:
     """Tests for SemanticToolSelector."""
 
-    def test_build_use_case_text_returns_empty(self):
-        """Test _build_use_case_text returns empty string (legacy method)."""
-        from victor.tools.semantic_selector import SemanticToolSelector
-
-        result = SemanticToolSelector._build_use_case_text("any_tool")
-        assert result == ""
-
     def test_cost_tier_warnings_defined(self):
         """Test COST_TIER_WARNINGS are defined."""
         from victor.tools.semantic_selector import COST_TIER_WARNINGS
