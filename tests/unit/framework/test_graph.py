@@ -35,6 +35,9 @@ from victor.framework.graph import (
     CheckpointerProtocol,
     MemoryCheckpointer,
     RLCheckpointerAdapter,
+    SubgraphNode,
+    Send,
+    default_state_merger,
     END,
     START,
     create_graph,
@@ -753,3 +756,597 @@ class TestFrameworkExports:
         assert FrameworkNodeStatus.COMPLETED.value == "completed"
         assert FrameworkNodeStatus.FAILED.value == "failed"
         assert FrameworkNodeStatus.SKIPPED.value == "skipped"
+
+
+# =============================================================================
+# Subgraph Nesting Tests (Item 4)
+# =============================================================================
+
+
+class TestSubgraphNesting:
+    """Tests for SubgraphNode and add_subgraph."""
+
+    async def test_subgraph_basic_execution(self):
+        """A subgraph node should execute its inner compiled graph."""
+        # Inner graph: increment value
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        # Outer graph: uses subgraph
+        outer = StateGraph(SimpleState)
+        outer.add_node("start", sync_node)
+        outer.add_subgraph("inner_graph", inner_compiled)
+        outer.add_edge("start", "inner_graph")
+        outer.add_edge("inner_graph", END)
+        outer.set_entry_point("start")
+
+        app = outer.compile()
+        result = await app.invoke({"value": 0, "history": []})
+        assert result.success
+        # sync_node adds 10, inner increment_node adds 1
+        assert result.state["value"] == 11
+
+    async def test_subgraph_with_input_mapper(self):
+        """Input mapper transforms parent state before subgraph."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("double", double_node)
+        inner.add_edge("double", END)
+        inner.set_entry_point("double")
+        inner_compiled = inner.compile()
+
+        outer = StateGraph(SimpleState)
+        outer.add_subgraph(
+            "sub",
+            inner_compiled,
+            input_mapper=lambda s: {**s, "value": s["value"] + 100},
+        )
+        outer.add_edge("sub", END)
+        outer.set_entry_point("sub")
+
+        app = outer.compile()
+        result = await app.invoke({"value": 5, "history": []})
+        assert result.success
+        # input_mapper: 5 + 100 = 105, double: 105 * 2 = 210
+        assert result.state["value"] == 210
+
+    async def test_subgraph_with_output_mapper(self):
+        """Output mapper transforms subgraph result back to parent."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        outer = StateGraph(SimpleState)
+        outer.add_subgraph(
+            "sub",
+            inner_compiled,
+            output_mapper=lambda s: {**s, "value": s["value"] * 10},
+        )
+        outer.add_edge("sub", END)
+        outer.set_entry_point("sub")
+
+        app = outer.compile()
+        result = await app.invoke({"value": 3, "history": []})
+        assert result.success
+        # inner: 3 + 1 = 4, output_mapper: 4 * 10 = 40
+        assert result.state["value"] == 40
+
+    async def test_subgraph_preserves_state_keys(self):
+        """Subgraph should not lose parent state keys."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        outer = StateGraph(SimpleState)
+        outer.add_subgraph("sub", inner_compiled)
+        outer.add_edge("sub", END)
+        outer.set_entry_point("sub")
+
+        app = outer.compile()
+        result = await app.invoke({"value": 1, "history": ["start"]})
+        assert result.success
+        assert "history" in result.state
+        assert "increment" in result.state["history"]
+
+    async def test_subgraph_node_in_history(self):
+        """The subgraph node should appear in execution history."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        outer = StateGraph(SimpleState)
+        outer.add_subgraph("sub", inner_compiled)
+        outer.add_edge("sub", END)
+        outer.set_entry_point("sub")
+
+        app = outer.compile()
+        result = await app.invoke({"value": 0, "history": []})
+        assert "sub" in result.node_history
+
+    def test_add_subgraph_duplicate_raises(self):
+        """Adding a subgraph with an existing node ID should raise."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        graph = StateGraph(SimpleState)
+        graph.add_node("dup", sync_node)
+        with pytest.raises(ValueError, match="already exists"):
+            graph.add_subgraph("dup", inner_compiled)
+
+    async def test_nested_subgraph(self):
+        """A subgraph can contain another subgraph (2-level nesting)."""
+        # Innermost: increment
+        innermost = StateGraph(SimpleState)
+        innermost.add_node("inc", increment_node)
+        innermost.add_edge("inc", END)
+        innermost.set_entry_point("inc")
+        innermost_compiled = innermost.compile()
+
+        # Middle: wraps innermost
+        middle = StateGraph(SimpleState)
+        middle.add_subgraph("inner", innermost_compiled)
+        middle.add_edge("inner", END)
+        middle.set_entry_point("inner")
+        middle_compiled = middle.compile()
+
+        # Outer
+        outer = StateGraph(SimpleState)
+        outer.add_subgraph("mid", middle_compiled)
+        outer.add_edge("mid", END)
+        outer.set_entry_point("mid")
+
+        app = outer.compile()
+        result = await app.invoke({"value": 0, "history": []})
+        assert result.success
+        assert result.state["value"] == 1
+
+    async def test_subgraph_from_schema(self):
+        """from_schema should handle 'subgraph' node type."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        schema = {
+            "nodes": [
+                {"id": "start", "type": "function", "func": "sync_fn"},
+                {"id": "sub", "type": "subgraph", "graph": "inner_graph"},
+            ],
+            "edges": [
+                {"source": "start", "target": "sub", "type": "normal"},
+                {"source": "sub", "target": END, "type": "normal"},
+            ],
+            "entry_point": "start",
+        }
+
+        graph = StateGraph.from_schema(
+            schema,
+            state_schema=SimpleState,
+            node_registry={"sync_fn": sync_node, "inner_graph": inner_compiled},
+        )
+        app = graph.compile()
+        result = await app.invoke({"value": 0, "history": []})
+        assert result.success
+        # sync_node adds 10, inner increment_node adds 1
+        assert result.state["value"] == 11
+
+    async def test_subgraph_node_dataclass(self):
+        """SubgraphNode dataclass should store all attributes."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        node = SubgraphNode(id="test", compiled_graph=inner_compiled)
+        assert node.id == "test"
+        assert node.compiled_graph is inner_compiled
+        assert node.input_mapper is None
+        assert node.output_mapper is None
+
+    async def test_subgraph_node_execute_directly(self):
+        """SubgraphNode.execute() should work when called directly."""
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        node = SubgraphNode(id="test", compiled_graph=inner_compiled)
+        result = await node.execute({"value": 5, "history": []})
+        assert result["value"] == 6
+
+
+# =============================================================================
+# Send / Fan-out Tests (Item 5)
+# =============================================================================
+
+
+class TestDefaultStateMerger:
+    """Tests for the default_state_merger function."""
+
+    def test_merges_sequential(self):
+        """Branch states are merged by sequential dict.update."""
+        base = {"a": 1, "b": 2}
+        branches = [{"a": 10, "c": 3}, {"d": 4}]
+        merged = default_state_merger(base, branches)
+        assert merged == {"a": 10, "b": 2, "c": 3, "d": 4}
+
+    def test_empty_branches(self):
+        """Empty branch list returns base state."""
+        base = {"x": 1}
+        merged = default_state_merger(base, [])
+        assert merged == {"x": 1}
+
+    def test_does_not_mutate_base(self):
+        """The original base dict should not be mutated."""
+        base = {"a": 1}
+        branches = [{"a": 99}]
+        default_state_merger(base, branches)
+        assert base["a"] == 1
+
+
+class TestSendFanOut:
+    """Tests for Send dataclass and fan-out execution."""
+
+    def test_send_dataclass(self):
+        """Send stores node and state."""
+        s = Send(node="process", state={"data": "hello"})
+        assert s.node == "process"
+        assert s.state == {"data": "hello"}
+
+    def test_edge_returns_send_list(self):
+        """A conditional edge returning List[Send] works."""
+        def fanout_condition(state):
+            return [
+                Send(node="a", state={"val": 1}),
+                Send(node="b", state={"val": 2}),
+            ]
+
+        edge = Edge(
+            source="start",
+            target={},
+            edge_type=EdgeType.CONDITIONAL,
+            condition=fanout_condition,
+        )
+        result = edge.get_target({"any": "state"})
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0].node == "a"
+        assert result[1].node == "b"
+
+    def test_edge_returns_string_for_regular_condition(self):
+        """A regular conditional edge still returns a string target."""
+        def regular_condition(state):
+            return "branch_a"
+
+        edge = Edge(
+            source="start",
+            target={"branch_a": "node_a", "branch_b": "node_b"},
+            edge_type=EdgeType.CONDITIONAL,
+            condition=regular_condition,
+        )
+        result = edge.get_target({"any": "state"})
+        assert result == "node_a"
+
+    async def test_fan_out_parallel_execution(self):
+        """Send-based fan-out executes branches in parallel and merges."""
+        async def router_node(state):
+            state["routed"] = True
+            return state
+
+        async def worker_a(state):
+            state["a_result"] = state.get("val", 0) * 10
+            return state
+
+        async def worker_b(state):
+            state["b_result"] = state.get("val", 0) + 100
+            return state
+
+        def fanout(state):
+            return [
+                Send(node="worker_a", state={**state, "val": 2}),
+                Send(node="worker_b", state={**state, "val": 3}),
+            ]
+
+        graph = StateGraph()
+        graph.add_node("router", router_node)
+        graph.add_node("worker_a", worker_a)
+        graph.add_node("worker_b", worker_b)
+        graph.set_entry_point("router")
+        # Map targets so validator sees them as reachable
+        graph.add_conditional_edge(
+            "router", fanout, {"a": "worker_a", "b": "worker_b"}
+        )
+
+        app = graph.compile()
+        result = await app.invoke({"val": 0})
+        assert result.success
+        # Both branches should have executed and merged
+        assert "a_result" in result.state
+        assert "b_result" in result.state
+
+    async def test_fan_out_with_custom_merger(self):
+        """Custom state merger is used when set."""
+        async def identity(state):
+            return state
+
+        def sum_merger(base, branches):
+            merged = dict(base)
+            for b in branches:
+                for k, v in b.items():
+                    if k in merged and isinstance(v, (int, float)):
+                        merged[k] = merged.get(k, 0) + v
+                    else:
+                        merged[k] = v
+            return merged
+
+        def fanout(state):
+            return [
+                Send(node="a", state={"count": 10}),
+                Send(node="b", state={"count": 20}),
+            ]
+
+        graph = StateGraph()
+        graph.add_node("start", identity)
+        graph.add_node("a", identity)
+        graph.add_node("b", identity)
+        graph.set_entry_point("start")
+        graph.add_conditional_edge(
+            "start", fanout, {"x": "a", "y": "b"}
+        )
+        graph.add_state_merger(sum_merger)
+
+        app = graph.compile()
+        result = await app.invoke({"count": 0})
+        assert result.success
+        # sum_merger: 0 + 10 + 20 = 30
+        assert result.state["count"] == 30
+
+    async def test_fan_out_node_history(self):
+        """Fan-out branches appear in node_history as send:<node>."""
+        async def noop(state):
+            return state
+
+        def fanout(state):
+            return [
+                Send(node="a", state=state),
+                Send(node="b", state=state),
+            ]
+
+        graph = StateGraph()
+        graph.add_node("router", noop)
+        graph.add_node("a", noop)
+        graph.add_node("b", noop)
+        graph.set_entry_point("router")
+        graph.add_conditional_edge(
+            "router", fanout, {"x": "a", "y": "b"}
+        )
+
+        app = graph.compile()
+        result = await app.invoke({})
+        assert "send:a" in result.node_history
+        assert "send:b" in result.node_history
+
+    async def test_fan_out_ends_graph_after_merge(self):
+        """After fan-out, the graph should terminate (reach END)."""
+        async def noop(state):
+            return state
+
+        def fanout(state):
+            return [Send(node="a", state=state)]
+
+        graph = StateGraph()
+        graph.add_node("start", noop)
+        graph.add_node("a", noop)
+        graph.set_entry_point("start")
+        graph.add_conditional_edge("start", fanout, {"x": "a"})
+
+        app = graph.compile()
+        result = await app.invoke({"x": 1})
+        assert result.success
+
+    def test_send_exported(self):
+        """Send and default_state_merger are in __all__."""
+        from victor.framework.graph import __all__ as graph_all
+        assert "Send" in graph_all
+        assert "default_state_merger" in graph_all
+        assert "SubgraphNode" in graph_all
+
+
+# =============================================================================
+# State History & Replay Tests (Item 6)
+# =============================================================================
+
+
+class TestStateHistoryReplay:
+    """Tests for get_state_history, replay_from, and start_node."""
+
+    async def test_get_state_history_returns_checkpoints(self):
+        """get_state_history returns all checkpoints for a thread."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_node("double", double_node)
+        graph.add_edge("inc", "double")
+        graph.add_edge("double", END)
+        graph.set_entry_point("inc")
+
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
+
+        thread_id = "test-history-thread"
+        await app.invoke({"value": 0, "history": []}, thread_id=thread_id)
+
+        history = await app.get_state_history(thread_id)
+        assert len(history) >= 2  # at least one per node
+        assert all(isinstance(cp, WorkflowCheckpoint) for cp in history)
+
+    async def test_get_state_history_empty_without_checkpointer(self):
+        """get_state_history returns [] when no checkpointer is configured."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_edge("inc", END)
+        graph.set_entry_point("inc")
+
+        app = graph.compile()
+        history = await app.get_state_history("any-thread")
+        assert history == []
+
+    async def test_get_state_history_empty_for_unknown_thread(self):
+        """get_state_history returns [] for a thread with no checkpoints."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_edge("inc", END)
+        graph.set_entry_point("inc")
+
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
+
+        history = await app.get_state_history("nonexistent-thread")
+        assert history == []
+
+    async def test_start_node_skips_earlier_nodes(self):
+        """invoke(start_node=...) starts execution from the given node."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_node("double", double_node)
+        graph.add_edge("inc", "double")
+        graph.add_edge("double", END)
+        graph.set_entry_point("inc")
+
+        app = graph.compile()
+
+        # Skip "inc", start from "double" directly
+        result = await app.invoke(
+            {"value": 5, "history": []},
+            start_node="double",
+        )
+        assert result.success
+        # Only double (5 * 2 = 10), not increment
+        assert result.state["value"] == 10
+        assert "double" in result.node_history
+        assert "inc" not in result.node_history
+
+    async def test_replay_from_checkpoint(self):
+        """replay_from restores checkpoint state and continues."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_node("double", double_node)
+        graph.add_edge("inc", "double")
+        graph.add_edge("double", END)
+        graph.set_entry_point("inc")
+
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
+
+        thread_id = "replay-test"
+        await app.invoke({"value": 0, "history": []}, thread_id=thread_id)
+
+        history = await app.get_state_history(thread_id)
+        assert len(history) > 0
+
+        # Replay from first checkpoint (should be after "inc")
+        first_cp = history[0]
+        replay_result = await app.replay_from(thread_id, first_cp.checkpoint_id)
+        assert replay_result.success
+
+    async def test_replay_from_generates_new_thread(self):
+        """replay_from creates a new thread to avoid polluting history."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_edge("inc", END)
+        graph.set_entry_point("inc")
+
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
+
+        thread_id = "replay-thread-test"
+        await app.invoke({"value": 0, "history": []}, thread_id=thread_id)
+
+        history = await app.get_state_history(thread_id)
+        first_cp = history[0]
+
+        await app.replay_from(thread_id, first_cp.checkpoint_id)
+
+        # Original thread history should be unchanged
+        original_history = await app.get_state_history(thread_id)
+        assert len(original_history) == len(history)
+
+    async def test_replay_from_nonexistent_checkpoint_raises(self):
+        """replay_from raises ValueError for unknown checkpoint_id."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_edge("inc", END)
+        graph.set_entry_point("inc")
+
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
+
+        with pytest.raises(ValueError, match="not found"):
+            await app.replay_from("any-thread", "nonexistent-checkpoint")
+
+    async def test_replay_from_without_checkpointer_raises(self):
+        """replay_from raises ValueError when no checkpointer."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_edge("inc", END)
+        graph.set_entry_point("inc")
+
+        app = graph.compile()
+
+        with pytest.raises(ValueError, match="checkpointer"):
+            await app.replay_from("any-thread", "any-checkpoint")
+
+    async def test_state_history_ordered_chronologically(self):
+        """Checkpoints should be ordered by creation time."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_node("double", double_node)
+        graph.add_edge("inc", "double")
+        graph.add_edge("double", END)
+        graph.set_entry_point("inc")
+
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
+
+        thread_id = "ordered-test"
+        await app.invoke({"value": 0, "history": []}, thread_id=thread_id)
+
+        history = await app.get_state_history(thread_id)
+        timestamps = [cp.timestamp for cp in history]
+        assert timestamps == sorted(timestamps)
+
+    async def test_replay_from_second_checkpoint(self):
+        """Replaying from the second checkpoint uses its state."""
+        graph = StateGraph(SimpleState)
+        graph.add_node("inc", increment_node)
+        graph.add_node("double", double_node)
+        graph.add_edge("inc", "double")
+        graph.add_edge("double", END)
+        graph.set_entry_point("inc")
+
+        checkpointer = MemoryCheckpointer()
+        app = graph.compile(checkpointer=checkpointer)
+
+        thread_id = "second-cp-test"
+        await app.invoke({"value": 1, "history": []}, thread_id=thread_id)
+
+        history = await app.get_state_history(thread_id)
+        assert len(history) >= 2
+
+        # Second checkpoint should be after "double" node
+        second_cp = history[1]
+        replay = await app.replay_from(thread_id, second_cp.checkpoint_id)
+        assert replay.success

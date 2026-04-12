@@ -175,6 +175,11 @@ class BenchmarkTask:
     # If None, framework infers complexity from task description
     complexity_override: Optional[str] = None
 
+    # Task type hint - if set, _infer_task_type() uses this instead of keyword inference.
+    # Valid values match FrameworkTaskType names: "edit", "create", "search", "analyze",
+    # "execute", "chat", "explore".  If None, keyword-based inference is used.
+    task_type_hint: Optional[str] = None
+
 
 @dataclass
 class CodeQualityMetrics:

@@ -249,6 +249,9 @@ class StandardGroundingRules:
 
     Provides base grounding rule templates that verticals can use
     or extend with domain-specific rules.
+
+    External verticals can register their own addendums via
+    ``register_addendum()`` without modifying this module (OCP).
     """
 
     # Base grounding rule - applies to all verticals
@@ -285,6 +288,31 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
         "Verify configuration syntax before suggesting. Always check existing resources first."
     )
 
+    # Registry for vertical-specific addendums (OCP: open for extension)
+    _grounding_addendums: Dict[str, str] = {}
+
+    @classmethod
+    def register_addendum(cls, vertical_name: str, text: str) -> None:
+        """Register a grounding addendum for a vertical.
+
+        External verticals call this to extend grounding rules
+        without modifying this module.
+
+        Args:
+            vertical_name: Vertical name (e.g. "research", "devops")
+            text: Addendum text to append after base grounding rules
+        """
+        cls._grounding_addendums[vertical_name] = text
+
+    @classmethod
+    def unregister_addendum(cls, vertical_name: str) -> None:
+        """Remove a previously registered addendum.
+
+        Args:
+            vertical_name: Vertical name to remove
+        """
+        cls._grounding_addendums.pop(vertical_name, None)
+
     @classmethod
     def get_base(cls, extended: bool = False) -> str:
         """Get base grounding rules.
@@ -301,6 +329,9 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
     def for_vertical(cls, vertical: str, extended: bool = False) -> str:
         """Get grounding rules for a specific vertical.
 
+        Looks up addendums from the registry populated via
+        ``register_addendum()``.
+
         Args:
             vertical: Vertical name
             extended: Whether to use extended rules
@@ -309,15 +340,24 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
             Grounding rules string with vertical addendum
         """
         base = cls.get_base(extended)
-        addendums = {
-            "research": cls.RESEARCH_ADDENDUM,
-            "data_analysis": cls.DATA_ADDENDUM,
-            "devops": cls.DEVOPS_ADDENDUM,
-        }
-        addendum = addendums.get(vertical, "")
+        addendum = cls._grounding_addendums.get(vertical, "")
         if addendum:
             return f"{base}\n{addendum}"
         return base
+
+    @classmethod
+    def _register_defaults(cls) -> None:
+        """Register the built-in default addendums.
+
+        Called at module load time for backward compatibility.
+        """
+        cls.register_addendum("research", cls.RESEARCH_ADDENDUM)
+        cls.register_addendum("data_analysis", cls.DATA_ADDENDUM)
+        cls.register_addendum("devops", cls.DEVOPS_ADDENDUM)
+
+
+# Register built-in addendums at module load time
+StandardGroundingRules._register_defaults()
 
 
 # =============================================================================
