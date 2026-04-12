@@ -169,15 +169,58 @@ class InitSynthesizer:
                 logger.warning("Could not create provider %s", provider)
                 return ""
 
+            import time as _time
+
             messages = [Message(role="user", content=prompt)]
+
+            logger.info(
+                "[init→LLM] provider=%s model=%s prompt_chars=%d prompt_lines=%d",
+                provider, model, len(prompt), prompt.count("\n"),
+            )
+            _start = _time.monotonic()
+
             response = await provider_instance.chat(
                 messages=messages,
                 model=model,
                 temperature=0.7,
                 max_tokens=4096,
             )
+            _elapsed_ms = (_time.monotonic() - _start) * 1000
+            content = response.content if response else ""
+            result = self._clean(content)
+
+            logger.info(
+                "[init←LLM] provider=%s model=%s duration=%.1fs "
+                "response_chars=%d response_lines=%d usage=%s",
+                provider, model, _elapsed_ms / 1000,
+                len(result), result.count("\n"),
+                getattr(response, "usage", None),
+            )
+
+            # Log to usage.jsonl for GEPA/MIPROv2/CoT learning
+            try:
+                from victor.observability.analytics.logger import UsageLogger
+                from pathlib import Path
+
+                logs_dir = Path.home() / ".victor" / "logs"
+                logs_dir.mkdir(parents=True, exist_ok=True)
+                usage = UsageLogger(log_file=logs_dir / "usage.jsonl", enabled=True)
+                usage.log_event("tool_call", {
+                    "tool_name": "init_synthesis",
+                    "tool_args": {"provider": provider, "model": model, "prompt_chars": len(prompt)},
+                })
+                usage.log_event("tool_result", {
+                    "tool_name": "init_synthesis",
+                    "success": bool(result),
+                    "duration_ms": round(_elapsed_ms, 1),
+                    "result_lines": result.count("\n"),
+                    "result_chars": len(result),
+                })
+            except Exception:
+                pass  # Usage logging is best-effort
+
             await provider_instance.close()
-            return self._clean(response.content) if response else ""
+            return result
         except Exception as e:
             logger.warning("Init synthesis via provider failed: %s", e)
             return ""
