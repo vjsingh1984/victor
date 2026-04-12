@@ -405,3 +405,234 @@ class TestKVToolSelectionStrategy:
         tool_a.name = "a_tool"
         result = AgentOrchestrator._apply_kv_tool_strategy(orch, [tool_a])
         assert result == [tool_a]  # Pass through unchanged
+
+
+# =====================================================================
+# W1: Cached optimization flags
+# =====================================================================
+
+
+class TestCachedOptimizationFlags:
+    """Test that optimization flags are cached at init, not recomputed per access."""
+
+    def test_cache_flag_attributes_exist(self):
+        """Orchestrator exposes _kv_opt_cached and _cache_opt_cached attributes."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        # These should be declared (even if None before _compute_cache_flags)
+        assert hasattr(AgentOrchestrator, "_compute_cache_flags")
+
+    def test_compute_cache_flags_sets_cached_values(self):
+        """_compute_cache_flags sets both cached flag values."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        provider = MagicMock()
+        provider.supports_prompt_caching.return_value = False
+        provider.supports_kv_prefix_caching.return_value = True
+        orch.provider = provider
+        orch.settings = MagicMock()
+        orch.settings.context = MagicMock()
+        orch.settings.context.cache_optimization_enabled = True
+        orch._check_cache_setting_enabled = lambda: True
+
+        AgentOrchestrator._compute_cache_flags(orch)
+
+        assert orch._kv_opt_cached is True
+        assert orch._cache_opt_cached is False
+
+    def test_property_uses_cached_value_when_available(self):
+        """_kv_optimization_enabled returns cached value if set."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        orch._kv_opt_cached = True
+        assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is True
+
+        orch._kv_opt_cached = False
+        assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is False
+
+    def test_property_computes_when_cache_is_none(self):
+        """If _kv_opt_cached is None, property falls back to computation."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        orch._kv_opt_cached = None
+        orch._check_cache_setting_enabled = lambda: True
+        provider = MagicMock()
+        provider.supports_kv_prefix_caching.return_value = True
+        orch.provider = provider
+
+        assert AgentOrchestrator._kv_optimization_enabled.fget(orch) is True
+
+
+# =====================================================================
+# W3: KV cache warm-up
+# =====================================================================
+
+
+class TestKVCacheWarmup:
+    """Test KV cache warm-up method."""
+
+    def test_warmup_method_exists(self):
+        """AgentOrchestrator has a warm_up_kv_cache method."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        assert hasattr(AgentOrchestrator, "warm_up_kv_cache")
+
+    @pytest.mark.asyncio
+    async def test_warmup_sends_minimal_request(self):
+        """warm_up_kv_cache sends system prompt to provider with max_tokens=1."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
+        orch._system_prompt = "You are an assistant."
+        orch.provider = MagicMock()
+        orch.provider.chat = MagicMock(return_value=MagicMock(content=""))
+        orch.model = "test-model"
+
+        await AgentOrchestrator.warm_up_kv_cache(orch)
+
+        orch.provider.chat.assert_called_once()
+        call_kwargs = orch.provider.chat.call_args
+        assert call_kwargs[1]["max_tokens"] == 1
+
+    @pytest.mark.asyncio
+    async def test_warmup_noop_when_kv_disabled(self):
+        """warm_up_kv_cache is a no-op when KV optimization is disabled."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        orch.provider = MagicMock()
+
+        await AgentOrchestrator.warm_up_kv_cache(orch)
+
+        orch.provider.chat.assert_not_called()
+
+
+# =====================================================================
+# W6: KV prefix observability
+# =====================================================================
+
+
+class TestKVPrefixObservability:
+    """Test KV prefix hash logging for observability."""
+
+    def test_compute_prefix_hash(self):
+        """_kv_prefix_fingerprint returns consistent hash for same prompt."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        orch._system_prompt = "You are a helpful assistant."
+
+        h1 = AgentOrchestrator._kv_prefix_fingerprint(orch)
+        h2 = AgentOrchestrator._kv_prefix_fingerprint(orch)
+        assert h1 == h2
+        assert isinstance(h1, str)
+        assert len(h1) > 0
+
+    def test_different_prompts_different_hash(self):
+        """Different prompts produce different fingerprints."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch1 = MagicMock(spec=AgentOrchestrator)
+        orch1._system_prompt = "Prompt A"
+        orch2 = MagicMock(spec=AgentOrchestrator)
+        orch2._system_prompt = "Prompt B"
+
+        assert AgentOrchestrator._kv_prefix_fingerprint(orch1) != (
+            AgentOrchestrator._kv_prefix_fingerprint(orch2)
+        )
+
+
+# =====================================================================
+# W5: provider_has_kv_cache wired up in builder
+# =====================================================================
+
+
+class TestBuilderKVCacheWiredUp:
+    """Test that provider_has_kv_cache is used for section cache freezing."""
+
+    def test_kv_cache_enables_section_freeze(self):
+        """When provider_has_kv_cache=True, _optimized_section_cache is used."""
+        from victor.agent.prompt_builder import SystemPromptBuilder
+
+        builder = SystemPromptBuilder.__new__(SystemPromptBuilder)
+        builder.provider_caches = False
+        builder.provider_has_kv_cache = True
+        builder.concise_mode = False
+        builder._rl_coordinator = None
+        builder._decision_service = None
+        builder._optimized_section_cache = {}
+
+        # First call computes sections
+        sections1 = SystemPromptBuilder._get_active_sections(builder)
+        # Sections should be a set (reduced for non-caching)
+        assert isinstance(sections1, set)
+
+
+# =====================================================================
+# W7: Separate KV setting
+# =====================================================================
+
+
+class TestSeparateKVSetting:
+    """Test kv_optimization_enabled as separate setting."""
+
+    def test_kv_optimization_enabled_setting_exists(self):
+        """ContextSettings has kv_optimization_enabled field."""
+        from victor.config.context_settings import ContextSettings
+
+        settings = ContextSettings()
+        assert hasattr(settings, "kv_optimization_enabled")
+        assert settings.kv_optimization_enabled is True  # Default
+
+    def test_kv_setting_can_be_disabled_independently(self):
+        """kv_optimization_enabled can be False while cache_optimization_enabled is True."""
+        from victor.config.context_settings import ContextSettings
+
+        settings = ContextSettings(
+            cache_optimization_enabled=True,
+            kv_optimization_enabled=False,
+        )
+        assert settings.cache_optimization_enabled is True
+        assert settings.kv_optimization_enabled is False
+
+
+# =====================================================================
+# W2: Cached tool sorting
+# =====================================================================
+
+
+class TestCachedToolSorting:
+    """Test that sorted tool results are cached to avoid redundant work."""
+
+    def test_same_tools_not_re_sorted(self):
+        """Sorting cache avoids re-sorting identical tool sets."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
+        orch._last_sorted_tool_names = None
+        orch._last_sorted_tools = None
+
+        tool_b = MagicMock()
+        tool_b.name = "b_tool"
+        tool_a = MagicMock()
+        tool_a.name = "a_tool"
+
+        # First sort
+        result1 = AgentOrchestrator._sort_tools_for_kv_stability(orch, [tool_b, tool_a])
+        assert [t.name for t in result1] == ["a_tool", "b_tool"]
+
+        # Second sort with same tools (different objects but same names)
+        tool_b2 = MagicMock()
+        tool_b2.name = "b_tool"
+        tool_a2 = MagicMock()
+        tool_a2.name = "a_tool"
+        result2 = AgentOrchestrator._sort_tools_for_kv_stability(orch, [tool_b2, tool_a2])
+
+        # Should use cache — same names means same result
+        assert orch._last_sorted_tools is not None

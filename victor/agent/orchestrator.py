@@ -847,6 +847,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         AgentRuntimeBootstrapper.prepare_components(self, settings)
         AgentRuntimeBootstrapper.finalize(self)
 
+        # Cache optimization flags once (provider is fully initialized)
+        self._kv_opt_cached: Optional[bool] = None
+        self._cache_opt_cached: Optional[bool] = None
+        self._last_sorted_tool_names: Optional[frozenset] = None
+        self._last_sorted_tools: Optional[list] = None
+        self._session_semantic_tools: Optional[list] = None
+        self._compute_cache_flags()
+
     # =====================================================================
     # Callbacks for decomposed components — delegated to CallbackCoordinator
     # =====================================================================
@@ -1562,15 +1570,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     @property
     def _cache_optimization_enabled(self) -> bool:
-        """Check if full API-level cache optimization should be used.
+        """Full API-level cache optimization — session-lock all tools + freeze prompt.
 
-        Enabled only when BOTH:
-        1. The setting cache_optimization_enabled is True (default), AND
-        2. The current provider supports API-level prompt caching (billing discount).
-
-        When True: session-locks all 48 tools + freezes system prompt.
-        Local providers (Ollama) return False — they use per-turn tool selection.
+        Uses cached flag from _compute_cache_flags() when available.
         """
+        cached = getattr(self, "_cache_opt_cached", None)
+        if cached is not None:
+            return cached
         try:
             if not self._check_cache_setting_enabled():
                 return False
@@ -1581,23 +1587,55 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except Exception:
             return False
 
+    def _compute_cache_flags(self) -> None:
+        """Compute and cache optimization flags once (called after provider init).
+
+        Caches _kv_opt_cached and _cache_opt_cached so the @property accessors
+        don't repeat try/except/getattr/hasattr chains on every access.
+        """
+        try:
+            if not self._check_cache_setting_enabled():
+                self._kv_opt_cached = False
+                self._cache_opt_cached = False
+                return
+
+            provider = getattr(self, "provider", None)
+            # Cache optimization (API billing discount)
+            self._cache_opt_cached = (
+                provider is not None
+                and hasattr(provider, "supports_prompt_caching")
+                and provider.supports_prompt_caching()
+            )
+            # KV optimization (prefix latency savings) — controlled by separate setting
+            kv_setting = True
+            ctx = getattr(self, "settings", None)
+            if ctx is not None:
+                context = getattr(ctx, "context", None)
+                if context is not None:
+                    kv_setting = getattr(context, "kv_optimization_enabled", True)
+
+            if not kv_setting:
+                self._kv_opt_cached = False
+            elif provider is not None and hasattr(provider, "supports_kv_prefix_caching"):
+                self._kv_opt_cached = provider.supports_kv_prefix_caching()
+            elif self._cache_opt_cached:
+                self._kv_opt_cached = True  # API caching implies KV
+            else:
+                self._kv_opt_cached = False
+        except Exception:
+            self._kv_opt_cached = False
+            self._cache_opt_cached = False
+
     @property
     def _kv_optimization_enabled(self) -> bool:
-        """Check if KV prefix cache optimization should be used.
+        """KV prefix cache optimization — freeze prompt for prefix reuse.
 
-        Enabled when the provider supports KV prefix caching (latency savings
-        from reusing computed KV state for matching prompt prefixes). This is
-        a lighter-weight optimization than _cache_optimization_enabled:
-
-        - Freezes system prompt after first build (prefix stability)
-        - Injects dynamic content into user messages (not system prompt)
-        - Sorts tools deterministically for prefix matching
-
-        But does NOT session-lock all 48 tools (uses per-turn semantic selection).
-
-        Falls back to supports_prompt_caching() for providers without the
-        supports_kv_prefix_caching() method.
+        Uses cached flag from _compute_cache_flags() when available.
         """
+        cached = getattr(self, "_kv_opt_cached", None)
+        if cached is not None:
+            return cached
+        # Fallback: compute on the fly (before _compute_cache_flags is called)
         try:
             if not self._check_cache_setting_enabled():
                 return False
@@ -1610,6 +1648,41 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return False
         except Exception:
             return False
+
+    async def warm_up_kv_cache(self) -> None:
+        """Prime the KV cache by sending a minimal request with the system prompt.
+
+        For KV prefix caching providers (Ollama, LMStudio), the first API call
+        is always cold — full prefill computation. This method sends a 1-token
+        completion to prime the KV cache so subsequent calls reuse the prefix.
+
+        No-op when KV optimization is disabled.
+        """
+        if not self._kv_optimization_enabled:
+            return
+        try:
+            from victor.providers.base import Message as Msg
+
+            messages = [Msg(role="system", content=self._system_prompt or "")]
+            await self.provider.chat(
+                messages=messages,
+                model=self.model,
+                max_tokens=1,
+            )
+            logger.info("[kv-cache] Warm-up complete — KV prefix primed")
+        except Exception as e:
+            logger.debug("[kv-cache] Warm-up failed (non-fatal): %s", e)
+
+    def _kv_prefix_fingerprint(self) -> str:
+        """Compute a short fingerprint of the system prompt for KV cache observability.
+
+        Returns a hex hash of the first 500 chars of the system prompt. Identical
+        hashes across turns indicate the KV prefix is stable (likely cache hit).
+        """
+        prompt = getattr(self, "_system_prompt", "") or ""
+        import hashlib
+
+        return hashlib.md5(prompt[:500].encode()).hexdigest()[:12]
 
     def get_session_tools(self) -> Optional[list]:
         """Get session-locked tools for cache-friendly API calls.
@@ -3018,12 +3091,25 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         When KV prefix caching is active, the tool definitions are part of the
         prompt prefix. Sorting ensures the same subset of tools always produces
         the same byte sequence, maximizing KV cache reuse across turns.
+
+        Caches the sorted result keyed on tool names to avoid redundant sorting.
         """
         if tools is None:
             return None
-        if self._kv_optimization_enabled:
-            return sorted(tools, key=lambda t: t.name)
-        return tools
+        if not self._kv_optimization_enabled:
+            return tools
+
+        # Check cache: same tool names → same sorted result
+        current_names = frozenset(t.name for t in tools)
+        last_names = getattr(self, "_last_sorted_tool_names", None)
+        last_tools = getattr(self, "_last_sorted_tools", None)
+        if last_names == current_names and last_tools is not None:
+            return last_tools
+
+        sorted_tools = sorted(tools, key=lambda t: t.name)
+        self._last_sorted_tool_names = current_names
+        self._last_sorted_tools = sorted_tools
+        return sorted_tools
 
     def _apply_kv_tool_strategy(self, tools):
         """Apply the configured KV tool selection strategy.

@@ -24,6 +24,12 @@ class ContextSettings(BaseModel):
     # system prompt frozen after first build.
     cache_optimization_enabled: bool = True
 
+    # KV prefix cache optimization: freeze system prompt and sort tools for
+    # prefix stability. Independent from cache_optimization_enabled (API billing).
+    # Applies to local providers (Ollama, LMStudio, llama.cpp, MLX, vLLM) that
+    # benefit from stable KV prefixes across turns.
+    kv_optimization_enabled: bool = True
+
     # KV tool selection strategy for providers with KV prefix caching (Ollama, etc.)
     # Controls how tools are managed across turns for KV cache stability:
     #   'per_turn'       — Fresh semantic selection each turn (max relevance, breaks prefix)
