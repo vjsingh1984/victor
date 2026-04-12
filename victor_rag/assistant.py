@@ -29,19 +29,23 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Type
 
-from victor.framework.extensions import (
-    MiddlewareProtocol,
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    StageDefinition,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
-    VerticalBase,
-    VerticalConfig,
-    VerticalExtensions,
-)
-from victor.framework.tool_naming import ToolNames
+from victor_sdk.verticals.protocols.base import VerticalBase
+from victor_sdk.core.types import StageDefinition, VerticalConfig
+from victor_sdk.verticals.extensions import VerticalExtensions
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    pass  # Protocol types used in annotations only
+
+# Runtime-resolved names (lazy imports inside methods that need them)
+# MiddlewareProtocol, SafetyExtensionProtocol, TieredToolConfig,
+# ModeConfigProviderProtocol, PromptContributorProtocol,
+# ToolDependencyProviderProtocol — accessed via victor.framework.extensions
+# in the methods that use them, not at module level.
+
+# ToolNames accessed at class body level — use SDK re-export
+from victor_sdk.constants.tool_names import ToolNames
 
 
 class RAGAssistant(VerticalBase):
