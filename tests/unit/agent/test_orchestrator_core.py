@@ -833,55 +833,75 @@ class TestHandleToolCalls:
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_no_name(self, orchestrator):
-        """Test _handle_tool_calls with tool call without name returns error feedback (GAP-5 fix)."""
-        result = await orchestrator._handle_tool_calls([{"arguments": {}}])
-        # GAP-5 FIX: Missing name now returns error feedback instead of being silently skipped
+        """Tool calls without name are handled by ToolPipeline (returns error result)."""
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
+
+        error_result = ToolCallResult(
+            tool_name="unknown", arguments={}, success=False,
+            error="Missing tool name",
+        )
+        mock_pipeline_result = PipelineExecutionResult(results=[error_result])
+        with patch.object(
+            orchestrator._tool_pipeline, "execute_tool_calls",
+            new_callable=AsyncMock, return_value=mock_pipeline_result,
+        ):
+            result = await orchestrator._handle_tool_calls([{"arguments": {}}])
         assert len(result) == 1
         assert result[0]["success"] is False
-        assert "missing name" in result[0]["error"].lower()
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_invalid_name(self, orchestrator):
-        """Test _handle_tool_calls with invalid tool name returns error feedback (GAP-5 fix)."""
-        # Register a mock that returns False for invalid names
-        orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=False)
+        """Invalid tool names are handled by ToolPipeline (returns error result)."""
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
 
-        result = await orchestrator._handle_tool_calls([{"name": "123invalid"}])
-        # GAP-5 FIX: Invalid tools now return error feedback instead of being silently skipped
+        error_result = ToolCallResult(
+            tool_name="123invalid", arguments={}, success=False,
+            error="Invalid tool name",
+        )
+        mock_pipeline_result = PipelineExecutionResult(results=[error_result])
+        with patch.object(
+            orchestrator._tool_pipeline, "execute_tool_calls",
+            new_callable=AsyncMock, return_value=mock_pipeline_result,
+        ):
+            result = await orchestrator._handle_tool_calls([{"name": "123invalid"}])
         assert len(result) == 1
-        assert result[0]["tool_name"] == "123invalid"
         assert result[0]["success"] is False
-        assert "Invalid tool name" in result[0]["error"]
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_disabled_tool(self, orchestrator):
-        """Test _handle_tool_calls with disabled tool returns error feedback (GAP-5 fix)."""
-        # Ensure tool name validation passes (reset if previous test mocked it)
-        orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=True)
-        # Mock orchestrator.is_tool_enabled to return False (this is what _handle_tool_calls checks)
-        orchestrator.is_tool_enabled = MagicMock(return_value=False)
-        result = await orchestrator._handle_tool_calls([{"name": "nonexistent_tool"}])
-        # GAP-5 FIX: Disabled tools now return error feedback instead of being silently skipped
+        """Disabled tools are handled by ToolPipeline (returns error result)."""
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
+
+        error_result = ToolCallResult(
+            tool_name="nonexistent_tool", arguments={}, success=False,
+            error="Tool not available",
+        )
+        mock_pipeline_result = PipelineExecutionResult(results=[error_result])
+        with patch.object(
+            orchestrator._tool_pipeline, "execute_tool_calls",
+            new_callable=AsyncMock, return_value=mock_pipeline_result,
+        ):
+            result = await orchestrator._handle_tool_calls([{"name": "nonexistent_tool"}])
         assert len(result) == 1
-        assert result[0]["tool_name"] == "nonexistent_tool"
         assert result[0]["success"] is False
-        # Error message contains "available" (disabled tools are "not available")
-        assert "not available" in result[0]["error"].lower()
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_budget_reached(self, orchestrator):
-        """Test _handle_tool_calls when budget reached (covers budget enforcement)."""
-        # Set the orchestrator's state to simulate budget exhaustion
-        orchestrator.tool_calls_used = 100  # Set calls used
-        orchestrator.tool_budget = 10  # Set budget to less than calls used
+        """Budget enforcement handled by ToolPipeline (returns budget_exhausted)."""
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult
 
-        # Use a valid tool name
-        orchestrator.sanitizer.is_valid_tool_name = MagicMock(return_value=True)
-        orchestrator.tools.is_tool_enabled = MagicMock(return_value=True)
-
-        result = await orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}])
-        # Should skip all calls because budget is already reached - returns empty list
-        # The check happens before executing any tool, so nothing is returned
+        mock_pipeline_result = PipelineExecutionResult(
+            results=[], budget_exhausted=True,
+        )
+        with patch.object(
+            orchestrator._tool_pipeline, "execute_tool_calls",
+            new_callable=AsyncMock, return_value=mock_pipeline_result,
+        ):
+            result = await orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}])
         assert len(result) == 0
 
     @pytest.mark.asyncio

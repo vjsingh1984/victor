@@ -38,6 +38,7 @@ class TestClearActiveSkills:
         orch._system_prompt = "Base prompt."
         orch._base_system_prompt = "Base prompt."
         orch._active_skill_prompt = ""
+        orch._cache_optimization_enabled = False
         orch.conversation = None
 
         # Inject a skill
@@ -56,6 +57,7 @@ class TestClearActiveSkills:
         orch._system_prompt = "Base prompt."
         orch._base_system_prompt = "Base prompt."
         orch._active_skill_prompt = ""
+        orch._cache_optimization_enabled = False
         orch.conversation = None
 
         AgentOrchestrator.clear_active_skills(orch)
@@ -72,6 +74,7 @@ class TestPerTurnSwitching:
         orch._system_prompt = "Base prompt."
         orch._base_system_prompt = "Base prompt."
         orch._active_skill_prompt = ""
+        orch._cache_optimization_enabled = False
         orch.conversation = None
 
         # Turn 1: debug skill
@@ -94,6 +97,7 @@ class TestPerTurnSwitching:
         orch._system_prompt = "Base prompt."
         orch._base_system_prompt = "Base prompt."
         orch._active_skill_prompt = ""
+        orch._cache_optimization_enabled = False
         orch.conversation = None
 
         # Turn 1: skill active

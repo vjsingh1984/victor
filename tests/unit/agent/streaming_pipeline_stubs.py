@@ -81,6 +81,15 @@ class OrchestratorStub:
         self._record_intelligent_outcome = lambda **__: None
         self._force_finalize = False
         self._container = None
+        self._session_tools = None
+        self._context_assembler = None
+        self._cache_optimization_enabled = False
+
+    def get_session_tools(self):
+        return self._session_tools
+
+    def get_assembled_messages(self, current_query=None):
+        return self.messages
 
     # Methods moved from DummyCoordinator to OrchestratorStub (pipeline now calls orch directly)
     def _apply_intent_guard(self, message: str):

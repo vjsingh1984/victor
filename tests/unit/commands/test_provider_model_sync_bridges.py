@@ -351,7 +351,7 @@ class TestConfigSyncBridge:
         tmp_path: Path,
     ) -> None:
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         (config_dir / "profiles.yaml").write_text("profiles:\n  default:\n    provider: ollama\n")
 
         settings = MagicMock()

@@ -77,18 +77,25 @@ class TestGEPAPromptIntegration:
 
     def test_default_prompt_includes_static_grounding(self):
         """When no GEPA candidate exists, static GROUNDING_RULES is used."""
+        from unittest.mock import patch
         from victor.agent.prompt_builder import GROUNDING_RULES
 
         builder = _make_builder()
-        prompt = builder.build()
+        # Ensure GEPA doesn't replace static sections
+        builder._optimized_section_cache = {}
+        with patch.object(builder, "_sample_optimized_section", return_value=None):
+            prompt = builder.build()
         assert GROUNDING_RULES in prompt
 
     def test_default_prompt_includes_static_completion(self):
         """When no GEPA candidate exists, static COMPLETION_GUIDANCE is used."""
+        from unittest.mock import patch
         from victor.agent.prompt_builder import COMPLETION_GUIDANCE
 
         builder = _make_builder()
-        prompt = builder.build()
+        builder._optimized_section_cache = {}
+        with patch.object(builder, "_sample_optimized_section", return_value=None):
+            prompt = builder.build()
         assert COMPLETION_GUIDANCE in prompt
 
     def test_optimized_grounding_replaces_static(self):
@@ -216,7 +223,7 @@ class TestPromptOptimizationSettings:
         )
 
         s = PromptOptimizationSettings()
-        assert not s.enabled
+        assert s.enabled  # Enabled by default for GEPA/MIPROv2/CoT
         assert s.default_strategies == ["gepa"]
         assert s.section_strategies == {}
 

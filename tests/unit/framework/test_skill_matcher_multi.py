@@ -152,25 +152,26 @@ class TestInjectSkillsPlural:
 
         orch = MagicMock(spec=AgentOrchestrator)
         orch._system_prompt = "Base prompt."
+        orch._cache_optimization_enabled = False
         orch.conversation = None
 
         skill_a = _make_skill("debug", phase="diagnostic")
         skill_b = _make_skill("refactor", phase="action")
 
-        # Call the real method on the mock
         AgentOrchestrator.inject_skills(orch, [(skill_a, 0.80), (skill_b, 0.70)])
 
         prompt = orch._system_prompt
         assert "ACTIVE SKILLS (2)" in prompt
         assert "debug" in prompt
         assert "refactor" in prompt
-        assert "debug" in prompt[: prompt.index("refactor")]  # debug before refactor
+        assert "debug" in prompt[: prompt.index("refactor")]
 
     def test_inject_caps_at_three(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
         orch = MagicMock(spec=AgentOrchestrator)
         orch._system_prompt = "Base."
+        orch._cache_optimization_enabled = False
         orch.conversation = None
 
         skills = [(_make_skill(f"s{i}"), 0.70) for i in range(5)]

@@ -36,7 +36,7 @@ class TestAutoGenerate:
     def test_skips_if_init_md_exists(self, tmp_path):
         """Auto-generate is idempotent — skips existing init.md."""
         victor_dir = tmp_path / ".victor"
-        victor_dir.mkdir()
+        victor_dir.mkdir(exist_ok=True)
         init_file = victor_dir / "init.md"
         init_file.write_text("# Existing context\n")
 

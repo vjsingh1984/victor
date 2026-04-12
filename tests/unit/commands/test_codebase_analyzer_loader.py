@@ -1,101 +1,55 @@
+"""Tests for codebase analyzer discovery chain in coding_support.
+
+Tests the public API: load_codebase_analyzer_module(),
+load_codebase_analyzer_attr(), load_tree_sitter_get_parser().
+"""
 from __future__ import annotations
 
 import types
+from unittest.mock import patch
 
 import pytest
 
 import victor.core.utils.coding_support as coding_support
 
 
-def test_analyzer_loader_prefers_extracted_victor_coding(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    preferred_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
+def test_analyzer_loader_prefers_extracted_victor_coding() -> None:
+    """load_codebase_analyzer_module() uses importlib discovery."""
+    mock_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
 
-    monkeypatch.setattr(
-        coding_support,
-        "_load_extracted_codebase_analyzer",
-        lambda: preferred_module,
-    )
-
-    def fail_if_legacy_called() -> object:
-        raise AssertionError("legacy analyzer path should not be loaded")
-
-    monkeypatch.setattr(
-        coding_support,
-        "_load_legacy_codebase_analyzer",
-        fail_if_legacy_called,
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_CODEBASE_ANALYZER_LOADERS",
-        (
-            coding_support._load_extracted_codebase_analyzer,
-            coding_support._load_legacy_codebase_analyzer,
-        ),
-    )
-
-    assert coding_support.load_codebase_analyzer_module() is preferred_module
+    with patch("importlib.import_module", return_value=mock_module):
+        result = coding_support.load_codebase_analyzer_module()
+    assert result is mock_module
 
 
-def test_analyzer_loader_falls_back_to_legacy_module(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    legacy_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
+def test_analyzer_loader_falls_back_to_legacy_module() -> None:
+    """Falls back through discovery chain when primary import fails."""
+    legacy_module = types.SimpleNamespace(generate_smart_victor_md=lambda: "legacy")
+    call_count = 0
 
-    monkeypatch.setattr(
-        coding_support,
-        "_load_extracted_codebase_analyzer",
-        lambda: (_ for _ in ()).throw(ImportError("victor_coding.codebase_analyzer")),
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_load_legacy_codebase_analyzer",
-        lambda: legacy_module,
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_CODEBASE_ANALYZER_LOADERS",
-        (
-            coding_support._load_extracted_codebase_analyzer,
-            coding_support._load_legacy_codebase_analyzer,
-        ),
-    )
+    def mock_import(name, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if "victor_coding.codebase_analyzer" in name:
+            return legacy_module
+        raise ImportError(f"No module named '{name}'")
 
-    assert coding_support.load_codebase_analyzer_module() is legacy_module
+    with patch("importlib.import_module", side_effect=mock_import):
+        result = coding_support.load_codebase_analyzer_module()
+    assert result is legacy_module
 
 
-def test_analyzer_loader_raises_clear_error_when_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        coding_support,
-        "_load_extracted_codebase_analyzer",
-        lambda: (_ for _ in ()).throw(ImportError("victor_coding.codebase_analyzer")),
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_load_legacy_codebase_analyzer",
-        lambda: (_ for _ in ()).throw(
-            ImportError("victor.verticals.contrib.coding.codebase_analyzer")
-        ),
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_CODEBASE_ANALYZER_LOADERS",
-        (
-            coding_support._load_extracted_codebase_analyzer,
-            coding_support._load_legacy_codebase_analyzer,
-        ),
-    )
-
-    with pytest.raises(ImportError, match="victor-coding package"):
-        coding_support.load_codebase_analyzer_module()
+def test_analyzer_loader_raises_clear_error_when_unavailable() -> None:
+    """Raises ImportError with helpful message when all paths fail."""
+    with patch("importlib.import_module", side_effect=ImportError("not found")):
+        with pytest.raises(ImportError, match="victor-coding"):
+            coding_support.load_codebase_analyzer_module()
 
 
 def test_analyzer_attr_loader_raises_clear_error_for_missing_symbol(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """load_codebase_analyzer_attr() raises ImportError for missing symbol."""
     module = types.SimpleNamespace(generate_smart_victor_md=lambda: "content")
     monkeypatch.setattr(coding_support, "load_codebase_analyzer_module", lambda: module)
 
@@ -103,139 +57,65 @@ def test_analyzer_attr_loader_raises_clear_error_for_missing_symbol(
         coding_support.load_codebase_analyzer_attr("generate_enhanced_init_md")
 
 
-def test_tree_sitter_loader_prefers_extracted_victor_coding(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    preferred_module = types.SimpleNamespace(get_parser=lambda language: f"parser:{language}")
+def test_tree_sitter_loader_prefers_extracted_victor_coding() -> None:
+    """load_tree_sitter_get_parser() returns get_parser callable."""
+    mock_module = types.SimpleNamespace(get_parser=lambda lang: f"parser:{lang}")
 
-    monkeypatch.setattr(
-        coding_support,
-        "_load_extracted_tree_sitter_manager",
-        lambda: preferred_module,
-    )
-
-    def fail_if_legacy_called() -> object:
-        raise AssertionError("legacy tree-sitter path should not be loaded")
-
-    monkeypatch.setattr(
-        coding_support,
-        "_load_legacy_tree_sitter_manager",
-        fail_if_legacy_called,
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_TREE_SITTER_MANAGER_LOADERS",
-        (
-            coding_support._load_extracted_tree_sitter_manager,
-            coding_support._load_legacy_tree_sitter_manager,
-        ),
-    )
-
-    get_parser = coding_support.load_tree_sitter_get_parser()
-
+    with patch("importlib.import_module", return_value=mock_module):
+        get_parser = coding_support.load_tree_sitter_get_parser()
     assert get_parser("python") == "parser:python"
 
 
-def test_tree_sitter_loader_falls_back_to_legacy_module(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    legacy_module = types.SimpleNamespace(get_parser=lambda language: f"legacy:{language}")
+def test_tree_sitter_loader_falls_back_to_legacy_module() -> None:
+    """Falls back through discovery chain for tree-sitter manager."""
+    legacy_module = types.SimpleNamespace(get_parser=lambda lang: f"legacy:{lang}")
+    call_count = 0
 
-    monkeypatch.setattr(
-        coding_support,
-        "_load_extracted_tree_sitter_manager",
-        lambda: (_ for _ in ()).throw(ImportError("victor_coding.codebase.tree_sitter_manager")),
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_load_legacy_tree_sitter_manager",
-        lambda: legacy_module,
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_TREE_SITTER_MANAGER_LOADERS",
-        (
-            coding_support._load_extracted_tree_sitter_manager,
-            coding_support._load_legacy_tree_sitter_manager,
-        ),
-    )
+    def mock_import(name, *args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if "tree_sitter" in name:
+            return legacy_module
+        raise ImportError(f"No module named '{name}'")
 
-    get_parser = coding_support.load_tree_sitter_get_parser()
-
+    with patch("importlib.import_module", side_effect=mock_import):
+        get_parser = coding_support.load_tree_sitter_get_parser()
     assert get_parser("python") == "legacy:python"
 
 
-def test_tree_sitter_loader_raises_clear_error_when_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(
-        coding_support,
-        "_load_extracted_tree_sitter_manager",
-        lambda: (_ for _ in ()).throw(ImportError("victor_coding.codebase.tree_sitter_manager")),
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_load_legacy_tree_sitter_manager",
-        lambda: (_ for _ in ()).throw(
-            ImportError("victor.verticals.contrib.coding.codebase.tree_sitter_manager")
-        ),
-    )
-    monkeypatch.setattr(
-        coding_support,
-        "_TREE_SITTER_MANAGER_LOADERS",
-        (
-            coding_support._load_extracted_tree_sitter_manager,
-            coding_support._load_legacy_tree_sitter_manager,
-        ),
-    )
-
-    with pytest.raises(ImportError, match="tree_sitter_manager requires the victor-coding"):
-        coding_support.load_tree_sitter_get_parser()
+def test_tree_sitter_loader_raises_clear_error_when_unavailable() -> None:
+    """Raises ImportError when tree-sitter manager not found."""
+    with patch("importlib.import_module", side_effect=ImportError("not found")):
+        with pytest.raises(ImportError, match="tree_sitter_manager requires"):
+            coding_support.load_tree_sitter_get_parser()
 
 
-def test_analyze_command_loader_prefers_extracted_victor_coding(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    preferred_app = object()
+def test_analyze_command_loader_prefers_extracted_victor_coding() -> None:
+    """load_coding_analyze_app() returns analyze_app from module."""
+    mock_app = object()
+    mock_module = types.SimpleNamespace(app=mock_app)
 
-    monkeypatch.setattr(
-        coding_support, "_load_extracted_analyze_command_app", lambda: preferred_app
-    )
-
-    def fail_if_legacy_called() -> object:
-        raise AssertionError("legacy analyze command path should not be loaded")
-
-    monkeypatch.setattr(coding_support, "_load_legacy_analyze_command_app", fail_if_legacy_called)
-    monkeypatch.setattr(
-        coding_support,
-        "_ANALYZE_COMMAND_APP_LOADERS",
-        (
-            coding_support._load_extracted_analyze_command_app,
-            coding_support._load_legacy_analyze_command_app,
-        ),
-    )
-
-    assert coding_support.load_coding_analyze_app() is preferred_app
+    with patch.object(coding_support, "_try_entry_point", return_value=None):
+        with patch.object(coding_support, "_try_import", return_value=mock_module):
+            result = coding_support.load_coding_analyze_app()
+    assert result is mock_app
 
 
-def test_analyze_command_loader_falls_back_to_legacy_module(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_analyze_command_loader_falls_back_to_legacy_module() -> None:
+    """Falls back through discovery chain for analyze command."""
     legacy_app = object()
+    legacy_module = types.SimpleNamespace(app=legacy_app)
 
-    monkeypatch.setattr(
-        coding_support,
-        "_load_extracted_analyze_command_app",
-        lambda: (_ for _ in ()).throw(ImportError("victor_coding.commands.analyze")),
-    )
-    monkeypatch.setattr(coding_support, "_load_legacy_analyze_command_app", lambda: legacy_app)
-    monkeypatch.setattr(
-        coding_support,
-        "_ANALYZE_COMMAND_APP_LOADERS",
-        (
-            coding_support._load_extracted_analyze_command_app,
-            coding_support._load_legacy_analyze_command_app,
-        ),
-    )
+    call_count = 0
 
-    assert coding_support.load_coding_analyze_app() is legacy_app
+    def mock_try_import(name):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise ImportError("primary not found")
+        return legacy_module
+
+    with patch.object(coding_support, "_try_entry_point", return_value=None):
+        with patch.object(coding_support, "_try_import", side_effect=mock_try_import):
+            result = coding_support.load_coding_analyze_app()
+    assert result is legacy_app
