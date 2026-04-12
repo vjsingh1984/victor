@@ -178,7 +178,8 @@ class TestCacheOptimizationWiring:
         orch.settings = MagicMock()
         orch.settings.context = MagicMock()
         orch.settings.context.cache_optimization_enabled = setting_enabled
-        # Use the real property
+        # Wire up real methods
+        orch._check_cache_setting_enabled = lambda: setting_enabled
         type(orch)._cache_optimization_enabled = AgentOrchestrator._cache_optimization_enabled
         return orch
 

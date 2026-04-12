@@ -262,6 +262,7 @@ class SystemPromptBuilder:
         concise_mode: bool = False,
         query_classification: Optional["QueryClassification"] = None,
         provider_caches: bool = False,
+        provider_has_kv_cache: bool = False,
     ):
         """Initialize the prompt builder.
 
@@ -277,9 +278,12 @@ class SystemPromptBuilder:
             enrichment_service: Optional prompt enrichment service for context injection
             vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
             concise_mode: If True, adds guidance to produce brief, direct responses
-            provider_caches: If True, provider supports prompt prefix caching (Anthropic).
+            provider_caches: If True, provider supports API-level prompt caching (Anthropic).
                 Full prompt is optimal (cached at 90% discount). If False, aggressively
                 prune sections and skip MIPROv2 few-shots to save tokens.
+            provider_has_kv_cache: If True, provider supports KV prefix caching (Ollama,
+                LMStudio, etc.). Sections are reduced AND frozen at session start so the
+                system prompt prefix stays byte-identical across turns.
         """
         # Handle both string and ProviderSettings object for provider_name
         # (backward compatibility with settings refactor)
@@ -303,6 +307,7 @@ class SystemPromptBuilder:
         self.concise_mode = concise_mode
         self.query_classification = query_classification
         self.provider_caches = provider_caches
+        self.provider_has_kv_cache = provider_has_kv_cache
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name

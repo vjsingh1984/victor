@@ -416,6 +416,10 @@ class OrchestratorFactory(
             hasattr(self.provider, "supports_prompt_caching")
             and self.provider.supports_prompt_caching()
         )
+        provider_has_kv_cache = (
+            hasattr(self.provider, "supports_kv_prefix_caching")
+            and self.provider.supports_kv_prefix_caching()
+        ) or provider_caches  # API caching providers also have KV caching
 
         return SystemPromptBuilder(
             provider_name=self.provider_name or self.provider.__class__.__name__.lower(),
@@ -424,6 +428,7 @@ class OrchestratorFactory(
             capabilities=capabilities,
             prompt_contributors=prompt_contributors,
             provider_caches=provider_caches,
+            provider_has_kv_cache=provider_has_kv_cache,
         )
 
     def create_project_context(self) -> "ProjectContext":
@@ -511,6 +516,10 @@ class OrchestratorFactory(
             hasattr(self.provider, "supports_prompt_caching")
             and self.provider.supports_prompt_caching()
         )
+        provider_has_kv_cache = (
+            hasattr(self.provider, "supports_kv_prefix_caching")
+            and self.provider.supports_kv_prefix_caching()
+        ) or provider_caches
 
         prompt_builder = SystemPromptBuilder(
             provider_name=provider_name,
@@ -519,6 +528,7 @@ class OrchestratorFactory(
             capabilities=tool_calling_caps,
             prompt_contributors=prompt_contributors,
             provider_caches=provider_caches,
+            provider_has_kv_cache=provider_has_kv_cache,
         )
 
         logger.debug(f"SystemPromptBuilder created for {provider_name}/{model}")

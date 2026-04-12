@@ -1137,8 +1137,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         else:
             self._system_prompt = base_prompt
 
-        if self._cache_optimization_enabled:
+        if self._kv_optimization_enabled:
             self._system_prompt_frozen = True
+        if self._cache_optimization_enabled:
             self._session_tools = None  # Re-lock tools for new workspace
 
         # Clear conversation history to remove old workspace context
@@ -1549,30 +1550,63 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._context_manager.get_max_context_chars()
 
+    def _check_cache_setting_enabled(self) -> bool:
+        """Check if cache optimization is enabled in settings."""
+        ctx = getattr(self, "settings", None)
+        if ctx is not None:
+            context = getattr(ctx, "context", None)
+            if context is not None:
+                if not getattr(context, "cache_optimization_enabled", True):
+                    return False
+        return True
+
     @property
     def _cache_optimization_enabled(self) -> bool:
-        """Check if prefix cache optimization should be used.
+        """Check if full API-level cache optimization should be used.
 
         Enabled only when BOTH:
         1. The setting cache_optimization_enabled is True (default), AND
-        2. The current provider supports prompt caching.
+        2. The current provider supports API-level prompt caching (billing discount).
 
-        This prevents local providers (Ollama) from getting session-locked
-        tools, which adds ~15K tokens of overhead per call with no caching
-        benefit.
+        When True: session-locks all 48 tools + freezes system prompt.
+        Local providers (Ollama) return False — they use per-turn tool selection.
         """
         try:
-            # Settings can explicitly disable
-            ctx = getattr(self, "settings", None)
-            if ctx is not None:
-                context = getattr(ctx, "context", None)
-                if context is not None:
-                    if not getattr(context, "cache_optimization_enabled", True):
-                        return False
-            # Provider must support caching
+            if not self._check_cache_setting_enabled():
+                return False
             provider = getattr(self, "provider", None)
             if provider is not None and hasattr(provider, "supports_prompt_caching"):
                 return provider.supports_prompt_caching()
+            return False
+        except Exception:
+            return False
+
+    @property
+    def _kv_optimization_enabled(self) -> bool:
+        """Check if KV prefix cache optimization should be used.
+
+        Enabled when the provider supports KV prefix caching (latency savings
+        from reusing computed KV state for matching prompt prefixes). This is
+        a lighter-weight optimization than _cache_optimization_enabled:
+
+        - Freezes system prompt after first build (prefix stability)
+        - Injects dynamic content into user messages (not system prompt)
+        - Sorts tools deterministically for prefix matching
+
+        But does NOT session-lock all 48 tools (uses per-turn semantic selection).
+
+        Falls back to supports_prompt_caching() for providers without the
+        supports_kv_prefix_caching() method.
+        """
+        try:
+            if not self._check_cache_setting_enabled():
+                return False
+            provider = getattr(self, "provider", None)
+            if provider is not None:
+                if hasattr(provider, "supports_kv_prefix_caching"):
+                    return provider.supports_kv_prefix_caching()
+                if hasattr(provider, "supports_prompt_caching"):
+                    return provider.supports_prompt_caching()
             return False
         except Exception:
             return False
@@ -1633,7 +1667,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 )
 
         # Cache-friendly: prepend dynamic content to last user message
-        if self._cache_optimization_enabled and messages:
+        # Gate on _kv_optimization_enabled so KV-only providers (Ollama) also benefit
+        if self._kv_optimization_enabled and messages:
             prefix_parts = []
 
             # Active skill prompt (if any)
@@ -2457,7 +2492,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             query_classification: Optional QueryClassification for task-aware prompting
         """
         # Freeze system prompt after first build for prefix cache stability
-        if self._cache_optimization_enabled and getattr(self, "_system_prompt_frozen", False):
+        # Gate on _kv_optimization_enabled so both API-caching and KV-caching providers benefit
+        if self._kv_optimization_enabled and getattr(self, "_system_prompt_frozen", False):
             logger.debug(
                 "[cache] System prompt frozen — skipping rebuild for query classification"
             )
@@ -2473,8 +2509,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         else:
             self._system_prompt = base_system_prompt
 
-        # Mark as frozen after first build (cache optimization)
-        if self._cache_optimization_enabled:
+        # Mark as frozen after first build (KV or API cache optimization)
+        if self._kv_optimization_enabled:
             self._system_prompt_frozen = True
 
         # Sync to conversation's live message list so provider receives it
@@ -2973,6 +3009,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
         current_intent = getattr(self, "_current_intent", None)
         tools = self._tool_planner.filter_tools_by_intent(tools, current_intent)
+        return self._sort_tools_for_kv_stability(tools)
+
+    def _sort_tools_for_kv_stability(self, tools):
+        """Sort tools deterministically by name for KV prefix cache stability.
+
+        When KV prefix caching is active, the tool definitions are part of the
+        prompt prefix. Sorting ensures the same subset of tools always produces
+        the same byte sequence, maximizing KV cache reuse across turns.
+        """
+        if tools is None:
+            return None
+        if self._kv_optimization_enabled:
+            return sorted(tools, key=lambda t: t.name)
         return tools
 
     # =====================================================================
