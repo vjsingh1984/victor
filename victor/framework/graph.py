@@ -634,6 +634,13 @@ class Node:
         return result
 
 
+# Maximum subgraph nesting depth to prevent unbounded recursion.
+# Each invoke() in a SubgraphNode increments the depth counter
+# stored in the state under this key.
+_SUBGRAPH_DEPTH_KEY = "__subgraph_depth__"
+_MAX_SUBGRAPH_DEPTH = 10
+
+
 @dataclass
 class SubgraphNode:
     """A node that wraps a compiled subgraph for modular composition.
@@ -643,20 +650,26 @@ class SubgraphNode:
     ``input_mapper`` / ``output_mapper`` callables transform state
     keys between the parent and child graphs.
 
+    Safety: A ``_SUBGRAPH_DEPTH_KEY`` counter in state prevents
+    unbounded recursion. Exceeding ``_MAX_SUBGRAPH_DEPTH`` (10)
+    raises ``RecursionError``.
+
     Attributes:
-        id: Unique node identifier (matches the parent graph's node id)
+        id: Unique node identifier
         compiled_graph: The inner compiled graph to execute
-        input_mapper: Optional function to transform parent state before
-            passing to the subgraph
-        output_mapper: Optional function to transform subgraph result
-            state back into the parent state
+        input_mapper: Optional state transform before subgraph
+        output_mapper: Optional state transform after subgraph
         metadata: Additional node metadata
     """
 
     id: str
     compiled_graph: "CompiledGraph"
-    input_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
-    output_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    input_mapper: Optional[
+        Callable[[Dict[str, Any]], Dict[str, Any]]
+    ] = None
+    output_mapper: Optional[
+        Callable[[Dict[str, Any]], Dict[str, Any]]
+    ] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     async def execute(self, state: Any) -> Any:
@@ -667,8 +680,12 @@ class SubgraphNode:
 
         Returns:
             Updated state after subgraph execution
+
+        Raises:
+            RecursionError: If subgraph nesting exceeds max depth
+            RuntimeError: If inner graph execution fails
         """
-        # Map parent state to subgraph input
+        # Extract plain dict from COW wrapper
         if isinstance(state, CopyOnWriteState):
             input_state = state.to_dict()
         elif isinstance(state, dict):
@@ -676,11 +693,32 @@ class SubgraphNode:
         else:
             input_state = state
 
+        # Recursion depth guard
+        depth = input_state.get(_SUBGRAPH_DEPTH_KEY, 0)
+        if depth >= _MAX_SUBGRAPH_DEPTH:
+            raise RecursionError(
+                f"Subgraph nesting depth {depth} exceeds "
+                f"maximum ({_MAX_SUBGRAPH_DEPTH}). "
+                f"Check for self-referencing subgraphs."
+            )
+        input_state[_SUBGRAPH_DEPTH_KEY] = depth + 1
+
         if self.input_mapper:
             input_state = self.input_mapper(input_state)
 
         result = await self.compiled_graph.invoke(input_state)
+
+        if not result.success:
+            raise RuntimeError(
+                f"Subgraph '{self.id}' failed: {result.error}"
+            )
+
         output_state = result.state
+
+        # Restore parent depth (don't leak counter upward)
+        output_state.pop(_SUBGRAPH_DEPTH_KEY, None)
+        if depth > 0:
+            output_state[_SUBGRAPH_DEPTH_KEY] = depth
 
         if self.output_mapper:
             output_state = self.output_mapper(output_state)

@@ -911,6 +911,77 @@ class TestSubgraphNesting:
         assert result.success
         assert result.state["value"] == 1
 
+    async def test_subgraph_depth_guard_prevents_infinite_recursion(
+        self,
+    ):
+        """Self-referencing subgraph hits depth limit."""
+        from victor.framework.graph import _MAX_SUBGRAPH_DEPTH
+
+        # Create a graph that references itself via a subgraph
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+        inner_compiled = inner.compile()
+
+        # Stack 12 levels of nesting (exceeds _MAX_SUBGRAPH_DEPTH=10)
+        graphs = [inner_compiled]
+        for i in range(12):
+            wrapper = StateGraph(SimpleState)
+            wrapper.add_subgraph("sub", graphs[-1])
+            wrapper.add_edge("sub", END)
+            wrapper.set_entry_point("sub")
+            graphs.append(wrapper.compile())
+
+        result = await graphs[-1].invoke({"value": 0, "history": []})
+        # Should fail due to depth limit, not hang
+        assert not result.success
+        assert "depth" in result.error.lower() or "recursion" in result.error.lower()
+
+    async def test_subgraph_depth_counter_not_leaked_to_parent(
+        self,
+    ):
+        """Depth counter cleaned from output state."""
+        from victor.framework.graph import _SUBGRAPH_DEPTH_KEY
+
+        inner = StateGraph(SimpleState)
+        inner.add_node("inc", increment_node)
+        inner.add_edge("inc", END)
+        inner.set_entry_point("inc")
+
+        outer = StateGraph(SimpleState)
+        outer.add_subgraph("sub", inner.compile())
+        outer.add_edge("sub", END)
+        outer.set_entry_point("sub")
+
+        result = await outer.compile().invoke(
+            {"value": 0, "history": []}
+        )
+        assert result.success
+        assert _SUBGRAPH_DEPTH_KEY not in result.state
+
+    async def test_subgraph_failure_propagates_as_error(self):
+        """Subgraph that fails should surface the error."""
+
+        async def failing_node(state):
+            raise ValueError("intentional failure")
+
+        inner = StateGraph(SimpleState)
+        inner.add_node("fail", failing_node)
+        inner.add_edge("fail", END)
+        inner.set_entry_point("fail")
+
+        outer = StateGraph(SimpleState)
+        outer.add_subgraph("sub", inner.compile())
+        outer.add_edge("sub", END)
+        outer.set_entry_point("sub")
+
+        result = await outer.compile().invoke(
+            {"value": 0, "history": []}
+        )
+        assert not result.success
+        assert "intentional failure" in result.error
+
     async def test_subgraph_from_schema(self):
         """from_schema should handle 'subgraph' node type."""
         inner = StateGraph(SimpleState)
