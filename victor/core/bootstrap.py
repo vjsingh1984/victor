@@ -48,13 +48,43 @@ from victor.core.container import (
 
 logger = logging.getLogger(__name__)
 
-_VERTICAL_PACKAGE_HINTS: Dict[str, str] = {
+_DEFAULT_VERTICAL_PACKAGE_HINTS: Dict[str, str] = {
     "coding": "victor-coding",
     "research": "victor-research",
     "devops": "victor-devops",
     "investment": "victor-invest",
 }
 _REPORTED_MISSING_VERTICALS: Set[str] = set()
+
+
+def _load_vertical_package_hints() -> Dict[str, str]:
+    """Load vertical package hints from entry points with hardcoded fallbacks.
+
+    Scans ``victor.vertical_hints`` entry points so that external vertical
+    packages can advertise their pip-installable name without modifying
+    this module.  Falls back to ``_DEFAULT_VERTICAL_PACKAGE_HINTS`` for
+    any vertical not covered by an entry point.
+
+    Each entry point should have ``name=<vertical>`` and its loaded value
+    should be the pip package name (a plain string).
+    """
+    hints = dict(_DEFAULT_VERTICAL_PACKAGE_HINTS)
+    try:
+        from importlib.metadata import entry_points
+
+        eps = entry_points()
+        # Python 3.12+ returns a SelectableGroups, older returns dict
+        group_eps = eps.select(group="victor.vertical_hints") if hasattr(eps, "select") else eps.get("victor.vertical_hints", [])  # noqa: E501
+        for ep in group_eps:
+            try:
+                value = ep.load()
+                if isinstance(value, str):
+                    hints[ep.name] = value
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return hints
 
 T = TypeVar("T")
 
@@ -275,9 +305,34 @@ def _phase_capabilities(container, settings, context):
     _report_capability_health(context.get("active_vertical"), container)
 
 
-def _phase_coding(container, settings, context):
-    """Phase: Language plugins, indexing (optional)."""
+def _phase_vertical_services(container, settings, context):
+    """Phase: Vertical-specific bootstrap services (language plugins, indexing, etc.).
+
+    Scans ``victor.bootstrap_services`` entry points so external verticals can
+    register bootstrap hooks without modifying this module.  Falls back to
+    the built-in coding services for backward compatibility.
+    """
     _register_coding_services(container, settings)
+
+    # Discover additional bootstrap service hooks from entry points
+    try:
+        from importlib.metadata import entry_points as _ep
+
+        eps = _ep()
+        group_eps = (
+            eps.select(group="victor.bootstrap_services")
+            if hasattr(eps, "select")
+            else eps.get("victor.bootstrap_services", [])
+        )
+        for ep in group_eps:
+            try:
+                hook = ep.load()
+                hook(container, settings, context)
+                logger.debug("Loaded bootstrap service entry point: %s", ep.name)
+            except Exception as exc:
+                logger.debug("Skipped bootstrap service %s: %s", ep.name, exc)
+    except Exception as exc:
+        logger.debug("Bootstrap service entry point discovery failed: %s", exc)
 
 
 def _phase_signature(container, settings, context):
@@ -351,7 +406,12 @@ _BOOTSTRAP_PHASES = [
         depends_on=("core", "events", "analytics", "embedding"),
     ),
     BootstrapPhase("capabilities", _phase_capabilities, depends_on=("plugins",)),
-    BootstrapPhase("coding", _phase_coding, depends_on=("capabilities",), optional=True),
+    BootstrapPhase(
+        "vertical_services",
+        _phase_vertical_services,
+        depends_on=("capabilities",),
+        optional=True,
+    ),
     BootstrapPhase("signature", _phase_signature, depends_on=("settings",)),
     BootstrapPhase("orchestrator", _phase_orchestrator, depends_on=("capabilities",)),
     BootstrapPhase("solid", _phase_solid, depends_on=("orchestrator",), optional=True),
@@ -996,7 +1056,7 @@ def _report_capability_health(
         return
 
     _REPORTED_MISSING_VERTICALS.add(normalized)
-    package_hint = _VERTICAL_PACKAGE_HINTS.get(normalized)
+    package_hint = _load_vertical_package_hints().get(normalized)
     if package_hint:
         remedy = (
             f"Install the '{package_hint}' package (e.g., `pip install {package_hint}`) "
