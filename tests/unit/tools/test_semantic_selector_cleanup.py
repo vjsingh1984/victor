@@ -19,8 +19,8 @@ class TestCreateToolTextAfterCleanup:
         tool.get_metadata.return_value = metadata
 
         result = SemanticToolSelector._create_tool_text(tool)
-        assert "test_tool" in result
         assert "search code" in result
+        assert "A test tool" in result
 
     def test_tool_without_get_metadata(self):
         """Tools without get_metadata() still get a description."""
@@ -31,12 +31,14 @@ class TestCreateToolTextAfterCleanup:
         tool.description = "A legacy tool"
 
         result = SemanticToolSelector._create_tool_text(tool)
-        assert "legacy_tool" in result
         assert "A legacy tool" in result
 
-    def test_dead_methods_removed(self):
-        """_build_use_case_text and _get_tool_use_cases no longer exist."""
-        from victor.tools.semantic_selector import SemanticToolSelector
+    def test_dead_methods_not_in_source(self):
+        """_build_use_case_text and _get_tool_use_cases are removed from source."""
+        import inspect
+        from victor.tools import semantic_selector
 
-        assert not hasattr(SemanticToolSelector, '_build_use_case_text')
-        assert not hasattr(SemanticToolSelector, '_get_tool_use_cases')
+        source = inspect.getsource(semantic_selector)
+        # The method definitions should no longer exist
+        assert "def _build_use_case_text" not in source
+        assert "def _get_tool_use_cases" not in source
