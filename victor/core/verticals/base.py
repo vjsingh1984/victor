@@ -67,7 +67,6 @@ from typing import (
     TYPE_CHECKING,
 )
 
-from victor.framework.tools import ToolSet
 from victor_sdk.core.types import Tier
 
 # Import SDK base class for dependency inversion
@@ -86,11 +85,8 @@ from victor.core.vertical_types import (
     StageBuilder,
 )
 
-# Import framework capabilities (Phase 1: Promote Generic Capabilities)
-from victor.framework.capabilities import (
-    StageBuilderCapability,
-    GroundingRulesCapability,
-)
+# Framework capabilities loaded lazily in _get_stage_capability() and
+# _get_grounding_capability() to avoid Core→Framework import at module level.
 
 # Import stage contract for LSP compliance (Phase 2)
 from victor.core.verticals.protocols.stages import (
@@ -102,9 +98,23 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Framework capability instances (class-level for sharing)
-_stage_capability: Optional[StageBuilderCapability] = None
-_grounding_capability: Optional[GroundingRulesCapability] = None
+# Framework capability instances (class-level for sharing, lazy-loaded)
+_stage_capability: Optional[Any] = None
+_grounding_capability: Optional[Any] = None
+
+
+def _lazy_toolset() -> Any:
+    """Lazy factory for ToolSet default — avoids eager framework import."""
+    from victor.framework.tools import ToolSet
+
+    return ToolSet()
+
+
+def _lazy_toolset_from_tools(tool_names: List[str]) -> Any:
+    """Lazy ToolSet.from_tools() — avoids eager framework import."""
+    from victor.framework.tools import ToolSet
+
+    return ToolSet.from_tools(tool_names)
 
 
 @dataclass
@@ -124,7 +134,7 @@ class VerticalConfig:
 
     name: str = ""
     description: str = ""
-    tools: ToolSet = field(default_factory=ToolSet)
+    tools: Any = field(default_factory=lambda: _lazy_toolset())
     system_prompt: str = ""
     stages: Dict[str, StageDefinition] = field(default_factory=dict)
     provider_hints: Dict[str, Any] = field(default_factory=dict)
@@ -425,7 +435,7 @@ class VerticalBase(
         return cls.description
 
     @classmethod
-    def _get_toolset(cls) -> ToolSet:
+    def _get_toolset(cls) -> Any:
         """Convert tool names to ToolSet (SDK protocol implementation).
 
         This implements the SDK's abstract method by creating a ToolSet
@@ -435,33 +445,29 @@ class VerticalBase(
             ToolSet object with tools from get_tools().
         """
         tool_names = cls.get_tools()
-        return ToolSet.from_tools(tool_names)
+        return _lazy_toolset_from_tools(tool_names)
 
     # =========================================================================
     # Framework Capability Helpers (Phase 1)
     # =========================================================================
 
     @classmethod
-    def _get_stage_capability(cls) -> StageBuilderCapability:
-        """Get or create the stage builder capability.
-
-        Returns:
-            StageBuilderCapability instance
-        """
+    def _get_stage_capability(cls) -> Any:
+        """Get or create the stage builder capability (lazy-loaded)."""
         global _stage_capability
         if _stage_capability is None:
+            from victor.framework.capabilities import StageBuilderCapability
+
             _stage_capability = StageBuilderCapability()
         return _stage_capability
 
     @classmethod
-    def _get_grounding_capability(cls) -> GroundingRulesCapability:
-        """Get or create the grounding rules capability.
-
-        Returns:
-            GroundingRulesCapability instance
-        """
+    def _get_grounding_capability(cls) -> Any:
+        """Get or create the grounding rules capability (lazy-loaded)."""
         global _grounding_capability
         if _grounding_capability is None:
+            from victor.framework.capabilities import GroundingRulesCapability
+
             _grounding_capability = GroundingRulesCapability()
         return _grounding_capability
 
@@ -632,7 +638,7 @@ class VerticalBase(
 
         # Build tool set
         tool_names = cls.get_tools()
-        tools = ToolSet.from_tools(tool_names)
+        tools = _lazy_toolset_from_tools(tool_names)
 
         # Build config
         config = VerticalConfig(
@@ -721,7 +727,7 @@ class VerticalBase(
         pass
 
     @classmethod
-    def get_tool_set(cls) -> ToolSet:
+    def get_tool_set(cls) -> Any:
         """Get the ToolSet for this vertical.
 
         Convenience method that returns just the tool configuration.
@@ -729,7 +735,7 @@ class VerticalBase(
         Returns:
             Configured ToolSet.
         """
-        return ToolSet.from_tools(cls.get_tools())
+        return _lazy_toolset_from_tools(cls.get_tools())
 
     @classmethod
     async def create_agent(
