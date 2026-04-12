@@ -892,8 +892,11 @@ class ChatCoordinator:
         max_garbage_chunks = 3
         total_tokens: float = 0
 
+        assembled = orch.get_assembled_messages(
+            current_query=stream_ctx.user_message if stream_ctx else None
+        )
         async for chunk in orch.provider.stream(
-            messages=orch.messages,
+            messages=assembled,
             model=orch.model,
             temperature=orch.temperature,
             max_tokens=orch.max_tokens,
@@ -1017,8 +1020,11 @@ class ChatCoordinator:
                 full_content = ""
                 recovered_tool_calls = None
 
+                retry_assembled = orch.get_assembled_messages(
+                    current_query=stream_ctx.user_message if stream_ctx else None
+                )
                 async for chunk in orch.provider.stream(
-                    messages=orch.messages,
+                    messages=retry_assembled,
                     model=orch.model,
                     temperature=temp,
                     max_tokens=orch.max_tokens,

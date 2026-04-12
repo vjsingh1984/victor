@@ -564,6 +564,8 @@ from victor.config.compaction_settings import CompactionSettings  # noqa: E402
 
 from victor.config.permission_settings import PermissionSettings  # noqa: E402
 
+from victor.config.prompt_optimization_settings import PromptOptimizationSettings  # noqa: E402
+
 # Module-level mapping of group names to nested model classes
 _NESTED_GROUPS = {
     "provider": ProviderSettings,
@@ -592,6 +594,7 @@ _NESTED_GROUPS = {
     "hooks": HooksSettings,
     "compaction": CompactionSettings,
     "permissions": PermissionSettings,
+    "prompt_optimization": PromptOptimizationSettings,
 }
 
 
@@ -738,6 +741,9 @@ class Settings(BaseSettings):
     hooks: Optional[HooksSettings] = Field(default=None, exclude=True, repr=False)
     compaction: Optional[CompactionSettings] = Field(default=None, exclude=True, repr=False)
     permissions: Optional[PermissionSettings] = Field(default=None, exclude=True, repr=False)
+    prompt_optimization: Optional[PromptOptimizationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
 
     # Default provider settings (LMStudio by default for local observability)
     default_provider: str = "ollama"

@@ -234,7 +234,12 @@ class StreamingChatPipeline:
             if handled:
                 break
 
-            tools = await self._get_tools_cached(orch, stream_ctx.context_msg, goals)
+            # Prefer session-locked tools for prefix cache stability (90% discount)
+            session_tools = orch.get_session_tools()
+            if session_tools is not None:
+                tools = session_tools
+            else:
+                tools = await self._get_tools_cached(orch, stream_ctx.context_msg, goals)
 
             # Prepare optional thinking parameter for providers that support it
             provider_kwargs = {}

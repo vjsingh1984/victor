@@ -331,6 +331,33 @@ class SessionLedgerConfig:
 
 
 @dataclass(frozen=True)
+class SummarizationConfig:
+    """Turn-based summarization compaction configuration.
+
+    When conversation exceeds trigger_turn_count, oldest turns are
+    summarized into a single compact message using a fast edge model.
+    Original messages remain in SQLite for audit but are removed from
+    the active context window.
+
+    Attributes:
+        enabled: Whether summarization compaction is active
+        trigger_turn_count: Summarize after this many turns in the conversation
+        max_turns_to_summarize: Number of oldest turns to summarize at once
+        summary_max_tokens: Maximum tokens for the summary output
+        summary_timeout_seconds: Timeout for the edge model summarization call
+    """
+
+    enabled: bool = True
+    trigger_turn_count: int = 15
+    max_turns_to_summarize: int = 10
+    summary_max_tokens: int = 400
+    summary_timeout_seconds: float = 8.0
+
+
+SUMMARIZATION_CONFIG = SummarizationConfig()
+
+
+@dataclass(frozen=True)
 class DeduplicationConfig:
     """Configuration for tool result deduplication.
 
@@ -343,7 +370,11 @@ class DeduplicationConfig:
 
     enabled: bool = True
     stub_template: str = "[Previously read: {path} -- {lines} lines]"
-    dedup_tool_names: tuple = ("read", "cat", "read_file")
+    dedup_tool_names: tuple = (
+        "read", "cat", "read_file", "head", "tail",  # File reads
+        "ls", "glob", "find",                          # Directory listings
+        "code_search", "grep", "search",               # Search results
+    )
     min_content_chars_to_dedup: int = 500
 
 

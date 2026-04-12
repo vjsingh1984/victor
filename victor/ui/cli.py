@@ -46,6 +46,7 @@ from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
 from victor.ui.commands.sessions import sessions_app
+from victor.ui.commands.db import db_app
 from victor.ui.commands.vertical import vertical_app
 from victor.ui.commands.plugin import plugin_app
 from victor.ui.commands.skills import skills_app
@@ -113,6 +114,7 @@ app.add_typer(tools_app)
 # Register scaffold_app as "vertical scaffold" subcommand under vertical_app
 vertical_app.add_typer(scaffold_app, name="scaffold")
 app.add_typer(sessions_app)
+app.add_typer(db_app)
 app.add_typer(vertical_app)
 app.add_typer(plugin_app)
 app.add_typer(skills_app)

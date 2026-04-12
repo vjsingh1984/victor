@@ -1540,6 +1540,75 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._context_manager.get_max_context_chars()
 
+    @property
+    def _cache_optimization_enabled(self) -> bool:
+        """Check if prefix cache optimization is enabled in settings."""
+        try:
+            ctx = getattr(self, "settings", None)
+            if ctx is None:
+                return True
+            context = getattr(ctx, "context", None)
+            if context is None:
+                return True
+            return getattr(context, "cache_optimization_enabled", True)
+        except Exception:
+            return True
+
+    def get_session_tools(self) -> Optional[list]:
+        """Get session-locked tools for cache-friendly API calls.
+
+        Returns the FULL tool set (frozen at session start) so the tools
+        prefix remains byte-identical across all API calls in a session.
+        When cache optimization is disabled, returns None (use per-turn).
+        """
+        if not self._cache_optimization_enabled:
+            return None
+        session_tools = getattr(self, "_session_tools", None)
+        if session_tools is None:
+            try:
+                all_tools = self._get_all_available_tools()
+                if all_tools:
+                    self._session_tools = all_tools
+                    logger.info(
+                        "[cache] Session tools locked: %d tools (prefix-stable)",
+                        len(all_tools),
+                    )
+                    return all_tools
+            except Exception:
+                return None
+        return session_tools
+
+    def get_assembled_messages(self, current_query: Optional[str] = None) -> List["Message"]:
+        """Get context-assembled messages for provider calls.
+
+        When context assembler is available: keeps system prompt + ledger +
+        last N full turns + score-selected older messages within budget.
+        Falls back to raw self.messages when assembler unavailable.
+
+        This is the preferred way to get messages for provider.chat()/stream()
+        calls — it respects token budgets and avoids O(n²) context growth.
+        """
+        assembler = getattr(self, "_context_assembler", None)
+        if assembler is None:
+            return self.messages
+
+        max_chars = self._get_max_context_chars()
+        assembled = assembler.assemble(
+            self.messages, max_chars, current_query=current_query
+        )
+
+        if len(assembled) < len(self.messages):
+            total_original = sum(len(m.content) for m in self.messages)
+            total_assembled = sum(len(m.content) for m in assembled)
+            logger.info(
+                "[context] Assembled %d/%d messages (%dK/%dK chars, budget=%dK)",
+                len(assembled), len(self.messages),
+                total_assembled // 1024, total_original // 1024,
+                max_chars // 1024,
+            )
+
+        return assembled
+
     def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
         """Check if context is at risk of overflow.
 
@@ -2293,9 +2362,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Updates both the orchestrator's cached prompt AND the conversation's
         live system message so the provider receives the updated prompt.
 
+        When cache_optimization_enabled is True and the system prompt has
+        already been built, this is a no-op to preserve prefix cache stability.
+        Query-specific guidance should be injected via user messages instead.
+
         Args:
             query_classification: Optional QueryClassification for task-aware prompting
         """
+        # Freeze system prompt after first build for prefix cache stability
+        if self._cache_optimization_enabled and getattr(self, "_system_prompt_frozen", False):
+            logger.debug(
+                "[cache] System prompt frozen — skipping rebuild for query classification"
+            )
+            return
+
         if query_classification is not None:
             self.prompt_builder.query_classification = query_classification
         base_system_prompt = self._build_system_prompt_with_adapter()
@@ -2305,6 +2385,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
         else:
             self._system_prompt = base_system_prompt
+
+        # Mark as frozen after first build (cache optimization)
+        if self._cache_optimization_enabled:
+            self._system_prompt_frozen = True
 
         # Sync to conversation's live message list so provider receives it
         if hasattr(self, "conversation") and self.conversation is not None:

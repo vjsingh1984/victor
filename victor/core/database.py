@@ -490,6 +490,194 @@ class DatabaseManager:
 
         return stats
 
+    # Table groups for bulk operations
+    TABLE_GROUPS = {
+        "rl": ["rl_outcome", "rl_metric"],
+        "agent": ["agent_prompt_history", "agent_workflow_run", "agent_team_run"],
+    }
+
+    # Column name mapping: table → date column used for time-based pruning
+    # Tables use different names: created_at, timestamp, executed_at
+    _DATE_COLUMNS = {
+        "rl_outcome": "created_at",
+        "rl_metric": "created_at",
+        "agent_prompt_history": "timestamp",
+        "agent_workflow_run": "executed_at",
+        "agent_team_run": "created_at",
+        "rl_cache_history": "created_at",
+        "rl_grounding_history": "created_at",
+        "rl_tool_outcome": "created_at",
+    }
+
+    def _get_date_column(self, table: str) -> str:
+        """Get the date column name for a table, with auto-detection fallback."""
+        if table in self._DATE_COLUMNS:
+            return self._DATE_COLUMNS[table]
+        # Auto-detect
+        conn = self.get_connection()
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info([{table}])").fetchall()}
+        for candidate in ("created_at", "timestamp", "executed_at", "updated_at"):
+            if candidate in cols:
+                return candidate
+        raise ValueError(f"No date column found in '{table}' (columns: {cols})")
+
+    def get_tables_for_group(self, group: str) -> list:
+        """Get table names for a logical group. 'all' returns all prunable tables."""
+        if group == "all":
+            tables = []
+            for g in self.TABLE_GROUPS.values():
+                tables.extend(g)
+            return tables
+        return list(self.TABLE_GROUPS.get(group, []))
+
+    def prune_table(
+        self,
+        table: str,
+        *,
+        older_than_days: int | None = None,
+        keep_last: int | None = None,
+    ) -> int:
+        """Delete old rows from a table.
+
+        Args:
+            table: Table name (must be in a known group for safety)
+            older_than_days: Delete rows older than N days (uses created_at)
+            keep_last: Keep only the most recent N rows
+
+        Returns:
+            Number of rows deleted
+        """
+        # Safety: only allow pruning known tables
+        all_prunable = self.get_tables_for_group("all")
+        if table not in all_prunable:
+            raise ValueError(
+                f"Table '{table}' not in prunable tables: {all_prunable}"
+            )
+
+        conn = self.get_connection()
+
+        if older_than_days is not None:
+            from datetime import datetime, timedelta, timezone
+
+            date_col = self._get_date_column(table)
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
+            cursor = conn.execute(
+                f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (cutoff,)
+            )
+            conn.commit()
+            deleted = cursor.rowcount
+            logger.info("Pruned %d rows from %s (older than %d days)", deleted, table, older_than_days)
+            return deleted
+
+        if keep_last is not None:
+            cursor = conn.execute(
+                f"DELETE FROM [{table}] WHERE id NOT IN "
+                f"(SELECT id FROM [{table}] ORDER BY id DESC LIMIT ?)",
+                (keep_last,),
+            )
+            conn.commit()
+            deleted = cursor.rowcount
+            logger.info("Pruned %d rows from %s (kept last %d)", deleted, table, keep_last)
+            return deleted
+
+        return 0
+
+    def archive_table(
+        self, table: str, before_date: str, output_path: "Path"
+    ) -> int:
+        """Export rows before a date to gzip JSONL, then delete them.
+
+        Args:
+            table: Table name
+            before_date: ISO date string (YYYY-MM-DD)
+            output_path: Path for the .jsonl.gz archive file
+
+        Returns:
+            Number of rows archived
+        """
+        import gzip
+        import json
+
+        all_prunable = self.get_tables_for_group("all")
+        if table not in all_prunable:
+            raise ValueError(f"Table '{table}' not prunable")
+
+        conn = self.get_connection()
+        date_col = self._get_date_column(table)
+        cursor = conn.execute(
+            f"SELECT * FROM [{table}] WHERE [{date_col}] < ?", (before_date,)
+        )
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+
+        if not rows:
+            return 0
+
+        # Write to gzip JSONL
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(output_path, "wt", encoding="utf-8") as f:
+            for row in rows:
+                record = dict(zip(columns, row))
+                f.write(json.dumps(record, default=str) + "\n")
+
+        # Delete archived rows
+        conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
+        conn.commit()
+
+        logger.info(
+            "Archived %d rows from %s to %s", len(rows), table, output_path
+        )
+        return len(rows)
+
+    def get_table_stats(self) -> list:
+        """Get per-table statistics for all tables with data.
+
+        Returns:
+            List of dicts with table, rows, min_date, max_date, est_size_kb
+        """
+        conn = self.get_connection()
+        tables = [
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        ]
+
+        stats = []
+        for table in sorted(tables):
+            try:
+                count = conn.execute(f"SELECT count(*) FROM [{table}]").fetchone()[0]
+                if count == 0:
+                    continue
+
+                # Try to get date range (check multiple column names)
+                min_date = max_date = None
+                try:
+                    date_col = self._get_date_column(table)
+                    row = conn.execute(
+                        f"SELECT MIN([{date_col}]), MAX([{date_col}]) FROM [{table}]"
+                    ).fetchone()
+                    min_date, max_date = row[0], row[1]
+                except Exception:
+                    pass
+
+                # Estimate size from sample
+                sample = conn.execute(f"SELECT * FROM [{table}] LIMIT 5").fetchall()
+                avg_row = sum(len(str(r)) for r in sample) / max(len(sample), 1)
+                est_kb = int(count * avg_row / 1024)
+
+                stats.append({
+                    "table": table,
+                    "rows": count,
+                    "min_date": str(min_date)[:10] if min_date else None,
+                    "max_date": str(max_date)[:10] if max_date else None,
+                    "est_size_kb": est_kb,
+                })
+            except Exception:
+                continue
+
+        return stats
+
     def vacuum(self) -> None:
         """Vacuum the database to reclaim space."""
         conn = self.get_connection()

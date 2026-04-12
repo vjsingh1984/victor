@@ -186,10 +186,19 @@ class AnthropicProvider(BaseProvider):
                 }
 
                 if system_message:
-                    request_params["system"] = system_message
+                    request_params["system"] = [
+                        {
+                            "type": "text",
+                            "text": system_message,
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ]
 
                 if tools:
-                    request_params["tools"] = self._convert_tools(tools)
+                    converted = self._convert_tools(tools)
+                    if converted:
+                        converted[-1]["cache_control"] = {"type": "ephemeral"}
+                    request_params["tools"] = converted
 
                 # Make API call with circuit breaker protection
                 response: AnthropicMessage = await self._execute_with_circuit_breaker(
@@ -287,10 +296,24 @@ class AnthropicProvider(BaseProvider):
             }
 
             if system_message:
-                request_params["system"] = system_message
+                # Use content block format with cache_control for prefix caching.
+                # Anthropic caches the prefix (tools → system → messages) at 90%
+                # discount. The ephemeral TTL (5 min) refreshes on each use.
+                request_params["system"] = [
+                    {
+                        "type": "text",
+                        "text": system_message,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
 
             if tools:
-                request_params["tools"] = self._convert_tools(tools)
+                converted = self._convert_tools(tools)
+                if converted:
+                    # Mark last tool with cache_control to cache the entire
+                    # tools prefix. Tools are first in Anthropic's cache hierarchy.
+                    converted[-1]["cache_control"] = {"type": "ephemeral"}
+                request_params["tools"] = converted
 
             tool_calls: Dict[str, Dict[str, Any]] = {}
             block_index_to_id: Dict[int, str] = {}

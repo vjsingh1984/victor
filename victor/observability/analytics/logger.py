@@ -1,3 +1,4 @@
+import gzip
 import json
 import logging
 import uuid
@@ -7,11 +8,21 @@ from typing import Any, Dict
 
 
 class UsageLogger:
-    """Logs agent usage events to a JSONL file for analytics."""
+    """Logs agent usage events to a JSONL file for analytics.
+
+    Includes automatic log rotation: when the file exceeds MAX_FILE_SIZE,
+    it is compressed and rotated (usage.jsonl → usage.1.jsonl.gz → ...).
+    Consumers already expect this naming: prompt_optimizer.py and benchmark.py
+    read ``usage.*.jsonl.gz`` via glob.
+    """
 
     # Class-level dedup: prevents duplicate session_start events when
     # multiple UsageLogger instances share the same logical session.
     _started_sessions: set = set()
+
+    # Rotation settings
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10 MB
+    MAX_ROTATED_FILES: int = 5
 
     def __init__(self, log_file: Path, enabled: bool = True):
         """
@@ -42,6 +53,49 @@ class UsageLogger:
         """Returns True if logging is enabled."""
         return self._enabled
 
+    def _maybe_rotate(self) -> None:
+        """Rotate log file if it exceeds MAX_FILE_SIZE.
+
+        Rotation scheme: usage.jsonl → usage.1.jsonl.gz → usage.2.jsonl.gz → ...
+        Oldest file (usage.{MAX_ROTATED_FILES}.jsonl.gz) is deleted.
+        """
+        try:
+            if not self._log_file.exists():
+                return
+            if self._log_file.stat().st_size < self.MAX_FILE_SIZE:
+                return
+        except OSError:
+            return
+
+        try:
+            parent = self._log_file.parent
+            # Shift existing rotated files (5 → delete, 4 → 5, 3 → 4, ...)
+            for i in range(self.MAX_ROTATED_FILES, 0, -1):
+                src = parent / f"usage.{i}.jsonl.gz"
+                if not src.exists():
+                    continue
+                if i == self.MAX_ROTATED_FILES:
+                    src.unlink()
+                else:
+                    dst = parent / f"usage.{i + 1}.jsonl.gz"
+                    src.rename(dst)
+
+            # Compress current file → usage.1.jsonl.gz
+            gz_path = parent / "usage.1.jsonl.gz"
+            with open(self._log_file, "rb") as f_in:
+                with gzip.open(gz_path, "wb") as f_out:
+                    f_out.write(f_in.read())
+
+            # Truncate current file
+            self._log_file.unlink()
+            self._log_file.touch()
+
+            self._logger.info(
+                "Rotated usage log: %s → %s", self._log_file.name, gz_path.name
+            )
+        except Exception as e:
+            self._logger.debug("Log rotation failed (non-critical): %s", e)
+
     def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """
         Logs a usage event.
@@ -52,6 +106,8 @@ class UsageLogger:
         """
         if not self._enabled:
             return
+
+        self._maybe_rotate()
 
         # Deduplicate session_start — emit only once per session_id
         if event_type == "session_start":

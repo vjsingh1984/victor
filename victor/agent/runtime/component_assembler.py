@@ -252,6 +252,17 @@ class ComponentAssembler:
             pruning_learner=pruning_learner,
         )
 
+        # Context assembler (turn-boundary assembly for provider calls)
+        try:
+            session_ledger = getattr(orchestrator, "_session_ledger", None)
+            orchestrator._context_assembler = factory.create_context_assembler(
+                ledger=session_ledger,
+                controller=orchestrator._conversation_controller,
+            )
+        except Exception as e:
+            logger.debug("Context assembler creation failed (graceful): %s", e)
+            orchestrator._context_assembler = None
+
         from victor.agent.context_manager import create_context_manager
 
         orchestrator._context_manager = create_context_manager(

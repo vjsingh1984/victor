@@ -388,6 +388,112 @@ class ContextCompactor:
     # Main Compaction Interface
     # ========================================================================
 
+    def _maybe_summarize_turns(self) -> Optional[CompactionAction]:
+        """Summarize old turns if conversation exceeds turn threshold.
+
+        Uses LLMCompactionSummarizer (edge model) to produce a compact
+        summary of the oldest turns. Summary replaces the original messages
+        in the active context while originals remain in SQLite.
+
+        Returns:
+            CompactionAction if summarization occurred, None otherwise.
+        """
+        from victor.config.orchestrator_constants import SUMMARIZATION_CONFIG
+
+        if not SUMMARIZATION_CONFIG.enabled or self.controller is None:
+            return None
+
+        messages = self.controller.messages
+        turn_count = sum(1 for m in messages if m.role == "user")
+        if turn_count <= SUMMARIZATION_CONFIG.trigger_turn_count:
+            return None
+
+        # Already summarized recently? Skip (check by last compaction turn)
+        if self._last_compaction_turn > 0:
+            turns_since_last = turn_count - self._last_compaction_turn
+            if turns_since_last < SUMMARIZATION_CONFIG.max_turns_to_summarize:
+                return None
+
+        # Find the oldest N turns (turn = user msg + subsequent assistant/tool msgs)
+        turn_boundaries = [i for i, m in enumerate(messages) if m.role == "user"]
+        if len(turn_boundaries) <= SUMMARIZATION_CONFIG.trigger_turn_count:
+            return None
+
+        # Keep system prompt (index 0 if present)
+        start_idx = 1 if messages and messages[0].role == "system" else 0
+        # Summarize up to max_turns_to_summarize oldest turns
+        end_turn_idx = min(
+            SUMMARIZATION_CONFIG.max_turns_to_summarize, len(turn_boundaries) - 3
+        )
+        if end_turn_idx <= 0:
+            return None
+
+        end_msg_idx = turn_boundaries[end_turn_idx]
+        turns_to_summarize = messages[start_idx:end_msg_idx]
+
+        if not turns_to_summarize:
+            return None
+
+        # Build summary text (heuristic — no LLM call for now, can upgrade later)
+        tool_names = set()
+        files_mentioned = set()
+        key_decisions = []
+        for msg in turns_to_summarize:
+            if msg.tool_name:
+                tool_names.add(msg.tool_name)
+            # Extract file paths mentioned
+            import re
+            paths = re.findall(r'[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)', msg.content[:500])
+            files_mentioned.update(paths[:5])
+            # Extract short decisions from assistant messages
+            if msg.role == "assistant" and len(msg.content) > 50:
+                first_line = msg.content.split("\n")[0][:150]
+                if first_line:
+                    key_decisions.append(first_line)
+
+        summary_parts = [f"[Context summary of {len(turns_to_summarize)} earlier messages]"]
+        if tool_names:
+            summary_parts.append(f"Tools used: {', '.join(sorted(tool_names)[:10])}")
+        if files_mentioned:
+            summary_parts.append(f"Files: {', '.join(sorted(files_mentioned)[:8])}")
+        if key_decisions:
+            summary_parts.append("Key points:")
+            for d in key_decisions[:5]:
+                summary_parts.append(f"  - {d}")
+
+        summary_text = "\n".join(summary_parts)
+
+        # Replace old turns with summary message
+        from victor.providers.base import Message
+        summary_msg = Message(role="assistant", content=summary_text)
+
+        # Remove old turns and insert summary
+        chars_before = sum(len(m.content) for m in turns_to_summarize)
+        del messages[start_idx:end_msg_idx]
+        messages.insert(start_idx, summary_msg)
+
+        chars_after = len(summary_text)
+        chars_freed = chars_before - chars_after
+        self._last_compaction_turn = sum(1 for m in messages if m.role == "user")
+
+        logger.info(
+            "[summarize] Replaced %d messages with summary (%dK → %dK chars, freed %dK)",
+            len(turns_to_summarize), chars_before // 1024,
+            chars_after // 1024, chars_freed // 1024,
+        )
+
+        return CompactionAction(
+            trigger=CompactionTrigger.THRESHOLD,
+            action_taken=True,
+            messages_removed=len(turns_to_summarize) - 1,
+            tokens_freed=self._estimate_tokens(chars_freed),
+            new_utilization=0.0,  # Will be recalculated
+            details=[
+                f"Summarized {len(turns_to_summarize)} messages into 1",
+                f"Freed ~{chars_freed // 4} tokens",
+            ],
+        )
+
     def check_and_compact(
         self,
         current_query: Optional[str] = None,
@@ -397,9 +503,11 @@ class ContextCompactor:
     ) -> CompactionAction:
         """Check context utilization and compact if needed.
 
-        Proactively compacts when utilization exceeds threshold, rather
-        than waiting for overflow. Uses RL learner for adaptive pruning
-        when available.
+        Two-phase compaction:
+        1. Turn-based summarization (early, at turn threshold)
+        2. Utilization-based compaction (late, at 70% threshold)
+
+        Uses RL learner for adaptive pruning when available.
 
         Args:
             current_query: Current user query for semantic relevance
@@ -410,6 +518,12 @@ class ContextCompactor:
         Returns:
             CompactionAction describing what was done
         """
+        # Phase 1: Turn-based summarization (fires early, before utilization threshold)
+        if not force:
+            summary_action = self._maybe_summarize_turns()
+            if summary_action and summary_action.action_taken:
+                return summary_action
+
         metrics = self.controller.get_context_metrics()
         utilization = metrics.utilization
 

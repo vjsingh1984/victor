@@ -160,12 +160,29 @@ class TurnBoundaryContextAssembler:
                         result.append(msg)
                         older_chars += len(msg.content)
         elif older_messages and older_budget > 0:
-            # No score_fn, include what fits from the end (most recent older msgs)
-            older_chars = 0
-            for msg in reversed(older_messages):
-                if older_chars + len(msg.content) <= older_budget:
-                    result.insert(len(result), msg)
-                    older_chars += len(msg.content)
+            # No score_fn: use Rust-accelerated fit_context() for smart selection
+            try:
+                from victor.processing.native.context_fitter import fit_context
+
+                # Convert chars budget to token budget (approx 4 chars/token)
+                token_budget = older_budget // 4
+                msg_dicts = [
+                    {"role": m.role, "content": m.content, "priority": 50}
+                    for m in older_messages
+                ]
+                fit_result = fit_context(
+                    msg_dicts, budget=token_budget, strategy="smart"
+                )
+                for idx in fit_result.kept_indices:
+                    result.append(older_messages[idx])
+                    older_chars += len(older_messages[idx].content)
+            except Exception:
+                # Fallback: include what fits from the end (most recent older msgs)
+                older_chars = 0
+                for msg in reversed(older_messages):
+                    if older_chars + len(msg.content) <= older_budget:
+                        result.insert(len(result), msg)
+                        older_chars += len(msg.content)
 
         # 5. Semantic augmentation: retrieve relevant compacted context
         if self._conversation_controller and current_query:

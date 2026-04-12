@@ -55,7 +55,7 @@ class PromptOptimizationSettings(BaseModel):
     """Top-level prompt optimization configuration."""
 
     # Master switch — gates ALL prompt optimization
-    enabled: bool = False
+    enabled: bool = True
 
     # Default strategy list applied to all evolvable sections.
     # Strategies are applied in order (layered).

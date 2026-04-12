@@ -17,3 +17,9 @@ class ContextSettings(BaseModel):
     response_token_reserve: int = 4096
     conversation_memory_enabled: bool = True
     conversation_embeddings_enabled: bool = True
+
+    # Prefix cache optimization: lock tools + system prompt at session start
+    # so the provider can cache them at 90% discount (Anthropic, OpenAI, Google).
+    # When enabled: full tool set sent every call, reminders via user messages,
+    # system prompt frozen after first build.
+    cache_optimization_enabled: bool = True
