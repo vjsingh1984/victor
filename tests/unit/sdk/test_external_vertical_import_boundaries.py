@@ -1,11 +1,18 @@
-"""SDK boundary enforcement for external verticals.
+"""SDK boundary tracking for external verticals.
 
-Verifies that installed external verticals do not import from
-victor.framework, victor.agent, victor.core, victor.security,
-or victor.tools directly. They should only import from victor_sdk.
+Tracks framework import usage in external verticals. Verticals currently
+use both SDK (victor_sdk) and framework (victor.framework) imports.
+This is architecturally valid — verticals NEED framework imports for
+runtime extensions (middleware, safety, workflows).
 
-This is an aspirational test — verticals that currently violate
-are tracked with xfail marks until migrated.
+The tracking purpose is:
+- Monitor which verticals could become SDK-only (like victor-invest)
+- Identify framework imports that could be replaced with SDK declarations
+- As SDK gains more data-only types (SafetyPatternDeclaration, etc.),
+  verticals can migrate framework imports to SDK equivalents
+
+xfail marks track current state, not failures to fix.
+See CLAUDE.md "Plugin → Vertical → Extension Architecture" for context.
 """
 
 import ast
