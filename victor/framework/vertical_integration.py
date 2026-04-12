@@ -843,7 +843,7 @@ class VerticalIntegrationPipeline:
         cache_ttl: int = 3600,
         max_cache_entries: int = 256,
         cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-        parallel_enabled: bool = False,
+        parallel_enabled: bool = True,
     ):
         """Initialize the pipeline.
 
@@ -2421,7 +2421,7 @@ def create_integration_pipeline(
     cache_ttl: int = 3600,
     max_cache_entries: int = 256,
     cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-    enable_parallel: bool = False,
+    enable_parallel: bool = True,
 ) -> VerticalIntegrationPipeline:
     """Create a vertical integration pipeline with feature flags (Phase 2).
 
@@ -2464,7 +2464,7 @@ def create_integration_pipeline_with_handlers(
     cache_ttl: int = 3600,
     max_cache_entries: int = 256,
     cache_policy: Optional["VerticalIntegrationCachePolicy"] = None,
-    enable_parallel: bool = False,
+    enable_parallel: bool = True,
 ) -> VerticalIntegrationPipeline:
     """Create a pipeline with custom step handlers.
 
