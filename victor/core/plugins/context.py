@@ -312,10 +312,19 @@ class _LazyCapabilityProxy:
         object.__setattr__(self, "_instance", None)
         object.__setattr__(self, "_resolved", False)
 
-    def __getattr__(self, name):
+    def _resolve(self):
+        """Resolve the lazy proxy by calling the factory."""
         if not object.__getattribute__(self, "_resolved"):
             factory = object.__getattribute__(self, "_factory")
             instance = factory()
             object.__setattr__(self, "_instance", instance)
             object.__setattr__(self, "_resolved", True)
-        return getattr(object.__getattribute__(self, "_instance"), name)
+        return object.__getattribute__(self, "_instance")
+
+    def __getattr__(self, name):
+        return getattr(self._resolve(), name)
+
+    def __call__(self, *args, **kwargs):
+        """Support calling the proxy as a constructor/factory."""
+        resolved = self._resolve()
+        return resolved(*args, **kwargs)

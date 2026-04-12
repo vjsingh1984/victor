@@ -182,6 +182,30 @@ def reset_plugin_registry():
 
 
 @pytest.fixture(autouse=True)
+def reset_capability_registry():
+    """Reset CapabilityRegistry between tests to prevent capability leakage.
+
+    The CapabilityRegistry singleton caches registered capabilities.
+    Without reset, tests that register an EditorProtocol (via vertical
+    loading) pollute the registry for file_editor_tool tests.
+    """
+    yield
+    import sys
+
+    if "victor.core.capability_registry" in sys.modules:
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+
+            instance = CapabilityRegistry.get_instance()
+            if hasattr(instance, "_capabilities"):
+                instance._capabilities.clear()
+            if hasattr(instance, "_enhanced"):
+                instance._enhanced.clear()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
 def reset_feature_flags():
     """Reset FeatureFlagManager singleton between tests."""
     yield
