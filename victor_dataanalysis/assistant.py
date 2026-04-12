@@ -5,18 +5,11 @@ Competitive positioning: ChatGPT Data Analysis, Claude Artifacts, Jupyter AI.
 
 from typing import Any, Dict, List, Optional
 
-from victor.framework.extensions import (
-    ModeConfigProviderProtocol,
-    PromptContributorProtocol,
-    SafetyExtensionProtocol,
-    StageDefinition,
-    TieredToolConfig,
-    ToolDependencyProviderProtocol,
-    VerticalBase,
-)
+from victor_sdk.verticals.protocols.base import VerticalBase
+from victor_sdk.core.types import StageDefinition
 
-# Phase 3: Import framework capabilities
-from victor.framework.capabilities import FileOperationsCapability
+# Framework capabilities imported lazily inside methods that need them.
+# FileOperationsCapability, protocol types accessed at runtime only.
 
 
 class DataAnalysisAssistant(VerticalBase):
@@ -29,8 +22,15 @@ class DataAnalysisAssistant(VerticalBase):
     description = "Data exploration, statistical analysis, visualization, and ML insights"
     version = "1.0.0"
 
-    # Phase 3: Framework file operations capability (read, write, edit, grep)
-    _file_ops = FileOperationsCapability()
+    # Phase 3: Framework file operations capability (lazy-loaded)
+    _file_ops = None
+
+    @classmethod
+    def _get_file_ops(cls):
+        if cls._file_ops is None:
+            from victor.framework.capabilities import FileOperationsCapability
+            cls._file_ops = FileOperationsCapability()
+        return cls._file_ops
 
     @classmethod
     def get_tools(cls) -> List[str]:
@@ -44,7 +44,7 @@ class DataAnalysisAssistant(VerticalBase):
         from victor.tools.tool_names import ToolNames
 
         # Start with framework file operations (read, write, edit, grep)
-        tools = cls._file_ops.get_tool_list()
+        tools = cls._get_file_ops().get_tool_list()
 
         # Add data analysis-specific tools
         tools.extend(
