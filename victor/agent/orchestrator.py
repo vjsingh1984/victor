@@ -749,6 +749,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self._system_added = False
 
+        # Streaming loop tracking counters (previously injected via hasattr in pipeline.py)
+        self._continuation_prompts: int = 0
+        self._asking_input_prompts: int = 0
+        self._consecutive_blocked_attempts: int = 0
+        self._cumulative_prompt_interventions: int = 0
+
         # Initialize tool call budget (via factory) - uses adapter recommendations with settings override
         self.tool_budget = self._factory.initialize_tool_budget(self.tool_calling_caps)
 
@@ -3042,11 +3048,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
             # Reset continuation/input prompts on successful tool call
             if success:
-                if hasattr(self, "_continuation_prompts") and self._continuation_prompts > 0:
+                if self._continuation_prompts > 0:
                     self._continuation_prompts = 0
                     if hasattr(self, "_tool_calls_at_continuation_start"):
                         self._tool_calls_at_continuation_start = self.tool_calls_used
-                if hasattr(self, "_asking_input_prompts") and self._asking_input_prompts > 0:
+                if self._asking_input_prompts > 0:
                     self._asking_input_prompts = 0
 
             # --- Analytics ---

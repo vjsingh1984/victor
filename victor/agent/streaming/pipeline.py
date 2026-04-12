@@ -462,16 +462,7 @@ class StreamingChatPipeline:
                             orch
                         )
 
-                    # Ensure tracking variables are initialized
-                    if not hasattr(orch, "_continuation_prompts"):
-                        orch._continuation_prompts = 0
-                    if not hasattr(orch, "_asking_input_prompts"):
-                        orch._asking_input_prompts = 0
-                    if not hasattr(orch, "_consecutive_blocked_attempts"):
-                        orch._consecutive_blocked_attempts = 0
-                    if not hasattr(orch, "_cumulative_prompt_interventions"):
-                        orch._cumulative_prompt_interventions = 0
-
+                    # Tracking variables now initialized in AgentOrchestrator.__init__
                     from victor.agent.streaming import create_tracking_state
 
                     tracking_state = create_tracking_state(orch)
