@@ -302,7 +302,7 @@ class BaseTool(ABC):
         2. Otherwise, auto-generate metadata from tool properties
 
         This ensures ALL tools can participate in semantic tool selection
-        without requiring manual configuration in tool_knowledge.yaml.
+        without requiring manual configuration files.
 
         Returns:
             ToolMetadata with semantic information for tool selection

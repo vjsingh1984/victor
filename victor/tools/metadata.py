@@ -36,7 +36,7 @@ class ToolMetadata:
 
     This dataclass allows tools to define their own semantic information
     inline, enabling fully dynamic tool registration without needing to
-    manually update tool_knowledge.yaml or tool_selection.py.
+    manually update configuration files or tool_selection.py.
 
     Attributes:
         category: Tool category (e.g., 'git', 'security', 'pipeline')
@@ -688,7 +688,7 @@ class ToolMetadataRegistry:
     def export_all(self) -> Dict[str, Dict[str, Any]]:
         """Export all metadata as dictionaries.
 
-        Useful for debugging, analysis, or generating tool_knowledge.yaml.
+        Useful for debugging and analysis.
 
         Returns:
             Dictionary mapping tool names to metadata dicts
