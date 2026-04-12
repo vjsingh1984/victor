@@ -280,6 +280,10 @@ class BedrockProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Bedrock supports prompt caching for Claude/Nova (90% discount on reads)."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

@@ -265,6 +265,10 @@ class MLXProvider(BaseProvider):
         """
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """MLX supports prefix caching for pure-attention models (latency savings)."""
+        return True
+
     def supports_tools(self) -> bool:
         """Check if provider supports tool calling.
 

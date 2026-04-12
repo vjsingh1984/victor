@@ -37,6 +37,39 @@ class TestSupportsPromptCaching:
         provider = AnthropicProvider.__new__(AnthropicProvider)
         assert provider.supports_prompt_caching() is True
 
+    @pytest.mark.parametrize(
+        "provider_module,provider_class",
+        [
+            ("victor.providers.openai_provider", "OpenAIProvider"),
+            ("victor.providers.google_provider", "GoogleProvider"),
+            ("victor.providers.deepseek_provider", "DeepSeekProvider"),
+            ("victor.providers.xai_provider", "XAIProvider"),
+            ("victor.providers.groq_provider", "GroqProvider"),
+            ("victor.providers.bedrock_provider", "BedrockProvider"),
+            ("victor.providers.vertex_provider", "VertexAIProvider"),
+            ("victor.providers.azure_openai_provider", "AzureOpenAIProvider"),
+            ("victor.providers.openrouter_provider", "OpenRouterProvider"),
+            # Local inference engines (KV prefix caching for latency savings)
+            ("victor.providers.ollama_provider", "OllamaProvider"),
+            ("victor.providers.vllm_provider", "VLLMProvider"),
+            ("victor.providers.lmstudio_provider", "LMStudioProvider"),
+            ("victor.providers.llamacpp_provider", "LlamaCppProvider"),
+            ("victor.providers.mlx_provider", "MLXProvider"),
+            # Cloud inference with auto-caching
+            ("victor.providers.fireworks_provider", "FireworksProvider"),
+            ("victor.providers.together_provider", "TogetherProvider"),
+            ("victor.providers.cerebras_provider", "CerebrasProvider"),
+        ],
+    )
+    def test_caching_providers_return_true(self, provider_module, provider_class):
+        """All cloud providers with cached token discounts should return True."""
+        import importlib
+
+        mod = importlib.import_module(provider_module)
+        cls = getattr(mod, provider_class)
+        # Call unbound method to avoid __init__ side effects
+        assert cls.supports_prompt_caching(MagicMock()) is True
+
     def test_is_caching_provider_convenience(self):
         from victor.providers.base import is_caching_provider
 

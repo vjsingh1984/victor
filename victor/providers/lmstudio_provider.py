@@ -261,6 +261,10 @@ class LMStudioProvider(BaseProvider):
         """LMStudio supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """LMStudio supports KV prefix caching for GGUF models (latency savings)."""
+        return True
+
     def model_uses_thinking_tags(self, model: Optional[str] = None) -> bool:
         """Check if model outputs thinking tags.
 

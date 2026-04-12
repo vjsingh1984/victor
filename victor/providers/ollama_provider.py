@@ -171,6 +171,10 @@ class OllamaProvider(BaseProvider):
         """Ollama supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Ollama auto-caches KV prefix via llama.cpp (latency savings on reuse)."""
+        return True
+
     def get_context_window(self, model: str) -> int:
         """Get context window size using cached discovery or config fallback."""
         cache_key = f"{self.base_url}:{model}"

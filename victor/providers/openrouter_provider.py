@@ -203,6 +203,10 @@ class OpenRouterProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """OpenRouter passes through provider caching discounts (25-90% off)."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

@@ -495,6 +495,10 @@ class CerebrasProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Cerebras auto-caches prompts with 5min TTL (latency savings)."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

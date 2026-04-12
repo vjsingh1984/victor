@@ -226,6 +226,10 @@ class GroqProvider(BaseProvider):
         """Groq supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Groq auto-caches prompts (50% discount on cached tokens)."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

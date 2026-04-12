@@ -195,6 +195,10 @@ class XAIProvider(BaseProvider):
         """xAI supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """xAI/Grok auto-caches prompts (50-75% discount on cached tokens)."""
+        return True
+
     def get_context_window(self, model: str) -> int:
         """Get context window size for a model.
 

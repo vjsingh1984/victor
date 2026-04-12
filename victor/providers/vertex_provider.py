@@ -235,6 +235,10 @@ class VertexAIProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Vertex AI (Gemini) supports context caching (75-90% discount)."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

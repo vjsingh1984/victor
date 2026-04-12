@@ -345,6 +345,10 @@ class LlamaCppProvider(BaseProvider):
         """llama.cpp supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """llama.cpp supports KV prefix caching natively (latency savings)."""
+        return True
+
     async def list_models(self) -> List[Dict[str, Any]]:
         """List models loaded in llama.cpp server.
 

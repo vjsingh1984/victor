@@ -236,6 +236,10 @@ class AzureOpenAIProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Azure OpenAI supports prompt caching (50-100% discount depending on SKU)."""
+        return True
+
     def _get_deployment_url(
         self, model_or_deployment: str, endpoint_type: str = "chat/completions"
     ) -> str:

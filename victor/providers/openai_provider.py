@@ -221,6 +221,10 @@ class OpenAIProvider(BaseProvider):
         """OpenAI supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """OpenAI auto-caches prompts with 50% discount on cached tokens."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

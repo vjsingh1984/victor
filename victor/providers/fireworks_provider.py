@@ -173,6 +173,10 @@ class FireworksProvider(BaseProvider):
     def supports_streaming(self) -> bool:
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Fireworks auto-caches prompts (50% discount on cached tokens)."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

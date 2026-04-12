@@ -158,6 +158,10 @@ class DeepSeekProvider(BaseProvider):
         """DeepSeek supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """DeepSeek auto-caches prefix on disk (90% discount on cached tokens)."""
+        return True
+
     def _model_supports_tools(self, model: str) -> bool:
         """Check if specific model supports tool calling.
 

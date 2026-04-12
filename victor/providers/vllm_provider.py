@@ -360,6 +360,10 @@ class VLLMProvider(BaseProvider):
         """vLLM supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """vLLM supports Automatic Prefix Caching (APC) for KV cache reuse."""
+        return True
+
     async def list_models(self) -> List[Dict[str, Any]]:
         """List models loaded in vLLM server.
 
