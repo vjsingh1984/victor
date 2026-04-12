@@ -1,113 +1,104 @@
-"""SDK boundary tracking for external verticals.
+"""SDK boundary enforcement for external vertical definition layers.
 
-Tracks framework import usage in external verticals. Verticals currently
-use both SDK (victor_sdk) and framework (victor.framework) imports.
-This is architecturally valid — verticals NEED framework imports for
-runtime extensions (middleware, safety, workflows).
+Enforces that vertical DEFINITION files (assistant.py, plugin.py) have
+no MODULE-LEVEL imports from victor.framework. Imports inside function
+bodies, methods, TYPE_CHECKING blocks, and __getattr__ are allowed
+(they're lazy/deferred and don't execute on module import).
 
-The tracking purpose is:
-- Monitor which verticals could become SDK-only (like victor-invest)
-- Identify framework imports that could be replaced with SDK declarations
-- As SDK gains more data-only types (SafetyPatternDeclaration, etc.),
-  verticals can migrate framework imports to SDK equivalents
-
-xfail marks track current state, not failures to fix.
-See CLAUDE.md "Plugin → Vertical → Extension Architecture" for context.
+Architecture: Plugin (bootstrap) -> Vertical (config) -> Extension (runtime)
+See CLAUDE.md "Plugin -> Vertical -> Extension Architecture"
 """
 
 import ast
 import importlib
-import sys
 from pathlib import Path
 from typing import List, Tuple
 
 import pytest
 
-# Framework modules that verticals should NOT import from
 BANNED_PREFIXES = (
-    "victor.agent",
-    "victor.core",
-    "victor.framework",
-    "victor.providers",
-    "victor.security",
-    "victor.storage",
-    "victor.tools",
-    "victor.workflows",
-    "victor.evaluation",
-    "victor.observability",
+    "victor.agent", "victor.core", "victor.framework", "victor.providers",
+    "victor.security", "victor.storage", "victor.tools", "victor.workflows",
+    "victor.evaluation", "victor.observability",
 )
 
-# SDK modules that verticals CAN import from
-ALLOWED_PREFIXES = (
-    "victor_sdk",
-)
+DEFINITION_FILES = {"assistant.py", "plugin.py"}
 
-# Map of vertical package name → (source directory, expected compliance)
-VERTICALS = {
-    "victor_invest": {"compliant": False},  # has framework_bootstrap.py
-    "victor_coding": {"compliant": False},  # xfail until migrated
-    "victor_research": {"compliant": False},
-    "victor_devops": {"compliant": False},
-    "victor_rag": {"compliant": False},
-    "victor_dataanalysis": {"compliant": False},
-}
+VERTICALS = [
+    "victor_invest", "victor_coding", "victor_research",
+    "victor_devops", "victor_rag", "victor_dataanalysis",
+]
 
 
-def _find_package_source(package_name: str) -> Path:
-    """Find the source directory for an installed package."""
+def _find_source(pkg: str) -> Path:
     try:
-        mod = importlib.import_module(package_name)
-        if hasattr(mod, "__path__"):
-            return Path(mod.__path__[0])
-        return Path(mod.__file__).parent
+        mod = importlib.import_module(pkg)
+        return Path(mod.__path__[0]) if hasattr(mod, "__path__") else None
     except ImportError:
         return None
 
 
-def _scan_imports(source_dir: Path) -> List[Tuple[str, int, str]]:
-    """Scan all .py files for banned imports. Returns (file, line, import)."""
-    violations = []
-    for py_file in source_dir.rglob("*.py"):
-        try:
-            tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
-        except SyntaxError:
-            continue
+def _get_module_level_imports(source: str) -> List[Tuple[int, str]]:
+    """Extract only MODULE-LEVEL imports (not inside functions/methods/if blocks)."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
 
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module:
-                if node.module.startswith(BANNED_PREFIXES):
-                    rel_path = py_file.relative_to(source_dir)
-                    violations.append((str(rel_path), node.lineno, node.module))
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name.startswith(BANNED_PREFIXES):
-                        rel_path = py_file.relative_to(source_dir)
-                        violations.append((str(rel_path), node.lineno, alias.name))
+    violations = []
+    for node in ast.iter_child_nodes(tree):
+        # Only check top-level statements
+        if isinstance(node, ast.ImportFrom) and node.module:
+            if node.module.startswith(BANNED_PREFIXES):
+                violations.append((node.lineno, node.module))
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.startswith(BANNED_PREFIXES):
+                    violations.append((node.lineno, alias.name))
+        # Check inside TYPE_CHECKING — these are OK (type-only)
+        # Check inside if/try blocks at module level — still module-level
+        elif isinstance(node, ast.If):
+            # Skip TYPE_CHECKING blocks
+            test = node.test
+            if isinstance(test, ast.Name) and test.id == "TYPE_CHECKING":
+                continue
+            if isinstance(test, ast.Attribute) and getattr(test, "attr", "") == "TYPE_CHECKING":
+                continue
+            # Other if blocks at module level: check their imports
+            for child in ast.walk(node):
+                if isinstance(child, ast.ImportFrom) and child.module:
+                    if child.module.startswith(BANNED_PREFIXES):
+                        violations.append((child.lineno, child.module))
     return violations
 
 
-@pytest.mark.parametrize("package_name", list(VERTICALS.keys()))
-def test_vertical_sdk_only_imports(package_name: str):
-    """External vertical should only import from victor_sdk, not framework internals."""
-    source_dir = _find_package_source(package_name)
-    if source_dir is None:
-        pytest.skip(f"{package_name} not installed")
+def _scan_definition_imports(source_dir: Path) -> List[Tuple[str, int, str]]:
+    """Scan definition-layer files for module-level banned imports."""
+    results = []
+    for py_file in source_dir.rglob("*.py"):
+        rel = str(py_file.relative_to(source_dir))
+        if Path(rel).name not in DEFINITION_FILES:
+            continue
+        source = py_file.read_text(encoding="utf-8")
+        for lineno, module in _get_module_level_imports(source):
+            results.append((rel, lineno, module))
+    return results
 
-    info = VERTICALS[package_name]
-    violations = _scan_imports(source_dir)
 
-    if not info["compliant"]:
-        if violations:
-            pytest.xfail(
-                f"{package_name} has {len(violations)} framework imports "
-                f"(expected — not yet migrated to SDK-only)"
-            )
-        else:
-            # If it passes unexpectedly, update compliant flag!
-            pass  # Let it pass — vertical was cleaned up
+@pytest.mark.parametrize("pkg", VERTICALS)
+def test_vertical_definition_layer_sdk_only(pkg: str):
+    """Definition files (assistant.py, plugin.py) must not have module-level framework imports.
 
+    Imports inside function bodies, TYPE_CHECKING blocks, and __getattr__
+    are allowed (deferred/lazy).
+    """
+    src = _find_source(pkg)
+    if src is None:
+        pytest.skip(f"{pkg} not installed")
+
+    violations = _scan_definition_imports(src)
     assert not violations, (
-        f"{package_name} imports from framework internals "
-        f"(should use victor_sdk only):\n"
-        + "\n".join(f"  {f}:{line}: {mod}" for f, line, mod in violations[:10])
+        f"{pkg} definition-layer files have module-level framework imports "
+        f"(should use victor_sdk or defer to function bodies):\n"
+        + "\n".join(f"  {f}:{line}: {mod}" for f, line, mod in violations)
     )
