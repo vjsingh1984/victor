@@ -35,9 +35,14 @@ use regex::Regex;
 // Matches contractions, letters, numbers, punctuation runs, and whitespace
 // runs. Each match becomes a "word" that is BPE-encoded independently.
 // ---------------------------------------------------------------------------
+// Note: The original tiktoken cl100k_base pattern uses \s+(?!\S) (negative
+// look-ahead) to differentiate trailing whitespace from mid-text whitespace.
+// The Rust `regex` crate doesn't support look-around. We replace it with
+// \s+$ (end-of-string) which handles the same case for BPE word splitting.
+// The remaining \s+ alternative catches all other whitespace runs.
 static WORD_SPLIT_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+(?!\S)|\s+",
+        r"(?i:'s|'t|'re|'ve|'m|'ll|'d)|[^\r\n\p{L}\p{N}]?\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]+[\r\n]*|\s*[\r\n]+|\s+$|\s+",
     )
     .expect("word-split regex must compile")
 });
