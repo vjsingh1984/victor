@@ -19,13 +19,26 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-SYNTHESIS_PROMPT = """You are writing an init.md file — a compact system-prompt context
+# Frame: fixed structure that wraps the evolvable RULES section.
+# GEPA evolves SYNTHESIS_RULES only; the frame is never mutated.
+_SYNTHESIS_FRAME_BEFORE = """You are writing an init.md file — a compact system-prompt context
 file that an AI coding assistant reads at the start of every conversation about this codebase.
 
 Below is raw auto-generated data about the project. Your job is to SYNTHESIZE it into a
 compact, high-signal init.md (target: 80–120 lines, under 2000 tokens).
 
-RULES:
+{rules}
+
+RAW DATA:
+
+```markdown
+{base_content}
+```
+
+Return ONLY the final init.md markdown. No preamble, no explanation."""
+
+# The evolvable rules section — this is what GEPA v2 optimizes.
+SYNTHESIS_RULES = """RULES:
 - Write project-specific content only. No generic advice.
 - Use these sections in order: Project Overview, Package Layout, Key Entry Points,
   Development Commands, Dependencies, Configuration, Architecture Notes, Codebase Scale.
@@ -46,15 +59,23 @@ RULES:
 - OMIT these sections entirely (they waste tokens): Analyzer Coverage, Performance Hints,
   Embeddings & Chunking, raw PageRank numbers, graph node IDs.
 - Do NOT include sections about the indexer or analysis tooling.
-- End with a one-line note: "Run `/init --update` to refresh after code changes."
+- End with a one-line note: "Run `/init --update` to refresh after code changes.\""""
 
-RAW DATA:
 
-```markdown
-{base_content}
-```
+def _build_synthesis_prompt(base_content: str, rules: str = SYNTHESIS_RULES) -> str:
+    """Assemble the full synthesis prompt from frame + rules + data."""
+    return _SYNTHESIS_FRAME_BEFORE.format(rules=rules, base_content=base_content)
 
-Return ONLY the final init.md markdown. No preamble, no explanation."""
+
+# Public constant for backward compatibility (assembled with static rules)
+SYNTHESIS_PROMPT = _build_synthesis_prompt("{base_content}")
+# Note: SYNTHESIS_PROMPT.format(base_content=...) still works because
+# _build_synthesis_prompt leaves {base_content} as a literal when called
+# with "{base_content}" as the data argument... except it would double-format.
+# So we define it directly for backward compat:
+SYNTHESIS_PROMPT = _SYNTHESIS_FRAME_BEFORE.format(
+    rules=SYNTHESIS_RULES, base_content="{base_content}"
+)
 
 TOOLS_FALLBACK_PROMPT = """Analyze this codebase and generate a comprehensive init.md file.
 
@@ -98,7 +119,16 @@ class InitSynthesizer:
         Returns:
             Synthesized init.md markdown content.
         """
-        prompt = SYNTHESIS_PROMPT.format(base_content=base_content)
+        # Check for GEPA-evolved RULES section (not the full prompt)
+        evolved_rules = self._get_evolved_rules(provider)
+        if evolved_rules:
+            prompt = _build_synthesis_prompt(base_content, rules=evolved_rules)
+            logger.info(
+                "[init] Using GEPA-evolved rules (%d chars) in fixed frame",
+                len(evolved_rules),
+            )
+        else:
+            prompt = _build_synthesis_prompt(base_content)
 
         if agent:
             return await self._run_with_orchestrator(agent, prompt)
@@ -205,9 +235,22 @@ class InitSynthesizer:
                 logs_dir = Path.home() / ".victor" / "logs"
                 logs_dir.mkdir(parents=True, exist_ok=True)
                 usage = UsageLogger(log_file=logs_dir / "usage.jsonl", enabled=True)
+
+                # Emit task_classification so GEPA trace collection
+                # categorizes this session as init_synthesis (not 'default')
+                usage.log_event("task_classification", {
+                    "task_type": "init_synthesis",
+                    "provider": provider,
+                    "model": model,
+                })
+
                 usage.log_event("tool_call", {
                     "tool_name": "init_synthesis",
-                    "tool_args": {"provider": provider, "model": model, "prompt_chars": len(prompt)},
+                    "tool_args": {
+                        "provider": provider,
+                        "model": model,
+                        "prompt_chars": len(prompt),
+                    },
                 })
                 usage.log_event("tool_result", {
                     "tool_name": "init_synthesis",
@@ -216,6 +259,9 @@ class InitSynthesizer:
                     "result_lines": result.count("\n"),
                     "result_chars": len(result),
                 })
+
+                # Log init output quality signal for GEPA evolution
+                self._log_init_quality(usage, result)
             except Exception:
                 pass  # Usage logging is best-effort
 
@@ -261,3 +307,91 @@ class InitSynthesizer:
             lines = lines[:-1] if lines and lines[-1].strip() == "```" else lines
             content = "\n".join(lines)
         return content
+
+    @staticmethod
+    def _log_init_quality(usage: Any, result: str) -> None:
+        """Score init output quality and log for GEPA learning.
+
+        Quality signals:
+        - Section completeness: how many expected sections are present
+        - Line count: within 80-120 target range
+        - Conciseness: no bloated or trivially short output
+        """
+        expected_sections = [
+            "Project Overview", "Package Layout", "Key Entry Points",
+            "Development Commands", "Dependencies", "Configuration",
+            "Architecture Notes", "Codebase Scale",
+        ]
+        sections_found = sum(1 for s in expected_sections if s in result)
+        section_score = sections_found / len(expected_sections)
+
+        line_count = result.count("\n") + 1
+        # Penalize being outside 60-140 range (relaxed from 80-120)
+        if 60 <= line_count <= 140:
+            length_score = 1.0
+        elif 40 <= line_count <= 200:
+            length_score = 0.7
+        else:
+            length_score = 0.3
+
+        # Combined quality score
+        quality_score = section_score * 0.6 + length_score * 0.2 + (0.2 if result else 0.0)
+
+        usage.log_event("init_quality", {
+            "sections_found": sections_found,
+            "sections_total": len(expected_sections),
+            "section_score": round(section_score, 2),
+            "line_count": line_count,
+            "length_score": round(length_score, 2),
+            "quality_score": round(quality_score, 2),
+            "char_count": len(result),
+        })
+
+    @staticmethod
+    def _get_evolved_rules(provider: Optional[str] = None) -> Optional[str]:
+        """Check if GEPA has evolved RULES for the init synthesis prompt.
+
+        Returns the evolved RULES text if a candidate exists with sufficient
+        confidence, otherwise None (caller uses static SYNTHESIS_RULES).
+        The rules are injected into the fixed frame — {base_content} is
+        always safe because the frame handles it.
+
+        Gated by prompt_optimization.enabled setting.
+        """
+        try:
+            from victor.config.settings import get_settings
+
+            po = getattr(get_settings(), "prompt_optimization", None)
+            if po is None or not po.enabled:
+                return None
+            strategies = po.get_strategies_for_section("INIT_SYNTHESIS_RULES")
+            if not strategies:
+                return None
+        except Exception:
+            return None
+
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("prompt_optimizer")
+            if learner is None:
+                return None
+            rec = learner.get_recommendation(
+                provider or "default",
+                "",  # model not relevant for rules template
+                "init_synthesis",
+                section_name="INIT_SYNTHESIS_RULES",
+            )
+            if rec and rec.confidence > 0.6 and not rec.is_baseline:
+                logger.info(
+                    "Using GEPA-evolved init rules "
+                    "(gen=%s, confidence=%.2f, %d chars)",
+                    rec.reason,
+                    rec.confidence,
+                    len(rec.value),
+                )
+                return rec.value
+        except Exception:
+            pass
+        return None

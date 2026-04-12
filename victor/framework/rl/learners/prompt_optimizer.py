@@ -382,6 +382,7 @@ class PromptOptimizerLearner(BaseLearner):
         "GROUNDING_RULES",
         "COMPLETION_GUIDANCE",
         "FEW_SHOT_EXAMPLES",
+        "INIT_SYNTHESIS_RULES",  # Only the RULES section, frame stays fixed
     ]
 
     DEFAULT_OBJECTIVES = [
@@ -428,6 +429,14 @@ class PromptOptimizerLearner(BaseLearner):
             self._extra_strategies["ASI_TOOL_EFFECTIVENESS_GUIDANCE"] = [
                 self._strategy,  # GEPA first
                 CoTDistillationStrategy(),  # CoT layered on top
+            ]
+
+            # INIT_SYNTHESIS_RULES: GEPA only for single-shot synthesis.
+            # MIPROv2 and CoT add tool-use patterns irrelevant to single-shot
+            # LLM calls. GEPA reflects on init output quality (section scores,
+            # line counts) and mutates the RULES to improve synthesis quality.
+            self._extra_strategies["INIT_SYNTHESIS_RULES"] = [
+                self._strategy,  # GEPA: reflect on quality, mutate rules
             ]
 
             logger.debug(
