@@ -346,7 +346,11 @@ class LlamaCppProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """llama.cpp supports KV prefix caching natively (latency savings)."""
+        """llama.cpp has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """llama.cpp natively reuses KV cache for matching prefixes."""
         return True
 
     async def list_models(self) -> List[Dict[str, Any]]:

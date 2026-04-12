@@ -186,6 +186,10 @@ class GoogleProvider(BaseProvider):
         """Gemini supports implicit caching (75-90% discount on cached tokens)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """Gemini reuses KV cache for matching prompt prefixes."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

@@ -240,6 +240,10 @@ class AzureOpenAIProvider(BaseProvider):
         """Azure OpenAI supports prompt caching (50-100% discount depending on SKU)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """Azure OpenAI reuses KV cache for matching prompt prefixes."""
+        return True
+
     def _get_deployment_url(
         self, model_or_deployment: str, endpoint_type: str = "chat/completions"
     ) -> str:

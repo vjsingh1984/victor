@@ -230,6 +230,10 @@ class GroqProvider(BaseProvider):
         """Groq auto-caches prompts (50% discount on cached tokens)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """Groq reuses KV cache for matching prompt prefixes."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

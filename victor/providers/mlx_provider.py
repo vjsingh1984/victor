@@ -266,7 +266,11 @@ class MLXProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """MLX supports prefix caching for pure-attention models (latency savings)."""
+        """MLX has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """MLX reuses KV cache for pure-attention models with matching prefixes."""
         return True
 
     def supports_tools(self) -> bool:

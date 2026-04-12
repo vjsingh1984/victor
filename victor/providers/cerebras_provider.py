@@ -499,6 +499,10 @@ class CerebrasProvider(BaseProvider):
         """Cerebras auto-caches prompts with 5min TTL (latency savings)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """Cerebras reuses KV cache with 5min TTL for matching prefixes."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

@@ -262,7 +262,11 @@ class LMStudioProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """LMStudio supports KV prefix caching for GGUF models (latency savings)."""
+        """LMStudio has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """LMStudio reuses KV cache for GGUF models with matching prefixes."""
         return True
 
     def model_uses_thinking_tags(self, model: Optional[str] = None) -> bool:

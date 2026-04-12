@@ -199,6 +199,10 @@ class XAIProvider(BaseProvider):
         """xAI/Grok auto-caches prompts (50-75% discount on cached tokens)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """xAI reuses KV cache for matching prompt prefixes."""
+        return True
+
     def get_context_window(self, model: str) -> int:
         """Get context window size for a model.
 

@@ -239,6 +239,10 @@ class VertexAIProvider(BaseProvider):
         """Vertex AI (Gemini) supports context caching (75-90% discount)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """Vertex AI reuses KV cache for matching prompt prefixes."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

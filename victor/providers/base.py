@@ -171,16 +171,30 @@ def is_tool_calling_provider(provider: Any) -> bool:
 
 
 def is_caching_provider(provider: Any) -> bool:
-    """Check if a provider supports prompt prefix caching.
+    """Check if a provider supports API-level prompt caching (billing discounts).
 
     Args:
         provider: Provider instance to check
 
     Returns:
-        True if provider supports prompt prefix caching
+        True if provider offers cached token billing discounts
     """
     if hasattr(provider, "supports_prompt_caching"):
         return provider.supports_prompt_caching()
+    return False
+
+
+def has_kv_prefix_caching(provider: Any) -> bool:
+    """Check if a provider benefits from stable prompt prefixes (KV cache reuse).
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider reuses KV cache for matching prefixes
+    """
+    if hasattr(provider, "supports_kv_prefix_caching"):
+        return provider.supports_kv_prefix_caching()
     return False
 
 
@@ -336,20 +350,43 @@ class BaseProvider(ABC):
         return False
 
     def supports_prompt_caching(self) -> bool:
-        """Check if provider supports prompt prefix caching.
+        """Check if provider supports API-level prompt prefix caching.
 
-        Providers with prompt caching (e.g., Anthropic's ephemeral cache) can
-        cache the tools + system prompt prefix at significant discount (90%).
-        For these providers, sending the full tool set every call is optimal
-        because cached tokens are nearly free.
+        API-level prompt caching means the provider offers a **billing discount**
+        (50-90%) on cached input tokens. For these providers, sending the full
+        tool set (48 tools) every call is optimal because cached tokens are
+        nearly free after the first call.
 
-        Providers WITHOUT prompt caching (Ollama, most local models) should
-        use aggressive per-turn tool selection to minimize token overhead.
+        This is distinct from KV prefix caching (see supports_kv_prefix_caching),
+        which is a latency optimization at the inference engine level.
+
+        Providers WITHOUT API-level caching (Ollama, LMStudio, llama.cpp, MLX,
+        vLLM) should use per-turn semantic tool selection (5-12 tools) to
+        minimize token overhead.
 
         Default implementation returns False.
 
         Returns:
-            True if provider supports prompt caching, False otherwise (default)
+            True if provider has API-level cached token discounts
+        """
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Check if provider supports KV prefix caching for latency savings.
+
+        KV prefix caching means the inference engine reuses computed key-value
+        state when consecutive requests share the same prompt prefix. This
+        reduces time-to-first-token (TTFT) but does NOT reduce cost — every
+        token still incurs compute on the first call.
+
+        When True, the framework should keep the system prompt + tool definitions
+        stable across turns within a session so the KV cache can be reused.
+
+        Both local engines (Ollama, vLLM, llama.cpp) and cloud APIs (Anthropic,
+        OpenAI) support this. Default is False.
+
+        Returns:
+            True if provider benefits from stable prompt prefixes
         """
         return False
 

@@ -172,7 +172,11 @@ class OllamaProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """Ollama auto-caches KV prefix via llama.cpp (latency savings on reuse)."""
+        """Ollama has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Ollama reuses KV cache via llama.cpp for matching prefixes."""
         return True
 
     def get_context_window(self, model: str) -> int:

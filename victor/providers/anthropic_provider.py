@@ -125,7 +125,11 @@ class AnthropicProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """Anthropic supports prompt prefix caching with ephemeral cache_control."""
+        """Anthropic offers 90% discount on cached input tokens."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Anthropic reuses KV cache for matching prompt prefixes."""
         return True
 
     async def chat(

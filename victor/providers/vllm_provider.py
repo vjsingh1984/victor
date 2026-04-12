@@ -361,6 +361,10 @@ class VLLMProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
+        """vLLM has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
         """vLLM supports Automatic Prefix Caching (APC) for KV cache reuse."""
         return True
 

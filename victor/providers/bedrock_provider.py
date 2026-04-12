@@ -284,6 +284,10 @@ class BedrockProvider(BaseProvider):
         """Bedrock supports prompt caching for Claude/Nova (90% discount on reads)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """Bedrock reuses KV cache for matching prompt prefixes."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

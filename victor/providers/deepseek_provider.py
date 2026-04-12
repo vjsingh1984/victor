@@ -162,6 +162,10 @@ class DeepSeekProvider(BaseProvider):
         """DeepSeek auto-caches prefix on disk (90% discount on cached tokens)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """DeepSeek reuses KV cache for matching prompt prefixes."""
+        return True
+
     def _model_supports_tools(self, model: str) -> bool:
         """Check if specific model supports tool calling.
 

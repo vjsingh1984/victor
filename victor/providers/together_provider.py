@@ -189,6 +189,10 @@ class TogetherProvider(BaseProvider):
         """Together AI has prompt caching always enabled."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """Together reuses KV cache for matching prompt prefixes."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

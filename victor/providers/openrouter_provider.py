@@ -207,6 +207,10 @@ class OpenRouterProvider(BaseProvider):
         """OpenRouter passes through provider caching discounts (25-90% off)."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """OpenRouter routes to providers that support KV prefix caching."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

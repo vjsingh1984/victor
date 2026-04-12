@@ -225,6 +225,10 @@ class OpenAIProvider(BaseProvider):
         """OpenAI auto-caches prompts with 50% discount on cached tokens."""
         return True
 
+    def supports_kv_prefix_caching(self) -> bool:
+        """OpenAI reuses KV cache server-side for matching prefixes."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

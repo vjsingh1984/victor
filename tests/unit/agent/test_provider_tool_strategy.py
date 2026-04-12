@@ -49,26 +49,96 @@ class TestSupportsPromptCaching:
             ("victor.providers.vertex_provider", "VertexAIProvider"),
             ("victor.providers.azure_openai_provider", "AzureOpenAIProvider"),
             ("victor.providers.openrouter_provider", "OpenRouterProvider"),
-            # Local inference engines (KV prefix caching for latency savings)
-            ("victor.providers.ollama_provider", "OllamaProvider"),
-            ("victor.providers.vllm_provider", "VLLMProvider"),
-            ("victor.providers.lmstudio_provider", "LMStudioProvider"),
-            ("victor.providers.llamacpp_provider", "LlamaCppProvider"),
-            ("victor.providers.mlx_provider", "MLXProvider"),
             # Cloud inference with auto-caching
             ("victor.providers.fireworks_provider", "FireworksProvider"),
             ("victor.providers.together_provider", "TogetherProvider"),
             ("victor.providers.cerebras_provider", "CerebrasProvider"),
         ],
     )
-    def test_caching_providers_return_true(self, provider_module, provider_class):
-        """All cloud providers with cached token discounts should return True."""
+    def test_cloud_caching_providers_return_true(self, provider_module, provider_class):
+        """Cloud providers with API-level cached token discounts return True."""
         import importlib
 
         mod = importlib.import_module(provider_module)
         cls = getattr(mod, provider_class)
         # Call unbound method to avoid __init__ side effects
         assert cls.supports_prompt_caching(MagicMock()) is True
+
+    @pytest.mark.parametrize(
+        "provider_module,provider_class",
+        [
+            ("victor.providers.ollama_provider", "OllamaProvider"),
+            ("victor.providers.vllm_provider", "VLLMProvider"),
+            ("victor.providers.lmstudio_provider", "LMStudioProvider"),
+            ("victor.providers.llamacpp_provider", "LlamaCppProvider"),
+            ("victor.providers.mlx_provider", "MLXProvider"),
+        ],
+    )
+    def test_local_providers_return_false(self, provider_module, provider_class):
+        """Local inference providers return False (KV cache != API prompt caching)."""
+        import importlib
+
+        mod = importlib.import_module(provider_module)
+        cls = getattr(mod, provider_class)
+        assert cls.supports_prompt_caching(MagicMock()) is False
+
+    @pytest.mark.parametrize(
+        "provider_module,provider_class",
+        [
+            # Local providers have KV prefix caching
+            ("victor.providers.ollama_provider", "OllamaProvider"),
+            ("victor.providers.vllm_provider", "VLLMProvider"),
+            ("victor.providers.lmstudio_provider", "LMStudioProvider"),
+            ("victor.providers.llamacpp_provider", "LlamaCppProvider"),
+            ("victor.providers.mlx_provider", "MLXProvider"),
+            # Cloud providers also have KV prefix caching
+            ("victor.providers.anthropic_provider", "AnthropicProvider"),
+            ("victor.providers.openai_provider", "OpenAIProvider"),
+            ("victor.providers.google_provider", "GoogleProvider"),
+        ],
+    )
+    def test_kv_prefix_caching_returns_true(self, provider_module, provider_class):
+        """All providers with KV prefix caching return True."""
+        import importlib
+
+        mod = importlib.import_module(provider_module)
+        cls = getattr(mod, provider_class)
+        assert cls.supports_kv_prefix_caching(MagicMock()) is True
+
+    def test_base_provider_kv_prefix_defaults_false(self):
+        from victor.providers.base import BaseProvider
+
+        mock_provider = MagicMock(spec=BaseProvider)
+        assert BaseProvider.supports_kv_prefix_caching(mock_provider) is False
+
+    def test_has_kv_prefix_caching_convenience(self):
+        from victor.providers.base import has_kv_prefix_caching
+
+        mock_kv = MagicMock()
+        mock_kv.supports_kv_prefix_caching.return_value = True
+        assert has_kv_prefix_caching(mock_kv) is True
+
+        mock_no_kv = MagicMock()
+        mock_no_kv.supports_kv_prefix_caching.return_value = False
+        assert has_kv_prefix_caching(mock_no_kv) is False
+
+        assert has_kv_prefix_caching(object()) is False
+
+    def test_local_provider_has_kv_but_no_api_caching(self):
+        """Local providers: KV=True, API=False (the two concepts are independent)."""
+        from victor.providers.ollama_provider import OllamaProvider
+
+        provider = OllamaProvider.__new__(OllamaProvider)
+        assert provider.supports_prompt_caching() is False
+        assert provider.supports_kv_prefix_caching() is True
+
+    def test_cloud_provider_has_both(self):
+        """Cloud providers: KV=True, API=True."""
+        from victor.providers.anthropic_provider import AnthropicProvider
+
+        provider = AnthropicProvider.__new__(AnthropicProvider)
+        assert provider.supports_prompt_caching() is True
+        assert provider.supports_kv_prefix_caching() is True
 
     def test_is_caching_provider_convenience(self):
         from victor.providers.base import is_caching_provider
