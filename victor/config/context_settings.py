@@ -23,3 +23,10 @@ class ContextSettings(BaseModel):
     # When enabled: full tool set sent every call, reminders via user messages,
     # system prompt frozen after first build.
     cache_optimization_enabled: bool = True
+
+    # KV tool selection strategy for providers with KV prefix caching (Ollama, etc.)
+    # Controls how tools are managed across turns for KV cache stability:
+    #   'per_turn'       — Fresh semantic selection each turn (max relevance, breaks prefix)
+    #   'session_stable' — Lock semantic selection after first query (stable prefix, may miss tools)
+    # Note: API-caching providers always use session-locked full tool set regardless.
+    kv_tool_strategy: str = "per_turn"

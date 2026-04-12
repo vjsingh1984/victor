@@ -3009,6 +3009,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         tools = self.tool_selector.prioritize_by_stage(context_msg, tools)
         current_intent = getattr(self, "_current_intent", None)
         tools = self._tool_planner.filter_tools_by_intent(tools, current_intent)
+        tools = self._apply_kv_tool_strategy(tools)
         return self._sort_tools_for_kv_stability(tools)
 
     def _sort_tools_for_kv_stability(self, tools):
@@ -3022,6 +3023,41 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return None
         if self._kv_optimization_enabled:
             return sorted(tools, key=lambda t: t.name)
+        return tools
+
+    def _apply_kv_tool_strategy(self, tools):
+        """Apply the configured KV tool selection strategy.
+
+        Strategies (controlled by settings.context.kv_tool_strategy):
+          'per_turn'       — Return tools as-is (fresh selection each turn)
+          'session_stable' — Lock tools after first selection for KV prefix stability
+
+        Only active when _kv_optimization_enabled is True and provider does NOT
+        use API-level caching (which already session-locks the full tool set).
+        """
+        if tools is None:
+            return None
+        if not self._kv_optimization_enabled:
+            return tools
+
+        strategy = "per_turn"
+        try:
+            ctx = getattr(self, "settings", None)
+            if ctx is not None:
+                context = getattr(ctx, "context", None)
+                if context is not None:
+                    strategy = getattr(context, "kv_tool_strategy", "per_turn")
+        except Exception:
+            pass
+
+        if strategy == "session_stable":
+            cached = getattr(self, "_session_semantic_tools", None)
+            if cached is not None:
+                return cached
+            self._session_semantic_tools = tools
+            return tools
+
+        # per_turn: return as-is, don't cache
         return tools
 
     # =====================================================================

@@ -309,3 +309,99 @@ class TestPromptBuilderKVAwareness:
         builder = SystemPromptBuilder.__new__(SystemPromptBuilder)
         builder.provider_has_kv_cache = True
         assert builder.provider_has_kv_cache is True
+
+
+# =====================================================================
+# KV Tool Selection Strategy (configurable via setting)
+# =====================================================================
+
+
+class TestKVToolSelectionStrategy:
+    """Test configurable tool selection strategies for KV providers.
+
+    Three strategies:
+    - 'per_turn': Fresh semantic selection each turn (max relevance, breaks KV prefix)
+    - 'session_stable': Lock semantic selection after first query (KV stable, may miss tools)
+    - 'session_full': Lock all 48 tools (only for API-caching providers)
+    """
+
+    def test_setting_defaults_to_per_turn(self):
+        """Default kv_tool_strategy is 'per_turn'."""
+        from victor.config.context_settings import ContextSettings
+
+        settings = ContextSettings()
+        assert settings.kv_tool_strategy == "per_turn"
+
+    def test_setting_accepts_session_stable(self):
+        """kv_tool_strategy can be set to 'session_stable'."""
+        from victor.config.context_settings import ContextSettings
+
+        settings = ContextSettings(kv_tool_strategy="session_stable")
+        assert settings.kv_tool_strategy == "session_stable"
+
+    def test_session_stable_returns_cached_tools_on_second_call(self):
+        """session_stable strategy returns same tools on subsequent turns."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
+
+        # Configure session_stable strategy
+        ctx = MagicMock()
+        ctx.kv_tool_strategy = "session_stable"
+        settings = MagicMock()
+        settings.context = ctx
+        orch.settings = settings
+
+        # Mock tools
+        tool_a = MagicMock()
+        tool_a.name = "a_tool"
+        tool_b = MagicMock()
+        tool_b.name = "b_tool"
+        first_selection = [tool_a, tool_b]
+
+        # First call: stores tools
+        orch._session_semantic_tools = None
+        result = AgentOrchestrator._apply_kv_tool_strategy(orch, first_selection)
+        assert result == first_selection
+        assert orch._session_semantic_tools == first_selection
+
+        # Second call: returns cached, ignores new selection
+        tool_c = MagicMock()
+        tool_c.name = "c_tool"
+        result2 = AgentOrchestrator._apply_kv_tool_strategy(orch, [tool_c])
+        assert result2 == first_selection  # Still the original set
+
+    def test_per_turn_returns_fresh_selection(self):
+        """per_turn strategy always returns the new selection."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
+        orch._session_semantic_tools = None
+
+        # Configure per_turn strategy
+        ctx = MagicMock()
+        ctx.kv_tool_strategy = "per_turn"
+        settings = MagicMock()
+        settings.context = ctx
+        orch.settings = settings
+
+        tool_a = MagicMock()
+        tool_a.name = "a_tool"
+
+        result = AgentOrchestrator._apply_kv_tool_strategy(orch, [tool_a])
+        assert [t.name for t in result] == ["a_tool"]
+        assert orch._session_semantic_tools is None  # Not cached
+
+    def test_non_kv_provider_ignores_strategy(self):
+        """Non-KV providers bypass the strategy entirely."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+
+        tool_a = MagicMock()
+        tool_a.name = "a_tool"
+        result = AgentOrchestrator._apply_kv_tool_strategy(orch, [tool_a])
+        assert result == [tool_a]  # Pass through unchanged
