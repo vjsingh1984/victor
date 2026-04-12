@@ -656,6 +656,30 @@ class SystemPromptBuilder:
         confidence, otherwise None (caller uses the static default).
         Gated by prompt_optimization.enabled setting.
         Checks section_strategies to skip sections with empty strategy list.
+
+        IMPORTANT: Results are cached per session in _optimized_section_cache
+        to ensure Thompson Sampling picks ONE candidate per section per session.
+        Without this cache, each build() call would re-sample and potentially
+        pick a different candidate, mutating the system prompt mid-session
+        and breaking provider prefix caching (90% discount).
+        """
+        # Session cache: sample once, reuse for the rest of the session
+        cache = getattr(self, "_optimized_section_cache", None)
+        if cache is None:
+            self._optimized_section_cache: Dict[str, Optional[str]] = {}
+            cache = self._optimized_section_cache
+        if section_name in cache:
+            return cache[section_name]
+
+        result = self._sample_optimized_section(section_name)
+        cache[section_name] = result
+        return result
+
+    def _sample_optimized_section(self, section_name: str) -> Optional[str]:
+        """Sample an evolved section from GEPA/MIPROv2/CoT (called once per session).
+
+        This does the actual Thompson Sampling via get_recommendation().
+        Results are cached by _get_optimized_section() to prevent mid-session mutation.
         """
         # Gate on settings.prompt_optimization.enabled (authoritative source)
         try:

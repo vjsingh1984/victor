@@ -1123,6 +1123,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
         # Rebuild system prompt with new workspace context (replaces old init.md)
+        # Workspace switch is a session reset — unfreeze and re-sample GEPA sections
+        self._system_prompt_frozen = False
+        if hasattr(self, "prompt_builder"):
+            self.prompt_builder._optimized_section_cache = {}
+
         base_prompt = self._build_system_prompt_with_adapter()
         if self.project_context.content:
             self._system_prompt = (
@@ -1131,6 +1136,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             logger.info(f"Loaded project context from {self.project_context.context_file}")
         else:
             self._system_prompt = base_prompt
+
+        if self._cache_optimization_enabled:
+            self._system_prompt_frozen = True
+            self._session_tools = None  # Re-lock tools for new workspace
 
         # Clear conversation history to remove old workspace context
         # This ensures the model doesn't see init.md from the previous project
