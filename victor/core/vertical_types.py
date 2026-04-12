@@ -273,22 +273,9 @@ When you receive tool output in <TOOL_OUTPUT> tags:
 
 VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
 
-    # Research-specific addendum
-    RESEARCH_ADDENDUM: str = (
-        "Always cite URLs for claims. Acknowledge uncertainty when sources conflict."
-    )
-
-    # Data-specific addendum
-    DATA_ADDENDUM: str = (
-        "Verify calculations with actual data. Always show code that produced results."
-    )
-
-    # DevOps-specific addendum
-    DEVOPS_ADDENDUM: str = (
-        "Verify configuration syntax before suggesting. Always check existing resources first."
-    )
-
-    # Registry for vertical-specific addendums (OCP: open for extension)
+    # Registry for vertical-specific addendums (OCP: open for extension).
+    # Verticals register addendums via register_addendum() in their
+    # VictorPlugin.register() call — no hardcoded strings in core.
     _grounding_addendums: Dict[str, str] = {}
 
     @classmethod
@@ -345,19 +332,8 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS."""
             return f"{base}\n{addendum}"
         return base
 
-    @classmethod
-    def _register_defaults(cls) -> None:
-        """Register the built-in default addendums.
-
-        Called at module load time for backward compatibility.
-        """
-        cls.register_addendum("research", cls.RESEARCH_ADDENDUM)
-        cls.register_addendum("data_analysis", cls.DATA_ADDENDUM)
-        cls.register_addendum("devops", cls.DEVOPS_ADDENDUM)
-
-
-# Register built-in addendums at module load time
-StandardGroundingRules._register_defaults()
+    # NOTE: No _register_defaults() — verticals register their own
+    # addendums via VictorPlugin.register(context) calls at startup.
 
 
 # =============================================================================

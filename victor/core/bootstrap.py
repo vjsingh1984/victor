@@ -48,12 +48,10 @@ from victor.core.container import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_VERTICAL_PACKAGE_HINTS: Dict[str, str] = {
-    "coding": "victor-coding",
-    "research": "victor-research",
-    "devops": "victor-devops",
-    "investment": "victor-invest",
-}
+# Vertical package hints loaded dynamically from entry points.
+# No hardcoded vertical names in core — verticals advertise
+# themselves via victor.vertical_hints entry points.
+_DEFAULT_VERTICAL_PACKAGE_HINTS: Dict[str, str] = {}
 _REPORTED_MISSING_VERTICALS: Set[str] = set()
 
 
@@ -306,15 +304,14 @@ def _phase_capabilities(container, settings, context):
 
 
 def _phase_vertical_services(container, settings, context):
-    """Phase: Vertical-specific bootstrap services (language plugins, indexing, etc.).
+    """Phase: Vertical-specific bootstrap services via entry points.
 
-    Scans ``victor.bootstrap_services`` entry points so external verticals can
-    register bootstrap hooks without modifying this module.  Falls back to
-    the built-in coding services for backward compatibility.
+    Scans ``victor.bootstrap_services`` entry points so external
+    verticals can register bootstrap hooks without modifying this
+    module.  No hardcoded vertical calls — all verticals participate
+    equally through entry points.
     """
-    _register_coding_services(container, settings)
-
-    # Discover additional bootstrap service hooks from entry points
+    # Discover bootstrap service hooks from entry points
     try:
         from importlib.metadata import entry_points as _ep
 

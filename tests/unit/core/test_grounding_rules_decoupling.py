@@ -1,4 +1,4 @@
-"""Tests for StandardGroundingRules decoupling (registry-based addendums)."""
+"""Tests for StandardGroundingRules registry (core purge — no hardcoded addendums)."""
 
 from victor.core.vertical_types import StandardGroundingRules
 
@@ -7,65 +7,71 @@ class TestGroundingRulesRegistry:
     """Tests for grounding addendum registration and lookup."""
 
     def setup_method(self):
-        """Reset the registry to defaults before each test."""
+        """Reset registry before each test."""
         StandardGroundingRules._grounding_addendums.clear()
-        StandardGroundingRules._register_defaults()
 
-    # --- backward compatibility ---
+    # --- empty by default after core purge ---
 
-    def test_defaults_registered_at_import(self):
-        """Built-in addendums should be present after _register_defaults."""
-        assert "research" in StandardGroundingRules._grounding_addendums
-        assert "data_analysis" in StandardGroundingRules._grounding_addendums
-        assert "devops" in StandardGroundingRules._grounding_addendums
+    def test_no_hardcoded_addendums_in_core(self):
+        """After core purge, no vertical-specific addendums in core."""
+        assert len(StandardGroundingRules._grounding_addendums) == 0
 
-    def test_for_vertical_research_backward_compat(self):
-        """for_vertical('research') returns base + research addendum."""
-        result = StandardGroundingRules.for_vertical("research")
-        assert StandardGroundingRules.BASE in result
-        assert StandardGroundingRules.RESEARCH_ADDENDUM in result
-
-    def test_for_vertical_data_analysis_backward_compat(self):
-        """for_vertical('data_analysis') returns base + data addendum."""
-        result = StandardGroundingRules.for_vertical("data_analysis")
-        assert StandardGroundingRules.DATA_ADDENDUM in result
-
-    def test_for_vertical_devops_backward_compat(self):
-        """for_vertical('devops') returns base + devops addendum."""
-        result = StandardGroundingRules.for_vertical("devops")
-        assert StandardGroundingRules.DEVOPS_ADDENDUM in result
-
-    def test_for_vertical_unknown_returns_base_only(self):
-        """Unknown vertical returns base rules without addendum."""
-        result = StandardGroundingRules.for_vertical("unknown_vertical")
+    def test_for_vertical_unknown_returns_base(self):
+        """Unknown vertical returns base rules only."""
+        result = StandardGroundingRules.for_vertical("anything")
         assert result == StandardGroundingRules.BASE
 
     # --- register / unregister ---
 
-    def test_register_custom_addendum(self):
-        """External verticals can register their own addendum."""
-        custom_text = "Always validate security constraints."
-        StandardGroundingRules.register_addendum("security", custom_text)
-        result = StandardGroundingRules.for_vertical("security")
-        assert custom_text in result
+    def test_register_addendum(self):
+        """Verticals register their own addendums at runtime."""
+        StandardGroundingRules.register_addendum(
+            "research", "Cite URLs for claims."
+        )
+        result = StandardGroundingRules.for_vertical("research")
         assert StandardGroundingRules.BASE in result
+        assert "Cite URLs" in result
+
+    def test_register_multiple_verticals(self):
+        """Multiple verticals can register independently."""
+        StandardGroundingRules.register_addendum("a", "Rule A")
+        StandardGroundingRules.register_addendum("b", "Rule B")
+        assert "Rule A" in StandardGroundingRules.for_vertical("a")
+        assert "Rule B" in StandardGroundingRules.for_vertical("b")
 
     def test_unregister_addendum(self):
-        """Unregistering removes the addendum so for_vertical falls back to base."""
-        StandardGroundingRules.unregister_addendum("research")
-        result = StandardGroundingRules.for_vertical("research")
+        """Unregistering removes the addendum."""
+        StandardGroundingRules.register_addendum("sec", "Check perms.")
+        StandardGroundingRules.unregister_addendum("sec")
+        result = StandardGroundingRules.for_vertical("sec")
         assert result == StandardGroundingRules.BASE
-        assert StandardGroundingRules.RESEARCH_ADDENDUM not in result
 
     def test_register_overrides_existing(self):
-        """Re-registering the same vertical replaces the old addendum."""
-        new_text = "New research rule."
-        StandardGroundingRules.register_addendum("research", new_text)
-        result = StandardGroundingRules.for_vertical("research")
-        assert new_text in result
-        assert StandardGroundingRules.RESEARCH_ADDENDUM not in result
+        """Re-registering replaces the old addendum."""
+        StandardGroundingRules.register_addendum("x", "Old rule")
+        StandardGroundingRules.register_addendum("x", "New rule")
+        result = StandardGroundingRules.for_vertical("x")
+        assert "New rule" in result
+        assert "Old rule" not in result
 
     def test_unregister_nonexistent_is_noop(self):
-        """Unregistering a vertical that was never registered does not raise."""
-        StandardGroundingRules.unregister_addendum("nonexistent")
-        # Should not raise
+        """Unregistering a never-registered vertical does not raise."""
+        StandardGroundingRules.unregister_addendum("ghost")
+
+    def test_for_vertical_extended_mode(self):
+        """Extended mode uses EXTENDED base instead of BASE."""
+        StandardGroundingRules.register_addendum("v", "Extra rule")
+        result = StandardGroundingRules.for_vertical("v", extended=True)
+        assert StandardGroundingRules.EXTENDED in result
+        assert "Extra rule" in result
+
+    def test_get_base_default(self):
+        """get_base() returns BASE by default."""
+        assert StandardGroundingRules.get_base() == StandardGroundingRules.BASE
+
+    def test_get_base_extended(self):
+        """get_base(extended=True) returns EXTENDED."""
+        assert (
+            StandardGroundingRules.get_base(extended=True)
+            == StandardGroundingRules.EXTENDED
+        )
