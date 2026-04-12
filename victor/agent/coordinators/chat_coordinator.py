@@ -533,6 +533,10 @@ class ChatCoordinator:
                 TaskComplexity.ANALYSIS,
             )
 
+        # Q&A detection: skip tools for pure question/display-only tasks
+        from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+        ctx.is_qa_task = ExecutionCoordinator._is_question_only(user_message)
+
         # Set goals for tool selection
         ctx.goals = orch._tool_planner.infer_goals_from_message(user_message)
 

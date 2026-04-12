@@ -411,12 +411,19 @@ class OrchestratorFactory(
         except Exception as e:
             logger.debug(f"Could not load vertical prompt contributors: {e}")
 
+        # Detect if provider supports prompt caching (e.g., Anthropic ephemeral cache)
+        provider_caches = (
+            hasattr(self.provider, "supports_prompt_caching")
+            and self.provider.supports_prompt_caching()
+        )
+
         return SystemPromptBuilder(
             provider_name=self.provider_name or self.provider.__class__.__name__.lower(),
             model=self.model,
             tool_adapter=tool_adapter,
             capabilities=capabilities,
             prompt_contributors=prompt_contributors,
+            provider_caches=provider_caches,
         )
 
     def create_project_context(self) -> "ProjectContext":
@@ -499,12 +506,19 @@ class OrchestratorFactory(
         except Exception as e:
             logger.debug(f"Could not load vertical prompt contributors: {e}")
 
+        # Detect if provider supports prompt caching
+        provider_caches = (
+            hasattr(self.provider, "supports_prompt_caching")
+            and self.provider.supports_prompt_caching()
+        )
+
         prompt_builder = SystemPromptBuilder(
             provider_name=provider_name,
             model=model,
             tool_adapter=tool_adapter,
             capabilities=tool_calling_caps,
             prompt_contributors=prompt_contributors,
+            provider_caches=provider_caches,
         )
 
         logger.debug(f"SystemPromptBuilder created for {provider_name}/{model}")

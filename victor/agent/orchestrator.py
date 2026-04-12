@@ -1551,17 +1551,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
     @property
     def _cache_optimization_enabled(self) -> bool:
-        """Check if prefix cache optimization is enabled in settings."""
+        """Check if prefix cache optimization should be used.
+
+        Enabled only when BOTH:
+        1. The setting cache_optimization_enabled is True (default), AND
+        2. The current provider supports prompt caching.
+
+        This prevents local providers (Ollama) from getting session-locked
+        tools, which adds ~15K tokens of overhead per call with no caching
+        benefit.
+        """
         try:
+            # Settings can explicitly disable
             ctx = getattr(self, "settings", None)
-            if ctx is None:
-                return True
-            context = getattr(ctx, "context", None)
-            if context is None:
-                return True
-            return getattr(context, "cache_optimization_enabled", True)
+            if ctx is not None:
+                context = getattr(ctx, "context", None)
+                if context is not None:
+                    if not getattr(context, "cache_optimization_enabled", True):
+                        return False
+            # Provider must support caching
+            provider = getattr(self, "provider", None)
+            if provider is not None and hasattr(provider, "supports_prompt_caching"):
+                return provider.supports_prompt_caching()
+            return False
         except Exception:
-            return True
+            return False
 
     def get_session_tools(self) -> Optional[list]:
         """Get session-locked tools for cache-friendly API calls.

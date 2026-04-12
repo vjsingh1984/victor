@@ -170,6 +170,20 @@ def is_tool_calling_provider(provider: Any) -> bool:
     return False
 
 
+def is_caching_provider(provider: Any) -> bool:
+    """Check if a provider supports prompt prefix caching.
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider supports prompt prefix caching
+    """
+    if hasattr(provider, "supports_prompt_caching"):
+        return provider.supports_prompt_caching()
+    return False
+
+
 class Message(BaseModel):
     """Standard message format across all providers."""
 
@@ -318,6 +332,24 @@ class BaseProvider(ABC):
 
         Returns:
             True if provider supports streaming, False otherwise (default)
+        """
+        return False
+
+    def supports_prompt_caching(self) -> bool:
+        """Check if provider supports prompt prefix caching.
+
+        Providers with prompt caching (e.g., Anthropic's ephemeral cache) can
+        cache the tools + system prompt prefix at significant discount (90%).
+        For these providers, sending the full tool set every call is optimal
+        because cached tokens are nearly free.
+
+        Providers WITHOUT prompt caching (Ollama, most local models) should
+        use aggressive per-turn tool selection to minimize token overhead.
+
+        Default implementation returns False.
+
+        Returns:
+            True if provider supports prompt caching, False otherwise (default)
         """
         return False
 

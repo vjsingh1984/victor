@@ -234,10 +234,14 @@ class StreamingChatPipeline:
             if handled:
                 break
 
-            # Prefer session-locked tools for prefix cache stability (90% discount)
-            session_tools = orch.get_session_tools()
-            if session_tools is not None:
-                tools = session_tools
+            # Q&A bypass: skip tools entirely for pure Q&A tasks.
+            # This avoids sending 48 tool schemas to local models (15K tokens overhead).
+            if getattr(stream_ctx, "is_qa_task", False):
+                tools = None
+            # Caching providers: use session-locked full tool set (90% discount)
+            elif orch.get_session_tools() is not None:
+                tools = orch.get_session_tools()
+            # Non-caching providers: per-turn semantic selection
             else:
                 tools = await self._get_tools_cached(orch, stream_ctx.context_msg, goals)
 

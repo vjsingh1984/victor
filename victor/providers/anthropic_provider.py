@@ -124,6 +124,10 @@ class AnthropicProvider(BaseProvider):
         """Anthropic supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """Anthropic supports prompt prefix caching with ephemeral cache_control."""
+        return True
+
     async def chat(
         self,
         messages: List[Message],

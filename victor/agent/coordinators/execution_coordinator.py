@@ -153,6 +153,11 @@ class ExecutionCoordinator:
         # Parallel exploration for complex tasks (before agentic loop)
         await self._run_parallel_exploration(user_message, task_classification)
 
+        # Detect Q&A-style messages that don't need tools.
+        # If the model answers without tool calls on the first turn, accept it
+        # immediately instead of nudging for tool usage.
+        is_qa_task = self._is_question_only(user_message)
+
         # Agentic loop: continue until no tool calls or budget exhausted
         final_response: Optional[CompletionResponse] = None
         consecutive_zero_tool_turns = 0
@@ -165,10 +170,13 @@ class ExecutionCoordinator:
         while iteration < iteration_budget:
             iteration += 1
 
-            # Get tool definitions if provider supports them
+            # Get tool definitions if provider supports them.
+            # Skip tools entirely for Q&A tasks — sending 48 tool schemas
+            # to a local model adds massive latency (68s vs 2s on gemma4:31b).
             tools = None
             if (
-                self._provider_context.provider.supports_tools()
+                not is_qa_task
+                and self._provider_context.provider.supports_tools()
                 and self._tool_context.tool_calls_used < self._tool_context.tool_budget
             ):
                 tools = await self._select_tools_for_turn(user_message)
@@ -275,6 +283,15 @@ class ExecutionCoordinator:
                 final_response = response
                 break
 
+            # Q&A shortcut: if the message is a question/display-only task
+            # and the model answered with content, accept it immediately.
+            # This avoids wasting 2+ extra LLM calls nudging for tool usage
+            # on prompts like "What is 2+2?" or "Explain X".
+            if is_qa_task and response.content:
+                logger.info("Q&A shortcut: accepting first response for question-only task")
+                final_response = response
+                break
+
             # No tools ever called — continue to give the model another chance
             continue
 
@@ -308,6 +325,54 @@ class ExecutionCoordinator:
             max_tokens=self._provider_context.max_tokens,
             tools=tools,
         )
+
+    # =====================================================================
+    # Q&A Detection
+    # =====================================================================
+
+    @staticmethod
+    def _is_question_only(message: str) -> bool:
+        """Detect messages that are pure Q&A and unlikely to need tools.
+
+        Returns True for conversational/knowledge questions like:
+        - "What is 2+2?"
+        - "Explain Python decorators"
+        - "How does X work?"
+
+        Returns False for messages that imply code/file work:
+        - "Fix the bug in main.py"
+        - "Create a new file"
+        - "Refactor the database module"
+        """
+        msg = message.strip().lower()
+
+        # Short messages ending with ? are almost always Q&A
+        if len(msg) < 120 and msg.endswith("?"):
+            # Unless they contain action words implying code work
+            action_words = (
+                "fix", "create", "write", "edit", "refactor", "add",
+                "implement", "update", "delete", "remove", "change",
+                "modify", "build", "deploy", "run", "test", "debug",
+                "install", "configure", "setup", "migrate",
+            )
+            words = set(msg.split())
+            if not words.intersection(action_words):
+                return True
+
+        # Explicit "explain", "what is", "how does" patterns
+        qa_prefixes = (
+            "what is", "what are", "what's", "who is", "who are",
+            "how does", "how do", "how is", "how can",
+            "why does", "why do", "why is",
+            "when does", "when is",
+            "explain", "describe", "define", "tell me about",
+            "can you explain", "what does",
+            "reply with", "answer", "say ",
+        )
+        if any(msg.startswith(p) for p in qa_prefixes):
+            return True
+
+        return False
 
     # =====================================================================
     # Parallel Exploration

@@ -72,6 +72,7 @@ class StreamingChatContext:
     is_action_task: bool = False
     is_complex_task: bool = False  # GAP-16: Track COMPLEX complexity for lenient progress checking
     needs_execution: bool = False
+    is_qa_task: bool = False  # Pure Q&A task — skip tools entirely
     coarse_task_type: str = "default"
 
     # Content accumulation

@@ -261,6 +261,7 @@ class SystemPromptBuilder:
         vertical: Optional[str] = None,
         concise_mode: bool = False,
         query_classification: Optional["QueryClassification"] = None,
+        provider_caches: bool = False,
     ):
         """Initialize the prompt builder.
 
@@ -276,6 +277,9 @@ class SystemPromptBuilder:
             enrichment_service: Optional prompt enrichment service for context injection
             vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
             concise_mode: If True, adds guidance to produce brief, direct responses
+            provider_caches: If True, provider supports prompt prefix caching (Anthropic).
+                Full prompt is optimal (cached at 90% discount). If False, aggressively
+                prune sections and skip MIPROv2 few-shots to save tokens.
         """
         # Handle both string and ProviderSettings object for provider_name
         # (backward compatibility with settings refactor)
@@ -298,6 +302,7 @@ class SystemPromptBuilder:
         self.vertical = vertical or "coding"
         self.concise_mode = concise_mode
         self.query_classification = query_classification
+        self.provider_caches = provider_caches
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -630,8 +635,10 @@ class SystemPromptBuilder:
             guidance = optimized or ASI_TOOL_EFFECTIVENESS_GUIDANCE
             base_prompt = f"{base_prompt}\n\n{guidance}"
 
-        # Few-shot examples (MIPROv2-mined from successful traces)
-        if "few_shot_examples" in sections_to_include:
+        # Few-shot examples (MIPROv2-mined from successful traces).
+        # Skip for non-caching providers — 200-400 tokens parsed from scratch
+        # every turn is not worth it without prefix caching (90% discount).
+        if "few_shot_examples" in sections_to_include and self.provider_caches:
             examples = self._get_optimized_section("FEW_SHOT_EXAMPLES")
             if examples:
                 base_prompt = f"{base_prompt}\n\n{examples}"
@@ -769,6 +776,17 @@ class SystemPromptBuilder:
 
         except Exception:
             pass
+
+        # For non-caching providers without edge model, use a reduced set.
+        # Full sections are expensive (reparsed every turn) with no cache benefit.
+        if not self.provider_caches:
+            reduced = {"completion", "task_guidance", "tool_constraint"}
+            if self.concise_mode:
+                reduced.add("concise_mode")
+            logger.debug(
+                f"Non-caching provider: using reduced sections {len(reduced)}/{len(all_sections)}"
+            )
+            return reduced
 
         return all_sections
 

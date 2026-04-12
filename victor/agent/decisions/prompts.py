@@ -17,8 +17,10 @@ from victor.agent.decisions.schemas import (
     ErrorClassDecision,
     IntentDecision,
     LoopDetection,
+    MultiSkillDecision,
     PromptFocusDecision,
     QuestionTypeDecision,
+    SkillSelectionDecision,
     StageDetectionDecision,
     TaskCompletionDecision,
     TaskTypeDecision,
@@ -186,5 +188,33 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
         ),
         schema=StageDetectionDecision,
         max_tokens=25,
+    ),
+    DecisionType.SKILL_SELECTION: DecisionPrompt(
+        system=(
+            "You match user requests to available skills. "
+            "Respond ONLY with a JSON object, no other text."
+        ),
+        user_template=(
+            "Which skill best matches this request?\n\n"
+            "Request: {message_excerpt}\n\n"
+            "Available skills: {available_skills}\n\n"
+            'Respond: {{"skill": "name_or_empty", "confidence": 0.0-1.0}}'
+        ),
+        schema=SkillSelectionDecision,
+        max_tokens=30,
+    ),
+    DecisionType.MULTI_SKILL_DECOMPOSITION: DecisionPrompt(
+        system=(
+            "You decompose complex requests into ordered skill sequences. "
+            "Respond ONLY with a JSON object, no other text."
+        ),
+        user_template=(
+            "Decompose this request into skills to execute in order:\n\n"
+            "Request: {message_excerpt}\n\n"
+            "Available skills: {available_skills}\n\n"
+            'Respond: {{"skills": ["skill1", "skill2"], "confidence": 0.0-1.0}}'
+        ),
+        schema=MultiSkillDecision,
+        max_tokens=50,
     ),
 }

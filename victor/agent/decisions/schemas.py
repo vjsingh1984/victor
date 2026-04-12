@@ -128,3 +128,17 @@ class ContinuationDecision(BaseModel):
         description="Recommended next action"
     )
     reason: str = Field(max_length=100, description="Brief reason for the recommendation")
+
+
+class SkillSelectionDecision(BaseModel):
+    """Which skill best matches this user request?"""
+
+    skill: str = Field(description="Selected skill name, or empty string if none match")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in selection")
+
+
+class MultiSkillDecision(BaseModel):
+    """How to decompose a complex request into multiple skills?"""
+
+    skills: list[str] = Field(description="Ordered list of skill names to execute")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in decomposition")
