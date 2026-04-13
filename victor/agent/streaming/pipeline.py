@@ -189,6 +189,11 @@ class StreamingChatPipeline:
         if decision_service is not None:
             decision_service.reset_budget()
 
+        # Spin detection: consecutive non-tool short responses indicate the model
+        # is stuck describing actions instead of executing them (common with local models)
+        _consecutive_empty_tool_responses = 0
+        _MAX_CONSECUTIVE_EMPTY = 3  # Break after 3 consecutive non-tool short responses
+
         while True:
             # === PRE-ITERATION CHECKS (via coordinator helper) ===
             cancelled = False
@@ -399,6 +404,29 @@ class StreamingChatPipeline:
 
             content_length = len(full_content.strip())
 
+            # Spin detection: model generates short text without tool calls
+            if not tool_calls and content_length < 120:
+                _consecutive_empty_tool_responses += 1
+                if _consecutive_empty_tool_responses >= _MAX_CONSECUTIVE_EMPTY:
+                    logger.warning(
+                        f"[spin-detect] {_consecutive_empty_tool_responses} consecutive non-tool "
+                        f"short responses — model is stuck describing actions instead of "
+                        f"executing them. Breaking loop. Last response: {full_content[:100]!r}"
+                    )
+                    yield orch._chunk_generator.generate_content_chunk(
+                        "\n\n[Agent detected a response loop — breaking to prevent wasted time. "
+                        "The model described tool calls without executing them.]",
+                        is_final=True,
+                    )
+                    return
+                logger.info(
+                    f"[spin-detect] Non-tool short response #{_consecutive_empty_tool_responses}"
+                    f"/{_MAX_CONSECUTIVE_EMPTY}: {content_length} chars, "
+                    f"content: {full_content[:80]!r}"
+                )
+            else:
+                _consecutive_empty_tool_responses = 0  # Reset on successful tool call
+
             # Record iteration in unified tracker
             orch.unified_tracker.record_iteration(content_length)
 
@@ -505,7 +533,9 @@ class StreamingChatPipeline:
                     action = intent_result.action
 
                     logger.info(
-                        f"Continuation action: {action} - {action_result.get('reason', 'unknown')}"
+                        f"[continuation] action={action} reason={action_result.get('reason', 'unknown')} "
+                        f"content_len={content_length} tool_calls={len(tool_calls) if tool_calls else 0} "
+                        f"iteration={stream_ctx.total_iterations} spin={_consecutive_empty_tool_responses}"
                     )
 
                     # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
