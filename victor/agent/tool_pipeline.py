@@ -563,6 +563,10 @@ class ToolPipeline:
         # Prevents re-reading identical files within TTL window
         self._read_file_timestamps: Dict[str, float] = {}
 
+        # Observability: pre-execution intent logging (LogAct-inspired)
+        self._observability_bus: Optional[Any] = None
+        self._trace_enricher: Optional[Any] = None
+
     @property
     def calls_used(self) -> int:
         """Number of tool calls used."""
@@ -1366,6 +1370,39 @@ class ToolPipeline:
 
         return result
 
+    def _emit_tool_intent(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Emit pre-execution intent event (LogAct-inspired).
+
+        Records tool intent BEFORE execution, enabling future voting/gating.
+        Uses ObservabilityBus for event emission.
+        """
+        bus = getattr(self, "_observability_bus", None)
+        if bus is None:
+            return
+
+        import hashlib
+
+        args_str = str(sorted(arguments.items())) if arguments else ""
+        args_hash = hashlib.md5(args_str.encode()).hexdigest()[:12]
+
+        reasoning = ""
+        enricher = getattr(self, "_trace_enricher", None)
+        if enricher:
+            reasoning = getattr(enricher, "_pending_reasoning", "") or ""
+
+        try:
+            bus.emit_sync(
+                "tool.intent",
+                {
+                    "tool_name": tool_name,
+                    "arguments_hash": args_hash,
+                    "reasoning_before": reasoning[:500],
+                    "timestamp": time.time(),
+                },
+            )
+        except Exception:
+            pass  # Intent logging is non-critical
+
     async def _execute_single_call(
         self,
         tool_call: Dict[str, Any],
@@ -1622,6 +1659,9 @@ class ToolPipeline:
                 logger.warning(f"Middleware chain process_before failed (data error): {e}")
             except AttributeError as e:
                 logger.debug(f"Middleware chain not properly configured: {e}")
+
+        # Emit pre-execution intent event (LogAct-inspired)
+        self._emit_tool_intent(tool_name, normalized_args)
 
         # Notify start
         if self.on_tool_start:

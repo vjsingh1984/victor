@@ -113,6 +113,9 @@ class StreamingChatContext:
     # Substantial content threshold for recovery decisions
     substantial_content_threshold: int = 500
 
+    # Pre-execution intent log (LogAct-inspired)
+    intent_log: List[Dict[str, Any]] = field(default_factory=list)
+
     # Tool execution tracking (for budget and progress checks)
     tool_budget: int = 200  # Default tool budget
     tool_calls_used: int = 0
