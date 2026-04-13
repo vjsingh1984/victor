@@ -159,7 +159,7 @@ class DeepSeekProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """DeepSeek auto-caches prefix on disk (90% discount on cached tokens)."""
+        """DeepSeek automatic disk cache (90% discount, $0 write, 1h+ TTL, cheapest)."""
         return True
 
     def supports_kv_prefix_caching(self) -> bool:

@@ -281,7 +281,7 @@ class BedrockProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """Bedrock supports prompt caching for Claude/Nova (90% discount on reads)."""
+        """AWS Bedrock explicit caching for Claude/Nova (90% read, 1.25x write, 5m TTL)."""
         return True
 
     def supports_kv_prefix_caching(self) -> bool:

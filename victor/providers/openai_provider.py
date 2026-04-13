@@ -222,7 +222,7 @@ class OpenAIProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """OpenAI auto-caches prompts with 50% discount on cached tokens."""
+        """OpenAI automatic prefix caching (90% discount, 1024 min tokens, 5m-24h TTL)."""
         return True
 
     def supports_kv_prefix_caching(self) -> bool:

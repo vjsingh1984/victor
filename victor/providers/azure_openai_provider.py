@@ -237,7 +237,7 @@ class AzureOpenAIProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """Azure OpenAI supports prompt caching (50-100% discount depending on SKU)."""
+        """Azure OpenAI automatic caching (50-75% discount, 1024 min tokens, 10m TTL)."""
         return True
 
     def supports_kv_prefix_caching(self) -> bool:

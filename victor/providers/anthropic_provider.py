@@ -125,7 +125,7 @@ class AnthropicProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """Anthropic offers 90% discount on cached input tokens."""
+        """Anthropic explicit cache_control (90% read, 1.25x write premium, 5m-1h TTL)."""
         return True
 
     def supports_kv_prefix_caching(self) -> bool:

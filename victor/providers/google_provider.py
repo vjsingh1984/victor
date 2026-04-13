@@ -183,7 +183,7 @@ class GoogleProvider(BaseProvider):
         return True
 
     def supports_prompt_caching(self) -> bool:
-        """Gemini supports implicit caching (75-90% discount on cached tokens)."""
+        """Gemini hybrid caching (75-90% read, $4.50/1M/hr storage, 32K min, custom TTL)."""
         return True
 
     def supports_kv_prefix_caching(self) -> bool:
