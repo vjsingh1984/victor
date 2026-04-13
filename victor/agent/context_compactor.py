@@ -439,8 +439,9 @@ class ContextCompactor:
         files_mentioned = set()
         key_decisions = []
         for msg in turns_to_summarize:
-            if msg.tool_name:
-                tool_names.add(msg.tool_name)
+            tool_name = getattr(msg, "tool_name", None)
+            if tool_name:
+                tool_names.add(tool_name)
             # Extract file paths mentioned
             import re
             paths = re.findall(r'[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)', msg.content[:500])
