@@ -482,6 +482,36 @@ class OllamaProvider(BaseProvider):
                     except Exception:
                         pass  # Fall through to original error
 
+                # Handle Ollama tool call parsing failures (HTTP 500)
+                # When model generates tool calls with very long/complex JSON
+                # (e.g., multi-line Python code), Ollama's parser can fail.
+                # Retry without tools — fallback parser will extract from text.
+                if e.response.status_code == 500 and tools:
+                    try:
+                        error_text = e.response.text
+                        if "error parsing tool call" in error_text.lower():
+                            self._provider_logger.logger.warning(
+                                f"Ollama tool call parsing failed (HTTP 500). "
+                                "Retrying without tools — using fallback text parsing."
+                            )
+                            payload = self._build_request_payload(
+                                messages=messages,
+                                model=model,
+                                temperature=temperature,
+                                max_tokens=max_tokens,
+                                tools=None,
+                                stream=False,
+                                **kwargs,
+                            )
+                            response = await self._execute_with_circuit_breaker(
+                                self._get_client().post, "/api/chat", json=payload
+                            )
+                            response.raise_for_status()
+                            result = response.json()
+                            return self._parse_response(result, model)
+                    except Exception:
+                        pass  # Fall through to original error
+
                 # Include error body for better debugging
                 error_body = ""
                 try:
