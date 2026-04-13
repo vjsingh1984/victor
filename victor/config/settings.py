@@ -817,6 +817,16 @@ class Settings(BaseSettings):
     code_executor_memory_limit: Optional[str] = "512m"
     code_executor_cpu_shares: Optional[int] = 256
 
+    # Subprocess resource limits (POSIX rlimit for tool subprocesses)
+    # When enabled, applies memory/CPU/FD limits via preexec_fn.
+    # Defaults to False — opt-in to avoid breaking existing workflows.
+    subprocess_resource_limits_enabled: bool = False
+
+    # Usage log semantic sampling (reduces disk I/O for noisy events)
+    usage_sampling_enabled: bool = True
+    usage_content_sample_rate: int = 10  # Emit 1 in N content-chunk events
+    usage_dedup_window_seconds: float = 5.0  # Dedup window for progress events
+
     # Write Approval Mode (safety for autonomous/task mode)
     # Controls when user confirmation is required for file modifications:
     #   - "off": Never require approval (dangerous, testing only)

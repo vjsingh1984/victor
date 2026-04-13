@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch, mock_open, MagicMock
 
+import pytest
 from pydantic import SecretStr
 
 from victor.config.settings import (
@@ -145,6 +146,23 @@ class TestProfileConfig:
 
 class TestSettings:
     """Tests for Settings class."""
+
+    @pytest.fixture(autouse=True)
+    def _bypass_account_manager(self, tmp_path):
+        """Force get_provider_settings to use legacy ProviderConfigRegistry.
+
+        On developer machines ~/.victor/config.yaml exists, causing
+        AccountManager to return a different dict shape than the legacy
+        path these tests exercise.
+        """
+        fake_config = tmp_path / "nonexistent_config.yaml"
+        with patch(
+            "victor.config.accounts.get_account_manager"
+        ) as mock_get_am:
+            mock_am = MagicMock()
+            mock_am.config_path = fake_config  # .exists() → False
+            mock_get_am.return_value = mock_am
+            yield
 
     def test_settings_defaults(self):
         """Test Settings with default values."""

@@ -4,7 +4,10 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict, Optional
+
+if TYPE_CHECKING:
+    from victor.observability.analytics.sampling_filter import SemanticSamplingFilter
 
 
 class UsageLogger:
@@ -24,18 +27,25 @@ class UsageLogger:
     MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10 MB
     MAX_ROTATED_FILES: int = 5
 
-    def __init__(self, log_file: Path, enabled: bool = True):
+    def __init__(
+        self,
+        log_file: Path,
+        enabled: bool = True,
+        sampling_filter: Optional["SemanticSamplingFilter"] = None,
+    ):
         """
         Initializes the UsageLogger.
 
         Args:
             log_file: Path to the log file.
             enabled: Whether logging is enabled.
+            sampling_filter: Optional filter to reduce noise events before disk I/O.
         """
         self._enabled = enabled
         self._log_file = log_file
         self.session_id = str(uuid.uuid4())
         self._logger = logging.getLogger(__name__)
+        self._sampling_filter = sampling_filter
 
         if self._enabled:
             self._prepare_log_file()
@@ -105,6 +115,10 @@ class UsageLogger:
             data: A dictionary of event-specific data.
         """
         if not self._enabled:
+            return
+
+        # Semantic sampling: drop noise events before disk I/O
+        if self._sampling_filter and not self._sampling_filter.should_emit(event_type, data):
             return
 
         self._maybe_rotate()

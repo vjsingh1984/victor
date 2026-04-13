@@ -497,10 +497,21 @@ class VictorAgentAdapter:
 
         # Wrap task description with explicit instructions for benchmark tasks.
         # Raw issue text alone causes models to analyze instead of fix.
+        # GEPA failure analysis (edit_mismatch category): the #1 failure mode is
+        # old_str not matching file content exactly. Explicit guidance here reduces
+        # edit rollbacks by ensuring the agent copies text verbatim from read output.
         prompt = (
-            "Fix the following issue by editing the source code in this repository. "
-            "Use the read tool to find the relevant files, then use the edit tool "
-            "to apply your fix. Do not just describe the fix — apply it.\n\n"
+            "Fix the following issue by editing the source code in this repository.\n\n"
+            "WORKFLOW:\n"
+            "1. Use code_search to find relevant files\n"
+            "2. Use read to examine the code (use offset/limit for large files)\n"
+            "3. Use edit to apply your fix — COPY the old_str EXACTLY from the "
+            "read output, character-by-character. Do NOT type it from memory.\n"
+            "4. If an edit fails (transaction rolled back), re-read the file at "
+            "that location and try again with the exact text.\n\n"
+            "CRITICAL: The edit tool's old_str must match the file content exactly "
+            "including whitespace, quotes, and line breaks. Even one wrong character "
+            "causes a rollback. Always copy from the most recent read output.\n\n"
             f"ISSUE:\n{task_description}"
         )
 

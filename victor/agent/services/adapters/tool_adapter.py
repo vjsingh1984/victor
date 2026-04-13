@@ -20,7 +20,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+    from victor.agent.coordinators.tool_coordinator import ToolCoordinator, ToolResultContext
     from victor.agent.protocols import ToolAccessContext
 
 logger = logging.getLogger(__name__)
@@ -114,6 +114,14 @@ class ToolServiceAdapter:
             tool_adapter,
             failed_signatures=failed_signatures,
         )
+
+    def process_tool_results(
+        self,
+        pipeline_result: Any,
+        ctx: "ToolResultContext",
+    ) -> List[Dict[str, Any]]:
+        """Process tool execution results via the coordinator."""
+        return self._tool_coordinator.process_tool_results(pipeline_result, ctx)
 
     def _build_tool_access_context(self) -> "ToolAccessContext":
         """Build tool access context."""

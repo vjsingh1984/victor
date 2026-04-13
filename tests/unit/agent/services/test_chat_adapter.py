@@ -1,6 +1,6 @@
 """Tests for ChatServiceAdapter."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -62,3 +62,36 @@ def test_reset_conversation_delegates(chat_adapter, mock_chat_coordinator):
     mock_chat_coordinator.reset_conversation = MagicMock()
     chat_adapter.reset_conversation()
     mock_chat_coordinator.reset_conversation.assert_called_once()
+
+
+def test_persist_message_delegates():
+    logger = MagicMock(spec=["log_event"])
+
+    with patch("asyncio.get_running_loop", side_effect=RuntimeError):
+        ChatServiceAdapter.persist_message(
+            role="user",
+            content="hello",
+            memory_manager=None,
+            memory_session_id=None,
+            usage_logger=logger,
+        )
+
+    logger.log_event.assert_called_once_with("user_prompt", {"content": "hello"})
+
+
+def test_persist_message_with_memory():
+    mm = MagicMock()
+    logger = MagicMock(spec=["log_event"])
+
+    with patch("asyncio.get_running_loop", side_effect=RuntimeError):
+        ChatServiceAdapter.persist_message(
+            role="user",
+            content="test",
+            memory_manager=mm,
+            memory_session_id="sess-1",
+            usage_logger=logger,
+        )
+
+    mm.add_message.assert_called_once()
+    call_args = mm.add_message.call_args
+    assert call_args.kwargs["session_id"] == "sess-1"

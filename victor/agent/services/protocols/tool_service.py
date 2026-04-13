@@ -32,6 +32,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
+    from victor.agent.coordinators.tool_coordinator import ToolResultContext
     from victor.tools.base import ToolResult
 
 
@@ -228,6 +229,25 @@ class ToolServiceProtocol(Protocol):
         - Starting new sessions
         - Testing and development
         - Recovery from budget exhaustion
+        """
+        ...
+
+    def process_tool_results(
+        self,
+        pipeline_result: Any,
+        ctx: "ToolResultContext",
+    ) -> List[Dict[str, Any]]:
+        """Process tool execution results.
+
+        Handles state mutations, analytics, failure detection,
+        conversation injection, and error display.
+
+        Args:
+            pipeline_result: Result from ToolPipeline.execute_tool_calls
+            ctx: Context carrying mutable state and callbacks
+
+        Returns:
+            List of result dicts with name, success, elapsed, error, etc.
         """
         ...
 

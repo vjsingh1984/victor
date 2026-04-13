@@ -226,6 +226,12 @@ def run_benchmark(
         "--no-edge-model",
         help="Disable edge model micro-decisions during benchmark",
     ),
+    account: Optional[str] = typer.Option(
+        None,
+        "--account",
+        "-a",
+        help="Use a configured account (e.g., openai-oauth). Overrides --profile/--provider.",
+    ),
 ) -> None:
     """Run a benchmark evaluation."""
     _configure_log_level(log_level, debug_modules=debug_modules)
@@ -264,6 +270,25 @@ def run_benchmark(
 
     bench_type, runner_factory = benchmark_map[benchmark_lower]
     runner = runner_factory() if callable(runner_factory) else runner_factory
+
+    # Resolve account if specified (overrides --profile and --provider)
+    resolved_account = None
+    if account:
+        from victor.config.accounts import get_account_manager
+
+        mgr = get_account_manager()
+        resolved_account = mgr.get_account(account)
+        if not resolved_account:
+            console.print(f"[bold red]Error:[/] Account '{account}' not found")
+            console.print("[dim]Run 'victor auth list' to see available accounts[/]")
+            raise typer.Exit(1)
+        # Account overrides provider and model (unless --model explicitly given)
+        provider = resolved_account.provider
+        if not model:
+            model = resolved_account.model
+        console.print(
+            f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]"
+        )
 
     # Load profile to get model if not specified
     effective_model = model
@@ -321,6 +346,7 @@ def run_benchmark(
             resume=resume,
             provider_override=provider,
             start_task=start_task,
+            resolved_account=resolved_account,
         )
     )
 
@@ -497,6 +523,7 @@ async def _run_benchmark_async(
     resume: bool,
     provider_override: Optional[str] = None,
     start_task: int = 0,
+    resolved_account=None,
 ):
     from victor.evaluation.harness import EvaluationHarness
     from victor.evaluation.agent_adapter import VictorAgentAdapter
@@ -602,12 +629,19 @@ async def _run_benchmark_async(
                     if not effective_model:
                         effective_model = "deepseek-chat"
 
-                api_key = get_api_key(provider_override)
+                # Build provider kwargs — use OAuth if account requires it
+                provider_kwargs: dict = {
+                    "settings": settings,
+                    "timeout": timeout,
+                }
+                if resolved_account and resolved_account.auth.method == "oauth":
+                    provider_kwargs["auth_mode"] = "oauth"
+                else:
+                    provider_kwargs["api_key"] = get_api_key(provider_override)
+
                 provider = ProviderRegistry.create(
                     provider_override,
-                    api_key=api_key,
-                    settings=settings,
-                    timeout=timeout,
+                    **provider_kwargs,
                 )
 
                 # Only enable thinking for providers that support it

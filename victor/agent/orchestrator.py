@@ -111,7 +111,7 @@ if TYPE_CHECKING:
 # Runtime imports - used for instantiation, enums, constants, or function calls
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.message_history import MessageHistory
-from victor.agent.conversation_memory import ConversationStore, MessageRole
+from victor.agent.conversation_memory import ConversationStore
 
 # DI container bootstrap
 from victor.core.bootstrap import ensure_bootstrapped, get_service_optional
@@ -1776,6 +1776,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self._kv_optimization_enabled and messages:
             prefix_parts = []
 
+            # GEPA/MIPROv2/CoT/PRIME evolved sections — dynamic optimization
+            # that adapts per-turn without breaking system prompt cache
+            if hasattr(self, "prompt_builder"):
+                opt_prefix = self.prompt_builder.get_dynamic_user_prefix()
+                if opt_prefix:
+                    prefix_parts.append(opt_prefix.strip())
+
             # Active skill prompt (if any)
             skill_prefix = self.get_skill_user_prefix()
             if skill_prefix:
@@ -1948,37 +1955,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _create_background_task(
         self, coro: Any, name: str = "background_task"
     ) -> Optional[asyncio.Task]:
-        """Create and track a background task for graceful shutdown.
+        """Create and track a background task for graceful shutdown."""
+        from victor.agent.coordinators.session_coordinator import SessionCoordinator
 
-        Args:
-            coro: The coroutine to run as a background task.
-            name: Name for the task (for logging).
-
-        Returns:
-            The created task, or None if no event loop is available.
-        """
-        try:
-            loop = asyncio.get_running_loop()
-            task = loop.create_task(coro, name=name)
-
-            # Track the task (lock protects concurrent add/discard)
-            with self._bg_task_lock:
-                self._background_tasks.add(task)
-
-            # Remove from tracking when done
-            def _discard_task(t: asyncio.Task) -> None:
-                with self._bg_task_lock:
-                    self._background_tasks.discard(t)
-
-            task.add_done_callback(_discard_task)
-
-            logger.debug(f"Created background task: {name}")
-            return task
-        except RuntimeError:
-            if asyncio.iscoroutine(coro):
-                coro.close()
-            logger.debug(f"No event loop available for background task: {name}")
-            return None
+        return SessionCoordinator.create_background_task(
+            coro, name, self._background_tasks, self._bg_task_lock
+        )
 
     async def _run_runtime_preload(self) -> None:
         """Run feature-flagged runtime preload tasks via PreloadManager."""
@@ -2869,7 +2851,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Add a message to conversation history.
 
         Enforces max_conversation_history ceiling by removing oldest
-        non-system messages when the limit is reached.
+        non-system messages when the limit is reached.  Persistence
+        and usage logging are delegated to ``ChatCoordinator.persist_message``.
 
         Args:
             role: Message role (user, assistant, system)
@@ -2877,7 +2860,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         max_history = getattr(self.settings, "max_conversation_history", 100)
         if len(self.conversation.messages) >= max_history:
-            # Remove oldest non-system message to stay within ceiling
             for i, msg in enumerate(self.conversation.messages):
                 if msg.get("role") != "system":
                     self.conversation.messages.pop(i)
@@ -2885,49 +2867,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         self.conversation.add_message(role, content)
 
-        # Persist to memory manager if available.
-        # Offload blocking SQLite I/O to the thread pool when an
-        # event loop is running to avoid blocking async callers.
-        if self.memory_manager and self._memory_session_id:
-            try:
-                role_map = {
-                    "user": MessageRole.USER,
-                    "assistant": MessageRole.ASSISTANT,
-                    "system": MessageRole.SYSTEM,
-                }
-                msg_role = role_map.get(role, MessageRole.USER)
+        # Delegate persistence + usage logging to ChatCoordinator
+        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
-                try:
-                    loop = asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = None
-
-                if loop is not None and loop.is_running():
-                    loop.run_in_executor(
-                        None,
-                        self.memory_manager.add_message,
-                        self._memory_session_id,
-                        msg_role,
-                        content,
-                    )
-                else:
-                    self.memory_manager.add_message(
-                        session_id=self._memory_session_id,
-                        role=msg_role,
-                        content=content,
-                    )
-            except Exception as e:
-                logger.debug(
-                    "Failed to persist message: %s", e
-                )
-
-        if role == "user":
-            self.usage_logger.log_event("user_prompt", {"content": content})
-        elif role == "assistant":
-            self.usage_logger.log_event("assistant_response", {"content": content})
-            # Buffer reasoning for next tool call (GEPA ASI enrichment)
-            if hasattr(self.usage_logger, "set_reasoning_context") and content:
-                self.usage_logger.set_reasoning_context(content)
+        ChatCoordinator.persist_message(
+            role=role,
+            content=content,
+            memory_manager=self.memory_manager,
+            memory_session_id=self._memory_session_id,
+            usage_logger=self.usage_logger,
+        )
 
     async def chat(
         self,
@@ -3374,10 +3323,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Handle tool calls from the model.
 
-        Delegates execution to ToolPipeline (which provides retry, caching,
-        parallel execution, middleware, deduplication), then applies
-        orchestrator-only post-processing: state mutations, conversation
-        injection, output formatting, and GEPA trace enrichment.
+        Delegates execution to ToolPipeline, then post-processes results
+        via ToolCoordinator.process_tool_results().
 
         Args:
             tool_calls: List of tool call requests
@@ -3398,119 +3345,37 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync budget from pipeline
         self.tool_calls_used = self._tool_pipeline.calls_used
 
-        # Post-process each result (orchestrator-only concerns)
-        results: List[Dict[str, Any]] = []
-        for call_result in pipeline_result.results:
-            if call_result.skipped:
-                continue
+        # Delegate post-processing to ToolCoordinator
+        from victor.agent.coordinators.tool_coordinator import ToolResultContext
 
-            tool_name = call_result.tool_name
-            normalized_args = call_result.arguments or {}
-            output = call_result.result
-            success = call_result.success
-            error_msg = call_result.error
-            elapsed_ms = call_result.execution_time_ms
+        ctx = ToolResultContext(
+            executed_tools=self.executed_tools,
+            observed_files=self.observed_files,
+            failed_tool_signatures=self.failed_tool_signatures,
+            shown_tool_errors=self._shown_tool_errors,
+            continuation_prompts=self._continuation_prompts,
+            asking_input_prompts=self._asking_input_prompts,
+            tool_calls_used=self.tool_calls_used,
+            record_tool_execution=self._record_tool_execution,
+            conversation_state=self.conversation_state,
+            unified_tracker=self.unified_tracker,
+            usage_logger=self.usage_logger,
+            add_message=self.add_message,
+            format_tool_output=self._format_tool_output,
+            console=self.console,
+            presentation=self._presentation,
+            stream_context=(
+                self._current_stream_context
+                if hasattr(self, "_current_stream_context")
+                else None
+            ),
+        )
 
-            # --- State mutations (orchestrator-local) ---
-            self.executed_tools.append(tool_name)
-            if tool_name == "read" and "path" in normalized_args:
-                self.observed_files.add(str(normalized_args.get("path")))
+        results = self._tool_coordinator.process_tool_results(pipeline_result, ctx)
 
-            # Reset activity timer
-            if hasattr(self, "_current_stream_context") and self._current_stream_context:
-                self._current_stream_context.reset_activity_timer()
-
-            # Reset continuation/input prompts on successful tool call
-            if success:
-                if self._continuation_prompts > 0:
-                    self._continuation_prompts = 0
-                    if hasattr(self, "_tool_calls_at_continuation_start"):
-                        self._tool_calls_at_continuation_start = self.tool_calls_used
-                if self._asking_input_prompts > 0:
-                    self._asking_input_prompts = 0
-
-            # --- Analytics ---
-            error_type = type(error_msg).__name__ if error_msg and not success else None
-            self._record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
-            self.conversation_state.record_tool_execution(tool_name, normalized_args)
-
-            result_dict = {"success": success}
-            if output is not None:
-                result_dict["result"] = output
-            self.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
-
-            # --- Semantic failure detection ---
-            follow_up_suggestions = None
-            semantic_success = success
-            if success and isinstance(output, dict) and output.get("success") is False:
-                semantic_success = False
-                error_msg = output.get("error", "Operation returned success=False")
-            elif success and isinstance(output, dict):
-                metadata = output.get("metadata")
-                if isinstance(metadata, dict):
-                    suggestions = metadata.get("follow_up_suggestions")
-                    if isinstance(suggestions, list) and suggestions:
-                        follow_up_suggestions = suggestions
-
-            error_display = None if semantic_success else (error_msg or "Unknown error")
-
-            # --- GEPA ASI trace enrichment ---
-            if hasattr(self.usage_logger, "set_duration_context"):
-                self.usage_logger.set_duration_context(elapsed_ms)
-
-            self.usage_logger.log_event(
-                "tool_result",
-                {
-                    "tool_name": tool_name,
-                    "success": semantic_success,
-                    "result": output,
-                    "error": error_display,
-                },
-            )
-
-            # --- Conversation injection ---
-            if semantic_success:
-                formatted_output = self._format_tool_output(tool_name, normalized_args, output)
-                self.add_message("user", formatted_output)
-                results.append(
-                    {
-                        "name": tool_name,
-                        "success": True,
-                        "elapsed": elapsed_ms / 1000,
-                        "args": normalized_args,
-                        "follow_up_suggestions": follow_up_suggestions,
-                    }
-                )
-            else:
-                # Track failed signature for dedup
-                sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
-                self.failed_tool_signatures.add(sig)
-
-                # User-facing error (deduplicated)
-                _not_found = "not found" in str(error_display).lower()
-                _shown_key = f"notfound:{tool_name}" if _not_found else None
-                if not (_shown_key and _shown_key in self._shown_tool_errors):
-                    if _shown_key and len(self._shown_tool_errors) < 500:
-                        self._shown_tool_errors.add(_shown_key)
-                    self.console.print(
-                        f"[red]{self._presentation.icon('error', with_color=False)} "
-                        f"Tool execution failed: {error_display}[/] "
-                        f"[dim]({elapsed_ms:.0f}ms)[/dim]"
-                    )
-
-                error_output = output if isinstance(output, dict) else {"error": error_display}
-                formatted_error = self._format_tool_output(
-                    tool_name, normalized_args, error_output
-                )
-                self.add_message("user", formatted_error)
-                results.append(
-                    {
-                        "name": tool_name,
-                        "success": False,
-                        "elapsed": elapsed_ms / 1000,
-                        "error": error_display,
-                    }
-                )
+        # Sync mutable state back from context
+        self._continuation_prompts = ctx.continuation_prompts
+        self._asking_input_prompts = ctx.asking_input_prompts
 
         return results
 
@@ -3905,22 +3770,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 )
 
     def _get_vertical_tiered_config(self) -> Any:
-        """Get TieredToolConfig from active vertical canonical API.
+        """Get TieredToolConfig from active vertical canonical API."""
+        from victor.agent.vertical_context import VerticalContext
 
-        Returns:
-            TieredToolConfig or None
-        """
-        try:
-            from victor.core.verticals.vertical_loader import get_vertical_loader
-
-            loader = get_vertical_loader()
-            if loader.active_vertical:
-                getter = getattr(loader.active_vertical, "get_tiered_tool_config", None)
-                if callable(getter):
-                    return getter()
-        except Exception as e:
-            logger.debug(f"Could not get tiered config from vertical: {e}")
-        return None
+        return VerticalContext.get_vertical_tiered_config()
 
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled (protocol method).

@@ -36,7 +36,7 @@ import subprocess
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ class CommandResult:
     command: Optional[str] = None
     working_dir: Optional[str] = None
     duration_ms: Optional[float] = None
+    truncated: bool = False
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for JSON serialization."""
@@ -85,6 +86,7 @@ class CommandResult:
             "command": self.command,
             "working_dir": self.working_dir,
             "duration_ms": self.duration_ms,
+            "truncated": self.truncated,
         }
 
 
@@ -100,6 +102,60 @@ from victor.security.command_safety import (  # noqa: E402
     DANGEROUS_PATTERNS,
     is_dangerous_command,
 )
+
+# =============================================================================
+# Subprocess Resource Limits
+# =============================================================================
+
+
+def create_resource_limit_preexec(
+    max_memory_mb: int = 512,
+    max_cpu_seconds: int = 300,
+    max_file_descriptors: int = 1024,
+) -> "Optional[Callable[[], None]]":
+    """Create a ``preexec_fn`` that applies POSIX resource limits.
+
+    Returns ``None`` on non-POSIX platforms (Windows) where
+    ``resource.setrlimit`` is unavailable.
+    """
+    try:
+        import resource as _resource  # POSIX only
+    except ImportError:
+        return None
+
+    def _apply_limits() -> None:
+        try:
+            mem_bytes = max_memory_mb * 1024 * 1024
+            _resource.setrlimit(_resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+        except (ValueError, OSError):
+            pass  # macOS may not enforce RLIMIT_AS
+        try:
+            _resource.setrlimit(
+                _resource.RLIMIT_CPU,
+                (max_cpu_seconds, max_cpu_seconds + 10),
+            )
+        except (ValueError, OSError):
+            pass
+        try:
+            _resource.setrlimit(
+                _resource.RLIMIT_NOFILE,
+                (max_file_descriptors, max_file_descriptors),
+            )
+        except (ValueError, OSError):
+            pass
+
+    return _apply_limits
+
+
+def _truncate_output(text: str, max_bytes: int) -> Tuple[str, bool]:
+    """Truncate output to *max_bytes* with a marker. Returns (text, truncated)."""
+    if max_bytes <= 0 or len(text.encode("utf-8", errors="replace")) <= max_bytes:
+        return text, False
+    truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode(
+        "utf-8", errors="ignore"
+    )
+    return truncated + "\n... [output truncated]", True
+
 
 # =============================================================================
 # Tool Availability Checking
@@ -188,6 +244,8 @@ def run_command(
     check_dangerous: bool = True,
     env: Optional[Dict[str, str]] = None,
     shell: bool = False,
+    preexec_fn: Optional[Callable[[], None]] = None,
+    max_output_bytes: int = 0,
 ) -> CommandResult:
     """Execute a command synchronously and return structured result.
 
@@ -198,6 +256,8 @@ def run_command(
         check_dangerous: Whether to check for dangerous commands (default: True).
         env: Environment variables to set.
         shell: Whether to use shell execution (default: False).
+        preexec_fn: Callable invoked in the child process before exec (POSIX only).
+        max_output_bytes: Truncate stdout/stderr beyond this many bytes (0 = no limit).
 
     Returns:
         CommandResult with execution details.
@@ -245,24 +305,34 @@ def run_command(
             cwd=working_dir,
             env=env,
             shell=shell,  # nosec B602
+            preexec_fn=preexec_fn,  # nosec B603
         )
 
         duration_ms = (time.time() - start_time) * 1000
 
+        stdout_text = result.stdout
+        stderr_text = result.stderr
+        was_truncated = False
+        if max_output_bytes > 0:
+            stdout_text, t1 = _truncate_output(stdout_text, max_output_bytes)
+            stderr_text, t2 = _truncate_output(stderr_text, max_output_bytes)
+            was_truncated = t1 or t2
+
         return CommandResult(
             success=result.returncode == 0,
-            stdout=result.stdout,
-            stderr=result.stderr,
+            stdout=stdout_text,
+            stderr=stderr_text,
             return_code=result.returncode,
             error_type=(
                 CommandErrorType.SUCCESS
                 if result.returncode == 0
                 else CommandErrorType.EXECUTION_ERROR
             ),
-            error_message=result.stderr if result.returncode != 0 else None,
+            error_message=stderr_text if result.returncode != 0 else None,
             command=cmd_str,
             working_dir=str(working_dir) if working_dir else None,
             duration_ms=duration_ms,
+            truncated=was_truncated,
         )
 
     except subprocess.TimeoutExpired:
@@ -323,6 +393,8 @@ async def run_command_async(
     timeout: int = 60,
     check_dangerous: bool = True,
     env: Optional[Dict[str, str]] = None,
+    preexec_fn: Optional[Callable[[], None]] = None,
+    max_output_bytes: int = 0,
 ) -> CommandResult:
     """Execute a shell command asynchronously and return structured result.
 
@@ -332,6 +404,8 @@ async def run_command_async(
         timeout: Timeout in seconds (default: 60).
         check_dangerous: Whether to check for dangerous commands (default: True).
         env: Environment variables to set.
+        preexec_fn: Callable invoked in the child process before exec (POSIX only).
+        max_output_bytes: Truncate stdout/stderr beyond this many bytes (0 = no limit).
 
     Returns:
         CommandResult with execution details.
@@ -376,6 +450,7 @@ async def run_command_async(
             stderr=asyncio.subprocess.PIPE,
             cwd=cwd,
             env=env,
+            preexec_fn=preexec_fn,
         )
 
         try:
@@ -401,6 +476,12 @@ async def run_command_async(
         stdout_str = stdout.decode("utf-8") if stdout else ""
         stderr_str = stderr.decode("utf-8") if stderr else ""
 
+        was_truncated = False
+        if max_output_bytes > 0:
+            stdout_str, t1 = _truncate_output(stdout_str, max_output_bytes)
+            stderr_str, t2 = _truncate_output(stderr_str, max_output_bytes)
+            was_truncated = t1 or t2
+
         return CommandResult(
             success=process.returncode == 0,
             stdout=stdout_str,
@@ -415,6 +496,7 @@ async def run_command_async(
             command=command,
             working_dir=str(working_dir) if working_dir else None,
             duration_ms=duration_ms,
+            truncated=was_truncated,
         )
 
     except Exception as e:

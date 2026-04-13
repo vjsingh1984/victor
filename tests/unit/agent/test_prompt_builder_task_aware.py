@@ -140,10 +140,12 @@ class TestGEPAPromptIntegration:
             ),
         ):
             builder = _make_builder()
-            prompt = builder.build()
+            # GEPA sections now go to user messages via get_dynamic_user_prefix()
+            # System prompt retains static defaults for non-KV providers
+            user_prefix = builder.get_dynamic_user_prefix()
 
-        assert GROUNDING_RULES not in prompt
-        assert evolved_text in prompt
+        assert user_prefix is not None
+        assert evolved_text in user_prefix
 
     def test_optimized_completion_replaces_static(self):
         """GEPA-evolved COMPLETION_GUIDANCE replaces the static version."""

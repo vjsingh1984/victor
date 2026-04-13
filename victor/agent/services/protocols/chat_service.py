@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
+    Any,
     AsyncIterator,
     Dict,
     Optional,
@@ -126,6 +127,28 @@ class ChatServiceProtocol(Protocol):
         - Starting fresh conversations
         - Testing and development
         - Clearing state after errors
+        """
+        ...
+
+    @staticmethod
+    def persist_message(
+        role: str,
+        content: str,
+        memory_manager: Optional[Any] = None,
+        memory_session_id: Optional[str] = None,
+        usage_logger: Optional[Any] = None,
+    ) -> None:
+        """Persist a message to memory and log usage events.
+
+        Handles async-aware thread pool offloading for SQLite I/O
+        and logs user_prompt/assistant_response events.
+
+        Args:
+            role: Message role (user, assistant, system)
+            content: Message content
+            memory_manager: Optional memory manager for persistence
+            memory_session_id: Optional session ID for memory
+            usage_logger: Optional logger for usage events
         """
         ...
 

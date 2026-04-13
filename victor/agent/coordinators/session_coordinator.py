@@ -59,10 +59,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from victor.core.async_utils import run_sync
 
@@ -759,6 +760,49 @@ class SessionCoordinator:
             conversation_embedding_store = None
 
         return conversation_embedding_store, pending_semantic_cache
+
+    # ========================================================================
+    # Background Task Management
+    # ========================================================================
+
+    @staticmethod
+    def create_background_task(
+        coro: Any,
+        name: str,
+        background_tasks: Set[asyncio.Task],
+        bg_task_lock: threading.Lock,
+    ) -> Optional[asyncio.Task]:
+        """Create and track a background task for graceful shutdown.
+
+        Args:
+            coro: The coroutine to run as a background task.
+            name: Name for the task (for logging).
+            background_tasks: Set tracking active background tasks.
+            bg_task_lock: Lock protecting concurrent add/discard.
+
+        Returns:
+            The created task, or None if no event loop is available.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(coro, name=name)
+
+            with bg_task_lock:
+                background_tasks.add(task)
+
+            def _discard_task(t: asyncio.Task) -> None:
+                with bg_task_lock:
+                    background_tasks.discard(t)
+
+            task.add_done_callback(_discard_task)
+
+            logger.debug(f"Created background task: {name}")
+            return task
+        except RuntimeError:
+            if asyncio.iscoroutine(coro):
+                coro.close()
+            logger.debug(f"No event loop available for background task: {name}")
+            return None
 
     # ========================================================================
     # String Representation

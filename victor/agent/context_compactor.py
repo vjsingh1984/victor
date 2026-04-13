@@ -485,7 +485,6 @@ class ContextCompactor:
 
         return CompactionAction(
             trigger=CompactionTrigger.THRESHOLD,
-            action_taken=True,
             messages_removed=len(turns_to_summarize) - 1,
             tokens_freed=self._estimate_tokens(chars_freed),
             new_utilization=0.0,  # Will be recalculated

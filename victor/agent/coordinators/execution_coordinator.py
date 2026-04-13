@@ -167,6 +167,9 @@ class ExecutionCoordinator:
         has_used_code_search = False
         _READ_ONLY_TOOLS = {"read", "ls", "list_directory", "grep"}
 
+        consecutive_all_blocked = 0  # Spin detection: dedup-blocked tool batches
+        MAX_ALL_BLOCKED = 3  # Break after 3 consecutive fully-blocked batches
+
         while iteration < iteration_budget:
             iteration += 1
 
@@ -237,6 +240,44 @@ class ExecutionCoordinator:
                     else:
                         failure_context.failed_tools.append(result)
                         failure_context.last_error = result.get("error")
+
+                # Spin detection: check if ALL tool calls were dedup-blocked
+                _pipeline = getattr(self._tool_context, "_tool_pipeline", None)
+                if _pipeline is None:
+                    # Try via orchestrator reference
+                    _orch = getattr(self, "_orchestrator", None) or getattr(
+                        self._chat_context, "_orchestrator", None
+                    )
+                    if _orch:
+                        _pipeline = getattr(_orch, "_tool_pipeline", None)
+
+                _all_blocked = (
+                    _pipeline
+                    and getattr(_pipeline, "last_batch_all_skipped", False)
+                )
+                if _all_blocked:
+                    consecutive_all_blocked += 1
+                    logger.info(
+                        f"[spin-detect] All tools blocked by dedup "
+                        f"({consecutive_all_blocked}/{MAX_ALL_BLOCKED})"
+                    )
+                    if consecutive_all_blocked == 2:
+                        self._chat_context.add_message(
+                            "system",
+                            "Your last tool calls were blocked because you already "
+                            "called them with the same arguments. Try a DIFFERENT "
+                            "tool or different arguments. If you've made your fix, "
+                            "provide your final answer.",
+                        )
+                    if consecutive_all_blocked >= MAX_ALL_BLOCKED:
+                        logger.warning(
+                            f"[spin-detect] {consecutive_all_blocked} consecutive "
+                            "fully-blocked tool batches — breaking spin loop"
+                        )
+                        final_response = response
+                        break
+                else:
+                    consecutive_all_blocked = 0
 
                 # Continue loop to get follow-up response
                 continue

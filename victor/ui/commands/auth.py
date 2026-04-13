@@ -115,6 +115,47 @@ auth_app = typer.Typer(name="auth", help="Manage authentication and provider acc
 console = Console()
 
 
+def _get_oauth_status(provider: str) -> str:
+    """Check OAuth token status for a provider without triggering login.
+
+    Returns:
+        "authenticated" if valid token exists, "expired" if token expired, "pending" otherwise.
+    """
+    try:
+        from pathlib import Path
+
+        from victor.config.secure_paths import get_victor_dir
+
+        token_file = get_victor_dir() / "oauth_tokens.yaml"
+    except ImportError:
+        token_file = Path.home() / ".victor" / "oauth_tokens.yaml"
+
+    if not token_file.exists():
+        return "pending"
+
+    try:
+        import yaml
+
+        with open(token_file) as f:
+            all_tokens = yaml.safe_load(f) or {}
+        data = all_tokens.get(provider)
+        if data is None or not data.get("access_token"):
+            return "pending"
+
+        # Check expiry
+        expires_at = data.get("expires_at")
+        if expires_at:
+            from datetime import datetime, timezone
+
+            exp = datetime.fromisoformat(expires_at)
+            if exp <= datetime.now(timezone.utc):
+                return "expired"
+
+        return "authenticated"
+    except Exception:
+        return "pending"
+
+
 # =============================================================================
 # Setup Command
 # =============================================================================
@@ -230,25 +271,58 @@ def auth_list() -> None:
         console.print("[dim]Run 'victor auth setup' to add your first account.[/]")
         return
 
+    # Determine default account name
+    default_name = manager.load_config().defaults.account
+
+    # Check OAuth token status for oauth accounts
+    oauth_status: dict[str, str] = {}
+    for account in accounts:
+        if account.auth.method == "oauth":
+            oauth_status[account.name] = _get_oauth_status(account.provider)
+
     table = Table(title="Configured Accounts", show_header=True)
     table.add_column("Name", style="cyan", no_wrap=True)
     table.add_column("Provider", style="green")
     table.add_column("Model", style="yellow")
     table.add_column("Auth", style="blue")
+    table.add_column("Status", style="dim")
     table.add_column("Tags", style="dim")
 
     for account in sorted(accounts, key=lambda a: a.name):
         tags_str = ", ".join(account.tags) if account.tags else ""
+        # Mark default account
+        name_display = account.name
+        if account.name == default_name:
+            name_display = f"{account.name} ★"
+
+        # Auth display with OAuth status
+        auth_display = account.auth.method
+        if account.auth.method == "oauth":
+            status = oauth_status.get(account.name, "pending")
+            status_display = (
+                "[green]authenticated[/]"
+                if status == "authenticated"
+                else "[yellow]pending login[/]"
+                if status == "pending"
+                else f"[red]{status}[/]"
+            )
+        elif account.auth.method == "none":
+            status_display = "[dim]local[/]"
+        else:
+            status_display = "[green]configured[/]"
+
         table.add_row(
-            account.name,
+            name_display,
             account.provider,
             account.model,
-            account.auth.method,
+            auth_display,
+            status_display,
             tags_str,
         )
 
     console.print(table)
     console.print(f"\n[dim]Total: {len(accounts)} account(s)[/]")
+    console.print("[dim]★ = default account[/]")
 
 
 # =============================================================================
@@ -394,12 +468,24 @@ def auth_test(
             console.print(f"[red]✗[/] Account '{name}' not found")
             raise typer.Exit(1)
     elif provider:
-        # Find first account for this provider
+        # First try as provider name
         accounts = [a for a in manager.list_accounts() if a.provider == provider]
-        if not accounts:
-            console.print(f"[red]✗[/] No account found for provider '{provider}'")
-            raise typer.Exit(1)
-        account = accounts[0]
+        if accounts:
+            account = accounts[0]
+        else:
+            # Fall back: treat as account name (user may have used -p instead of -n)
+            account = manager.get_account(provider)
+            if not account:
+                console.print(
+                    f"[red]✗[/] No account or provider named '{provider}'"
+                )
+                console.print(
+                    f"[dim]Hint: use --name/-n to test by account name[/]"
+                )
+                raise typer.Exit(1)
+            console.print(
+                f"[dim]Matched account '{provider}' (hint: use -n for account names)[/]"
+            )
     else:
         # Use default account
         account = manager.get_account()

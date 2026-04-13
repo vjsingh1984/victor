@@ -413,23 +413,32 @@ async def shell(
     # Apply command optimizer pipeline (grep→rg, etc.)
     cmd = optimize_command(cmd)
 
-    # Redirect search commands to code_search (when available).
+    # Redirect broad recursive search commands to code_search (when available).
     # Models bypass the semantic index by calling shell("rg ...") directly.
+    # Allow targeted single-file searches (grep -n "pattern" specific_file.py)
+    # since those are precise and don't benefit from semantic search.
     import re as _re
 
     _base_cmd = cmd.strip().split("|")[0].strip()
     if _re.match(r"^\s*(rg|grep|ag|ack)\s+", _base_cmd, _re.IGNORECASE):
-        return {
-            "success": False,
-            "error": (
-                "Use code_search(query='...') instead of shell search commands. "
-                "code_search uses the semantic index and is more reliable. "
-                "Example: code_search(query='FilePathField', mode='semantic')"
-            ),
-            "stdout": "",
-            "stderr": "",
-            "return_code": -1,
-        }
+        # Allow targeted searches: grep on a specific file path (not recursive)
+        _is_recursive = bool(_re.search(r"\s-[a-zA-Z]*r[a-zA-Z]*\s", _base_cmd))
+        _targets_file = bool(
+            _re.search(r"\s[\w./\-]+\.\w{1,10}\s*$", _base_cmd)
+            or _re.search(r"\s[\w./\-]+\.\w{1,10}\s*\|", cmd.strip())
+        )
+        if not _targets_file or _is_recursive:
+            return {
+                "success": False,
+                "error": (
+                    "Use code_search(query='...') instead of shell search commands. "
+                    "code_search uses the semantic index and is more reliable. "
+                    "Example: code_search(query='FilePathField', mode='semantic')"
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+            }
 
     # Check for dangerous commands
     if not dangerous and _is_dangerous(cmd):

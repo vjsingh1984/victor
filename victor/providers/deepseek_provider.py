@@ -133,12 +133,16 @@ class DeepSeekProvider(BaseProvider):
             config={"base_url": base_url, "timeout": timeout, **kwargs},
         )
 
-        super().__init__(base_url=base_url, timeout=timeout, **kwargs)
+        # Cap per-call timeout to prevent a single API call from consuming
+        # the entire task budget (e.g., benchmark passes timeout=420 but a
+        # single call should not hang for more than 120s)
+        api_timeout = min(timeout, self.DEFAULT_TIMEOUT)
+        super().__init__(base_url=base_url, timeout=api_timeout, **kwargs)
 
         # Use httpx for consistent behavior with other providers
         self.client = httpx.AsyncClient(
             base_url=base_url,
-            timeout=httpx.Timeout(timeout),
+            timeout=httpx.Timeout(api_timeout),
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",

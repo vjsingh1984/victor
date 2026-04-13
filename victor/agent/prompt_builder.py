@@ -628,25 +628,12 @@ class SystemPromptBuilder:
             if tool_guidance:
                 base_prompt = f"{base_prompt}\n\n{tool_guidance}"
 
-        # GEPA: Replace static GROUNDING_RULES with evolved version if available
-        optimized_grounding = self._get_optimized_section("GROUNDING_RULES")
-        if optimized_grounding:
-            base_prompt = base_prompt.replace(GROUNDING_RULES, optimized_grounding)
-
-        # ASI-derived tool effectiveness guidance (GEPA-inspired)
-        # Check if prompt optimizer has an evolved version, else use static default
+        # Static tool effectiveness guidance in system prompt.
+        # When KV optimization is enabled, GEPA-evolved versions of these sections
+        # are injected via get_dynamic_user_prefix() into user messages instead,
+        # keeping the system prompt stable for cache efficiency.
         if "tool_guidance" in sections_to_include:
-            optimized = self._get_optimized_section("ASI_TOOL_EFFECTIVENESS_GUIDANCE")
-            guidance = optimized or ASI_TOOL_EFFECTIVENESS_GUIDANCE
-            base_prompt = f"{base_prompt}\n\n{guidance}"
-
-        # Few-shot examples (MIPROv2-mined from successful traces).
-        # Skip for non-caching providers — 200-400 tokens parsed from scratch
-        # every turn is not worth it without prefix caching (90% discount).
-        if "few_shot_examples" in sections_to_include and self.provider_caches:
-            examples = self._get_optimized_section("FEW_SHOT_EXAMPLES")
-            if examples:
-                base_prompt = f"{base_prompt}\n\n{examples}"
+            base_prompt = f"{base_prompt}\n\n{ASI_TOOL_EFFECTIVENESS_GUIDANCE}"
 
         # Log system prompt composition sent to LLM
         logger.debug(
@@ -730,6 +717,41 @@ class SystemPromptBuilder:
         except Exception:
             pass
         return None
+
+    def get_dynamic_user_prefix(self) -> Optional[str]:
+        """Get optimized prompt content for injection into user messages.
+
+        When the system prompt is frozen (KV/API cache optimization), evolved
+        sections from GEPA/MIPROv2/CoT/PRIME are injected here instead. This
+        allows per-turn optimization without breaking prefix cache stability.
+
+        Returns:
+            Optimized guidance text to prepend to user messages, or None.
+        """
+        parts = []
+
+        # GEPA-evolved sections (with static fallbacks for key guidance)
+        for section_name, static_fallback in [
+            ("ASI_TOOL_EFFECTIVENESS_GUIDANCE", ASI_TOOL_EFFECTIVENESS_GUIDANCE),
+            ("GROUNDING_RULES", None),
+            ("COMPLETION_GUIDANCE", None),
+        ]:
+            evolved = self._get_optimized_section(section_name)
+            if evolved:
+                parts.append(evolved)
+            elif static_fallback and section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE":
+                # Always include tool effectiveness — it's critical for edit accuracy
+                parts.append(static_fallback)
+
+        # MIPROv2 few-shot examples (if available and provider caches)
+        few_shot = self._get_optimized_section("FEW_SHOT_EXAMPLES")
+        if few_shot:
+            parts.append(few_shot)
+
+        if not parts:
+            return None
+
+        return "<system-reminder>\n" + "\n\n".join(parts) + "\n</system-reminder>"
 
     def _get_active_sections(self) -> set:
         """Determine which prompt sections to include.

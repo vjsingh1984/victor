@@ -319,6 +319,7 @@ class EnhancedUsageLogger:
         max_log_size: int = 10 * 1024 * 1024,  # 10 MB
         backup_count: int = 5,
         compress_rotated: bool = True,
+        sampling_filter: Optional[Any] = None,
     ):
         """Initialize enhanced usage logger.
 
@@ -331,11 +332,13 @@ class EnhancedUsageLogger:
             max_log_size: Maximum log file size before rotation
             backup_count: Number of backup files to keep
             compress_rotated: Whether to compress rotated files
+            sampling_filter: Optional SemanticSamplingFilter for noise reduction.
         """
         self._enabled = enabled
         self._log_file = Path(log_file).expanduser()
         self.session_id = str(uuid.uuid4())
         self._lock = threading.Lock()
+        self._sampling_filter = sampling_filter
 
         # Initialize components
         self._scrubber = PIIScrubber() if scrub_pii else None
@@ -376,6 +379,10 @@ class EnhancedUsageLogger:
             data: Event-specific data dictionary
         """
         if not self._enabled:
+            return
+
+        # Semantic sampling: drop noise events before disk I/O
+        if self._sampling_filter and not self._sampling_filter.should_emit(event_type, data):
             return
 
         # Check for rotation

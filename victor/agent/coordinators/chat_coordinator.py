@@ -1086,3 +1086,71 @@ class ChatCoordinator:
             CompletionResponse from the model
         """
         return await self.chat(user_message, use_planning=use_planning)
+
+    # =====================================================================
+    # Message Persistence (extracted from AgentOrchestrator.add_message)
+    # =====================================================================
+
+    @staticmethod
+    def persist_message(
+        role: str,
+        content: str,
+        memory_manager: Any,
+        memory_session_id: Optional[str],
+        usage_logger: Any,
+    ) -> None:
+        """Persist a message to memory and log the event.
+
+        Offloads blocking SQLite I/O to the thread pool when an event
+        loop is running, preventing async caller blocking.
+
+        Args:
+            role: Message role (user, assistant, system).
+            content: Message content text.
+            memory_manager: MemoryManager instance (or None).
+            memory_session_id: Active memory session ID (or None).
+            usage_logger: UsageLogger for event logging.
+        """
+        # Persist to memory manager if available
+        if memory_manager and memory_session_id:
+            try:
+                from victor.agent.conversation_memory import MessageRole
+
+                role_map = {
+                    "user": MessageRole.USER,
+                    "assistant": MessageRole.ASSISTANT,
+                    "system": MessageRole.SYSTEM,
+                }
+                msg_role = role_map.get(role, MessageRole.USER)
+
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop is not None and loop.is_running():
+                    loop.run_in_executor(
+                        None,
+                        memory_manager.add_message,
+                        memory_session_id,
+                        msg_role,
+                        content,
+                    )
+                else:
+                    memory_manager.add_message(
+                        session_id=memory_session_id,
+                        role=msg_role,
+                        content=content,
+                    )
+            except Exception as e:
+                logging.getLogger(__name__).debug(
+                    "Failed to persist message: %s", e
+                )
+
+        # Log usage event
+        if role == "user":
+            usage_logger.log_event("user_prompt", {"content": content})
+        elif role == "assistant":
+            usage_logger.log_event("assistant_response", {"content": content})
+            if hasattr(usage_logger, "set_reasoning_context") and content:
+                usage_logger.set_reasoning_context(content)

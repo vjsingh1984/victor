@@ -7,7 +7,7 @@ ChatCoordinator, enabling feature-flagged service layer migration.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator, Optional
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.chat_coordinator import ChatCoordinator
@@ -53,6 +53,28 @@ class ChatServiceAdapter:
     ) -> "CompletionResponse":
         """Process a chat message with planning via the coordinator."""
         return await self._chat_coordinator.chat_with_planning(user_message, use_planning)
+
+    @staticmethod
+    def persist_message(
+        role: str,
+        content: str,
+        memory_manager: Optional[Any] = None,
+        memory_session_id: Optional[str] = None,
+        usage_logger: Optional[Any] = None,
+    ) -> None:
+        """Persist a message to memory and log usage events.
+
+        Delegates to ChatCoordinator.persist_message static method.
+        """
+        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+
+        ChatCoordinator.persist_message(
+            role=role,
+            content=content,
+            memory_manager=memory_manager,
+            memory_session_id=memory_session_id,
+            usage_logger=usage_logger,
+        )
 
     def reset_conversation(self) -> None:
         """Reset conversation state."""

@@ -299,7 +299,7 @@ class ConnectionValidator:
         import time
         import aiohttp
 
-        endpoint = account.endpoint or self.VALIDATION_ENDPOINTS.get(account.provider)
+        endpoint = account.endpoint or self._resolve_endpoint(account)
 
         if not endpoint:
             return ValidationResult(
@@ -406,13 +406,29 @@ class ConnectionValidator:
 
         return None
 
-    def _get_oauth_client_id(self, provider: str) -> Optional[str]:
-        """Get OAuth client_id from keyring."""
-        try:
-            from victor.config.api_keys import _get_key_from_keyring
+    def _resolve_endpoint(self, account: ProviderAccount) -> Optional[str]:
+        """Resolve the correct endpoint for a provider account.
 
-            return _get_key_from_keyring(f"{provider}_oauth_client_id")
-        except ImportError:
+        OAuth accounts use different endpoints (e.g., Codex bridge for OpenAI).
+        """
+        if account.auth.method == "oauth":
+            oauth_endpoints = {
+                "openai": "https://chatgpt.com/backend-api/codex/v1/models",
+                "qwen": "https://portal.qwen.ai/v1/models",
+            }
+            return oauth_endpoints.get(account.provider)
+        return self.VALIDATION_ENDPOINTS.get(account.provider)
+
+    def _get_oauth_client_id(self, provider: str) -> Optional[str]:
+        """Get OAuth client_id using the full resolution chain.
+
+        Checks: environment variable -> keyring -> well-known public client IDs.
+        """
+        try:
+            from victor.providers.oauth_manager import _get_oauth_client_id
+
+            return _get_oauth_client_id(provider)
+        except (ImportError, ValueError):
             return None
 
     def _get_provider_env_var(self, provider: str) -> Optional[str]:
@@ -465,8 +481,41 @@ class ConnectionValidator:
                     headers["x-api-key"] = api_key
                 else:
                     headers["Authorization"] = f"Bearer {api_key}"
+        elif account.auth.method == "oauth":
+            # Use cached OAuth token if available (don't trigger login)
+            token = self._get_cached_oauth_token(account.provider)
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+                if account.provider == "openai":
+                    headers["originator"] = "victor"
 
         return headers
+
+    def _get_cached_oauth_token(self, provider: str) -> Optional[str]:
+        """Get cached OAuth access token without triggering login."""
+        try:
+            from pathlib import Path
+
+            from victor.config.secure_paths import get_victor_dir
+
+            token_file = get_victor_dir() / "oauth_tokens.yaml"
+        except ImportError:
+            token_file = Path.home() / ".victor" / "oauth_tokens.yaml"
+
+        if not token_file.exists():
+            return None
+
+        try:
+            import yaml
+
+            with open(token_file) as f:
+                all_tokens = yaml.safe_load(f) or {}
+            data = all_tokens.get(provider)
+            if data and data.get("access_token"):
+                return data["access_token"]
+        except Exception:
+            pass
+        return None
 
 
 # =============================================================================

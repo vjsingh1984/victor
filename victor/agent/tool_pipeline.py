@@ -1559,9 +1559,16 @@ class ToolPipeline:
 
         # Session-level file read dedup - prevents re-reading files even if cache was cleared
         # This is a fallback for the prompting loop fix when idempotent cache doesn't match
+        # NOTE: Only dedup reads of the EXACT same file+args within a short window.
+        # Do NOT block re-reads after the file has been edited (agent needs to verify).
+        # Allow re-reads with different offset/limit (reading different sections).
         if tool_name.lower() in ("read", "read_file"):
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
-            if file_path and self._is_duplicate_read(file_path):
+            offset = normalized_args.get("offset")
+            limit = normalized_args.get("limit")
+            # Only dedup exact same file+offset+limit reads
+            dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
+            if dedup_key and self._is_duplicate_read(dedup_key):
                 logger.info(
                     f"[Pipeline] Skipping duplicate read of {file_path} "
                     "(file was read recently in this session)"
@@ -1576,6 +1583,18 @@ class ToolPipeline:
                     skip_reason="Duplicate file read within session",
                     normalization_applied=normalization_applied,
                 )
+
+        # Invalidate read cache for files that were just edited/written
+        if tool_name.lower() in ("edit", "write", "write_file", "edit_file"):
+            edited_path = normalized_args.get("path") or normalized_args.get("file_path")
+            if edited_path:
+                # Clear all cached reads for this file (any offset/limit)
+                stale_keys = [
+                    k for k in self._read_file_timestamps
+                    if k.startswith(f"{edited_path}:")
+                ]
+                for k in stale_keys:
+                    del self._read_file_timestamps[k]
 
         # Code correction middleware - validate and fix code arguments
         code_corrected = False

@@ -91,6 +91,34 @@ class TaskContext:
 
 
 @dataclass
+class ToolResultContext:
+    """Context for post-processing tool results.
+
+    Carries references the orchestrator would otherwise access via ``self``,
+    enabling the ToolCoordinator to handle result post-processing without
+    a back-reference to the orchestrator.
+    """
+
+    executed_tools: List[str]
+    observed_files: Set[str]
+    failed_tool_signatures: Set[str]
+    shown_tool_errors: Set[str]
+    continuation_prompts: int = 0
+    asking_input_prompts: int = 0
+    tool_calls_used: int = 0
+    # Callbacks
+    record_tool_execution: Optional[Callable[..., None]] = None
+    conversation_state: Optional[Any] = None
+    unified_tracker: Optional[Any] = None
+    usage_logger: Optional[Any] = None
+    add_message: Optional[Callable[[str, str], None]] = None
+    format_tool_output: Optional[Callable[..., str]] = None
+    console: Optional[Any] = None
+    presentation: Optional[Any] = None
+    stream_context: Optional[Any] = None
+
+
+@dataclass
 class ToolCoordinatorConfig:
     """Configuration for ToolCoordinator.
 
@@ -1077,6 +1105,152 @@ class ToolCoordinator:
             is_repeated_failure=is_repeated,
         )
 
+    # -----------------------------------------------------------------
+    # Post-processing (extracted from AgentOrchestrator._handle_tool_calls)
+    # -----------------------------------------------------------------
+
+    def process_tool_results(
+        self,
+        pipeline_result: "PipelineExecutionResult",
+        ctx: ToolResultContext,
+    ) -> List[Dict[str, Any]]:
+        """Post-process tool pipeline results.
+
+        Handles state mutations, analytics recording, semantic failure
+        detection, GEPA trace enrichment, conversation injection, and
+        error display.  Previously lived in ``AgentOrchestrator._handle_tool_calls``.
+
+        Args:
+            pipeline_result: Result from ``ToolPipeline.execute_tool_calls()``.
+            ctx: References to orchestrator state that this method mutates.
+
+        Returns:
+            List of result dicts suitable for the agentic loop.
+        """
+        results: List[Dict[str, Any]] = []
+
+        for call_result in pipeline_result.results:
+            if call_result.skipped:
+                continue
+
+            tool_name = call_result.tool_name
+            normalized_args = call_result.arguments or {}
+            output = call_result.result
+            success = call_result.success
+            error_msg = call_result.error
+            elapsed_ms = call_result.execution_time_ms
+
+            # --- State mutations ---
+            ctx.executed_tools.append(tool_name)
+            if tool_name == "read" and "path" in normalized_args:
+                ctx.observed_files.add(str(normalized_args.get("path")))
+
+            if ctx.stream_context is not None:
+                ctx.stream_context.reset_activity_timer()
+
+            if success:
+                if ctx.continuation_prompts > 0:
+                    ctx.continuation_prompts = 0
+                if ctx.asking_input_prompts > 0:
+                    ctx.asking_input_prompts = 0
+
+            # --- Analytics ---
+            error_type = type(error_msg).__name__ if error_msg and not success else None
+            if ctx.record_tool_execution:
+                ctx.record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
+            if ctx.conversation_state:
+                ctx.conversation_state.record_tool_execution(tool_name, normalized_args)
+
+            result_dict: Dict[str, Any] = {"success": success}
+            if output is not None:
+                result_dict["result"] = output
+            if ctx.unified_tracker:
+                ctx.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
+
+            # --- Semantic failure detection ---
+            follow_up_suggestions = None
+            semantic_success = success
+            if success and isinstance(output, dict) and output.get("success") is False:
+                semantic_success = False
+                error_msg = output.get("error", "Operation returned success=False")
+            elif success and isinstance(output, dict):
+                metadata = output.get("metadata")
+                if isinstance(metadata, dict):
+                    suggestions = metadata.get("follow_up_suggestions")
+                    if isinstance(suggestions, list) and suggestions:
+                        follow_up_suggestions = suggestions
+
+            error_display = None if semantic_success else (error_msg or "Unknown error")
+
+            # --- GEPA ASI trace enrichment ---
+            if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
+                ctx.usage_logger.set_duration_context(elapsed_ms)
+            if ctx.usage_logger:
+                ctx.usage_logger.log_event(
+                    "tool_result",
+                    {
+                        "tool_name": tool_name,
+                        "success": semantic_success,
+                        "result": output,
+                        "error": error_display,
+                    },
+                )
+
+            # --- Conversation injection ---
+            if semantic_success:
+                formatted_output = (
+                    ctx.format_tool_output(tool_name, normalized_args, output)
+                    if ctx.format_tool_output
+                    else str(output)
+                )
+                if ctx.add_message:
+                    ctx.add_message("user", formatted_output)
+                results.append(
+                    {
+                        "name": tool_name,
+                        "success": True,
+                        "elapsed": elapsed_ms / 1000,
+                        "args": normalized_args,
+                        "follow_up_suggestions": follow_up_suggestions,
+                    }
+                )
+            else:
+                sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
+                ctx.failed_tool_signatures.add(sig)
+
+                _not_found = "not found" in str(error_display).lower()
+                _shown_key = f"notfound:{tool_name}" if _not_found else None
+                if not (_shown_key and _shown_key in ctx.shown_tool_errors):
+                    if _shown_key and len(ctx.shown_tool_errors) < 500:
+                        ctx.shown_tool_errors.add(_shown_key)
+                    if ctx.console and ctx.presentation:
+                        ctx.console.print(
+                            f"[red]{ctx.presentation.icon('error', with_color=False)} "
+                            f"Tool execution failed: {error_display}[/] "
+                            f"[dim]({elapsed_ms:.0f}ms)[/dim]"
+                        )
+
+                error_output = (
+                    output if isinstance(output, dict) else {"error": error_display}
+                )
+                formatted_error = (
+                    ctx.format_tool_output(tool_name, normalized_args, error_output)
+                    if ctx.format_tool_output
+                    else str(error_output)
+                )
+                if ctx.add_message:
+                    ctx.add_message("user", formatted_error)
+                results.append(
+                    {
+                        "name": tool_name,
+                        "success": False,
+                        "elapsed": elapsed_ms / 1000,
+                        "error": error_display,
+                    }
+                )
+
+        return results
+
 
 @dataclass
 class ToolCallValidation:
@@ -1145,6 +1319,7 @@ def create_tool_coordinator(
 __all__ = [
     "ToolCoordinator",
     "ToolCoordinatorConfig",
+    "ToolResultContext",
     "TaskContext",
     "ToolCallValidation",
     "NormalizedArgs",

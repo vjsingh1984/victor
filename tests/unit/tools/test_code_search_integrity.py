@@ -42,6 +42,10 @@ class TestIndexIntegrityProbe:
         mock_index._is_indexed = True
         mock_index.semantic_search = AsyncMock(return_value=[])
         mock_index.index_codebase = AsyncMock()
+        # Probe checks vector_store._table.count_rows() — must return int
+        mock_table = MagicMock()
+        mock_table.count_rows.return_value = 100
+        mock_index._vector_store._table = mock_table
 
         from victor.tools.code_search_tool import _probe_index_integrity
 

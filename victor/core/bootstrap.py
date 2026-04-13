@@ -833,6 +833,8 @@ def _register_signature_store(container: ServiceContainer, settings: Settings) -
 
 def _create_usage_logger(log_file: Path, settings: Settings) -> Any:
     """Create usage logger with enhanced features if available."""
+    sampling_filter = _create_sampling_filter(settings)
+
     try:
         from victor.analytics.enhanced_logger import EnhancedUsageLogger
 
@@ -844,13 +846,34 @@ def _create_usage_logger(log_file: Path, settings: Settings) -> Any:
             max_log_size=10 * 1024 * 1024,  # 10MB
             backup_count=5,
             compress_rotated=True,
+            sampling_filter=sampling_filter,
         )
     except Exception as e:
         logger.warning(f"Failed to create enhanced logger: {e}")
         # Fall back to basic logger
         from victor.analytics.logger import UsageLogger
 
-        return UsageLogger(log_file, enabled=True)
+        return UsageLogger(log_file, enabled=True, sampling_filter=sampling_filter)
+
+
+def _create_sampling_filter(settings: Settings) -> Any:
+    """Create semantic sampling filter if enabled in settings."""
+    if not getattr(settings, "usage_sampling_enabled", True):
+        return None
+    try:
+        from victor.observability.analytics.sampling_filter import (
+            SamplingPolicy,
+            SemanticSamplingFilter,
+        )
+
+        policy = SamplingPolicy(
+            sample_rate=getattr(settings, "usage_content_sample_rate", 10),
+            dedup_window_seconds=getattr(settings, "usage_dedup_window_seconds", 5.0),
+        )
+        return SemanticSamplingFilter(policy)
+    except Exception as e:
+        logger.debug("Sampling filter unavailable: %s", e)
+        return None
 
 
 def _create_signature_store() -> Any:
