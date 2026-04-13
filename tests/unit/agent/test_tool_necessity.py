@@ -1,4 +1,5 @@
 """Tests for meta-cognitive tool necessity decision (HDPO-inspired)."""
+
 from unittest.mock import MagicMock
 
 import pytest

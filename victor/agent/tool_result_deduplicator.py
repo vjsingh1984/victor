@@ -148,9 +148,7 @@ class ToolResultDeduplicator:
                         content=f"[Duplicate tool output — {lines} lines, see later message]",
                     )
                     stubbed += 1
-                    logger.debug(
-                        "Content-hash dedup: stubbed message %d (dup of %d)", prev_idx, i
-                    )
+                    logger.debug("Content-hash dedup: stubbed message %d (dup of %d)", prev_idx, i)
             seen[fingerprint] = i
 
         return stubbed

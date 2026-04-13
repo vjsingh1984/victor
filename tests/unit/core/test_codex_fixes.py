@@ -1,8 +1,8 @@
 """Tests for Codex-verified plugin/vertical architecture fixes."""
+
 from unittest.mock import MagicMock, AsyncMock, patch
 from dataclasses import dataclass
 import pytest
-
 
 # =====================================================================
 # Fix 1: Subprocess Permission Enforcement (Finding #6)

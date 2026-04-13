@@ -72,7 +72,11 @@ def _load_vertical_package_hints() -> Dict[str, str]:
 
         eps = entry_points()
         # Python 3.12+ returns a SelectableGroups, older returns dict
-        group_eps = eps.select(group="victor.vertical_hints") if hasattr(eps, "select") else eps.get("victor.vertical_hints", [])  # noqa: E501
+        group_eps = (
+            eps.select(group="victor.vertical_hints")
+            if hasattr(eps, "select")
+            else eps.get("victor.vertical_hints", [])
+        )  # noqa: E501
         for ep in group_eps:
             try:
                 value = ep.load()
@@ -83,6 +87,7 @@ def _load_vertical_package_hints() -> Dict[str, str]:
     except Exception:
         pass
     return hints
+
 
 T = TypeVar("T")
 

@@ -278,12 +278,9 @@ class TurnBoundaryContextAssembler:
                 # Convert chars budget to token budget (approx 4 chars/token)
                 token_budget = older_budget // 4
                 msg_dicts = [
-                    {"role": m.role, "content": m.content, "priority": 50}
-                    for m in older_messages
+                    {"role": m.role, "content": m.content, "priority": 50} for m in older_messages
                 ]
-                fit_result = fit_context(
-                    msg_dicts, budget=token_budget, strategy="smart"
-                )
+                fit_result = fit_context(msg_dicts, budget=token_budget, strategy="smart")
                 for idx in fit_result.kept_indices:
                     result.append(older_messages[idx])
                     older_chars += len(older_messages[idx].content)

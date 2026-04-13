@@ -664,12 +664,8 @@ class SubgraphNode:
 
     id: str
     compiled_graph: "CompiledGraph"
-    input_mapper: Optional[
-        Callable[[Dict[str, Any]], Dict[str, Any]]
-    ] = None
-    output_mapper: Optional[
-        Callable[[Dict[str, Any]], Dict[str, Any]]
-    ] = None
+    input_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
+    output_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     async def execute(self, state: Any) -> Any:
@@ -709,9 +705,7 @@ class SubgraphNode:
         result = await self.compiled_graph.invoke(input_state)
 
         if not result.success:
-            raise RuntimeError(
-                f"Subgraph '{self.id}' failed: {result.error}"
-            )
+            raise RuntimeError(f"Subgraph '{self.id}' failed: {result.error}")
 
         output_state = result.state
 
@@ -1363,9 +1357,9 @@ class CompiledGraph(Generic[StateType]):
         self._config = config or GraphConfig()
         self._strict_edges = strict_edges
         self._debug_hook: Optional[Any] = None  # DebugHook for debugging
-        self._state_merger: Callable[
-            [Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]
-        ] = default_state_merger
+        self._state_merger: Callable[[Dict[str, Any], List[Dict[str, Any]]], Dict[str, Any]] = (
+            default_state_merger
+        )
 
     def set_debug_hook(self, hook: Optional[Any]) -> None:
         """Set debug hook for execution.
@@ -1679,9 +1673,7 @@ class CompiledGraph(Generic[StateType]):
                 node_history=node_history,
             )
 
-    def _get_next_node(
-        self, current_node: str, state: Any
-    ) -> Union[str, List[Send]]:
+    def _get_next_node(self, current_node: str, state: Any) -> Union[str, List[Send]]:
         """Determine next node based on edges and state.
 
         Args:
@@ -1742,14 +1734,10 @@ class CompiledGraph(Generic[StateType]):
                 timeout_manager=timeout_manager,
             )
             if not success:
-                logger.warning(
-                    "Parallel branch %s failed: %s", send.node, error
-                )
+                logger.warning("Parallel branch %s failed: %s", send.node, error)
             return result_state if isinstance(result_state, dict) else dict(result_state)
 
-        branch_results = await asyncio.gather(
-            *[_run_branch(s) for s in sends]
-        )
+        branch_results = await asyncio.gather(*[_run_branch(s) for s in sends])
 
         base = base_state if isinstance(base_state, dict) else dict(base_state)
         return self._state_merger(base, list(branch_results))
@@ -1926,9 +1914,7 @@ class CompiledGraph(Generic[StateType]):
         """
         checkpointer = self._config.checkpoint.checkpointer
         if checkpointer is None:
-            raise ValueError(
-                "Cannot replay without a checkpointer configured on the graph."
-            )
+            raise ValueError("Cannot replay without a checkpointer configured on the graph.")
 
         all_checkpoints = await checkpointer.list(thread_id)
         target = None
@@ -1938,9 +1924,7 @@ class CompiledGraph(Generic[StateType]):
                 break
 
         if target is None:
-            raise ValueError(
-                f"Checkpoint '{checkpoint_id}' not found for thread '{thread_id}'."
-            )
+            raise ValueError(f"Checkpoint '{checkpoint_id}' not found for thread '{thread_id}'.")
 
         replay_thread = f"replay_{uuid.uuid4().hex}"
         return await self.invoke(
@@ -2460,9 +2444,7 @@ class StateGraph(Generic[StateType]):
                 # Subgraph node - look up compiled graph in node_registry
                 subgraph_key = node_def.get("graph")
                 if not subgraph_key:
-                    raise ValueError(
-                        f"Subgraph node '{node_id}' must specify 'graph' key"
-                    )
+                    raise ValueError(f"Subgraph node '{node_id}' must specify 'graph' key")
                 if subgraph_key not in node_registry:
                     raise ValueError(
                         f"Subgraph '{subgraph_key}' not found in node_registry. "

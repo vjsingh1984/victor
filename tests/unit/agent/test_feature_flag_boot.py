@@ -83,9 +83,7 @@ class TestFeatureFlagBoot:
         REPRESENTATIVE_COMBOS,
         ids=[_combo_id(c) for c in REPRESENTATIVE_COMBOS],
     )
-    def test_orchestrator_flag_combo_no_import_error(
-        self, flag_combo
-    ):
+    def test_orchestrator_flag_combo_no_import_error(self, flag_combo):
         """FeatureFlagManager accepts the combo without error."""
         mgr = _make_flag_manager(flag_combo)
 
@@ -106,6 +104,4 @@ class TestFeatureFlagBoot:
 
         for flag, expected in flag_combo.items():
             actual = mgr.is_enabled(flag)
-            assert actual == expected, (
-                f"{flag.name}: expected {expected}, got {actual}"
-            )
+            assert actual == expected, f"{flag.name}: expected {expected}, got {actual}"

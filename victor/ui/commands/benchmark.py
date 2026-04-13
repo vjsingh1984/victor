@@ -286,9 +286,7 @@ def run_benchmark(
         provider = resolved_account.provider
         if not model:
             model = resolved_account.model
-        console.print(
-            f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]"
-        )
+        console.print(f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]")
 
     # Load profile to get model if not specified
     effective_model = model
@@ -399,8 +397,10 @@ def run_benchmark(
                 model_lower = (config.model or "").lower()
                 provider = "default"
                 for prefix, prov in [
-                    ("gpt", "openai"), ("grok", "xai"),
-                    ("deepseek", "deepseek"), ("haiku", "anthropic"),
+                    ("gpt", "openai"),
+                    ("grok", "xai"),
+                    ("deepseek", "deepseek"),
+                    ("haiku", "anthropic"),
                     ("claude", "anthropic"),
                 ]:
                     if prefix in model_lower:

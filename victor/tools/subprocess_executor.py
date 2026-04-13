@@ -151,9 +151,7 @@ def _truncate_output(text: str, max_bytes: int) -> Tuple[str, bool]:
     """Truncate output to *max_bytes* with a marker. Returns (text, truncated)."""
     if max_bytes <= 0 or len(text.encode("utf-8", errors="replace")) <= max_bytes:
         return text, False
-    truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode(
-        "utf-8", errors="ignore"
-    )
+    truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
     return truncated + "\n... [output truncated]", True
 
 

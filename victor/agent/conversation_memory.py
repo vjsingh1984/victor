@@ -850,15 +850,11 @@ class ConversationStore:
 
             # Auto-vacuum if fragmented
             with sqlite3.connect(self.db_path) as conn:
-                freelist = conn.execute(
-                    "PRAGMA freelist_count"
-                ).fetchone()[0]
+                freelist = conn.execute("PRAGMA freelist_count").fetchone()[0]
                 if freelist > _FREELIST_VACUUM_THRESHOLD:
                     conn.execute("PRAGMA incremental_vacuum")
                     conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    logger.info(
-                        f"Auto-vacuum: reclaimed {freelist} free pages"
-                    )
+                    logger.info(f"Auto-vacuum: reclaimed {freelist} free pages")
         except sqlite3.Error as e:
             logger.debug(f"Auto-maintenance skipped: {e}")
 
@@ -1139,10 +1135,7 @@ class ConversationStore:
 
         fam = model_family.value if model_family else "unknown"
         sz = model_size.value if model_size else "unknown"
-        logger.info(
-            f"Created session {session_id} for project: "
-            f"{project_path} [{fam}/{sz}]"
-        )
+        logger.info(f"Created session {session_id} for project: " f"{project_path} [{fam}/{sz}]")
 
         return session
 
@@ -1455,12 +1448,20 @@ class ConversationStore:
     # =========================================================================
 
     # Known test model names that should not exist in production DB
-    TEST_MODEL_NAMES = frozenset({
-        "test-model", "dummy", "fake", "dummy-model",
-        "specific-tool-model", "unknown-model",
-        "totally-unknown-model-xyz", "mock-model",
-        "test-provider-model", "gpt-oss:20b",
-    })
+    TEST_MODEL_NAMES = frozenset(
+        {
+            "test-model",
+            "dummy",
+            "fake",
+            "dummy-model",
+            "specific-tool-model",
+            "unknown-model",
+            "totally-unknown-model-xyz",
+            "mock-model",
+            "test-provider-model",
+            "gpt-oss:20b",
+        }
+    )
 
     def cleanup_stale_sessions(
         self,
@@ -1489,12 +1490,9 @@ class ConversationStore:
 
                 # 1. Purge test model sessions
                 if purge_test_models:
-                    placeholders = ",".join(
-                        "?" * len(self.TEST_MODEL_NAMES)
-                    )
+                    placeholders = ",".join("?" * len(self.TEST_MODEL_NAMES))
                     cursor = conn.execute(
-                        f"DELETE FROM sessions WHERE model IN "
-                        f"({placeholders})",
+                        f"DELETE FROM sessions WHERE model IN " f"({placeholders})",
                         list(self.TEST_MODEL_NAMES),
                     )
                     deleted["test_models"] = cursor.rowcount
@@ -1511,12 +1509,9 @@ class ConversationStore:
                 if max_age_days > 0:
                     from datetime import timedelta
 
-                    cutoff = (
-                        datetime.now() - timedelta(days=max_age_days)
-                    ).isoformat()
+                    cutoff = (datetime.now() - timedelta(days=max_age_days)).isoformat()
                     cursor = conn.execute(
-                        "DELETE FROM sessions "
-                        "WHERE last_activity < ?",
+                        "DELETE FROM sessions " "WHERE last_activity < ?",
                         (cutoff,),
                     )
                     deleted["stale"] = cursor.rowcount
@@ -1733,9 +1728,7 @@ class ConversationStore:
             f"Remaining: {len(session.messages)}, Tokens: {current_tokens}"
         )
 
-    def _delete_messages_from_db(
-        self, session_id: str, message_ids: List[str]
-    ) -> None:
+    def _delete_messages_from_db(self, session_id: str, message_ids: List[str]) -> None:
         """Delete pruned messages from SQLite in batches.
 
         Args:
@@ -1753,8 +1746,7 @@ class ConversationStore:
                         batch,
                     )
             logger.debug(
-                f"Deleted {len(message_ids)} pruned messages from DB "
-                f"for session {session_id}"
+                f"Deleted {len(message_ids)} pruned messages from DB " f"for session {session_id}"
             )
         except sqlite3.Error as e:
             logger.warning(f"Failed to delete pruned messages from DB: {e}")
@@ -1825,10 +1817,7 @@ class ConversationStore:
         # Truncate large tool outputs for storage
         if len(content) > self._TOOL_OUTPUT_STORE_LIMIT and (
             message.role in (MessageRole.TOOL_CALL, MessageRole.TOOL_RESULT)
-            or (
-                message.role == MessageRole.USER
-                and content.startswith("<TOOL_OUTPUT")
-            )
+            or (message.role == MessageRole.USER and content.startswith("<TOOL_OUTPUT"))
         ):
             content = (
                 content[: self._TOOL_OUTPUT_STORE_LIMIT]
@@ -1862,8 +1851,7 @@ class ConversationStore:
         """Update session last activity timestamp."""
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
-                "UPDATE sessions SET last_activity = ? "
-                "WHERE session_id = ?",
+                "UPDATE sessions SET last_activity = ? " "WHERE session_id = ?",
                 (datetime.now().isoformat(), session_id),
             )
 
@@ -1913,22 +1901,15 @@ class ConversationStore:
         if role in (MessageRole.TOOL_CALL, MessageRole.TOOL_RESULT):
             session.tool_usage_count += 1
 
-        if session.current_tokens > (
-            session.max_tokens - session.reserved_tokens
-        ):
+        if session.current_tokens > (session.max_tokens - session.reserved_tokens):
             self._prune_context(session)
 
         # Offload blocking SQLite I/O to thread pool
-        await asyncio.to_thread(
-            self._persist_message, session_id, message
-        )
-        await asyncio.to_thread(
-            self._update_session_activity, session_id
-        )
+        await asyncio.to_thread(self._persist_message, session_id, message)
+        await asyncio.to_thread(self._update_session_activity, session_id)
 
         logger.debug(
-            "Added %s message to %s (async). "
-            "Tokens: %d, Total: %d",
+            "Added %s message to %s (async). " "Tokens: %d, Total: %d",
             role.value,
             session_id,
             token_count,

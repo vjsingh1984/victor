@@ -12,7 +12,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from victor.framework.init_synthesizer import (
-    InitSynthesizer, SYNTHESIS_PROMPT, _build_synthesis_prompt,
+    InitSynthesizer,
+    SYNTHESIS_PROMPT,
+    _build_synthesis_prompt,
 )
 
 
@@ -50,9 +52,7 @@ class TestInitSynthesizer:
     async def test_synthesize_cleans_code_fences(self):
         """Output wrapped in ``` gets cleaned."""
         mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(
-            content="```markdown\n# Project\n\nOverview.\n```"
-        )
+        mock_agent.chat.return_value = MagicMock(content="```markdown\n# Project\n\nOverview.\n```")
 
         synthesizer = InitSynthesizer()
         result = await synthesizer.synthesize("raw data", agent=mock_agent)
@@ -111,9 +111,7 @@ class TestInitSynthesizerToolsFallback:
             MockAgent.create = AsyncMock(return_value=mock_agent_instance)
 
             synthesizer = InitSynthesizer()
-            result = await synthesizer.synthesize_with_tools(
-                provider="ollama", model="qwen3:8b"
-            )
+            result = await synthesizer.synthesize_with_tools(provider="ollama", model="qwen3:8b")
 
             # Should create with vertical="coding" for tool access
             create_kwargs = MockAgent.create.call_args[1]
@@ -175,9 +173,7 @@ class TestInitSynthesizerGEPAWiring:
         mock_agent.chat.return_value = MagicMock(content="# Evolved result")
 
         synthesizer = InitSynthesizer()
-        with patch.object(
-            InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules
-        ):
+        with patch.object(InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules):
             result = await synthesizer.synthesize("raw data", agent=mock_agent)
 
         prompt_sent = mock_agent.chat.call_args[0][0]
@@ -209,9 +205,7 @@ class TestInitSynthesizerGEPAWiring:
         mock_agent.chat.return_value = MagicMock(content="# Result")
 
         synthesizer = InitSynthesizer()
-        with patch.object(
-            InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules
-        ):
+        with patch.object(InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules):
             await synthesizer.synthesize("UNIQUE_DATA_XYZ", agent=mock_agent)
 
         prompt_sent = mock_agent.chat.call_args[0][0]

@@ -491,7 +491,7 @@ class OllamaProvider(BaseProvider):
                         error_text = e.response.text
                         if "error parsing tool call" in error_text.lower():
                             self._provider_logger.logger.warning(
-                                f"Ollama tool call parsing failed (HTTP 500). "
+                                "Ollama tool call parsing failed (HTTP 500). "
                                 "Retrying without tools — using fallback text parsing."
                             )
                             payload = self._build_request_payload(

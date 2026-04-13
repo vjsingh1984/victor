@@ -21,7 +21,12 @@ def _generate_jsonl(n_events, seed=42):
         for _ in range(n_events):
             sid = rng.choice(sessions)
             etype = rng.choice(["tool_call", "tool_result", "session_start", "user_prompt"])
-            event = {"session_id": sid, "event_type": etype, "timestamp": "2026-04-11T00:00:00Z", "data": {}}
+            event = {
+                "session_id": sid,
+                "event_type": etype,
+                "timestamp": "2026-04-11T00:00:00Z",
+                "data": {},
+            }
             if etype == "tool_result":
                 event["data"]["success"] = rng.random() > 0.2
             f.write(json.dumps(event) + "\n")
@@ -32,6 +37,7 @@ class TestTraceScannerCorrectness:
 
     def test_scan_empty_file(self):
         from victor.processing.native.trace_scanner import scan_usage_file
+
         path = Path(tempfile.mktemp(suffix=".jsonl"))
         path.write_text("")
         result = scan_usage_file(str(path))
@@ -40,11 +46,13 @@ class TestTraceScannerCorrectness:
 
     def test_scan_nonexistent(self):
         from victor.processing.native.trace_scanner import scan_usage_file
+
         result = scan_usage_file("/nonexistent/file.jsonl")
         assert result == []
 
     def test_scan_correctness_vs_python(self):
         from victor.processing.native.trace_scanner import scan_usage_file, _scan_usage_file_python
+
         path = _generate_jsonl(500)
         rust_result = scan_usage_file(path)
         python_result = _scan_usage_file_python(path)
@@ -58,10 +66,11 @@ class TestTraceScannerCorrectness:
 
     def test_scan_malformed_lines_skipped(self):
         from victor.processing.native.trace_scanner import scan_usage_file
+
         path = Path(tempfile.mktemp(suffix=".jsonl"))
         path.write_text(
             '{"session_id":"s1","event_type":"tool_call","data":{}}\n'
-            'NOT VALID JSON\n'
+            "NOT VALID JSON\n"
             '{"session_id":"s1","event_type":"tool_call","data":{}}\n'
             '{"session_id":"s1","event_type":"tool_call","data":{}}\n'
         )
@@ -72,10 +81,9 @@ class TestTraceScannerCorrectness:
 
     def test_scan_filters_low_tool_calls(self):
         from victor.processing.native.trace_scanner import scan_usage_file
+
         path = Path(tempfile.mktemp(suffix=".jsonl"))
-        path.write_text(
-            '{"session_id":"s1","event_type":"tool_call","data":{}}\n'
-        )
+        path.write_text('{"session_id":"s1","event_type":"tool_call","data":{}}\n')
         result = scan_usage_file(str(path))
         assert result == []  # Only 1 tool_call, filtered
         path.unlink()
@@ -95,6 +103,7 @@ class TestTraceScannerPerformance:
     @pytest.mark.skipif(not _NATIVE_AVAILABLE, reason="No Rust")
     def test_benchmark_5k_events(self):
         from victor.processing.native.trace_scanner import scan_usage_file, _scan_usage_file_python
+
         path = _generate_jsonl(5000)
         py_ms = _time_fn(_scan_usage_file_python, path)
         rs_ms = _time_fn(scan_usage_file, path)
@@ -107,6 +116,7 @@ class TestTraceScannerPerformance:
     def test_benchmark_real_usage_file(self):
         """Benchmark against the actual usage.jsonl if it exists."""
         from victor.processing.native.trace_scanner import scan_usage_file, _scan_usage_file_python
+
         real_path = str(Path.home() / ".victor/logs/usage.jsonl")
         if not Path(real_path).exists():
             pytest.skip("No real usage.jsonl")

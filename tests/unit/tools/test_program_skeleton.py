@@ -1,4 +1,5 @@
 """Tests for program skeleton mode in code search (SE Conventions paper)."""
+
 import pytest
 
 

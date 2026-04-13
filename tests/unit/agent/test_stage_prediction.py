@@ -1,4 +1,5 @@
 """Tests for stage-predictive context pruning (AutonAgenticAI-inspired)."""
+
 from unittest.mock import MagicMock
 from dataclasses import dataclass
 import pytest
@@ -7,10 +8,12 @@ import pytest
 class TestStagePredictor:
     def test_method_exists(self):
         from victor.agent.conversation_state import ConversationStateMachine
+
         assert hasattr(ConversationStateMachine, "predict_next_stage")
 
     def test_predict_from_reading(self):
         from victor.agent.conversation_state import ConversationStateMachine, STAGE_TRANSITION_PROBS
+
         sm = MagicMock(spec=ConversationStateMachine)
         sm.state = MagicMock()
         sm.state.stage = MagicMock()
@@ -21,6 +24,7 @@ class TestStagePredictor:
 
     def test_predict_from_execution(self):
         from victor.agent.conversation_state import ConversationStateMachine
+
         sm = MagicMock(spec=ConversationStateMachine)
         sm.state = MagicMock()
         sm.state.stage = MagicMock()
@@ -31,6 +35,7 @@ class TestStagePredictor:
 
     def test_predict_from_initial(self):
         from victor.agent.conversation_state import ConversationStateMachine
+
         sm = MagicMock(spec=ConversationStateMachine)
         sm.state = MagicMock()
         sm.state.stage = MagicMock()
@@ -41,6 +46,7 @@ class TestStagePredictor:
 
     def test_completion_stays(self):
         from victor.agent.conversation_state import ConversationStateMachine
+
         sm = MagicMock(spec=ConversationStateMachine)
         sm.state = MagicMock()
         sm.state.stage = MagicMock()
@@ -51,6 +57,7 @@ class TestStagePredictor:
 
     def test_transition_probs_constant_exists(self):
         from victor.agent.conversation_state import STAGE_TRANSITION_PROBS
+
         assert isinstance(STAGE_TRANSITION_PROBS, dict)
         assert "reading" in STAGE_TRANSITION_PROBS
         assert "execution" in STAGE_TRANSITION_PROBS
@@ -65,6 +72,7 @@ class MockMessage:
 class TestPredictivePruning:
     def test_apply_focus_with_prediction(self):
         from victor.agent.context_assembler import TurnBoundaryContextAssembler
+
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [
             MockMessage("assistant", "read_file result: old exploration content"),
@@ -85,6 +93,7 @@ class TestPredictivePruning:
 
     def test_no_prediction_unchanged(self):
         from victor.agent.context_assembler import TurnBoundaryContextAssembler
+
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [MockMessage("assistant", "some content")]
         scores = [1.0]

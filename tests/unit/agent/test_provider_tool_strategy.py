@@ -14,7 +14,6 @@ import pytest
 
 from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
 
-
 # =====================================================================
 # Step 1-2: Provider capability detection
 # =====================================================================

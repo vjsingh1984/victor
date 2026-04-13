@@ -535,6 +535,7 @@ class ChatCoordinator:
 
         # Q&A detection: skip tools for pure question/display-only tasks
         from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+
         ctx.is_qa_task = ExecutionCoordinator._is_question_only(user_message)
 
         # Set goals for tool selection
@@ -1143,9 +1144,7 @@ class ChatCoordinator:
                         content=content,
                     )
             except Exception as e:
-                logging.getLogger(__name__).debug(
-                    "Failed to persist message: %s", e
-                )
+                logging.getLogger(__name__).debug("Failed to persist message: %s", e)
 
         # Log usage event
         if role == "user":

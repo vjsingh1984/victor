@@ -1,4 +1,5 @@
 """Tests for active trace quality filtering (MemReader-inspired)."""
+
 from unittest.mock import MagicMock
 import pytest
 
@@ -6,10 +7,12 @@ import pytest
 class TestTraceQualityScoring:
     def test_function_exists(self):
         from victor.framework.rl.learners.prompt_optimizer import score_trace_quality
+
         assert callable(score_trace_quality)
 
     def test_rich_trace_high_score(self):
         from victor.framework.rl.learners.prompt_optimizer import score_trace_quality
+
         detail = MagicMock()
         detail.result_summary = "Found function definition"
         detail.error_detail = ""
@@ -23,6 +26,7 @@ class TestTraceQualityScoring:
 
     def test_trivial_trace_low_score(self):
         from victor.framework.rl.learners.prompt_optimizer import score_trace_quality
+
         trace = MagicMock()
         trace.tool_calls = 1
         trace.tool_call_details = []
@@ -32,6 +36,7 @@ class TestTraceQualityScoring:
 
     def test_abandoned_session_zero(self):
         from victor.framework.rl.learners.prompt_optimizer import score_trace_quality
+
         trace = MagicMock()
         trace.tool_calls = 0
         trace.tool_call_details = []
@@ -41,6 +46,7 @@ class TestTraceQualityScoring:
 
     def test_well_categorized_failures_boost(self):
         from victor.framework.rl.learners.prompt_optimizer import score_trace_quality
+
         trace = MagicMock()
         trace.tool_calls = 3
         trace.tool_call_details = []
@@ -50,6 +56,7 @@ class TestTraceQualityScoring:
 
     def test_success_without_details_moderate(self):
         from victor.framework.rl.learners.prompt_optimizer import score_trace_quality
+
         trace = MagicMock()
         trace.tool_calls = 4
         trace.tool_call_details = []
@@ -60,5 +67,6 @@ class TestTraceQualityScoring:
 
     def test_threshold_constant_exists(self):
         from victor.framework.rl.learners.prompt_optimizer import TRACE_QUALITY_THRESHOLD
+
         assert isinstance(TRACE_QUALITY_THRESHOLD, float)
         assert 0.0 < TRACE_QUALITY_THRESHOLD < 1.0

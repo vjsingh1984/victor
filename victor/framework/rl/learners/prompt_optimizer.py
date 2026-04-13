@@ -98,8 +98,7 @@ def score_trace_quality(trace) -> float:
     details = getattr(trace, "tool_call_details", [])
     if details:
         populated = sum(
-            1 for d in details
-            if getattr(d, "result_summary", "") or getattr(d, "error_detail", "")
+            1 for d in details if getattr(d, "result_summary", "") or getattr(d, "error_detail", "")
         )
         completeness = populated / max(len(details), 1)
         score += 0.3 * completeness
@@ -179,12 +178,14 @@ def analyze_capability_gaps(traces) -> List[CapabilityGap]:
 
     gaps = []
     for cap, count in sorted(capability_failures.items(), key=lambda x: -x[1]):
-        gaps.append(CapabilityGap(
-            capability=cap,
-            failure_rate=count / total_failures,
-            failure_count=count,
-            example_errors=capability_errors.get(cap, []),
-        ))
+        gaps.append(
+            CapabilityGap(
+                capability=cap,
+                failure_rate=count / total_failures,
+                failure_count=count,
+                example_errors=capability_errors.get(cap, []),
+            )
+        )
     return gaps[:3]
 
 
@@ -849,8 +850,7 @@ class PromptOptimizerLearner(BaseLearner):
 
         if conv_traces:
             logger.info(
-                "Unified traces: %d from JSONL + %d from conversations "
-                "= %d unique",
+                "Unified traces: %d from JSONL + %d from conversations " "= %d unique",
                 len(jsonl_traces),
                 len(conv_traces),
                 len(traces),
@@ -927,6 +927,7 @@ class PromptOptimizerLearner(BaseLearner):
             self._candidates[key] = section_candidates[:MAX_CANDIDATES_PER_SECTION]
             # Remove pruned from DB
             from victor.core.schema import Tables
+
             for p_candidate in pruned:
                 try:
                     self.db.execute(
@@ -936,8 +937,12 @@ class PromptOptimizerLearner(BaseLearner):
                 except Exception:
                     pass
             self.db.commit()
-            logger.info("Pruned %d candidates from %s (kept top %d)",
-                       len(pruned), key, MAX_CANDIDATES_PER_SECTION)
+            logger.info(
+                "Pruned %d candidates from %s (kept top %d)",
+                len(pruned),
+                key,
+                MAX_CANDIDATES_PER_SECTION,
+            )
 
         # GEPA v2: Add to Pareto frontier
         if self._use_pareto:
@@ -1339,9 +1344,7 @@ class PromptOptimizerLearner(BaseLearner):
 
         return traces
 
-    def _collect_traces_from_conversations(
-        self, limit: int = 50
-    ) -> List[ExecutionTrace]:
+    def _collect_traces_from_conversations(self, limit: int = 50) -> List[ExecutionTrace]:
         """Collect execution traces from ConversationStore SQLite DB.
 
         Converts normalized session+message data into ExecutionTrace
@@ -1361,16 +1364,12 @@ class PromptOptimizerLearner(BaseLearner):
         try:
             store = ConversationStore()
         except Exception:
-            logger.debug(
-                "ConversationStore unavailable for trace collection"
-            )
+            logger.debug("ConversationStore unavailable for trace collection")
             return traces
 
         try:
             # Get sessions with enough messages to be meaningful
-            sessions = store.get_rl_training_data(
-                limit=limit, min_messages=3
-            )
+            sessions = store.get_rl_training_data(limit=limit, min_messages=3)
         except Exception as e:
             logger.debug("Failed to query RL training data: %s", e)
             return traces
@@ -1401,26 +1400,16 @@ class PromptOptimizerLearner(BaseLearner):
                                 )
                             )
                         elif msg.role == MessageRole.TOOL_RESULT:
-                            is_error = (
-                                "error" in msg.content.lower()[:200]
-                            )
+                            is_error = "error" in msg.content.lower()[:200]
                             if details:
                                 last = details[-1]
                                 last.success = not is_error
-                                last.result_summary = (
-                                    msg.content[:500]
-                                )
+                                last.result_summary = msg.content[:500]
                                 if is_error:
-                                    last.error_detail = (
-                                        msg.content[:500]
-                                    )
+                                    last.error_detail = msg.content[:500]
                             if is_error:
-                                cat = self._categorize_failure(
-                                    msg.content[:300]
-                                )
-                                failures[cat] = (
-                                    failures.get(cat, 0) + 1
-                                )
+                                cat = self._categorize_failure(msg.content[:300])
+                                failures[cat] = failures.get(cat, 0) + 1
             except Exception:
                 pass  # Fall back to aggregate-only
 
@@ -1437,9 +1426,7 @@ class PromptOptimizerLearner(BaseLearner):
                     tool_calls=total_tool_calls,
                     tool_failures=failures,
                     success=failure_rate < 0.3,
-                    completion_score=max(
-                        0.0, 1.0 - failure_rate * 1.5
-                    ),
+                    completion_score=max(0.0, 1.0 - failure_rate * 1.5),
                     tokens_used=0,
                     tool_call_details=details,
                 )
@@ -1463,9 +1450,7 @@ class PromptOptimizerLearner(BaseLearner):
                 existing = by_id.get(t.session_id)
                 if existing is None:
                     by_id[t.session_id] = t
-                elif len(t.tool_call_details) > len(
-                    existing.tool_call_details
-                ):
+                elif len(t.tool_call_details) > len(existing.tool_call_details):
                     # Prefer the richer trace
                     by_id[t.session_id] = t
         merged = list(by_id.values())

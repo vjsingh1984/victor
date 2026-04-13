@@ -146,9 +146,7 @@ class HostPluginContext(PluginContext):
                         vertical_name,
                     )
             except Exception as e:
-                logger.debug(
-                    "Capability extraction failed for %s: %s", vertical_name, e
-                )
+                logger.debug("Capability extraction failed for %s: %s", vertical_name, e)
 
         # Strategy 2: Entry point scanning (deferred — runs if vertical has EP registrations)
         # Cached to avoid redundant scanning when multiple verticals register
@@ -194,9 +192,7 @@ class HostPluginContext(PluginContext):
                                     e,
                                 )
             except Exception as e:
-                logger.debug(
-                    "Entry point discovery failed for %s: %s", vertical_name, e
-                )
+                logger.debug("Entry point discovery failed for %s: %s", vertical_name, e)
 
     def register_capability(
         self,

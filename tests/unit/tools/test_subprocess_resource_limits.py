@@ -13,7 +13,6 @@ from victor.tools.subprocess_executor import (
     run_command,
 )
 
-
 # ---------------------------------------------------------------------------
 # SubprocessResourceLimits dataclass
 # ---------------------------------------------------------------------------
@@ -81,9 +80,11 @@ class TestCreateResourceLimitPreexec:
         """On platforms without resource module, returns None."""
         with patch.dict("sys.modules", {"resource": None}):
             # Force re-import to hit ImportError
-            fn = create_resource_limit_preexec.__wrapped__() if hasattr(
-                create_resource_limit_preexec, "__wrapped__"
-            ) else None
+            fn = (
+                create_resource_limit_preexec.__wrapped__()
+                if hasattr(create_resource_limit_preexec, "__wrapped__")
+                else None
+            )
         # Direct test: if resource import fails, returns None
         # This is hard to test without reloading, so we test the contract:
         # on POSIX it returns callable, verified above.
@@ -161,9 +162,7 @@ class TestRunCommandWithLimits:
         sentinel = lambda: None  # noqa: E731
 
         with patch("victor.tools.subprocess_executor.subprocess.run") as mock_run:
-            mock_run.return_value = type(
-                "R", (), {"returncode": 0, "stdout": "", "stderr": ""}
-            )()
+            mock_run.return_value = type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
             run_command(["echo", "hi"], preexec_fn=sentinel, check_dangerous=False)
 
         _, kwargs = mock_run.call_args

@@ -689,9 +689,7 @@ class VerticalContext:
         except Exception as e:
             import logging
 
-            logging.getLogger(__name__).debug(
-                f"Could not get tiered config from vertical: {e}"
-            )
+            logging.getLogger(__name__).debug(f"Could not get tiered config from vertical: {e}")
         return None
 
     # ==========================================================================

@@ -302,9 +302,7 @@ def auth_list() -> None:
             status_display = (
                 "[green]authenticated[/]"
                 if status == "authenticated"
-                else "[yellow]pending login[/]"
-                if status == "pending"
-                else f"[red]{status}[/]"
+                else "[yellow]pending login[/]" if status == "pending" else f"[red]{status}[/]"
             )
         elif account.auth.method == "none":
             status_display = "[dim]local[/]"
@@ -476,16 +474,10 @@ def auth_test(
             # Fall back: treat as account name (user may have used -p instead of -n)
             account = manager.get_account(provider)
             if not account:
-                console.print(
-                    f"[red]✗[/] No account or provider named '{provider}'"
-                )
-                console.print(
-                    f"[dim]Hint: use --name/-n to test by account name[/]"
-                )
+                console.print(f"[red]✗[/] No account or provider named '{provider}'")
+                console.print(f"[dim]Hint: use --name/-n to test by account name[/]")
                 raise typer.Exit(1)
-            console.print(
-                f"[dim]Matched account '{provider}' (hint: use -n for account names)[/]"
-            )
+            console.print(f"[dim]Matched account '{provider}' (hint: use -n for account names)[/]")
     else:
         # Use default account
         account = manager.get_account()

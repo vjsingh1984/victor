@@ -1,4 +1,5 @@
 """Tests for SIMBA challenge-focused trace sampling (DSPy-inspired)."""
+
 from unittest.mock import MagicMock
 import pytest
 
@@ -19,6 +20,7 @@ class TestSIMBAChallengeSampling:
 
     def test_function_exists(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
+
         assert hasattr(PromptOptimizerLearner, "_select_challenging_traces")
 
     def test_recovery_traces_preferred(self):
@@ -38,7 +40,9 @@ class TestSIMBAChallengeSampling:
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
 
         learner = MagicMock(spec=PromptOptimizerLearner)
-        high_fail = self._make_trace(success=False, score=0.3, failures={"edit_mismatch": 5}, has_errors=True)
+        high_fail = self._make_trace(
+            success=False, score=0.3, failures={"edit_mismatch": 5}, has_errors=True
+        )
         low_fail = self._make_trace(success=False, score=0.4, failures={"timeout": 1})
         traces = [low_fail, high_fail]
 

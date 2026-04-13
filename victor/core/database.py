@@ -550,9 +550,7 @@ class DatabaseManager:
         # Safety: only allow pruning known tables
         all_prunable = self.get_tables_for_group("all")
         if table not in all_prunable:
-            raise ValueError(
-                f"Table '{table}' not in prunable tables: {all_prunable}"
-            )
+            raise ValueError(f"Table '{table}' not in prunable tables: {all_prunable}")
 
         conn = self.get_connection()
 
@@ -561,12 +559,12 @@ class DatabaseManager:
 
             date_col = self._get_date_column(table)
             cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
-            cursor = conn.execute(
-                f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (cutoff,)
-            )
+            cursor = conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (cutoff,))
             conn.commit()
             deleted = cursor.rowcount
-            logger.info("Pruned %d rows from %s (older than %d days)", deleted, table, older_than_days)
+            logger.info(
+                "Pruned %d rows from %s (older than %d days)", deleted, table, older_than_days
+            )
             return deleted
 
         if keep_last is not None:
@@ -582,9 +580,7 @@ class DatabaseManager:
 
         return 0
 
-    def archive_table(
-        self, table: str, before_date: str, output_path: "Path"
-    ) -> int:
+    def archive_table(self, table: str, before_date: str, output_path: "Path") -> int:
         """Export rows before a date to gzip JSONL, then delete them.
 
         Args:
@@ -604,9 +600,7 @@ class DatabaseManager:
 
         conn = self.get_connection()
         date_col = self._get_date_column(table)
-        cursor = conn.execute(
-            f"SELECT * FROM [{table}] WHERE [{date_col}] < ?", (before_date,)
-        )
+        cursor = conn.execute(f"SELECT * FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
         columns = [desc[0] for desc in cursor.description]
         rows = cursor.fetchall()
 
@@ -624,9 +618,7 @@ class DatabaseManager:
         conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
         conn.commit()
 
-        logger.info(
-            "Archived %d rows from %s to %s", len(rows), table, output_path
-        )
+        logger.info("Archived %d rows from %s to %s", len(rows), table, output_path)
         return len(rows)
 
     def get_table_stats(self) -> list:
@@ -638,9 +630,7 @@ class DatabaseManager:
         conn = self.get_connection()
         tables = [
             r[0]
-            for r in conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         ]
 
         stats = []
@@ -666,13 +656,15 @@ class DatabaseManager:
                 avg_row = sum(len(str(r)) for r in sample) / max(len(sample), 1)
                 est_kb = int(count * avg_row / 1024)
 
-                stats.append({
-                    "table": table,
-                    "rows": count,
-                    "min_date": str(min_date)[:10] if min_date else None,
-                    "max_date": str(max_date)[:10] if max_date else None,
-                    "est_size_kb": est_kb,
-                })
+                stats.append(
+                    {
+                        "table": table,
+                        "rows": count,
+                        "min_date": str(min_date)[:10] if min_date else None,
+                        "max_date": str(max_date)[:10] if max_date else None,
+                        "est_size_kb": est_kb,
+                    }
+                )
             except Exception:
                 continue
 

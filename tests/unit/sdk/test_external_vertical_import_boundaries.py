@@ -17,16 +17,27 @@ from typing import List, Tuple
 import pytest
 
 BANNED_PREFIXES = (
-    "victor.agent", "victor.core", "victor.framework", "victor.providers",
-    "victor.security", "victor.storage", "victor.tools", "victor.workflows",
-    "victor.evaluation", "victor.observability",
+    "victor.agent",
+    "victor.core",
+    "victor.framework",
+    "victor.providers",
+    "victor.security",
+    "victor.storage",
+    "victor.tools",
+    "victor.workflows",
+    "victor.evaluation",
+    "victor.observability",
 )
 
 DEFINITION_FILES = {"assistant.py", "plugin.py"}
 
 VERTICALS = [
-    "victor_invest", "victor_coding", "victor_research",
-    "victor_devops", "victor_rag", "victor_dataanalysis",
+    "victor_invest",
+    "victor_coding",
+    "victor_research",
+    "victor_devops",
+    "victor_rag",
+    "victor_dataanalysis",
 ]
 
 

@@ -1,4 +1,5 @@
 """Tests for session-end GEPA evolution (EvoTest-inspired)."""
+
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -6,10 +7,12 @@ import pytest
 class TestSessionEndEvolution:
     def test_method_exists(self):
         from victor.framework.rl.coordinator import RLCoordinator
+
         assert hasattr(RLCoordinator, "try_evolve_on_session_end")
 
     def test_evolve_called_with_enough_tools(self):
         from victor.framework.rl.coordinator import RLCoordinator
+
         coord = MagicMock(spec=RLCoordinator)
         coord._evolution_section_idx = 0
 
@@ -29,6 +32,7 @@ class TestSessionEndEvolution:
 
     def test_no_evolve_without_learner(self):
         from victor.framework.rl.coordinator import RLCoordinator
+
         coord = MagicMock(spec=RLCoordinator)
         coord._learners = {}
         result = RLCoordinator.try_evolve_on_session_end(coord, "ollama", "qwen3")
@@ -36,6 +40,7 @@ class TestSessionEndEvolution:
 
     def test_round_robin_sections(self):
         from victor.framework.rl.coordinator import RLCoordinator
+
         coord = MagicMock(spec=RLCoordinator)
         coord._evolution_section_idx = 0
         learner = MagicMock()
@@ -61,6 +66,7 @@ class TestSessionEndEvolution:
 
     def test_exception_doesnt_crash(self):
         from victor.framework.rl.coordinator import RLCoordinator
+
         coord = MagicMock(spec=RLCoordinator)
         coord._evolution_section_idx = 0
         learner = MagicMock()

@@ -333,9 +333,7 @@ class PlanningCoordinator:
                         f"Using planning provider from CLI override: {planning_provider_name}"
                     )
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to get planning provider {planning_provider_name}: {e}"
-                    )
+                    logger.warning(f"Failed to get planning provider {planning_provider_name}: {e}")
             else:
                 planning_model = cli_planning_model
         else:
@@ -369,7 +367,11 @@ class PlanningCoordinator:
         enriched_request = user_message
         try:
             matcher = getattr(self.orchestrator, "skill_matcher", None)
-            if matcher and getattr(matcher, "initialized", False) and getattr(matcher, "skills", None):
+            if (
+                matcher
+                and getattr(matcher, "initialized", False)
+                and getattr(matcher, "skills", None)
+            ):
                 from victor.framework.skill_planner import build_skill_aware_plan_prompt
 
                 skills = getattr(matcher, "skills", [])
@@ -579,7 +581,9 @@ class PlanningCoordinator:
         This helps prevent context overflow during long planning sessions.
         """
         orch = self.orchestrator
-        if orch.has_capability("context_compactor") and orch.get_capability_value("context_compactor"):
+        if orch.has_capability("context_compactor") and orch.get_capability_value(
+            "context_compactor"
+        ):
             try:
                 # Get current query from public conversation API
                 current_query = ""

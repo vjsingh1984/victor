@@ -9,6 +9,7 @@ class TestToolSelectionCaching:
     @pytest.mark.asyncio
     async def test_same_context_reuses_tools(self):
         from victor.agent.streaming.pipeline import StreamingChatPipeline
+
         orch = MagicMock()
         orch._select_tools_for_turn = AsyncMock(
             return_value=[MagicMock(name="read"), MagicMock(name="write")]
@@ -25,6 +26,7 @@ class TestToolSelectionCaching:
     @pytest.mark.asyncio
     async def test_different_context_invalidates(self):
         from victor.agent.streaming.pipeline import StreamingChatPipeline
+
         orch = MagicMock()
         orch._select_tools_for_turn = AsyncMock(return_value=[MagicMock(name="read")])
         pipeline = StreamingChatPipeline.__new__(StreamingChatPipeline)
@@ -38,6 +40,7 @@ class TestToolSelectionCaching:
     @pytest.mark.asyncio
     async def test_none_tools_not_cached(self):
         from victor.agent.streaming.pipeline import StreamingChatPipeline
+
         orch = MagicMock()
         orch._select_tools_for_turn = AsyncMock(return_value=None)
         pipeline = StreamingChatPipeline.__new__(StreamingChatPipeline)

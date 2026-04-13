@@ -182,9 +182,7 @@ class StreamingChatCoordinator:
 
         # Log tool definitions sent to LLM (permanent, INFO level)
         if tools:
-            tool_summaries = [
-                f"{t.name}: {(t.description or '')[:80]}" for t in tools
-            ]
+            tool_summaries = [f"{t.name}: {(t.description or '')[:80]}" for t in tools]
             logger.debug(
                 "[ToolDefs→LLM] %d tools selected for query=%s\n  %s",
                 len(tools),

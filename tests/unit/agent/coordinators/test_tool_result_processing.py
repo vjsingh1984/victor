@@ -165,9 +165,7 @@ class TestProcessToolResults:
     def test_analytics_recorded(self):
         coord = self._make_coordinator()
         pipeline_result = FakePipelineResult(
-            results=[
-                FakeCallResult(tool_name="read", success=True, result="ok")
-            ]
+            results=[FakeCallResult(tool_name="read", success=True, result="ok")]
         )
         ctx = _make_ctx()
         coord.process_tool_results(pipeline_result, ctx)
@@ -179,9 +177,7 @@ class TestProcessToolResults:
     def test_usage_logger_called(self):
         coord = self._make_coordinator()
         pipeline_result = FakePipelineResult(
-            results=[
-                FakeCallResult(tool_name="read", success=True, result="data")
-            ]
+            results=[FakeCallResult(tool_name="read", success=True, result="data")]
         )
         ctx = _make_ctx()
         coord.process_tool_results(pipeline_result, ctx)
@@ -199,9 +195,7 @@ class TestProcessToolResults:
     def test_continuation_prompts_reset_on_success(self):
         coord = self._make_coordinator()
         pipeline_result = FakePipelineResult(
-            results=[
-                FakeCallResult(tool_name="read", success=True, result="ok")
-            ]
+            results=[FakeCallResult(tool_name="read", success=True, result="ok")]
         )
         ctx = _make_ctx(continuation_prompts=3, asking_input_prompts=2)
         coord.process_tool_results(pipeline_result, ctx)

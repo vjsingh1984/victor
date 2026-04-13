@@ -1,4 +1,5 @@
 """Tests that semantic selector works after dead stub removal."""
+
 from unittest.mock import MagicMock
 
 

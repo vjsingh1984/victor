@@ -422,9 +422,7 @@ class ContextCompactor:
         # Keep system prompt (index 0 if present)
         start_idx = 1 if messages and messages[0].role == "system" else 0
         # Summarize up to max_turns_to_summarize oldest turns
-        end_turn_idx = min(
-            SUMMARIZATION_CONFIG.max_turns_to_summarize, len(turn_boundaries) - 3
-        )
+        end_turn_idx = min(SUMMARIZATION_CONFIG.max_turns_to_summarize, len(turn_boundaries) - 3)
         if end_turn_idx <= 0:
             return None
 
@@ -444,7 +442,8 @@ class ContextCompactor:
                 tool_names.add(tool_name)
             # Extract file paths mentioned
             import re
-            paths = re.findall(r'[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)', msg.content[:500])
+
+            paths = re.findall(r"[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)", msg.content[:500])
             files_mentioned.update(paths[:5])
             # Extract short decisions from assistant messages
             if msg.role == "assistant" and len(msg.content) > 50:
@@ -466,6 +465,7 @@ class ContextCompactor:
 
         # Replace old turns with summary message
         from victor.providers.base import Message
+
         summary_msg = Message(role="assistant", content=summary_text)
 
         # Remove old turns and insert summary
@@ -479,8 +479,10 @@ class ContextCompactor:
 
         logger.info(
             "[summarize] Replaced %d messages with summary (%dK → %dK chars, freed %dK)",
-            len(turns_to_summarize), chars_before // 1024,
-            chars_after // 1024, chars_freed // 1024,
+            len(turns_to_summarize),
+            chars_before // 1024,
+            chars_after // 1024,
+            chars_freed // 1024,
         )
 
         return CompactionAction(

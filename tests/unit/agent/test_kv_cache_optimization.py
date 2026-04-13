@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-
 # =====================================================================
 # Fix 1: _kv_optimization_enabled property
 # =====================================================================
@@ -223,9 +222,7 @@ class TestDynamicContentInjection:
             for i in range(len(messages) - 1, -1, -1):
                 if messages[i].role == "user":
                     prefix = "\n".join(prefix_parts) + "\n\n"
-                    messages[i] = Message(
-                        role="user", content=prefix + messages[i].content
-                    )
+                    messages[i] = Message(role="user", content=prefix + messages[i].content)
                     break
 
         assert messages[0].content == "system prompt"  # Unchanged

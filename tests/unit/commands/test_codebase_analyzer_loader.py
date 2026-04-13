@@ -3,6 +3,7 @@
 Tests the public API: load_codebase_analyzer_module(),
 load_codebase_analyzer_attr(), load_tree_sitter_get_parser().
 """
+
 from __future__ import annotations
 
 import types

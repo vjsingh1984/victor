@@ -371,9 +371,17 @@ class DeduplicationConfig:
     enabled: bool = True
     stub_template: str = "[Previously read: {path} -- {lines} lines]"
     dedup_tool_names: tuple = (
-        "read", "cat", "read_file", "head", "tail",  # File reads
-        "ls", "glob", "find",                          # Directory listings
-        "code_search", "grep", "search",               # Search results
+        "read",
+        "cat",
+        "read_file",
+        "head",
+        "tail",  # File reads
+        "ls",
+        "glob",
+        "find",  # Directory listings
+        "code_search",
+        "grep",
+        "search",  # Search results
     )
     min_content_chars_to_dedup: int = 500
 

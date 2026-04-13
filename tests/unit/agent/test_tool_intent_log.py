@@ -1,4 +1,5 @@
 """Tests for pre-execution intent logging (LogAct-inspired)."""
+
 import time
 from unittest.mock import MagicMock, patch, AsyncMock
 from dataclasses import dataclass, field
@@ -13,6 +14,7 @@ class TestToolIntentEmission:
     def test_emit_tool_intent_method_exists(self):
         """ToolPipeline has _emit_tool_intent method."""
         from victor.agent.tool_pipeline import ToolPipeline
+
         assert hasattr(ToolPipeline, "_emit_tool_intent")
 
     def test_intent_contains_required_fields(self):
@@ -56,6 +58,7 @@ class TestIntentLogInContext:
     def test_context_has_intent_log(self):
         """StreamingChatContext has intent_log field."""
         from victor.agent.streaming.context import StreamingChatContext
+
         ctx = StreamingChatContext.__new__(StreamingChatContext)
         ctx.intent_log = []
         assert isinstance(ctx.intent_log, list)

@@ -1,4 +1,5 @@
 """Tests for evolution audit display and stage prediction integration."""
+
 from unittest.mock import MagicMock
 import pytest
 
@@ -8,6 +9,7 @@ class TestEvolutionAuditReport:
 
     def test_function_exists(self):
         from victor.framework.rl.coordinator import RLCoordinator
+
         assert hasattr(RLCoordinator, "format_evolution_report")
 
     def test_report_contains_section_name(self):

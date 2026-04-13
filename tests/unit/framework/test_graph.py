@@ -954,9 +954,7 @@ class TestSubgraphNesting:
         outer.add_edge("sub", END)
         outer.set_entry_point("sub")
 
-        result = await outer.compile().invoke(
-            {"value": 0, "history": []}
-        )
+        result = await outer.compile().invoke({"value": 0, "history": []})
         assert result.success
         assert _SUBGRAPH_DEPTH_KEY not in result.state
 
@@ -976,9 +974,7 @@ class TestSubgraphNesting:
         outer.add_edge("sub", END)
         outer.set_entry_point("sub")
 
-        result = await outer.compile().invoke(
-            {"value": 0, "history": []}
-        )
+        result = await outer.compile().invoke({"value": 0, "history": []})
         assert not result.success
         assert "intentional failure" in result.error
 
@@ -1080,6 +1076,7 @@ class TestSendFanOut:
 
     def test_edge_returns_send_list(self):
         """A conditional edge returning List[Send] works."""
+
         def fanout_condition(state):
             return [
                 Send(node="a", state={"val": 1}),
@@ -1100,6 +1097,7 @@ class TestSendFanOut:
 
     def test_edge_returns_string_for_regular_condition(self):
         """A regular conditional edge still returns a string target."""
+
         def regular_condition(state):
             return "branch_a"
 
@@ -1114,6 +1112,7 @@ class TestSendFanOut:
 
     async def test_fan_out_parallel_execution(self):
         """Send-based fan-out executes branches in parallel and merges."""
+
         async def router_node(state):
             state["routed"] = True
             return state
@@ -1138,9 +1137,7 @@ class TestSendFanOut:
         graph.add_node("worker_b", worker_b)
         graph.set_entry_point("router")
         # Map targets so validator sees them as reachable
-        graph.add_conditional_edge(
-            "router", fanout, {"a": "worker_a", "b": "worker_b"}
-        )
+        graph.add_conditional_edge("router", fanout, {"a": "worker_a", "b": "worker_b"})
 
         app = graph.compile()
         result = await app.invoke({"val": 0})
@@ -1151,6 +1148,7 @@ class TestSendFanOut:
 
     async def test_fan_out_with_custom_merger(self):
         """Custom state merger is used when set."""
+
         async def identity(state):
             return state
 
@@ -1175,9 +1173,7 @@ class TestSendFanOut:
         graph.add_node("a", identity)
         graph.add_node("b", identity)
         graph.set_entry_point("start")
-        graph.add_conditional_edge(
-            "start", fanout, {"x": "a", "y": "b"}
-        )
+        graph.add_conditional_edge("start", fanout, {"x": "a", "y": "b"})
         graph.add_state_merger(sum_merger)
 
         app = graph.compile()
@@ -1188,6 +1184,7 @@ class TestSendFanOut:
 
     async def test_fan_out_node_history(self):
         """Fan-out branches appear in node_history as send:<node>."""
+
         async def noop(state):
             return state
 
@@ -1202,9 +1199,7 @@ class TestSendFanOut:
         graph.add_node("a", noop)
         graph.add_node("b", noop)
         graph.set_entry_point("router")
-        graph.add_conditional_edge(
-            "router", fanout, {"x": "a", "y": "b"}
-        )
+        graph.add_conditional_edge("router", fanout, {"x": "a", "y": "b"})
 
         app = graph.compile()
         result = await app.invoke({})
@@ -1213,6 +1208,7 @@ class TestSendFanOut:
 
     async def test_fan_out_ends_graph_after_merge(self):
         """After fan-out, the graph should terminate (reach END)."""
+
         async def noop(state):
             return state
 
@@ -1232,6 +1228,7 @@ class TestSendFanOut:
     def test_send_exported(self):
         """Send and default_state_merger are in __all__."""
         from victor.framework.graph import __all__ as graph_all
+
         assert "Send" in graph_all
         assert "default_state_merger" in graph_all
         assert "SubgraphNode" in graph_all

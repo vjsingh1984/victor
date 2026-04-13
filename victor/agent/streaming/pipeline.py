@@ -54,19 +54,14 @@ class StreamingChatPipeline:
         self._last_tool_context: Optional[str] = None
         self._last_tools: Optional[Any] = None
 
-    async def _get_tools_cached(
-        self, orch: Any, context_msg: str, goals: Any
-    ) -> Any:
+    async def _get_tools_cached(self, orch: Any, context_msg: str, goals: Any) -> Any:
         """Select tools with per-turn caching.
 
         If context_msg hasn't changed since the last call, returns the
         previously selected tools. This avoids redundant semantic search
         and tool schema serialization within the same streaming turn.
         """
-        if (
-            self._last_tool_context == context_msg
-            and self._last_tools is not None
-        ):
+        if self._last_tool_context == context_msg and self._last_tools is not None:
             return self._last_tools
 
         tools = await orch._select_tools_for_turn(context_msg, goals)

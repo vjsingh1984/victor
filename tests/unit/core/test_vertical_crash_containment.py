@@ -17,10 +17,13 @@ def _make_crashing_vertical(**overrides):
         "get_system_prompt": classmethod(lambda cls: "You are a test."),
     }
     for method_name, exc in overrides.items():
+
         def make_raiser(e):
             def raiser(cls):
                 raise e
+
             return classmethod(raiser)
+
         attrs[method_name] = make_raiser(exc)
 
     return type("CrashyVertical", (VerticalBase,), attrs)
@@ -54,18 +57,26 @@ class TestGetConfigCrashContainment:
 
     def test_normal_vertical_unaffected(self):
         """Non-crashing verticals should work exactly as before."""
+
         class GoodVertical(VerticalBase):
             name = "good"
             description = "good vertical"
 
             @classmethod
-            def get_name(cls): return "good"
+            def get_name(cls):
+                return "good"
+
             @classmethod
-            def get_description(cls): return "good"
+            def get_description(cls):
+                return "good"
+
             @classmethod
-            def get_tools(cls): return ["read", "write"]
+            def get_tools(cls):
+                return ["read", "write"]
+
             @classmethod
-            def get_system_prompt(cls): return "You are good."
+            def get_system_prompt(cls):
+                return "You are good."
 
         config = GoodVertical.get_config(use_cache=False)
         assert config.name == "good"

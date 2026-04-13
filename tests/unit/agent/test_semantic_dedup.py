@@ -1,4 +1,5 @@
 """Tests for semantic context deduplication (DCE-inspired)."""
+
 from unittest.mock import MagicMock
 from dataclasses import dataclass
 
@@ -16,6 +17,7 @@ class TestSemanticDeduplication:
 
     def test_method_exists(self):
         from victor.agent.context_assembler import TurnBoundaryContextAssembler
+
         assert hasattr(TurnBoundaryContextAssembler, "_deduplicate_semantic")
 
     def test_identical_messages_deduplicated(self):
@@ -25,8 +27,14 @@ class TestSemanticDeduplication:
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
 
         msgs = [
-            MockMessage(role="assistant", content="File content of src/auth.py: def hello(name): return f'Hello {name}'"),
-            MockMessage(role="assistant", content="File content of src/auth.py: def hello(name): return f'Hello {name}'"),
+            MockMessage(
+                role="assistant",
+                content="File content of src/auth.py: def hello(name): return f'Hello {name}'",
+            ),
+            MockMessage(
+                role="assistant",
+                content="File content of src/auth.py: def hello(name): return f'Hello {name}'",
+            ),
             MockMessage(role="user", content="Now edit it"),
         ]
 

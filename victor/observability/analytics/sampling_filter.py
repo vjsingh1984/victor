@@ -26,16 +26,18 @@ class SamplingPolicy:
         deduped_types: Event types subject to time-window deduplication.
     """
 
-    always_pass: Set[str] = field(default_factory=lambda: {
-        "tool_call",
-        "tool_result",
-        "error",
-        "recovery",
-        "session_start",
-        "session_end",
-        "user_prompt",
-        "assistant_response",
-    })
+    always_pass: Set[str] = field(
+        default_factory=lambda: {
+            "tool_call",
+            "tool_result",
+            "error",
+            "recovery",
+            "session_start",
+            "session_end",
+            "user_prompt",
+            "assistant_response",
+        }
+    )
     sample_rate: int = 10
     dedup_window_seconds: float = 5.0
     sampled_types: Set[str] = field(default_factory=lambda: {"content"})

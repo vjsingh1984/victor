@@ -668,9 +668,30 @@ async def _literal_search(
 
         # Filename detection: if query looks like a filename (has extension),
         # use find/rg --files instead of content search
-        filename_exts = (".py", ".js", ".ts", ".go", ".java", ".c", ".cpp", ".rs",
-                         ".yaml", ".yml", ".json", ".toml", ".md", ".txt", ".sh",
-                         ".rb", ".php", ".swift", ".kt", ".scala", ".r", ".sql")
+        filename_exts = (
+            ".py",
+            ".js",
+            ".ts",
+            ".go",
+            ".java",
+            ".c",
+            ".cpp",
+            ".rs",
+            ".yaml",
+            ".yml",
+            ".json",
+            ".toml",
+            ".md",
+            ".txt",
+            ".sh",
+            ".rb",
+            ".php",
+            ".swift",
+            ".kt",
+            ".scala",
+            ".r",
+            ".sql",
+        )
         query_lower = search_query.lower()
         is_filename_query = (
             any(query_lower.endswith(ext) for ext in filename_exts)
@@ -704,17 +725,17 @@ async def _literal_search(
                     timeout=15,
                     cwd=find_cwd,
                 )
-                found_files = [
-                    f.strip() for f in find_result.stdout.splitlines() if f.strip()
-                ]
+                found_files = [f.strip() for f in find_result.stdout.splitlines() if f.strip()]
                 if found_files:
                     results = []
                     for fpath in found_files[:k]:
-                        results.append({
-                            "path": fpath,
-                            "score": 10 if fpath.endswith(search_query) else 5,
-                            "snippet": f"[File found: {fpath}]",
-                        })
+                        results.append(
+                            {
+                                "path": fpath,
+                                "score": 10 if fpath.endswith(search_query) else 5,
+                                "snippet": f"[File found: {fpath}]",
+                            }
+                        )
                     logger.info(
                         f"Filename search: found {len(found_files)} files matching "
                         f"{search_query!r} in {search_path}"

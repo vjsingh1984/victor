@@ -100,9 +100,7 @@ class UsageLogger:
             self._log_file.unlink()
             self._log_file.touch()
 
-            self._logger.info(
-                "Rotated usage log: %s → %s", self._log_file.name, gz_path.name
-            )
+            self._logger.info("Rotated usage log: %s → %s", self._log_file.name, gz_path.name)
         except Exception as e:
             self._logger.debug("Log rotation failed (non-critical): %s", e)
 

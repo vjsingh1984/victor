@@ -1126,9 +1126,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             coordinator = get_rl_coordinator()
             coordinator.set_repo_context(workspace_dir.name)
         except Exception as exc:
-            logger.debug(
-                "RL coordinator repo context unavailable: %s", exc
-            )
+            logger.debug("RL coordinator repo context unavailable: %s", exc)
 
         # Rebuild system prompt with new workspace context (replaces old init.md)
         # Workspace switch is a session reset — unfreeze and re-sample GEPA sections
@@ -1748,17 +1746,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             messages = list(self.messages)
         else:
             max_chars = self._get_max_context_chars()
-            messages = assembler.assemble(
-                self.messages, max_chars, current_query=current_query
-            )
+            messages = assembler.assemble(self.messages, max_chars, current_query=current_query)
 
             if len(messages) < len(self.messages):
                 total_original = sum(len(m.content) for m in self.messages)
                 total_assembled = sum(len(m.content) for m in messages)
                 logger.info(
                     "[context] Assembled %d/%d messages (%dK/%dK chars, budget=%dK)",
-                    len(messages), len(self.messages),
-                    total_assembled // 1024, total_original // 1024,
+                    len(messages),
+                    len(self.messages),
+                    total_assembled // 1024,
+                    total_original // 1024,
                     max_chars // 1024,
                 )
 
@@ -2581,9 +2579,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Freeze system prompt after first build for prefix cache stability
         # Gate on _kv_optimization_enabled so both API-caching and KV-caching providers benefit
         if self._kv_optimization_enabled and getattr(self, "_system_prompt_frozen", False):
-            logger.debug(
-                "[cache] System prompt frozen — skipping rebuild for query classification"
-            )
+            logger.debug("[cache] System prompt frozen — skipping rebuild for query classification")
             return
 
         if query_classification is not None:
@@ -3365,9 +3361,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             console=self.console,
             presentation=self._presentation,
             stream_context=(
-                self._current_stream_context
-                if hasattr(self, "_current_stream_context")
-                else None
+                self._current_stream_context if hasattr(self, "_current_stream_context") else None
             ),
         )
 

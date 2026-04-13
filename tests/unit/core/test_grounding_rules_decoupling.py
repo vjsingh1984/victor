@@ -25,9 +25,7 @@ class TestGroundingRulesRegistry:
 
     def test_register_addendum(self):
         """Verticals register their own addendums at runtime."""
-        StandardGroundingRules.register_addendum(
-            "research", "Cite URLs for claims."
-        )
+        StandardGroundingRules.register_addendum("research", "Cite URLs for claims.")
         result = StandardGroundingRules.for_vertical("research")
         assert StandardGroundingRules.BASE in result
         assert "Cite URLs" in result
@@ -71,7 +69,4 @@ class TestGroundingRulesRegistry:
 
     def test_get_base_extended(self):
         """get_base(extended=True) returns EXTENDED."""
-        assert (
-            StandardGroundingRules.get_base(extended=True)
-            == StandardGroundingRules.EXTENDED
-        )
+        assert StandardGroundingRules.get_base(extended=True) == StandardGroundingRules.EXTENDED

@@ -42,10 +42,12 @@ class TestBatchScoreCorrectness:
 
     def test_empty_list(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         assert batch_score_messages([], []) == []
 
     def test_single_message(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         result = batch_score_messages([50], [1000.0])
         assert len(result) == 1
         assert result[0][0] == 0
@@ -53,6 +55,7 @@ class TestBatchScoreCorrectness:
 
     def test_correctness_vs_python_100(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         priorities, timestamps = _generate_test_data(100)
         rust_result = batch_score_messages(priorities, timestamps)
         python_result = _python_score_messages(priorities, timestamps)
@@ -63,6 +66,7 @@ class TestBatchScoreCorrectness:
 
     def test_sorted_descending(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         priorities, timestamps = _generate_test_data(50)
         result = batch_score_messages(priorities, timestamps)
         scores = [s for _, s in result]
@@ -71,6 +75,7 @@ class TestBatchScoreCorrectness:
 
     def test_max_age_zero(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         now = time.time()
         result = batch_score_messages([50, 75, 100], [now, now, now])
         assert len(result) == 3
@@ -78,12 +83,14 @@ class TestBatchScoreCorrectness:
 
     def test_priority_weight(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         now = time.time()
         result = batch_score_messages([25, 100], [now, now])
         assert result[0][0] == 1
 
     def test_recency_weight(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         now = time.time()
         result = batch_score_messages([50, 50], [now - 3600, now])
         assert result[0][0] == 1
@@ -103,6 +110,7 @@ class TestBatchScorePerformance:
     @pytest.mark.skipif(not _NATIVE_AVAILABLE, reason="Rust native not available")
     def test_benchmark_1k(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         p, t = _generate_test_data(1000)
         py_ms = _time_fn(_python_score_messages, p, t)
         rs_ms = _time_fn(batch_score_messages, p, t)
@@ -113,6 +121,7 @@ class TestBatchScorePerformance:
     @pytest.mark.skipif(not _NATIVE_AVAILABLE, reason="Rust native not available")
     def test_benchmark_10k(self):
         from victor.processing.native.context_fitter import batch_score_messages
+
         p, t = _generate_test_data(10000)
         py_ms = _time_fn(_python_score_messages, p, t)
         rs_ms = _time_fn(batch_score_messages, p, t)

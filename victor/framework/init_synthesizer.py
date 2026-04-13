@@ -157,9 +157,7 @@ class InitSynthesizer:
                 TOOLS_FALLBACK_PROMPT, provider, model, vertical="coding"
             )
 
-    async def _run_with_orchestrator(
-        self, agent: "AgentOrchestrator", prompt: str
-    ) -> str:
+    async def _run_with_orchestrator(self, agent: "AgentOrchestrator", prompt: str) -> str:
         """Run synthesis using an existing orchestrator (slash command path)."""
         try:
             response = await agent.chat(prompt)
@@ -205,7 +203,10 @@ class InitSynthesizer:
 
             logger.info(
                 "[init→LLM] provider=%s model=%s prompt_chars=%d prompt_lines=%d",
-                provider, model, len(prompt), prompt.count("\n"),
+                provider,
+                model,
+                len(prompt),
+                prompt.count("\n"),
             )
             _start = _time.monotonic()
 
@@ -222,8 +223,11 @@ class InitSynthesizer:
             logger.info(
                 "[init←LLM] provider=%s model=%s duration=%.1fs "
                 "response_chars=%d response_lines=%d usage=%s",
-                provider, model, _elapsed_ms / 1000,
-                len(result), result.count("\n"),
+                provider,
+                model,
+                _elapsed_ms / 1000,
+                len(result),
+                result.count("\n"),
                 getattr(response, "usage", None),
             )
 
@@ -238,27 +242,36 @@ class InitSynthesizer:
 
                 # Emit task_classification so GEPA trace collection
                 # categorizes this session as init_synthesis (not 'default')
-                usage.log_event("task_classification", {
-                    "task_type": "init_synthesis",
-                    "provider": provider,
-                    "model": model,
-                })
-
-                usage.log_event("tool_call", {
-                    "tool_name": "init_synthesis",
-                    "tool_args": {
+                usage.log_event(
+                    "task_classification",
+                    {
+                        "task_type": "init_synthesis",
                         "provider": provider,
                         "model": model,
-                        "prompt_chars": len(prompt),
                     },
-                })
-                usage.log_event("tool_result", {
-                    "tool_name": "init_synthesis",
-                    "success": bool(result),
-                    "duration_ms": round(_elapsed_ms, 1),
-                    "result_lines": result.count("\n"),
-                    "result_chars": len(result),
-                })
+                )
+
+                usage.log_event(
+                    "tool_call",
+                    {
+                        "tool_name": "init_synthesis",
+                        "tool_args": {
+                            "provider": provider,
+                            "model": model,
+                            "prompt_chars": len(prompt),
+                        },
+                    },
+                )
+                usage.log_event(
+                    "tool_result",
+                    {
+                        "tool_name": "init_synthesis",
+                        "success": bool(result),
+                        "duration_ms": round(_elapsed_ms, 1),
+                        "result_lines": result.count("\n"),
+                        "result_chars": len(result),
+                    },
+                )
 
                 # Log init output quality signal for GEPA evolution
                 self._log_init_quality(usage, result)
@@ -318,9 +331,14 @@ class InitSynthesizer:
         - Conciseness: no bloated or trivially short output
         """
         expected_sections = [
-            "Project Overview", "Package Layout", "Key Entry Points",
-            "Development Commands", "Dependencies", "Configuration",
-            "Architecture Notes", "Codebase Scale",
+            "Project Overview",
+            "Package Layout",
+            "Key Entry Points",
+            "Development Commands",
+            "Dependencies",
+            "Configuration",
+            "Architecture Notes",
+            "Codebase Scale",
         ]
         sections_found = sum(1 for s in expected_sections if s in result)
         section_score = sections_found / len(expected_sections)
@@ -337,15 +355,18 @@ class InitSynthesizer:
         # Combined quality score
         quality_score = section_score * 0.6 + length_score * 0.2 + (0.2 if result else 0.0)
 
-        usage.log_event("init_quality", {
-            "sections_found": sections_found,
-            "sections_total": len(expected_sections),
-            "section_score": round(section_score, 2),
-            "line_count": line_count,
-            "length_score": round(length_score, 2),
-            "quality_score": round(quality_score, 2),
-            "char_count": len(result),
-        })
+        usage.log_event(
+            "init_quality",
+            {
+                "sections_found": sections_found,
+                "sections_total": len(expected_sections),
+                "section_score": round(section_score, 2),
+                "line_count": line_count,
+                "length_score": round(length_score, 2),
+                "quality_score": round(quality_score, 2),
+                "char_count": len(result),
+            },
+        )
 
     @staticmethod
     def _get_evolved_rules(provider: Optional[str] = None) -> Optional[str]:
@@ -385,8 +406,7 @@ class InitSynthesizer:
             )
             if rec and rec.confidence > 0.6 and not rec.is_baseline:
                 logger.info(
-                    "Using GEPA-evolved init rules "
-                    "(gen=%s, confidence=%.2f, %d chars)",
+                    "Using GEPA-evolved init rules " "(gen=%s, confidence=%.2f, %d chars)",
                     rec.reason,
                     rec.confidence,
                     len(rec.value),

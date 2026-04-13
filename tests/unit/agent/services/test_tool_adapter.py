@@ -78,9 +78,7 @@ def test_is_healthy_with_none():
 
 
 def test_process_tool_results_delegates(tool_adapter, mock_tool_coordinator):
-    mock_tool_coordinator.process_tool_results.return_value = [
-        {"name": "read", "success": True}
-    ]
+    mock_tool_coordinator.process_tool_results.return_value = [{"name": "read", "success": True}]
     mock_pipeline_result = MagicMock()
     mock_ctx = MagicMock()
 

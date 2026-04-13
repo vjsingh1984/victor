@@ -79,18 +79,12 @@ class TestBootstrapPhaseRename:
         """vertical_services phase is optional."""
         from victor.core.bootstrap import _BOOTSTRAP_PHASES
 
-        phase = next(
-            p for p in _BOOTSTRAP_PHASES
-            if p.name == "vertical_services"
-        )
+        phase = next(p for p in _BOOTSTRAP_PHASES if p.name == "vertical_services")
         assert phase.optional is True
 
     def test_vertical_services_depends_on_capabilities(self):
         """vertical_services phase depends on capabilities."""
         from victor.core.bootstrap import _BOOTSTRAP_PHASES
 
-        phase = next(
-            p for p in _BOOTSTRAP_PHASES
-            if p.name == "vertical_services"
-        )
+        phase = next(p for p in _BOOTSTRAP_PHASES if p.name == "vertical_services")
         assert "capabilities" in phase.depends_on

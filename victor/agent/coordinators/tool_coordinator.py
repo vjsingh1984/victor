@@ -906,7 +906,9 @@ class ToolCoordinator:
         Deprecated: Use set_enabled_tools() directly instead of passing
         the full orchestrator. Kept for backward compatibility.
         """
-        orch_tools = orchestrator.get_enabled_tools() if hasattr(orchestrator, "get_enabled_tools") else None
+        orch_tools = (
+            orchestrator.get_enabled_tools() if hasattr(orchestrator, "get_enabled_tools") else None
+        )
         if orch_tools:
             self.set_enabled_tools(orch_tools)
 
@@ -1230,9 +1232,7 @@ class ToolCoordinator:
                             f"[dim]({elapsed_ms:.0f}ms)[/dim]"
                         )
 
-                error_output = (
-                    output if isinstance(output, dict) else {"error": error_display}
-                )
+                error_output = output if isinstance(output, dict) else {"error": error_display}
                 formatted_error = (
                     ctx.format_tool_output(tool_name, normalized_args, error_output)
                     if ctx.format_tool_output

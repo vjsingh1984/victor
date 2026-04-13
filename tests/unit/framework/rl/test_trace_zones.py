@@ -1,4 +1,5 @@
 """Tests for GEPA semantic trace zones (PRIME-inspired)."""
+
 from unittest.mock import MagicMock
 from enum import Enum
 
@@ -8,12 +9,14 @@ import pytest
 class TestTraceZoneEnum:
     def test_zone_enum_exists(self):
         from victor.framework.rl.learners.prompt_optimizer import TraceZone
+
         assert hasattr(TraceZone, "SUCCESS")
         assert hasattr(TraceZone, "FAILURE")
         assert hasattr(TraceZone, "RECOVERY")
 
     def test_zone_values(self):
         from victor.framework.rl.learners.prompt_optimizer import TraceZone
+
         assert TraceZone.SUCCESS.value == "successful_strategies"
         assert TraceZone.FAILURE.value == "failure_patterns"
         assert TraceZone.RECOVERY.value == "recovery_patterns"
@@ -33,21 +36,25 @@ class TestTraceZoneClassification:
 
     def test_high_score_success_zone(self):
         from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+
         trace = self._make_trace(score=0.85, success=True)
         assert classify_trace_zone(trace) == TraceZone.SUCCESS
 
     def test_low_score_failure_zone(self):
         from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+
         trace = self._make_trace(score=0.3, success=False, has_failures=True)
         assert classify_trace_zone(trace) == TraceZone.FAILURE
 
     def test_recovery_zone(self):
         from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+
         trace = self._make_trace(has_recovery=True)
         assert classify_trace_zone(trace) == TraceZone.RECOVERY
 
     def test_medium_score_defaults_to_success(self):
         from victor.framework.rl.learners.prompt_optimizer import classify_trace_zone, TraceZone
+
         trace = self._make_trace(score=0.6, success=True)
         assert classify_trace_zone(trace) == TraceZone.SUCCESS
 

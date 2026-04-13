@@ -77,8 +77,8 @@ class TestContribImportBoundaries:
                     violations.append(f"{py_file.relative_to(contrib)}:{imp}")
 
         assert not violations, (
-            f"Contrib verticals must not import from victor internals. "
-            f"Violations:\n" + "\n".join(f"  - {v}" for v in violations)
+            "Contrib verticals must not import from victor internals. "
+            "Violations:\n" + "\n".join(f"  - {v}" for v in violations)
         )
 
     def test_contrib_init_is_tombstone(self):

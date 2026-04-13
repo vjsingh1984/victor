@@ -11,7 +11,6 @@ from victor.observability.analytics.sampling_filter import (
     SemanticSamplingFilter,
 )
 
-
 # ---------------------------------------------------------------------------
 # SamplingPolicy defaults
 # ---------------------------------------------------------------------------
@@ -36,9 +35,16 @@ class TestSamplingPolicy:
 class TestSemanticSamplingFilter:
     def test_high_value_events_always_pass(self):
         f = SemanticSamplingFilter()
-        for et in ["tool_call", "tool_result", "error", "recovery",
-                    "session_start", "session_end", "user_prompt",
-                    "assistant_response"]:
+        for et in [
+            "tool_call",
+            "tool_result",
+            "error",
+            "recovery",
+            "session_start",
+            "session_end",
+            "user_prompt",
+            "assistant_response",
+        ]:
             assert f.should_emit(et, {}) is True
 
     def test_content_events_sampled(self):
@@ -85,9 +91,9 @@ class TestSemanticSamplingFilter:
         f = SemanticSamplingFilter(policy)
 
         f.should_emit("tool_call", {})  # pass
-        f.should_emit("content", {})    # drop (1st, need 2nd)
-        f.should_emit("content", {})    # pass (2nd)
-        f.should_emit("content", {})    # drop (3rd)
+        f.should_emit("content", {})  # drop (1st, need 2nd)
+        f.should_emit("content", {})  # pass (2nd)
+        f.should_emit("content", {})  # drop (3rd)
 
         stats = f.get_stats()
         assert stats["events_passed"] == 2

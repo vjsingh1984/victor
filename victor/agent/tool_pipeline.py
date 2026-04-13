@@ -1200,9 +1200,8 @@ class ToolPipeline:
 
         # Track whether ALL tool calls in this batch were skipped/blocked
         # Used by spin detection in the streaming pipeline
-        self.last_batch_all_skipped = (
-            len(result.results) > 0
-            and all(getattr(r, "skipped", False) for r in result.results)
+        self.last_batch_all_skipped = len(result.results) > 0 and all(
+            getattr(r, "skipped", False) for r in result.results
         )
         if self.last_batch_all_skipped:
             logger.info(
@@ -1590,8 +1589,7 @@ class ToolPipeline:
             if edited_path:
                 # Clear all cached reads for this file (any offset/limit)
                 stale_keys = [
-                    k for k in self._read_file_timestamps
-                    if k.startswith(f"{edited_path}:")
+                    k for k in self._read_file_timestamps if k.startswith(f"{edited_path}:")
                 ]
                 for k in stale_keys:
                     del self._read_file_timestamps[k]

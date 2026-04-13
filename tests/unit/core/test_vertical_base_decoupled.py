@@ -67,13 +67,20 @@ class TestCoreFrameworkDecoupling:
             description = "test"
 
             @classmethod
-            def get_name(cls): return "test-decoupled"
+            def get_name(cls):
+                return "test-decoupled"
+
             @classmethod
-            def get_description(cls): return "test"
+            def get_description(cls):
+                return "test"
+
             @classmethod
-            def get_tools(cls): return ["read", "write"]
+            def get_tools(cls):
+                return ["read", "write"]
+
             @classmethod
-            def get_system_prompt(cls): return "You are a test."
+            def get_system_prompt(cls):
+                return "You are a test."
 
         config = TestVertical.get_config(use_cache=False)
         assert config is not None

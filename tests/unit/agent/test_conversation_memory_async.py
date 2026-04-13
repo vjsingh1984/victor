@@ -48,16 +48,13 @@ class TestConversationStoreAsync:
         # Verify directly in SQLite
         with sqlite3.connect(db_path) as conn:
             row = conn.execute(
-                "SELECT content FROM messages "
-                "WHERE session_id = ?",
+                "SELECT content FROM messages " "WHERE session_id = ?",
                 (session.session_id,),
             ).fetchone()
             assert row is not None
             assert "Persisted async" in row[0]
 
-    async def test_add_message_async_updates_session_tokens(
-        self, tmp_path
-    ):
+    async def test_add_message_async_updates_session_tokens(self, tmp_path):
         """add_message_async updates in-memory token count."""
         store = ConversationStore(db_path=tmp_path / "test.db")
         session = store.create_session(project_path=str(tmp_path))
@@ -71,9 +68,7 @@ class TestConversationStoreAsync:
 
         assert session.current_tokens > initial_tokens
 
-    async def test_add_message_async_multiple_messages(
-        self, tmp_path
-    ):
+    async def test_add_message_async_multiple_messages(self, tmp_path):
         """Multiple async messages are all persisted in order."""
         db_path = tmp_path / "test.db"
         store = ConversationStore(db_path=db_path)

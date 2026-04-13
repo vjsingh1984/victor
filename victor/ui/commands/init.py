@@ -369,7 +369,9 @@ providers:
         if force and interactive:
             interactive = False
             include_dirs = [str(Path.cwd())]
-            console.print("[dim]Using current directory (.) for analysis (--force skips prompts)[/]")
+            console.print(
+                "[dim]Using current directory (.) for analysis (--force skips prompts)[/]"
+            )
 
         if interactive and not quick:
             console.print("\n[bold]Interactive Project Scoping[/]")

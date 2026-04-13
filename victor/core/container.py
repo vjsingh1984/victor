@@ -174,9 +174,7 @@ class ServiceScope:
                     try:
                         service.dispose()
                     except Exception as e:
-                        logger.warning(
-                            f"Error disposing scoped service: {e}"
-                        )
+                        logger.warning(f"Error disposing scoped service: {e}")
             self._scoped_instances.clear()
 
     async def adispose(self) -> None:
@@ -190,16 +188,12 @@ class ServiceScope:
                     try:
                         await service.adispose()
                     except Exception as e:
-                        logger.warning(
-                            f"Error async-disposing scoped: {e}"
-                        )
+                        logger.warning(f"Error async-disposing scoped: {e}")
                 elif isinstance(service, Disposable):
                     try:
                         service.dispose()
                     except Exception as e:
-                        logger.warning(
-                            f"Error disposing scoped service: {e}"
-                        )
+                        logger.warning(f"Error disposing scoped service: {e}")
             self._scoped_instances.clear()
 
     def __enter__(self) -> "ServiceScope":
@@ -211,9 +205,7 @@ class ServiceScope:
     async def __aenter__(self) -> "ServiceScope":
         return self
 
-    async def __aexit__(
-        self, exc_type: Any, exc_val: Any, exc_tb: Any
-    ) -> None:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         await self.adispose()
 
 
@@ -333,9 +325,7 @@ class ServiceContainer:
     def _check_frozen(self) -> None:
         """Raise if container is frozen."""
         if self._frozen:
-            raise ContainerFrozenError(
-                "Container is frozen; registrations are not allowed"
-            )
+            raise ContainerFrozenError("Container is frozen; registrations are not allowed")
 
     def register(
         self,
@@ -455,8 +445,7 @@ class ServiceContainer:
         if service_type in resolving:
             chain = " -> ".join(t.__name__ for t in resolving)
             raise ServiceResolutionError(
-                f"Circular dependency detected: "
-                f"{chain} -> {service_type.__name__}"
+                f"Circular dependency detected: " f"{chain} -> {service_type.__name__}"
             )
 
         if descriptor.lifetime == ServiceLifetime.TRANSIENT:
@@ -684,8 +673,7 @@ class ServiceContainer:
         if service_type in resolving:
             chain = " -> ".join(t.__name__ for t in resolving)
             raise ServiceResolutionError(
-                f"Circular dependency detected: "
-                f"{chain} -> {service_type.__name__}"
+                f"Circular dependency detected: " f"{chain} -> {service_type.__name__}"
             )
 
         resolving.add(service_type)
@@ -701,16 +689,11 @@ class ServiceContainer:
                 return
             self._disposed = True
             for descriptor in self._descriptors.values():
-                if (
-                    descriptor.instance is not None
-                    and isinstance(descriptor.instance, Disposable)
-                ):
+                if descriptor.instance is not None and isinstance(descriptor.instance, Disposable):
                     try:
                         descriptor.instance.dispose()
                     except Exception as e:
-                        logger.warning(
-                            f"Error disposing service: {e}"
-                        )
+                        logger.warning(f"Error disposing service: {e}")
             self._descriptors.clear()
 
     async def adispose(self) -> None:
@@ -727,16 +710,12 @@ class ServiceContainer:
                     try:
                         await inst.adispose()
                     except Exception as e:
-                        logger.warning(
-                            f"Error async-disposing service: {e}"
-                        )
+                        logger.warning(f"Error async-disposing service: {e}")
                 elif isinstance(inst, Disposable):
                     try:
                         inst.dispose()
                     except Exception as e:
-                        logger.warning(
-                            f"Error disposing service: {e}"
-                        )
+                        logger.warning(f"Error disposing service: {e}")
             self._descriptors.clear()
 
     def __enter__(self) -> "ServiceContainer":
@@ -748,9 +727,7 @@ class ServiceContainer:
     async def __aenter__(self) -> "ServiceContainer":
         return self
 
-    async def __aexit__(
-        self, exc_type: Any, exc_val: Any, exc_tb: Any
-    ) -> None:
+    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         await self.adispose()
 
 

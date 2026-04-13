@@ -838,13 +838,17 @@ class TestHandleToolCalls:
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
 
         error_result = ToolCallResult(
-            tool_name="unknown", arguments={}, success=False,
+            tool_name="unknown",
+            arguments={},
+            success=False,
             error="Missing tool name",
         )
         mock_pipeline_result = PipelineExecutionResult(results=[error_result])
         with patch.object(
-            orchestrator._tool_pipeline, "execute_tool_calls",
-            new_callable=AsyncMock, return_value=mock_pipeline_result,
+            orchestrator._tool_pipeline,
+            "execute_tool_calls",
+            new_callable=AsyncMock,
+            return_value=mock_pipeline_result,
         ):
             result = await orchestrator._handle_tool_calls([{"arguments": {}}])
         assert len(result) == 1
@@ -857,13 +861,17 @@ class TestHandleToolCalls:
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
 
         error_result = ToolCallResult(
-            tool_name="123invalid", arguments={}, success=False,
+            tool_name="123invalid",
+            arguments={},
+            success=False,
             error="Invalid tool name",
         )
         mock_pipeline_result = PipelineExecutionResult(results=[error_result])
         with patch.object(
-            orchestrator._tool_pipeline, "execute_tool_calls",
-            new_callable=AsyncMock, return_value=mock_pipeline_result,
+            orchestrator._tool_pipeline,
+            "execute_tool_calls",
+            new_callable=AsyncMock,
+            return_value=mock_pipeline_result,
         ):
             result = await orchestrator._handle_tool_calls([{"name": "123invalid"}])
         assert len(result) == 1
@@ -876,13 +884,17 @@ class TestHandleToolCalls:
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
 
         error_result = ToolCallResult(
-            tool_name="nonexistent_tool", arguments={}, success=False,
+            tool_name="nonexistent_tool",
+            arguments={},
+            success=False,
             error="Tool not available",
         )
         mock_pipeline_result = PipelineExecutionResult(results=[error_result])
         with patch.object(
-            orchestrator._tool_pipeline, "execute_tool_calls",
-            new_callable=AsyncMock, return_value=mock_pipeline_result,
+            orchestrator._tool_pipeline,
+            "execute_tool_calls",
+            new_callable=AsyncMock,
+            return_value=mock_pipeline_result,
         ):
             result = await orchestrator._handle_tool_calls([{"name": "nonexistent_tool"}])
         assert len(result) == 1
@@ -895,11 +907,14 @@ class TestHandleToolCalls:
         from victor.agent.tool_pipeline import PipelineExecutionResult
 
         mock_pipeline_result = PipelineExecutionResult(
-            results=[], budget_exhausted=True,
+            results=[],
+            budget_exhausted=True,
         )
         with patch.object(
-            orchestrator._tool_pipeline, "execute_tool_calls",
-            new_callable=AsyncMock, return_value=mock_pipeline_result,
+            orchestrator._tool_pipeline,
+            "execute_tool_calls",
+            new_callable=AsyncMock,
+            return_value=mock_pipeline_result,
         ):
             result = await orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}])
         assert len(result) == 0

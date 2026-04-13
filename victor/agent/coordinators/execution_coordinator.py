@@ -251,10 +251,7 @@ class ExecutionCoordinator:
                     if _orch:
                         _pipeline = getattr(_orch, "_tool_pipeline", None)
 
-                _all_blocked = (
-                    _pipeline
-                    and getattr(_pipeline, "last_batch_all_skipped", False)
-                )
+                _all_blocked = _pipeline and getattr(_pipeline, "last_batch_all_skipped", False)
                 if _all_blocked:
                     consecutive_all_blocked += 1
                     logger.info(
@@ -391,10 +388,27 @@ class ExecutionCoordinator:
         if len(msg) < 120 and msg.endswith("?"):
             # Unless they contain action words implying code work
             action_words = (
-                "fix", "create", "write", "edit", "refactor", "add",
-                "implement", "update", "delete", "remove", "change",
-                "modify", "build", "deploy", "run", "test", "debug",
-                "install", "configure", "setup", "migrate",
+                "fix",
+                "create",
+                "write",
+                "edit",
+                "refactor",
+                "add",
+                "implement",
+                "update",
+                "delete",
+                "remove",
+                "change",
+                "modify",
+                "build",
+                "deploy",
+                "run",
+                "test",
+                "debug",
+                "install",
+                "configure",
+                "setup",
+                "migrate",
             )
             words = set(msg.split())
             if not words.intersection(action_words):
@@ -402,13 +416,29 @@ class ExecutionCoordinator:
 
         # Explicit "explain", "what is", "how does" patterns
         qa_prefixes = (
-            "what is", "what are", "what's", "who is", "who are",
-            "how does", "how do", "how is", "how can",
-            "why does", "why do", "why is",
-            "when does", "when is",
-            "explain", "describe", "define", "tell me about",
-            "can you explain", "what does",
-            "reply with", "answer", "say ",
+            "what is",
+            "what are",
+            "what's",
+            "who is",
+            "who are",
+            "how does",
+            "how do",
+            "how is",
+            "how can",
+            "why does",
+            "why do",
+            "why is",
+            "when does",
+            "when is",
+            "explain",
+            "describe",
+            "define",
+            "tell me about",
+            "can you explain",
+            "what does",
+            "reply with",
+            "answer",
+            "say ",
         )
         if any(msg.startswith(p) for p in qa_prefixes):
             return True

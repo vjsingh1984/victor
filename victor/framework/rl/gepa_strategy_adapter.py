@@ -89,7 +89,9 @@ class GEPAServiceStrategy:
         scores = [getattr(t, "completion_score", 0.0) for t in traces]
         avg_score = sum(scores) / max(len(scores), 1)
         tool_counts = [getattr(t, "tool_calls", 0) for t in traces]
-        avg_tools = sum(tc for tc in tool_counts if isinstance(tc, (int, float))) / max(len(tool_counts), 1)
+        avg_tools = sum(tc for tc in tool_counts if isinstance(tc, (int, float))) / max(
+            len(tool_counts), 1
+        )
         all_tools: Counter = Counter()
         for t in traces:
             for d in getattr(t, "tool_call_details", []):

@@ -1,4 +1,5 @@
 """Tests for GEPA capability gap analysis (TRACE-inspired)."""
+
 from unittest.mock import MagicMock
 import pytest
 
@@ -20,11 +21,15 @@ class TestCapabilityGapAnalysis:
 
     def test_function_exists(self):
         from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
+
         assert callable(analyze_capability_gaps)
 
     def test_dominant_gap_identified(self):
         from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
-        traces = [self._make_trace(success=False, failures={"edit_mismatch": 8, "file_not_found": 2})]
+
+        traces = [
+            self._make_trace(success=False, failures={"edit_mismatch": 8, "file_not_found": 2})
+        ]
         gaps = analyze_capability_gaps(traces)
         assert len(gaps) >= 1
         assert gaps[0].capability == "edit_precision"
@@ -32,7 +37,12 @@ class TestCapabilityGapAnalysis:
 
     def test_multiple_gaps_ranked(self):
         from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
-        traces = [self._make_trace(success=False, failures={"edit_mismatch": 5, "file_not_found": 3, "timeout": 2})]
+
+        traces = [
+            self._make_trace(
+                success=False, failures={"edit_mismatch": 5, "file_not_found": 3, "timeout": 2}
+            )
+        ]
         gaps = analyze_capability_gaps(traces)
         assert len(gaps) >= 2
         counts = [g.failure_count for g in gaps]
@@ -40,11 +50,13 @@ class TestCapabilityGapAnalysis:
 
     def test_no_failures_returns_empty(self):
         from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
+
         traces = [self._make_trace(success=True, failures={})]
         assert analyze_capability_gaps(traces) == []
 
     def test_example_errors_collected(self):
         from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
+
         detail = self._make_detail(success=False, error="old_str not found in auth.py")
         traces = [self._make_trace(success=False, failures={"edit_mismatch": 1}, details=[detail])]
         gaps = analyze_capability_gaps(traces)
@@ -53,13 +65,27 @@ class TestCapabilityGapAnalysis:
 
     def test_max_3_gaps_returned(self):
         from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
-        traces = [self._make_trace(success=False, failures={
-            "edit_mismatch": 5, "file_not_found": 4, "timeout": 3, "search_no_results": 2, "shell_error": 1,
-        })]
+
+        traces = [
+            self._make_trace(
+                success=False,
+                failures={
+                    "edit_mismatch": 5,
+                    "file_not_found": 4,
+                    "timeout": 3,
+                    "search_no_results": 2,
+                    "shell_error": 1,
+                },
+            )
+        ]
         assert len(analyze_capability_gaps(traces)) <= 3
 
     def test_capability_mapping_exists(self):
-        from victor.framework.rl.learners.prompt_optimizer import FAILURE_TO_CAPABILITY, FAILURE_HINTS
+        from victor.framework.rl.learners.prompt_optimizer import (
+            FAILURE_TO_CAPABILITY,
+            FAILURE_HINTS,
+        )
+
         for category in FAILURE_HINTS:
             assert category in FAILURE_TO_CAPABILITY, f"Missing mapping for {category}"
 
@@ -67,18 +93,23 @@ class TestCapabilityGapAnalysis:
 class TestCapabilityGapDataclass:
     def test_dataclass_exists(self):
         from victor.framework.rl.learners.prompt_optimizer import CapabilityGap
-        gap = CapabilityGap(capability="edit_precision", failure_rate=0.65, failure_count=13, example_errors=["err"])
+
+        gap = CapabilityGap(
+            capability="edit_precision", failure_rate=0.65, failure_count=13, example_errors=["err"]
+        )
         assert gap.capability == "edit_precision"
 
 
 class TestGapReportFormatting:
     def test_format_function_exists(self):
         from victor.framework.rl.gepa_strategy_adapter import GEPAServiceStrategy
+
         assert hasattr(GEPAServiceStrategy, "_format_gap_report")
 
     def test_gap_report_contains_capability_name(self):
         from victor.framework.rl.gepa_strategy_adapter import GEPAServiceStrategy
         from victor.framework.rl.learners.prompt_optimizer import CapabilityGap
+
         gaps = [CapabilityGap("edit_precision", 0.65, 13, ["old_str not found"])]
         report = GEPAServiceStrategy._format_gap_report(gaps)
         assert "edit_precision" in report

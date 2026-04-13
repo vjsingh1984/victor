@@ -1,4 +1,5 @@
 """Tests for evolution display and stage prediction heuristic wiring."""
+
 from unittest.mock import MagicMock
 import pytest
 
@@ -8,6 +9,7 @@ class TestEvolutionDisplay:
 
     def test_log_method_exists(self):
         from victor.agent.debug_logger import DebugLogger
+
         assert hasattr(DebugLogger, "log_evolution_report")
 
     def test_report_logged_with_section(self):

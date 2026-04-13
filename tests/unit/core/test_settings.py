@@ -156,9 +156,7 @@ class TestSettings:
         path these tests exercise.
         """
         fake_config = tmp_path / "nonexistent_config.yaml"
-        with patch(
-            "victor.config.accounts.get_account_manager"
-        ) as mock_get_am:
+        with patch("victor.config.accounts.get_account_manager") as mock_get_am:
             mock_am = MagicMock()
             mock_am.config_path = fake_config  # .exists() → False
             mock_get_am.return_value = mock_am

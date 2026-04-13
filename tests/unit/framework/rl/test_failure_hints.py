@@ -63,33 +63,60 @@ class TestExpandedCategories:
 
     def test_permission_denied(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
-        assert PromptOptimizerLearner._categorize_failure("Permission denied: /etc/shadow") == "permission_denied"
-        assert PromptOptimizerLearner._categorize_failure("Access denied to file") == "permission_denied"
+
+        assert (
+            PromptOptimizerLearner._categorize_failure("Permission denied: /etc/shadow")
+            == "permission_denied"
+        )
+        assert (
+            PromptOptimizerLearner._categorize_failure("Access denied to file")
+            == "permission_denied"
+        )
 
     def test_edit_syntax(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
-        assert PromptOptimizerLearner._categorize_failure("Syntax error after edit") == "edit_syntax"
+
+        assert (
+            PromptOptimizerLearner._categorize_failure("Syntax error after edit") == "edit_syntax"
+        )
 
     def test_search_no_results(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
-        assert PromptOptimizerLearner._categorize_failure("No results found for query") == "search_no_results"
-        assert PromptOptimizerLearner._categorize_failure("No matches for pattern") == "search_no_results"
+
+        assert (
+            PromptOptimizerLearner._categorize_failure("No results found for query")
+            == "search_no_results"
+        )
+        assert (
+            PromptOptimizerLearner._categorize_failure("No matches for pattern")
+            == "search_no_results"
+        )
 
     def test_test_failure(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
-        assert PromptOptimizerLearner._categorize_failure("Test failed: assertion error in test_auth") == "test_failure"
+
+        assert (
+            PromptOptimizerLearner._categorize_failure("Test failed: assertion error in test_auth")
+            == "test_failure"
+        )
 
     def test_shell_error(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
-        assert PromptOptimizerLearner._categorize_failure("Command failed with error code 1") == "shell_error"
+
+        assert (
+            PromptOptimizerLearner._categorize_failure("Command failed with error code 1")
+            == "shell_error"
+        )
 
     def test_tool_error(self):
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
+
         assert PromptOptimizerLearner._categorize_failure("error in tool execution") == "tool_error"
 
     def test_original_categories_preserved(self):
         """Original 7 categories still work correctly."""
         from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
+
         cat = PromptOptimizerLearner._categorize_failure
         assert cat("File not found: foo.py") == "file_not_found"
         assert cat("old_str not found in bar.py") == "edit_mismatch"
@@ -130,7 +157,13 @@ class TestHintInjectionInSummary:
         trace.tool_calls = 20
         trace.tokens_used = 5000
         trace.tool_failures = {
-            "a": 10, "b": 9, "c": 8, "d": 7, "e": 6, "f": 5, "g": 4,
+            "a": 10,
+            "b": 9,
+            "c": 8,
+            "d": 7,
+            "e": 6,
+            "f": 5,
+            "g": 4,
         }
 
         summary = GEPAServiceStrategy._build_heuristic_summary([trace])

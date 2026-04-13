@@ -24,10 +24,12 @@ from unittest.mock import patch, MagicMock
 
 from victor.tools.file_editor_tool import edit
 
+
 def _check_editor():
     """Check at runtime (not import time) if enhanced editor is available."""
     try:
         from victor.tools.file_editor_tool import _is_file_editor_available
+
         return _is_file_editor_available()
     except Exception:
         return False
