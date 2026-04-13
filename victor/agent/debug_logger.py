@@ -247,6 +247,22 @@ class DebugLogger:
 
         self.logger.info(f"   {icon} {tool_name}: {size} ({elapsed_ms:.0f}ms)")
 
+    def log_evolution_report(self, report: dict) -> None:
+        """Display GEPA evolution report with visual formatting.
+
+        Called after session-end evolution to show what was evolved.
+        """
+        if not self.enabled:
+            return
+
+        section = report.get("section", "?")
+        audit_text = report.get("report", "")
+        icon = self._presentation.icon("success", with_color=False)
+        self.logger.info(f"   {icon} [GEPA Evolution] {section}")
+        for line in audit_text.split("\n"):
+            if line.strip():
+                self.logger.info(f"      {line}")
+
     def log_model_response(
         self,
         content: str,

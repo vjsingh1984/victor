@@ -634,10 +634,15 @@ class ConversationStateMachine:
                 context.get("tool_call_count", 0),
             )
 
+            # Use predict_next_stage() as heuristic for the decision service
+            # (AutonAgenticAI-inspired: static prediction as fast-path)
+            predicted_stage, pred_confidence = self.predict_next_stage()
+            heuristic_conf = pred_confidence if pred_confidence >= 0.6 else 0.0
+
             decision = service.decide_sync(
                 DecisionType.STAGE_DETECTION,
                 context=context,
-                heuristic_confidence=0.0,
+                heuristic_confidence=heuristic_conf,
             )
 
             if decision.source in ("heuristic", "budget_exhausted", "timeout_fallback"):
