@@ -176,15 +176,26 @@ from victor.tools.base import AccessMode, DangerLevel, Priority
 
 
 def _create_file_editor(backup_dir: str):
-    """Create a FileEditor instance via capability registry."""
+    """Create a FileEditor instance via capability registry.
+
+    The registry may return:
+    - A class (FileEditor) → instantiate with backup_dir
+    - A _LazyCapabilityProxy → resolves to class or instance
+    - An already-instantiated FileEditor → use directly
+    """
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import EditorProtocol
 
     registry = CapabilityRegistry.get_instance()
-    factory = registry.get(EditorProtocol)
-    if factory is not None and registry.is_enhanced(EditorProtocol):
-        # The enhanced provider is a callable factory (the FileEditor class)
-        return factory(backup_dir=backup_dir)
+    provider = registry.get(EditorProtocol)
+    if provider is not None and registry.is_enhanced(EditorProtocol):
+        # If it's a class, instantiate it
+        if isinstance(provider, type):
+            return provider(backup_dir=backup_dir)
+        # Already an instance — reset any stale transaction state
+        if hasattr(provider, "_in_transaction"):
+            provider._in_transaction = False
+        return provider
     return None
 
 

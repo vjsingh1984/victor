@@ -24,18 +24,24 @@ from unittest.mock import patch, MagicMock
 
 from victor.tools.file_editor_tool import edit
 
-try:
-    from victor.tools.file_editor_tool import _is_file_editor_available
+def _check_editor():
+    """Check at runtime (not import time) if enhanced editor is available."""
+    try:
+        from victor.tools.file_editor_tool import _is_file_editor_available
+        return _is_file_editor_available()
+    except Exception:
+        return False
 
-    _has_victor_coding = _is_file_editor_available()
-except Exception:
-    _has_victor_coding = False
 
-# Mark all tests in this module as integration tests (require victor-coding)
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(not _has_victor_coding, reason="Requires victor-coding package"),
-]
+# These tests require the enhanced editor (EditorProtocol registered via vertical).
+pytestmark = [pytest.mark.integration]
+
+
+@pytest.fixture(autouse=True)
+def skip_without_editor():
+    """Skip if enhanced editor is not registered (runtime check each test)."""
+    if not _check_editor():
+        pytest.skip("Enhanced editor not registered (requires vertical)")
 
 
 class TestEditBasicOperations:
