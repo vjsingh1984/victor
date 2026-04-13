@@ -24,7 +24,7 @@ class TestSessionEndEvolution:
         coord._learners = {"prompt_optimizer": learner}
 
         result = RLCoordinator.try_evolve_on_session_end(coord, "ollama", "qwen3")
-        assert result is True
+        assert result  # Truthy (dict or True)
         learner.evolve.assert_called_once()
 
     def test_no_evolve_without_learner(self):

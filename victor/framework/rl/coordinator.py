@@ -973,11 +973,42 @@ class RLCoordinator:
             logger.error(f"RL: Failed to get recommendation from {learner_name}: {e}")
             return None
 
-    def try_evolve_on_session_end(self, provider: str, model: str) -> bool:
+    @staticmethod
+    def format_evolution_report(
+        section: str,
+        generation: int,
+        old_text: str,
+        new_text: str,
+        alpha: float = 1.0,
+        beta_val: float = 1.0,
+        sample_count: int = 0,
+    ) -> str:
+        """Format an auditable evolution report for user visibility.
+
+        Returns a structured text report showing before/after prompt text,
+        generation number, and Thompson Sampling statistics.
+        """
+        max_preview = 300
+        old_preview = (old_text[:max_preview] + "...") if len(old_text) > max_preview else old_text
+        new_preview = (new_text[:max_preview] + "...") if len(new_text) > max_preview else new_text
+        mean = alpha / (alpha + beta_val) if (alpha + beta_val) > 0 else 0.5
+
+        lines = [
+            f"[GEPA Evolution] section={section} gen-{generation}",
+            f"  Stats: α={alpha:.1f} β={beta_val:.1f} mean={mean:.2f} samples={sample_count}",
+            f"  Before ({len(old_text)} chars): {old_preview}",
+            f"  After  ({len(new_text)} chars): {new_preview}",
+        ]
+        return "\n".join(lines)
+
+    def try_evolve_on_session_end(self, provider: str, model: str):
         """EvoTest: try evolving one prompt section after conversation end.
 
         Lightweight evolution — picks one section (round-robin), collects
         recent traces, evolves if enough data. Non-blocking, best-effort.
+
+        Returns:
+            dict with report on success, True for legacy compat, False on skip.
         """
         learner = self._learners.get("prompt_optimizer")
         if learner is None:
@@ -999,11 +1030,17 @@ class RLCoordinator:
         try:
             result = learner.evolve(section, current_text, provider)
             if result:
-                logger.info(
-                    f"[evotest] Session-end evolution: section={section} "
-                    f"gen={result.generation} provider={provider}"
+                report = self.format_evolution_report(
+                    section=section,
+                    generation=getattr(result, "generation", 0),
+                    old_text=current_text,
+                    new_text=getattr(result, "text", ""),
+                    alpha=getattr(result, "alpha", 1.0),
+                    beta_val=getattr(result, "beta_val", 1.0),
+                    sample_count=getattr(result, "sample_count", 0),
                 )
-                return True
+                logger.info(f"[evotest] {report}")
+                return {"evolved": True, "section": section, "report": report}
         except Exception as e:
             logger.debug(f"[evotest] Evolution skipped: {e}")
         return False
