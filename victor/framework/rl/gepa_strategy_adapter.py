@@ -79,74 +79,94 @@ class GEPAServiceStrategy:
         service = self._tier_manager.get_service()
         return service.mutate(current_text, reflection, section_name)
 
-    def _format_traces_as_asi(self, traces: List[Any]) -> str:
-        """Convert ExecutionTrace list to rich ASI text summary.
-
-        This is the key difference from the old GEPAStrategy — we produce
-        a detailed per-session, per-tool-call narrative rather than just
-        aggregated failure counts.
-
-        Format:
-            Session s1 (action, ollama/qwen3):
-              [1] read("src/auth.py") → success (45ms)
-                  Reasoning: "I need to check the auth module..."
-              [2] edit("src/auth.py") → FAILED (12ms)
-                  Error: old_str not found
-                  Reasoning: "Now I'll fix the import..."
-              Result: FAILED (edit_mismatch)
-        """
+    @staticmethod
+    def _format_single_trace(trace) -> List[str]:
+        """Format a single execution trace into ASI text lines."""
         lines: List[str] = []
+        sid = getattr(trace, "session_id", "?")
+        header = (
+            f"Session {str(sid)[:8]} "
+            f"({getattr(trace, 'task_type', '?')}, "
+            f"{getattr(trace, 'provider', '?')}/{getattr(trace, 'model', '?')}):"
+        )
+        lines.append(header)
 
-        for trace in traces[:20]:  # Limit to 20 sessions for context window
-            header = (
-                f"Session {trace.session_id[:8]} "
-                f"({trace.task_type}, {trace.provider}/{trace.model}):"
-            )
-            lines.append(header)
+        tool_calls = getattr(trace, "tool_call_details", None)
+        if tool_calls and isinstance(tool_calls, list):
+            for i, tc in enumerate(tool_calls[:10], 1):
+                tool_name = getattr(tc, "tool_name", "?")
+                success = getattr(tc, "success", True)
+                duration = getattr(tc, "duration_ms", 0)
+                status = "success" if success else "FAILED"
+                args_summary = getattr(tc, "arguments_summary", "")
 
-            # Check if trace has detailed tool calls (enriched) or just counts
-            tool_calls = getattr(trace, "tool_call_details", None)
-            if tool_calls and isinstance(tool_calls, list):
-                for i, tc in enumerate(tool_calls[:10], 1):
-                    tool_name = getattr(tc, "tool_name", "?")
-                    success = getattr(tc, "success", True)
-                    duration = getattr(tc, "duration_ms", 0)
-                    status = "success" if success else "FAILED"
-                    args_summary = getattr(tc, "arguments_summary", "")
+                line = f"  [{i}] {tool_name}({args_summary}) → {status}"
+                if duration:
+                    line += f" ({duration:.0f}ms)"
+                lines.append(line)
 
-                    line = f"  [{i}] {tool_name}({args_summary}) → {status}"
-                    if duration:
-                        line += f" ({duration:.0f}ms)"
-                    lines.append(line)
+                reasoning = getattr(tc, "reasoning_before", "")
+                if reasoning:
+                    lines.append(f'      Reasoning: "{reasoning[:200]}"')
 
-                    reasoning = getattr(tc, "reasoning_before", "")
-                    if reasoning:
-                        lines.append(f'      Reasoning: "{reasoning[:200]}"')
+                error = getattr(tc, "error_detail", "")
+                if error and not success:
+                    lines.append(f"      Error: {error[:300]}")
 
-                    error = getattr(tc, "error_detail", "")
-                    if error and not success:
-                        lines.append(f"      Error: {error[:300]}")
+                result_summary = getattr(tc, "result_summary", "")
+                if result_summary and success:
+                    lines.append(f"      Result: {result_summary[:200]}")
+        else:
+            tc_count = getattr(trace, "tool_calls", 0)
+            if isinstance(tc_count, int):
+                lines.append(f"  Tool calls: {tc_count}")
+            failures = getattr(trace, "tool_failures", {})
+            if failures:
+                for cat, count in failures.items():
+                    lines.append(f"  Failures: {cat} x{count}")
 
-                    result_summary = getattr(tc, "result_summary", "")
-                    if result_summary and success:
-                        lines.append(f"      Result: {result_summary[:200]}")
-            else:
-                # Fallback for non-enriched traces (old format)
-                tc_count = getattr(trace, "tool_calls", 0)
-                if isinstance(tc_count, int):
-                    lines.append(f"  Tool calls: {tc_count}")
-                failures = getattr(trace, "tool_failures", {})
-                if failures:
-                    for cat, count in failures.items():
-                        lines.append(f"  Failures: {cat} x{count}")
+        outcome = "SUCCESS" if trace.success else "FAILED"
+        score = getattr(trace, "completion_score", 0)
+        lines.append(f"  Outcome: {outcome} (score={score:.2f})")
+        lines.append("")
+        return lines
 
-            # Session outcome
-            outcome = "SUCCESS" if trace.success else "FAILED"
-            score = getattr(trace, "completion_score", 0)
-            lines.append(f"  Outcome: {outcome} (score={score:.2f})")
-            lines.append("")
+    @staticmethod
+    def _format_traces_as_asi(traces: List[Any]) -> str:
+        """Convert ExecutionTrace list to ASI text with semantic zone grouping.
 
-        return "\n".join(lines) if lines else "No trace data available."
+        Organizes traces into 3 zones (PRIME-inspired) before formatting:
+        - SUCCESSFUL STRATEGIES: high-scoring, no failures
+        - FAILURE PATTERNS: low-scoring or failed
+        - RECOVERY PATTERNS: succeeded despite tool failures
+        """
+        from victor.framework.rl.learners.prompt_optimizer import (
+            TraceZone,
+            classify_trace_zone,
+        )
+
+        zones: Dict[str, List[Any]] = {z.value: [] for z in TraceZone}
+        for trace in traces[:20]:
+            zone = classify_trace_zone(trace)
+            zones[zone.value].append(trace)
+
+        zone_labels = {
+            TraceZone.SUCCESS.value: "SUCCESSFUL STRATEGIES",
+            TraceZone.FAILURE.value: "FAILURE PATTERNS",
+            TraceZone.RECOVERY.value: "RECOVERY PATTERNS",
+        }
+
+        parts: List[str] = []
+        for zone in TraceZone:
+            zone_traces = zones[zone.value]
+            if not zone_traces:
+                continue
+            label = zone_labels[zone.value]
+            parts.append(f"\n=== {label} ({len(zone_traces)} sessions) ===")
+            for trace in zone_traces:
+                parts.extend(GEPAServiceStrategy._format_single_trace(trace))
+
+        return "\n".join(parts) if parts else "No trace data available."
 
     @staticmethod
     def _build_heuristic_summary(traces: List[Any]) -> str:

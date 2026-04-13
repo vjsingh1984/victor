@@ -32,12 +32,44 @@ import json
 import logging
 import random
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Semantic Trace Zones (inspired by arXiv:2604.07645 — PRIME)
+# ---------------------------------------------------------------------------
+
+
+class TraceZone(str, Enum):
+    """Semantic zones for GEPA trace organization."""
+
+    SUCCESS = "successful_strategies"
+    FAILURE = "failure_patterns"
+    RECOVERY = "recovery_patterns"
+
+
+def classify_trace_zone(trace) -> TraceZone:
+    """Classify an execution trace into a semantic zone.
+
+    - RECOVERY: successful despite having tool failures (retry worked)
+    - FAILURE: score < 0.5 or not successful
+    - SUCCESS: everything else (score >= 0.5, no failures)
+    """
+    has_failures = bool(getattr(trace, "tool_failures", None))
+    is_success = getattr(trace, "success", False)
+    score = getattr(trace, "completion_score", 0.0)
+
+    if is_success and has_failures:
+        return TraceZone.RECOVERY
+    if not is_success or score < 0.5:
+        return TraceZone.FAILURE
+    return TraceZone.SUCCESS
+
 
 # ---------------------------------------------------------------------------
 # Structured Failure Taxonomy (inspired by arXiv:2601.08884)
