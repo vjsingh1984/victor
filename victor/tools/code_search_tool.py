@@ -667,11 +667,30 @@ async def _literal_search(
         )
 
         if is_filename_query:
-            logger.info(f"Filename query detected: using find for {search_query!r}")
-            find_cmd = ["find", search_path, "-type", "f", "-name", f"*{search_query}*"]
+            import platform
+
+            system = platform.system()
+            logger.info(
+                f"Filename query detected: using {'dir' if system == 'Windows' else 'find'} "
+                f"for {search_query!r} on {system}"
+            )
+
+            if system == "Windows":
+                # Windows: use dir /s /b for recursive file search
+                find_cmd = ["cmd", "/c", "dir", "/s", "/b", f"*{search_query}*"]
+                find_cwd = search_path
+            else:
+                # Linux / macOS: use find
+                find_cmd = ["find", search_path, "-type", "f", "-name", f"*{search_query}*"]
+                find_cwd = None
+
             try:
                 find_result = subprocess.run(
-                    find_cmd, capture_output=True, text=True, timeout=15,
+                    find_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                    cwd=find_cwd,
                 )
                 found_files = [
                     f.strip() for f in find_result.stdout.splitlines() if f.strip()
