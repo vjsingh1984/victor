@@ -116,13 +116,23 @@ class TurnBoundaryContextAssembler:
         most_common = Counter(tool_types).most_common(1)[0][0]
         return most_common
 
-    def _apply_focus_scoring(self, messages: list, scores: list, focus_phase: str) -> list:
-        """Adjust message scores based on current focus phase (DACS-inspired).
+    def _apply_focus_scoring(
+        self, messages: list, scores: list, focus_phase: str, predicted_phase: str = None
+    ) -> list:
+        """Adjust message scores based on current AND predicted phase.
 
         Boosts active-phase messages (1.5x), compresses stale-phase (0.3x).
+        With prediction: double-compresses messages irrelevant to BOTH
+        current and predicted phases (0.2x) — AutonAgenticAI-inspired.
         """
         if focus_phase == "mixed":
             return list(scores)
+
+        phase_keywords = {
+            "exploration": ("read_file", "search", "grep"),
+            "mutation": ("edit", "write", "create"),
+            "execution": ("bash", "test", "git "),
+        }
 
         adjusted = []
         for msg, score in zip(messages, scores):
@@ -145,6 +155,18 @@ class TurnBoundaryContextAssembler:
                 adjusted.append(score * 1.5)
             else:
                 adjusted.append(score)
+
+        # Predictive pruning: double-compress messages irrelevant to both phases
+        if predicted_phase and predicted_phase != focus_phase and predicted_phase != "mixed":
+            current_kws = phase_keywords.get(focus_phase, ())
+            predicted_kws = phase_keywords.get(predicted_phase, ())
+
+            for i, msg in enumerate(messages):
+                content_lower = getattr(msg, "content", "").lower()
+                relevant_to_current = any(kw in content_lower for kw in current_kws)
+                relevant_to_predicted = any(kw in content_lower for kw in predicted_kws)
+                if not relevant_to_current and not relevant_to_predicted:
+                    adjusted[i] *= 0.2  # Aggressive prune for doubly-irrelevant
 
         return adjusted
 

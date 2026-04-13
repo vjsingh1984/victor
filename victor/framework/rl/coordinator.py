@@ -973,6 +973,41 @@ class RLCoordinator:
             logger.error(f"RL: Failed to get recommendation from {learner_name}: {e}")
             return None
 
+    def try_evolve_on_session_end(self, provider: str, model: str) -> bool:
+        """EvoTest: try evolving one prompt section after conversation end.
+
+        Lightweight evolution — picks one section (round-robin), collects
+        recent traces, evolves if enough data. Non-blocking, best-effort.
+        """
+        learner = self._learners.get("prompt_optimizer")
+        if learner is None:
+            return False
+
+        sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+        if not sections:
+            return False
+
+        idx = getattr(self, "_evolution_section_idx", 0)
+        section = sections[idx % len(sections)]
+        self._evolution_section_idx = idx + 1
+
+        rec = learner.get_recommendation(provider, model, "default", section_name=section)
+        current_text = rec.value if rec else ""
+        if not current_text:
+            return False
+
+        try:
+            result = learner.evolve(section, current_text, provider)
+            if result:
+                logger.info(
+                    f"[evotest] Session-end evolution: section={section} "
+                    f"gen={result.generation} provider={provider}"
+                )
+                return True
+        except Exception as e:
+            logger.debug(f"[evotest] Evolution skipped: {e}")
+        return False
+
     # =========================================================================
     # Async Wrappers - Non-blocking versions for async orchestrator
     # =========================================================================

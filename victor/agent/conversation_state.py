@@ -140,6 +140,18 @@ NATURAL_BACKWARD_TRANSITIONS = {
     (ConversationStage.COMPLETION, ConversationStage.VERIFICATION),  # re-verify
 }
 
+# Empirical stage transition probabilities (AutonAgenticAI-inspired).
+# Used by predict_next_stage() for predictive context pruning.
+STAGE_TRANSITION_PROBS: Dict[str, Dict[str, float]] = {
+    "initial": {"reading": 0.7, "planning": 0.3},
+    "planning": {"reading": 0.6, "execution": 0.3, "analysis": 0.1},
+    "reading": {"execution": 0.5, "analysis": 0.3, "reading": 0.2},
+    "analysis": {"execution": 0.6, "reading": 0.3, "planning": 0.1},
+    "execution": {"verification": 0.5, "reading": 0.3, "execution": 0.2},
+    "verification": {"completion": 0.4, "execution": 0.4, "reading": 0.2},
+    "completion": {"completion": 1.0},
+}
+
 STAGE_KEYWORDS: Dict[ConversationStage, List[str]] = {
     ConversationStage.INITIAL: ["what", "how", "where", "explain", "help", "can you"],
     ConversationStage.PLANNING: ["plan", "approach", "strategy", "design", "architect"],
@@ -333,6 +345,23 @@ class ConversationStateMachine:
         # Sync initial state to manager if provided
         if self._state_manager:
             self._sync_state_to_manager()
+
+    def predict_next_stage(self) -> tuple:
+        """Predict the most likely next stage (AutonAgenticAI-inspired).
+
+        Uses empirical transition probabilities to predict where
+        the conversation will move next. Used by context pruning to
+        proactively preserve messages relevant to the predicted phase.
+
+        Returns:
+            (predicted_stage: str, confidence: float)
+        """
+        current = self.current_stage.value
+        probs = STAGE_TRANSITION_PROBS.get(current, {})
+        if not probs:
+            return (current, 0.5)
+        best_stage = max(probs, key=probs.get)
+        return (best_stage, probs[best_stage])
 
     def reset(self) -> None:
         """Reset state for a new conversation."""
