@@ -421,16 +421,18 @@ class StreamingChatPipeline:
             content_length = len(full_content.strip())
 
             # Spin detection: count iterations with no meaningful progress.
-            # Triggers when: (a) no tool calls and short response, OR
-            # (b) tool calls exist but ALL were skipped/blocked by dedup
+            # Check AFTER tool execution (last_batch_all_skipped is set by pipeline)
             _all_tools_blocked = False
-            if tool_calls:
-                # Check if the last tool pipeline execution produced only skipped results
-                _pipeline_stats = getattr(orch, "_tool_pipeline", None)
-                if _pipeline_stats and hasattr(_pipeline_stats, "last_batch_all_skipped"):
-                    _all_tools_blocked = _pipeline_stats.last_batch_all_skipped
+            _pipeline_obj = getattr(orch, "_tool_pipeline", None)
+            if _pipeline_obj and getattr(_pipeline_obj, "last_batch_all_skipped", False):
+                _all_tools_blocked = True
 
             _no_progress = (not tool_calls and content_length < 120) or _all_tools_blocked
+            logger.info(
+                f"[spin-check] tool_calls={len(tool_calls) if tool_calls else 0} "
+                f"content_len={content_length} all_blocked={_all_tools_blocked} "
+                f"no_progress={_no_progress} spin={_consecutive_empty_tool_responses}"
+            )
             if _no_progress:
                 _consecutive_empty_tool_responses += 1
 
