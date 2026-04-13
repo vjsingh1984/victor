@@ -21,12 +21,15 @@ and the framework's internal registries and containers.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Set, Type
 
 import typer
 from victor_sdk import PluginContext
 
 logger = logging.getLogger(__name__)
+
+# EP scan cache — avoids redundant entry point scanning per vertical
+_EP_SCAN_CACHE: Set[str] = set()
 
 
 class HostPluginContext(PluginContext):
@@ -148,6 +151,7 @@ class HostPluginContext(PluginContext):
                 )
 
         # Strategy 2: Entry point scanning (deferred — runs if vertical has EP registrations)
+        # Cached to avoid redundant scanning when multiple verticals register
         if vertical_name:
             try:
                 from victor.framework.entry_point_registry import (
@@ -156,6 +160,11 @@ class HostPluginContext(PluginContext):
 
                 ep_registry = get_entry_point_registry()
                 for group in ("victor.capabilities", "victor.sdk.capabilities"):
+                    cache_key = f"{group}:{vertical_name}"
+                    if cache_key in _EP_SCAN_CACHE:
+                        continue
+                    _EP_SCAN_CACHE.add(cache_key)
+
                     group_obj = ep_registry.get_group(group)
                     if not group_obj:
                         continue
@@ -323,6 +332,13 @@ class _LazyCapabilityProxy:
 
     def __getattr__(self, name):
         return getattr(self._resolve(), name)
+
+    def __setattr__(self, name, value):
+        """Delegate attribute setting to the resolved instance."""
+        if name in ("_factory", "_instance", "_resolved"):
+            object.__setattr__(self, name, value)
+        else:
+            setattr(self._resolve(), name, value)
 
     def __call__(self, *args, **kwargs):
         """Support calling the proxy as a constructor/factory."""
