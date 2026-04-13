@@ -28,7 +28,7 @@ class TestDecisionType:
         assert DecisionType.CONTINUATION_ACTION.value == "continuation_action"
 
     def test_decision_type_count(self):
-        assert len(DecisionType) == 12
+        assert len(DecisionType) == 13
 
 
 class TestTaskCompletionDecision:
