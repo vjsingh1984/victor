@@ -206,6 +206,34 @@ def reset_capability_registry():
 
 
 @pytest.fixture(autouse=True)
+def reset_vertical_registry():
+    """Snapshot and restore VerticalRegistry between tests.
+
+    Uses snapshot/restore (not clear) so built-in verticals like 'benchmark'
+    survive across tests while test-registered verticals are cleaned up.
+    """
+    import sys
+
+    saved = None
+    if "victor.core.verticals.base" in sys.modules:
+        try:
+            from victor.core.verticals.base import VerticalRegistry
+
+            saved = dict(VerticalRegistry._registry)
+        except (ImportError, AttributeError):
+            pass
+    yield
+    if saved is not None and "victor.core.verticals.base" in sys.modules:
+        try:
+            from victor.core.verticals.base import VerticalRegistry
+
+            VerticalRegistry._registry.clear()
+            VerticalRegistry._registry.update(saved)
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
 def reset_feature_flags():
     """Reset FeatureFlagManager singleton between tests."""
     yield

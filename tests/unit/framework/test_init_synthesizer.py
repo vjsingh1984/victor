@@ -34,21 +34,16 @@ class TestInitSynthesizer:
 
     @pytest.mark.asyncio
     async def test_synthesize_without_agent_creates_fresh(self):
-        """When no agent, synthesize() uses Agent.create() + run()."""
-        mock_result = MagicMock(success=True, content="# Generated init.md")
-
-        with patch("victor.framework.agent.Agent") as MockAgent:
-            mock_agent_instance = AsyncMock()
-            mock_agent_instance.run.return_value = mock_result
-            MockAgent.create = AsyncMock(return_value=mock_agent_instance)
-
+        """When no agent, synthesize() uses direct provider call via _run_with_fresh_agent."""
+        with patch.object(
+            InitSynthesizer, "_run_with_fresh_agent", return_value="# Generated init.md"
+        ) as mock_fresh:
             synthesizer = InitSynthesizer()
             result = await synthesizer.synthesize(
-                "raw data", provider="ollama", model="qwen3:8b"
+                "raw data", provider="ollama", model="qwen3-coder:30b"
             )
 
-            MockAgent.create.assert_called_once()
-            mock_agent_instance.run.assert_called_once()
+            mock_fresh.assert_called_once()
             assert result == "# Generated init.md"
 
     @pytest.mark.asyncio

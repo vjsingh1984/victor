@@ -193,8 +193,9 @@ def _create_file_editor(backup_dir: str):
         if isinstance(provider, type):
             return provider(backup_dir=backup_dir)
         # Already an instance — reset any stale transaction state
-        if hasattr(provider, "_in_transaction"):
-            provider._in_transaction = False
+        # FileEditor uses current_transaction (Optional[EditTransaction]), not _in_transaction
+        if hasattr(provider, "current_transaction"):
+            provider.current_transaction = None
         return provider
     return None
 
