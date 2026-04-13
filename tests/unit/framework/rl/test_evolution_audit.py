@@ -126,8 +126,9 @@ class TestStagePredictionInDecisionFallback:
         )
 
         sm = MagicMock(spec=ConversationStateMachine)
-        sm.current_stage = MagicMock()
-        sm.current_stage.value = "reading"
+        sm.state = MagicMock()
+        sm.state.stage = MagicMock()
+        sm.state.stage.value = "reading"
 
         stage, conf = ConversationStateMachine.predict_next_stage(sm)
         # Should provide usable heuristic

@@ -12,8 +12,9 @@ class TestStagePredictor:
     def test_predict_from_reading(self):
         from victor.agent.conversation_state import ConversationStateMachine, STAGE_TRANSITION_PROBS
         sm = MagicMock(spec=ConversationStateMachine)
-        sm.current_stage = MagicMock()
-        sm.current_stage.value = "reading"
+        sm.state = MagicMock()
+        sm.state.stage = MagicMock()
+        sm.state.stage.value = "reading"
         stage, conf = ConversationStateMachine.predict_next_stage(sm)
         assert stage == "execution"  # Most likely after reading
         assert conf >= 0.4
@@ -21,8 +22,9 @@ class TestStagePredictor:
     def test_predict_from_execution(self):
         from victor.agent.conversation_state import ConversationStateMachine
         sm = MagicMock(spec=ConversationStateMachine)
-        sm.current_stage = MagicMock()
-        sm.current_stage.value = "execution"
+        sm.state = MagicMock()
+        sm.state.stage = MagicMock()
+        sm.state.stage.value = "execution"
         stage, conf = ConversationStateMachine.predict_next_stage(sm)
         assert stage == "verification"
         assert conf >= 0.4
@@ -30,8 +32,9 @@ class TestStagePredictor:
     def test_predict_from_initial(self):
         from victor.agent.conversation_state import ConversationStateMachine
         sm = MagicMock(spec=ConversationStateMachine)
-        sm.current_stage = MagicMock()
-        sm.current_stage.value = "initial"
+        sm.state = MagicMock()
+        sm.state.stage = MagicMock()
+        sm.state.stage.value = "initial"
         stage, conf = ConversationStateMachine.predict_next_stage(sm)
         assert stage == "reading"
         assert conf >= 0.6
@@ -39,8 +42,9 @@ class TestStagePredictor:
     def test_completion_stays(self):
         from victor.agent.conversation_state import ConversationStateMachine
         sm = MagicMock(spec=ConversationStateMachine)
-        sm.current_stage = MagicMock()
-        sm.current_stage.value = "completion"
+        sm.state = MagicMock()
+        sm.state.stage = MagicMock()
+        sm.state.stage.value = "completion"
         stage, conf = ConversationStateMachine.predict_next_stage(sm)
         assert stage == "completion"
         assert conf >= 0.9

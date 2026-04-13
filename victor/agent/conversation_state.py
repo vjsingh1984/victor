@@ -356,7 +356,7 @@ class ConversationStateMachine:
         Returns:
             (predicted_stage: str, confidence: float)
         """
-        current = self.current_stage.value
+        current = self.state.stage.value
         probs = STAGE_TRANSITION_PROBS.get(current, {})
         if not probs:
             return (current, 0.5)
