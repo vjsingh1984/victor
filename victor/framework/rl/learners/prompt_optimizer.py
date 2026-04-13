@@ -72,6 +72,123 @@ def classify_trace_zone(trace) -> TraceZone:
 
 
 # ---------------------------------------------------------------------------
+# Trace Quality Scoring (inspired by arXiv:2604.07877 — MemReader)
+# ---------------------------------------------------------------------------
+
+TRACE_QUALITY_THRESHOLD = 0.3
+
+
+def score_trace_quality(trace) -> float:
+    """Score trace quality for GEPA reflection value (MemReader-inspired).
+
+    Returns 0.0-1.0. Traces below TRACE_QUALITY_THRESHOLD are noise.
+    Criteria: substance, completeness, richness, coherence.
+    """
+    score = 0.0
+
+    tool_calls = getattr(trace, "tool_calls", 0)
+    if isinstance(tool_calls, int):
+        if tool_calls >= 5:
+            score += 0.3
+        elif tool_calls >= 3:
+            score += 0.2
+        elif tool_calls >= 1:
+            score += 0.1
+
+    details = getattr(trace, "tool_call_details", [])
+    if details:
+        populated = sum(
+            1 for d in details
+            if getattr(d, "result_summary", "") or getattr(d, "error_detail", "")
+        )
+        completeness = populated / max(len(details), 1)
+        score += 0.3 * completeness
+
+    reasoning_count = sum(1 for d in details if getattr(d, "reasoning_before", ""))
+    if details and reasoning_count / max(len(details), 1) > 0.5:
+        score += 0.2
+
+    failures = getattr(trace, "tool_failures", {})
+    if failures:
+        categorized = sum(v for k, v in failures.items() if k != "other")
+        total = sum(failures.values())
+        if total > 0 and categorized / total > 0.5:
+            score += 0.2
+        else:
+            score += 0.1
+    elif getattr(trace, "success", False):
+        score += 0.15
+
+    return min(score, 1.0)
+
+
+# ---------------------------------------------------------------------------
+# Capability Gap Analysis (inspired by arXiv:2604.05336 — TRACE)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CapabilityGap:
+    """A specific capability deficiency identified from trace contrast."""
+
+    capability: str
+    failure_rate: float
+    failure_count: int
+    example_errors: List[str]
+
+
+FAILURE_TO_CAPABILITY: Dict[str, str] = {
+    "edit_mismatch": "edit_precision",
+    "edit_ambiguous": "edit_precision",
+    "edit_syntax": "edit_precision",
+    "file_not_found": "path_resolution",
+    "read_directory": "path_resolution",
+    "permission_denied": "path_resolution",
+    "search_no_results": "search_strategy",
+    "tool_not_found": "tool_knowledge",
+    "tool_error": "tool_knowledge",
+    "timeout": "execution_efficiency",
+    "shell_error": "execution_efficiency",
+    "test_failure": "verification",
+    "other": "other",
+}
+
+
+def analyze_capability_gaps(traces) -> List[CapabilityGap]:
+    """Contrast success vs failure zones to find dominant gaps (TRACE-inspired)."""
+    capability_failures: Dict[str, int] = {}
+    capability_errors: Dict[str, List[str]] = {}
+    total_failures = 0
+
+    for trace in traces:
+        zone = classify_trace_zone(trace)
+        if zone != TraceZone.FAILURE:
+            continue
+        for cat, count in getattr(trace, "tool_failures", {}).items():
+            capability = FAILURE_TO_CAPABILITY.get(cat, "other")
+            capability_failures[capability] = capability_failures.get(capability, 0) + count
+            total_failures += count
+            for detail in getattr(trace, "tool_call_details", []):
+                if not getattr(detail, "success", True) and getattr(detail, "error_detail", ""):
+                    errors = capability_errors.setdefault(capability, [])
+                    if len(errors) < 3:
+                        errors.append(getattr(detail, "error_detail", "")[:200])
+
+    if not total_failures:
+        return []
+
+    gaps = []
+    for cap, count in sorted(capability_failures.items(), key=lambda x: -x[1]):
+        gaps.append(CapabilityGap(
+            capability=cap,
+            failure_rate=count / total_failures,
+            failure_count=count,
+            example_errors=capability_errors.get(cap, []),
+        ))
+    return gaps[:3]
+
+
+# ---------------------------------------------------------------------------
 # Structured Failure Taxonomy (inspired by arXiv:2601.08884)
 # ---------------------------------------------------------------------------
 # Each failure category maps to a corrective "Prompt Hint" that feeds into

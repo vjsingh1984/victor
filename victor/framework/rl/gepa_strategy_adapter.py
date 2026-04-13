@@ -60,14 +60,32 @@ class GEPAServiceStrategy:
         current_text: str,
     ) -> str:
         """Convert traces to ASI summary and call GEPA reflection."""
+        from victor.framework.rl.learners.prompt_optimizer import analyze_capability_gaps
+
         service = self._tier_manager.get_service()
         traces_summary = self._format_traces_as_asi(traces)
-
-        # Prepend heuristic aggregates for context
         heuristic = self._build_heuristic_summary(traces)
-        full_summary = f"{heuristic}\n\n{traces_summary}"
 
+        # TRACE-inspired: prepend capability gap analysis for focused reflection
+        gaps = analyze_capability_gaps(traces)
+        gap_report = self._format_gap_report(gaps)
+
+        full_summary = f"{gap_report}\n{heuristic}\n\n{traces_summary}"
         return service.reflect(full_summary, section_name, current_text)
+
+    @staticmethod
+    def _format_gap_report(gaps) -> str:
+        """Format capability gaps as structured report for GEPA reflection."""
+        if not gaps:
+            return ""
+        lines = ["=== CAPABILITY GAP ANALYSIS (TRACE-inspired) ==="]
+        for i, gap in enumerate(gaps, 1):
+            pct = int(gap.failure_rate * 100)
+            lines.append(f"  #{i} {gap.capability}: {gap.failure_count} failures ({pct}% of total)")
+            for err in gap.example_errors[:2]:
+                lines.append(f"      Example: {err}")
+        lines.append("Focus reflection on the PRIMARY gap above.\n")
+        return "\n".join(lines)
 
     def mutate(
         self,

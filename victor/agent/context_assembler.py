@@ -92,6 +92,62 @@ class TurnBoundaryContextAssembler:
 
         return result
 
+    @staticmethod
+    def _detect_focus_phase(recent_messages: list) -> str:
+        """Detect current activity phase from recent tool calls (DACS-inspired).
+
+        Returns: 'exploration' | 'mutation' | 'execution' | 'mixed'
+        """
+        from collections import Counter
+
+        tool_types = []
+        for msg in recent_messages[-6:]:
+            content = getattr(msg, "content", "") or ""
+            content_lower = content.lower()
+            if any(kw in content_lower for kw in ("read_file", "code_search", "grep", "ls ")):
+                tool_types.append("exploration")
+            elif any(kw in content_lower for kw in ("edit", "write_file", "create")):
+                tool_types.append("mutation")
+            elif any(kw in content_lower for kw in ("bash", "shell", "test", "git ")):
+                tool_types.append("execution")
+
+        if not tool_types:
+            return "mixed"
+        most_common = Counter(tool_types).most_common(1)[0][0]
+        return most_common
+
+    def _apply_focus_scoring(self, messages: list, scores: list, focus_phase: str) -> list:
+        """Adjust message scores based on current focus phase (DACS-inspired).
+
+        Boosts active-phase messages (1.5x), compresses stale-phase (0.3x).
+        """
+        if focus_phase == "mixed":
+            return list(scores)
+
+        adjusted = []
+        for msg, score in zip(messages, scores):
+            content = getattr(msg, "content", "") or ""
+            content_lower = content.lower()
+
+            is_exploration = any(kw in content_lower for kw in ("read_file", "search", "grep"))
+            is_mutation = any(kw in content_lower for kw in ("edit", "write", "create"))
+            is_execution = any(kw in content_lower for kw in ("bash", "test", "git "))
+
+            if focus_phase == "mutation" and is_exploration:
+                adjusted.append(score * 0.3)
+            elif focus_phase == "exploration" and is_mutation:
+                adjusted.append(score * 0.3)
+            elif focus_phase == "mutation" and is_mutation:
+                adjusted.append(score * 1.5)
+            elif focus_phase == "exploration" and is_exploration:
+                adjusted.append(score * 1.5)
+            elif focus_phase == "execution" and is_execution:
+                adjusted.append(score * 1.5)
+            else:
+                adjusted.append(score)
+
+        return adjusted
+
     def assemble(
         self,
         messages: List[Message],
