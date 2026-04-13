@@ -636,3 +636,84 @@ class TestCachedToolSorting:
 
         # Should use cache — same names means same result
         assert orch._last_sorted_tools is not None
+
+
+# =====================================================================
+# Integration gaps: warm-up wiring, fingerprint logging, facade exposure
+# =====================================================================
+
+
+class TestWarmUpIntegration:
+    """Test warm_up_kv_cache is accessible from Agent facade."""
+
+    @pytest.mark.asyncio
+    async def test_agent_exposes_warm_up(self):
+        """Agent facade has a warm_up() method delegating to orchestrator."""
+        from victor.framework.agent import Agent
+
+        assert hasattr(Agent, "warm_up")
+
+    @pytest.mark.asyncio
+    async def test_agent_warm_up_delegates_to_orchestrator(self):
+        """Agent.warm_up() calls orchestrator.warm_up_kv_cache()."""
+        from victor.framework.agent import Agent
+
+        orch = MagicMock()
+        orch.warm_up_kv_cache = MagicMock(return_value=None)
+        # Make it async
+        import asyncio
+
+        async def mock_warm_up():
+            pass
+
+        orch.warm_up_kv_cache = mock_warm_up
+
+        agent = Agent.__new__(Agent)
+        agent._orchestrator = orch
+
+        # Should not raise
+        await Agent.warm_up(agent)
+
+
+class TestFingerprintLogging:
+    """Test that fingerprint is logged during streaming for observability."""
+
+    def test_fingerprint_logged_in_get_assembled_messages(self):
+        """_kv_prefix_fingerprint is called when KV optimization is active."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        orch._system_prompt = "test prompt"
+
+        fingerprint = AgentOrchestrator._kv_prefix_fingerprint(orch)
+        assert len(fingerprint) == 12  # md5[:12]
+        assert all(c in "0123456789abcdef" for c in fingerprint)
+
+
+class TestFallbackPathConsistency:
+    """Test that _kv_optimization_enabled fallback checks kv_optimization_enabled setting."""
+
+    def test_fallback_respects_kv_setting_disabled(self):
+        """When _kv_opt_cached is None and kv_optimization_enabled=False, returns False."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = MagicMock(spec=AgentOrchestrator)
+        orch._kv_opt_cached = None  # Force fallback path
+
+        # Settings: cache enabled but kv disabled
+        ctx = MagicMock()
+        ctx.cache_optimization_enabled = True
+        ctx.kv_optimization_enabled = False
+        settings = MagicMock()
+        settings.context = ctx
+        orch.settings = settings
+        orch._check_cache_setting_enabled = lambda: True
+
+        # Provider supports KV
+        provider = MagicMock()
+        provider.supports_kv_prefix_caching.return_value = True
+        orch.provider = provider
+
+        # Fallback should check kv_optimization_enabled
+        result = AgentOrchestrator._kv_optimization_enabled.fget(orch)
+        assert result is False

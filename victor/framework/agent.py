@@ -948,6 +948,18 @@ class Agent:
         self._orchestrator.reset_conversation()
         self._state.reset()
 
+    async def warm_up(self) -> None:
+        """Prime the KV cache for faster first responses.
+
+        For local providers (Ollama, LMStudio) with KV prefix caching, the first
+        API call is always cold. This sends a minimal 1-token request to prime
+        the KV cache with the system prompt, making subsequent calls faster.
+
+        No-op for cloud providers or when KV optimization is disabled.
+        """
+        if hasattr(self._orchestrator, "warm_up_kv_cache"):
+            await self._orchestrator.warm_up_kv_cache()
+
     async def close(self) -> None:
         """Clean up resources."""
         # Clean up orchestrator

@@ -1639,6 +1639,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         try:
             if not self._check_cache_setting_enabled():
                 return False
+            # Check separate kv_optimization_enabled setting
+            ctx = getattr(self, "settings", None)
+            if ctx is not None:
+                context = getattr(ctx, "context", None)
+                if context is not None:
+                    if not getattr(context, "kv_optimization_enabled", True):
+                        return False
             provider = getattr(self, "provider", None)
             if provider is not None:
                 if hasattr(provider, "supports_kv_prefix_caching"):
@@ -1738,6 +1745,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     total_assembled // 1024, total_original // 1024,
                     max_chars // 1024,
                 )
+
+        # Log KV prefix fingerprint for observability
+        if self._kv_optimization_enabled:
+            logger.debug(
+                "[kv-cache] prefix=%s frozen=%s tools_cached=%s",
+                self._kv_prefix_fingerprint(),
+                getattr(self, "_system_prompt_frozen", False),
+                getattr(self, "_last_sorted_tool_names", None) is not None,
+            )
 
         # Cache-friendly: prepend dynamic content to last user message
         # Gate on _kv_optimization_enabled so KV-only providers (Ollama) also benefit
