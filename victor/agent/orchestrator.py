@@ -1314,6 +1314,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except Exception as e:
             logger.debug(f"IntelligentPipeline record_outcome failed: {e}")
 
+        # EvoTest: trigger session-end GEPA evolution (E12)
+        if self.tool_calls_used >= 3:
+            try:
+                rl_coord = getattr(self, "_rl_coordinator", None)
+                if rl_coord and hasattr(rl_coord, "try_evolve_on_session_end"):
+                    result = rl_coord.try_evolve_on_session_end(
+                        getattr(self.provider, "name", "unknown"), self.model
+                    )
+                    if result and isinstance(result, dict):
+                        # Display evolution report via debug logger
+                        debug_log = getattr(self, "debug_logger", None)
+                        if debug_log and hasattr(debug_log, "log_evolution_report"):
+                            debug_log.log_evolution_report(result)
+            except Exception as e:
+                logger.debug(f"[evotest] Session-end evolution failed: {e}")
+
     def _should_continue_intelligent(self) -> tuple[bool, str]:
         """Check if processing should continue using learned behaviors.
 
