@@ -20,6 +20,7 @@ while preserving the session ledger, recent turns, and high-value older messages
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Callable, List, Optional
 
@@ -58,6 +59,38 @@ class TurnBoundaryContextAssembler:
     @property
     def config(self) -> ContextAssemblerConfig:
         return self._config
+
+    def _deduplicate_semantic(self, messages: list) -> list:
+        """Remove semantically redundant messages (DCE-inspired).
+
+        Uses content normalization + hashing for fast near-duplicate detection.
+        Short messages (<50 chars) are never deduplicated. Keeps first occurrence.
+        """
+        if not messages:
+            return []
+
+        seen_hashes: set = set()
+        result = []
+
+        for msg in messages:
+            content = getattr(msg, "content", "") or ""
+
+            # Short messages are cheap -- always keep
+            if len(content) < 50:
+                result.append(msg)
+                continue
+
+            # Normalize: strip whitespace, collapse runs, lowercase
+            normalized = " ".join(content.lower().split())
+            content_hash = hashlib.md5(normalized.encode()).hexdigest()
+
+            if content_hash in seen_hashes:
+                continue  # Duplicate -- skip
+
+            seen_hashes.add(content_hash)
+            result.append(msg)
+
+        return result
 
     def assemble(
         self,
