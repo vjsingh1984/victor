@@ -28,6 +28,7 @@ class DecisionType(str, Enum):
     STAGE_DETECTION = "stage_detection"
     SKILL_SELECTION = "skill_selection"
     MULTI_SKILL_DECOMPOSITION = "multi_skill_decomposition"
+    TOOL_NECESSITY = "tool_necessity"
 
 
 class TaskCompletionDecision(BaseModel):
@@ -119,6 +120,13 @@ class StageDetectionDecision(BaseModel):
         Field(description="Detected conversation stage")
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in detection")
+
+
+class ToolNecessityDecision(BaseModel):
+    """Does this request require tools?"""
+
+    requires_tools: bool = Field(description="Whether tools/file operations are needed")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in assessment")
 
 
 class ContinuationDecision(BaseModel):

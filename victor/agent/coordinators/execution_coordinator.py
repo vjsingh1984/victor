@@ -665,6 +665,143 @@ class ExecutionCoordinator:
             tool_calls=None,
         )
 
+    # =====================================================================
+    # Static Heuristics
+    # =====================================================================
+
+    @staticmethod
+    def _is_question_only_scored(message: str) -> tuple:
+        """Detect Q&A messages with confidence score (HDPO-inspired).
+
+        Returns (is_qa: bool, confidence: float) where confidence indicates
+        how certain the heuristic is. Low confidence (<0.7) suggests the
+        edge LLM should be consulted for refinement.
+        """
+        msg = message.strip().lower()
+
+        # Short messages ending with ? — high confidence Q&A
+        if len(msg) < 120 and msg.endswith("?"):
+            action_words = (
+                "fix",
+                "create",
+                "write",
+                "edit",
+                "refactor",
+                "add",
+                "implement",
+                "update",
+                "delete",
+                "remove",
+                "change",
+                "modify",
+                "build",
+                "deploy",
+                "run",
+                "test",
+                "debug",
+                "install",
+                "configure",
+                "setup",
+                "migrate",
+            )
+            words = set(msg.split())
+            action_matches = words.intersection(action_words)
+            if not action_matches:
+                return (True, 0.95)  # Strong Q&A signal
+            else:
+                # Question with action words — ambiguous
+                return (False, 0.5)  # Low confidence
+
+        # Explicit QA prefixes — high confidence
+        qa_prefixes = (
+            "what is",
+            "what are",
+            "what's",
+            "who is",
+            "who are",
+            "how does",
+            "how do",
+            "how is",
+            "how can",
+            "why does",
+            "why do",
+            "why is",
+            "when does",
+            "when is",
+            "explain",
+            "describe",
+            "define",
+            "tell me about",
+            "can you explain",
+            "what does",
+            "show me",
+            "reply with",
+            "answer",
+            "say ",
+        )
+        for prefix in qa_prefixes:
+            if msg.startswith(prefix):
+                # Check if action words follow the QA prefix
+                rest = msg[len(prefix) :].strip()
+                action_words = (
+                    "fix",
+                    "create",
+                    "write",
+                    "edit",
+                    "refactor",
+                    "implement",
+                    "update",
+                    "delete",
+                    "build",
+                    "deploy",
+                    "run",
+                    "test",
+                    "debug",
+                )
+                rest_words = set(rest.split())
+                if rest_words.intersection(action_words):
+                    return (True, 0.5)  # QA prefix but action words — ambiguous
+                return (True, 0.9)
+
+        # Action-heavy messages — high confidence NOT Q&A
+        action_indicators = (
+            "fix",
+            "create",
+            "write",
+            "edit",
+            "refactor",
+            "implement",
+            "update",
+            "delete",
+            "build",
+            "deploy",
+            "run",
+            "test",
+            "debug",
+            "install",
+            "configure",
+            "setup",
+            "migrate",
+        )
+        words = set(msg.split())
+        action_count = len(words.intersection(action_indicators))
+        if action_count >= 2:
+            return (False, 0.95)
+        if action_count == 1:
+            return (False, 0.8)
+
+        # No strong signals — default to needs-tools with low confidence
+        return (False, 0.6)
+
+    @staticmethod
+    def _is_question_only(message: str) -> bool:
+        """Detect messages that are pure Q&A and unlikely to need tools.
+
+        Backward-compatible wrapper around _is_question_only_scored().
+        """
+        is_qa, _ = ExecutionCoordinator._is_question_only_scored(message)
+        return is_qa
+
 
 __all__ = [
     "ExecutionCoordinator",

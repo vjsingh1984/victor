@@ -24,6 +24,7 @@ from victor.agent.decisions.schemas import (
     StageDetectionDecision,
     TaskCompletionDecision,
     TaskTypeDecision,
+    ToolNecessityDecision,
     ToolSelectionDecision,
 )
 
@@ -216,5 +217,15 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
         ),
         schema=MultiSkillDecision,
         max_tokens=50,
+    ),
+    DecisionType.TOOL_NECESSITY: DecisionPrompt(
+        system="You assess if a coding request needs file/tool operations. Respond JSON only.",
+        user_template=(
+            "Does this need tools (file read/write/search/execute)?\n\n"
+            "Request: {message_excerpt}\n\n"
+            'JSON: {{"requires_tools": true/false, "confidence": 0.0-1.0}}'
+        ),
+        schema=ToolNecessityDecision,
+        max_tokens=30,
     ),
 }
