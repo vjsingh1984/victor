@@ -120,11 +120,23 @@ def clear_index_cache() -> None:
 
 
 async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
-    """Validate persistent index integrity with a test query.
+    """Validate persistent index integrity with a lightweight check.
 
     Returns True if index was corrupt and rebuilt, False if healthy.
     """
     try:
+        # Quick check: does the vector store have data?
+        store = getattr(index, "_vector_store", None) or getattr(index, "vector_store", None)
+        if store:
+            # Check if table has rows (faster than running a full semantic query)
+            table = getattr(store, "_table", None)
+            if table is not None:
+                row_count = table.count_rows() if hasattr(table, "count_rows") else -1
+                if row_count > 0:
+                    logger.info("Persistent index healthy: %d rows in vector store", row_count)
+                    return False  # Healthy
+
+        # Fallback: try a semantic search with timeout
         await asyncio.wait_for(
             index.semantic_search(query="test", max_results=1),
             timeout=timeout,
@@ -621,15 +633,15 @@ async def _literal_search(
     import subprocess
 
     try:
-        # Resolve '.' to the framework's project root
+        # Resolve empty or '.' to the framework's project root
         search_path = path
-        if search_path == ".":
+        if not search_path or search_path == ".":
             try:
                 from victor.config.settings import get_project_paths
 
                 search_path = str(get_project_paths().project_root)
             except Exception:
-                pass
+                search_path = "."  # Fallback to CWD
 
         # Normalize dotted notation: "Class.method" → search for "def method"
         # in files containing "class Class". This handles the common pattern
@@ -940,6 +952,14 @@ async def code_search(
         else:
             return result
     search_root = path
+    # Resolve empty path to project root (benchmark/agent sets this)
+    if not search_root or search_root == ".":
+        try:
+            from victor.config.settings import get_project_paths
+
+            search_root = str(get_project_paths().project_root)
+        except Exception:
+            search_root = "."
     try:
         root_path = Path(search_root).resolve()
         # If path is a file, use its parent directory (model passed file path instead of directory)
