@@ -344,6 +344,26 @@ class StreamingChatPipeline:
                         orch._recovery_integration.record_outcome(success=False)
                         return
                 if recovery_action.action in ("retry", "force_summary"):
+                    # Check for spin BEFORE continuing — blocked tools trigger recovery
+                    # "retry" which bypasses the main spin check below
+                    _pipeline_obj = getattr(orch, "_tool_pipeline", None)
+                    if _pipeline_obj and getattr(_pipeline_obj, "last_batch_all_skipped", False):
+                        _consecutive_empty_tool_responses += 1
+                        logger.info(
+                            f"[spin-check] recovery={recovery_action.action} "
+                            f"all_blocked=True spin={_consecutive_empty_tool_responses}"
+                        )
+                        if _consecutive_empty_tool_responses >= _MAX_CONSECUTIVE_EMPTY:
+                            logger.warning(
+                                f"[spin-detect] {_consecutive_empty_tool_responses} consecutive "
+                                f"blocked tool calls via recovery. Breaking loop."
+                            )
+                            yield orch._chunk_generator.generate_content_chunk(
+                                "\n\n[Agent detected a tool-call loop — all attempts were "
+                                "blocked by deduplication. Try a different approach.]",
+                                is_final=True,
+                            )
+                            return
                     continue
 
             if full_content:
