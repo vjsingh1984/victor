@@ -1034,6 +1034,42 @@ class PromptOptimizerLearner(BaseLearner):
             logger.info("Seeded %d Pareto instance scores from evaluations", updated)
         return updated
 
+    def _select_challenging_traces(
+        self, traces: List[ExecutionTrace], max_traces: int = 20
+    ) -> List[ExecutionTrace]:
+        """SIMBA-inspired: bias selection toward challenging examples.
+
+        Scores each trace by challenge value. Recovery patterns are most
+        valuable, followed by high-failure, borderline scores, detailed errors.
+        Returns 70/30 mix of challenging/easy traces for contrast.
+        """
+        if len(traces) < max_traces:
+            return traces
+
+        scored = []
+        for trace in traces:
+            challenge = 0.0
+            zone = classify_trace_zone(trace)
+            if zone == TraceZone.RECOVERY:
+                challenge += 0.4
+            total_failures = sum(getattr(trace, "tool_failures", {}).values())
+            challenge += 0.3 * min(total_failures / 5.0, 1.0)
+            score = getattr(trace, "completion_score", 0.0)
+            if 0.1 < score < 0.7:
+                challenge += 0.2 * (1.0 - score)
+            details = getattr(trace, "tool_call_details", [])
+            has_errors = any(getattr(d, "error_detail", "") for d in details)
+            if has_errors:
+                challenge += 0.1
+            scored.append((trace, challenge))
+
+        scored.sort(key=lambda x: -x[1])
+        n_challenging = int(max_traces * 0.7)
+        n_easy = max_traces - n_challenging
+        challenging = [t for t, _ in scored[:n_challenging]]
+        easy = [t for t in traces if classify_trace_zone(t) == TraceZone.SUCCESS][:n_easy]
+        return challenging + easy
+
     def _collect_traces(self, limit: int = 50) -> List[ExecutionTrace]:
         """Collect execution traces from usage.jsonl files."""
         traces: List[ExecutionTrace] = []

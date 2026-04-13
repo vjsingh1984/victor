@@ -70,8 +70,44 @@ class GEPAServiceStrategy:
         gaps = analyze_capability_gaps(traces)
         gap_report = self._format_gap_report(gaps)
 
-        full_summary = f"{gap_report}\n{heuristic}\n\n{traces_summary}"
+        # MIPROv2-inspired: data distribution profile for data-aware reflection
+        data_profile = self._build_data_profile(traces)
+
+        full_summary = f"{data_profile}\n{gap_report}\n{heuristic}\n\n{traces_summary}"
         return service.reflect(full_summary, section_name, current_text)
+
+    @staticmethod
+    def _build_data_profile(traces: List[Any]) -> str:
+        """Data distribution profile for data-aware reflection (MIPROv2-inspired)."""
+        if not traces:
+            return ""
+        from collections import Counter
+
+        total = len(traces)
+        task_types = Counter(getattr(t, "task_type", "default") for t in traces)
+        providers = Counter(getattr(t, "provider", "unknown") for t in traces)
+        scores = [getattr(t, "completion_score", 0.0) for t in traces]
+        avg_score = sum(scores) / max(len(scores), 1)
+        tool_counts = [getattr(t, "tool_calls", 0) for t in traces]
+        avg_tools = sum(tc for tc in tool_counts if isinstance(tc, (int, float))) / max(len(tool_counts), 1)
+        all_tools: Counter = Counter()
+        for t in traces:
+            for d in getattr(t, "tool_call_details", []):
+                name = getattr(d, "tool_name", "")
+                if name:
+                    all_tools[name] += 1
+        top_tools = all_tools.most_common(5)
+        lines = [
+            "=== DATA DISTRIBUTION PROFILE ===",
+            f"  Total sessions: {total}",
+            f"  Avg completion score: {avg_score:.2f}",
+            f"  Avg tool calls/session: {avg_tools:.1f}",
+            f"  Task types: {dict(task_types.most_common(3))}",
+            f"  Providers: {dict(providers.most_common(3))}",
+            f"  Top tools: {', '.join(f'{t}({c})' for t, c in top_tools)}",
+            "Optimize the prompt for THIS distribution of usage.\n",
+        ]
+        return "\n".join(lines)
 
     @staticmethod
     def _format_gap_report(gaps) -> str:
