@@ -40,6 +40,74 @@ from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Structured Failure Taxonomy (inspired by arXiv:2601.08884)
+# ---------------------------------------------------------------------------
+# Each failure category maps to a corrective "Prompt Hint" that feeds into
+# GEPA's reflection step, giving the mutation LLM actionable guidance
+# instead of raw category names. Add new categories by adding entries.
+
+FAILURE_HINTS: Dict[str, str] = {
+    "file_not_found": (
+        "Verify file paths with ls() or list_directory before reading. "
+        "Use code_search to find files by name or content."
+    ),
+    "read_directory": (
+        "Use ls() for directories, read() only for files. "
+        "Check the path is a file, not a directory."
+    ),
+    "permission_denied": (
+        "Check file permissions. Avoid writing to read-only paths. "
+        "Use a working directory the agent has write access to."
+    ),
+    "edit_mismatch": (
+        "Read the complete file before editing. Copy old_str exactly from "
+        "tool output — character for character, including whitespace and indentation."
+    ),
+    "edit_ambiguous": (
+        "Include 3+ surrounding context lines in old_str to make the match unique. "
+        "If the string appears multiple times, add distinguishing context."
+    ),
+    "edit_syntax": (
+        "Validate that new_str preserves correct syntax. Check indentation matches "
+        "the surrounding code. Run a linter after editing if available."
+    ),
+    "tool_not_found": (
+        "Use only tools listed in the available tools. Check tool name spelling. "
+        "Use list_directory or code_search as universal fallbacks."
+    ),
+    "timeout": (
+        "Keep tool calls focused. Avoid reading entire large directories. "
+        "Use targeted searches instead of broad scans. Limit shell command duration."
+    ),
+    "tool_error": (
+        "Check tool arguments match the expected schema. Review the error message "
+        "and adjust arguments before retrying."
+    ),
+    "search_no_results": (
+        "Broaden the search query. Try alternative keywords, partial names, "
+        "or regex patterns. Fall back to ls() + grep for manual search."
+    ),
+    "shell_error": (
+        "Check command syntax. Ensure required tools (git, npm, etc.) are "
+        "installed. Use absolute paths for reliability."
+    ),
+    "test_failure": (
+        "Read the test output carefully. Identify which assertion failed and why. "
+        "Fix the root cause, not the symptom."
+    ),
+    "other": (
+        "Read the error message carefully. Diagnose the root cause before "
+        "retrying. Avoid repeating the same failing operation."
+    ),
+}
+
+
+def get_failure_hint(category: str) -> str:
+    """Get the corrective prompt hint for a failure category."""
+    return FAILURE_HINTS.get(category, "")
+
+
+# ---------------------------------------------------------------------------
 # Data Models
 # ---------------------------------------------------------------------------
 
@@ -908,20 +976,45 @@ class PromptOptimizerLearner(BaseLearner):
 
     @staticmethod
     def _categorize_failure(error: str) -> str:
-        """Categorize a tool failure error message."""
-        error_lower = error.lower()
-        if "file not found" in error_lower or "directory not found" in error_lower:
+        """Categorize a tool failure error message into a structured category.
+
+        The order of checks matters: more specific patterns come before
+        more generic ones to ensure correct classification.
+
+        Returns one of the 13 FAILURE_HINTS keys.
+        """
+        lower = error.lower()
+        # Filesystem errors
+        if "not found" in lower and ("file" in lower or "path" in lower):
             return "file_not_found"
-        if "old_str not found" in error_lower:
-            return "edit_mismatch"
-        if "ambiguous" in error_lower or "found 2 times" in error_lower:
-            return "edit_ambiguous"
-        if "cannot read directory" in error_lower:
+        if "directory" in lower and ("read" in lower or "cannot" in lower):
             return "read_directory"
-        if "tool" in error_lower and "not found" in error_lower:
+        if "permission denied" in lower or "access denied" in lower:
+            return "permission_denied"
+        # Edit errors
+        if "old_str" in lower and "not found" in lower:
+            return "edit_mismatch"
+        if "ambiguous" in lower or ("match" in lower and "found" in lower and "times" in lower):
+            return "edit_ambiguous"
+        if "syntax error" in lower and ("edit" in lower or "after" in lower):
+            return "edit_syntax"
+        # Tool errors
+        if "tool" in lower and "not found" in lower:
             return "tool_not_found"
-        if "timeout" in error_lower:
+        if "timeout" in lower or "timed out" in lower:
             return "timeout"
+        # Search errors
+        if "no results" in lower or "no matches" in lower:
+            return "search_no_results"
+        # Test failures
+        if "test failed" in lower or ("assertion" in lower and "fail" in lower):
+            return "test_failure"
+        # Shell command errors
+        if "command" in lower and ("fail" in lower or "error" in lower):
+            return "shell_error"
+        # Generic tool errors (after all specific checks)
+        if "error" in lower and "tool" in lower:
+            return "tool_error"
         return "other"
 
     # ------------------------------------------------------------------

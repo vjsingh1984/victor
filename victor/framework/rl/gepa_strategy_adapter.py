@@ -176,7 +176,13 @@ class GEPAServiceStrategy:
             f"- Avg tokens: {total_tokens/max(total,1):.0f}",
         ]
         if all_failures:
+            from victor.framework.rl.learners.prompt_optimizer import FAILURE_HINTS
+
             lines.append("- Top failures:")
             for cat, count in sorted(all_failures.items(), key=lambda x: -x[1])[:5]:
-                lines.append(f"  {cat}: {count}")
+                hint = FAILURE_HINTS.get(cat, "")
+                if hint:
+                    lines.append(f"  {cat}: {count} → Hint: {hint}")
+                else:
+                    lines.append(f"  {cat}: {count}")
         return "\n".join(lines)
