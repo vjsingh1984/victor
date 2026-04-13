@@ -10,7 +10,7 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 
@@ -28,20 +28,28 @@ def _make_skill(name: str, **kwargs):
     )
 
 
+def _make_orch_mock(kv_enabled=False):
+    """Create a mock orchestrator with correct _kv_optimization_enabled behavior."""
+    from victor.agent.orchestrator import AgentOrchestrator
+
+    orch = MagicMock(spec=AgentOrchestrator)
+    orch._system_prompt = "Base prompt."
+    orch._base_system_prompt = "Base prompt."
+    orch._active_skill_prompt = ""
+    orch.conversation = None
+    type(orch)._kv_optimization_enabled = PropertyMock(return_value=kv_enabled)
+    return orch
+
+
 class TestClearActiveSkills:
     """clear_active_skills() removes skill injection from system prompt."""
 
     def test_clear_removes_skill_prefix(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = MagicMock(spec=AgentOrchestrator)
-        orch._system_prompt = "Base prompt."
-        orch._base_system_prompt = "Base prompt."
-        orch._active_skill_prompt = ""
-        orch._cache_optimization_enabled = False
-        orch.conversation = None
+        orch = _make_orch_mock(kv_enabled=False)
 
-        # Inject a skill
+        # Inject a skill (legacy path: mutates system prompt)
         AgentOrchestrator.inject_skill(orch, _make_skill("debug"))
         assert "ACTIVE SKILL: debug" in orch._system_prompt
 
@@ -53,12 +61,7 @@ class TestClearActiveSkills:
     def test_clear_when_no_skill_is_noop(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = MagicMock(spec=AgentOrchestrator)
-        orch._system_prompt = "Base prompt."
-        orch._base_system_prompt = "Base prompt."
-        orch._active_skill_prompt = ""
-        orch._cache_optimization_enabled = False
-        orch.conversation = None
+        orch = _make_orch_mock(kv_enabled=False)
 
         AgentOrchestrator.clear_active_skills(orch)
         assert orch._system_prompt == "Base prompt."
@@ -70,12 +73,7 @@ class TestPerTurnSwitching:
     def test_inject_replaces_previous(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = MagicMock(spec=AgentOrchestrator)
-        orch._system_prompt = "Base prompt."
-        orch._base_system_prompt = "Base prompt."
-        orch._active_skill_prompt = ""
-        orch._cache_optimization_enabled = False
-        orch.conversation = None
+        orch = _make_orch_mock(kv_enabled=False)
 
         # Turn 1: debug skill
         AgentOrchestrator.inject_skill(orch, _make_skill("debug"))
@@ -93,12 +91,7 @@ class TestPerTurnSwitching:
     def test_turn_with_no_skill_clears(self):
         from victor.agent.orchestrator import AgentOrchestrator
 
-        orch = MagicMock(spec=AgentOrchestrator)
-        orch._system_prompt = "Base prompt."
-        orch._base_system_prompt = "Base prompt."
-        orch._active_skill_prompt = ""
-        orch._cache_optimization_enabled = False
-        orch.conversation = None
+        orch = _make_orch_mock(kv_enabled=False)
 
         # Turn 1: skill active
         AgentOrchestrator.inject_skill(orch, _make_skill("debug"))
@@ -108,3 +101,16 @@ class TestPerTurnSwitching:
         AgentOrchestrator.clear_active_skills(orch)
         assert "ACTIVE SKILL" not in orch._system_prompt
         assert orch._system_prompt == "Base prompt."
+
+    def test_kv_enabled_stores_for_user_message(self):
+        """When KV optimization is active, skill stored for user msg injection."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orch = _make_orch_mock(kv_enabled=True)
+
+        AgentOrchestrator.inject_skill(orch, _make_skill("debug"))
+
+        # System prompt NOT mutated (KV prefix preserved)
+        assert orch._system_prompt == "Base prompt."
+        # Skill stored for user message injection
+        assert "debug" in orch._active_skill_prompt
