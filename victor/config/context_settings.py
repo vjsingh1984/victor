@@ -36,3 +36,9 @@ class ContextSettings(BaseModel):
     #   'session_stable' — Lock semantic selection after first query (stable prefix, may miss tools)
     # Note: API-caching providers always use session-locked full tool set regardless.
     kv_tool_strategy: str = "per_turn"
+
+    # HITL tool approval mode: controls which tools require human approval.
+    #   'auto'      — All tools auto-approved (default, backward compatible)
+    #   'dangerous'  — MEDIUM+ danger level tools require approval
+    #   'all'        — Every tool call requires approval
+    tool_approval_mode: str = "auto"
