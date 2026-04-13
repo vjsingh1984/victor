@@ -15,6 +15,101 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def extract_skeleton(source: str, language: str = "python") -> str:
+    """Extract a program skeleton from source code.
+
+    Returns function/class signatures + docstrings without implementation
+    details. Inspired by arXiv:2604.07502 (SE Conventions for Agentic Dev).
+
+    Args:
+        source: Source code string
+        language: Programming language (currently 'python' supported)
+
+    Returns:
+        Skeleton string with signatures and docstrings
+    """
+    if not source.strip():
+        return ""
+
+    if language != "python":
+        # Fallback: first 50 lines for unknown languages
+        lines = source.split("\n")[:50]
+        return "\n".join(lines)
+
+    lines = source.split("\n")
+    skeleton_lines: List[str] = []
+    in_body = False
+    body_indent = 0
+    in_docstring = False
+    docstring_quote: Optional[str] = None
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Import statements — always include
+        if stripped.startswith(("import ", "from ")):
+            skeleton_lines.append(line)
+            in_body = False
+            continue
+
+        # Decorators — include
+        if stripped.startswith("@"):
+            skeleton_lines.append(line)
+            in_body = False
+            continue
+
+        # Class/function definitions — always include
+        if stripped.startswith(("def ", "class ", "async def ")):
+            skeleton_lines.append(line)
+            # Calculate body indent level
+            body_indent = len(line) - len(line.lstrip()) + 4
+            in_body = True
+            in_docstring = False
+            continue
+
+        # Docstrings right after def/class — include
+        if in_body and not in_docstring:
+            if '"""' in stripped or "'''" in stripped:
+                skeleton_lines.append(line)
+                quote = '"""' if '"""' in stripped else "'''"
+                # Check if single-line docstring
+                if stripped.count(quote) >= 2:
+                    in_body = True  # Continue looking for nested defs
+                    continue
+                in_docstring = True
+                docstring_quote = quote
+                continue
+            elif stripped.startswith("#"):
+                # Comment right after def — include as pseudo-docstring
+                skeleton_lines.append(line)
+                continue
+            else:
+                # First non-docstring line in body — skip body
+                in_body = True
+                continue
+
+        # Inside docstring — include until closing
+        if in_docstring:
+            skeleton_lines.append(line)
+            if docstring_quote and docstring_quote in stripped:
+                in_docstring = False
+            continue
+
+        # Module-level assignments/constants (not indented) — include
+        if not stripped.startswith(" ") and not stripped.startswith("\t"):
+            if "=" in stripped and not stripped.startswith("#"):
+                # Module-level constant
+                skeleton_lines.append(line)
+                in_body = False
+                continue
+
+        # Blank lines between definitions — preserve structure
+        if not stripped and not in_body:
+            skeleton_lines.append(line)
+
+    return "\n".join(skeleton_lines).rstrip()
+
+
 # Legacy cache for semantic indexes (use _get_index_cache() for DI support)
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
 
