@@ -521,6 +521,9 @@ class ToolPipeline:
         self.on_tool_complete = on_tool_complete
         self.on_tool_event = on_tool_event
 
+        # Spin detection: track whether last batch had all calls blocked
+        self.last_batch_all_skipped: bool = False
+
         # Output aggregation and synthesis checkpoints
         self._output_aggregator: Optional[OutputAggregator] = None
         self._synthesis_checkpoint: Optional[CompositeSynthesisCheckpoint] = None
@@ -1194,6 +1197,18 @@ class ToolPipeline:
                 )
                 result.results.append(dup_result)
                 result.skipped_calls += 1
+
+        # Track whether ALL tool calls in this batch were skipped/blocked
+        # Used by spin detection in the streaming pipeline
+        self.last_batch_all_skipped = (
+            len(result.results) > 0
+            and all(getattr(r, "skipped", False) for r in result.results)
+        )
+        if self.last_batch_all_skipped:
+            logger.info(
+                f"[pipeline] All {len(result.results)} tool calls in batch were "
+                f"skipped/blocked (dedup or session filter)"
+            )
 
         # Check synthesis checkpoint
         if self._synthesis_checkpoint and tool_history:
