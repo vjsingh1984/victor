@@ -311,6 +311,22 @@ class StreamingChatPipeline:
                     full_content, list(all_tool_names), TOOL_ALIASES
                 )
 
+                # Tool format assist: if model describes a tool but didn't call it,
+                # inject a format hint as a system message so it can self-correct.
+                # This is more effective than generic "use tools" encouragement.
+                if mentioned_tools_detected and _consecutive_empty_tool_responses >= 1:
+                    tool_hint = mentioned_tools_detected[0]
+                    logger.info(
+                        f"[tool-format-assist] Model mentioned '{tool_hint}' without calling it "
+                        f"(spin #{_consecutive_empty_tool_responses}). Injecting format hint."
+                    )
+                    orch.add_message(
+                        "system",
+                        f"You described wanting to use '{tool_hint}' but didn't call it. "
+                        f"Call the tool directly — don't describe what you want to do, execute it. "
+                        f"If you've already modified the file successfully, say _DONE_.",
+                    )
+
             # Use recovery integration to detect and handle failures
             recovery_action = await orch._handle_recovery_with_integration(
                 stream_ctx=stream_ctx,
@@ -407,6 +423,21 @@ class StreamingChatPipeline:
             # Spin detection: model generates short text without tool calls
             if not tool_calls and content_length < 120:
                 _consecutive_empty_tool_responses += 1
+
+                # Approach pivot: at spin 2, suggest the model try a different approach
+                if _consecutive_empty_tool_responses == 2:
+                    logger.info(
+                        "[approach-pivot] Model stuck for 2 iterations. "
+                        "Injecting approach change suggestion."
+                    )
+                    orch.add_message(
+                        "system",
+                        "You seem stuck. Try a DIFFERENT approach: "
+                        "if reading failed, try code_search instead. "
+                        "If editing failed, re-read the file first to get exact content. "
+                        "If you've already made the fix, say _DONE_.",
+                    )
+
                 if _consecutive_empty_tool_responses >= _MAX_CONSECUTIVE_EMPTY:
                     logger.warning(
                         f"[spin-detect] {_consecutive_empty_tool_responses} consecutive non-tool "
