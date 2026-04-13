@@ -654,6 +654,50 @@ async def _literal_search(
             f"resolved={search_path!r}, exts={exts}"
         )
 
+        # Filename detection: if query looks like a filename (has extension),
+        # use find/rg --files instead of content search
+        filename_exts = (".py", ".js", ".ts", ".go", ".java", ".c", ".cpp", ".rs",
+                         ".yaml", ".yml", ".json", ".toml", ".md", ".txt", ".sh",
+                         ".rb", ".php", ".swift", ".kt", ".scala", ".r", ".sql")
+        query_lower = search_query.lower()
+        is_filename_query = (
+            any(query_lower.endswith(ext) for ext in filename_exts)
+            and " " not in search_query
+            and len(search_query) < 100
+        )
+
+        if is_filename_query:
+            logger.info(f"Filename query detected: using find for {search_query!r}")
+            find_cmd = ["find", search_path, "-type", "f", "-name", f"*{search_query}*"]
+            try:
+                find_result = subprocess.run(
+                    find_cmd, capture_output=True, text=True, timeout=15,
+                )
+                found_files = [
+                    f.strip() for f in find_result.stdout.splitlines() if f.strip()
+                ]
+                if found_files:
+                    results = []
+                    for fpath in found_files[:k]:
+                        results.append({
+                            "path": fpath,
+                            "score": 10 if fpath.endswith(search_query) else 5,
+                            "snippet": f"[File found: {fpath}]",
+                        })
+                    logger.info(
+                        f"Filename search: found {len(found_files)} files matching "
+                        f"{search_query!r} in {search_path}"
+                    )
+                    return {
+                        "success": True,
+                        "results": results,
+                        "count": len(results),
+                        "mode": "filename",
+                    }
+            except (subprocess.TimeoutExpired, Exception) as e:
+                logger.debug(f"Filename search failed, falling back to content: {e}")
+            # Fall through to content search if find returns nothing
+
         # Build command: prefer ripgrep, fall back to grep
         use_rg = shutil.which("rg") is not None
         if use_rg:
@@ -786,9 +830,12 @@ async def _literal_search(
         "crash",
         "failure",
         "find",
+        "find file",
+        "locate file",
         "grep",
         "literal",
         "code search",
+        "filename",
     ],
     mandatory_keywords=[
         "search code",
@@ -820,10 +867,14 @@ async def code_search(
     exts: Optional[List[str]] = None,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Find code by CONCEPT or TEXT when you DON'T know exact location/name.
+    """Find code by CONCEPT, TEXT, or FILENAME when you DON'T know exact location.
 
     Use this tool for exploration when you need to discover where relevant code
     lives. Returns file snippets ranked by relevance.
+
+    FILENAME SEARCH: Pass a filename (e.g., "fitswcs.py") and the tool will
+    automatically use `find` to locate matching files. No need for a separate
+    find command.
 
     DIFFERS FROM:
     - symbol(): Gets FULL CODE of a known symbol. Use when you know file + name.
