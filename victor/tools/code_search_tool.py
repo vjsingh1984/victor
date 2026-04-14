@@ -39,7 +39,6 @@ def extract_skeleton(source: str, language: str = "python") -> str:
     lines = source.split("\n")
     skeleton_lines: List[str] = []
     in_body = False
-    body_indent = 0
     in_docstring = False
     docstring_quote: Optional[str] = None
 
