@@ -603,6 +603,59 @@ class TestToolPipelineNormalization:
         assert args["file"] == "victor/agent/orchestrator.py"
         assert strategy is not None
 
+    def test_normalize_tool_call_reroutes_module_dependents_query_to_graph(self, pipeline):
+        """Reverse module-dependency queries should route to graph neighbors."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "what modules depend on auth"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "neighbors"
+        assert args["node"] == "auth"
+        assert args["depth"] == 1
+        assert args["direction"] == "in"
+        assert args["modules_only"] is True
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_module_dependencies_query_to_graph(self, pipeline):
+        """Forward module-dependency queries should route to graph neighbors."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "what modules does auth depend on"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "neighbors"
+        assert args["node"] == "auth"
+        assert args["depth"] == 1
+        assert args["direction"] == "out"
+        assert args["modules_only"] is True
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_architecture_summary_query_to_graph(self, pipeline):
+        """Architecture summary queries should route to structured graph ranking."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "summarize the architecture"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "module_pagerank"
+        assert args["top_k"] == 5
+        assert args["only_runtime"] is True
+        assert args["include_callsites"] is True
+        assert args["max_callsites"] == 3
+        assert args["structured"] is True
+        assert args["include_modules"] is True
+        assert strategy is not None
+
     def test_normalize_tool_call_reroutes_pagerank_query_to_graph(self, pipeline):
         """Centrality semantic queries should route to graph pagerank analysis."""
         pipeline.search_router = SearchRouter()
@@ -1097,6 +1150,132 @@ class TestToolPipelineSearchRouting:
         assert executed_kwargs["tool_name"] == "graph"
         assert executed_kwargs["arguments"]["mode"] == "file_deps"
         assert executed_kwargs["arguments"]["file"] == "victor/agent/orchestrator.py"
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_module_dependents_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Reverse module-dependency queries should execute as graph neighbor calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 2, "results": ["ui", "api"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "what modules depend on auth",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "neighbors"
+        assert executed_kwargs["arguments"]["node"] == "auth"
+        assert executed_kwargs["arguments"]["direction"] == "in"
+        assert executed_kwargs["arguments"]["modules_only"] is True
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_module_dependencies_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Forward module-dependency queries should execute as graph neighbor calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 2, "results": ["storage", "providers"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "what modules does auth depend on",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "neighbors"
+        assert executed_kwargs["arguments"]["node"] == "auth"
+        assert executed_kwargs["arguments"]["direction"] == "out"
+        assert executed_kwargs["arguments"]["modules_only"] is True
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_architecture_summary_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Architecture summary queries should execute as structured module graph ranking."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 5, "results": ["agent", "providers", "storage", "framework", "tools"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "summarize the architecture",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "module_pagerank"
+        assert executed_kwargs["arguments"]["structured"] is True
+        assert executed_kwargs["arguments"]["include_modules"] is True
+        assert executed_kwargs["arguments"]["only_runtime"] is True
         assert "directory" not in executed_kwargs["arguments"]
         assert result.successful_calls == 1
 

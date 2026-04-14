@@ -269,6 +269,13 @@ class TestConvenienceFunctions:
         tool = suggest_search_tool("show file dependencies for victor/agent/orchestrator.py")
         assert tool == "graph"
 
+    def test_suggest_search_tool_graph_architecture_summary(self):
+        """Architecture summary questions should recommend the graph tool."""
+        from victor.agent.search_router import suggest_search_tool
+
+        tool = suggest_search_tool("summarize the architecture")
+        assert tool == "graph"
+
     def test_is_keyword_query(self):
         """Test is_keyword_query function."""
         from victor.agent.search_router import is_keyword_query
@@ -455,6 +462,59 @@ class TestRealWorldQueries:
             "file": "victor/agent/orchestrator.py",
         }
         assert "file_dependencies_for" in result.matched_patterns
+
+    def test_module_dependents_query_routes_to_graph_tool(self):
+        """Reverse module-dependency questions should route to graph neighbors."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("what modules depend on auth")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {
+            "mode": "neighbors",
+            "node": "auth",
+            "depth": 1,
+            "direction": "in",
+            "modules_only": True,
+        }
+        assert "module_dependents" in result.matched_patterns
+
+    def test_module_dependencies_query_routes_to_graph_tool(self):
+        """Forward module-dependency questions should route to graph neighbors."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("what modules does auth depend on")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {
+            "mode": "neighbors",
+            "node": "auth",
+            "depth": 1,
+            "direction": "out",
+            "modules_only": True,
+        }
+        assert "module_dependencies" in result.matched_patterns
+
+    def test_architecture_summary_query_routes_to_graph_tool(self):
+        """Architecture summary questions should route to structured module graph ranking."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("summarize the architecture")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {
+            "mode": "module_pagerank",
+            "top_k": 5,
+            "only_runtime": True,
+            "include_callsites": True,
+            "max_callsites": 3,
+            "structured": True,
+            "include_modules": True,
+        }
+        assert "architecture_summary" in result.matched_patterns
 
     def test_pagerank_query_routes_to_graph_tool(self):
         """Centrality questions should route to graph(mode='pagerank')."""

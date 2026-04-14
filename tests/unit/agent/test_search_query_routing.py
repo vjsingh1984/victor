@@ -146,6 +146,40 @@ def test_route_search_query_includes_graph_file_dependency_arguments() -> None:
     assert result["search_type"] == "semantic"
 
 
+def test_route_search_query_includes_graph_module_dependents_arguments() -> None:
+    """Reverse module-dependency queries should recommend graph neighbor args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("what modules depend on auth")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "neighbors",
+        "node": "auth",
+        "depth": 1,
+        "direction": "in",
+        "modules_only": True,
+    }
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_graph_module_dependencies_arguments() -> None:
+    """Forward module-dependency queries should recommend graph neighbor args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("what modules does auth depend on")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "neighbors",
+        "node": "auth",
+        "depth": 1,
+        "direction": "out",
+        "modules_only": True,
+    }
+    assert result["search_type"] == "semantic"
+
+
 def test_route_search_query_includes_graph_pagerank_arguments() -> None:
     """Centrality queries should recommend the graph tool with pagerank args."""
     orchestrator = _make_orchestrator()
@@ -215,5 +249,14 @@ def test_get_recommended_search_tool_uses_graph_file_dependency_tool_name() -> N
     result = orchestrator.get_recommended_search_tool(
         "what files does victor/agent/orchestrator.py depend on"
     )
+
+    assert result == "graph"
+
+
+def test_get_recommended_search_tool_uses_graph_architecture_summary_tool_name() -> None:
+    """Architecture summary questions should recommend the graph tool."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool("summarize the architecture")
 
     assert result == "graph"

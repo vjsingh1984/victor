@@ -242,6 +242,13 @@ GRAPH_ANALYTIC_SIGNALS: List[Tuple[str, str, str, bool]] = [
 
 GRAPH_ARCHITECTURE_SIGNALS: List[Tuple[str, str, str, bool]] = [
     (
+        r"\b(?:summari(?:ze|se)|overview|describe|explain|show|give\s+me|provide)\s+"
+        r"(?:the\s+)?architecture\b",
+        "module_pagerank",
+        "architecture_summary",
+        False,
+    ),
+    (
         r"\b(?:show|find|get|list)\s+(?:the\s+)?(?:top[\s-]*\d+\s+)?(?:most\s+)?"
         r"important\s+(?:modules?|components?|packages?|subsystems?)\b",
         "module_pagerank",
@@ -337,6 +344,23 @@ GRAPH_FILE_SIGNALS: List[Tuple[str, str, str, bool]] = [
         rf"\bwhat\s+files?\s+does\s+{_GRAPH_FILE_FRAGMENT}\s+depend\s+on\b",
         "file_deps",
         "file_depends_on",
+        False,
+    ),
+]
+
+GRAPH_DEPENDENCY_SIGNALS: List[Tuple[str, str, str, bool]] = [
+    (
+        rf"\b(?:what|which)\s+(?:modules?|packages?|components?|subsystems?)\s+depend\s+on\s+"
+        rf"{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "in",
+        "module_dependents",
+        False,
+    ),
+    (
+        rf"\b(?:what|which)\s+(?:modules?|packages?|components?|subsystems?)\s+does\s+"
+        rf"{_GRAPH_SYMBOL_FRAGMENT}\s+depend\s+on\b",
+        "out",
+        "module_dependencies",
         False,
     ),
 ]
@@ -440,6 +464,7 @@ class SearchRouter:
         self._graph_architecture_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_analytic_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_file_patterns: List[Tuple[re.Pattern, str, str]] = []
+        self._graph_dependency_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_navigation_patterns: List[Tuple[re.Pattern, str, int, str]] = []
         self._graph_patterns: List[Tuple[re.Pattern, str, int, str]] = []
 
@@ -455,6 +480,9 @@ class SearchRouter:
             GRAPH_ANALYTIC_SIGNALS, self._graph_analytic_patterns
         )
         self._compile_graph_analytic_patterns(GRAPH_FILE_SIGNALS, self._graph_file_patterns)
+        self._compile_graph_analytic_patterns(
+            GRAPH_DEPENDENCY_SIGNALS, self._graph_dependency_patterns
+        )
         self._compile_graph_patterns(GRAPH_NAVIGATION_SIGNALS, self._graph_navigation_patterns)
         self._compile_graph_patterns(GRAPH_TRAVERSAL_SIGNALS, self._graph_patterns)
 
@@ -484,6 +512,11 @@ class SearchRouter:
                 self._compile_graph_analytic_patterns(
                     custom_signals["graph_files"],
                     self._graph_file_patterns,
+                )
+            if "graph_dependencies" in custom_signals:
+                self._compile_graph_analytic_patterns(
+                    custom_signals["graph_dependencies"],
+                    self._graph_dependency_patterns,
                 )
             if "graph_navigation" in custom_signals:
                 self._compile_graph_patterns(
@@ -570,6 +603,10 @@ class SearchRouter:
         graph_file_route = self._route_graph_file_query(query)
         if graph_file_route is not None:
             return graph_file_route
+
+        graph_dependency_route = self._route_graph_dependency_query(query)
+        if graph_dependency_route is not None:
+            return graph_dependency_route
 
         graph_navigation_route = self._route_graph_navigation_query(query)
         if graph_navigation_route is not None:
@@ -700,6 +737,20 @@ class SearchRouter:
                 continue
 
             top_k = self._extract_requested_top_k(query, default=5)
+            tool_arguments: Dict[str, Any] = {
+                "mode": mode,
+                "top_k": top_k,
+                "only_runtime": True,
+                "include_callsites": True,
+                "max_callsites": 3,
+            }
+            if name == "architecture_summary":
+                tool_arguments.update(
+                    {
+                        "structured": True,
+                        "include_modules": True,
+                    }
+                )
             return SearchRoute(
                 search_type=SearchType.SEMANTIC,
                 confidence=0.93,
@@ -707,13 +758,7 @@ class SearchRouter:
                 transformed_query=None,
                 matched_patterns=[name],
                 tool_name="graph",
-                tool_arguments={
-                    "mode": mode,
-                    "top_k": top_k,
-                    "only_runtime": True,
-                    "include_callsites": True,
-                    "max_callsites": 3,
-                },
+                tool_arguments=tool_arguments,
             )
 
         return None
@@ -737,6 +782,35 @@ class SearchRouter:
                 matched_patterns=[name],
                 tool_name="graph",
                 tool_arguments={"mode": mode, "file": file_path},
+            )
+
+        return None
+
+    def _route_graph_dependency_query(self, query: str) -> Optional[SearchRoute]:
+        """Return graph-tool routes for directional module dependency questions."""
+        for pattern, direction, name in self._graph_dependency_patterns:
+            match = pattern.search(query)
+            if not match:
+                continue
+
+            symbol = self._extract_graph_symbol(match)
+            if not symbol:
+                continue
+
+            return SearchRoute(
+                search_type=SearchType.SEMANTIC,
+                confidence=0.92,
+                reason="Query asks for directional module dependencies suited for graph neighborhood traversal",
+                transformed_query=symbol,
+                matched_patterns=[name],
+                tool_name="graph",
+                tool_arguments={
+                    "mode": "neighbors",
+                    "node": symbol,
+                    "depth": 1,
+                    "direction": direction,
+                    "modules_only": True,
+                },
             )
 
         return None
