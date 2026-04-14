@@ -37,7 +37,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +84,45 @@ def _ensure_benchmark_runtime_tools(adapter) -> object:
         + "; ".join(issues)
         + ". Check tool discovery and tool configuration before running benchmarks."
     )
+
+
+def _summarize_code_intelligence_diagnostics(
+    result: Any,
+    *,
+    sample_limit: int = 5,
+) -> dict[str, Any]:
+    """Summarize which benchmark tasks skipped the code-intelligence path."""
+    tasks = list(getattr(result, "task_results", []) or [])
+    missing_code_intel = [task for task in tasks if not getattr(task, "used_code_intelligence", False)]
+    failed_missing = [
+        task
+        for task in missing_code_intel
+        if getattr(getattr(task, "status", None), "value", None) in {"failed", "error", "timeout"}
+    ]
+    missing_graph = [task for task in tasks if not getattr(task, "used_graph", False)]
+
+    def _task_ids(items: list[Any]) -> list[str]:
+        return [str(getattr(item, "task_id", "")) for item in items if getattr(item, "task_id", "")]
+
+    total_tasks = len(tasks)
+    missing_ids = _task_ids(missing_code_intel)
+    failed_missing_ids = _task_ids(failed_missing)
+    missing_graph_ids = _task_ids(missing_graph)
+    coverage = ((total_tasks - len(missing_ids)) / total_tasks) if total_tasks else 0.0
+
+    return {
+        "total_tasks": total_tasks,
+        "code_intelligence_coverage": coverage,
+        "tasks_without_code_intelligence": len(missing_ids),
+        "task_ids_without_code_intelligence": missing_ids,
+        "sample_task_ids_without_code_intelligence": missing_ids[:sample_limit],
+        "failed_tasks_without_code_intelligence": len(failed_missing_ids),
+        "failed_task_ids_without_code_intelligence": failed_missing_ids,
+        "sample_failed_task_ids_without_code_intelligence": failed_missing_ids[:sample_limit],
+        "tasks_without_graph": len(missing_graph_ids),
+        "task_ids_without_graph": missing_graph_ids,
+        "sample_task_ids_without_graph": missing_graph_ids[:sample_limit],
+    }
 
 
 async def _prewarm_code_intelligence_index(
@@ -499,6 +538,19 @@ def run_benchmark(
 
     console.print(results_table)
 
+    code_intel_diagnostics = _summarize_code_intelligence_diagnostics(result)
+    failed_without_code_intel = code_intel_diagnostics["failed_task_ids_without_code_intelligence"]
+    missing_code_intel = code_intel_diagnostics["task_ids_without_code_intelligence"]
+    if failed_without_code_intel:
+        console.print(
+            "[yellow]Code intelligence missed on failed tasks:[/] "
+            + ", ".join(failed_without_code_intel[:5])
+        )
+    elif missing_code_intel:
+        console.print(
+            "[dim]Tasks without code intelligence:[/] " + ", ".join(missing_code_intel[:5])
+        )
+
     # Auto-evolve: run GEPA evolution after benchmark completes
     # This is the "post-session hook" from Memory Scaling — the agent
     # improves its prompts automatically after each benchmark run.
@@ -551,6 +603,7 @@ def run_benchmark(
             "model": config.model,
             "timestamp": datetime.now().isoformat(),
             "metrics": metrics,
+            "diagnostics": code_intel_diagnostics,
             "task_results": [
                 {
                     "task_id": r.task_id,

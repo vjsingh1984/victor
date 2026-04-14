@@ -149,3 +149,57 @@ class TestBenchmarkRuntimeReadiness:
 
         with pytest.raises(RuntimeError, match="disabled tools: graph"):
             _ensure_benchmark_runtime_tools(adapter)
+
+
+class TestBenchmarkCodeIntelligenceDiagnostics:
+    def test_summarize_code_intelligence_diagnostics_identifies_missed_tasks(self):
+        from victor.evaluation.protocol import TaskStatus
+        from victor.ui.commands.benchmark import _summarize_code_intelligence_diagnostics
+
+        passed = MagicMock()
+        passed.task_id = "task-pass"
+        passed.used_code_intelligence = True
+        passed.used_graph = True
+        passed.status = TaskStatus.PASSED
+
+        failed_without_intel = MagicMock()
+        failed_without_intel.task_id = "task-fail"
+        failed_without_intel.used_code_intelligence = False
+        failed_without_intel.used_graph = False
+        failed_without_intel.status = TaskStatus.FAILED
+
+        passed_without_graph = MagicMock()
+        passed_without_graph.task_id = "task-no-graph"
+        passed_without_graph.used_code_intelligence = True
+        passed_without_graph.used_graph = False
+        passed_without_graph.status = TaskStatus.PASSED
+
+        result = MagicMock(task_results=[passed, failed_without_intel, passed_without_graph])
+
+        diagnostics = _summarize_code_intelligence_diagnostics(result)
+
+        assert diagnostics["total_tasks"] == 3
+        assert diagnostics["tasks_without_code_intelligence"] == 1
+        assert diagnostics["failed_tasks_without_code_intelligence"] == 1
+        assert diagnostics["task_ids_without_code_intelligence"] == ["task-fail"]
+        assert diagnostics["failed_task_ids_without_code_intelligence"] == ["task-fail"]
+        assert diagnostics["tasks_without_graph"] == 2
+        assert diagnostics["sample_task_ids_without_graph"] == ["task-fail", "task-no-graph"]
+        assert diagnostics["code_intelligence_coverage"] == pytest.approx(2 / 3)
+
+    def test_summarize_code_intelligence_diagnostics_handles_full_coverage(self):
+        from victor.evaluation.protocol import TaskStatus
+        from victor.ui.commands.benchmark import _summarize_code_intelligence_diagnostics
+
+        task = MagicMock()
+        task.task_id = "task-1"
+        task.used_code_intelligence = True
+        task.used_graph = True
+        task.status = TaskStatus.PASSED
+
+        diagnostics = _summarize_code_intelligence_diagnostics(MagicMock(task_results=[task]))
+
+        assert diagnostics["tasks_without_code_intelligence"] == 0
+        assert diagnostics["failed_tasks_without_code_intelligence"] == 0
+        assert diagnostics["tasks_without_graph"] == 0
+        assert diagnostics["code_intelligence_coverage"] == 1.0
