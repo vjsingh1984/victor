@@ -365,6 +365,32 @@ GRAPH_DEPENDENCY_SIGNALS: List[Tuple[str, str, str, bool]] = [
     ),
 ]
 
+GRAPH_DEPENDENCY_TRAVERSAL_SIGNALS: List[Tuple[str, str, str, bool]] = [
+    (
+        rf"\b(?:show|find|get|trace|list)\s+(?:the\s+)?(?:downstream|outgoing)\s+"
+        rf"dependencies\s+(?:of|for)\s+{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "out",
+        "downstream_dependencies",
+        False,
+    ),
+    (
+        rf"\b(?:show|find|get|trace|list)\s+(?:the\s+)?(?:upstream|incoming)\s+"
+        rf"dependencies\s+(?:of|for)\s+{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "in",
+        "upstream_dependencies",
+        False,
+    ),
+]
+
+GRAPH_SCOPED_ARCHITECTURE_SIGNALS: List[Tuple[str, str, bool]] = [
+    (
+        rf"\b(?:summari(?:ze|se)|overview|describe|explain|show)\s+(?:the\s+)?"
+        rf"architecture\s+(?:of|around|for)\s+{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "scoped_architecture_summary",
+        False,
+    ),
+]
+
 # Patterns that indicate a graph traversal is more appropriate than plain search.
 # Format: (regex_pattern, mode, depth, description, case_sensitive)
 GRAPH_TRAVERSAL_SIGNALS: List[Tuple[str, str, int, str, bool]] = [
@@ -465,6 +491,8 @@ class SearchRouter:
         self._graph_analytic_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_file_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_dependency_patterns: List[Tuple[re.Pattern, str, str]] = []
+        self._graph_dependency_traversal_patterns: List[Tuple[re.Pattern, str, str]] = []
+        self._graph_scoped_architecture_patterns: List[Tuple[re.Pattern, str]] = []
         self._graph_navigation_patterns: List[Tuple[re.Pattern, str, int, str]] = []
         self._graph_patterns: List[Tuple[re.Pattern, str, int, str]] = []
 
@@ -476,12 +504,18 @@ class SearchRouter:
         self._compile_graph_analytic_patterns(
             GRAPH_ARCHITECTURE_SIGNALS, self._graph_architecture_patterns
         )
-        self._compile_graph_analytic_patterns(
-            GRAPH_ANALYTIC_SIGNALS, self._graph_analytic_patterns
-        )
+        self._compile_graph_analytic_patterns(GRAPH_ANALYTIC_SIGNALS, self._graph_analytic_patterns)
         self._compile_graph_analytic_patterns(GRAPH_FILE_SIGNALS, self._graph_file_patterns)
         self._compile_graph_analytic_patterns(
             GRAPH_DEPENDENCY_SIGNALS, self._graph_dependency_patterns
+        )
+        self._compile_graph_analytic_patterns(
+            GRAPH_DEPENDENCY_TRAVERSAL_SIGNALS,
+            self._graph_dependency_traversal_patterns,
+        )
+        self._compile_graph_scoped_patterns(
+            GRAPH_SCOPED_ARCHITECTURE_SIGNALS,
+            self._graph_scoped_architecture_patterns,
         )
         self._compile_graph_patterns(GRAPH_NAVIGATION_SIGNALS, self._graph_navigation_patterns)
         self._compile_graph_patterns(GRAPH_TRAVERSAL_SIGNALS, self._graph_patterns)
@@ -517,6 +551,16 @@ class SearchRouter:
                 self._compile_graph_analytic_patterns(
                     custom_signals["graph_dependencies"],
                     self._graph_dependency_patterns,
+                )
+            if "graph_dependency_traversal" in custom_signals:
+                self._compile_graph_analytic_patterns(
+                    custom_signals["graph_dependency_traversal"],
+                    self._graph_dependency_traversal_patterns,
+                )
+            if "graph_scoped_architecture" in custom_signals:
+                self._compile_graph_scoped_patterns(
+                    custom_signals["graph_scoped_architecture"],
+                    self._graph_scoped_architecture_patterns,
                 )
             if "graph_navigation" in custom_signals:
                 self._compile_graph_patterns(
@@ -573,6 +617,20 @@ class SearchRouter:
             except re.error as e:
                 logger.warning(f"Invalid graph analytic pattern '{pattern_str}': {e}")
 
+    def _compile_graph_scoped_patterns(
+        self,
+        signals: List[Tuple[str, str, bool]],
+        target: List[Tuple[re.Pattern, str]],
+    ) -> None:
+        """Compile graph patterns that extract a single scoped symbol."""
+        for pattern_str, name, case_sensitive in signals:
+            try:
+                flags = 0 if case_sensitive else re.IGNORECASE
+                compiled = re.compile(pattern_str, flags)
+                target.append((compiled, name))
+            except re.error as e:
+                logger.warning(f"Invalid graph scoped pattern '{pattern_str}': {e}")
+
     def route(self, query: str) -> SearchRoute:
         """Route a search query to appropriate search type.
 
@@ -592,6 +650,10 @@ class SearchRouter:
         if graph_route is not None:
             return graph_route
 
+        scoped_architecture_route = self._route_scoped_architecture_query(query)
+        if scoped_architecture_route is not None:
+            return scoped_architecture_route
+
         graph_architecture_route = self._route_graph_architecture_query(query)
         if graph_architecture_route is not None:
             return graph_architecture_route
@@ -607,6 +669,10 @@ class SearchRouter:
         graph_dependency_route = self._route_graph_dependency_query(query)
         if graph_dependency_route is not None:
             return graph_dependency_route
+
+        graph_dependency_traversal_route = self._route_graph_dependency_traversal_query(query)
+        if graph_dependency_traversal_route is not None:
+            return graph_dependency_traversal_route
 
         graph_navigation_route = self._route_graph_navigation_query(query)
         if graph_navigation_route is not None:
@@ -786,6 +852,39 @@ class SearchRouter:
 
         return None
 
+    def _route_scoped_architecture_query(self, query: str) -> Optional[SearchRoute]:
+        """Return graph-tool routes for architecture questions scoped to one component."""
+        for pattern, name in self._graph_scoped_architecture_patterns:
+            match = pattern.search(query)
+            if not match:
+                continue
+
+            symbol = self._extract_graph_symbol(match)
+            if not symbol:
+                continue
+
+            return SearchRoute(
+                search_type=SearchType.SEMANTIC,
+                confidence=0.94,
+                reason="Query asks for a scoped architecture summary suited for structured graph neighborhood analysis",
+                transformed_query=symbol,
+                matched_patterns=[name],
+                tool_name="graph",
+                tool_arguments={
+                    "mode": "neighbors",
+                    "node": symbol,
+                    "depth": self._extract_requested_depth(query, default=2),
+                    "direction": "both",
+                    "structured": True,
+                    "include_modules": True,
+                    "include_symbols": True,
+                    "include_calls": True,
+                    "include_refs": True,
+                },
+            )
+
+        return None
+
     def _route_graph_dependency_query(self, query: str) -> Optional[SearchRoute]:
         """Return graph-tool routes for directional module dependency questions."""
         for pattern, direction, name in self._graph_dependency_patterns:
@@ -808,6 +907,35 @@ class SearchRouter:
                     "mode": "neighbors",
                     "node": symbol,
                     "depth": 1,
+                    "direction": direction,
+                    "modules_only": True,
+                },
+            )
+
+        return None
+
+    def _route_graph_dependency_traversal_query(self, query: str) -> Optional[SearchRoute]:
+        """Return graph-tool routes for deep upstream/downstream dependency traversal."""
+        for pattern, direction, name in self._graph_dependency_traversal_patterns:
+            match = pattern.search(query)
+            if not match:
+                continue
+
+            symbol = self._extract_graph_symbol(match)
+            if not symbol:
+                continue
+
+            return SearchRoute(
+                search_type=SearchType.SEMANTIC,
+                confidence=0.93,
+                reason="Query asks for deeper dependency traversal suited for graph neighborhood analysis",
+                transformed_query=symbol,
+                matched_patterns=[name],
+                tool_name="graph",
+                tool_arguments={
+                    "mode": "neighbors",
+                    "node": symbol,
+                    "depth": self._extract_requested_depth(query, default=2),
                     "direction": direction,
                     "modules_only": True,
                 },
@@ -990,6 +1118,31 @@ class SearchRouter:
         patterns = [
             r"\btop[\s-]*(\d+)\b",
             r"\b(\d+)\s+(?:most|top)\b",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if not match:
+                continue
+            try:
+                requested = int(match.group(1))
+            except (TypeError, ValueError):
+                continue
+            return max(minimum, min(maximum, requested))
+        return default
+
+    def _extract_requested_depth(
+        self,
+        query: str,
+        default: int = 1,
+        *,
+        minimum: int = 1,
+        maximum: int = 6,
+    ) -> int:
+        """Extract a requested traversal depth from a natural-language query."""
+        patterns = [
+            r"\bdepth\s+(\d+)\b",
+            r"\bto\s+depth\s+(\d+)\b",
+            r"\b(\d+)\s+hops?\b",
         ]
         for pattern in patterns:
             match = re.search(pattern, query, re.IGNORECASE)

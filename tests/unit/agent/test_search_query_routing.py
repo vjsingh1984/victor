@@ -180,6 +180,44 @@ def test_route_search_query_includes_graph_module_dependencies_arguments() -> No
     assert result["search_type"] == "semantic"
 
 
+def test_route_search_query_includes_graph_downstream_dependency_arguments() -> None:
+    """Deep downstream dependency queries should preserve requested depth."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("show downstream dependencies of auth to depth 3")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "neighbors",
+        "node": "auth",
+        "depth": 3,
+        "direction": "out",
+        "modules_only": True,
+    }
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_scoped_architecture_summary_arguments() -> None:
+    """Scoped architecture summary queries should route to structured graph neighbors."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("summarize architecture of auth")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "neighbors",
+        "node": "auth",
+        "depth": 2,
+        "direction": "both",
+        "structured": True,
+        "include_modules": True,
+        "include_symbols": True,
+        "include_calls": True,
+        "include_refs": True,
+    }
+    assert result["search_type"] == "semantic"
+
+
 def test_route_search_query_includes_graph_pagerank_arguments() -> None:
     """Centrality queries should recommend the graph tool with pagerank args."""
     orchestrator = _make_orchestrator()
@@ -235,9 +273,7 @@ def test_get_recommended_search_tool_uses_graph_path_tool_name() -> None:
     """Dependency-path questions should recommend the graph tool."""
     orchestrator = _make_orchestrator()
 
-    result = orchestrator.get_recommended_search_tool(
-        "show the path from Parser to Provider"
-    )
+    result = orchestrator.get_recommended_search_tool("show the path from Parser to Provider")
 
     assert result == "graph"
 
@@ -258,5 +294,14 @@ def test_get_recommended_search_tool_uses_graph_architecture_summary_tool_name()
     orchestrator = _make_orchestrator()
 
     result = orchestrator.get_recommended_search_tool("summarize the architecture")
+
+    assert result == "graph"
+
+
+def test_get_recommended_search_tool_uses_scoped_architecture_summary_tool_name() -> None:
+    """Scoped architecture summary questions should recommend the graph tool."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool("explain architecture around auth")
 
     assert result == "graph"

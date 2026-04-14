@@ -82,9 +82,7 @@ def detect_provider_tier(provider: Any) -> ProviderTier:
     if provider is None:
         return ProviderTier.NO_CACHE
 
-    api_cache = (
-        hasattr(provider, "supports_prompt_caching") and provider.supports_prompt_caching()
-    )
+    api_cache = hasattr(provider, "supports_prompt_caching") and provider.supports_prompt_caching()
     kv_cache = (
         hasattr(provider, "supports_kv_prefix_caching") and provider.supports_kv_prefix_caching()
     )

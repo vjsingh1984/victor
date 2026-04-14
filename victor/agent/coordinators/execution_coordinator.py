@@ -244,7 +244,9 @@ class ExecutionCoordinator:
                         _orch = getattr(self, "_orchestrator", None) or getattr(
                             self._chat_context, "_orchestrator", None
                         )
-                        _injector = getattr(_orch, "_optimization_injector", None) if _orch else None
+                        _injector = (
+                            getattr(_orch, "_optimization_injector", None) if _orch else None
+                        )
                         if _injector and result.get("error"):
                             _injector.record_failure(
                                 result.get("tool_name", "unknown"),

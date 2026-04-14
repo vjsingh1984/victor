@@ -656,6 +656,46 @@ class TestToolPipelineNormalization:
         assert args["include_modules"] is True
         assert strategy is not None
 
+    def test_normalize_tool_call_reroutes_downstream_dependency_query_to_graph(self, pipeline):
+        """Deep downstream dependency queries should route to graph neighbors."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "show downstream dependencies of auth to depth 3"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "neighbors"
+        assert args["node"] == "auth"
+        assert args["depth"] == 3
+        assert args["direction"] == "out"
+        assert args["modules_only"] is True
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_scoped_architecture_summary_query_to_graph(
+        self, pipeline
+    ):
+        """Scoped architecture summary queries should route to structured graph neighbors."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "summarize architecture of auth"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "neighbors"
+        assert args["node"] == "auth"
+        assert args["depth"] == 2
+        assert args["direction"] == "both"
+        assert args["structured"] is True
+        assert args["include_modules"] is True
+        assert args["include_symbols"] is True
+        assert args["include_calls"] is True
+        assert args["include_refs"] is True
+        assert strategy is not None
+
     def test_normalize_tool_call_reroutes_pagerank_query_to_graph(self, pipeline):
         """Centrality semantic queries should route to graph pagerank analysis."""
         pipeline.search_router = SearchRouter()
@@ -1122,7 +1162,10 @@ class TestToolPipelineSearchRouting:
             return_value=ToolExecutionResult(
                 tool_name="graph",
                 success=True,
-                result={"count": 3, "results": ["victor/providers/base.py", "victor/tools/code_search_tool.py"]},
+                result={
+                    "count": 3,
+                    "results": ["victor/providers/base.py", "victor/tools/code_search_tool.py"],
+                },
                 error=None,
             )
         )
@@ -1246,7 +1289,10 @@ class TestToolPipelineSearchRouting:
             return_value=ToolExecutionResult(
                 tool_name="graph",
                 success=True,
-                result={"count": 5, "results": ["agent", "providers", "storage", "framework", "tools"]},
+                result={
+                    "count": 5,
+                    "results": ["agent", "providers", "storage", "framework", "tools"],
+                },
                 error=None,
             )
         )
@@ -1276,6 +1322,94 @@ class TestToolPipelineSearchRouting:
         assert executed_kwargs["arguments"]["structured"] is True
         assert executed_kwargs["arguments"]["include_modules"] is True
         assert executed_kwargs["arguments"]["only_runtime"] is True
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_downstream_dependency_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Deep downstream dependency queries should execute as graph neighbor calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 3, "results": ["storage", "providers", "ui"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "show downstream dependencies of auth to depth 3",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "neighbors"
+        assert executed_kwargs["arguments"]["node"] == "auth"
+        assert executed_kwargs["arguments"]["depth"] == 3
+        assert executed_kwargs["arguments"]["direction"] == "out"
+        assert executed_kwargs["arguments"]["modules_only"] is True
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_scoped_architecture_summary_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Scoped architecture summary queries should execute as structured graph neighbors."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 4, "results": ["auth", "storage", "providers", "tests"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "summarize architecture of auth",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "neighbors"
+        assert executed_kwargs["arguments"]["node"] == "auth"
+        assert executed_kwargs["arguments"]["structured"] is True
+        assert executed_kwargs["arguments"]["include_modules"] is True
+        assert executed_kwargs["arguments"]["include_symbols"] is True
+        assert executed_kwargs["arguments"]["include_calls"] is True
+        assert executed_kwargs["arguments"]["include_refs"] is True
         assert "directory" not in executed_kwargs["arguments"]
         assert result.successful_calls == 1
 

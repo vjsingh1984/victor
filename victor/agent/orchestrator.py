@@ -1804,17 +1804,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     model=getattr(self, "_model", "") or "",
                     task_type=getattr(self, "_current_task_type", "default"),
                     active_skill_prompt=(
-                        self.get_skill_user_prefix() if hasattr(self, "get_skill_user_prefix") else None
+                        self.get_skill_user_prefix()
+                        if hasattr(self, "get_skill_user_prefix")
+                        else None
                     ),
                     last_turn_failed=(
                         injector._last_failure_category is not None if injector else False
                     ),
-                    last_failure_category=(
-                        injector._last_failure_category if injector else None
-                    ),
-                    last_failure_error=(
-                        injector._last_failure_error if injector else None
-                    ),
+                    last_failure_category=(injector._last_failure_category if injector else None),
+                    last_failure_error=(injector._last_failure_error if injector else None),
                 )
 
                 # Get context reminders

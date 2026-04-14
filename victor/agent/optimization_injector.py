@@ -47,9 +47,7 @@ FAILURE_HINTS: Dict[str, str] = {
     "read_directory": (
         "You tried to read a directory. Use ls() for directories, read() for files."
     ),
-    "permission_denied": (
-        "Permission denied. Check file permissions or use a different path."
-    ),
+    "permission_denied": ("Permission denied. Check file permissions or use a different path."),
     "edit_mismatch": (
         "Your edit failed because old_str did not match the file content. "
         "RE-READ the file at the exact location and COPY the text "
@@ -203,8 +201,7 @@ class OptimizationInjector:
             evolved_count = sum(1 for r in results if "TOOL EFFECTIVENESS" not in r)
             if evolved_count > 0:
                 logger.info(
-                    "[OptimizationInjector] Serving %d evolved + %d static sections "
-                    "for %s/%s",
+                    "[OptimizationInjector] Serving %d evolved + %d static sections " "for %s/%s",
                     evolved_count,
                     len(results) - evolved_count,
                     provider or "default",

@@ -73,11 +73,11 @@ class TestVerticalMetadata:
         assert VerticalMetadata._extract_name_from_classname("DevOpsVertical") == "devops"
         assert VerticalMetadata._extract_name_from_classname("RAGVertical") == "rag"
 
-    def test_extract_name_from_classname_no_suffix_emits_warning(self):
-        """Test that classes without recognized suffixes emit deprecation warning."""
-        with pytest.warns(DeprecationWarning, match="does not follow the recommended"):
-            result = VerticalMetadata._extract_name_from_classname("CustomClass")
+    def test_extract_name_from_classname_no_suffix_emits_warning(self, caplog):
+        """Test that classes without recognized suffixes log a warning."""
+        result = VerticalMetadata._extract_name_from_classname("CustomClass")
         assert result == "customclass"
+        assert any("does not follow the recommended" in r.message for r in caplog.records)
 
     def test_normalize_name(self):
         """Test name normalization."""

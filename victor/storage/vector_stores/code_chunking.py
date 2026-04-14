@@ -126,7 +126,9 @@ def _match_symbol(
         if symbol.line_start <= start_line and symbol.line_end >= end_line
     ]
     if containing:
-        return min(containing, key=lambda symbol: (symbol.line_end - symbol.line_start, symbol.line_start))
+        return min(
+            containing, key=lambda symbol: (symbol.line_end - symbol.line_start, symbol.line_start)
+        )
 
     best_symbol: Optional[CodeSymbolLike] = None
     best_ratio = 0.0
@@ -322,7 +324,11 @@ class TreeSitterStructuralCodeChunker:
         *,
         is_root: bool,
     ) -> list[_ByteSpan]:
-        if not is_root and self._span_word_count(node.start_byte, node.end_byte, parse_context) <= self._chunk_size:
+        if (
+            not is_root
+            and self._span_word_count(node.start_byte, node.end_byte, parse_context)
+            <= self._chunk_size
+        ):
             return [self._make_span(node.start_byte, node.end_byte, parse_context)]
 
         children = self._named_children(node)
@@ -342,7 +348,11 @@ class TreeSitterStructuralCodeChunker:
 
     def _named_children(self, node: Any) -> list[Any]:
         children = list(getattr(node, "named_children", []) or [])
-        filtered = [child for child in children if getattr(child, "end_byte", 0) > getattr(child, "start_byte", 0)]
+        filtered = [
+            child
+            for child in children
+            if getattr(child, "end_byte", 0) > getattr(child, "start_byte", 0)
+        ]
         return sorted(filtered, key=lambda child: (child.start_byte, child.end_byte))
 
     def _merge_spans(
@@ -365,7 +375,10 @@ class TreeSitterStructuralCodeChunker:
                 continue
 
             projected = self._make_span(current.start_byte, span.end_byte, parse_context)
-            if self._span_word_count(projected.start_byte, projected.end_byte, parse_context) <= self._chunk_size:
+            if (
+                self._span_word_count(projected.start_byte, projected.end_byte, parse_context)
+                <= self._chunk_size
+            ):
                 current = projected
                 continue
 

@@ -62,8 +62,12 @@ class ChangeImpactAccumulator:
         score = float(row.get("score", 0.0) or 0.0)
         metadata = dict(row.get("metadata", {}) or {})
         content = str(row.get("content", "") or "")
-        symbol_name = row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
-        line_number = row.get("line_number") or metadata.get("start_line") or metadata.get("line_number")
+        symbol_name = (
+            row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+        )
+        line_number = (
+            row.get("line_number") or metadata.get("start_line") or metadata.get("line_number")
+        )
 
         if score >= candidate.seed_score:
             candidate.symbol_name = symbol_name
@@ -164,7 +168,9 @@ class ChangeImpactAccumulator:
         for candidate in self._candidates.values():
             hint_boost = min(0.05 * len(candidate.matched_hints), 0.15)
             support_boost = min(0.04 * max(candidate.support_count - 1, 0), 0.16)
-            score = round(candidate.seed_score + candidate.graph_score + hint_boost + support_boost, 4)
+            score = round(
+                candidate.seed_score + candidate.graph_score + hint_boost + support_boost, 4
+            )
 
             metadata = dict(candidate.metadata)
             metadata["impact"] = {

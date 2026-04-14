@@ -50,8 +50,8 @@ class TestDeprecatedConstantDescriptor:
         assert descriptor._warned is False
         assert descriptor._cached_value is None
 
-    def test_get_emits_warning_on_first_access(self):
-        """Test that deprecation warning is emitted on first access."""
+    def test_get_emits_warning_on_first_access(self, caplog):
+        """Test that deprecation log warning is emitted on first access."""
 
         def loader():
             return "test_value"
@@ -62,20 +62,14 @@ class TestDeprecatedConstantDescriptor:
             loader=loader,
         )
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        class Container:
+            const = descriptor
 
-            # Access the descriptor
-            class Container:
-                const = descriptor
+        _ = Container.const
 
-            _ = Container.const
+        assert any("MY_CONSTANT is deprecated" in r.message for r in caplog.records)
 
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "MY_CONSTANT is deprecated" in str(w[0].message)
-
-    def test_get_only_warns_once(self):
+    def test_get_only_warns_once(self, caplog):
         """Test that warning is only emitted once."""
 
         def loader():
@@ -90,15 +84,12 @@ class TestDeprecatedConstantDescriptor:
         class Container:
             const = descriptor
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        _ = Container.const
+        _ = Container.const
+        _ = Container.const
 
-            # Access multiple times
-            _ = Container.const
-            _ = Container.const
-            _ = Container.const
-
-            assert len(w) == 1
+        dep_logs = [r for r in caplog.records if "MY_CONSTANT is deprecated" in r.message]
+        assert len(dep_logs) == 1
 
     def test_get_caches_loaded_value(self):
         """Test that value is cached after first load."""
@@ -154,7 +145,7 @@ class TestDeprecatedConstantDescriptor:
 
             assert result == expected
 
-    def test_reset_clears_cache_and_warning_state(self):
+    def test_reset_clears_cache_and_warning_state(self, caplog):
         """Test that reset clears cached value and warning state."""
         call_count = 0
 
@@ -172,21 +163,20 @@ class TestDeprecatedConstantDescriptor:
         class Container:
             const = descriptor
 
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
+        # First access
+        val1 = Container.const
+        assert val1 == "value_1"
+        first_count = len([r for r in caplog.records if "deprecated" in r.message])
+        assert first_count == 1
 
-            # First access
-            val1 = Container.const
-            assert val1 == "value_1"
-            assert len(w) == 1
+        # Reset
+        descriptor.reset()
 
-            # Reset
-            descriptor.reset()
-
-            # Access again should reload and warn again
-            val2 = Container.const
-            assert val2 == "value_2"
-            assert len(w) == 2
+        # Access again should reload and warn again
+        val2 = Container.const
+        assert val2 == "value_2"
+        second_count = len([r for r in caplog.records if "deprecated" in r.message])
+        assert second_count == 2
 
     def test_loader_exception_propagates(self):
         """Test that loader exceptions propagate correctly."""

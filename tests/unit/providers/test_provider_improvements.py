@@ -438,7 +438,9 @@ class TestRetryStrategy:
     @pytest.mark.asyncio
     async def test_retries_open_circuit_breaker(self, retry, monkeypatch):
         """Open circuits should be retried after their cooldown."""
-        from victor.providers.circuit_breaker import CircuitBreakerError as CanonicalCircuitBreakerError
+        from victor.providers.circuit_breaker import (
+            CircuitBreakerError as CanonicalCircuitBreakerError,
+        )
 
         attempts = [0]
         sleeps: list[float] = []

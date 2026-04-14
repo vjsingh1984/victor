@@ -107,9 +107,13 @@ class TestSearchRedundancy:
 
         tracker.add_call("grep", {"query": "tool registration", "mode": "semantic"})
         # Same query, same mode → redundant
-        assert tracker.is_redundant("grep", {"query": "tool registration", "mode": "semantic"}) is True
+        assert (
+            tracker.is_redundant("grep", {"query": "tool registration", "mode": "semantic"}) is True
+        )
         # Same query, different mode → NOT redundant (different search strategy)
-        assert tracker.is_redundant("grep", {"query": "tool registration", "mode": "regex"}) is False
+        assert (
+            tracker.is_redundant("grep", {"query": "tool registration", "mode": "regex"}) is False
+        )
 
     def test_synonym_query_not_redundant(self):
         """Synonym queries are allowed — agent may need different perspectives."""

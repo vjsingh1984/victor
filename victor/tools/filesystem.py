@@ -1570,7 +1570,11 @@ async def read(
 
             # Check provider name for local indicators
             provider_obj = getattr(settings, "provider", None)
-            provider = (provider_obj.default_provider if hasattr(provider_obj, "default_provider") else str(provider_obj or "")).lower()
+            provider = (
+                provider_obj.default_provider
+                if hasattr(provider_obj, "default_provider")
+                else str(provider_obj or "")
+            ).lower()
             local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
             if any(p in provider for p in local_providers):
                 # Try to get model context size from capabilities

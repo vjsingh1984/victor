@@ -153,7 +153,7 @@ def test_tree_sitter_structural_chunker_preserves_module_level_context() -> None
             "    value = json.loads(data)",
             "    return value",
             "",
-            "result = handle(parse_json(\"{}\"))",
+            'result = handle(parse_json("{}"))',
         ]
     )
     symbols = [FakeSymbol("parse_json", "function", 5, 7)]

@@ -26,7 +26,6 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional
 
-
 _QUOTED_HINT_RE = re.compile(r"[`'\"]([^`'\"]{2,80})[`'\"]")
 _DOTTED_SYMBOL_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+\b")
 _CAMEL_HINT_RE = re.compile(r"\b[A-Z][A-Za-z0-9_]{2,}\b")
@@ -44,7 +43,9 @@ def extract_issue_hints(issue_description: str, *, limit: int = 12) -> List[str]
         key = normalized.lower()
         if len(normalized) < 3 or key in seen:
             return
-        if any(key in existing.lower() and len(existing) > len(normalized) for existing in candidates):
+        if any(
+            key in existing.lower() and len(existing) > len(normalized) for existing in candidates
+        ):
             return
         seen.add(key)
         candidates.append(normalized)
@@ -135,12 +136,18 @@ class IssueLocalizationAccumulator:
         if not file_path:
             return
 
-        candidate = self._candidates.setdefault(file_path, _LocalizationCandidate(file_path=file_path))
+        candidate = self._candidates.setdefault(
+            file_path, _LocalizationCandidate(file_path=file_path)
+        )
         score = float(row.get("score", 0.0) or 0.0)
         metadata = dict(row.get("metadata", {}) or {})
         content = str(row.get("content", "") or "")
-        symbol_name = row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
-        line_number = row.get("line_number") or metadata.get("start_line") or metadata.get("line_number")
+        symbol_name = (
+            row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+        )
+        line_number = (
+            row.get("line_number") or metadata.get("start_line") or metadata.get("line_number")
+        )
 
         if score >= candidate.seed_score:
             candidate.symbol_name = symbol_name
@@ -219,7 +226,9 @@ class IssueLocalizationAccumulator:
             candidate.metadata.setdefault("related_symbol", neighbor.get("name"))
             if not candidate.content:
                 relation_summary = seed_symbol or seed_file_path
-                candidate.content = f"{neighbor.get('name') or neighbor_file} ({relation} of {relation_summary})"
+                candidate.content = (
+                    f"{neighbor.get('name') or neighbor_file} ({relation} of {relation_summary})"
+                )
             candidate.matched_hints.update(
                 _match_hints(
                     self.hints,
@@ -238,7 +247,9 @@ class IssueLocalizationAccumulator:
         for candidate in self._candidates.values():
             hint_boost = min(0.05 * len(candidate.matched_hints), 0.15)
             support_boost = min(0.03 * max(candidate.support_count - 1, 0), 0.12)
-            score = round(candidate.seed_score + candidate.graph_score + hint_boost + support_boost, 4)
+            score = round(
+                candidate.seed_score + candidate.graph_score + hint_boost + support_boost, 4
+            )
 
             metadata = dict(candidate.metadata)
             metadata["localization"] = {

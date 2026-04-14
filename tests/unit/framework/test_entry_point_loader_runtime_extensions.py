@@ -98,8 +98,9 @@ def test_load_rl_config_provider_returns_provider_instance(mock_registry_cls) ->
 @patch("victor.framework.entry_point_loader._cached_entry_points")
 def test_list_installed_verticals_warns_when_legacy_group_is_present(
     mock_cached_entry_points,
+    caplog,
 ) -> None:
-    """Installed vertical inventory should surface deprecated raw entry-point usage."""
+    """Installed vertical inventory should log warning for deprecated raw entry-points."""
 
     class _EntryPoint:
         def __init__(self, name: str) -> None:
@@ -115,20 +116,18 @@ def test_list_installed_verticals_warns_when_legacy_group_is_present(
     mock_cached_entry_points.side_effect = _mock_group
     reset_entry_point_loader_stats(clear_cache=True)
 
-    with warnings.catch_warnings(record=True) as recorded:
-        warnings.simplefilter("always")
-        verticals = list_installed_verticals()
+    verticals = list_installed_verticals()
 
     assert verticals == ["coding", "legacy-security"]
-    assert len(recorded) == 1
-    assert "victor.verticals" in str(recorded[0].message)
+    assert any("victor.verticals" in r.message for r in caplog.records)
 
 
 @patch("victor.framework.entry_point_loader._cached_entry_points")
 def test_list_installed_verticals_warns_only_once_for_legacy_group(
     mock_cached_entry_points,
+    caplog,
 ) -> None:
-    """Repeated inventory calls should not spam legacy raw-entry-point warnings."""
+    """Repeated inventory calls should not spam log warnings."""
 
     class _EntryPoint:
         def __init__(self, name: str) -> None:
@@ -144,9 +143,8 @@ def test_list_installed_verticals_warns_only_once_for_legacy_group(
     mock_cached_entry_points.side_effect = _mock_group
     reset_entry_point_loader_stats(clear_cache=True)
 
-    with warnings.catch_warnings(record=True) as recorded:
-        warnings.simplefilter("always")
-        list_installed_verticals()
-        list_installed_verticals()
+    list_installed_verticals()
+    list_installed_verticals()
 
-    assert len(recorded) == 1
+    legacy_warnings = [r for r in caplog.records if "victor.verticals" in r.message]
+    assert len(legacy_warnings) == 1

@@ -958,9 +958,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             accumulator.add_seed(row)
             metadata = dict(row.get("metadata", {}) or {})
             symbol_name = (
-                row.get("symbol_name")
-                or metadata.get("qualified_name")
-                or metadata.get("name")
+                row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
             )
             file_path = row.get("file_path") or metadata.get("file_path")
             score = float(row.get("score", 0.0) or 0.0)
@@ -1027,9 +1025,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             accumulator.add_seed(row)
             metadata = dict(row.get("metadata", {}) or {})
             symbol_name = (
-                row.get("symbol_name")
-                or metadata.get("qualified_name")
-                or metadata.get("name")
+                row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
             )
             file_path = row.get("file_path") or metadata.get("file_path")
             score = float(row.get("score", 0.0) or 0.0)

@@ -91,14 +91,13 @@ class TestVerticalDeprecation:
 
         assert hasattr(VerticalRegistry, "_warn_legacy_entry_point_usage")
 
-    def test_deprecation_uses_warnings_module(self):
-        """Method uses warnings.warn with DeprecationWarning."""
+    def test_deprecation_uses_logger_warning(self):
+        """Method uses logger.warning for deprecation notices."""
         import inspect
         from victor.core.verticals.base import VerticalRegistry
 
         source = inspect.getsource(VerticalRegistry._warn_legacy_entry_point_usage)
-        assert "DeprecationWarning" in source
-        assert "warnings.warn" in source
+        assert "logger.warning" in source
 
 
 # =====================================================================
