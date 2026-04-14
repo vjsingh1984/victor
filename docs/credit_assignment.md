@@ -201,13 +201,63 @@ pytest tests/unit/framework/rl/ tests/integration/rl/ -v
 
 | File | Purpose |
 |------|---------|
-| `victor/framework/rl/credit_assignment.py` | Core: 6 assigners, data structures, integration |
+| `victor/framework/rl/credit_assignment.py` | Core: 9 assigners (GAE, TD, MC, N-step, Shapley, Hindsight, C3, CARL, LLM-as-Critic) |
+| `victor/framework/rl/credit_tracking_service.py` | Runtime bridge: ToolPipeline → credit assignment → ObservabilityBus |
+| `victor/framework/rl/tool_reputation.py` | Online mid-turn EMA reputation tracking |
 | `victor/framework/rl/credit_graph_integration.py` | StateGraph wrapper and tracing |
 | `victor/framework/rl/credit_visualization.py` | HTML visualization and multi-format export |
 | `victor/framework/rl/credit_persistence.py` | SQLite storage and analytics |
 | `victor/teams/mixins/credit_assignment.py` | Team coordination mixin |
+| `victor/teams/mixins/credit_aware_routing.py` | Shapley-driven agent rerouting |
+| `victor/config/credit_assignment_settings.py` | Settings (enabled, methodology, gamma, etc.) |
 | `victor/commands/credit_commands.py` | CLI commands |
-| `examples/credit_assignment_examples.py` | 5 real-world examples |
+
+## Feedback Loops
+
+### Between-Turn (strategic, slower)
+
+After all tool calls in a turn complete, `CreditTrackingService.assign_turn_credit()` runs credit assignment and generates tool effectiveness guidance that's injected into the next turn's prompt.
+
+```python
+# Automatic — wired in ToolCoordinator after execute_tool_calls()
+# Credit signals → ObservabilityBus → GEPA trace enrichment
+# generate_tool_guidance() → UnifiedPromptPipeline.compose_turn_prefix()
+```
+
+### Within-Turn (tactical, faster)
+
+`ToolReputationTracker` updates an EMA reputation score after every tool execution. Its `get_selection_guidance()` is injected mid-stream, biasing the agent toward reliable tools.
+
+```python
+from victor.framework.rl.tool_reputation import ToolReputationTracker
+
+tracker = ToolReputationTracker(alpha=0.3)
+tracker.record("read_file", success=True, duration_ms=50)
+tracker.record("shell", success=False, duration_ms=5000)
+
+guidance = tracker.get_selection_guidance()
+# → "Mid-turn tool reputation:
+#    - read_file: reliable (1 calls, score +0.3)
+#    - shell: unreliable (1/last 5 failed, score -0.3). Verify arguments."
+```
+
+## Credit-Driven Team Rerouting
+
+```python
+from victor.teams.mixins.credit_aware_routing import CreditAwareTeamCoordinator
+from victor.teams import UnifiedTeamCoordinator
+
+class MyTeam(CreditAwareTeamCoordinator, UnifiedTeamCoordinator):
+    pass
+
+team = MyTeam(orchestrator, reroute_threshold=0.5, min_rounds_before_reroute=3)
+# After multiple rounds, underperforming agents' tasks are
+# automatically rerouted to the highest-performing agent.
+
+perf = team.get_agent_performance()
+# → {"coder": {"avg_credit": 0.8, "is_rerouted": False},
+#    "tester": {"avg_credit": -0.3, "is_rerouted": True, "rerouted_to": "coder"}}
+```
 
 ## Extending
 
@@ -216,5 +266,6 @@ To add a new credit assignment method:
 1. Inherit from `BaseCreditAssigner`
 2. Implement `assign_credit()` method
 3. Add to `CreditAssignmentIntegration._assigners` registry
-4. Add unit tests in `test_credit_assignment.py`
-5. Add integration test in `test_credit_assignment_integration.py`
+4. Remove from `CreditAssignmentIntegration._UNIMPLEMENTED` if present
+5. Add unit tests in `test_credit_assignment.py`
+6. Add integration test in `test_credit_assignment_integration.py`
