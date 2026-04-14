@@ -505,6 +505,9 @@ from victor.config.security_settings import SecuritySettings  # noqa: E402
 from victor.config.event_settings import EventSettings  # noqa: E402
 
 
+from victor.config.event_debouncing_settings import EventDebouncingSettings  # noqa: E402
+
+
 from victor.config.observability_settings import ObservabilitySettings  # noqa: E402
 
 
@@ -574,6 +577,7 @@ _NESTED_GROUPS = {
     "resilience": ResilienceSettings,
     "security": SecuritySettings,
     "events": EventSettings,
+    "event_debouncing": EventDebouncingSettings,
     "pipeline": PipelineSettings,
     "observability": ObservabilitySettings,
     "context": ContextSettings,
@@ -719,6 +723,7 @@ class Settings(BaseSettings):
     resilience: Optional[ResilienceSettings] = Field(default=None, exclude=True, repr=False)
     security: Optional[SecuritySettings] = Field(default=None, exclude=True, repr=False)
     events: Optional[EventSettings] = Field(default=None, exclude=True, repr=False)
+    event_debouncing: Optional[EventDebouncingSettings] = Field(default=None, exclude=True, repr=False)
     pipeline: Optional[PipelineSettings] = Field(default=None, exclude=True, repr=False)
     observability: Optional[ObservabilitySettings] = Field(default=None, exclude=True, repr=False)
     context: Optional[ContextSettings] = Field(default=None, exclude=True, repr=False)

@@ -104,12 +104,16 @@ class FrameworkShim:
         - Applies vertical configuration (tools, stages, system prompt)
         - Provides session ID generation and propagation
         - Maintains 100% backward compatibility
+        - Includes event debouncing to prevent log bloat
 
     Attributes:
         orchestrator: Created orchestrator instance (after create_orchestrator())
         observability: ObservabilityIntegration instance (if enabled)
         session_id: Session ID for event correlation
     """
+
+    # Class-level debouncer singleton
+    _debouncer: Optional["SessionStartDebouncer"] = None
 
     def __init__(
         self,
@@ -156,6 +160,21 @@ class FrameworkShim:
         self._orchestrator: Optional["AgentOrchestrator"] = None
         self._observability: Optional["ObservabilityIntegration"] = None
         self._vertical_config: Optional["VerticalConfig"] = None
+
+    @classmethod
+    def _get_debouncer(cls) -> "SessionStartDebouncer":
+        """Get or create the session start debouncer singleton.
+
+        Returns:
+            SessionStartDebouncer instance.
+        """
+        if cls._debouncer is None:
+            from victor.observability.debouncing import SessionStartDebouncer, DebounceConfig
+
+            # Try to load config from settings (will use defaults if not available)
+            config = DebounceConfig()  # Will load from settings if available
+            cls._debouncer = SessionStartDebouncer(config)
+        return cls._debouncer
 
     def _resolve_vertical(
         self, vertical: Optional[Union[Type["VerticalBase"], str]]
@@ -418,11 +437,29 @@ class FrameworkShim:
     def emit_session_start(self, metadata: Optional[dict] = None) -> None:
         """Emit a session start event if observability is enabled.
 
+        This method includes adaptive debouncing to prevent log bloat from
+        duplicate session_start events that occur within a short time window.
+
         Args:
             metadata: Optional session metadata.
         """
-        if self._observability:
-            self._observability.on_session_start(metadata or {})
+        if not self._observability:
+            return
+
+        # Prepare metadata with session_id (create a copy to avoid modifying caller's dict)
+        event_metadata = dict(metadata or {})  # Create a shallow copy
+        event_metadata.setdefault("session_id", self._session_id)
+
+        # Apply debouncing to prevent log bloat
+        debouncer = self._get_debouncer()
+
+        if not debouncer.should_emit(self._session_id, event_metadata):
+            logger.debug(f"Debounced duplicate session_start: {self._session_id}")
+            return
+
+        # Emit the event
+        self._observability.on_session_start(event_metadata)
+        debouncer.record(self._session_id, event_metadata)
 
     def emit_session_end(
         self,

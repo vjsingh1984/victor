@@ -521,7 +521,9 @@ class TestFrameworkShimLifecycle:
             shim._observability.on_session_start = MagicMock()
 
             shim.emit_session_start({"mode": "cli"})
-            shim._observability.on_session_start.assert_called_once_with({"mode": "cli"})
+            # session_id is automatically added to metadata
+            expected_metadata = {"mode": "cli", "session_id": shim.session_id}
+            shim._observability.on_session_start.assert_called_once_with(expected_metadata)
 
     @pytest.mark.asyncio
     async def test_emit_session_end(self, mock_settings, mock_orchestrator):
