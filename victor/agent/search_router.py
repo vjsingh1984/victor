@@ -341,9 +341,22 @@ GRAPH_FILE_SIGNALS: List[Tuple[str, str, str, bool]] = [
         False,
     ),
     (
+        rf"\b(?:what|which)\s+files?\s+depend\s+on\s+{_GRAPH_FILE_FRAGMENT}(?=$|[\s?.!,])",
+        "file_deps",
+        "file_dependents",
+        False,
+    ),
+    (
         rf"\bwhat\s+files?\s+does\s+{_GRAPH_FILE_FRAGMENT}\s+depend\s+on\b",
         "file_deps",
         "file_depends_on",
+        False,
+    ),
+    (
+        rf"\b(?:summari(?:ze|se)|overview|describe|explain|show)\s+(?:the\s+)?"
+        rf"architecture\s+(?:of|around|for)\s+{_GRAPH_FILE_FRAGMENT}(?=$|[\s?.!,])",
+        "file_deps",
+        "file_architecture_summary",
         False,
     ),
 ]
@@ -650,6 +663,10 @@ class SearchRouter:
         if graph_route is not None:
             return graph_route
 
+        graph_file_route = self._route_graph_file_query(query)
+        if graph_file_route is not None:
+            return graph_file_route
+
         scoped_architecture_route = self._route_scoped_architecture_query(query)
         if scoped_architecture_route is not None:
             return scoped_architecture_route
@@ -661,10 +678,6 @@ class SearchRouter:
         graph_analytic_route = self._route_graph_analytic_query(query)
         if graph_analytic_route is not None:
             return graph_analytic_route
-
-        graph_file_route = self._route_graph_file_query(query)
-        if graph_file_route is not None:
-            return graph_file_route
 
         graph_dependency_route = self._route_graph_dependency_query(query)
         if graph_dependency_route is not None:
@@ -840,6 +853,23 @@ class SearchRouter:
             if not file_path:
                 continue
 
+            tool_arguments: Dict[str, Any] = {"mode": mode, "file": file_path}
+            if name == "file_dependents":
+                tool_arguments["direction"] = "in"
+            elif name == "file_depends_on":
+                tool_arguments["direction"] = "out"
+            elif name == "file_architecture_summary":
+                tool_arguments.update(
+                    {
+                        "direction": "both",
+                        "structured": True,
+                        "include_modules": True,
+                        "include_symbols": True,
+                        "include_calls": True,
+                        "include_refs": True,
+                    }
+                )
+
             return SearchRoute(
                 search_type=SearchType.SEMANTIC,
                 confidence=0.93,
@@ -847,7 +877,7 @@ class SearchRouter:
                 transformed_query=file_path,
                 matched_patterns=[name],
                 tool_name="graph",
-                tool_arguments={"mode": mode, "file": file_path},
+                tool_arguments=tool_arguments,
             )
 
         return None

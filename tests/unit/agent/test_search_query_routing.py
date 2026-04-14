@@ -218,6 +218,60 @@ def test_route_search_query_includes_scoped_architecture_summary_arguments() -> 
     assert result["search_type"] == "semantic"
 
 
+def test_route_search_query_includes_graph_file_dependents_arguments() -> None:
+    """Reverse file-dependency queries should route to graph file dependencies."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("what files depend on victor/agent/orchestrator.py")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "file_deps",
+        "file": "victor/agent/orchestrator.py",
+        "direction": "in",
+    }
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_graph_forward_file_dependencies_arguments() -> None:
+    """Forward file-dependency queries should route to graph file dependencies."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query(
+        "what files does victor/agent/orchestrator.py depend on"
+    )
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "file_deps",
+        "file": "victor/agent/orchestrator.py",
+        "direction": "out",
+    }
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_file_architecture_summary_arguments() -> None:
+    """File-scoped architecture queries should route to structured file graph output."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query(
+        "summarize architecture around victor/agent/orchestrator.py"
+    )
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "file_deps",
+        "file": "victor/agent/orchestrator.py",
+        "direction": "both",
+        "structured": True,
+        "include_modules": True,
+        "include_symbols": True,
+        "include_calls": True,
+        "include_refs": True,
+    }
+    assert result["search_type"] == "semantic"
+
+
 def test_route_search_query_includes_graph_pagerank_arguments() -> None:
     """Centrality queries should recommend the graph tool with pagerank args."""
     orchestrator = _make_orchestrator()
@@ -303,5 +357,16 @@ def test_get_recommended_search_tool_uses_scoped_architecture_summary_tool_name(
     orchestrator = _make_orchestrator()
 
     result = orchestrator.get_recommended_search_tool("explain architecture around auth")
+
+    assert result == "graph"
+
+
+def test_get_recommended_search_tool_uses_file_architecture_summary_tool_name() -> None:
+    """File-scoped architecture questions should recommend the graph tool."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool(
+        "explain architecture around victor/agent/orchestrator.py"
+    )
 
     assert result == "graph"

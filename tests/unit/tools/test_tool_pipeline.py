@@ -696,6 +696,60 @@ class TestToolPipelineNormalization:
         assert args["include_refs"] is True
         assert strategy is not None
 
+    def test_normalize_tool_call_reroutes_file_dependents_query_to_graph(self, pipeline):
+        """Reverse file-dependency queries should route to graph file dependencies."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "what files depend on victor/agent/orchestrator.py"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "file_deps"
+        assert args["file"] == "victor/agent/orchestrator.py"
+        assert args["direction"] == "in"
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_forward_file_dependencies_query_to_graph(
+        self, pipeline
+    ):
+        """Forward file-dependency queries should route to graph file dependencies."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "what files does victor/agent/orchestrator.py depend on"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "file_deps"
+        assert args["file"] == "victor/agent/orchestrator.py"
+        assert args["direction"] == "out"
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_file_architecture_summary_query_to_graph(
+        self, pipeline
+    ):
+        """File-scoped architecture queries should route to structured file graph output."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "summarize architecture around victor/agent/orchestrator.py"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "file_deps"
+        assert args["file"] == "victor/agent/orchestrator.py"
+        assert args["direction"] == "both"
+        assert args["structured"] is True
+        assert args["include_modules"] is True
+        assert args["include_symbols"] is True
+        assert args["include_calls"] is True
+        assert args["include_refs"] is True
+        assert strategy is not None
+
     def test_normalize_tool_call_reroutes_pagerank_query_to_graph(self, pipeline):
         """Centrality semantic queries should route to graph pagerank analysis."""
         pipeline.search_router = SearchRouter()
@@ -1405,6 +1459,134 @@ class TestToolPipelineSearchRouting:
         assert executed_kwargs["tool_name"] == "graph"
         assert executed_kwargs["arguments"]["mode"] == "neighbors"
         assert executed_kwargs["arguments"]["node"] == "auth"
+        assert executed_kwargs["arguments"]["structured"] is True
+        assert executed_kwargs["arguments"]["include_modules"] is True
+        assert executed_kwargs["arguments"]["include_symbols"] is True
+        assert executed_kwargs["arguments"]["include_calls"] is True
+        assert executed_kwargs["arguments"]["include_refs"] is True
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_file_dependents_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Reverse file-dependency queries should execute as graph file dependencies."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 2, "results": ["victor/tools/code_search_tool.py", "victor/providers/base.py"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "what files depend on victor/agent/orchestrator.py",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "file_deps"
+        assert executed_kwargs["arguments"]["file"] == "victor/agent/orchestrator.py"
+        assert executed_kwargs["arguments"]["direction"] == "in"
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_forward_file_dependencies_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Forward file-dependency queries should execute as graph file dependencies."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 2, "results": ["victor/providers/base.py", "victor/tools/code_search_tool.py"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "what files does victor/agent/orchestrator.py depend on",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "file_deps"
+        assert executed_kwargs["arguments"]["file"] == "victor/agent/orchestrator.py"
+        assert executed_kwargs["arguments"]["direction"] == "out"
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_file_architecture_summary_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """File-scoped architecture queries should execute as structured file graph output."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 4, "results": ["orchestrator", "providers", "tools", "framework"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "summarize architecture around victor/agent/orchestrator.py",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "file_deps"
+        assert executed_kwargs["arguments"]["file"] == "victor/agent/orchestrator.py"
+        assert executed_kwargs["arguments"]["direction"] == "both"
         assert executed_kwargs["arguments"]["structured"] is True
         assert executed_kwargs["arguments"]["include_modules"] is True
         assert executed_kwargs["arguments"]["include_symbols"] is True
