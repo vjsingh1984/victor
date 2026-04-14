@@ -20,6 +20,27 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Set
 
+from victor_sdk.capabilities.runtime import (
+    BaseCapabilityProvider,
+    CapabilityLoaderPortProtocol,
+    CapabilityConfigMergePolicy,
+    CapabilityConfigScopePortProtocol,
+    CapabilityConfigService,
+    CapabilityEntry,
+    CapabilityMetadata,
+    CapabilityType,
+    DEFAULT_CAPABILITY_CONFIG_SCOPE_KEY,
+    OrchestratorCapability,
+    build_capability_loader,
+    capability,
+    load_capability_config,
+    register_capability_entries,
+    resolve_capability_config_scope_key,
+    resolve_capability_config_service,
+    store_capability_config,
+    update_capability_config_section,
+)
+
 
 class FileOperationType(Enum):
     """Types of generic file operations exposed by a vertical."""
@@ -126,9 +147,27 @@ class PromptContributionCapability:
 
 
 __all__ = [
+    "BaseCapabilityProvider",
+    "CapabilityConfigMergePolicy",
+    "CapabilityConfigScopePortProtocol",
+    "CapabilityConfigService",
+    "CapabilityEntry",
+    "CapabilityLoaderPortProtocol",
+    "CapabilityMetadata",
+    "CapabilityType",
+    "DEFAULT_CAPABILITY_CONFIG_SCOPE_KEY",
     "FileOperation",
     "FileOperationsCapability",
     "FileOperationType",
+    "OrchestratorCapability",
     "PromptContribution",
     "PromptContributionCapability",
+    "build_capability_loader",
+    "capability",
+    "load_capability_config",
+    "register_capability_entries",
+    "resolve_capability_config_scope_key",
+    "resolve_capability_config_service",
+    "store_capability_config",
+    "update_capability_config_section",
 ]

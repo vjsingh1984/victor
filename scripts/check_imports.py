@@ -236,6 +236,28 @@ class ImportValidator:
                 )
                 self.violations.append(violation)
 
+        # Rule 4: Core (victor/) must not import from external vertical packages.
+        # Use entry points or CapabilityRegistry for capability discovery.
+        EXTERNAL_VERTICAL_PACKAGES = (
+            "victor_coding",
+            "victor_devops",
+            "victor_research",
+            "victor_rag",
+            "victor_dataanalysis",
+            "victor_invest",
+        )
+        if rel_path.startswith("victor/") and any(
+            module_name.startswith(pkg) for pkg in EXTERNAL_VERTICAL_PACKAGES
+        ):
+            violation = ImportViolation(
+                file_path=file_path,
+                line_number=line_number,
+                imported_module=module_name,
+                rule="Core must not import from external verticals - use entry points or CapabilityRegistry",
+                severity="error",
+            )
+            self.violations.append(violation)
+
     def validate_directory(self, directory: Path) -> None:
         """Validate all Python files in a directory.
 

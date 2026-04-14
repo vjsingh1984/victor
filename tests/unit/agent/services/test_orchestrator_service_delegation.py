@@ -83,6 +83,71 @@ class TestAdapterImports:
         )
 
 
+class TestServiceProtocolImports:
+    """Test that all 6 service protocols are importable."""
+
+    def test_import_all_service_protocols(self):
+        from victor.agent.services.protocols import (
+            ChatServiceProtocol,
+            ContextServiceProtocol,
+            ProviderServiceProtocol,
+            RecoveryServiceProtocol,
+            SessionServiceProtocol,
+            ToolServiceProtocol,
+        )
+
+        assert all(
+            [
+                ChatServiceProtocol,
+                ToolServiceProtocol,
+                SessionServiceProtocol,
+                ContextServiceProtocol,
+                ProviderServiceProtocol,
+                RecoveryServiceProtocol,
+            ]
+        )
+
+    def test_provider_service_protocol_has_required_methods(self):
+        from victor.agent.services.protocols import ProviderServiceProtocol
+
+        required = {
+            "switch_provider",
+            "get_current_provider_info",
+            "check_provider_health",
+            "get_available_providers",
+            "is_healthy",
+        }
+        actual = {name for name in dir(ProviderServiceProtocol) if not name.startswith("_")}
+        assert required.issubset(actual), f"Missing: {required - actual}"
+
+    def test_recovery_service_protocol_has_required_methods(self):
+        from victor.agent.services.protocols import RecoveryServiceProtocol
+
+        required = {
+            "classify_error",
+            "select_recovery_action",
+            "execute_recovery",
+            "can_retry",
+            "is_healthy",
+        }
+        actual = {name for name in dir(RecoveryServiceProtocol) if not name.startswith("_")}
+        assert required.issubset(actual), f"Missing: {required - actual}"
+
+    def test_context_service_protocol_has_required_methods(self):
+        from victor.agent.services.protocols import ContextServiceProtocol
+
+        required = {
+            "get_context_metrics",
+            "check_context_overflow",
+            "compact_context",
+            "add_message",
+            "get_messages",
+            "is_healthy",
+        }
+        actual = {name for name in dir(ContextServiceProtocol) if not name.startswith("_")}
+        assert required.issubset(actual), f"Missing: {required - actual}"
+
+
 class TestAdapterProtocolConformance:
     """Test that adapters expose the expected interface methods."""
 

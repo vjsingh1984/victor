@@ -192,11 +192,23 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
         try:
             module_name = f"victor.{vertical}.handlers"
             import importlib
+            import inspect
 
             module = importlib.import_module(module_name)
 
             if hasattr(module, "register_handlers"):
-                module.register_handlers()
+                from victor.workflows.executor import register_compute_handler
+
+                register_handlers = module.register_handlers
+                try:
+                    parameters = inspect.signature(register_handlers).parameters
+                except (TypeError, ValueError):
+                    parameters = {}
+
+                if parameters:
+                    register_handlers(register_compute_handler)
+                else:
+                    register_handlers()
             if hasattr(module, "HANDLERS"):
                 handlers.update(module.HANDLERS.keys())
         except ImportError:

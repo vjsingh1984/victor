@@ -129,13 +129,12 @@ class VersionCompatibilityMatrix:
     specific vertical versions are compatible with the framework version.
 
     Rules can be loaded from:
-    - External JSON file (victor/data/compatibility_matrix.json)
-    - Programmatic registration
+    - Programmatic registration via register_rule()
     - Built-in defaults for known verticals
+    - External JSON files (optional, for testing)
 
     Example:
         >>> matrix = VersionCompatibilityMatrix.get_instance()
-        >>> matrix.load_from_file("victor/data/compatibility_matrix.json")
         >>> result = matrix.check_compatibility("coding", "2.0.0", "0.6.0")
         >>> if result.is_compatible:
         ...     print("Compatible!")

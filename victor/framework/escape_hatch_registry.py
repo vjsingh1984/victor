@@ -239,30 +239,26 @@ class EscapeHatchRegistry:
     ) -> Tuple[int, int]:
         """Bulk register conditions and transforms from a vertical.
 
-                Convenience method for registering all escape hatches from a
-                vertical's CONDITIONS and TRANSFORMS dictionaries.
+        Convenience method for registering all escape hatches from a
+        vertical's CONDITIONS and TRANSFORMS dictionaries.
 
-                Args:
-                    vertical: Vertical name
-                    conditions: Dict of condition name -> function
-                    transforms: Dict of transform name -> function
-                    replace: If True, replace existing entries
+        Args:
+            vertical: Vertical name
+            conditions: Dict of condition name -> function
+            transforms: Dict of transform name -> function
+            replace: If True, replace existing entries
 
-                Returns:
-                    Tuple of (conditions_registered, transforms_registered)
+        Returns:
+            Tuple of (conditions_registered, transforms_registered)
 
-                Example:
-        try:
-                        from victor_coding.escape_hatches import CONDITIONS, TRANSFORMS
-        except ImportError:
-            # External vertical package may not be installed
-            pass
-
-                    registry.register_from_vertical(
-                        "coding",
-                        conditions=CONDITIONS,
-                        transforms=TRANSFORMS,
-                    )
+        Example:
+            # Escape hatches are provided by external vertical packages
+            # (e.g., victor-coding) via victor.escape_hatches entry points.
+            registry.register_from_vertical(
+                "coding",
+                conditions=conditions,
+                transforms=transforms,
+            )
         """
         cond_count = 0
         trans_count = 0

@@ -497,21 +497,20 @@ class TestFrameworkShimLifecycle:
         settings = MagicMock()
         settings.provider = "anthropic"
         # Add proper mock settings for event debouncing to avoid enum/type errors
-        # Session start debouncing
+        # Session start debouncing (matches DebounceConfig.from_settings attribute names)
         settings.event_debouncing.session_start_window_type = "time_based"
         settings.event_debouncing.session_start_window_seconds = 5
-        settings.event_debouncing.session_start_max_events_per_window = 3
+        settings.event_debouncing.session_start_max_per_window = 3
+        settings.event_debouncing.session_start_metadata_fingerprinting = True
+        settings.event_debouncing.session_start_track_lifecycle = True
         # Session end debouncing
         settings.event_debouncing.session_end_window_type = "time_based"
         settings.event_debouncing.session_end_window_seconds = 5
-        settings.event_debouncing.session_end_max_events_per_window = 3
+        settings.event_debouncing.session_end_max_per_window = 3
         # Tool call debouncing
         settings.event_debouncing.tool_call_window_type = "time_based"
         settings.event_debouncing.tool_call_window_seconds = 5
-        settings.event_debouncing.tool_call_max_events_per_window = 3
-        # Common debouncing settings
-        settings.event_debouncing.enable_metadata_fingerprinting = True
-        settings.event_debouncing.track_session_lifecycle = True
+        settings.event_debouncing.tool_call_max_per_window = 3
         # Event backend settings
         settings.event_backend_type = "in_memory"
         settings.event_delivery_guarantee = "at_most_once"

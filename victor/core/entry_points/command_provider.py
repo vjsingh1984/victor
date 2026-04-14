@@ -49,7 +49,8 @@ class CommandProvider(Protocol):
                 verbose: bool = False,
             ):
                 \"\"\"Check the codebase index status.\"\"\"
-                from victor_coding.codebase.indexer import CodebaseIndex
+                # This import runs inside the external vertical package
+                from my_vertical.codebase.indexer import CodebaseIndex
                 index = CodebaseIndex(path)
                 status = index.check_status()
                 if verbose:

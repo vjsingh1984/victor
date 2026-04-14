@@ -50,6 +50,7 @@ from victor.framework.capabilities.base import (
     BaseCapabilityProvider,
     CapabilityMetadata,
 )
+from victor_sdk.registries import set_default_persona_registry
 
 if TYPE_CHECKING:
     from victor.framework.multi_agent.personas import PersonaTraits
@@ -142,6 +143,7 @@ class FrameworkPersonaProvider(BaseCapabilityProvider["PersonaTraits"]):
         self._capabilities: Dict[str, "PersonaTraits"] = {}
         self._metadata_full: Dict[str, CapabilityMetadata] = {}
         self._initialized = True
+        set_default_persona_registry(self)
 
     @classmethod
     def reset_instance(cls) -> None:

@@ -25,10 +25,10 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, Set
 
 from victor.framework.chain_registry import get_chain_registry
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.definition import (
     AgentNode,
     ComputeNode,
@@ -142,59 +142,6 @@ def get_compute_handler(name: str) -> Optional[ComputeHandler]:
 def list_compute_handlers() -> List[str]:
     """List all registered compute handler names."""
     return list(_compute_handlers.keys())
-
-
-class ExecutorNodeStatus(Enum):
-    """Execution status of a workflow executor node.
-
-    Renamed from NodeStatus to be semantically distinct:
-    - ExecutorNodeStatus (here): Executor node status
-    - ProtocolNodeStatus (victor.workflows.protocols): Workflow protocol node status
-    - FrameworkNodeStatus (victor.framework.graph): Framework graph node status
-    """
-
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-
-
-@dataclass
-class NodeResult:
-    """Result from executing a workflow node.
-
-    Attributes:
-        node_id: ID of the executed node
-        status: Execution status
-        output: Output data (for agent nodes: agent result)
-        error: Error message if failed
-        duration_seconds: Execution time
-        tool_calls_used: Tool calls made (for agent nodes)
-    """
-
-    node_id: str
-    status: ExecutorNodeStatus
-    output: Optional[Any] = None
-    error: Optional[str] = None
-    duration_seconds: float = 0.0
-    tool_calls_used: int = 0
-
-    @property
-    def success(self) -> bool:
-        """Check if node completed successfully."""
-        return self.status == ExecutorNodeStatus.COMPLETED
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
-        return {
-            "node_id": self.node_id,
-            "status": self.status.value,
-            "output": self.output,
-            "error": self.error,
-            "duration_seconds": self.duration_seconds,
-            "tool_calls_used": self.tool_calls_used,
-        }
 
 
 @dataclass

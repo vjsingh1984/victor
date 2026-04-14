@@ -38,14 +38,10 @@ The PromptBuilder uses a fluent API pattern for ergonomic construction:
 
 Integration with verticals:
 
-try:
-        from victor_coding.prompts import CodingPromptContributor
-except ImportError:
-    # External vertical package may not be installed
-    pass
-
+    # Prompt contributors are provided by external vertical packages
+    # (e.g., victor-coding) via victor.prompt_contributors entry points.
     builder = PromptBuilder()
-    builder.add_from_contributor(CodingPromptContributor())
+    builder.add_from_contributor(prompt_contributor)
     prompt = builder.build()
 """
 

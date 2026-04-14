@@ -60,16 +60,9 @@ from victor.storage.vector_stores.models import (
     create_embedding_model,
 )
 
-try:
-    from victor_coding.languages.base import TreeSitterQueries
-    from victor_coding.languages.registry import (
-        LanguageRegistry,
-        get_language_registry,
-    )
-except ImportError:
-    TreeSitterQueries = None  # type: ignore[misc, assignment]
-    LanguageRegistry = None  # type: ignore[misc, assignment]
-    get_language_registry = None  # type: ignore[assignment]
+# Language registry and tree-sitter queries are provided by external vertical
+# packages (e.g., victor-coding) via CapabilityRegistry. We use Any for type
+# annotations and _NullLanguageRegistry as fallback when no provider is installed.
 
 try:
     from tree_sitter import Query, QueryCursor
@@ -202,7 +195,7 @@ class _TreeSitterAnalysis:
 
     parser: Any
     tree: Any
-    queries: TreeSitterQueries
+    queries: Any
     chunking_context: TreeSitterParseContext
 
 
@@ -235,7 +228,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self,
         config: EmbeddingConfig,
         client: Optional[Any] = None,
-        language_registry: Optional[LanguageRegistry] = None,
+        language_registry: Optional[Any] = None,
     ) -> None:
         super().__init__(config)
 
@@ -249,15 +242,38 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self._graph_api: Optional[Any] = None
         if language_registry is not None:
             self._language_registry = language_registry
-        elif callable(get_language_registry):
-            self._language_registry = get_language_registry()
         else:
-            self._language_registry = _NullLanguageRegistry()
+            # Discover language registry via CapabilityRegistry (provided by
+            # external verticals like victor-coding at bootstrap time)
+            discovered = self._discover_language_registry()
+            self._language_registry = (
+                discovered if discovered is not None else _NullLanguageRegistry()
+            )
 
         if not getattr(self._language_registry, "_plugins", {}):
             self._language_registry.discover_plugins()
 
         self._dimension = int(config.extra_config.get("dimension", 384))
+
+    @staticmethod
+    def _discover_language_registry() -> Optional[Any]:
+        """Discover a language registry from CapabilityRegistry.
+
+        External vertical packages (e.g., victor-coding) register their
+        language registry as a capability at bootstrap. Returns None if
+        no provider is installed.
+        """
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+
+            registry = CapabilityRegistry.get_instance()
+            # Look for any registered provider with a get/detect_language interface
+            for proto_type, (provider, _status) in registry._providers.items():
+                if hasattr(provider, "get") and hasattr(provider, "detect_language"):
+                    return provider
+        except Exception:
+            pass
+        return None
         self._batch_size = int(config.extra_config.get("batch_size", 16))
         self._chunk_size = int(config.extra_config.get("chunk_size", 500))
         self._chunk_overlap = int(config.extra_config.get("chunk_overlap", 50))
@@ -1490,7 +1506,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self,
         tree: Any,
         parser: Any,
-        queries: TreeSitterQueries,
+        queries: Any,
         content: str,
     ) -> List[_GraphSymbol]:
         symbols: List[_GraphSymbol] = []
@@ -1527,7 +1543,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self,
         tree: Any,
         parser: Any,
-        queries: TreeSitterQueries,
+        queries: Any,
     ) -> List[_GraphEdge]:
         if not queries.calls:
             return []

@@ -1,21 +1,27 @@
-"""SDK safety pattern declarations.
-
-Provides data-only safety pattern types that verticals can use to
-declare their safety requirements without importing from
-victor.security.safety (framework internal).
-
-Verticals declare WHAT patterns to apply. The framework's SafetyCoordinator
-decides HOW to enforce them at runtime.
-"""
+"""SDK-owned safety contracts and pattern declarations."""
 
 from victor_sdk.safety.patterns import (
     SafetyPatternDeclaration,
     SafetyPatternType,
     SafetySeverity,
 )
+from victor_sdk.safety.runtime import (
+    SafetyAction,
+    SafetyCategory,
+    SafetyCheckResult,
+    SafetyCoordinator,
+    SafetyRule,
+    SafetyStats,
+)
 
 __all__ = [
+    "SafetyAction",
+    "SafetyCategory",
+    "SafetyCheckResult",
+    "SafetyCoordinator",
     "SafetyPatternDeclaration",
     "SafetyPatternType",
+    "SafetyRule",
     "SafetySeverity",
+    "SafetyStats",
 ]

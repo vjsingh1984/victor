@@ -84,41 +84,10 @@ class VerticalConfigRegistry:
         VerticalConfigRegistry.register_provider_hints("my_vertical", {...})
     """
 
-    # Provider hints templates
+    # Provider hints — only the "default" fallback lives in core.
+    # Vertical-specific hints are registered dynamically by external vertical
+    # packages via register_vertical_config() during VictorPlugin.register().
     _provider_hints: Dict[str, Dict[str, Any]] = {
-        "coding": {
-            "preferred_providers": ["anthropic", "openai"],
-            "preferred_models": [
-                "claude-sonnet-4-20250514",
-                "gpt-4-turbo",
-                "claude-3-5-sonnet-20241022",
-            ],
-            "min_context_window": 100000,
-            "requires_tool_calling": True,
-            "prefers_extended_thinking": True,
-        },
-        "research": {
-            "preferred_providers": ["anthropic", "openai", "google"],
-            "min_context_window": 100000,
-            "features": ["web_search", "large_context"],
-        },
-        "devops": {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 100000,
-            "features": ["tool_calling", "large_context"],
-            "requires_tool_calling": True,
-        },
-        "data_analysis": {
-            "preferred_providers": ["anthropic", "openai"],
-            "min_context_window": 128000,
-            "features": ["tool_calling", "large_context", "code_execution"],
-        },
-        "rag": {
-            "preferred_providers": ["anthropic", "openai", "google"],
-            "min_context_window": 8000,
-            "features": ["tool_calling"],
-            "temperature": 0.3,
-        },
         "default": {
             "preferred_providers": ["anthropic", "openai"],
             "min_context_window": 100000,
@@ -126,48 +95,9 @@ class VerticalConfigRegistry:
         },
     }
 
-    # Evaluation criteria templates
+    # Evaluation criteria — only the "default" fallback lives in core.
+    # Vertical-specific criteria are registered by external packages.
     _evaluation_criteria: Dict[str, List[str]] = {
-        "coding": [
-            "Code correctness and functionality",
-            "Test coverage and validation",
-            "Code quality and maintainability",
-            "Security best practices",
-            "Performance considerations",
-        ],
-        "research": [
-            "accuracy",
-            "source_quality",
-            "comprehensiveness",
-            "clarity",
-            "attribution",
-            "objectivity",
-            "timeliness",
-        ],
-        "devops": [
-            "configuration_correctness",
-            "security_best_practices",
-            "idempotency",
-            "documentation_completeness",
-            "resource_efficiency",
-            "disaster_recovery",
-            "monitoring_coverage",
-        ],
-        "data_analysis": [
-            "statistical_correctness",
-            "visualization_quality",
-            "insight_clarity",
-            "reproducibility",
-            "data_privacy",
-            "methodology_transparency",
-        ],
-        "rag": [
-            "Answer is grounded in retrieved documents",
-            "Sources are properly cited",
-            "No hallucination of facts not in documents",
-            "Relevant documents were retrieved",
-            "Answer is coherent and well-structured",
-        ],
         "default": [
             "Task completion accuracy",
             "Tool usage efficiency",

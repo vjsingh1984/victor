@@ -107,15 +107,16 @@ class CreditGranularity(Enum):
 class CreditMethodology(Enum):
     """Credit assignment methodologies from the paper (arXiv:2604.09459).
 
-    Implemented methods (8):
+    Implemented methods (9):
     - Value-based: Monte Carlo, TD(λ), GAE, N-step returns
     - Game-theoretic: Shapley values
     - Information-theoretic: Hindsight (HER-style)
     - Counterfactual: C3 (leave-one-out)
     - Bifurcation: CARL (entropy-based critical action detection)
+    - Critic-based: LLM-as-Critic (Ollama edge model, falls back to GAE)
 
-    Planned methods (4) — raise NotImplementedError if used directly:
-    - Critic-based: Actor-Critic, LLM-as-Critic, CCPO, HCAPO
+    Planned methods (3) — raise NotImplementedError if used directly:
+    - Actor-Critic (needs neural value network), CCPO, HCAPO
     """
 
     # Value-based methods (implemented)
@@ -136,9 +137,11 @@ class CreditMethodology(Enum):
     # Bifurcation (implemented)
     CARL = "carl"  # Entropy-based critical action detection → CARLCreditAssigner
 
+    # Critic-based (implemented)
+    LLM_AS_CRITIC = "llm_critic"  # LLM evaluates actions → LLMCriticCreditAssigner
+
     # Planned — not yet implemented (will raise NotImplementedError)
     ACTOR_CRITIC = "actor_critic"  # Separate value network
-    LLM_AS_CRITIC = "llm_critic"  # LLM evaluates actions
     CCPO = "ccpo"  # Counterfactual Credit-weighted PPO
     HCAPO = "hcapo"  # Hierarchical Credit Assignment PPO
 
@@ -1110,6 +1113,187 @@ class CARLCreditAssigner(BaseCreditAssigner[ActionMetadata]):
 
 
 # ============================================================================
+# LLM-as-Critic Credit Assigner
+# ============================================================================
+
+
+class LLMCriticCreditAssigner(BaseCreditAssigner[ActionMetadata]):
+    """LLM-as-Critic: uses a cheap/fast LLM to evaluate action quality.
+
+    Instead of mathematical value estimation, asks an LLM to score each
+    action's contribution to the trajectory outcome. Falls back to GAE
+    when no LLM is available.
+
+    Uses the same provider infrastructure as GEPA (Ollama edge model by
+    default — free, local, fast). The LLM receives a structured prompt
+    with the action context and returns a quality score.
+
+    Reference: arXiv:2604.09459 Section 3.3 (LLM-as-Judge / CAPO pattern)
+    """
+
+    def __init__(
+        self,
+        config: Optional[CreditAssignmentConfig] = None,
+        provider_name: str = "ollama",
+        model: str = "qwen3.5:2b",
+    ):
+        super().__init__(config)
+        self._provider_name = provider_name
+        self._model = model
+        self._provider: Optional[Any] = None
+        self._gae_fallback = EpisodeLevelCreditAssigner(config)
+
+    def assign_credit(
+        self,
+        trajectory: List[ActionMetadata],
+        rewards: List[float],
+        config: Optional[CreditAssignmentConfig] = None,
+    ) -> List[CreditSignal]:
+        """Assign credit using LLM evaluation of each action."""
+        if len(trajectory) != len(rewards):
+            raise ValueError("Trajectory and rewards must have same length")
+
+        cfg = config or self.config
+
+        # Try LLM-based evaluation
+        llm_scores = self._evaluate_with_llm(trajectory, rewards)
+        if llm_scores is None:
+            # Fallback to GAE if LLM unavailable
+            logger.debug("LLM-as-Critic unavailable, falling back to GAE")
+            return self._gae_fallback.assign_credit(trajectory, rewards, cfg)
+
+        # Combine LLM scores with raw rewards
+        signals = []
+        for i, action_meta in enumerate(trajectory):
+            llm_score = llm_scores[i] if i < len(llm_scores) else 0.5
+            # Credit = blend of LLM evaluation and raw reward
+            credit = 0.6 * llm_score + 0.4 * rewards[i]
+
+            signal = CreditSignal(
+                action_id=action_meta.action_id,
+                raw_reward=rewards[i],
+                credit=credit,
+                confidence=0.85,  # LLM judgment has moderate confidence
+                methodology=CreditMethodology.LLM_AS_CRITIC,
+                granularity=cfg.granularity,
+                metadata=action_meta,
+            )
+            signals.append(signal)
+            self._credit_store[action_meta.action_id] = signal
+
+        return signals
+
+    def _evaluate_with_llm(
+        self,
+        trajectory: List[ActionMetadata],
+        rewards: List[float],
+    ) -> Optional[List[float]]:
+        """Ask LLM to evaluate each action's contribution.
+
+        Returns a list of scores in [0, 1] for each action, or None if
+        the LLM is unavailable.
+        """
+        provider = self._get_provider()
+        if provider is None:
+            return None
+
+        # Build a concise evaluation prompt
+        total_reward = sum(rewards)
+        outcome = "successful" if total_reward > 0 else "failed"
+
+        actions_text = []
+        for i, (meta, reward) in enumerate(zip(trajectory, rewards)):
+            tool = meta.tool_name or meta.method_name or "unknown"
+            actions_text.append(f"  {i}: tool={tool}, reward={reward:+.2f}")
+
+        prompt = (
+            f"/no_think\n"
+            f"Rate each action's contribution to this {outcome} trajectory "
+            f"(total reward: {total_reward:+.2f}).\n\n"
+            f"Actions:\n" + "\n".join(actions_text[:20]) + "\n\n"
+            "Reply with ONLY a comma-separated list of scores (0.0 to 1.0), "
+            "one per action. Example: 0.8, 0.3, 0.9, 0.1"
+        )
+
+        try:
+            from victor.core.async_utils import run_sync_in_thread
+            from victor.providers.base import Message
+
+            messages = [Message(role="user", content=prompt)]
+            response = run_sync_in_thread(
+                provider.chat(
+                    messages=messages,
+                    model=self._model,
+                    max_tokens=200,
+                    temperature=0.3,  # Low temp for consistent scoring
+                ),
+                timeout=15.0,
+            )
+
+            if not response or not response.content:
+                return None
+
+            # Parse scores from response
+            return self._parse_scores(response.content, len(trajectory))
+
+        except Exception as e:
+            logger.debug("LLM-as-Critic evaluation failed: %s", e)
+            return None
+
+    def _parse_scores(self, response: str, expected_count: int) -> Optional[List[float]]:
+        """Parse comma-separated scores from LLM response."""
+        import re
+
+        # Strip thinking artifacts
+        content = response
+        if "<think>" in content:
+            content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+
+        # Extract numbers
+        numbers = re.findall(r"(\d+\.?\d*)", content)
+        if not numbers:
+            return None
+
+        scores = []
+        for n in numbers[:expected_count]:
+            try:
+                score = float(n)
+                scores.append(min(1.0, max(0.0, score)))
+            except ValueError:
+                scores.append(0.5)
+
+        # Pad with 0.5 if LLM returned fewer scores than actions
+        while len(scores) < expected_count:
+            scores.append(0.5)
+
+        return scores
+
+    def _get_provider(self) -> Optional[Any]:
+        """Get or create LLM provider (same pattern as GEPA)."""
+        if self._provider is not None:
+            return self._provider
+        if not self._provider_name:
+            return None
+        try:
+            if self._provider_name == "ollama":
+                from victor.providers.ollama_provider import OllamaProvider
+
+                self._provider = OllamaProvider()
+            else:
+                from importlib import import_module
+
+                mod = import_module(f"victor.providers.{self._provider_name}_provider")
+                cls_name = f"{self._provider_name.title()}Provider"
+                self._provider = getattr(mod, cls_name)()
+            return self._provider
+        except Exception as e:
+            logger.debug(
+                "Failed to create %s provider for LLM-as-Critic: %s", self._provider_name, e
+            )
+            return None
+
+
+# ============================================================================
 # Main Integration Class
 # ============================================================================
 
@@ -1129,6 +1313,7 @@ class CreditAssignmentIntegration:
         CreditMethodology.N_STEP_RETURNS: TurnLevelCreditAssigner,
         CreditMethodology.C3: CounterfactualCreditAssigner,
         CreditMethodology.CARL: CARLCreditAssigner,
+        CreditMethodology.LLM_AS_CRITIC: LLMCriticCreditAssigner,
     }
 
     def __init__(
@@ -1174,7 +1359,6 @@ class CreditAssignmentIntegration:
     # Methodologies that have no assigner implementation yet
     _UNIMPLEMENTED: ClassVar[set] = {
         CreditMethodology.ACTOR_CRITIC,
-        CreditMethodology.LLM_AS_CRITIC,
         CreditMethodology.CCPO,
         CreditMethodology.HCAPO,
     }
@@ -1383,6 +1567,8 @@ __all__ = [
     # Bifurcation (CARL)
     "CARLCreditAssigner",
     "CriticalActionIdentifier",
+    # LLM-as-Critic
+    "LLMCriticCreditAssigner",
     # Main integration
     "CreditAssignmentIntegration",
     "StateGraphCreditMixin",
