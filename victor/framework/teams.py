@@ -461,11 +461,13 @@ class AgentTeam:
                 ],
             )
         """
+        normalized_formation = TeamFormation(getattr(formation, "value", formation))
+
         # Convert specs to TeamMembers
         team_members = [spec.to_team_member(index=i) for i, spec in enumerate(members)]
 
         # For hierarchical, ensure we have a manager
-        if formation == TeamFormation.HIERARCHICAL:
+        if normalized_formation == TeamFormation.HIERARCHICAL:
             has_manager = any(m.is_manager for m in team_members)
             if not has_manager and team_members:
                 # Make the first member the manager
@@ -484,7 +486,7 @@ class AgentTeam:
             name=name,
             goal=goal,
             members=team_members,
-            formation=formation,
+            formation=normalized_formation,
             total_tool_budget=total_tool_budget,
             max_iterations=max_iterations,
             timeout_seconds=timeout_seconds,

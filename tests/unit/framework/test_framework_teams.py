@@ -539,6 +539,23 @@ class TestAgentTeamConfig:
 
         assert team.config.shared_context == context
 
+    @pytest.mark.asyncio
+    async def test_create_accepts_sdk_team_schema_types(self, mock_orchestrator):
+        """create should normalize SDK team schema inputs."""
+        from victor_sdk.team_schema import TeamFormation as SdkTeamFormation
+        from victor_sdk.team_schema import TeamMemberSpec as SdkTeamMemberSpec
+
+        team = await AgentTeam.create(
+            orchestrator=mock_orchestrator,
+            name="SDK Team",
+            goal="Goal",
+            members=[SdkTeamMemberSpec(role="executor", goal="Execute")],
+            formation=SdkTeamFormation.PIPELINE,
+        )
+
+        assert team.formation == TeamFormation.PIPELINE
+        assert team.members[0].goal == "Execute"
+
 
 class TestAgentTeamProperties:
     """Tests for AgentTeam properties."""
