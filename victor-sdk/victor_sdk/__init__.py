@@ -125,6 +125,12 @@ from victor_sdk.workflows import (
     WorkflowContextProtocol,
     register_compute_handlers,
 )
+from victor_sdk.workflow_runtime import (
+    BaseYAMLWorkflowProvider,
+    WorkflowBuilder,
+    WorkflowDefinition,
+    workflow,
+)
 from victor_sdk.core.plugins import PluginContext, VictorPlugin
 from victor_sdk.registries import (
     PersonaRegistryProtocol,
@@ -293,6 +299,7 @@ __all__ = [
     "FileOperationType",
     "BaseCapabilityProvider",
     "BaseRLConfig",
+    "BaseYAMLWorkflowProvider",
     "ComputeHandlerProtocol",
     "ComputeHandlerRegistrar",
     "ComputeNodeProtocol",
@@ -330,6 +337,9 @@ __all__ = [
     "get_default_team_registry",
     "set_default_persona_registry",
     "set_default_team_registry",
+    "WorkflowBuilder",
+    "WorkflowDefinition",
+    "workflow",
     "PluginContext",
     "VictorPlugin",
     # Exceptions
