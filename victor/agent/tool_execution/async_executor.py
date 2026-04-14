@@ -226,7 +226,7 @@ class AsyncToolExecutor:
                     parallelizable=True,
                 )
 
-            except asyncio.TimeoutError as e:
+            except asyncio.TimeoutError:
                 duration = (time.time() - start_time) * 1000
                 return ExecutionResult(
                     call_id=call.call_id,

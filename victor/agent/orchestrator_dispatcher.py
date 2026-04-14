@@ -103,7 +103,7 @@ class OrchestratorDispatcher:
             self._impl = AgentOrchestrator()
             self._factory_called = True
 
-            logger.debug(f"OrchestratorDispatcher: Lazy loaded AgentOrchestrator")
+            logger.debug("OrchestratorDispatcher: Lazy loaded AgentOrchestrator")
             return self._impl
 
         except Exception as e:
