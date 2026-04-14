@@ -136,6 +136,12 @@ from victor_sdk.verticals.protocols.hooks import HookProvider, HookConfigProvide
 from victor_sdk.verticals.protocols.permissions import PermissionProvider
 from victor_sdk.verticals.protocols.compaction import CompactionProvider
 from victor_sdk.verticals.protocols.plugins import ExternalPluginProvider
+from victor_sdk.verticals.protocols.tool_plugins import (
+    ToolFactory,
+    ToolFactoryAdapter,
+    ToolFactoryPlugin,
+    ToolPluginHelper,
+)
 
 __all__ = [
     # SDK-native protocols
@@ -207,6 +213,10 @@ __all__ = [
     "PermissionProvider",
     "CompactionProvider",
     "ExternalPluginProvider",
+    "ToolFactory",
+    "ToolFactoryAdapter",
+    "ToolFactoryPlugin",
+    "ToolPluginHelper",
     # Promoted storage protocols
     "GraphNodeData",
     "GraphEdgeData",

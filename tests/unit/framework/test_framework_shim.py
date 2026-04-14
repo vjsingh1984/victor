@@ -493,9 +493,16 @@ class TestFrameworkShimLifecycle:
 
     @pytest.fixture
     def mock_settings(self):
-        """Create mock settings."""
+        """Create mock settings with proper event_debouncing values."""
         settings = MagicMock()
         settings.provider = "anthropic"
+        # Add proper mock settings for event debouncing to avoid enum errors
+        settings.event_debouncing.session_start_window_type = "time_based"
+        settings.event_debouncing.session_end_window_type = "time_based"
+        settings.event_debouncing.tool_call_window_type = "time_based"
+        settings.event_backend_type = "in_memory"
+        settings.event_delivery_guarantee = "at_most_once"
+        settings.event_queue_overflow_policy = "drop_newest"
         return settings
 
     @pytest.fixture

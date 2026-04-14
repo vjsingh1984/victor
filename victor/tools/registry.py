@@ -679,3 +679,170 @@ class ToolRegistry(BaseRegistry[str, Any]):
             hook(result)
 
         return result
+
+    # ========================================================================
+    # Plugin-Based Tool Registration
+    # ========================================================================
+
+    def register_plugin(self, plugin: Any) -> None:
+        """Register a tool plugin with the registry.
+
+        Tool plugins enable external verticals to dynamically register
+        tools at runtime. The plugin's register() method is called to perform
+        the actual registration.
+
+        This method accepts any object with a register() method, including:
+        - VictorPlugin from victor_sdk.core.plugins
+        - ToolFactoryAdapter from victor_sdk.verticals.protocols.tool_plugins
+        - Any class with a register(registry) method
+
+        Args:
+            plugin: Object with register() method (VictorPlugin protocol)
+
+        Raises:
+            AttributeError: If plugin doesn't have a register() method
+            Exception: If plugin.register() raises an exception
+
+        Example:
+            from victor_sdk.verticals.protocols import ToolPluginHelper
+
+            # Using helper
+            tools = {"code_search": CodeSearchTool(), "refactor": RefactoringTool()}
+            plugin = ToolPluginHelper.from_instances(tools)
+            registry.register_plugin(plugin)
+
+        Example:
+            # Custom plugin class
+            class MyVerticalPlugin:
+                def register(self, registry: ToolRegistry) -> None:
+                    registry.register(CodeSearchTool())
+                    registry.register(RefactoringTool())
+
+            plugin = MyVerticalPlugin()
+            registry.register_plugin(plugin)
+        """
+        if not hasattr(plugin, "register"):
+            raise AttributeError(
+                f"Tool plugin must have a 'register' method. Got: {type(plugin)}"
+            )
+
+        # Call plugin's register method
+        plugin.register(self)
+
+    def discover_plugins(self) -> int:
+        """Discover and register tool plugins from entry points.
+
+        Scans the 'victor.plugins' entry point group for tool plugins
+        and automatically registers them.
+
+        Returns:
+            Number of plugins discovered and registered
+
+        Example:
+            # In setup.py:
+            # setup_entry_points={
+            #     "victor.plugins": [
+            #         "my_vertical = my_vertical.plugin:MyVerticalPlugin"
+            #     ]
+            # }
+
+            # At runtime:
+            count = registry.discover_plugins()
+            print(f"Registered {count} tool plugins")
+        """
+        import importlib.metadata
+
+        count = 0
+
+        try:
+            eps = importlib.metadata.entry_points()
+
+            # Python 3.12+ returns a SelectableGroups, older returns dict
+            if hasattr(eps, 'select'):
+                plugin_eps = eps.select(group="victor.plugins")
+            else:
+                plugin_eps = eps.get("victor.plugins", [])
+
+            for ep in plugin_eps:
+                try:
+                    plugin = ep.load()
+                    self.register_plugin(plugin)
+                    count += 1
+                except Exception as e:
+                    # Log but don't fail - allow other plugins to load
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"Failed to load tool plugin '{ep.name}': {e}"
+                    )
+
+        except Exception:
+            # Entry points not available or other error
+            pass
+
+        return count
+
+    def register_from_entry_points(
+        self,
+        entry_point_group: str = "victor.plugins",
+        enabled: bool = True,
+    ) -> int:
+        """Discover and register tools from entry points.
+
+        Legacy method for discovering tools from entry points.
+        Prefer discover_plugins() for new code.
+
+        Args:
+            entry_point_group: Entry point group to scan (default: victor.plugins)
+            enabled: Whether discovered tools are enabled by default (unused, for backward compatibility)
+
+        Returns:
+            Number of entry points discovered and registered
+
+        Note:
+            This method scans for both VictorPlugin implementations
+            and lists/tuples of tool instances.
+        """
+        import importlib.metadata
+
+        count = 0
+
+        try:
+            eps = importlib.metadata.entry_points()
+
+            if hasattr(eps, 'select'):
+                group_eps = eps.select(group=entry_point_group)
+            else:
+                group_eps = eps.get(entry_point_group, [])
+
+            for ep in group_eps:
+                try:
+                    plugin = ep.load()
+
+                    # Register if it has a register method
+                    if hasattr(plugin, "register"):
+                        self.register_plugin(plugin)
+                        count += 1
+                    # Or if it's a list/callable of tool factories
+                    elif isinstance(plugin, (list, tuple)):
+                        from victor_sdk.verticals.protocols import ToolPluginHelper
+
+                        # Convert list of tools to plugin
+                        tools = {f"tool_{i}": tool for i, tool in enumerate(plugin)}
+                        adapter = ToolPluginHelper.from_instances(tools)
+                        self.register_plugin(adapter)
+                        count += 1
+
+                except Exception as e:
+                    # Log but don't fail
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f"Failed to load tool plugin from '{ep.name}': {e}"
+                    )
+
+        except Exception:
+            # Entry points not available
+            pass
+
+        return count
