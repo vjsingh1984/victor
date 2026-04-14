@@ -1569,7 +1569,8 @@ async def read(
                 return 1500, 65536  # ~2000 lines, 32KB for local models (airgapped)
 
             # Check provider name for local indicators
-            provider = getattr(settings, "provider", "").lower()
+            provider_obj = getattr(settings, "provider", None)
+            provider = (provider_obj.default_provider if hasattr(provider_obj, "default_provider") else str(provider_obj or "")).lower()
             local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
             if any(p in provider for p in local_providers):
                 # Try to get model context size from capabilities

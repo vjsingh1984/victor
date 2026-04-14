@@ -44,6 +44,30 @@ def test_get_recommended_search_tool_uses_bug_route_tool_name() -> None:
     assert result == "code_search"
 
 
+def test_route_search_query_includes_localize_mode_arguments() -> None:
+    """Issue localization queries should route to code_search with localize mode."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query(
+        "which files should I edit to add a logger parameter to BaseRepository"
+    )
+
+    assert result["recommended_tool"] == "code_search"
+    assert result["recommended_args"] == {"mode": "localize"}
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_impact_mode_arguments() -> None:
+    """Change-impact queries should route to code_search with impact mode."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("what breaks if I change BaseRepository.save")
+
+    assert result["recommended_tool"] == "code_search"
+    assert result["recommended_args"] == {"mode": "impact"}
+    assert result["search_type"] == "semantic"
+
+
 def test_route_search_query_includes_graph_arguments() -> None:
     """Call-graph queries should recommend the graph tool with traversal args."""
     orchestrator = _make_orchestrator()
@@ -59,10 +83,93 @@ def test_route_search_query_includes_graph_arguments() -> None:
     assert result["search_type"] == "semantic"
 
 
+def test_route_search_query_includes_graph_neighbors_arguments() -> None:
+    """Neighbor queries should recommend the graph tool with neighbor args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("show neighbors of BaseProvider")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "neighbors",
+        "node": "BaseProvider",
+        "depth": 1,
+    }
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_graph_path_arguments() -> None:
+    """Dependency-path queries should recommend the graph tool with path args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("find dependency path between Parser and Provider")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "path",
+        "source": "Parser",
+        "target": "Provider",
+    }
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_graph_pagerank_arguments() -> None:
+    """Centrality queries should recommend the graph tool with pagerank args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("show the top 7 most central symbols in this repo")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {"mode": "pagerank", "top_k": 7}
+    assert result["search_type"] == "semantic"
+
+
 def test_get_recommended_search_tool_uses_graph_route_tool_name() -> None:
     """Graph traversal routes should surface graph as the recommended tool."""
     orchestrator = _make_orchestrator()
 
     result = orchestrator.get_recommended_search_tool("trace execution from main")
+
+    assert result == "graph"
+
+
+def test_get_recommended_search_tool_uses_localize_route_tool_name() -> None:
+    """Issue localization routes should still recommend code_search."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool(
+        "localize the issue for repetitive output to counter BREACH attacks"
+    )
+
+    assert result == "code_search"
+
+
+def test_get_recommended_search_tool_uses_impact_route_tool_name() -> None:
+    """Impact-analysis routes should still recommend code_search."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool(
+        "show me the blast radius if I modify BaseRepository.save"
+    )
+
+    assert result == "code_search"
+
+
+def test_get_recommended_search_tool_uses_graph_pagerank_tool_name() -> None:
+    """Centrality questions should recommend the graph tool."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool("what are the most important modules here")
+
+    assert result == "graph"
+
+
+def test_get_recommended_search_tool_uses_graph_path_tool_name() -> None:
+    """Dependency-path questions should recommend the graph tool."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool(
+        "show the path from Parser to Provider"
+    )
 
     assert result == "graph"

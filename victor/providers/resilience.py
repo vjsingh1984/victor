@@ -317,6 +317,8 @@ class ProviderRetryConfig:
         ConnectionError,
         TimeoutError,
         asyncio.TimeoutError,
+        CanonicalCircuitBreakerError,
+        CircuitOpenError,
         # httpx transport errors: RemoteProtocolError, ReadError, etc.
         # "Server disconnected without sending a response"
     )

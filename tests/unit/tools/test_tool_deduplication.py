@@ -101,32 +101,33 @@ class TestToolDeduplicationTracker:
 class TestSearchRedundancy:
     """Test search/grep redundancy detection."""
 
-    def test_exact_query_match(self):
-        """Test exact query match detection."""
+    def test_exact_query_and_mode_match(self):
+        """Test exact query+mode match detection."""
         tracker = ToolDeduplicationTracker()
 
         tracker.add_call("grep", {"query": "tool registration", "mode": "semantic"})
-        is_dup = tracker.is_redundant("grep", {"query": "tool registration", "mode": "regex"})
+        # Same query, same mode → redundant
+        assert tracker.is_redundant("grep", {"query": "tool registration", "mode": "semantic"}) is True
+        # Same query, different mode → NOT redundant (different search strategy)
+        assert tracker.is_redundant("grep", {"query": "tool registration", "mode": "regex"}) is False
 
-        assert is_dup is True
-
-    def test_synonym_query_match(self):
-        """Test synonym query match detection."""
+    def test_synonym_query_not_redundant(self):
+        """Synonym queries are allowed — agent may need different perspectives."""
         tracker = ToolDeduplicationTracker()
 
         tracker.add_call("grep", {"query": "tool registration"})
         is_dup = tracker.is_redundant("grep", {"query": "register tool"})
 
-        assert is_dup is True
+        assert is_dup is False
 
-    def test_substring_query_match(self):
-        """Test substring query match detection."""
+    def test_substring_query_not_redundant(self):
+        """Substring queries are allowed — agent may be narrowing/broadening search."""
         tracker = ToolDeduplicationTracker()
 
         tracker.add_call("code_search", {"query": "error handling in providers"})
         is_dup = tracker.is_redundant("code_search", {"query": "error handling"})
 
-        assert is_dup is True
+        assert is_dup is False
 
     def test_different_queries_not_redundant(self):
         """Test that different queries are not redundant."""
@@ -400,23 +401,23 @@ class TestPerformance:
 class TestSemanticSimilarity:
     """Test semantic similarity detection."""
 
-    def test_error_handling_synonyms(self):
-        """Test error handling synonym detection."""
+    def test_error_handling_synonyms_not_blocked(self):
+        """Synonym queries are allowed — exact match only for dedup."""
         tracker = ToolDeduplicationTracker()
 
         tracker.add_call("grep", {"query": "error handling"})
         is_dup = tracker.is_redundant("grep", {"query": "exception"})
 
-        assert is_dup is True
+        assert is_dup is False
 
-    def test_provider_synonyms(self):
-        """Test provider synonym detection."""
+    def test_provider_synonyms_not_blocked(self):
+        """Synonym queries are allowed — exact match only for dedup."""
         tracker = ToolDeduplicationTracker()
 
         tracker.add_call("grep", {"query": "provider"})
         is_dup = tracker.is_redundant("grep", {"query": "llm provider"})
 
-        assert is_dup is True
+        assert is_dup is False
 
     def test_unrelated_queries(self):
         """Test that unrelated queries are not matched."""

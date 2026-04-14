@@ -120,6 +120,34 @@ class TeamEventType(str, Enum):
     """Work was handed off between members."""
 
 
+# Register domain event mapping with canonical EventType taxonomy
+def _register_team_event_taxonomy() -> None:
+    try:
+        from victor.core.events.taxonomy import EventTaxonomyRegistry
+        from victor.framework.events import EventType
+
+        EventTaxonomyRegistry.register_domain(
+            "team",
+            TeamEventType,
+            {
+                TeamEventType.TEAM_START: EventType.STREAM_START,
+                TeamEventType.TEAM_COMPLETE: EventType.STREAM_END,
+                TeamEventType.TEAM_ERROR: EventType.ERROR,
+                TeamEventType.MEMBER_START: EventType.PROGRESS,
+                TeamEventType.MEMBER_PROGRESS: EventType.PROGRESS,
+                TeamEventType.MEMBER_COMPLETE: EventType.MILESTONE,
+                TeamEventType.MEMBER_ERROR: EventType.ERROR,
+                TeamEventType.MESSAGE_SENT: EventType.CONTENT,
+                TeamEventType.HANDOFF: EventType.STAGE_CHANGE,
+            },
+        )
+    except ImportError:
+        pass
+
+
+_register_team_event_taxonomy()
+
+
 @dataclass
 class TeamEvent:
     """An event from team execution.

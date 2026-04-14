@@ -266,17 +266,10 @@ class VerticalMetadata:
         # Emit deprecation warning for legacy pattern
         import warnings
 
-        warnings.warn(
-            f"Vertical class '{classname}' does not follow the recommended "
-            f"naming convention (Assistant or Vertical suffix). "
-            f"Support for name inference will be removed in v1.0. "
-            f"Use the @register_vertical decorator or define a 'name' attribute.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-
-        logger.debug(
-            f"Using classname '{classname}' as vertical name " f"(no recognized suffix pattern)"
+        logger.warning(
+            "Vertical class '%s' does not follow the recommended naming convention "
+            "(Assistant or Vertical suffix). Use @register_vertical or define a 'name' attribute.",
+            classname,
         )
         return classname.lower()
 

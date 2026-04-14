@@ -233,13 +233,23 @@ class ExecutionCoordinator:
                 # Handle tool calls and track results
                 tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
 
-                # Update failure context
+                # Update failure context and record for real-time failure hints
                 for result in tool_results:
                     if result.get("success"):
                         failure_context.successful_tools.append(result)
                     else:
                         failure_context.failed_tools.append(result)
                         failure_context.last_error = result.get("error")
+                        # Record failure in OptimizationInjector for next-turn hints
+                        _orch = getattr(self, "_orchestrator", None) or getattr(
+                            self._chat_context, "_orchestrator", None
+                        )
+                        _injector = getattr(_orch, "_optimization_injector", None) if _orch else None
+                        if _injector and result.get("error"):
+                            _injector.record_failure(
+                                result.get("tool_name", "unknown"),
+                                result["error"],
+                            )
 
                 # Spin detection: check if ALL tool calls were dedup-blocked
                 _pipeline = getattr(self._tool_context, "_tool_pipeline", None)

@@ -65,6 +65,7 @@ POPULAR_MODELS: Dict[str, List[str]] = {
         "claude-opus-4-6",
     ],
     "openai": [
+        "gpt-5.4-mini",
         "gpt-4.1",
         "gpt-4o",
         "o3-mini",

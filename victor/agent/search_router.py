@@ -152,9 +152,154 @@ BUG_SIMILARITY_SIGNALS: List[Tuple[str, float, str, bool]] = [
     (r"\b(bug|bugs|failing|failure|failures|broken)\b", 0.7, "bug_symptom", False),
 ]
 
-_GRAPH_SYMBOL_FRAGMENT = (
-    r"(?:[`'\"](?P<quoted>[^`'\"]+)[`'\"]|(?P<bare>[A-Za-z_][A-Za-z0-9_:.<>/-]*))"
+ISSUE_LOCALIZATION_SIGNALS: List[Tuple[str, float, str, bool]] = [
+    (
+        r"\b(?:localize|locate)\s+(?:the\s+)?(?:issue|bug|regression|failure|problem|fix)\b",
+        1.0,
+        "localize_issue",
+        False,
+    ),
+    (
+        r"\b(?:which|what)\s+files?\s+(?:should\s+i\s+)?(?:edit|change|modify|fix)\b",
+        1.0,
+        "which_files_to_edit",
+        False,
+    ),
+    (
+        r"\bwhere\s+(?:should\s+i\s+)?(?:edit|change|modify|fix)\b",
+        0.9,
+        "where_to_edit",
+        False,
+    ),
+    (
+        r"\b(?:relevant|affected|suspicious)\s+files?\b",
+        0.8,
+        "relevant_files",
+        False,
+    ),
+    (
+        r"\bfiles?\s+to\s+(?:edit|change|modify|fix)\b",
+        0.9,
+        "files_to_edit",
+        False,
+    ),
+]
+
+CHANGE_IMPACT_SIGNALS: List[Tuple[str, float, str, bool]] = [
+    (
+        r"\bwhat\s+breaks\s+if\s+i\s+(?:change|modify|edit)\b",
+        1.0,
+        "what_breaks_if_i_change",
+        False,
+    ),
+    (
+        r"\bimpact\s+of\s+(?:changing|modifying|editing)\b",
+        0.95,
+        "impact_of_change",
+        False,
+    ),
+    (
+        r"\bblast\s+radius\b",
+        0.95,
+        "blast_radius",
+        False,
+    ),
+    (
+        r"\baffected\s+files?\b",
+        0.85,
+        "affected_files",
+        False,
+    ),
+    (
+        r"\b(?:what|which)\s+(?:breaks|is\s+affected)\b",
+        0.8,
+        "what_breaks",
+        False,
+    ),
+]
+
+GRAPH_ANALYTIC_SIGNALS: List[Tuple[str, str, str, bool]] = [
+    (
+        r"\b(?:show|find|get|list)\s+(?:the\s+)?(?:top[\s-]*\d+\s+)?(?:most\s+)?"
+        r"(?:important|central)\s+(?:symbols?|functions?|methods?|modules?|nodes?)\b",
+        "pagerank",
+        "central_symbols",
+        False,
+    ),
+    (
+        r"\b(?:important|central|hub)\s+(?:symbols?|functions?|methods?|modules?|nodes?)\b",
+        "pagerank",
+        "important_symbols",
+        False,
+    ),
+    (
+        r"\bpagerank\b",
+        "pagerank",
+        "pagerank",
+        False,
+    ),
+]
+
+
+def _graph_symbol_fragment(*, quoted_group: str, bare_group: str) -> str:
+    """Return a reusable regex fragment for graph symbol extraction."""
+    return (
+        rf"(?:[`'\"](?P<{quoted_group}>[^`'\"]+)[`'\"]|"
+        rf"(?P<{bare_group}>[A-Za-z_][A-Za-z0-9_:.<>/-]*))"
+    )
+
+
+_GRAPH_SYMBOL_FRAGMENT = _graph_symbol_fragment(quoted_group="quoted", bare_group="bare")
+_GRAPH_SOURCE_SYMBOL_FRAGMENT = _graph_symbol_fragment(
+    quoted_group="source_quoted",
+    bare_group="source_bare",
 )
+_GRAPH_TARGET_SYMBOL_FRAGMENT = _graph_symbol_fragment(
+    quoted_group="target_quoted",
+    bare_group="target_bare",
+)
+
+GRAPH_NAVIGATION_SIGNALS: List[Tuple[str, str, int, str, bool]] = [
+    (
+        rf"\b(?:show|get|find|list)\s+(?:the\s+)?(?:neighbors?|connections?|dependencies)\s+"
+        rf"(?:of|for)\s+(?:the\s+)?(?:symbol\s+|function\s+|method\s+|class\s+|module\s+)?"
+        rf"{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "neighbors",
+        1,
+        "neighbor_of",
+        False,
+    ),
+    (
+        rf"\b(?:what|which)\s+(?:symbols?|functions?|methods?|modules?|nodes?)?\s*"
+        rf"(?:are\s+)?(?:connected|related)\s+to\s+(?:the\s+)?"
+        rf"(?:symbol\s+|function\s+|method\s+|class\s+|module\s+)?"
+        rf"{_GRAPH_SYMBOL_FRAGMENT}(?=$|[\s?.!,])",
+        "neighbors",
+        1,
+        "connected_to",
+        False,
+    ),
+    (
+        rf"\b(?:find|show|get|trace|list)\s+(?:the\s+)?"
+        rf"(?:shortest\s+|dependency\s+|connection\s+)?path\s+between\s+"
+        rf"{_GRAPH_SOURCE_SYMBOL_FRAGMENT}\s+and\s+{_GRAPH_TARGET_SYMBOL_FRAGMENT}"
+        rf"(?=$|[\s?.!,])",
+        "path",
+        0,
+        "path_between",
+        False,
+    ),
+    (
+        rf"\b(?:find|show|get|trace|list)\s+(?:the\s+)?"
+        rf"(?:shortest\s+|dependency\s+|connection\s+)?path\s+from\s+"
+        rf"{_GRAPH_SOURCE_SYMBOL_FRAGMENT}\s+to\s+{_GRAPH_TARGET_SYMBOL_FRAGMENT}"
+        rf"(?=$|[\s?.!,])",
+        "path",
+        0,
+        "path_from_to",
+        False,
+    ),
+]
 
 # Patterns that indicate a graph traversal is more appropriate than plain search.
 # Format: (regex_pattern, mode, depth, description, case_sensitive)
@@ -250,11 +395,21 @@ class SearchRouter:
         self._keyword_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._semantic_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._bug_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._localization_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._impact_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._graph_analytic_patterns: List[Tuple[re.Pattern, str, str]] = []
+        self._graph_navigation_patterns: List[Tuple[re.Pattern, str, int, str]] = []
         self._graph_patterns: List[Tuple[re.Pattern, str, int, str]] = []
 
         self._compile_patterns(KEYWORD_SIGNALS, self._keyword_patterns)
         self._compile_patterns(SEMANTIC_SIGNALS, self._semantic_patterns)
         self._compile_patterns(BUG_SIMILARITY_SIGNALS, self._bug_patterns)
+        self._compile_patterns(ISSUE_LOCALIZATION_SIGNALS, self._localization_patterns)
+        self._compile_patterns(CHANGE_IMPACT_SIGNALS, self._impact_patterns)
+        self._compile_graph_analytic_patterns(
+            GRAPH_ANALYTIC_SIGNALS, self._graph_analytic_patterns
+        )
+        self._compile_graph_patterns(GRAPH_NAVIGATION_SIGNALS, self._graph_navigation_patterns)
         self._compile_graph_patterns(GRAPH_TRAVERSAL_SIGNALS, self._graph_patterns)
 
         # Add custom signals
@@ -265,6 +420,20 @@ class SearchRouter:
                 self._compile_patterns(custom_signals["semantic"], self._semantic_patterns)
             if "bug" in custom_signals:
                 self._compile_patterns(custom_signals["bug"], self._bug_patterns)
+            if "localization" in custom_signals:
+                self._compile_patterns(custom_signals["localization"], self._localization_patterns)
+            if "impact" in custom_signals:
+                self._compile_patterns(custom_signals["impact"], self._impact_patterns)
+            if "graph_analytics" in custom_signals:
+                self._compile_graph_analytic_patterns(
+                    custom_signals["graph_analytics"],
+                    self._graph_analytic_patterns,
+                )
+            if "graph_navigation" in custom_signals:
+                self._compile_graph_patterns(
+                    custom_signals["graph_navigation"],
+                    self._graph_navigation_patterns,
+                )
             if "graph" in custom_signals:
                 self._compile_graph_patterns(custom_signals["graph"], self._graph_patterns)
 
@@ -301,6 +470,20 @@ class SearchRouter:
             except re.error as e:
                 logger.warning(f"Invalid graph pattern '{pattern_str}': {e}")
 
+    def _compile_graph_analytic_patterns(
+        self,
+        signals: List[Tuple[str, str, str, bool]],
+        target: List[Tuple[re.Pattern, str, str]],
+    ) -> None:
+        """Compile graph-analysis regex patterns."""
+        for pattern_str, mode, name, case_sensitive in signals:
+            try:
+                flags = 0 if case_sensitive else re.IGNORECASE
+                compiled = re.compile(pattern_str, flags)
+                target.append((compiled, mode, name))
+            except re.error as e:
+                logger.warning(f"Invalid graph analytic pattern '{pattern_str}': {e}")
+
     def route(self, query: str) -> SearchRoute:
         """Route a search query to appropriate search type.
 
@@ -319,6 +502,22 @@ class SearchRouter:
         graph_route = self._route_graph_query(query)
         if graph_route is not None:
             return graph_route
+
+        graph_analytic_route = self._route_graph_analytic_query(query)
+        if graph_analytic_route is not None:
+            return graph_analytic_route
+
+        graph_navigation_route = self._route_graph_navigation_query(query)
+        if graph_navigation_route is not None:
+            return graph_navigation_route
+
+        localization_route = self._route_issue_localization_query(query)
+        if localization_route is not None:
+            return localization_route
+
+        impact_route = self._route_change_impact_query(query)
+        if impact_route is not None:
+            return impact_route
 
         bug_route = self._route_bug_similarity_query(query)
         if bug_route is not None:
@@ -410,6 +609,64 @@ class SearchRouter:
 
         return None
 
+    def _route_graph_analytic_query(self, query: str) -> Optional[SearchRoute]:
+        """Return graph-tool routes for centrality / importance questions."""
+        for pattern, mode, name in self._graph_analytic_patterns:
+            if not pattern.search(query):
+                continue
+
+            if mode == "pagerank":
+                top_k = self._extract_requested_top_k(query, default=5)
+                return SearchRoute(
+                    search_type=SearchType.SEMANTIC,
+                    confidence=0.9,
+                    reason="Query asks for important or central symbols suited for graph ranking",
+                    transformed_query=None,
+                    matched_patterns=[name],
+                    tool_name="graph",
+                    tool_arguments={"mode": "pagerank", "top_k": top_k},
+                )
+
+        return None
+
+    def _route_graph_navigation_query(self, query: str) -> Optional[SearchRoute]:
+        """Return graph-tool routes for neighbor and path questions."""
+        for pattern, mode, depth, name in self._graph_navigation_patterns:
+            match = pattern.search(query)
+            if not match:
+                continue
+
+            if mode == "neighbors":
+                symbol = self._extract_graph_symbol(match)
+                if not symbol:
+                    continue
+                return SearchRoute(
+                    search_type=SearchType.SEMANTIC,
+                    confidence=0.92,
+                    reason="Query asks for symbol relationships suited for graph neighborhood traversal",
+                    transformed_query=symbol,
+                    matched_patterns=[name],
+                    tool_name="graph",
+                    tool_arguments={"mode": "neighbors", "node": symbol, "depth": depth},
+                )
+
+            if mode == "path":
+                source = self._extract_graph_symbol(match, prefix="source_")
+                target = self._extract_graph_symbol(match, prefix="target_")
+                if not source or not target:
+                    continue
+                return SearchRoute(
+                    search_type=SearchType.SEMANTIC,
+                    confidence=0.94,
+                    reason="Query asks for a dependency/connection path suited for graph path analysis",
+                    transformed_query=None,
+                    matched_patterns=[name],
+                    tool_name="graph",
+                    tool_arguments={"mode": "path", "source": source, "target": target},
+                )
+
+        return None
+
     def _route_bug_similarity_query(self, query: str) -> Optional[SearchRoute]:
         """Return a code_search bug-similarity route for bug/regression style queries."""
         if self._has_quoted_string(query):
@@ -431,6 +688,40 @@ class SearchRouter:
             matched_patterns=bug_matches,
             tool_name="code_search",
             tool_arguments={"mode": "bugs"},
+        )
+
+    def _route_issue_localization_query(self, query: str) -> Optional[SearchRoute]:
+        """Return a code_search localization route for file-localization queries."""
+        localization_score, localization_matches = self._score_patterns(
+            query, self._localization_patterns
+        )
+        if localization_score < 0.8:
+            return None
+
+        return SearchRoute(
+            search_type=SearchType.SEMANTIC,
+            confidence=min(1.0, 0.5 + localization_score / 2.0),
+            reason="Query asks for issue/file localization suited for graph-guided localization",
+            transformed_query=None,
+            matched_patterns=localization_matches,
+            tool_name="code_search",
+            tool_arguments={"mode": "localize"},
+        )
+
+    def _route_change_impact_query(self, query: str) -> Optional[SearchRoute]:
+        """Return a code_search impact-analysis route for blast-radius queries."""
+        impact_score, impact_matches = self._score_patterns(query, self._impact_patterns)
+        if impact_score < 0.8:
+            return None
+
+        return SearchRoute(
+            search_type=SearchType.SEMANTIC,
+            confidence=min(1.0, 0.5 + impact_score / 2.0),
+            reason="Query asks for blast-radius / change-impact analysis suited for graph expansion",
+            transformed_query=None,
+            matched_patterns=impact_matches,
+            tool_name="code_search",
+            tool_arguments={"mode": "impact"},
         )
 
     def _score_patterns(
@@ -485,6 +776,37 @@ class SearchRouter:
             return None
 
         return normalized
+
+    def _extract_graph_symbol(self, match: re.Match[str], prefix: str = "") -> Optional[str]:
+        """Extract and normalize a graph symbol from a regex match."""
+        groups = match.groupdict()
+        return self._normalize_graph_symbol(
+            groups.get(f"{prefix}quoted") or groups.get(f"{prefix}bare")
+        )
+
+    def _extract_requested_top_k(
+        self,
+        query: str,
+        default: int = 5,
+        *,
+        minimum: int = 1,
+        maximum: int = 20,
+    ) -> int:
+        """Extract a user-requested top-k value from a natural-language query."""
+        patterns = [
+            r"\btop[\s-]*(\d+)\b",
+            r"\b(\d+)\s+(?:most|top)\b",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if not match:
+                continue
+            try:
+                requested = int(match.group(1))
+            except (TypeError, ValueError):
+                continue
+            return max(minimum, min(maximum, requested))
+        return default
 
     def suggest_tool(self, query: str) -> str:
         """Suggest the best search tool for a query.

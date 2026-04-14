@@ -542,6 +542,50 @@ class TestToolPipelineNormalization:
         assert args["depth"] == 2
         assert strategy is not None
 
+    def test_normalize_tool_call_reroutes_neighbors_query_to_graph(self, pipeline):
+        """Neighbor semantic queries should route to graph neighbor analysis."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "show neighbors of BaseProvider"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "neighbors"
+        assert args["node"] == "BaseProvider"
+        assert args["depth"] == 1
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_path_query_to_graph(self, pipeline):
+        """Dependency-path semantic queries should route to graph path analysis."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "find dependency path between Parser and Provider"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "path"
+        assert args["source"] == "Parser"
+        assert args["target"] == "Provider"
+        assert strategy is not None
+
+    def test_normalize_tool_call_reroutes_pagerank_query_to_graph(self, pipeline):
+        """Centrality semantic queries should route to graph pagerank analysis."""
+        pipeline.search_router = SearchRouter()
+
+        tool_name, args, strategy = pipeline._normalize_tool_call(
+            "semantic_code_search",
+            {"query": "show the top 3 most central symbols"},
+        )
+
+        assert tool_name == "graph"
+        assert args["mode"] == "pagerank"
+        assert args["top_k"] == 3
+        assert strategy is not None
+
     def test_get_call_signature_json(self, pipeline):
         """Test generating call signature."""
         sig = pipeline._get_call_signature("test_tool", {"a": 1, "b": 2})
@@ -857,6 +901,128 @@ class TestToolPipelineSearchRouting:
         assert executed_kwargs["arguments"]["mode"] == "callers"
         assert executed_kwargs["arguments"]["node"] == "parse_json"
         assert executed_kwargs["arguments"]["depth"] == 2
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_neighbors_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Neighbor search queries should execute as graph neighbor calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 2, "results": ["BaseModel", "ProviderConfig"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "show neighbors of BaseProvider",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "neighbors"
+        assert executed_kwargs["arguments"]["node"] == "BaseProvider"
+        assert executed_kwargs["arguments"]["depth"] == 1
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_path_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Dependency-path search queries should execute as graph path calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"found": True, "path": ["Parser", "Resolver", "Provider"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "find dependency path between Parser and Provider",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "path"
+        assert executed_kwargs["arguments"]["source"] == "Parser"
+        assert executed_kwargs["arguments"]["target"] == "Provider"
+        assert "directory" not in executed_kwargs["arguments"]
+        assert result.successful_calls == 1
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_calls_reroutes_pagerank_query_to_graph(
+        self, mock_tool_registry, mock_tool_executor
+    ):
+        """Centrality search queries should execute as graph pagerank calls."""
+        mock_tool_executor.execute = AsyncMock(
+            return_value=ToolExecutionResult(
+                tool_name="graph",
+                success=True,
+                result={"count": 3, "results": ["auth", "router", "storage"]},
+                error=None,
+            )
+        )
+        pipeline = ToolPipeline(
+            tool_registry=mock_tool_registry,
+            tool_executor=mock_tool_executor,
+            search_router=SearchRouter(),
+        )
+
+        result = await pipeline.execute_tool_calls(
+            [
+                {
+                    "name": "code_search",
+                    "arguments": {
+                        "query": "show the top 3 most central symbols",
+                        "directory": "src",
+                    },
+                }
+            ],
+            {},
+        )
+
+        mock_tool_executor.execute.assert_awaited_once()
+        executed_kwargs = mock_tool_executor.execute.await_args.kwargs
+        assert executed_kwargs["tool_name"] == "graph"
+        assert executed_kwargs["arguments"]["mode"] == "pagerank"
+        assert executed_kwargs["arguments"]["top_k"] == 3
         assert "directory" not in executed_kwargs["arguments"]
         assert result.successful_calls == 1
 

@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
+    CircuitBreakerError,
     CircuitBreakerRegistry,
 )
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
@@ -414,6 +415,15 @@ class BaseProvider(ABC):
         # Tier 0: Already classified
         if isinstance(error, ProviderError):
             return error
+
+        if isinstance(error, CircuitBreakerError):
+            return ProviderRateLimitError(
+                message=f"Provider temporarily unavailable: {error}",
+                provider=self.name,
+                retry_after=error.retry_after,
+                status_code=429,
+                raw_error=error,
+            )
 
         wrapped_error = (
             getattr(error, "last_error", None)

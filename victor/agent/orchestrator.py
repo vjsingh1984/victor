@@ -732,6 +732,25 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_calling_caps=self.tool_calling_caps,
         )
 
+        # PromptComposer: unified prompt composition pipeline
+        # Routes content to system prompt vs user prefix based on provider tier.
+        # Sits alongside SystemPromptBuilder during migration (Strangler Fig).
+        try:
+            from victor.agent.content_registry import create_default_registry
+            from victor.agent.optimization_injector import OptimizationInjector
+            from victor.agent.prompt_composer import PromptComposer
+
+            self._optimization_injector = OptimizationInjector()
+            self._prompt_composer = PromptComposer(
+                provider=self.provider,
+                registry=create_default_registry(),
+                optimization_injector=self._optimization_injector,
+            )
+        except Exception as e:
+            logger.debug("PromptComposer unavailable: %s", e)
+            self._optimization_injector = None
+            self._prompt_composer = None
+
         # Load project context from .victor/init.md (via factory - DI with fallback)
         self.project_context = self._factory.create_project_context()
 
@@ -1131,8 +1150,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Rebuild system prompt with new workspace context (replaces old init.md)
         # Workspace switch is a session reset — unfreeze and re-sample GEPA sections
         self._system_prompt_frozen = False
-        if hasattr(self, "prompt_builder"):
-            self.prompt_builder._optimized_section_cache = {}
+        # Unfreeze PromptComposer for new workspace (clears GEPA session cache)
+        if getattr(self, "_prompt_composer", None):
+            self._prompt_composer.unfreeze()
 
         base_prompt = self._build_system_prompt_with_adapter()
         if self.project_context.content:
@@ -1772,34 +1792,55 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Cache-friendly: prepend dynamic content to last user message
         # Gate on _kv_optimization_enabled so KV-only providers (Ollama) also benefit
         if self._kv_optimization_enabled and messages:
-            prefix_parts = []
+            # Use PromptComposer if available (unified pipeline)
+            composer = getattr(self, "_prompt_composer", None)
+            if composer:
+                from victor.agent.prompt_composer import TurnContext
 
-            # GEPA/MIPROv2/CoT/PRIME evolved sections — dynamic optimization
-            # that adapts per-turn without breaking system prompt cache
-            if hasattr(self, "prompt_builder"):
-                opt_prefix = self.prompt_builder.get_dynamic_user_prefix()
-                if opt_prefix:
-                    prefix_parts.append(opt_prefix.strip())
+                # Build turn context for the composer
+                injector = getattr(self, "_optimization_injector", None)
+                turn_ctx = TurnContext(
+                    provider_name=self.provider_name or "",
+                    model=getattr(self, "_model", "") or "",
+                    task_type=getattr(self, "_current_task_type", "default"),
+                    active_skill_prompt=(
+                        self.get_skill_user_prefix() if hasattr(self, "get_skill_user_prefix") else None
+                    ),
+                    last_turn_failed=(
+                        injector._last_failure_category is not None if injector else False
+                    ),
+                    last_failure_category=(
+                        injector._last_failure_category if injector else None
+                    ),
+                    last_failure_error=(
+                        injector._last_failure_error if injector else None
+                    ),
+                )
 
-            # Active skill prompt (if any)
-            skill_prefix = self.get_skill_user_prefix()
-            if skill_prefix:
-                prefix_parts.append(skill_prefix.strip())
+                # Get context reminders
+                reminder_mgr = getattr(self, "_reminder_manager", None)
+                if reminder_mgr:
+                    turn_ctx.reminder_text = reminder_mgr.get_user_message_prefix()
 
-            # Context reminders (files read, budget, progress)
-            reminder_mgr = getattr(self, "_reminder_manager", None)
-            if reminder_mgr:
-                reminder_prefix = reminder_mgr.get_user_message_prefix()
-                if reminder_prefix:
-                    prefix_parts.append(reminder_prefix.strip())
+                # Get last user message text for KNN few-shot matching
+                last_user_msg = ""
+                for m in reversed(messages):
+                    if m.role == "user":
+                        last_user_msg = m.content[:200]
+                        break
 
-            if prefix_parts:
-                # Find last user message and prepend
+                prefix = composer.compose_user_prefix(last_user_msg, turn_ctx)
+
+                # Clear failure state after injecting hint
+                if injector and turn_ctx.last_turn_failed:
+                    injector._last_failure_category = None
+                    injector._last_failure_error = None
+
+            if prefix:
                 from victor.providers.base import Message as Msg
 
                 for i in range(len(messages) - 1, -1, -1):
                     if messages[i].role == "user":
-                        prefix = "\n".join(prefix_parts) + "\n\n"
                         messages[i] = Msg(
                             role="user",
                             content=prefix + messages[i].content,

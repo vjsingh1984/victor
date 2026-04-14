@@ -460,6 +460,7 @@ class TestBenchmarkSyncBridge:
                 log_level=None,
                 debug_modules=None,
                 no_edge_model=False,
+                account=None,
             )
 
         mock_async.assert_called_once_with(
@@ -472,6 +473,7 @@ class TestBenchmarkSyncBridge:
             resume=False,
             provider_override=None,
             start_task=0,
+            resolved_account=None,
         )
         mock_run_sync.assert_called_once_with(coro)
 

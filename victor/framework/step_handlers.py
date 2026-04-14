@@ -2303,11 +2303,51 @@ class StepHandlerRegistry:
     def add_handler(self, handler: StepHandlerProtocol) -> None:
         """Add a handler to the registry.
 
+        Validates capability_contracts on the handler and logs warnings
+        for any contracts that appear unsatisfiable (e.g., impossibly high
+        version requirements). Contract validation is advisory — handlers
+        are always registered to avoid breaking existing pipelines.
+
         Args:
             handler: Step handler to add
         """
+        self._validate_contracts(handler)
         self.handlers.append(handler)
         self._sort_handlers()
+
+    @staticmethod
+    def _validate_contracts(handler: StepHandlerProtocol) -> None:
+        """Validate capability contracts declared by a handler.
+
+        Logs warnings for contracts that are likely unsatisfiable.
+        Does not block registration — advisory only.
+        """
+        contracts = getattr(handler, "capability_contracts", ())
+        if not contracts:
+            return
+
+        for contract in contracts:
+            if not isinstance(contract, tuple) or len(contract) < 2:
+                logger.warning(
+                    "Handler '%s' has malformed contract: %r",
+                    handler.name,
+                    contract,
+                )
+                continue
+
+            cap_name = contract[0]
+            cap_version = contract[1]
+
+            # Warn on impossibly high version numbers
+            if isinstance(cap_version, int) and cap_version > 100:
+                logger.warning(
+                    "Handler '%s' declares contract ('%s', version=%d) "
+                    "which exceeds any known capability version. "
+                    "This contract may be unsatisfiable.",
+                    handler.name,
+                    cap_name,
+                    cap_version,
+                )
 
     def remove_handler(self, name: str) -> bool:
         """Remove a handler by name.

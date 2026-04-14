@@ -128,6 +128,7 @@ from victor.core.events.emit_helper import (
     start_emit_sync_metrics_reporter,
     stop_emit_sync_metrics_reporter,
 )
+from victor.core.events.taxonomy import EventTaxonomyRegistry
 
 __all__ = [
     # Protocol-based - Core types
@@ -168,6 +169,9 @@ __all__ = [
     "SyncEventWrapper",
     "SyncObservabilityBus",
     "SyncEventHandler",
+    # Sync emit helper APIs
+    # Event taxonomy
+    "EventTaxonomyRegistry",
     # Sync emit helper APIs
     "emit_event_sync",
     "get_emit_sync_stats",

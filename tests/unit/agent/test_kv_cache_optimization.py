@@ -552,8 +552,8 @@ class TestKVPrefixObservability:
 class TestBuilderKVCacheWiredUp:
     """Test that provider_has_kv_cache is used for section cache freezing."""
 
-    def test_kv_cache_enables_section_freeze(self):
-        """When provider_has_kv_cache=True, _optimized_section_cache is used."""
+    def test_kv_cache_enables_section_selection(self):
+        """When provider_has_kv_cache=True, active sections are selected."""
         from victor.agent.prompt_builder import SystemPromptBuilder
 
         builder = SystemPromptBuilder.__new__(SystemPromptBuilder)
@@ -562,12 +562,10 @@ class TestBuilderKVCacheWiredUp:
         builder.concise_mode = False
         builder._rl_coordinator = None
         builder._decision_service = None
-        builder._optimized_section_cache = {}
 
-        # First call computes sections
-        sections1 = SystemPromptBuilder._get_active_sections(builder)
-        # Sections should be a set (reduced for non-caching)
-        assert isinstance(sections1, set)
+        # Active sections should be a set (reduced for non-caching KV providers)
+        sections = SystemPromptBuilder._get_active_sections(builder)
+        assert isinstance(sections, set)
 
 
 # =====================================================================

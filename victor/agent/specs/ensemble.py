@@ -36,15 +36,7 @@ This module is kept for backward compatibility but will be removed in v1.0.
 
 import asyncio
 import logging
-import warnings
 from abc import ABC, abstractmethod
-
-warnings.warn(
-    "victor.agent.specs.ensemble is deprecated. Use victor.teams instead. "
-    "See UnifiedTeamCoordinator for SEQUENTIAL/PARALLEL/HIERARCHICAL/PIPELINE patterns.",
-    DeprecationWarning,
-    stacklevel=2,
-)
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum

@@ -435,6 +435,35 @@ class TestRetryStrategy:
         with pytest.raises(ValueError):
             await retry.execute(value_error)
 
+    @pytest.mark.asyncio
+    async def test_retries_open_circuit_breaker(self, retry, monkeypatch):
+        """Open circuits should be retried after their cooldown."""
+        from victor.providers.circuit_breaker import CircuitBreakerError as CanonicalCircuitBreakerError
+
+        attempts = [0]
+        sleeps: list[float] = []
+
+        async def flaky():
+            attempts[0] += 1
+            if attempts[0] == 1:
+                raise CanonicalCircuitBreakerError(
+                    "Circuit breaker 'provider_OpenAIProvider' is OPEN. Retry after 0.5s",
+                    state=CircuitState.OPEN,
+                    retry_after=0.5,
+                )
+            return "ok"
+
+        async def fake_sleep(delay: float) -> None:
+            sleeps.append(delay)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await retry.execute(flaky)
+
+        assert result == "ok"
+        assert attempts[0] == 2
+        assert sleeps == [0.1]
+
 
 # =============================================================================
 # Rate Limiter Tests

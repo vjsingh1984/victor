@@ -100,6 +100,17 @@ class CapabilityNegotiator:
         # 4. Extension dependencies validation
         self._validate_extension_dependencies(manifest, result)
 
+        # 5. Manifest class reference validation (detect stale module/class refs)
+        module_path = getattr(manifest, "module_path", "")
+        class_name = getattr(manifest, "class_name", "")
+        if module_path or class_name:
+            ref_errors = self.validate_manifest_class_references(module_path, class_name)
+            for err in ref_errors:
+                result.warnings.append(
+                    f"Stale class reference in manifest '{manifest.name}': {err}"
+                )
+                logger.warning("Manifest '%s' has stale class reference: %s", manifest.name, err)
+
         if result.compatible:
             logger.debug(
                 "Manifest negotiation passed for '%s' (api_version=%d)",
@@ -114,6 +125,41 @@ class CapabilityNegotiator:
             )
 
         return result
+
+    def validate_manifest_class_references(
+        self,
+        module_path: str,
+        class_name: str,
+    ) -> list[str]:
+        """Validate that a manifest's module/class references are resolvable.
+
+        Checks that the declared module can be imported and the class exists
+        within it. Returns a list of error strings (empty if valid).
+
+        Args:
+            module_path: Dotted module path (e.g., "victor.benchmark.assistant")
+            class_name: Class name within the module (e.g., "BenchmarkVertical")
+
+        Returns:
+            List of error messages. Empty list means all references are valid.
+        """
+        if not module_path and not class_name:
+            return []
+
+        import importlib
+
+        errors: list[str] = []
+
+        try:
+            mod = importlib.import_module(module_path)
+        except (ImportError, ModuleNotFoundError) as exc:
+            errors.append(f"Module '{module_path}' cannot be imported: {exc}")
+            return errors
+
+        if class_name and not hasattr(mod, class_name):
+            errors.append(f"Class '{class_name}' not found in module '{module_path}'")
+
+        return errors
 
     def _check_sdk_version_skew(
         self, manifest: ExtensionManifest, result: NegotiationResult

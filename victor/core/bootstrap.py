@@ -805,11 +805,14 @@ def _auto_detect_enhanced_capabilities(registry: Any) -> None:
                 logger.debug(f"{label} auto-detection skipped: {e}")
 
 
-def _register_coding_services(container: ServiceContainer, settings: Settings) -> None:
-    """Register coding services (language plugins, indexing).
+def _register_language_services(container: ServiceContainer, settings: Settings) -> None:
+    """Register language plugin services (discovery, indexing).
 
     This ensures language plugins are discovered at startup, not mid-conversation.
-    Uses the capability registry — no direct victor_coding imports.
+    Uses the capability registry — no direct vertical imports.
+
+    Note: Currently unused by bootstrap phases. Available for vertical-triggered
+    language plugin discovery via ``victor.bootstrap_services`` entry points.
     """
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import LanguageRegistryProtocol

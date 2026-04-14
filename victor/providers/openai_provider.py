@@ -319,40 +319,7 @@ class OpenAIProvider(BaseProvider):
                 return parsed
 
             except Exception as e:
-                # Convert to specific provider error types based on error message
-                # Skip if already a ProviderError to avoid double-wrapping
-                if isinstance(e, ProviderError):
-                    raise
-
-                error_str = str(e).lower()
-                if any(
-                    term in error_str
-                    for term in [
-                        "auth",
-                        "unauthorized",
-                        "invalid key",
-                        "invalid api",
-                        "api_key",
-                        "401",
-                    ]
-                ):
-                    raise ProviderAuthError(
-                        message=f"Authentication failed: {str(e)}",
-                        provider=self.name,
-                    ) from e
-                elif any(term in error_str for term in ["rate limit", "429", "too many requests"]):
-                    raise ProviderRateLimitError(
-                        message=f"Rate limit exceeded: {str(e)}",
-                        provider=self.name,
-                        status_code=429,
-                    ) from e
-                else:
-                    # Wrap generic errors in ProviderError
-                    raise ProviderError(
-                        message=f"OpenAI API error: {str(e)}",
-                        provider=self.name,
-                        raw_error=e,
-                    ) from e
+                raise self.classify_error(e) from e
 
     async def stream(
         self,
@@ -589,27 +556,7 @@ class OpenAIProvider(BaseProvider):
         Raises:
             ProviderError: Always raises after converting
         """
-        error_msg = str(error)
-
-        if "authentication" in error_msg.lower() or "api_key" in error_msg.lower():
-            raise ProviderAuthError(
-                message=f"Authentication failed: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
-        elif "rate_limit" in error_msg.lower() or "429" in error_msg:
-            raise ProviderRateLimitError(
-                message=f"Rate limit exceeded: {error_msg}",
-                provider=self.name,
-                status_code=429,
-                raw_error=error,
-            )
-        else:
-            raise ProviderError(
-                message=f"OpenAI API error: {error_msg}",
-                provider=self.name,
-                raw_error=error,
-            )
+        raise self.classify_error(error)
 
     async def list_models(self) -> List[Dict[str, Any]]:
         """List available OpenAI models.

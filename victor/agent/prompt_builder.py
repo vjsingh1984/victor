@@ -619,19 +619,18 @@ class SystemPromptBuilder:
                 base_prompt = f"{base_prompt}\n\n{tool_constraint}"
 
         if "completion" in sections_to_include:
-            optimized_completion = self._get_optimized_section("COMPLETION_GUIDANCE")
-            completion = optimized_completion or COMPLETION_GUIDANCE
-            base_prompt = f"{base_prompt}\n\n{completion}"
+            # Static baseline in system prompt. GEPA-evolved versions go to
+            # user messages via PromptComposer/OptimizationInjector.
+            base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
 
         if "tool_guidance" in sections_to_include:
             tool_guidance = self.get_provider_tool_guidance()
             if tool_guidance:
                 base_prompt = f"{base_prompt}\n\n{tool_guidance}"
 
-        # Static tool effectiveness guidance in system prompt.
-        # When KV optimization is enabled, GEPA-evolved versions of these sections
-        # are injected via get_dynamic_user_prefix() into user messages instead,
-        # keeping the system prompt stable for cache efficiency.
+        # Static tool effectiveness guidance in system prompt (baseline).
+        # GEPA-evolved versions are injected via PromptComposer.compose_user_prefix()
+        # into user messages, keeping the system prompt stable for cache efficiency.
         if "tool_guidance" in sections_to_include:
             base_prompt = f"{base_prompt}\n\n{ASI_TOOL_EFFECTIVENESS_GUIDANCE}"
 
@@ -647,111 +646,6 @@ class SystemPromptBuilder:
         )
 
         return base_prompt
-
-    def _get_optimized_section(self, section_name: str) -> Optional[str]:
-        """Check if the prompt optimizer has an evolved version of a section.
-
-        Returns the evolved text if a candidate exists with sufficient
-        confidence, otherwise None (caller uses the static default).
-        Gated by prompt_optimization.enabled setting.
-        Checks section_strategies to skip sections with empty strategy list.
-
-        IMPORTANT: Results are cached per session in _optimized_section_cache
-        to ensure Thompson Sampling picks ONE candidate per section per session.
-        Without this cache, each build() call would re-sample and potentially
-        pick a different candidate, mutating the system prompt mid-session
-        and breaking provider prefix caching (90% discount).
-        """
-        # Session cache: sample once, reuse for the rest of the session
-        cache = getattr(self, "_optimized_section_cache", None)
-        if cache is None:
-            self._optimized_section_cache: Dict[str, Optional[str]] = {}
-            cache = self._optimized_section_cache
-        if section_name in cache:
-            return cache[section_name]
-
-        result = self._sample_optimized_section(section_name)
-        cache[section_name] = result
-        return result
-
-    def _sample_optimized_section(self, section_name: str) -> Optional[str]:
-        """Sample an evolved section from GEPA/MIPROv2/CoT (called once per session).
-
-        This does the actual Thompson Sampling via get_recommendation().
-        Results are cached by _get_optimized_section() to prevent mid-session mutation.
-        """
-        # Gate on settings.prompt_optimization.enabled (authoritative source)
-        try:
-            from victor.config.settings import get_settings
-
-            po = getattr(get_settings(), "prompt_optimization", None)
-            if po is None or not po.enabled:
-                return None
-            strategies = po.get_strategies_for_section(section_name)
-            if not strategies:
-                return None
-        except Exception:
-            return None
-
-        try:
-            from victor.framework.rl.coordinator import get_rl_coordinator
-
-            coordinator = get_rl_coordinator()
-            learner = coordinator.get_learner("prompt_optimizer")
-            if learner is None:
-                return None
-            rec = learner.get_recommendation(
-                getattr(self, "provider_name", "") or "",
-                getattr(self, "model", "") or "",
-                getattr(self, "task_type", "default"),
-                section_name=section_name,
-            )
-            if rec and rec.confidence > 0.6 and not rec.is_baseline:
-                logger.info(
-                    "Using GEPA-evolved prompt section '%s' (gen=%s, confidence=%.2f)",
-                    section_name,
-                    rec.reason,
-                    rec.confidence,
-                )
-                return rec.value
-        except Exception:
-            pass
-        return None
-
-    def get_dynamic_user_prefix(self) -> Optional[str]:
-        """Get optimized prompt content for injection into user messages.
-
-        When the system prompt is frozen (KV/API cache optimization), evolved
-        sections from GEPA/MIPROv2/CoT/PRIME are injected here instead. This
-        allows per-turn optimization without breaking prefix cache stability.
-
-        Returns:
-            Optimized guidance text to prepend to user messages, or None.
-        """
-        parts = []
-
-        # GEPA-evolved sections (with static fallbacks for key guidance)
-        for section_name, static_fallback in [
-            ("ASI_TOOL_EFFECTIVENESS_GUIDANCE", ASI_TOOL_EFFECTIVENESS_GUIDANCE),
-            ("GROUNDING_RULES", None),
-            ("COMPLETION_GUIDANCE", None),
-        ]:
-            evolved = self._get_optimized_section(section_name)
-            if evolved:
-                parts.append(evolved)
-            elif static_fallback and section_name == "ASI_TOOL_EFFECTIVENESS_GUIDANCE":
-                # Always include tool effectiveness — it's critical for edit accuracy
-                parts.append(static_fallback)
-
-        # MIPROv2 few-shot examples (if available and provider caches)
-        few_shot = self._get_optimized_section("FEW_SHOT_EXAMPLES")
-        if few_shot:
-            parts.append(few_shot)
-
-        if not parts:
-            return None
-
-        return "<system-reminder>\n" + "\n\n".join(parts) + "\n</system-reminder>"
 
     def _get_active_sections(self) -> set:
         """Determine which prompt sections to include.

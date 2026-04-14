@@ -149,6 +149,43 @@ class IIndexable(Protocol):
 
 
 @runtime_checkable
+class IIssueLocalizer(Protocol):
+    """Optional protocol for graph-guided issue localization capabilities.
+
+    Implementations return file-level or symbol-level candidates for a natural
+    language issue description, typically by combining semantic retrieval with
+    structural graph expansion.
+    """
+
+    async def localize_issue(
+        self,
+        issue_description: str,
+        language: Optional[str] = None,
+        top_k: int = 10,
+        include_graph_context: bool = True,
+        context_limit: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Return ranked localization candidates for an issue description."""
+        ...
+
+
+@runtime_checkable
+class IChangeImpactAnalyzer(Protocol):
+    """Optional protocol for graph-guided change-impact / blast-radius analysis."""
+
+    async def analyze_change_impact(
+        self,
+        change_description: str,
+        language: Optional[str] = None,
+        top_k: int = 10,
+        include_graph_context: bool = True,
+        context_limit: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Return ranked impact candidates for a proposed change."""
+        ...
+
+
+@runtime_checkable
 class ISemanticSearchWithIndexing(ISemanticSearch, IIndexable, Protocol):
     """Combined protocol for searchable and indexable implementations.
 
@@ -180,6 +217,8 @@ class ISemanticSearchWithIndexing(ISemanticSearch, IIndexable, Protocol):
 
 
 __all__ = [
+    "IChangeImpactAnalyzer",
+    "IIssueLocalizer",
     "ISemanticSearch",
     "IIndexable",
     "ISemanticSearchWithIndexing",

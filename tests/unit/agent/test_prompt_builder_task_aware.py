@@ -76,36 +76,29 @@ class TestGEPAPromptIntegration:
     """Tests for GEPA-evolved prompt section integration in the builder."""
 
     def test_default_prompt_includes_static_grounding(self):
-        """When no GEPA candidate exists, static GROUNDING_RULES is used."""
-        from unittest.mock import patch
+        """System prompt always includes static GROUNDING_RULES."""
         from victor.agent.prompt_builder import GROUNDING_RULES
 
         builder = _make_builder()
-        # Ensure GEPA doesn't replace static sections
-        builder._optimized_section_cache = {}
-        with patch.object(builder, "_sample_optimized_section", return_value=None):
-            prompt = builder.build()
+        prompt = builder.build()
         assert GROUNDING_RULES in prompt
 
     def test_default_prompt_includes_static_completion(self):
-        """When no GEPA candidate exists, static COMPLETION_GUIDANCE is used."""
-        from unittest.mock import patch
+        """System prompt always includes static COMPLETION_GUIDANCE."""
         from victor.agent.prompt_builder import COMPLETION_GUIDANCE
 
         builder = _make_builder()
-        builder._optimized_section_cache = {}
-        with patch.object(builder, "_sample_optimized_section", return_value=None):
-            prompt = builder.build()
+        prompt = builder.build()
         assert COMPLETION_GUIDANCE in prompt
 
-    def test_optimized_grounding_replaces_static(self):
-        """GEPA-evolved GROUNDING_RULES replaces the static version."""
+    def test_optimized_grounding_via_optimization_injector(self):
+        """GEPA-evolved GROUNDING_RULES is served via OptimizationInjector."""
         from unittest.mock import patch, MagicMock
-        from victor.agent.prompt_builder import GROUNDING_RULES
         from victor.config.prompt_optimization_settings import (
             PromptOptimizationSettings,
         )
         from victor.framework.rl.base import RLRecommendation
+        from victor.agent.optimization_injector import OptimizationInjector
 
         evolved_text = "EVOLVED GROUNDING: Always verify tool output."
 
@@ -130,31 +123,24 @@ class TestGEPAPromptIntegration:
                 return_value=mock_settings,
             ),
             patch(
-                "victor.agent.prompt_builder.get_rl_coordinator",
-                return_value=mock_coordinator,
-                create=True,
-            ),
-            patch(
                 "victor.framework.rl.coordinator.get_rl_coordinator",
                 return_value=mock_coordinator,
             ),
         ):
-            builder = _make_builder()
-            # GEPA sections now go to user messages via get_dynamic_user_prefix()
-            # System prompt retains static defaults for non-KV providers
-            user_prefix = builder.get_dynamic_user_prefix()
+            injector = OptimizationInjector()
+            sections = injector.get_evolved_sections("deepseek", "deepseek-chat", "edit")
 
-        assert user_prefix is not None
-        assert evolved_text in user_prefix
+        assert any(evolved_text in s for s in sections)
 
     def test_optimized_completion_replaces_static(self):
-        """GEPA-evolved COMPLETION_GUIDANCE replaces the static version."""
+        """GEPA-evolved COMPLETION_GUIDANCE is served via OptimizationInjector."""
         from unittest.mock import patch, MagicMock
         from victor.agent.prompt_builder import COMPLETION_GUIDANCE
         from victor.config.prompt_optimization_settings import (
             PromptOptimizationSettings,
         )
         from victor.framework.rl.base import RLRecommendation
+        from victor.agent.optimization_injector import OptimizationInjector
 
         evolved_text = "EVOLVED COMPLETION: Signal with **FINISHED**: marker."
 
@@ -179,20 +165,21 @@ class TestGEPAPromptIntegration:
                 return_value=mock_settings,
             ),
             patch(
-                "victor.agent.prompt_builder.get_rl_coordinator",
-                return_value=mock_coordinator,
-                create=True,
-            ),
-            patch(
                 "victor.framework.rl.coordinator.get_rl_coordinator",
                 return_value=mock_coordinator,
             ),
         ):
+            injector = OptimizationInjector()
+            sections = injector.get_evolved_sections("deepseek", "deepseek-chat", "edit")
+
+            # System prompt retains static COMPLETION_GUIDANCE
             builder = _make_builder()
             prompt = builder.build()
 
-        assert COMPLETION_GUIDANCE not in prompt
-        assert evolved_text in prompt
+        # Evolved version goes to user prefix via injector
+        assert any(evolved_text in s for s in sections)
+        # Static baseline remains in system prompt
+        assert COMPLETION_GUIDANCE in prompt
 
     def test_prompt_optimization_disabled_uses_static_prompts(self):
         """When prompt_optimization.enabled=False, no GEPA candidates used."""

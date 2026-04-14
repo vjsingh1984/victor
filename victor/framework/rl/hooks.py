@@ -137,6 +137,33 @@ class RLEventType(str, Enum):
     """GEPA prompt evolution cycle completed. Triggers: prompt_optimizer"""
 
 
+# Register domain event mapping with canonical EventType taxonomy
+def _register_rl_event_taxonomy() -> None:
+    try:
+        from victor.core.events.taxonomy import EventTaxonomyRegistry
+        from victor.framework.events import EventType
+
+        EventTaxonomyRegistry.register_domain(
+            "rl",
+            RLEventType,
+            {
+                RLEventType.TOOL_EXECUTED: EventType.TOOL_RESULT,
+                RLEventType.TOOL_SELECTED: EventType.TOOL_CALL,
+                RLEventType.MODE_TRANSITION: EventType.STAGE_CHANGE,
+                RLEventType.GROUNDING_CHECK: EventType.PROGRESS,
+                RLEventType.QUALITY_ASSESSED: EventType.PROGRESS,
+                RLEventType.WORKFLOW_COMPLETED: EventType.STREAM_END,
+                RLEventType.TEAM_COMPLETED: EventType.MILESTONE,
+                RLEventType.GEPA_EVOLUTION: EventType.MILESTONE,
+            },
+        )
+    except ImportError:
+        pass
+
+
+_register_rl_event_taxonomy()
+
+
 @dataclass
 class RLEvent:
     """Event data structure for RL hook dispatch.

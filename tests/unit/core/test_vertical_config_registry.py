@@ -23,21 +23,38 @@ class TestDynamicToolConfigRegistration:
         assert "read" in config.mandatory
         assert "web_search" in config.vertical_core
 
-    def test_builtin_verticals_still_work(self):
-        """Built-in verticals (coding, research) still resolve."""
+    def test_builtin_verticals_require_registration(self):
+        """Verticals must register via register_vertical_tools() first."""
+        # Without registration, for_vertical returns None
+        TieredToolTemplate._registered_verticals.pop("coding", None)
+        assert TieredToolTemplate.for_vertical("coding") is None
+
+        # After registration, it resolves
+        TieredToolTemplate.register_vertical_tools(
+            "coding",
+            core_tools={"edit", "write", "shell", "git", "search", "overview"},
+            readonly_for_analysis=False,
+        )
         coding = TieredToolTemplate.for_vertical("coding")
         assert coding is not None
         assert "edit" in coding.vertical_core
+        TieredToolTemplate._registered_verticals.pop("coding", None)
 
     def test_unknown_vertical_returns_none(self):
         """Unknown vertical without registration returns None."""
         config = TieredToolTemplate.for_vertical("nonexistent_xyz_12345")
         assert config is None
 
-    def test_registered_vertical_overrides_builtin(self):
-        """Dynamic registration takes precedence over hardcoded defaults."""
+    def test_registered_vertical_can_be_updated(self):
+        """Dynamic registration can be updated by re-registering."""
+        TieredToolTemplate.register_vertical_tools(
+            "research",
+            core_tools={"web_search", "web_fetch", "overview"},
+            readonly_for_analysis=True,
+        )
         original = TieredToolTemplate.for_vertical("research")
         assert original is not None
+        assert "shell" not in original.vertical_core
 
         TieredToolTemplate.register_vertical_tools(
             "research",
@@ -48,7 +65,6 @@ class TestDynamicToolConfigRegistration:
         assert updated is not None
         assert "shell" in updated.vertical_core
 
-        # Clean up — restore original
         TieredToolTemplate._registered_verticals.pop("research", None)
 
 

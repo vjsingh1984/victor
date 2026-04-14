@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import asyncio
 import inspect
 import logging
 import warnings
@@ -787,7 +788,9 @@ def _create_tool_class(
                 if inspect.iscoroutinefunction(self._fn):
                     result = await self._fn(**kwargs)
                 else:
-                    result = self._fn(**kwargs)
+                    # Offload sync functions to a thread to avoid blocking
+                    # the event loop during CPU-bound or I/O-bound operations.
+                    result = await asyncio.to_thread(self._fn, **kwargs)
 
                 # Handle dict-based error returns for backwards compatibility
                 # Tools returning {"success": False, "error": "..."} should be converted

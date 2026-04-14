@@ -604,7 +604,6 @@ def list_installed_verticals() -> List[str]:
             "'victor.verticals'. Migrate these packages to 'victor.plugins'. "
             f"Observed legacy entries: {', '.join(sorted(legacy_verticals))}"
         )
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
         logger.warning(message)
         _WARNED_LEGACY_VERTICAL_LISTINGS = True
 

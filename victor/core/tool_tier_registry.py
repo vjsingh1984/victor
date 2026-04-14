@@ -171,12 +171,14 @@ class ToolTierRegistry:
     def _register_defaults(self) -> None:
         """Register default tier configurations.
 
-        Called during singleton initialization to set up base tiers
-        that are common across all verticals.
+        Called during singleton initialization to set up the base tier
+        that is common across all verticals. Vertical-specific tiers
+        are registered dynamically when verticals call
+        TieredToolTemplate.register_vertical_tools() at activation time.
         """
         from victor.core.vertical_types import TieredToolConfig, TieredToolTemplate
 
-        # Register base tier (shared across all verticals)
+        # Register base tier only (shared across all verticals)
         self.register(
             name="base",
             config=TieredToolConfig(
@@ -185,20 +187,6 @@ class ToolTierRegistry:
             ),
             description="Base tier with mandatory tools for all verticals",
         )
-
-        # Register pre-configured vertical tiers from TieredToolTemplate
-        for vertical_name, vertical_core in TieredToolTemplate.VERTICAL_CORES.items():
-            readonly = TieredToolTemplate.VERTICAL_READONLY_DEFAULTS.get(vertical_name, True)
-            self.register(
-                name=vertical_name,
-                config=TieredToolConfig(
-                    mandatory=TieredToolTemplate.DEFAULT_MANDATORY.copy(),
-                    vertical_core=vertical_core.copy(),
-                    readonly_only_for_analysis=readonly,
-                ),
-                parent="base",
-                description=f"Tiered configuration for {vertical_name} vertical",
-            )
 
     def register(
         self,

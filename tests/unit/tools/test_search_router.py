@@ -248,6 +248,20 @@ class TestConvenienceFunctions:
         tool = suggest_search_tool("who calls parse_json")
         assert tool == "graph"
 
+    def test_suggest_search_tool_graph_pagerank(self):
+        """Centrality questions should recommend the graph tool."""
+        from victor.agent.search_router import suggest_search_tool
+
+        tool = suggest_search_tool("show the most central symbols in this repo")
+        assert tool == "graph"
+
+    def test_suggest_search_tool_graph_path(self):
+        """Dependency-path questions should recommend the graph tool."""
+        from victor.agent.search_router import suggest_search_tool
+
+        tool = suggest_search_tool("find dependency path between Parser and Provider")
+        assert tool == "graph"
+
     def test_is_keyword_query(self):
         """Test is_keyword_query function."""
         from victor.agent.search_router import is_keyword_query
@@ -371,6 +385,49 @@ class TestRealWorldQueries:
 
         assert result.tool_name == "graph"
         assert result.tool_arguments == {"mode": "trace", "node": "main", "depth": 3}
+
+    def test_neighbors_query_routes_to_graph_tool(self):
+        """Neighbor questions should route to graph(mode='neighbors')."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("show neighbors of BaseProvider")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {
+            "mode": "neighbors",
+            "node": "BaseProvider",
+            "depth": 1,
+        }
+        assert result.transformed_query == "BaseProvider"
+        assert "neighbor_of" in result.matched_patterns
+
+    def test_path_query_routes_to_graph_tool(self):
+        """Dependency-path questions should route to graph(mode='path')."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("find dependency path between Parser and Provider")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {
+            "mode": "path",
+            "source": "Parser",
+            "target": "Provider",
+        }
+        assert result.transformed_query is None
+        assert "path_between" in result.matched_patterns
+
+    def test_pagerank_query_routes_to_graph_tool(self):
+        """Centrality questions should route to graph(mode='pagerank')."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("show the top 7 most central symbols in this repo")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {"mode": "pagerank", "top_k": 7}
+        assert "central_symbols" in result.matched_patterns
 
     def test_import_exact_match(self):
         """Test exact import routes to KEYWORD."""

@@ -26,6 +26,7 @@ from victor.providers.base import (
     ProviderAuthError,
     ProviderRateLimitError,
 )
+from victor.providers.circuit_breaker import CircuitBreakerError, CircuitState
 
 
 @pytest.fixture
@@ -351,8 +352,37 @@ async def test_chat_generic_error(openai_provider):
                 model="gpt-4",
             )
 
-        assert "OpenAI API error" in str(exc_info.value)
+        assert "openai API error" in str(exc_info.value)
         assert exc_info.value.provider == "openai"
+
+
+@pytest.mark.asyncio
+async def test_chat_open_circuit_maps_to_rate_limit(openai_provider):
+    """Open circuit breaker errors should surface as retryable provider errors."""
+    breaker_error = CircuitBreakerError(
+        "Circuit breaker 'provider_OpenAIProvider' is OPEN. Retry after 7.2s",
+        state=CircuitState.OPEN,
+        retry_after=7.2,
+    )
+
+    with patch.object(
+        openai_provider,
+        "_execute_with_circuit_breaker",
+        new_callable=AsyncMock,
+    ) as mock_execute:
+        mock_execute.side_effect = breaker_error
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ProviderRateLimitError) as exc_info:
+            await openai_provider.chat(
+                messages=messages,
+                model="gpt-4",
+            )
+
+        assert exc_info.value.provider == "openai"
+        assert exc_info.value.retry_after == 7.2
+        assert exc_info.value.status_code == 429
 
 
 @pytest.mark.asyncio

@@ -605,24 +605,12 @@ class TieredToolTemplate:
     # Standard mandatory tools - essential for any task across all verticals
     DEFAULT_MANDATORY: Set[str] = {"read", "ls", "grep"}
 
-    # Legacy built-in defaults — verticals should register via register_vertical_tools()
-    # These remain as migration fallbacks and will emit deprecation warnings.
-    _LEGACY_CORES: Dict[str, Set[str]] = {
-        "coding": {"edit", "write", "shell", "git", "search", "overview"},
-        "research": {"web_search", "web_fetch", "overview"},
-        "devops": {"shell", "git", "docker", "overview"},
-        "data_analysis": {"shell", "write", "overview"},
-        "rag": {"rag_search", "rag_query", "rag_list", "rag_stats", "rag_delete"},
-    }
-    _LEGACY_READONLY: Dict[str, bool] = {
-        "coding": False,
-        "research": True,
-        "devops": False,
-        "data_analysis": False,
-        "rag": True,
-    }
+    # Legacy dicts emptied — verticals MUST register via register_vertical_tools().
+    # Kept as empty dicts for structural backward compatibility.
+    _LEGACY_CORES: Dict[str, Set[str]] = {}
+    _LEGACY_READONLY: Dict[str, bool] = {}
 
-    # Backward-compat aliases (deprecated)
+    # Backward-compat aliases (empty, kept for import compatibility)
     VERTICAL_CORES = _LEGACY_CORES
     VERTICAL_READONLY_DEFAULTS = _LEGACY_READONLY
 
@@ -652,6 +640,26 @@ class TieredToolTemplate:
             "core_tools": core_tools,
             "readonly_for_analysis": readonly_for_analysis,
         }
+
+        # Propagate to ToolTierRegistry so the tool access controller
+        # and other consumers can discover the tier centrally.
+        try:
+            from victor.core.tool_tier_registry import ToolTierRegistry
+
+            config = cls.create(
+                vertical_core=core_tools,
+                readonly_only_for_analysis=readonly_for_analysis,
+            )
+            registry = ToolTierRegistry.get_instance()
+            registry.register(
+                name=vertical,
+                config=config,
+                parent="base",
+                description=f"Tiered configuration for {vertical} vertical",
+                overwrite=True,
+            )
+        except Exception:
+            pass  # Registry not available yet during early bootstrap
 
     @classmethod
     def create(
@@ -694,7 +702,7 @@ class TieredToolTemplate:
         Returns:
             Configured TieredToolConfig or None if vertical not known
         """
-        # Check dynamic registry first (OCP extension point)
+        # Dynamic registry only (OCP extension point)
         if vertical in cls._registered_verticals:
             reg = cls._registered_verticals[vertical]
             return cls.create(
@@ -702,70 +710,32 @@ class TieredToolTemplate:
                 readonly_only_for_analysis=reg.get("readonly_for_analysis", True),
             )
 
-        # Fall back to legacy built-in defaults (deprecated)
-        if vertical not in cls._LEGACY_CORES:
-            return None
-
-        import warnings
-
-        warnings.warn(
-            f"Vertical '{vertical}' is using legacy hardcoded tool defaults. "
-            f"Verticals should register tools via register_vertical_tools() "
-            f"during activation. Legacy defaults will be removed in v1.0.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return cls.create(
-            vertical_core=cls._LEGACY_CORES[vertical].copy(),
-            readonly_only_for_analysis=cls._LEGACY_READONLY.get(vertical, True),
-        )
+        return None
 
     @classmethod
-    def for_coding(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for coding vertical."""
-        return cls.for_vertical("coding")  # type: ignore
+    def unregister_vertical_tools(cls, vertical: str) -> None:
+        """Remove a vertical's tool configuration from the dynamic registry.
 
-    @classmethod
-    def for_research(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for research vertical."""
-        return cls.for_vertical("research")  # type: ignore
-
-    @classmethod
-    def for_devops(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for devops vertical."""
-        return cls.for_vertical("devops")  # type: ignore
-
-    @classmethod
-    def for_data_analysis(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for data analysis vertical."""
-        return cls.for_vertical("data_analysis")  # type: ignore
-
-    @classmethod
-    def for_rag(cls) -> TieredToolConfig:
-        """Get TieredToolConfig for RAG vertical."""
-        return cls.for_vertical("rag")  # type: ignore
-
-    @classmethod
-    def register_vertical(
-        cls,
-        name: str,
-        vertical_core: Set[str],
-        readonly_only_for_analysis: bool = True,
-    ) -> None:
-        """Register a new vertical's tool configuration.
+        Primarily for test cleanup to ensure isolation between tests.
 
         Args:
-            name: Vertical name
-            vertical_core: Core tools for the vertical
-            readonly_only_for_analysis: Whether to hide write tools for analysis
+            vertical: Vertical name to unregister
         """
-        cls.VERTICAL_CORES[name] = vertical_core
-        cls.VERTICAL_READONLY_DEFAULTS[name] = readonly_only_for_analysis
+        cls._registered_verticals.pop(vertical, None)
+
+        # Propagate removal to ToolTierRegistry
+        try:
+            from victor.core.tool_tier_registry import ToolTierRegistry
+
+            registry = ToolTierRegistry.get_instance()
+            registry.unregister(vertical)
+        except Exception:
+            pass  # Registry not available or entry doesn't exist
 
     @classmethod
     def list_verticals(cls) -> List[str]:
-        """List all registered verticals."""
-        return list(cls.VERTICAL_CORES.keys())
+        """List all dynamically registered verticals."""
+        return list(cls._registered_verticals.keys())
 
 
 # =============================================================================

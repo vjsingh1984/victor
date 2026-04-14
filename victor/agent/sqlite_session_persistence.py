@@ -62,16 +62,6 @@ class SQLiteSessionPersistence:
         Args:
             db_path: Path to project database (default: .victor/project.db)
         """
-        import warnings
-
-        warnings.warn(
-            "SQLiteSessionPersistence is deprecated. "
-            "Use ConversationStore from victor.agent.conversation_memory "
-            "instead. This class will be removed in 0.9.0.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
         from victor.config.settings import get_project_paths
         from victor.core.database import get_project_database
 

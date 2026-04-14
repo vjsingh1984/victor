@@ -934,12 +934,14 @@ async def code_search(
     - "semantic": Embedding-based search. Best for concepts, patterns, inheritance.
     - "literal": Keyword matching (like grep). Best for exact text/identifiers.
     - "bugs": Similar bug search with graph context when supported by the provider.
+    - "localize": File-level issue localization using semantic seeds plus graph expansion.
+    - "impact": Change-impact / blast-radius analysis using graph expansion when available.
 
     Args:
         query: Search query (semantic concepts or literal text)
         path: Directory to search
         k: Max results
-        mode: Search mode - "semantic" (default), "literal", or "bugs"
+        mode: Search mode - "semantic" (default), "literal", "bugs", "localize", or "impact"
         reindex: Force re-index (semantic mode only)
         file: Filter by file path (semantic mode only)
         symbol: Filter by type (class/function/method) (semantic mode only)
@@ -948,10 +950,12 @@ async def code_search(
         exts: File extensions for literal mode (e.g., [".py", ".js"])
         _exec_ctx: Framework execution context (contains settings, etc.)
 
-    Example:
-        search(query="error handling in providers")  # Semantic: find related concepts
-        search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
-        search(query="json parsing crash on empty payload", mode="bugs")
+        Example:
+            search(query="error handling in providers")  # Semantic: find related concepts
+            search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
+            search(query="json parsing crash on empty payload", mode="bugs")
+            search(query="which files should I edit to add a logger parameter", mode="localize")
+            search(query="what breaks if I change BaseRepository.save", mode="impact")
     """
     # Route to literal search if mode is "literal"
     if mode == "literal":
@@ -1088,6 +1092,106 @@ async def code_search(
                 }
             else:
                 fallback_metadata = {}
+        elif mode == "localize":
+            ignored_filters = [
+                name
+                for name, value in (("file", file), ("symbol", symbol), ("test", test))
+                if value is not None
+            ]
+            try:
+                localize_issue = getattr(index, "localize_issue", None)
+                if localize_issue is None:
+                    raise NotImplementedError("localize_issue unsupported")
+
+                localization_results = await localize_issue(
+                    issue_description=query,
+                    language=lang,
+                    top_k=k,
+                    include_graph_context=True,
+                    context_limit=min(max(1, k), 3),
+                )
+                ranked_results = _prepare_ranked_results(
+                    localization_results,
+                    search_mode="issue_localization",
+                )
+                extra_metadata = {
+                    "provider_capability": "localize_issue",
+                }
+                if ignored_filters:
+                    extra_metadata["ignored_filters"] = ignored_filters
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
+                return _build_search_response(
+                    results=ranked_results,
+                    mode="localize",
+                    rebuilt=rebuilt,
+                    root_path=root_path,
+                    exec_ctx=_exec_ctx,
+                    filters_applied=filters_applied,
+                    ranking_note="Results ranked by combined_score (issue_localization × importance). Graph-expanded file candidates included when available.",
+                    extra_metadata=extra_metadata,
+                    follow_up_suggestions=follow_up_suggestions,
+                )
+            except NotImplementedError as exc:
+                logger.info(
+                    "Issue localization mode is unsupported by %s; falling back to semantic search",
+                    type(index).__name__,
+                )
+                filters_applied.append("mode_fallback=semantic")
+                fallback_metadata = {
+                    "requested_mode": "localize",
+                    "fallback_mode": "semantic",
+                    "fallback_reason": str(exc),
+                }
+        elif mode == "impact":
+            ignored_filters = [
+                name
+                for name, value in (("file", file), ("symbol", symbol), ("test", test))
+                if value is not None
+            ]
+            try:
+                analyze_change_impact = getattr(index, "analyze_change_impact", None)
+                if analyze_change_impact is None:
+                    raise NotImplementedError("analyze_change_impact unsupported")
+
+                impact_results = await analyze_change_impact(
+                    change_description=query,
+                    language=lang,
+                    top_k=k,
+                    include_graph_context=True,
+                    context_limit=min(max(1, k), 3),
+                )
+                ranked_results = _prepare_ranked_results(
+                    impact_results,
+                    search_mode="change_impact",
+                )
+                extra_metadata = {
+                    "provider_capability": "analyze_change_impact",
+                }
+                if ignored_filters:
+                    extra_metadata["ignored_filters"] = ignored_filters
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
+                return _build_search_response(
+                    results=ranked_results,
+                    mode="impact",
+                    rebuilt=rebuilt,
+                    root_path=root_path,
+                    exec_ctx=_exec_ctx,
+                    filters_applied=filters_applied,
+                    ranking_note="Results ranked by combined_score (change_impact × importance). Graph-expanded blast-radius candidates included when available.",
+                    extra_metadata=extra_metadata,
+                    follow_up_suggestions=follow_up_suggestions,
+                )
+            except NotImplementedError as exc:
+                logger.info(
+                    "Impact mode is unsupported by %s; falling back to semantic search",
+                    type(index).__name__,
+                )
+                filters_applied.append("mode_fallback=semantic")
+                fallback_metadata = {
+                    "requested_mode": "impact",
+                    "fallback_mode": "semantic",
+                    "fallback_reason": str(exc),
+                }
         else:
             fallback_metadata = {}
 

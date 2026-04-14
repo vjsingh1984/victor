@@ -221,6 +221,5 @@ def _warn_legacy_resolution(resolved_module_path: str) -> None:
                 f"'{resolved_module_path}'. Migrate to the extracted 'victor_<vertical>' package."
             )
 
-        warnings.warn(message, DeprecationWarning, stacklevel=3)
         logger.warning(message)
         _WARNED_LEGACY_RESOLUTIONS.add(resolved_module_path)

@@ -80,6 +80,36 @@ class WorkflowEventType(str, Enum):
     CHECKPOINT_SAVED = "checkpoint_saved"
 
 
+# Register domain event mapping with canonical EventType taxonomy
+def _register_workflow_event_taxonomy() -> None:
+    try:
+        from victor.core.events.taxonomy import EventTaxonomyRegistry
+        from victor.framework.events import EventType
+
+        EventTaxonomyRegistry.register_domain(
+            "workflow",
+            WorkflowEventType,
+            {
+                WorkflowEventType.WORKFLOW_START: EventType.STREAM_START,
+                WorkflowEventType.WORKFLOW_COMPLETE: EventType.STREAM_END,
+                WorkflowEventType.WORKFLOW_ERROR: EventType.ERROR,
+                WorkflowEventType.NODE_START: EventType.PROGRESS,
+                WorkflowEventType.NODE_COMPLETE: EventType.MILESTONE,
+                WorkflowEventType.NODE_ERROR: EventType.ERROR,
+                WorkflowEventType.AGENT_CONTENT: EventType.CONTENT,
+                WorkflowEventType.AGENT_TOOL_CALL: EventType.TOOL_CALL,
+                WorkflowEventType.AGENT_TOOL_RESULT: EventType.TOOL_RESULT,
+                WorkflowEventType.PROGRESS_UPDATE: EventType.PROGRESS,
+                WorkflowEventType.CHECKPOINT_SAVED: EventType.MILESTONE,
+            },
+        )
+    except ImportError:
+        pass  # Events module not available during early import
+
+
+_register_workflow_event_taxonomy()
+
+
 def _now_utc() -> datetime:
     """Return current UTC timestamp."""
     return datetime.now(timezone.utc)

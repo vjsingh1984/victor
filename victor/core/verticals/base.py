@@ -1067,7 +1067,6 @@ class VerticalRegistry:
             "Publish VictorPlugin objects via 'victor.plugins' instead. "
             f"Observed legacy entries: {names}"
         )
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
         logger.warning(message)
         cls._legacy_entry_point_warning_emitted = True
 

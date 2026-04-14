@@ -27,10 +27,14 @@ Test Categories:
 """
 
 import uuid
+import warnings
 from typing import Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+# Suppress FrameworkShim deprecation warning — we are intentionally testing the shim
+pytestmark = pytest.mark.filterwarnings("ignore:FrameworkShim is deprecated")
 
 from victor.core.verticals.import_resolver import import_module_with_fallback
 from victor.framework.shim import FrameworkShim, get_vertical, list_verticals
