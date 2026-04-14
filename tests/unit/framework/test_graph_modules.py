@@ -553,6 +553,8 @@ class TestGraphStoreProtocol:
         ]
 
         expected_methods = [
+            "initialize",
+            "close",
             "upsert_nodes",
             "upsert_edges",
             "get_neighbors",

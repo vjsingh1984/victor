@@ -116,6 +116,14 @@ class SqliteGraphStore(GraphStoreProtocol):
         self._ensure_schema()
         self._lock = asyncio.Lock()
 
+    async def initialize(self) -> None:
+        """Ensure schema exists for compatibility with higher-level stores."""
+        self._ensure_schema()
+
+    async def close(self) -> None:
+        """Close underlying database connection."""
+        self._db.close()
+
     def _connect(self) -> sqlite3.Connection:
         """Get database connection."""
         return self._db.get_connection()

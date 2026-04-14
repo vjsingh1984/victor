@@ -14,6 +14,12 @@ class MemoryGraphStore(GraphStoreProtocol):
         self._edges: Dict[tuple[str, str, str], GraphEdge] = {}
         self._file_mtimes: Dict[str, float] = {}
 
+    async def initialize(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
     async def upsert_nodes(self, nodes: Iterable[GraphNode]) -> None:
         for n in nodes:
             self._nodes[n.node_id] = n

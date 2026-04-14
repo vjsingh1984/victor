@@ -86,6 +86,27 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+def _normalize_project_database_paths(project_path: Optional[Path]) -> tuple[Path, Path, Path]:
+    """Normalize project DB input to project root, state dir, and db file."""
+    if project_path is None:
+        resolved = Path.cwd().resolve()
+    else:
+        resolved = Path(project_path).resolve()
+
+    if resolved.suffix == ".db":
+        project_dir = resolved.parent
+        db_path = resolved
+    elif resolved.name == ".victor":
+        project_dir = resolved
+        db_path = project_dir / "project.db"
+    else:
+        project_dir = resolved / ".victor"
+        db_path = project_dir / "project.db"
+
+    project_root = project_dir.parent
+    return project_root, project_dir, db_path
+
+
 class DatabaseManager:
     """Unified database manager for Victor.
 
@@ -943,13 +964,11 @@ class ProjectDatabaseManager:
         Args:
             project_path: Path to project root. If None, uses current directory.
         """
-        if project_path is None:
-            project_path = Path.cwd()
-
-        self.project_dir = project_path / ".victor"
+        project_root, project_dir, db_path = _normalize_project_database_paths(project_path)
+        self.project_root = project_root
+        self.project_dir = project_dir
         self.project_dir.mkdir(parents=True, exist_ok=True)
-
-        self.db_path = self.project_dir / "project.db"
+        self.db_path = db_path
         self._local = threading.local()
         self._migration_lock = threading.Lock()
         self._migrated = False
@@ -1216,10 +1235,8 @@ def get_project_database(project_path: Optional[Path] = None) -> ProjectDatabase
         ProjectDatabaseManager instance for the project
     """
     global _project_databases
-    if project_path is None:
-        project_path = Path.cwd()
-
-    project_key = str(project_path.resolve())
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
+    project_key = str(db_path)
     if project_key not in _project_databases:
         _project_databases[project_key] = ProjectDatabaseManager(project_path)
     return _project_databases[project_key]
@@ -1237,10 +1254,8 @@ def reset_database() -> None:
 def reset_project_database(project_path: Optional[Path] = None) -> None:
     """Reset project database instance (for testing)."""
     global _project_databases
-    if project_path is None:
-        project_path = Path.cwd()
-
-    project_key = str(project_path.resolve())
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
+    project_key = str(db_path)
     if project_key in _project_databases:
         _project_databases[project_key].close()
         del _project_databases[project_key]
