@@ -78,34 +78,40 @@ class ToolCallSpec:
 
 
 # Optimized tool categorization using frozenset for O(1) lookups
-READ_TOOLS = frozenset({
-    "read_file",
-    "list_directory",
-    "code_search",
-    "semantic_code_search",
-    "grep_search",
-    "plan_files",
-    "git",
-    "directory_tree",
-    "file_info",
-})
+READ_TOOLS = frozenset(
+    {
+        "read_file",
+        "list_directory",
+        "code_search",
+        "semantic_code_search",
+        "grep_search",
+        "plan_files",
+        "git",
+        "directory_tree",
+        "file_info",
+    }
+)
 
-WRITE_TOOLS = frozenset({
-    "write_file",
-    "edit_files",
-    "execute_bash",
-    "docker",
-    "patch",
-    "create_file",
-    "notebook_edit",
-})
+WRITE_TOOLS = frozenset(
+    {
+        "write_file",
+        "edit_files",
+        "execute_bash",
+        "docker",
+        "patch",
+        "create_file",
+        "notebook_edit",
+    }
+)
 
-NETWORK_TOOLS = frozenset({
-    "web_search",
-    "web_fetch",
-    "http_request",
-    "fetch",
-})
+NETWORK_TOOLS = frozenset(
+    {
+        "web_search",
+        "web_fetch",
+        "http_request",
+        "fetch",
+    }
+)
 
 # Tool metadata for categorization
 TOOL_METADATA: Dict[str, Dict[str, Any]] = {
@@ -115,18 +121,15 @@ TOOL_METADATA: Dict[str, Dict[str, Any]] = {
     "write_file": {"category": ToolCategory.WRITE, "side_effects": True},
     "edit_files": {"category": ToolCategory.WRITE, "side_effects": True},
     "execute_bash": {"category": ToolCategory.WRITE, "side_effects": True},
-
     # Search tools
     "code_search": {"category": ToolCategory.READ_ONLY, "side_effects": False},
     "semantic_code_search": {"category": ToolCategory.READ_ONLY, "side_effects": False},
     "grep_search": {"category": ToolCategory.READ_ONLY, "side_effects": False},
-
     # Network tools
     "web_search": {"category": ToolCategory.NETWORK, "side_effects": False},
     "web_fetch": {"category": ToolCategory.NETWORK, "side_effects": False},
     "http_request": {"category": ToolCategory.NETWORK, "side_effects": False},
     "fetch": {"category": ToolCategory.NETWORK, "side_effects": False},
-
     # Development tools
     "docker": {"category": ToolCategory.WRITE, "side_effects": True},
     "patch": {"category": ToolCategory.WRITE, "side_effects": True},

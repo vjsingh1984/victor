@@ -345,12 +345,15 @@ class TestRunTaskErrorHandling:
 
         caplog.set_level(logging.DEBUG, logger="victor.evaluation.benchmarks.swe_bench")
 
-        with patch(
-            "asyncio.create_subprocess_exec",
-            side_effect=[apply_proc, test_proc],
-        ), patch(
-            "victor.context.test_runner.detect_test_runner",
-            return_value=runner_config,
+        with (
+            patch(
+                "asyncio.create_subprocess_exec",
+                side_effect=[apply_proc, test_proc],
+            ),
+            patch(
+                "victor.context.test_runner.detect_test_runner",
+                return_value=runner_config,
+            ),
         ):
             updated = await runner._run_tests_in_cached_repo(
                 task,

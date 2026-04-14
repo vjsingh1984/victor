@@ -258,5 +258,8 @@ class OrchestratorProtocolAdapter:
             return self._orchestrator.is_complete
         elif hasattr(self._orchestrator, "_conversation_state"):
             from victor.agent.conversation_state import ConversationStage
-            return self._orchestrator._conversation_state.current_stage == ConversationStage.COMPLETE
+
+            return (
+                self._orchestrator._conversation_state.current_stage == ConversationStage.COMPLETE
+            )
         return False

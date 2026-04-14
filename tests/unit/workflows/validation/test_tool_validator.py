@@ -254,8 +254,7 @@ class TestToolDependencyValidator:
 
         assert result.valid is False
         assert any(
-            record.levelno == logging.DEBUG
-            and "missing_tool" in record.message
+            record.levelno == logging.DEBUG and "missing_tool" in record.message
             for record in caplog.records
         )
         assert not any(record.levelno >= logging.WARNING for record in caplog.records)
