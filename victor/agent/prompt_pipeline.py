@@ -355,6 +355,11 @@ class UnifiedPromptPipeline:
             if credit:
                 parts.append(credit)
 
+        # 7. Online tool reputation (mid-turn feedback from current session)
+        reputation = self._get_tool_reputation_guidance()
+        if reputation:
+            parts.append(reputation)
+
         if not parts:
             return ""
 
@@ -408,6 +413,27 @@ class UnifiedPromptPipeline:
             if service is None:
                 return None
             return service.generate_tool_guidance()
+        except Exception:
+            return None
+
+    def _get_tool_reputation_guidance(self) -> Optional[str]:
+        """Get online tool reputation guidance from ToolPipeline.
+
+        The ToolReputationTracker on the ToolPipeline updates after every
+        tool execution. This pulls its current guidance for mid-turn injection.
+        """
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+            # Try to find tool pipeline via the container or orchestrator
+            pipeline = container.get_optional("tool_pipeline")
+            if pipeline is None:
+                return None
+            tracker = getattr(pipeline, "_tool_reputation", None)
+            if tracker is None:
+                return None
+            return tracker.get_selection_guidance()
         except Exception:
             return None
 

@@ -573,6 +573,15 @@ class ToolPipeline:
         # Credit assignment: automatic tool-level credit tracking (FEP-0001 Phase 3)
         self._credit_tracking_service: Optional[Any] = None
 
+        # Online tool reputation: mid-turn credit feedback (updates per tool call)
+        self._tool_reputation: Optional[Any] = None
+        try:
+            from victor.framework.rl.tool_reputation import ToolReputationTracker
+
+            self._tool_reputation = ToolReputationTracker()
+        except ImportError:
+            pass
+
     @property
     def credit_tracking_service(self) -> Any:
         """Credit tracking service (if enabled). None otherwise."""
@@ -1943,6 +1952,17 @@ class ToolPipeline:
                 )
             except Exception:
                 pass  # Credit tracking is non-critical
+
+        # Update online tool reputation (mid-turn feedback)
+        if self._tool_reputation is not None:
+            try:
+                self._tool_reputation.record(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    duration_ms=call_result.execution_time_ms,
+                )
+            except Exception:
+                pass  # Reputation tracking is non-critical
 
         return call_result
 
