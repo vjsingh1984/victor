@@ -3,6 +3,9 @@
 import logging
 
 from typing import List
+from unittest.mock import Mock
+
+import pytest
 
 from victor.core import tool_dependency_loader
 from victor.core.verticals.adapters import ensure_runtime_vertical
@@ -257,6 +260,94 @@ def test_ensure_runtime_vertical_reuses_cached_adapter_for_sdk_vertical():
     assert first is second
     assert issubclass(first, VerticalBase)
     assert first is not requested
+
+
+def test_manifest_negotiation_enforces_min_framework_version(monkeypatch):
+    """Manifest negotiation should honor min_framework_version on normalized manifests."""
+
+    loader = VerticalLoader()
+    vertical = _make_sdk_vertical("future_framework_vertical", api_version=2)
+    vertical._victor_manifest = ExtensionManifest(
+        api_version=2,
+        name="future_framework_vertical",
+        version="1.0.0",
+        min_framework_version=">=9.9.9",
+    )
+
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.get_framework_version",
+        lambda: "1.2.3",
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.capability_negotiator.CapabilityNegotiator.negotiate",
+        lambda self, manifest: Mock(compatible=True, warnings=[], errors=[]),
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.version_matrix.get_compatibility_matrix",
+        lambda: Mock(
+            is_loaded=lambda: True,
+            load_default_rules=lambda: None,
+            check_compatibility=lambda **kwargs: Mock(
+                is_incompatible=False,
+                message="",
+                required_features=[],
+                status=Mock(value="compatible"),
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="does not meet requirement >=9.9.9"):
+        loader._negotiate_manifest(vertical)
+
+
+def test_manifest_negotiation_uses_runtime_framework_version_for_matrix(monkeypatch):
+    """Version-matrix compatibility should use the normalized framework version helper."""
+
+    loader = VerticalLoader()
+    vertical = _make_sdk_vertical("matrix_version_vertical", api_version=2)
+    vertical._victor_manifest = ExtensionManifest(
+        api_version=2,
+        name="matrix_version_vertical",
+        version="1.0.0",
+        min_framework_version=">=0.0.1",
+    )
+    observed: dict[str, str] = {}
+
+    def _check_compatibility(*, vertical_name: str, vertical_version: str, framework_version: str):
+        observed["vertical_name"] = vertical_name
+        observed["vertical_version"] = vertical_version
+        observed["framework_version"] = framework_version
+        return Mock(
+            is_incompatible=False,
+            message="",
+            required_features=[],
+            status=Mock(value="compatible"),
+        )
+
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.get_framework_version",
+        lambda: "2.4.6",
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.capability_negotiator.CapabilityNegotiator.negotiate",
+        lambda self, manifest: Mock(compatible=True, warnings=[], errors=[]),
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.version_matrix.get_compatibility_matrix",
+        lambda: Mock(
+            is_loaded=lambda: True,
+            load_default_rules=lambda: None,
+            check_compatibility=_check_compatibility,
+        ),
+    )
+
+    loader._negotiate_manifest(vertical)
+
+    assert observed == {
+        "vertical_name": "matrix_version_vertical",
+        "vertical_version": "1.0.0",
+        "framework_version": "2.4.6",
+    }
 
 
 def test_discover_vertical_names_uses_entry_point_metadata_only(monkeypatch):

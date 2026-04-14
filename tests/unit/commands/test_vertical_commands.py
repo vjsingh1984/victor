@@ -440,13 +440,15 @@ class TestVerticalRegistryManager:
         errors = manager._validate_package(spec)
         assert len(errors) == 0
 
-    def test_clear_cache(self):
+    def test_clear_cache(self, tmp_path):
         """Test clearing metadata cache."""
         manager = VerticalRegistryManager()
+        manager.cache_dir = tmp_path / "verticals"
+        manager.cache_dir.mkdir(parents=True)
 
         # Create a fake cache file
         cache_file = manager.cache_dir / "available.json"
-        cache_file.write_text(json.dumps({"test": "data"}))
+        cache_file.write_text(json.dumps({"test": "data"}), encoding="utf-8")
 
         # Clear cache
         manager.clear_cache()
@@ -608,6 +610,61 @@ class TestVerticalCommands:
 
         assert result.exit_code == 0
         mock_create.assert_called_once()
+
+    def test_audit_command_reports_contract_violations(self, tmp_path):
+        """Audit command should flag extracted-vertical contract violations."""
+        package_dir = tmp_path / "victor_bad"
+        package_dir.mkdir()
+        (tmp_path / "pyproject.toml").write_text(
+            """
+[project]
+name = "victor-bad"
+version = "0.1.0"
+dependencies = ["victor-sdk>=0.1.0"]
+
+[project.entry-points."victor.plugins"]
+bad = "victor_bad.plugin:get_plugin"
+""".strip(),
+            encoding="utf-8",
+        )
+        (package_dir / "__init__.py").write_text("", encoding="utf-8")
+        (package_dir / "plugin.py").write_text(
+            "from victor.framework.agent import Agent\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(vertical_app, ["audit", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "FAILED" in result.stdout
+        assert "forbidden_runtime_import" in result.stdout
+
+    def test_audit_command_passes_clean_vertical_repo(self, tmp_path):
+        """Audit command should pass an SDK-pure extracted vertical."""
+        package_dir = tmp_path / "victor_good"
+        package_dir.mkdir()
+        (tmp_path / "pyproject.toml").write_text(
+            """
+[project]
+name = "victor-good"
+version = "0.1.0"
+dependencies = ["victor-sdk>=0.1.0"]
+
+[project.entry-points."victor.plugins"]
+good = "victor_good.plugin:get_plugin"
+""".strip(),
+            encoding="utf-8",
+        )
+        (package_dir / "__init__.py").write_text("", encoding="utf-8")
+        (package_dir / "plugin.py").write_text(
+            "from victor_sdk.core.plugins import VictorPlugin\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(vertical_app, ["audit", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "PASSED" in result.stdout
 
 
 class TestVerticalFiltering:

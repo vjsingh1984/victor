@@ -11,6 +11,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Set
 
+from victor.core.verticals.framework_version import get_framework_version
 from victor_sdk.core.api_version import CURRENT_API_VERSION, MIN_SUPPORTED_API_VERSION
 from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
 
@@ -177,9 +178,7 @@ class CapabilityNegotiator:
             return
 
         try:
-            from importlib.metadata import version as get_version
-
-            framework_version = get_version("victor-ai")
+            framework_version = get_framework_version()
         except Exception:
             logger.debug("Cannot determine victor-ai version; skipping version skew check")
             return

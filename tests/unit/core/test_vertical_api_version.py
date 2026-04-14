@@ -2,9 +2,12 @@
 
 import logging
 from typing import List
-from unittest.mock import patch
 
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor_sdk.core.api_version import (
+    CURRENT_API_VERSION,
+    MIN_SUPPORTED_API_VERSION,
+)
 
 
 def _make_vertical(name: str, api_version=None):
@@ -64,19 +67,19 @@ class TestVerticalAPIVersion:
         assert result is False
         assert "below minimum" in caplog.text
 
-    def test_vertical_newer_warns(self, caplog):
-        """A vertical with version > CURRENT should warn but not reject."""
+    def test_vertical_newer_rejected(self, caplog):
+        """A vertical with version > CURRENT should be rejected."""
         v = _make_vertical("ver_newer", api_version=99)
 
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.ERROR):
             result = VerticalRegistry._validate_external_vertical(v, "test_ep")
 
-        assert result is True
+        assert result is False
         assert "newer than current" in caplog.text
 
     def test_matching_version_silent(self, caplog):
         """A vertical with matching version should produce no version warnings."""
-        v = _make_vertical("ver_match", api_version=1)
+        v = _make_vertical("ver_match", api_version=CURRENT_API_VERSION)
 
         with caplog.at_level(logging.DEBUG):
             result = VerticalRegistry._validate_external_vertical(v, "test_ep")
@@ -88,9 +91,9 @@ class TestVerticalAPIVersion:
         assert "newer than current" not in caplog.text
 
     def test_registry_version_constants(self):
-        """VerticalRegistry should expose version constants."""
-        assert VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION == 1
-        assert VerticalRegistry.CURRENT_API_VERSION == 1
+        """VerticalRegistry should expose SDK-aligned version constants."""
+        assert VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION == MIN_SUPPORTED_API_VERSION
+        assert VerticalRegistry.CURRENT_API_VERSION == CURRENT_API_VERSION
         assert (
             VerticalRegistry.CURRENT_API_VERSION >= VerticalRegistry.MINIMUM_SUPPORTED_API_VERSION
         )

@@ -7,6 +7,22 @@ Victor verticals without runtime dependencies.
 from victor_sdk.verticals.registration import ExtensionDependency, register_vertical
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.extensions import VerticalExtensions
+from victor_sdk.verticals.mode_config import (
+    ModeConfig as StaticModeConfig,
+    ModeDefinition,
+    StaticModeConfigProvider,
+    VerticalModeConfig,
+)
+from victor_sdk.verticals.tool_dependencies import (
+    ToolDependencyConfig,
+    ToolDependencyLoadError,
+    ToolDependencyLoader,
+    YAMLToolDependencyProvider,
+    create_tool_dependency_provider,
+    get_cached_provider,
+    invalidate_provider_cache,
+    load_tool_dependency_yaml,
+)
 from victor_sdk.verticals.protocols import (
     # SDK-native protocols
     CapabilityProvider,
@@ -54,6 +70,18 @@ __all__ = [
     "ExtensionDependency",
     "VerticalBase",
     "VerticalExtensions",
+    "StaticModeConfig",
+    "ModeDefinition",
+    "StaticModeConfigProvider",
+    "VerticalModeConfig",
+    "ToolDependencyConfig",
+    "ToolDependencyLoadError",
+    "ToolDependencyLoader",
+    "YAMLToolDependencyProvider",
+    "create_tool_dependency_provider",
+    "get_cached_provider",
+    "invalidate_provider_cache",
+    "load_tool_dependency_yaml",
     # SDK-native protocols
     "ToolDependency",
     "ToolDependencyProviderProtocol",

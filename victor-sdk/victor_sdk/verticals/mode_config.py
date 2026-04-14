@@ -218,9 +218,50 @@ class VerticalModeConfig:
     default_budget: int = 10
 
 
+class StaticModeConfigProvider:
+    """Pure SDK mode-config provider backed by static vertical definitions.
+
+    This replaces the need for external verticals to import the runtime
+    ``ModeConfigRegistry`` or ``RegistryBasedModeConfigProvider`` helpers.
+    The core runtime already consumes ``ModeConfigProviderProtocol`` via
+    duck typing and normalizes the returned objects centrally.
+    """
+
+    def __init__(self, config: VerticalModeConfig):
+        """Initialize the provider with a vertical's mode configuration."""
+
+        self._config = config
+
+    def get_mode_configs(self) -> Dict[str, ModeConfig]:
+        """Return mode configurations for this vertical."""
+
+        return {
+            name: definition.to_mode_config()
+            for name, definition in self._config.modes.items()
+        }
+
+    def get_default_mode(self) -> str:
+        """Return the configured default mode name."""
+
+        return self._config.default_mode
+
+    def get_default_tool_budget(self, task_type: Optional[str] = None) -> int:
+        """Return the configured default tool budget."""
+
+        if task_type:
+            return self._config.task_budgets.get(task_type, self._config.default_budget)
+        return self._config.default_budget
+
+    def get_tool_budget_for_task(self, task_type: str) -> int:
+        """Return the recommended budget for a task type."""
+
+        return self.get_default_tool_budget(task_type)
+
+
 __all__ = [
     "ModeConfig",
     "ModeDefinition",
     "ModeLevel",
+    "StaticModeConfigProvider",
     "VerticalModeConfig",
 ]

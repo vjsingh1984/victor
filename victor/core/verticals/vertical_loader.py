@@ -54,6 +54,7 @@ from victor.core.events.emit_helper import emit_event_sync
 from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.framework_version import get_framework_version
 from victor.core.verticals.manifest_contract import (
     get_or_create_vertical_manifest,
     get_vertical_runtime_metadata,
@@ -888,22 +889,21 @@ class VerticalLoader:
             return
 
         # 1. Version Negotiation (Core Framework v. Vertical Requirement)
-        try:
-            from packaging import version
-            from victor.version import VERSION as FRAMEWORK_VERSION
+        required = getattr(manifest, "min_framework_version", None)
+        if required:
+            try:
+                from packaging import version
+                from packaging.specifiers import SpecifierSet
 
-            required = getattr(manifest, "framework_version_requirement", ">=1.0.0")
-
-            from packaging.specifiers import SpecifierSet
-
-            spec = SpecifierSet(required)
-            if version.parse(FRAMEWORK_VERSION) not in spec:
-                raise ValueError(
-                    f"Incompatible framework version: {FRAMEWORK_VERSION} "
-                    f"does not meet requirement {required} for vertical {manifest.name}"
-                )
-        except (ImportError, AttributeError) as exc:
-            logger.debug("Core version negotiation skipped: %s", exc)
+                framework_version = get_framework_version()
+                spec = SpecifierSet(required)
+                if version.parse(framework_version) not in spec:
+                    raise ValueError(
+                        f"Incompatible framework version: {framework_version} "
+                        f"does not meet requirement {required} for vertical {manifest.name}"
+                    )
+            except ImportError as exc:
+                logger.debug("Core version negotiation skipped: %s", exc)
 
         # 2. Capability/Protocol Negotiation
         try:
@@ -932,14 +932,12 @@ class VerticalLoader:
         # 3. Version Compatibility Matrix Check
         try:
             from victor.core.verticals.version_matrix import (
-                VersionCompatibilityMatrix,
                 get_compatibility_matrix,
             )
-            from victor.version import VERSION as FRAMEWORK_VERSION
-            from packaging.version import parse as parse_version
 
             vertical_version = getattr(manifest, "version", "1.0.0")
             vertical_name = manifest.name
+            framework_version = get_framework_version()
 
             # Get compatibility matrix
             matrix = get_compatibility_matrix()
@@ -952,12 +950,12 @@ class VerticalLoader:
             result = matrix.check_compatibility(
                 vertical_name=vertical_name,
                 vertical_version=vertical_version,
-                framework_version=FRAMEWORK_VERSION,
+                framework_version=framework_version,
             )
 
             if result.is_incompatible:
                 raise ValueError(
-                    f"Vertical '{vertical_name}' is incompatible with framework {FRAMEWORK_VERSION}: "
+                    f"Vertical '{vertical_name}' is incompatible with framework {framework_version}: "
                     f"{result.message}"
                 )
 

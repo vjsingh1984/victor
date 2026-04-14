@@ -14,6 +14,7 @@
 
 """Vertical management commands."""
 
+import json
 from typing import Optional
 
 import typer
@@ -303,6 +304,61 @@ def search_verticals(
 
     console.print(table)
     console.print(f"\n[dim]Found {len(results)} result(s)[/]")
+
+
+@vertical_app.command("audit")
+def audit_verticals(
+    paths: list[str] = typer.Argument(..., help="One or more extracted vertical repository paths"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+) -> None:
+    """Audit extracted vertical repositories against the supported plugin contract."""
+    _deprecation_notice()
+
+    from victor.core.verticals.contract_audit import VerticalContractAuditor
+
+    reports = VerticalContractAuditor().audit_paths(paths)
+
+    if json_output:
+        console.print_json(json.dumps([report.to_dict() for report in reports], indent=2))
+    else:
+        table = Table(title="Vertical Contract Audit")
+        table.add_column("Repo", style="cyan")
+        table.add_column("Result")
+        table.add_column("Errors", justify="right")
+        table.add_column("Warnings", justify="right")
+        table.add_column("Plugin Entry Points")
+
+        for report in reports:
+            status = "[green]PASSED[/]" if report.passed else "[red]FAILED[/]"
+            plugin_entries = ", ".join(report.plugin_entry_points) if report.plugin_entry_points else "-"
+            table.add_row(
+                str(report.root_path),
+                status,
+                str(report.error_count),
+                str(report.warning_count),
+                plugin_entries,
+            )
+
+        console.print(table)
+
+        for report in reports:
+            if not report.issues:
+                continue
+            console.print(f"\n[bold]{report.project_name or report.root_path.name}[/]")
+            for issue in report.issues:
+                location = ""
+                if issue.path:
+                    location = f" ({issue.path}"
+                    if issue.line is not None:
+                        location += f":{issue.line}"
+                    location += ")"
+                style = "red" if issue.level == "error" else "yellow"
+                console.print(
+                    f"[{style}]{issue.level.upper()} {issue.code}[/]{location}: {issue.message}"
+                )
+
+    if any(not report.passed for report in reports):
+        raise typer.Exit(1)
 
 
 @vertical_app.command("create")

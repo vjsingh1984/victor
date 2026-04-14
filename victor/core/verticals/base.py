@@ -67,6 +67,10 @@ from typing import (
     TYPE_CHECKING,
 )
 
+from victor_sdk.core.api_version import (
+    CURRENT_API_VERSION as SDK_CURRENT_API_VERSION,
+    MIN_SUPPORTED_API_VERSION as SDK_MIN_SUPPORTED_API_VERSION,
+)
 from victor_sdk.core.types import Tier
 
 # Import SDK base class for dependency inversion
@@ -824,8 +828,8 @@ class VerticalRegistry:
     _external_discovered: bool = False
     _legacy_entry_point_warning_emitted: bool = False
     ENTRY_POINT_GROUP: str = "victor.verticals"
-    MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = 1
-    CURRENT_API_VERSION: ClassVar[int] = 1
+    MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = SDK_MIN_SUPPORTED_API_VERSION
+    CURRENT_API_VERSION: ClassVar[int] = SDK_CURRENT_API_VERSION
 
     @classmethod
     def _is_contrib_module(cls, module_path: str) -> bool:
@@ -1159,11 +1163,12 @@ class VerticalRegistry:
             )
             return False
         if api_version > cls.CURRENT_API_VERSION:
-            logger.warning(
+            logger.error(
                 f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
                 f"API version {api_version} is newer than current "
-                f"version {cls.CURRENT_API_VERSION}. It may use unsupported features."
+                f"version {cls.CURRENT_API_VERSION}. Skipping."
             )
+            return False
 
         return True
 
