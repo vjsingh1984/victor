@@ -65,10 +65,15 @@ jobs:
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install the in-repo SDK FIRST so victor-ai can resolve victor-sdk>=X.Y
           # from the local editable install instead of requiring it on PyPI.
-          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
+          pip install --no-cache-dir -e ./victor-sdk
           # Install the full development + CI dependency set explicitly. Avoid relying on
           # self-referential extras, which can leave async/test plugins unresolved in matrix jobs.
-          pip install --force-reinstall --no-cache-dir -e ".[dev,ci,api]"
+          # NOTE: Do NOT use --force-reinstall here — it overwrites the local editable
+          # victor-sdk (0.7.0 with cli module) with the older PyPI release (0.6.0 without it).
+          pip install --no-cache-dir -e ".[dev,ci,api]"
+          # Re-install SDK editably to guarantee the local version wins even if
+          # pip resolved victor-sdk from PyPI as a transitive dependency above.
+          pip install --no-cache-dir --no-deps -e ./victor-sdk
           # Install pytest-split for sharding across CI jobs
           pip install pytest-split
 
@@ -142,9 +147,12 @@ jobs:
           pip uninstall -y victor victor-ai victor-sdk || true
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           # Install the in-repo SDK first so victor-ai can resolve the dependency locally.
-          pip install --force-reinstall --no-cache-dir -e ./victor-sdk
-          # Install victor-ai with embeddings extra (needed for CLI import chain)
-          pip install --force-reinstall --no-cache-dir -e ".[embeddings]"
+          pip install --no-cache-dir -e ./victor-sdk
+          # Install victor-ai with embeddings extra (needed for CLI import chain).
+          # Do NOT use --force-reinstall — it overwrites local editable SDK with PyPI version.
+          pip install --no-cache-dir -e ".[embeddings]"
+          # Re-install SDK editably to guarantee the local version wins
+          pip install --no-cache-dir --no-deps -e ./victor-sdk
 
       - name: Test CLI commands
         run: |
