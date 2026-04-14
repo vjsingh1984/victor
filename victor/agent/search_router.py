@@ -240,6 +240,29 @@ GRAPH_ANALYTIC_SIGNALS: List[Tuple[str, str, str, bool]] = [
     ),
 ]
 
+GRAPH_ARCHITECTURE_SIGNALS: List[Tuple[str, str, str, bool]] = [
+    (
+        r"\b(?:show|find|get|list)\s+(?:the\s+)?(?:top[\s-]*\d+\s+)?(?:most\s+)?"
+        r"important\s+(?:modules?|components?|packages?|subsystems?)\b",
+        "module_pagerank",
+        "important_modules",
+        False,
+    ),
+    (
+        r"\b(?:show|find|get|list)\s+(?:the\s+)?(?:top[\s-]*\d+\s+)?(?:most\s+)?"
+        r"(?:central|critical)\s+(?:modules?|components?|packages?|subsystems?)\b",
+        "module_centrality",
+        "central_modules",
+        False,
+    ),
+    (
+        r"\barchitecture\s+(?:hotspots?|summary)\b",
+        "module_pagerank",
+        "architecture_hotspots",
+        False,
+    ),
+]
+
 
 def _graph_symbol_fragment(*, quoted_group: str, bare_group: str) -> str:
     """Return a reusable regex fragment for graph symbol extraction."""
@@ -258,6 +281,7 @@ _GRAPH_TARGET_SYMBOL_FRAGMENT = _graph_symbol_fragment(
     quoted_group="target_quoted",
     bare_group="target_bare",
 )
+_GRAPH_FILE_FRAGMENT = r"(?P<file>(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9_]+)"
 
 GRAPH_NAVIGATION_SIGNALS: List[Tuple[str, str, int, str, bool]] = [
     (
@@ -297,6 +321,22 @@ GRAPH_NAVIGATION_SIGNALS: List[Tuple[str, str, int, str, bool]] = [
         "path",
         0,
         "path_from_to",
+        False,
+    ),
+]
+
+GRAPH_FILE_SIGNALS: List[Tuple[str, str, str, bool]] = [
+    (
+        rf"\b(?:show|find|get|list)\s+(?:the\s+)?(?:file\s+)?dependencies\s+(?:for|of)\s+"
+        rf"{_GRAPH_FILE_FRAGMENT}(?=$|[\s?.!,])",
+        "file_deps",
+        "file_dependencies_for",
+        False,
+    ),
+    (
+        rf"\bwhat\s+files?\s+does\s+{_GRAPH_FILE_FRAGMENT}\s+depend\s+on\b",
+        "file_deps",
+        "file_depends_on",
         False,
     ),
 ]
@@ -397,7 +437,9 @@ class SearchRouter:
         self._bug_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._localization_patterns: List[Tuple[re.Pattern, float, str]] = []
         self._impact_patterns: List[Tuple[re.Pattern, float, str]] = []
+        self._graph_architecture_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_analytic_patterns: List[Tuple[re.Pattern, str, str]] = []
+        self._graph_file_patterns: List[Tuple[re.Pattern, str, str]] = []
         self._graph_navigation_patterns: List[Tuple[re.Pattern, str, int, str]] = []
         self._graph_patterns: List[Tuple[re.Pattern, str, int, str]] = []
 
@@ -407,8 +449,12 @@ class SearchRouter:
         self._compile_patterns(ISSUE_LOCALIZATION_SIGNALS, self._localization_patterns)
         self._compile_patterns(CHANGE_IMPACT_SIGNALS, self._impact_patterns)
         self._compile_graph_analytic_patterns(
+            GRAPH_ARCHITECTURE_SIGNALS, self._graph_architecture_patterns
+        )
+        self._compile_graph_analytic_patterns(
             GRAPH_ANALYTIC_SIGNALS, self._graph_analytic_patterns
         )
+        self._compile_graph_analytic_patterns(GRAPH_FILE_SIGNALS, self._graph_file_patterns)
         self._compile_graph_patterns(GRAPH_NAVIGATION_SIGNALS, self._graph_navigation_patterns)
         self._compile_graph_patterns(GRAPH_TRAVERSAL_SIGNALS, self._graph_patterns)
 
@@ -424,10 +470,20 @@ class SearchRouter:
                 self._compile_patterns(custom_signals["localization"], self._localization_patterns)
             if "impact" in custom_signals:
                 self._compile_patterns(custom_signals["impact"], self._impact_patterns)
+            if "graph_architecture" in custom_signals:
+                self._compile_graph_analytic_patterns(
+                    custom_signals["graph_architecture"],
+                    self._graph_architecture_patterns,
+                )
             if "graph_analytics" in custom_signals:
                 self._compile_graph_analytic_patterns(
                     custom_signals["graph_analytics"],
                     self._graph_analytic_patterns,
+                )
+            if "graph_files" in custom_signals:
+                self._compile_graph_analytic_patterns(
+                    custom_signals["graph_files"],
+                    self._graph_file_patterns,
                 )
             if "graph_navigation" in custom_signals:
                 self._compile_graph_patterns(
@@ -503,9 +559,17 @@ class SearchRouter:
         if graph_route is not None:
             return graph_route
 
+        graph_architecture_route = self._route_graph_architecture_query(query)
+        if graph_architecture_route is not None:
+            return graph_architecture_route
+
         graph_analytic_route = self._route_graph_analytic_query(query)
         if graph_analytic_route is not None:
             return graph_analytic_route
+
+        graph_file_route = self._route_graph_file_query(query)
+        if graph_file_route is not None:
+            return graph_file_route
 
         graph_navigation_route = self._route_graph_navigation_query(query)
         if graph_navigation_route is not None:
@@ -626,6 +690,54 @@ class SearchRouter:
                     tool_name="graph",
                     tool_arguments={"mode": "pagerank", "top_k": top_k},
                 )
+
+        return None
+
+    def _route_graph_architecture_query(self, query: str) -> Optional[SearchRoute]:
+        """Return graph-tool routes for module-level architecture questions."""
+        for pattern, mode, name in self._graph_architecture_patterns:
+            if not pattern.search(query):
+                continue
+
+            top_k = self._extract_requested_top_k(query, default=5)
+            return SearchRoute(
+                search_type=SearchType.SEMANTIC,
+                confidence=0.93,
+                reason="Query asks for architecture-level hotspots suited for module graph ranking",
+                transformed_query=None,
+                matched_patterns=[name],
+                tool_name="graph",
+                tool_arguments={
+                    "mode": mode,
+                    "top_k": top_k,
+                    "only_runtime": True,
+                    "include_callsites": True,
+                    "max_callsites": 3,
+                },
+            )
+
+        return None
+
+    def _route_graph_file_query(self, query: str) -> Optional[SearchRoute]:
+        """Return graph-tool routes for file dependency questions."""
+        for pattern, mode, name in self._graph_file_patterns:
+            match = pattern.search(query)
+            if not match:
+                continue
+
+            file_path = self._normalize_graph_file(match.groupdict().get("file"))
+            if not file_path:
+                continue
+
+            return SearchRoute(
+                search_type=SearchType.SEMANTIC,
+                confidence=0.93,
+                reason="Query asks for file-level dependency analysis suited for graph file dependencies",
+                transformed_query=file_path,
+                matched_patterns=[name],
+                tool_name="graph",
+                tool_arguments={"mode": mode, "file": file_path},
+            )
 
         return None
 
@@ -783,6 +895,14 @@ class SearchRouter:
         return self._normalize_graph_symbol(
             groups.get(f"{prefix}quoted") or groups.get(f"{prefix}bare")
         )
+
+    def _normalize_graph_file(self, file_path: Optional[str]) -> Optional[str]:
+        """Normalize a file path extracted from a graph-oriented query."""
+        if not file_path:
+            return None
+
+        normalized = file_path.strip().strip("`'\"").strip().rstrip("?.!,:;")
+        return normalized or None
 
     def _extract_requested_top_k(
         self,

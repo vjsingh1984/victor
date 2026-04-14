@@ -113,6 +113,39 @@ def test_route_search_query_includes_graph_path_arguments() -> None:
     assert result["search_type"] == "semantic"
 
 
+def test_route_search_query_includes_graph_module_pagerank_arguments() -> None:
+    """Architecture-hotspot queries should recommend module pagerank graph args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query("show the top 4 most important modules")
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "module_pagerank",
+        "top_k": 4,
+        "only_runtime": True,
+        "include_callsites": True,
+        "max_callsites": 3,
+    }
+    assert result["search_type"] == "semantic"
+
+
+def test_route_search_query_includes_graph_file_dependency_arguments() -> None:
+    """File-dependency queries should recommend the graph tool with file args."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.route_search_query(
+        "show file dependencies for victor/agent/orchestrator.py"
+    )
+
+    assert result["recommended_tool"] == "graph"
+    assert result["recommended_args"] == {
+        "mode": "file_deps",
+        "file": "victor/agent/orchestrator.py",
+    }
+    assert result["search_type"] == "semantic"
+
+
 def test_route_search_query_includes_graph_pagerank_arguments() -> None:
     """Centrality queries should recommend the graph tool with pagerank args."""
     orchestrator = _make_orchestrator()
@@ -170,6 +203,17 @@ def test_get_recommended_search_tool_uses_graph_path_tool_name() -> None:
 
     result = orchestrator.get_recommended_search_tool(
         "show the path from Parser to Provider"
+    )
+
+    assert result == "graph"
+
+
+def test_get_recommended_search_tool_uses_graph_file_dependency_tool_name() -> None:
+    """File-dependency questions should recommend the graph tool."""
+    orchestrator = _make_orchestrator()
+
+    result = orchestrator.get_recommended_search_tool(
+        "what files does victor/agent/orchestrator.py depend on"
     )
 
     assert result == "graph"

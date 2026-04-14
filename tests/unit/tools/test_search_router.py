@@ -262,6 +262,13 @@ class TestConvenienceFunctions:
         tool = suggest_search_tool("find dependency path between Parser and Provider")
         assert tool == "graph"
 
+    def test_suggest_search_tool_graph_file_dependencies(self):
+        """File-dependency questions should recommend the graph tool."""
+        from victor.agent.search_router import suggest_search_tool
+
+        tool = suggest_search_tool("show file dependencies for victor/agent/orchestrator.py")
+        assert tool == "graph"
+
     def test_is_keyword_query(self):
         """Test is_keyword_query function."""
         from victor.agent.search_router import is_keyword_query
@@ -417,6 +424,37 @@ class TestRealWorldQueries:
         }
         assert result.transformed_query is None
         assert "path_between" in result.matched_patterns
+
+    def test_module_pagerank_query_routes_to_graph_tool(self):
+        """Architecture-hotspot questions should route to graph(mode='module_pagerank')."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("show the top 4 most important modules")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {
+            "mode": "module_pagerank",
+            "top_k": 4,
+            "only_runtime": True,
+            "include_callsites": True,
+            "max_callsites": 3,
+        }
+        assert "important_modules" in result.matched_patterns
+
+    def test_file_dependency_query_routes_to_graph_tool(self):
+        """File-dependency questions should route to graph(mode='file_deps')."""
+        from victor.agent.search_router import SearchRouter
+
+        router = SearchRouter()
+        result = router.route("show file dependencies for victor/agent/orchestrator.py")
+
+        assert result.tool_name == "graph"
+        assert result.tool_arguments == {
+            "mode": "file_deps",
+            "file": "victor/agent/orchestrator.py",
+        }
+        assert "file_dependencies_for" in result.matched_patterns
 
     def test_pagerank_query_routes_to_graph_tool(self):
         """Centrality questions should route to graph(mode='pagerank')."""
