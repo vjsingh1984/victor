@@ -113,9 +113,6 @@ class FrameworkShim:
         session_id: Session ID for event correlation
     """
 
-    # Class-level debouncer singleton
-    _debouncer: Optional["SessionStartDebouncer"] = None
-
     def __init__(
         self,
         settings: "Settings",
@@ -161,21 +158,24 @@ class FrameworkShim:
         self._orchestrator: Optional["AgentOrchestrator"] = None
         self._observability: Optional["ObservabilityIntegration"] = None
         self._vertical_config: Optional["VerticalConfig"] = None
+        # Instance-level debouncer (loads from settings)
+        self._debouncer: Optional["SessionStartDebouncer"] = None
 
-    @classmethod
-    def _get_debouncer(cls) -> "SessionStartDebouncer":
-        """Get or create the session start debouncer singleton.
+    def _get_debouncer(self) -> "SessionStartDebouncer":
+        """Get or create the session start debouncer for this instance.
+
+        The debouncer is created on first access and configured from settings.
 
         Returns:
-            SessionStartDebouncer instance.
+            SessionStartDebouncer instance configured from settings.
         """
-        if cls._debouncer is None:
+        if self._debouncer is None:
             from victor.observability.debouncing import SessionStartDebouncer, DebounceConfig
 
-            # Try to load config from settings (will use defaults if not available)
-            config = DebounceConfig()  # Will load from settings if available
-            cls._debouncer = SessionStartDebouncer(config)
-        return cls._debouncer
+            # Load config from settings (with fallback to defaults)
+            config = DebounceConfig.from_settings(self._settings)
+            self._debouncer = SessionStartDebouncer(config)
+        return self._debouncer
 
     def _resolve_vertical(
         self, vertical: Optional[Union[Type["VerticalBase"], str]]
