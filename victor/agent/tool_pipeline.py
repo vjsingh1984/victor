@@ -570,6 +570,14 @@ class ToolPipeline:
         self._observability_bus: Optional[Any] = None
         self._trace_enricher: Optional[Any] = None
 
+        # Credit assignment: automatic tool-level credit tracking (FEP-0001 Phase 3)
+        self._credit_tracking_service: Optional[Any] = None
+
+    @property
+    def credit_tracking_service(self) -> Any:
+        """Credit tracking service (if enabled). None otherwise."""
+        return self._credit_tracking_service
+
     @property
     def calls_used(self) -> int:
         """Number of tool calls used."""
@@ -1922,6 +1930,19 @@ class ToolPipeline:
                 )
             except Exception:
                 logger.debug("on_tool_event fallback emission failed", exc_info=True)
+
+        # Record tool result for credit assignment (FEP-0001 Phase 3)
+        if self._credit_tracking_service is not None:
+            try:
+                self._credit_tracking_service.record_tool_result(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    execution_time_ms=call_result.execution_time_ms,
+                    error=call_result.error,
+                    arguments=call_result.arguments,
+                )
+            except Exception:
+                pass  # Credit tracking is non-critical
 
         return call_result
 

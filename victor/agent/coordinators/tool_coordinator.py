@@ -719,6 +719,16 @@ class ToolCoordinator:
         self._execution_count += successful
         self.consume_budget(successful)
 
+        # Assign credit at turn boundary (FEP-0001 Phase 3)
+        # Individual tool results were recorded by ToolPipeline callback;
+        # now trigger credit assignment for this batch.
+        credit_service = self._pipeline.credit_tracking_service
+        if credit_service is not None and credit_service.pending_signals > 0:
+            try:
+                credit_service.assign_turn_credit()
+            except Exception:
+                pass  # Credit assignment is non-critical
+
         logger.debug(
             f"Executed {successful}/{call_count} tool calls, "
             f"budget remaining: {self.get_remaining_budget()}"

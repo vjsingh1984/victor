@@ -79,7 +79,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -91,6 +90,43 @@ from typing import (
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import RLCoordinator, get_rl_coordinator
+from victor.framework.rl.config import (
+    BaseRLConfig,
+    DEFAULT_ACTIVE_LEARNERS,
+    DEFAULT_PATIENCE_MAP,
+    LearnerType,
+)
+from victor.framework.rl.credit_assignment import (
+    ActionMetadata,
+    BaseCreditAssigner,
+    CreditAssignmentConfig,
+    CreditAssignmentIntegration,
+    CreditAssignmentProvider,
+    CreditGranularity,
+    CreditMethodology,
+    CreditSignal,
+    CriticalActionIdentifier,
+    StateGraphCreditMixin,
+    TrajectorySegment,
+    compute_credit_metrics,
+    visualize_credit_assignment,
+)
+from victor.framework.rl.credit_graph_integration import (
+    CreditTracer,
+    CreditAwareGraph,
+    CompiledCreditAwareGraph,
+    Transition,
+    ExecutionTrace,
+    create_credit_aware_workflow,
+)
+from victor.framework.rl.credit_visualization import (
+    CreditVisualizationBuilder,
+    ExportConfig,
+    CreditAssignmentExporter,
+    CreditAssignmentReport,
+    export_credit_report,
+    create_interactive_report,
+)
 from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
@@ -98,56 +134,6 @@ if TYPE_CHECKING:
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
 
 logger = logging.getLogger(__name__)
-
-
-class LearnerType(str, Enum):
-    """Available learner types in the RL system.
-
-    Each learner optimizes a different aspect of agent behavior.
-    """
-
-    # Tool-related learners
-    TOOL_SELECTOR = "tool_selector"
-    """Optimizes tool selection based on task context."""
-
-    CACHE_EVICTION = "cache_eviction"
-    """Learns optimal cache eviction strategies."""
-
-    # Continuation learners
-    CONTINUATION_PATIENCE = "continuation_patience"
-    """Adjusts patience for model continuation attempts."""
-
-    CONTINUATION_PROMPTS = "continuation_prompts"
-    """Optimizes continuation prompt templates."""
-
-    # Quality learners
-    GROUNDING_THRESHOLD = "grounding_threshold"
-    """Adjusts grounding verification thresholds."""
-
-    SEMANTIC_THRESHOLD = "semantic_threshold"
-    """Optimizes semantic similarity thresholds."""
-
-    QUALITY_WEIGHTS = "quality_weights"
-    """Learns quality assessment weights."""
-
-    # Model/mode learners
-    MODEL_SELECTOR = "model_selector"
-    """Recommends optimal model for task type."""
-
-    MODE_TRANSITION = "mode_transition"
-    """Learns optimal mode transitions."""
-
-    # Prompt learners
-    PROMPT_TEMPLATE = "prompt_template"
-    """Optimizes prompt template selection."""
-
-
-# Import config after LearnerType to avoid circular import
-from victor.framework.rl.config import (
-    BaseRLConfig,
-    DEFAULT_ACTIVE_LEARNERS,
-    DEFAULT_PATIENCE_MAP,
-)
 
 
 @dataclass
@@ -628,4 +614,32 @@ __all__ = [
     # Convenience functions
     "create_outcome",
     "record_tool_success",
+    # Credit Assignment (arXiv:2604.09459)
+    "CreditGranularity",
+    "CreditMethodology",
+    "ActionMetadata",
+    "CreditSignal",
+    "TrajectorySegment",
+    "CreditAssignmentConfig",
+    "CreditAssignmentProvider",
+    "BaseCreditAssigner",
+    "CreditAssignmentIntegration",
+    "CriticalActionIdentifier",
+    "StateGraphCreditMixin",
+    "compute_credit_metrics",
+    "visualize_credit_assignment",
+    # Credit Assignment Integration
+    "CreditTracer",
+    "CreditAwareGraph",
+    "CompiledCreditAwareGraph",
+    "Transition",
+    "ExecutionTrace",
+    "create_credit_aware_workflow",
+    # Visualization & Export
+    "CreditVisualizationBuilder",
+    "ExportConfig",
+    "CreditAssignmentExporter",
+    "CreditAssignmentReport",
+    "export_credit_report",
+    "create_interactive_report",
 ]

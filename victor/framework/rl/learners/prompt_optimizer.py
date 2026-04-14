@@ -296,6 +296,9 @@ class ExecutionTrace:
     section_tokens: Dict[str, int] = field(default_factory=dict)
     # GEPA v2: detailed per-call traces (ASI)
     tool_call_details: List["ToolCallTrace"] = field(default_factory=list)
+    # Credit assignment signals (FEP-0001 Phase 3)
+    # Per-tool credit values from CreditTrackingService
+    credit_signals: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -502,6 +505,22 @@ class GEPAStrategy:
             lines.append("- Top failure categories:")
             for cat, count in sorted(all_failures.items(), key=lambda x: -x[1])[:5]:
                 lines.append(f"  - {cat}: {count}")
+
+        # Enrich with credit assignment data (FEP-0001 Phase 3)
+        credit_traces = [t for t in traces if t.credit_signals]
+        if credit_traces:
+            tool_credits: Dict[str, List[float]] = {}
+            for trace in credit_traces:
+                for cs in trace.credit_signals:
+                    tname = cs.get("tool_name", "unknown")
+                    tool_credits.setdefault(tname, []).append(cs.get("credit", 0.0))
+            if tool_credits:
+                lines.append("- Tool credit attribution:")
+                for tool, credits in sorted(
+                    tool_credits.items(), key=lambda x: sum(x[1]), reverse=True
+                )[:5]:
+                    avg = sum(credits) / len(credits)
+                    lines.append(f"  - {tool}: avg_credit={avg:+.2f} ({len(credits)} calls)")
 
         reflection = "\n".join(lines)
 
@@ -855,6 +874,9 @@ class PromptOptimizerLearner(BaseLearner):
                 len(conv_traces),
                 len(traces),
             )
+
+        # Enrich traces with credit signals (FEP-0001 Phase 3)
+        self._enrich_traces_with_credit(traces)
 
         if len(traces) < MIN_TRACES_FOR_EVOLUTION:
             logger.info(
@@ -1456,6 +1478,46 @@ class PromptOptimizerLearner(BaseLearner):
         merged = list(by_id.values())
         merged.sort(key=lambda t: -t.completion_score)
         return merged
+
+    def _enrich_traces_with_credit(self, traces: List[ExecutionTrace]) -> None:
+        """Enrich execution traces with credit assignment signals.
+
+        Pulls recent credit signals from CreditTrackingService (if available
+        via DI container) and attaches per-tool credit data to traces.
+        This gives GEPA concrete per-tool value attribution for targeted
+        prompt mutations.
+        """
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+            # Try to resolve credit tracking service
+            service = container.get_optional("credit_tracking_service")
+            if service is None:
+                return
+
+            tool_summary = service.get_tool_credit_summary()
+            if not tool_summary:
+                return
+
+            # For each trace, attach credit data for its tools
+            for trace in traces:
+                credit_data = []
+                for detail in trace.tool_call_details:
+                    tool_name = getattr(detail, "tool_name", "")
+                    if tool_name in tool_summary:
+                        credit_data.append(
+                            {
+                                "tool_name": tool_name,
+                                "credit": tool_summary[tool_name]["avg_credit"],
+                                "total_credit": tool_summary[tool_name]["total_credit"],
+                                "call_count": tool_summary[tool_name]["call_count"],
+                            }
+                        )
+                if credit_data:
+                    trace.credit_signals = credit_data
+        except Exception:
+            pass  # Credit enrichment is best-effort
 
     def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward from outcome."""

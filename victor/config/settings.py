@@ -569,6 +569,8 @@ from victor.config.permission_settings import PermissionSettings  # noqa: E402
 
 from victor.config.prompt_optimization_settings import PromptOptimizationSettings  # noqa: E402
 
+from victor.config.credit_assignment_settings import CreditAssignmentSettings  # noqa: E402
+
 # Module-level mapping of group names to nested model classes
 _NESTED_GROUPS = {
     "provider": ProviderSettings,
@@ -599,6 +601,7 @@ _NESTED_GROUPS = {
     "compaction": CompactionSettings,
     "permissions": PermissionSettings,
     "prompt_optimization": PromptOptimizationSettings,
+    "credit_assignment": CreditAssignmentSettings,
 }
 
 
@@ -749,6 +752,9 @@ class Settings(BaseSettings):
     compaction: Optional[CompactionSettings] = Field(default=None, exclude=True, repr=False)
     permissions: Optional[PermissionSettings] = Field(default=None, exclude=True, repr=False)
     prompt_optimization: Optional[PromptOptimizationSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
+    credit_assignment: Optional[CreditAssignmentSettings] = Field(
         default=None, exclude=True, repr=False
     )
 
