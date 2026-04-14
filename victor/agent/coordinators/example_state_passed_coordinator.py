@@ -125,10 +125,12 @@ class ExampleStatePassedCoordinator:
         batch.update_state("last_query_type", "simple", scope="conversation")
 
         # Example: Set capability flag
-        batch.add(StateTransition(
-            transition_type=TransitionType.UPDATE_CAPABILITY,
-            data={"capability": "simple_query_handled", "value": True},
-        ))
+        batch.add(
+            StateTransition(
+                transition_type=TransitionType.UPDATE_CAPABILITY,
+                data={"capability": "simple_query_handled", "value": True},
+            )
+        )
 
         return CoordinatorResult(
             transitions=batch,
@@ -167,7 +169,9 @@ class ExampleStatePassedCoordinator:
 
         if has_observed_files:
             # We already have file information
-            reasoning = f"Using existing file info from {len(context.observed_files)} observed files"
+            reasoning = (
+                f"Using existing file info from {len(context.observed_files)} observed files"
+            )
 
             return CoordinatorResult(
                 transitions=TransitionBatch(),
@@ -179,10 +183,7 @@ class ExampleStatePassedCoordinator:
         reasoning = "Need to list files to answer query about file/directory structure"
 
         batch = TransitionBatch()
-        batch.execute_tool(
-            tool_name="list_directory",
-            arguments={"path": "."}
-        )
+        batch.execute_tool(tool_name="list_directory", arguments={"path": "."})
 
         return CoordinatorResult(
             transitions=batch,
@@ -191,7 +192,7 @@ class ExampleStatePassedCoordinator:
             metadata={
                 "tool_requested": "list_directory",
                 "tool_reason": "file_structure_inquiry",
-            }
+            },
         )
 
     async def analyze_with_multi_step_plan(
@@ -223,18 +224,18 @@ class ExampleStatePassedCoordinator:
         is_complex = any(indicator in user_message.lower() for indicator in complexity_indicators)
 
         if not is_complex:
-            return CoordinatorResult.no_op(
-                reasoning="Query appears simple, no planning needed"
-            )
+            return CoordinatorResult.no_op(reasoning="Query appears simple, no planning needed")
 
         # Create a multi-step plan
         batch = TransitionBatch()
 
         # Step 1: Update conversation stage
-        batch.add(StateTransition(
-            transition_type=TransitionType.UPDATE_STAGE,
-            data={"stage": "planning"},
-        ))
+        batch.add(
+            StateTransition(
+                transition_type=TransitionType.UPDATE_STAGE,
+                data={"stage": "planning"},
+            )
+        )
 
         # Step 2: Store the plan in state
         plan_steps = [
@@ -248,10 +249,12 @@ class ExampleStatePassedCoordinator:
         batch.update_state("current_step", 0, scope="conversation")
 
         # Step 3: Set capability to track planning mode
-        batch.add(StateTransition(
-            transition_type=TransitionType.UPDATE_CAPABILITY,
-            data={"capability": "planning_mode", "value": True},
-        ))
+        batch.add(
+            StateTransition(
+                transition_type=TransitionType.UPDATE_CAPABILITY,
+                data={"capability": "planning_mode", "value": True},
+            )
+        )
 
         reasoning = f"Created {len(plan_steps)}-step plan for complex task"
 
@@ -262,7 +265,7 @@ class ExampleStatePassedCoordinator:
             metadata={
                 "plan_step_count": len(plan_steps),
                 "complexity": "high",
-            }
+            },
         )
 
     def get_analysis_summary(self, context: ContextSnapshot) -> Dict[str, Any]:
@@ -396,8 +399,7 @@ class ExampleStatePassedCoordinatorTest:
         snapshot = ExampleStatePassedCoordinatorTest.create_test_snapshot()
 
         result = await coordinator.analyze_with_tool_execution(
-            snapshot,
-            "List all files in the project"
+            snapshot, "List all files in the project"
         )
 
         # Verify tool execution was requested
@@ -405,7 +407,8 @@ class ExampleStatePassedCoordinatorTest:
 
         # Find the tool execution transition
         tool_transitions = [
-            t for t in result.transitions.transitions
+            t
+            for t in result.transitions.transitions
             if t.transition_type == TransitionType.EXECUTE_TOOL
         ]
 

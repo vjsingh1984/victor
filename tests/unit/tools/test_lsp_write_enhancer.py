@@ -217,7 +217,9 @@ class TestLSPWriteEnhancer:
         enhancer = LSPWriteEnhancer()
 
         # Unknown file extension
-        content, formatter_name = await enhancer.format_with_formatter("test.unknown_ext", "some content")
+        content, formatter_name = await enhancer.format_with_formatter(
+            "test.unknown_ext", "some content"
+        )
 
         # Should return content unchanged
         assert content == "some content"
@@ -229,7 +231,9 @@ class TestLSPWriteEnhancer:
         enhancer = LSPWriteEnhancer()
 
         # Python file but formatter might not be installed
-        content, formatter_name = await enhancer.format_with_formatter("test.py", "def hello(): pass")
+        content, formatter_name = await enhancer.format_with_formatter(
+            "test.py", "def hello(): pass"
+        )
 
         # Should return content (possibly formatted or unchanged)
         assert isinstance(content, str)

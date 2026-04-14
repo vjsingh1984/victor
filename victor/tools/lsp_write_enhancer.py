@@ -272,7 +272,10 @@ class LSPWriteEnhancer:
             try:
                 # Offload to thread to avoid blocking event loop
                 import asyncio
-                formatted = await asyncio.to_thread(self._format_with_black_library, content, file_path)
+
+                formatted = await asyncio.to_thread(
+                    self._format_with_black_library, content, file_path
+                )
                 if formatted is not None:
                     return formatted, "black (in-process)"
             except Exception as e:
@@ -305,7 +308,9 @@ class LSPWriteEnhancer:
                     formatted = f.read()
                 return formatted, formatter.name
             else:
-                logger.warning(f"Formatter {formatter.name} failed: {stderr.decode('utf-8', errors='ignore')}")
+                logger.warning(
+                    f"Formatter {formatter.name} failed: {stderr.decode('utf-8', errors='ignore')}"
+                )
                 return content, None
 
         except asyncio.TimeoutError:

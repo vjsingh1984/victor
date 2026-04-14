@@ -173,7 +173,7 @@ class VerticalContractAuditor:
             report.add_issue(
                 "error",
                 "missing_plugin_entry_point",
-                "project.entry-points.\"victor.plugins\" is missing or empty.",
+                'project.entry-points."victor.plugins" is missing or empty.',
                 path="pyproject.toml",
             )
 

@@ -99,9 +99,7 @@ def bootstrap_new_services(
     # Bootstrap ContextService (always create, used conditionally by orchestrator)
     context_service = _create_context_service(container)
     services_created["context"] = context_service
-    container.register(
-        ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON
-    )
+    container.register(ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON)
     logger.info("Bootstrapped ContextService")
 
     # Bootstrap ProviderService (always create)
@@ -137,9 +135,7 @@ def bootstrap_new_services(
     # Bootstrap SessionService (always create)
     session_service = _create_session_service(container)
     services_created["session"] = session_service
-    container.register(
-        SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON
-    )
+    container.register(SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON)
     logger.info("Bootstrapped SessionService")
 
     # Bootstrap decision service — prefer tiered (edge+balanced+performance),

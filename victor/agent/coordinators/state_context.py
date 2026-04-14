@@ -180,7 +180,9 @@ class StateTransition:
                 raise ValueError("UPDATE_STATE transition requires 'key' and 'value' data")
         elif self.transition_type == TransitionType.EXECUTE_TOOL:
             if "tool_name" not in self.data or "arguments" not in self.data:
-                raise ValueError("EXECUTE_TOOL transition requires 'tool_name' and 'arguments' data")
+                raise ValueError(
+                    "EXECUTE_TOOL transition requires 'tool_name' and 'arguments' data"
+                )
 
 
 @dataclass
@@ -207,10 +209,9 @@ class TransitionBatch:
         Returns:
             Self for chaining
         """
-        self.add(StateTransition(
-            transition_type=TransitionType.ADD_MESSAGE,
-            data={"message": message}
-        ))
+        self.add(
+            StateTransition(transition_type=TransitionType.ADD_MESSAGE, data={"message": message})
+        )
         return self
 
     def update_state(self, key: str, value: Any, scope: str = "conversation") -> "TransitionBatch":
@@ -224,10 +225,12 @@ class TransitionBatch:
         Returns:
             Self for chaining
         """
-        self.add(StateTransition(
-            transition_type=TransitionType.UPDATE_STATE,
-            data={"key": key, "value": value, "scope": scope}
-        ))
+        self.add(
+            StateTransition(
+                transition_type=TransitionType.UPDATE_STATE,
+                data={"key": key, "value": value, "scope": scope},
+            )
+        )
         return self
 
     def execute_tool(self, tool_name: str, arguments: Dict[str, Any]) -> "TransitionBatch":
@@ -240,10 +243,12 @@ class TransitionBatch:
         Returns:
             Self for chaining
         """
-        self.add(StateTransition(
-            transition_type=TransitionType.EXECUTE_TOOL,
-            data={"tool_name": tool_name, "arguments": arguments}
-        ))
+        self.add(
+            StateTransition(
+                transition_type=TransitionType.EXECUTE_TOOL,
+                data={"tool_name": tool_name, "arguments": arguments},
+            )
+        )
         return self
 
     def extend(self, other: "TransitionBatch") -> "TransitionBatch":
@@ -304,7 +309,9 @@ class CoordinatorResult:
         )
 
     @staticmethod
-    def transitions_only(*transitions: StateTransition, reasoning: Optional[str] = None) -> "CoordinatorResult":
+    def transitions_only(
+        *transitions: StateTransition, reasoning: Optional[str] = None
+    ) -> "CoordinatorResult":
         """Create a result with only transitions.
 
         Args:
@@ -333,7 +340,9 @@ class CoordinatorResult:
         self.transitions.add_message(message)
         return self
 
-    def update_state(self, key: str, value: Any, scope: str = "conversation") -> "CoordinatorResult":
+    def update_state(
+        self, key: str, value: Any, scope: str = "conversation"
+    ) -> "CoordinatorResult":
         """Add a state update transition.
 
         Args:
@@ -453,27 +462,28 @@ def create_snapshot(orchestrator: Any) -> ContextSnapshot:
         Immutable ContextSnapshot
     """
     # Access orchestrator properties
-    messages = tuple(orchestrator.messages) if hasattr(orchestrator, 'messages') else ()
+    messages = tuple(orchestrator.messages) if hasattr(orchestrator, "messages") else ()
 
     # Copy state dictionaries to prevent mutation
-    conv_state = dict(getattr(orchestrator, 'conversation_state', {}))
-    sess_state = dict(getattr(orchestrator, 'session_state', {}))
+    conv_state = dict(getattr(orchestrator, "conversation_state", {}))
+    sess_state = dict(getattr(orchestrator, "session_state", {}))
 
     # Copy capabilities
-    caps = dict(getattr(orchestrator, '_capabilities', {}))
+    caps = dict(getattr(orchestrator, "_capabilities", {}))
 
     # Copy observed files
-    observed = tuple(getattr(orchestrator, 'observed_files', []))
+    observed = tuple(getattr(orchestrator, "observed_files", []))
 
     return ContextSnapshot(
         messages=messages,
-        session_id=getattr(orchestrator, 'session_id', ''),
-        conversation_stage=getattr(orchestrator, 'conversation_stage', 'initial'),
-        settings=getattr(orchestrator, 'settings', None),
-        model=getattr(orchestrator, 'model', ''),
-        provider=getattr(orchestrator, 'provider_name', '') or getattr(orchestrator, 'provider', ''),
-        max_tokens=getattr(orchestrator, 'max_tokens', 4096),
-        temperature=getattr(orchestrator, 'temperature', 0.7),
+        session_id=getattr(orchestrator, "session_id", ""),
+        conversation_stage=getattr(orchestrator, "conversation_stage", "initial"),
+        settings=getattr(orchestrator, "settings", None),
+        model=getattr(orchestrator, "model", ""),
+        provider=getattr(orchestrator, "provider_name", "")
+        or getattr(orchestrator, "provider", ""),
+        max_tokens=getattr(orchestrator, "max_tokens", 4096),
+        temperature=getattr(orchestrator, "temperature", 0.7),
         conversation_state=conv_state,
         session_state=sess_state,
         observed_files=observed,

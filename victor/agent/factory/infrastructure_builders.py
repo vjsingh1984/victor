@@ -179,9 +179,15 @@ class InfrastructureBuildersMixin:
         # Determine analytics log file location
         # Redirect test telemetry to prevent MagicMock leakage to global usage.jsonl
         import os
-        if os.getenv("PYTEST_XDIST_WORKER") or os.getenv("TEST_MODE") or os.getenv("PYTEST_CURRENT_TEST"):
+
+        if (
+            os.getenv("PYTEST_XDIST_WORKER")
+            or os.getenv("TEST_MODE")
+            or os.getenv("PYTEST_CURRENT_TEST")
+        ):
             # Running under pytest - use test-specific log file
             import tempfile
+
             test_log_dir = Path(tempfile.gettempdir()) / "victor_test_telemetry"
             test_log_dir.mkdir(exist_ok=True)
             analytics_log_file = test_log_dir / "test_usage.jsonl"
