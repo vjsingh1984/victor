@@ -238,13 +238,18 @@ async def scan(
 
         if req_path.exists():
             try:
-                proc = subprocess.run(
-                    ["pip-audit", "-r", str(req_path), "-f", "json"],
-                    capture_output=True,
-                    text=True,
-                    check=True,
+                # Use asyncio subprocess to avoid blocking event loop
+                import asyncio
+
+                proc = await asyncio.create_subprocess_exec(
+                    "pip-audit", "-r", str(req_path), "-f", "json",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
-                audit = json.loads(proc.stdout)
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    raise subprocess.CalledProcessError(proc.returncode, "pip-audit", stderr)
+                audit = json.loads(stdout.decode('utf-8'))
                 vulns = []
                 for item in audit.get("dependencies", []):
                     for vuln in item.get("vulns", []):
@@ -284,13 +289,18 @@ async def scan(
     # IaC scan (optional, semgrep or bandit)
     if "config" in scan_types and iac_scan:
         try:
-            proc = subprocess.run(
-                ["bandit", "-r", str(path_obj), "-f", "json"],
-                capture_output=True,
-                text=True,
-                check=True,
+            # Use asyncio subprocess to avoid blocking event loop
+            import asyncio
+
+            proc = await asyncio.create_subprocess_exec(
+                "bandit", "-r", str(path_obj), "-f", "json",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
-            bandit = json.loads(proc.stdout)
+            stdout, stderr = await proc.communicate()
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(proc.returncode, "bandit", stderr)
+            bandit = json.loads(stdout.decode('utf-8'))
             findings = []
             for res in bandit.get("results", []):
                 findings.append(

@@ -236,7 +236,7 @@ class LSPWriteEnhancer:
             for d in diagnostics
         ]
 
-    def format_with_formatter(self, path: str, content: str) -> tuple[str, Optional[str]]:
+    async def format_with_formatter(self, path: str, content: str) -> tuple[str, Optional[str]]:
         """Format code using language-specific formatter.
 
         Args:
@@ -270,7 +270,9 @@ class LSPWriteEnhancer:
         # Try in-process formatting first (faster, no subprocess overhead)
         if formatter.name == "black" and self._use_thread_formatter:
             try:
-                formatted = self._format_with_black_library(content, file_path)
+                # Offload to thread to avoid blocking event loop
+                import asyncio
+                formatted = await asyncio.to_thread(self._format_with_black_library, content, file_path)
                 if formatted is not None:
                     return formatted, "black (in-process)"
             except Exception as e:
@@ -287,23 +289,26 @@ class LSPWriteEnhancer:
             cmd = formatter.command.copy()
             cmd.append(tmp_path)
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                cwd=self._workspace_root,
-                timeout=10,
-            )
+            # Use asyncio subprocess to avoid blocking event loop
+            import asyncio
 
-            if result.returncode == 0:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=self._workspace_root,
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+
+            if proc.returncode == 0:
                 with open(tmp_path, "r") as f:
                     formatted = f.read()
                 return formatted, formatter.name
             else:
-                logger.warning(f"Formatter {formatter.name} failed: {result.stderr}")
+                logger.warning(f"Formatter {formatter.name} failed: {stderr.decode('utf-8', errors='ignore')}")
                 return content, None
 
-        except subprocess.TimeoutExpired:
+        except asyncio.TimeoutError:
             logger.warning(f"Formatter {formatter.name} timed out")
             return content, None
         except FileNotFoundError:
@@ -365,7 +370,7 @@ class LSPWriteEnhancer:
 
         # Format if requested
         if format_code:
-            formatted_content, formatter_name = self.format_with_formatter(path, content)
+            formatted_content, formatter_name = await self.format_with_formatter(path, content)
             result.formatted = formatter_name is not None
             result.formatter_used = formatter_name
             content_to_write = formatted_content

@@ -631,16 +631,31 @@ async def scaffold(
     # Init-git operation
     elif operation == "init-git":
         try:
+            # Use asyncio subprocess to avoid blocking event loop
+            import asyncio
+
             # Initialize git
-            subprocess.run(["git", "init"], check=True, capture_output=True)
+            proc = await asyncio.create_subprocess_exec(
+                "git", "init",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
 
             # Create initial commit
-            subprocess.run(["git", "add", "."], check=True, capture_output=True)
-            subprocess.run(
-                ["git", "commit", "-m", "Initial commit"],
-                check=True,
-                capture_output=True,
+            proc = await asyncio.create_subprocess_exec(
+                "git", "add", ".",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
             )
+            await proc.communicate()
+
+            proc = await asyncio.create_subprocess_exec(
+                "git", "commit", "-m", "Initial commit",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
 
             return {
                 "success": True,

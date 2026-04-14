@@ -455,3 +455,27 @@ def cleanup_dangling_asyncio_tasks():
                 task.cancel()
     except RuntimeError:
         pass  # No event loop
+
+
+@pytest.fixture(autouse=True, scope="session")
+def set_test_mode():
+    """Set TEST_MODE environment variable to redirect test telemetry.
+
+    This fixture runs once per test session and sets TEST_MODE to prevent
+    MagicMock events and test telemetry from polluting the global usage.jsonl
+    file. Test events will be redirected to /tmp/victor_test_telemetry/test_usage.jsonl
+    instead.
+
+    Priority: P1 - Prevents MagicMock leakage in global logs (HIGH criticality)
+    """
+    import os
+
+    original = os.environ.get("TEST_MODE")
+    os.environ["TEST_MODE"] = "1"
+
+    yield
+
+    if original is not None:
+        os.environ["TEST_MODE"] = original
+    else:
+        os.environ.pop("TEST_MODE", None)

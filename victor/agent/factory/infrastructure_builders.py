@@ -175,7 +175,19 @@ class InfrastructureBuildersMixin:
             logger.debug("Using enhanced usage logger from DI container")
             return usage_logger
 
-        analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
+        # Determine analytics log file location
+        # Redirect test telemetry to prevent MagicMock leakage to global usage.jsonl
+        import os
+        if os.getenv("PYTEST_XDIST_WORKER") or os.getenv("TEST_MODE") or os.getenv("PYTEST_CURRENT_TEST"):
+            # Running under pytest - use test-specific log file
+            import tempfile
+            test_log_dir = Path(tempfile.gettempdir()) / "victor_test_telemetry"
+            test_log_dir.mkdir(exist_ok=True)
+            analytics_log_file = test_log_dir / "test_usage.jsonl"
+        else:
+            # Normal operation - use global logs directory
+            analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
+
         usage_logger = UsageLogger(
             analytics_log_file,
             enabled=getattr(self.settings, "analytics_enabled", True),

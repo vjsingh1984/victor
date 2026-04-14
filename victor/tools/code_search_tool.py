@@ -715,13 +715,19 @@ async def _literal_search(
                 find_cwd = None
 
             try:
-                find_result = subprocess.run(
-                    find_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=15,
+                # Use asyncio subprocess to avoid blocking event loop
+                import asyncio
+
+                proc = await asyncio.create_subprocess_exec(
+                    *find_cmd,
                     cwd=find_cwd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=15
+                )
+                find_result = type('obj', (object,), {'stdout': stdout.decode('utf-8', errors='ignore')})
                 found_files = [f.strip() for f in find_result.stdout.splitlines() if f.strip()]
                 if found_files:
                     results = []
@@ -780,12 +786,14 @@ async def _literal_search(
         else:
             cmd = ["grep", "-rn", "--include=*.py", "--", search_query, search_path]
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
+        # Use asyncio subprocess to avoid blocking event loop
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        result = type('obj', (object,), {'stdout': stdout.decode('utf-8', errors='ignore')})
 
         # Parse results: group by file, take top k files
         file_matches: Dict[str, List[str]] = {}

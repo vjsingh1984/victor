@@ -609,9 +609,23 @@ def _register_analytics_services(container: ServiceContainer, settings: Settings
 
     # Enhanced usage logger
     paths = get_project_paths()
+
+    # Check for test mode and redirect telemetry to test-specific location
+    # This prevents MagicMock events from test suites from polluting global usage.jsonl
+    import os
+    if os.getenv("PYTEST_XDIST_WORKER") or os.getenv("TEST_MODE") or os.getenv("PYTEST_CURRENT_TEST"):
+        # Running under pytest - use test-specific log file
+        import tempfile
+        test_log_dir = Path(tempfile.gettempdir()) / "victor_test_telemetry"
+        test_log_dir.mkdir(exist_ok=True)
+        usage_log_file = test_log_dir / "test_usage.jsonl"
+    else:
+        # Normal operation - use global logs directory
+        usage_log_file = paths.global_logs_dir / "usage.jsonl"
+
     container.register(
         UsageLoggerProtocol,
-        lambda c: _create_usage_logger(paths.global_logs_dir / "usage.jsonl", settings),
+        lambda c: _create_usage_logger(usage_log_file, settings),
         ServiceLifetime.SINGLETON,
     )
 

@@ -399,15 +399,24 @@ async def cicd(
         external_output = None
         if validate_command:
             try:
-                proc = subprocess.run(
-                    validate_command.split(),
-                    check=True,
-                    capture_output=True,
-                    text=True,
+                # Use asyncio subprocess to avoid blocking event loop
+                import asyncio
+
+                proc = await asyncio.create_subprocess_exec(
+                    *validate_command.split(),
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
-                external_output = proc.stdout.strip()
-            except subprocess.CalledProcessError as exc:
-                issues.append(f"External validator failed: {exc.stderr.strip()}")
+                stdout, stderr = await proc.communicate()
+                if proc.returncode != 0:
+                    raise subprocess.CalledProcessError(proc.returncode, validate_command, stderr)
+                external_output = stdout.decode('utf-8').strip()
+            except (subprocess.CalledProcessError, Exception) as exc:
+                error_msg = str(getattr(exc, 'stderr', b'')) if hasattr(exc, 'stderr') else str(exc)
+                if error_msg:
+                    issues.append(f"External validator failed: {error_msg}")
+                else:
+                    issues.append(f"External validator failed: {exc}")
 
         # Build report
         report = []
