@@ -93,7 +93,9 @@ def _summarize_code_intelligence_diagnostics(
 ) -> dict[str, Any]:
     """Summarize which benchmark tasks skipped the code-intelligence path."""
     tasks = list(getattr(result, "task_results", []) or [])
-    missing_code_intel = [task for task in tasks if not getattr(task, "used_code_intelligence", False)]
+    missing_code_intel = [
+        task for task in tasks if not getattr(task, "used_code_intelligence", False)
+    ]
     failed_missing = [
         task
         for task in missing_code_intel
@@ -840,9 +842,7 @@ async def _run_benchmark_async(
                 )
             readiness = _ensure_benchmark_runtime_tools(adapter)
             console.print(
-                "  [dim]Benchmark tools ready: "
-                + ", ".join(readiness.enabled_tools)
-                + "[/]"
+                "  [dim]Benchmark tools ready: " + ", ".join(readiness.enabled_tools) + "[/]"
             )
             workspace_manager = SWEBenchWorkspaceManager()
 

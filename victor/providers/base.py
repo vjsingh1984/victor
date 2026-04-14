@@ -445,8 +445,7 @@ class BaseProvider(ABC):
                 return True
 
             if any(
-                parent.__name__ in connection_exception_names
-                for parent in type(candidate).__mro__
+                parent.__name__ in connection_exception_names for parent in type(candidate).__mro__
             ):
                 return True
 

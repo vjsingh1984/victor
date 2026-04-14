@@ -332,12 +332,14 @@ class GraphAnalyzer:
             out_degree = sum(
                 1
                 for edge in self.outgoing.get(node_id, ())
-                if (allowed_edges is None or edge.type in allowed_edges) and edge.dst in allowed_nodes
+                if (allowed_edges is None or edge.type in allowed_edges)
+                and edge.dst in allowed_nodes
             )
             in_degree = sum(
                 1
                 for edge in self.incoming.get(node_id, ())
-                if (allowed_edges is None or edge.type in allowed_edges) and edge.src in allowed_nodes
+                if (allowed_edges is None or edge.type in allowed_edges)
+                and edge.src in allowed_nodes
             )
             results.append(
                 _node_payload(
@@ -522,9 +524,9 @@ def _build_structured_neighbors(
             item for item in flattened if item["type"] not in {"file", "module", "stdlib_module"}
         ]
     if include_calls or include_callsites:
-        structured["calls"] = [
-            item for item in flattened if item["edge_type"] == "CALLS"
-        ][:max_callsites]
+        structured["calls"] = [item for item in flattened if item["edge_type"] == "CALLS"][
+            :max_callsites
+        ]
     if include_refs:
         structured["references"] = [
             item for item in flattened if item["edge_type"] == "REFERENCES"
@@ -576,8 +578,7 @@ def _project_module_adjacency(
     projected = {"adjacency": adjacency}
     if include_callsites:
         projected["callsites"] = {
-            f"{src}->{dst}": samples[:max_callsites]
-            for (src, dst), samples in callsites.items()
+            f"{src}->{dst}": samples[:max_callsites] for (src, dst), samples in callsites.items()
         }
     return projected
 
@@ -680,7 +681,11 @@ def _build_file_dependency_result(
             summary["modules"] = sorted(
                 {
                     _module_name_from_file(normalized),
-                    *[_module_name_from_file(dep) for dep in dependencies if "." in dep or "/" in dep],
+                    *[
+                        _module_name_from_file(dep)
+                        for dep in dependencies
+                        if "." in dep or "/" in dep
+                    ],
                     *[
                         _module_name_from_file(dep)
                         for dep in dependents
@@ -771,13 +776,27 @@ async def graph(
             search_query = query or node or file
             if not search_query:
                 raise ValueError("find mode requires query, node, or file")
-            result = {"matches": loaded.analyzer.search(search_query, node_types=node_types, limit=top_k)}
-        elif mode in {"callers", "callees", "trace", "call_flow", "neighbors", "impact", "subgraph"}:
+            result = {
+                "matches": loaded.analyzer.search(search_query, node_types=node_types, limit=top_k)
+            }
+        elif mode in {
+            "callers",
+            "callees",
+            "trace",
+            "call_flow",
+            "neighbors",
+            "impact",
+            "subgraph",
+        }:
             target_ref = node or source
             if not target_ref:
                 raise ValueError(f"{mode} mode requires node")
-            preferred_types = {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
-            resolved_id = loaded.analyzer.resolve_node_id(target_ref, preferred_types=preferred_types)
+            preferred_types = (
+                {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+            )
+            resolved_id = loaded.analyzer.resolve_node_id(
+                target_ref, preferred_types=preferred_types
+            )
             if resolved_id is None:
                 raise ValueError(f"Could not resolve graph node '{target_ref}'")
 
@@ -874,8 +893,7 @@ async def graph(
             ranked = sorted(components, key=lambda component: (-len(component), component))
             result = {
                 "components": [
-                    {"size": len(component), "nodes": component}
-                    for component in ranked[:top_k]
+                    {"size": len(component), "nodes": component} for component in ranked[:top_k]
                 ]
             }
         elif mode == "patterns":

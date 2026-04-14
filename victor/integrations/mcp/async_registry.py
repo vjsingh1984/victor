@@ -160,9 +160,7 @@ class AsyncMCPRegistry:
                 stats.connection_time = datetime.now(timezone.utc)
 
                 # Start health check
-                self._health_check_tasks[name] = asyncio.create_task(
-                    self._health_check_loop(name)
-                )
+                self._health_check_tasks[name] = asyncio.create_task(self._health_check_loop(name))
 
                 logger.info(f"Connected to MCP server: {name}")
                 return True

@@ -45,6 +45,7 @@ def list(
         victor bundle list --bundle engineering
         victor bundle list --status installed
     """
+
     async def _list() -> None:
         registry = await get_registry()
 
@@ -233,6 +234,7 @@ def check(
         victor bundle check
         victor bundle check --bundle engineering
     """
+
     async def _check() -> None:
         registry = await get_registry()
 
@@ -275,6 +277,7 @@ def capabilities():
     Example:
         victor bundle capabilities
     """
+
     async def _list_capabilities() -> None:
         registry = await get_registry()
 

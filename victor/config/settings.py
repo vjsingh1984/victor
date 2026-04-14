@@ -723,7 +723,9 @@ class Settings(BaseSettings):
     resilience: Optional[ResilienceSettings] = Field(default=None, exclude=True, repr=False)
     security: Optional[SecuritySettings] = Field(default=None, exclude=True, repr=False)
     events: Optional[EventSettings] = Field(default=None, exclude=True, repr=False)
-    event_debouncing: Optional[EventDebouncingSettings] = Field(default=None, exclude=True, repr=False)
+    event_debouncing: Optional[EventDebouncingSettings] = Field(
+        default=None, exclude=True, repr=False
+    )
     pipeline: Optional[PipelineSettings] = Field(default=None, exclude=True, repr=False)
     observability: Optional[ObservabilitySettings] = Field(default=None, exclude=True, repr=False)
     context: Optional[ContextSettings] = Field(default=None, exclude=True, repr=False)

@@ -213,19 +213,23 @@ When you need to use a tool or resource, check if it's available through MCP and
             try:
                 mcp_resources = await server.list_resources()
                 for resource in mcp_resources:
-                    resources.append({
-                        "uri": resource.uri,
-                        "name": resource.name,
-                        "description": resource.description,
-                        "mime_type": resource.mime_type,
-                        "server": server.name,
-                    })
+                    resources.append(
+                        {
+                            "uri": resource.uri,
+                            "name": resource.name,
+                            "description": resource.description,
+                            "mime_type": resource.mime_type,
+                            "server": server.name,
+                        }
+                    )
             except Exception as e:
                 logger.warning(f"Failed to list resources from MCP server: {e}")
 
         return resources
 
-    async def call_mcp_tool(self, server_name: str, tool_name: str, arguments: Dict[str, Any]) -> Any:
+    async def call_mcp_tool(
+        self, server_name: str, tool_name: str, arguments: Dict[str, Any]
+    ) -> Any:
         """
         Call an MCP tool on a specific server.
 
@@ -321,7 +325,7 @@ class MCPKnowledgeContributor:
         lines = ["## Available MCP Resources", ""]
         for resource in resources:
             lines.append(f"- {resource['name']} ({resource['uri']})")
-            if resource.get('description'):
+            if resource.get("description"):
                 lines.append(f"  Description: {resource['description']}")
             lines.append(f"  Server: {resource['server']}")
 
@@ -335,7 +339,7 @@ class MCPKnowledgeContributor:
         lines = ["## Available MCP Tools", ""]
         for tool in tools:
             lines.append(f"- {tool['name']}")
-            if tool.get('description'):
+            if tool.get("description"):
                 lines.append(f"  Description: {tool['description']}")
             lines.append(f"  Server: {tool['server']}")
 

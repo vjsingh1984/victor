@@ -180,7 +180,10 @@ class SessionStartDebouncer:
                 return False
 
             # Under count limit, apply TIME_BASED specific logic without fingerprinting
-            if self.config.window_type == WindowType.TIME_BASED and not self.config.enable_metadata_fingerprinting:
+            if (
+                self.config.window_type == WindowType.TIME_BASED
+                and not self.config.enable_metadata_fingerprinting
+            ):
                 # Without fingerprinting: allow only 1 event per session (session-based deduplication)
                 if all_recent_events:
                     self._stats["debounced"] += 1
@@ -277,9 +280,7 @@ class SessionStartDebouncer:
         if self.config.enable_metadata_fingerprinting:
             # Include key metadata in fingerprint
             relevant_fields = {"provider", "model", "vertical", "mode"}
-            relevant = {
-                k: v for k, v in metadata.items() if k in relevant_fields
-            }
+            relevant = {k: v for k, v in metadata.items() if k in relevant_fields}
 
             if relevant:
                 fingerprint = hashlib.md5(
@@ -303,9 +304,7 @@ class SessionStartDebouncer:
         normalized = json.dumps(metadata, sort_keys=True)
         return hashlib.md5(normalized.encode()).hexdigest()
 
-    def _cleanup_old_events(
-        self, event_key: str, window_start: datetime
-    ) -> None:
+    def _cleanup_old_events(self, event_key: str, window_start: datetime) -> None:
         """
         Remove events outside the time window.
 
@@ -315,18 +314,14 @@ class SessionStartDebouncer:
         """
         if event_key in self._events:
             self._events[event_key] = [
-                record
-                for record in self._events[event_key]
-                if record.timestamp > window_start
+                record for record in self._events[event_key] if record.timestamp > window_start
             ]
 
             # Clean up empty lists
             if not self._events[event_key]:
                 del self._events[event_key]
 
-    def _cleanup_old_events_for_session(
-        self, session_id: str, window_start: datetime
-    ) -> None:
+    def _cleanup_old_events_for_session(self, session_id: str, window_start: datetime) -> None:
         """
         Remove old events for all event keys belonging to a session.
 
@@ -335,8 +330,7 @@ class SessionStartDebouncer:
             window_start: Start of the current window.
         """
         keys_to_clean = [
-            key for key in self._events.keys()
-            if key.startswith(session_id) or key == session_id
+            key for key in self._events.keys() if key.startswith(session_id) or key == session_id
         ]
 
         for key in keys_to_clean:
