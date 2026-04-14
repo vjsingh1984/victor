@@ -61,8 +61,6 @@ def extract_skeleton(source: str, language: str = "python") -> str:
         # Class/function definitions — always include
         if stripped.startswith(("def ", "class ", "async def ")):
             skeleton_lines.append(line)
-            # Calculate body indent level
-            body_indent = len(line) - len(line.lstrip()) + 4
             in_body = True
             in_docstring = False
             continue
