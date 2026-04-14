@@ -711,9 +711,7 @@ class TestToolPipelineNormalization:
         assert args["direction"] == "in"
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_forward_file_dependencies_query_to_graph(
-        self, pipeline
-    ):
+    def test_normalize_tool_call_reroutes_forward_file_dependencies_query_to_graph(self, pipeline):
         """Forward file-dependency queries should route to graph file dependencies."""
         pipeline.search_router = SearchRouter()
 
@@ -728,9 +726,7 @@ class TestToolPipelineNormalization:
         assert args["direction"] == "out"
         assert strategy is not None
 
-    def test_normalize_tool_call_reroutes_file_architecture_summary_query_to_graph(
-        self, pipeline
-    ):
+    def test_normalize_tool_call_reroutes_file_architecture_summary_query_to_graph(self, pipeline):
         """File-scoped architecture queries should route to structured file graph output."""
         pipeline.search_router = SearchRouter()
 
@@ -1476,7 +1472,10 @@ class TestToolPipelineSearchRouting:
             return_value=ToolExecutionResult(
                 tool_name="graph",
                 success=True,
-                result={"count": 2, "results": ["victor/tools/code_search_tool.py", "victor/providers/base.py"]},
+                result={
+                    "count": 2,
+                    "results": ["victor/tools/code_search_tool.py", "victor/providers/base.py"],
+                },
                 error=None,
             )
         )
@@ -1517,7 +1516,10 @@ class TestToolPipelineSearchRouting:
             return_value=ToolExecutionResult(
                 tool_name="graph",
                 success=True,
-                result={"count": 2, "results": ["victor/providers/base.py", "victor/tools/code_search_tool.py"]},
+                result={
+                    "count": 2,
+                    "results": ["victor/providers/base.py", "victor/tools/code_search_tool.py"],
+                },
                 error=None,
             )
         )
