@@ -65,8 +65,6 @@ from typing import (
     Union,
 )
 
-from victor.core.shared_types import SubAgentRole
-from victor.agent.teams.coordinator import TeamCoordinator
 from victor.teams.types import (
     MemoryConfig,
     TeamConfig,
@@ -79,6 +77,8 @@ from victor.teams import (
 )
 
 if TYPE_CHECKING:
+    from victor.agent.teams.coordinator import TeamCoordinator
+    from victor.core.shared_types import SubAgentRole
     from victor.core.protocols import OrchestratorProtocol as AgentOrchestrator
     from victor.framework.agent import Agent
 
@@ -210,22 +210,22 @@ class TeamEvent:
         }
 
 
-# Role name to SubAgentRole mapping
-ROLE_MAPPING: Dict[str, SubAgentRole] = {
-    "researcher": SubAgentRole.RESEARCHER,
-    "research": SubAgentRole.RESEARCHER,
-    "planner": SubAgentRole.PLANNER,
-    "plan": SubAgentRole.PLANNER,
-    "executor": SubAgentRole.EXECUTOR,
-    "execute": SubAgentRole.EXECUTOR,
-    "impl": SubAgentRole.EXECUTOR,
-    "implementer": SubAgentRole.EXECUTOR,
-    "reviewer": SubAgentRole.REVIEWER,
-    "review": SubAgentRole.REVIEWER,
-    "critic": SubAgentRole.REVIEWER,
-    "writer": SubAgentRole.EXECUTOR,
-    "analyzer": SubAgentRole.RESEARCHER,
-    "verifier": SubAgentRole.REVIEWER,
+# Role name to SubAgentRole name mapping (string-based to avoid eager import)
+ROLE_MAPPING: Dict[str, str] = {
+    "researcher": "RESEARCHER",
+    "research": "RESEARCHER",
+    "planner": "PLANNER",
+    "plan": "PLANNER",
+    "executor": "EXECUTOR",
+    "execute": "EXECUTOR",
+    "impl": "EXECUTOR",
+    "implementer": "EXECUTOR",
+    "reviewer": "REVIEWER",
+    "review": "REVIEWER",
+    "critic": "REVIEWER",
+    "writer": "EXECUTOR",
+    "analyzer": "RESEARCHER",
+    "verifier": "REVIEWER",
 }
 
 
@@ -312,13 +312,12 @@ class TeamMemberSpec:
         Returns:
             TeamMember instance with memory coordinator attached if memory is enabled
         """
-        # Resolve role
+        from victor.core.shared_types import SubAgentRole
+
+        # Resolve role via string mapping → enum
         role_lower = self.role.lower()
-        if role_lower in ROLE_MAPPING:
-            sub_role = ROLE_MAPPING[role_lower]
-        else:
-            # Default to executor for unknown roles
-            sub_role = SubAgentRole.EXECUTOR
+        role_name = ROLE_MAPPING.get(role_lower, "EXECUTOR")
+        sub_role = getattr(SubAgentRole, role_name, SubAgentRole.EXECUTOR)
 
         # Generate name if not provided
         name = self.name or f"{self.role.title()} Agent"
@@ -492,7 +491,9 @@ class AgentTeam:
             shared_context=shared_context or {},
         )
 
-        # Create coordinator
+        # Create coordinator (lazy import to avoid framework → agent chain)
+        from victor.agent.teams.coordinator import TeamCoordinator
+
         coordinator = TeamCoordinator(orchestrator)
 
         return cls(coordinator, config)

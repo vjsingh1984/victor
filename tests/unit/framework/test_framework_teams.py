@@ -281,33 +281,38 @@ class TestTeamMemberSpecPersona:
 
 
 class TestRoleMapping:
-    """Tests for role string to SubAgentRole mapping."""
+    """Tests for role string to SubAgentRole name mapping.
+
+    ROLE_MAPPING uses string values (not SubAgentRole enums) to avoid
+    eager import of victor.core.shared_types at module level.
+    Resolution to enum happens in TeamMemberSpec.to_team_member().
+    """
 
     def test_researcher_mappings(self):
         """Researcher role aliases should map correctly."""
-        assert ROLE_MAPPING["researcher"] == SubAgentRole.RESEARCHER
-        assert ROLE_MAPPING["research"] == SubAgentRole.RESEARCHER
-        assert ROLE_MAPPING["analyzer"] == SubAgentRole.RESEARCHER
+        assert ROLE_MAPPING["researcher"] == "RESEARCHER"
+        assert ROLE_MAPPING["research"] == "RESEARCHER"
+        assert ROLE_MAPPING["analyzer"] == "RESEARCHER"
 
     def test_planner_mappings(self):
         """Planner role aliases should map correctly."""
-        assert ROLE_MAPPING["planner"] == SubAgentRole.PLANNER
-        assert ROLE_MAPPING["plan"] == SubAgentRole.PLANNER
+        assert ROLE_MAPPING["planner"] == "PLANNER"
+        assert ROLE_MAPPING["plan"] == "PLANNER"
 
     def test_executor_mappings(self):
         """Executor role aliases should map correctly."""
-        assert ROLE_MAPPING["executor"] == SubAgentRole.EXECUTOR
-        assert ROLE_MAPPING["execute"] == SubAgentRole.EXECUTOR
-        assert ROLE_MAPPING["impl"] == SubAgentRole.EXECUTOR
-        assert ROLE_MAPPING["implementer"] == SubAgentRole.EXECUTOR
-        assert ROLE_MAPPING["writer"] == SubAgentRole.EXECUTOR
+        assert ROLE_MAPPING["executor"] == "EXECUTOR"
+        assert ROLE_MAPPING["execute"] == "EXECUTOR"
+        assert ROLE_MAPPING["impl"] == "EXECUTOR"
+        assert ROLE_MAPPING["implementer"] == "EXECUTOR"
+        assert ROLE_MAPPING["writer"] == "EXECUTOR"
 
     def test_reviewer_mappings(self):
         """Reviewer role aliases should map correctly."""
-        assert ROLE_MAPPING["reviewer"] == SubAgentRole.REVIEWER
-        assert ROLE_MAPPING["review"] == SubAgentRole.REVIEWER
-        assert ROLE_MAPPING["critic"] == SubAgentRole.REVIEWER
-        assert ROLE_MAPPING["verifier"] == SubAgentRole.REVIEWER
+        assert ROLE_MAPPING["reviewer"] == "REVIEWER"
+        assert ROLE_MAPPING["review"] == "REVIEWER"
+        assert ROLE_MAPPING["critic"] == "REVIEWER"
+        assert ROLE_MAPPING["verifier"] == "REVIEWER"
 
     def test_unknown_role_defaults_to_executor(self):
         """Unknown roles should default to executor."""
