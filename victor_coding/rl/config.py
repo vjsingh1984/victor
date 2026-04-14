@@ -24,9 +24,8 @@ across RL Q-values, workflow patterns, and vertical configurations.
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
-from victor.framework.rl import LearnerType
-from victor.framework.rl.config import BaseRLConfig
-from victor.framework.tool_naming import ToolNames
+from victor_sdk.constants import ToolNames
+from victor_sdk.rl import BaseRLConfig, LearnerType
 
 
 @dataclass

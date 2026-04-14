@@ -33,10 +33,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from victor.framework.extensions import (
+from victor_sdk import (
     ConversationCoordinator,
     ConversationStats,
-    ConversationTurn,
     TurnType,
 )
 
@@ -326,7 +325,7 @@ class EnhancedCodingConversationManager:
         if ctx.tests_run:
             passed = sum(1 for t in ctx.tests_run if t.get("passed"))
             total = len(ctx.tests_run)
-            parts.append(f"## Tests Run")
+            parts.append("## Tests Run")
             parts.append(f"- Results: {passed}/{total} passed")
             parts.append("")
 

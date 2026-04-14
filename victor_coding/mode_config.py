@@ -12,29 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Coding-specific mode configurations using central registry.
-
-This module registers coding-specific operational modes with the central
-ModeConfigRegistry and exports a registry-based provider for protocol
-compatibility.
-"""
+"""Coding-specific mode configurations using SDK-owned static descriptors."""
 
 from __future__ import annotations
 
 from typing import Dict
 
-from victor.framework.extensions import (
+from victor_sdk.verticals.mode_config import (
     ModeConfig,
-    ModeConfigRegistry,
     ModeDefinition,
-    RegistryBasedModeConfigProvider,
+    StaticModeConfigProvider,
+    VerticalModeConfig,
 )
 
-# =============================================================================
-# Coding-Specific Modes (Registered with Central Registry)
-# =============================================================================
-
-# Vertical-specific modes that extend/override defaults
 _CODING_MODES: Dict[str, ModeDefinition] = {
     "architect": ModeDefinition(
         name="architect",
@@ -70,7 +60,6 @@ _CODING_MODES: Dict[str, ModeDefinition] = {
     ),
 }
 
-# Coding-specific task type budgets
 _CODING_TASK_BUDGETS: Dict[str, int] = {
     "code_generation": 3,
     "create_simple": 2,
@@ -88,60 +77,23 @@ _CODING_TASK_BUDGETS: Dict[str, int] = {
 }
 
 
-# =============================================================================
-# Register with Central Registry
-# =============================================================================
-
-
-def _register_coding_modes() -> None:
-    """Register coding modes with the central registry."""
-    registry = ModeConfigRegistry.get_instance()
-    registry.register_vertical(
-        name="coding",
-        modes=_CODING_MODES,
-        task_budgets=_CODING_TASK_BUDGETS,
-        default_mode="default",
+def _build_mode_config(default_mode: str = "default") -> VerticalModeConfig:
+    return VerticalModeConfig(
+        vertical_name="coding",
+        modes=dict(_CODING_MODES),
+        task_budgets=dict(_CODING_TASK_BUDGETS),
+        default_mode=default_mode,
         default_budget=10,
     )
 
 
-# NOTE: Import-time auto-registration removed (SOLID compliance)
-# Registration happens when CodingModeConfigProvider is instantiated during
-# vertical integration. The provider's __init__ calls _register_coding_modes()
-# for idempotent registration.
-
-
-# =============================================================================
-# Provider (Protocol Compatibility)
-# =============================================================================
-
-
-class CodingModeConfigProvider(RegistryBasedModeConfigProvider):
-    """Mode configuration provider for coding vertical.
-
-    Uses the central ModeConfigRegistry but provides coding-specific
-    complexity mapping.
-    """
+class CodingModeConfigProvider(StaticModeConfigProvider):
+    """Mode configuration provider for the coding vertical."""
 
     def __init__(self, default_mode: str = "default") -> None:
-        """Initialize coding mode provider."""
-        # Ensure registration (idempotent - handles singleton reset)
-        _register_coding_modes()
-        super().__init__(
-            vertical="coding",
-            default_mode=default_mode,
-            default_budget=10,
-        )
+        super().__init__(_build_mode_config(default_mode))
 
     def get_mode_for_complexity(self, complexity: str) -> str:
-        """Map complexity level to coding mode.
-
-        Args:
-            complexity: Complexity level
-
-        Returns:
-            Recommended mode name
-        """
         mapping = {
             "trivial": "fast",
             "simple": "fast",
@@ -153,35 +105,20 @@ class CodingModeConfigProvider(RegistryBasedModeConfigProvider):
 
 
 def get_mode_config(mode_name: str) -> ModeConfig | None:
-    """Get a specific mode configuration.
-
-    Args:
-        mode_name: Name of the mode
-
-    Returns:
-        ModeConfig or None if not found
-    """
-    registry = ModeConfigRegistry.get_instance()
-    modes = registry.get_modes("coding")
-    return modes.get(mode_name.lower())
+    mode_definition = _CODING_MODES.get(mode_name.lower())
+    if mode_definition is None:
+        return None
+    return mode_definition.to_mode_config()
 
 
 def get_tool_budget(mode_name: str | None = None, task_type: str | None = None) -> int:
-    """Get tool budget based on mode or task type.
-
-    Args:
-        mode_name: Optional mode name
-        task_type: Optional task type
-
-    Returns:
-        Recommended tool budget
-    """
-    registry = ModeConfigRegistry.get_instance()
-    return registry.get_tool_budget(
-        vertical="coding",
-        mode_name=mode_name,
-        task_type=task_type,
-    )
+    if task_type is not None:
+        return _CODING_TASK_BUDGETS.get(task_type, 10)
+    if mode_name is not None:
+        mode_definition = _CODING_MODES.get(mode_name.lower())
+        if mode_definition is not None:
+            return mode_definition.tool_budget
+    return 10
 
 
 __all__ = [

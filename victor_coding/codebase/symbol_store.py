@@ -256,7 +256,6 @@ class SymbolStore:
                 CREATE INDEX IF NOT EXISTS idx_symbols_parent ON symbols(parent_symbol);
                 CREATE INDEX IF NOT EXISTS idx_imports_file ON imports(file_path);
                 CREATE INDEX IF NOT EXISTS idx_patterns_type ON patterns(pattern_type);
-                CREATE INDEX IF NOT EXISTS idx_files_type ON files(file_type);
 
                 -- Metadata table
                 CREATE TABLE IF NOT EXISTS metadata (
@@ -264,6 +263,13 @@ class SymbolStore:
                     value TEXT
                 );
             """)
+
+            # Migrate: add file_type column to old DBs that lack it
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(files)").fetchall()}
+            if "file_type" not in cols:
+                conn.execute('ALTER TABLE files ADD COLUMN file_type TEXT DEFAULT "source"')
+            # Index on file_type (after migration ensures column exists)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_files_type ON files(file_type)")
 
     def should_ignore(self, path: Path) -> bool:
         """Check if path should be ignored.

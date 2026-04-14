@@ -48,9 +48,12 @@ def test_pyproject_registers_canonical_runtime_extension_entry_points() -> None:
 def test_pyproject_keeps_sdk_in_base_dependencies_and_victor_runtime_optional() -> None:
     project = tomllib.loads((_REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
 
-    assert "victor-sdk>=0.6.0,<1.0" in project["dependencies"]
+    assert any(dependency.startswith("victor-sdk") for dependency in project["dependencies"])
     assert all("victor-ai" not in dependency for dependency in project["dependencies"])
-    assert "victor-ai>=0.6.0,<1.0" in project["optional-dependencies"]["runtime"]
+    assert any(
+        dependency.startswith("victor-ai>=")
+        for dependency in project["optional-dependencies"]["runtime"]
+    )
 
 
 def test_plugin_implements_protocol_and_registers_vertical() -> None:

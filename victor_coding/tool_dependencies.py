@@ -51,7 +51,7 @@ import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
-from victor.framework.extensions import (
+from victor_sdk.verticals.tool_dependencies import (
     YAMLToolDependencyProvider,
     load_tool_dependency_yaml,
 )

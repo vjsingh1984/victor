@@ -23,21 +23,21 @@ TeamMember) while providing domain-specific team configurations for coding tasks
 
 DEPRECATION NOTICE:
     CodingTeamSpec is deprecated and will be removed in a future version.
-    Use TeamSpec from victor.framework.team_schema instead:
+    Use TeamSpec from victor_sdk.team_schema instead:
 
-        from victor.framework.team_schema import TeamSpec
+        from victor_sdk.team_schema import TeamSpec
 
     CodingTeamSpec is maintained for backwards compatibility.
 """
 
 import warnings
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
-from victor.framework.teams import TeamFormation, TeamMemberSpec
+from victor_sdk.team_schema import TeamFormation, TeamMemberSpec, TeamSpec
 
 # Import framework multi-agent types for composition
-from victor.framework.multi_agent import (
+from victor_sdk import (
     TeamTemplate,
     TeamSpec as FrameworkTeamSpec,
     TeamMember as FrameworkTeamMember,
@@ -47,9 +47,6 @@ from victor.framework.multi_agent import (
     CommunicationStyle,
     ExpertiseLevel,
 )
-
-# Import canonical TeamSpec from framework
-from victor.framework.team_schema import TeamSpec
 
 
 @dataclass
@@ -193,7 +190,7 @@ class CodingTeamSpec:
 
     .. deprecated::
         CodingTeamSpec is deprecated. Use TeamSpec from
-        victor.framework.team_schema instead. CodingTeamSpec is maintained
+        victor_sdk.team_schema instead. CodingTeamSpec is maintained
         for backwards compatibility but will be removed in a future version.
 
     This class provides backward-compatible team specifications while
@@ -219,13 +216,13 @@ class CodingTeamSpec:
         """Emit deprecation warning on instantiation."""
         warnings.warn(
             "CodingTeamSpec is deprecated. Use TeamSpec from "
-            "victor.framework.team_schema instead.",
+            "victor_sdk.team_schema instead.",
             DeprecationWarning,
             stacklevel=3,
         )
 
     def to_canonical_team_spec(self) -> TeamSpec:
-        """Convert to canonical TeamSpec from victor.framework.team_schema.
+        """Convert to canonical TeamSpec from victor_sdk.team_schema.
 
         Returns:
             TeamSpec instance with vertical set to "coding"
