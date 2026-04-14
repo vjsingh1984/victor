@@ -1,7 +1,6 @@
 # Simple in-memory GraphStoreProtocol implementation (non-persistent).
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, Iterable, List, Optional
 
 from victor.storage.graph.protocol import GraphEdge, GraphNode, GraphStoreProtocol
@@ -13,6 +12,7 @@ class MemoryGraphStore(GraphStoreProtocol):
     def __init__(self) -> None:
         self._nodes: Dict[str, GraphNode] = {}
         self._edges: Dict[tuple[str, str, str], GraphEdge] = {}
+        self._file_mtimes: Dict[str, float] = {}
 
     async def upsert_nodes(self, nodes: Iterable[GraphNode]) -> None:
         for n in nodes:
@@ -53,9 +53,67 @@ class MemoryGraphStore(GraphStoreProtocol):
             results.append(node)
         return results
 
+    async def search_symbols(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+        symbol_types: Optional[Iterable[str]] = None,
+    ) -> List[GraphNode]:
+        query_lower = query.lower()
+        allowed_types = set(symbol_types) if symbol_types else None
+        matches: List[GraphNode] = []
+        for node in self._nodes.values():
+            if allowed_types is not None and node.type not in allowed_types:
+                continue
+            haystacks = [
+                node.name,
+                node.signature or "",
+                node.docstring or "",
+            ]
+            if any(query_lower in value.lower() for value in haystacks if value):
+                matches.append(node)
+        matches.sort(key=lambda node: (node.file, node.line or 0, node.name))
+        return matches[:limit]
+
+    async def get_node_by_id(self, node_id: str) -> Optional[GraphNode]:
+        return self._nodes.get(node_id)
+
+    async def get_all_nodes(self) -> List[GraphNode]:
+        return sorted(self._nodes.values(), key=lambda node: (node.file, node.line or 0, node.name))
+
+    async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
+        return sorted(
+            [node for node in self._nodes.values() if node.file == file],
+            key=lambda node: (node.line or 0, node.name),
+        )
+
+    async def update_file_mtime(self, file: str, mtime: float) -> None:
+        self._file_mtimes[file] = mtime
+
+    async def get_stale_files(self, file_mtimes: Dict[str, float]) -> List[str]:
+        return [
+            file
+            for file, current_mtime in file_mtimes.items()
+            if self._file_mtimes.get(file, float("-inf")) < current_mtime
+        ]
+
+    async def delete_by_file(self, file: str) -> None:
+        node_ids = {node.node_id for node in self._nodes.values() if node.file == file}
+        self._nodes = {
+            node_id: node for node_id, node in self._nodes.items() if node_id not in node_ids
+        }
+        self._edges = {
+            key: edge
+            for key, edge in self._edges.items()
+            if edge.src not in node_ids and edge.dst not in node_ids
+        }
+        self._file_mtimes.pop(file, None)
+
     async def delete_by_repo(self) -> None:
         self._nodes.clear()
         self._edges.clear()
+        self._file_mtimes.clear()
 
     async def stats(self) -> Dict[str, Any]:
         return {
@@ -63,3 +121,6 @@ class MemoryGraphStore(GraphStoreProtocol):
             "edges": len(self._edges),
             "path": ":memory:",
         }
+
+    async def get_all_edges(self) -> List[GraphEdge]:
+        return sorted(self._edges.values(), key=lambda edge: (edge.src, edge.dst, edge.type))

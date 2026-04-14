@@ -391,6 +391,15 @@ class SqliteGraphStore(GraphStoreProtocol):
             row = cur.fetchone()
             return self._row_to_node(row) if row else None
 
+    async def get_all_nodes(self) -> List[GraphNode]:
+        """Get all nodes in the graph."""
+        async with self._lock:
+            conn = self._connect()
+            cur = conn.execute(
+                f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} ORDER BY file, line, name"
+            )
+            return [self._row_to_node(row) for row in cur.fetchall()]
+
     async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
         """Get all symbols in a specific file."""
         async with self._lock:

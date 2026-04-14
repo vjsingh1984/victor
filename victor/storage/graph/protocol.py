@@ -63,6 +63,10 @@ class GraphStoreProtocol(Protocol):
         """Get a single node by its ID."""
         ...
 
+    async def get_all_nodes(self) -> List[GraphNode]:
+        """Get all nodes in the graph (bulk retrieval for analytics)."""
+        ...
+
     async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
         """Get all symbols in a specific file."""
         ...
