@@ -330,7 +330,9 @@ def audit_verticals(
 
         for report in reports:
             status = "[green]PASSED[/]" if report.passed else "[red]FAILED[/]"
-            plugin_entries = ", ".join(report.plugin_entry_points) if report.plugin_entry_points else "-"
+            plugin_entries = (
+                ", ".join(report.plugin_entry_points) if report.plugin_entry_points else "-"
+            )
             table.add_row(
                 str(report.root_path),
                 status,

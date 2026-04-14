@@ -724,10 +724,10 @@ async def _literal_search(
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(), timeout=15
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15)
+                find_result = type(
+                    "obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")}
                 )
-                find_result = type('obj', (object,), {'stdout': stdout.decode('utf-8', errors='ignore')})
                 found_files = [f.strip() for f in find_result.stdout.splitlines() if f.strip()]
                 if found_files:
                     results = []
@@ -793,7 +793,7 @@ async def _literal_search(
             stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
-        result = type('obj', (object,), {'stdout': stdout.decode('utf-8', errors='ignore')})
+        result = type("obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")})
 
         # Parse results: group by file, take top k files
         file_matches: Dict[str, List[str]] = {}

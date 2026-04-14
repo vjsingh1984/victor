@@ -636,7 +636,8 @@ async def scaffold(
 
             # Initialize git
             proc = await asyncio.create_subprocess_exec(
-                "git", "init",
+                "git",
+                "init",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -644,14 +645,19 @@ async def scaffold(
 
             # Create initial commit
             proc = await asyncio.create_subprocess_exec(
-                "git", "add", ".",
+                "git",
+                "add",
+                ".",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
             await proc.communicate()
 
             proc = await asyncio.create_subprocess_exec(
-                "git", "commit", "-m", "Initial commit",
+                "git",
+                "commit",
+                "-m",
+                "Initial commit",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )

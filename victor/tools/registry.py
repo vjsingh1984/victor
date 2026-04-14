@@ -722,9 +722,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             registry.register_plugin(plugin)
         """
         if not hasattr(plugin, "register"):
-            raise AttributeError(
-                f"Tool plugin must have a 'register' method. Got: {type(plugin)}"
-            )
+            raise AttributeError(f"Tool plugin must have a 'register' method. Got: {type(plugin)}")
 
         # Call plugin's register method
         plugin.register(self)
@@ -758,7 +756,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
             eps = importlib.metadata.entry_points()
 
             # Python 3.12+ returns a SelectableGroups, older returns dict
-            if hasattr(eps, 'select'):
+            if hasattr(eps, "select"):
                 plugin_eps = eps.select(group="victor.plugins")
             else:
                 plugin_eps = eps.get("victor.plugins", [])
@@ -771,10 +769,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
                 except Exception as e:
                     # Log but don't fail - allow other plugins to load
                     import logging
+
                     logger = logging.getLogger(__name__)
-                    logger.warning(
-                        f"Failed to load tool plugin '{ep.name}': {e}"
-                    )
+                    logger.warning(f"Failed to load tool plugin '{ep.name}': {e}")
 
         except Exception:
             # Entry points not available or other error
@@ -810,7 +807,7 @@ class ToolRegistry(BaseRegistry[str, Any]):
         try:
             eps = importlib.metadata.entry_points()
 
-            if hasattr(eps, 'select'):
+            if hasattr(eps, "select"):
                 group_eps = eps.select(group=entry_point_group)
             else:
                 group_eps = eps.get(entry_point_group, [])
@@ -836,10 +833,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
                 except Exception as e:
                     # Log but don't fail
                     import logging
+
                     logger = logging.getLogger(__name__)
-                    logger.warning(
-                        f"Failed to load tool plugin from '{ep.name}': {e}"
-                    )
+                    logger.warning(f"Failed to load tool plugin from '{ep.name}': {e}")
 
         except Exception:
             # Entry points not available
