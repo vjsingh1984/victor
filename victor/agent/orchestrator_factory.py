@@ -534,6 +534,35 @@ class OrchestratorFactory(
         logger.debug(f"SystemPromptBuilder created for {provider_name}/{model}")
         return prompt_builder
 
+    def create_prompt_pipeline(
+        self,
+        builder: Any,
+        get_context_window: Optional[Any] = None,
+    ) -> Any:
+        """Create UnifiedPromptPipeline with all dependencies.
+
+        Args:
+            builder: SystemPromptBuilder instance
+            get_context_window: Callable returning model context window size
+
+        Returns:
+            Configured UnifiedPromptPipeline
+        """
+        from victor.agent.content_registry import create_default_registry
+        from victor.agent.optimization_injector import OptimizationInjector
+        from victor.agent.prompt_pipeline import UnifiedPromptPipeline
+
+        optimizer = OptimizationInjector()
+        registry = create_default_registry()
+
+        return UnifiedPromptPipeline(
+            provider=self.provider,
+            builder=builder,
+            registry=registry,
+            optimizer=optimizer,
+            get_context_window=get_context_window,
+        )
+
     def create_workflow_optimization_components(
         self, timeout_seconds: Optional[float] = None
     ) -> WorkflowOptimizationComponents:

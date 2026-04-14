@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified prompt composition pipeline.
+"""Unified prompt composition pipeline (DEPRECATED).
+
+.. deprecated::
+    Superseded by ``victor.agent.prompt_pipeline.UnifiedPromptPipeline``.
+    Import from ``victor.agent.prompt_pipeline`` for new code.
 
 Routes prompt content to the correct placement (system prompt, user message
 prefix, tool definitions, or omitted) based on provider caching capabilities
@@ -275,6 +279,19 @@ class PromptComposer:
         if self._optimizer:
             self._optimizer.clear_session_cache()
 
+    def _get_credit_guidance(self) -> Optional[str]:
+        """Get credit-driven tool guidance from CreditTrackingService."""
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+            service = container.get_optional("credit_tracking_service")
+            if service is None:
+                return None
+            return service.generate_tool_guidance()
+        except Exception:
+            return None
+
     def compose_user_prefix(
         self,
         user_message: str,
@@ -324,6 +341,11 @@ class PromptComposer:
         # 5. Context reminders
         if turn_context.reminder_text:
             parts.append(turn_context.reminder_text)
+
+        # 6. Credit-driven tool guidance (FEP-0001 Phase 3 feedback loop)
+        credit_guidance = self._get_credit_guidance()
+        if credit_guidance:
+            parts.append(credit_guidance)
 
         if not parts:
             return ""

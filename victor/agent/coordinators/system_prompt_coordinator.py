@@ -111,6 +111,12 @@ class SystemPromptCoordinator:
         else:
             final_prompt = base_prompt
 
+        # Inject credit-driven tool effectiveness guidance (FEP-0001 Phase 3)
+        # This is the feedback loop: credit signals → prompt → agent behavior
+        credit_guidance = self._get_credit_guidance()
+        if credit_guidance:
+            final_prompt = f"{final_prompt}\n\n{credit_guidance}"
+
         # Emit prompt_used event for RL learning
         self._emit_prompt_used_event(final_prompt)
 
@@ -169,6 +175,24 @@ class SystemPromptCoordinator:
         except Exception as e:
             # RL hook failure should never block prompt building
             logger.debug(f"Failed to emit prompt_used event: {e}")
+
+    def _get_credit_guidance(self) -> Optional[str]:
+        """Get credit-driven tool effectiveness guidance if available.
+
+        Pulls guidance from CreditTrackingService. Returns None if credit
+        tracking is disabled or insufficient data has been collected.
+        This is non-blocking and best-effort.
+        """
+        try:
+            from victor.core import get_container
+
+            container = get_container()
+            service = container.get_optional("credit_tracking_service")
+            if service is None:
+                return None
+            return service.generate_tool_guidance()
+        except Exception:
+            return None
 
     def resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.

@@ -606,6 +606,33 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._tool_coordinator = self._interaction_runtime.tool_coordinator
         self._session_coordinator = self._interaction_runtime.session_coordinator
 
+    def _initialize_credit_runtime(self) -> None:
+        """Initialize credit assignment runtime (FEP-0001 Phase 3).
+
+        Creates CreditTrackingService and attaches it to the ToolPipeline.
+        Gated by settings.credit_assignment.enabled (default: False).
+        """
+        self._credit_tracking_service = None
+        ca_settings = getattr(self.settings, "credit_assignment", None)
+        if ca_settings is None or not getattr(ca_settings, "enabled", False):
+            return
+
+        try:
+            from victor.framework.rl.credit_tracking_service import CreditTrackingService
+
+            obs_bus = getattr(self, "_observability_bus", None)
+            self._credit_tracking_service = CreditTrackingService.from_settings(
+                self.settings, observability_bus=obs_bus
+            )
+
+            # Attach to ToolPipeline
+            if hasattr(self, "_tool_pipeline") and self._tool_pipeline is not None:
+                self._tool_pipeline._credit_tracking_service = self._credit_tracking_service
+
+            logger.info("Credit tracking service initialized")
+        except Exception as e:
+            logger.warning("Failed to initialize credit tracking: %s", e)
+
     def _initialize_services(self) -> None:
         """Initialize service layer by registering coordinators and bootstrapping services.
 
@@ -639,22 +666,29 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Resolve service instances from container
         from victor.agent.services.protocols import (
             ChatServiceProtocol,
-            ToolServiceProtocol,
-            SessionServiceProtocol,
             ContextServiceProtocol,
+            ProviderServiceProtocol,
+            RecoveryServiceProtocol,
+            SessionServiceProtocol,
+            ToolServiceProtocol,
         )
 
         self._chat_service = self._container.get_optional(ChatServiceProtocol)
         self._tool_service = self._container.get_optional(ToolServiceProtocol)
         self._session_service = self._container.get_optional(SessionServiceProtocol)
         self._context_service = self._container.get_optional(ContextServiceProtocol)
+        self._provider_service = self._container.get_optional(ProviderServiceProtocol)
+        self._recovery_service = self._container.get_optional(RecoveryServiceProtocol)
 
         logger.info(
-            "Service layer initialized: chat=%s, tool=%s, session=%s, context=%s",
+            "Service layer initialized: chat=%s, tool=%s, session=%s, "
+            "context=%s, provider=%s, recovery=%s",
             self._chat_service is not None,
             self._tool_service is not None,
             self._session_service is not None,
             self._context_service is not None,
+            self._provider_service is not None,
+            self._recovery_service is not None,
         )
 
     def _register_coordinators_for_services(self) -> None:
@@ -703,6 +737,26 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
         logger.debug("Bootstrapped service layer")
+
+    def _create_execution_context(self) -> "ExecutionContext":
+        """Create an ExecutionContext carrying all runtime dependencies.
+
+        Replaces scattered get_global_manager() / get_instance() calls
+        with explicit context passing. Created after services are
+        bootstrapped so all dependencies are available.
+
+        Returns:
+            ExecutionContext with settings, container, state manager,
+            and lazy service accessor.
+        """
+        from victor.runtime.context import ExecutionContext
+
+        session_id = getattr(self, "_memory_session_id", "") or ""
+        return ExecutionContext.create(
+            settings=self.settings,
+            container=self._container,
+            session_id=session_id,
+        )
 
     def __init__(
         self,
@@ -790,23 +844,27 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_calling_caps=self.tool_calling_caps,
         )
 
-        # PromptComposer: unified prompt composition pipeline
-        # Routes content to system prompt vs user prefix based on provider tier.
-        # Sits alongside SystemPromptBuilder during migration (Strangler Fig).
+        # UnifiedPromptPipeline: consolidated prompt assembly (replaces
+        # PromptComposer + SystemPromptCoordinator + frozen-prompt glue).
         try:
             from victor.agent.content_registry import create_default_registry
             from victor.agent.optimization_injector import OptimizationInjector
-            from victor.agent.prompt_composer import PromptComposer
+            from victor.agent.prompt_pipeline import UnifiedPromptPipeline
 
             self._optimization_injector = OptimizationInjector()
-            self._prompt_composer = PromptComposer(
+            self._prompt_pipeline = UnifiedPromptPipeline(
                 provider=self.provider,
+                builder=self.prompt_builder,
                 registry=create_default_registry(),
-                optimization_injector=self._optimization_injector,
+                optimizer=self._optimization_injector,
+                get_context_window=self._get_model_context_window,
             )
+            # Backward compat alias — old code referencing _prompt_composer
+            self._prompt_composer = self._prompt_pipeline
         except Exception as e:
-            logger.debug("PromptComposer unavailable: %s", e)
+            logger.debug("UnifiedPromptPipeline unavailable: %s", e)
             self._optimization_injector = None
+            self._prompt_pipeline = None
             self._prompt_composer = None
 
         # Load project context from .victor/init.md (via factory - DI with fallback)
@@ -923,6 +981,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         AgentRuntimeBootstrapper.prepare_components(self, settings)
         AgentRuntimeBootstrapper.finalize(self)
+
+        # Create ExecutionContext — explicit context object replacing global singletons.
+        # Available after services are bootstrapped; passed to coordinators and workflows.
+        self._execution_context = self._create_execution_context()
 
         # Cache optimization flags once (provider is fully initialized)
         self._kv_opt_cached: Optional[bool] = None
@@ -1207,10 +1269,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Rebuild system prompt with new workspace context (replaces old init.md)
         # Workspace switch is a session reset — unfreeze and re-sample GEPA sections
+        if getattr(self, "_prompt_pipeline", None):
+            self._prompt_pipeline.unfreeze()
         self._system_prompt_frozen = False
-        # Unfreeze PromptComposer for new workspace (clears GEPA session cache)
-        if getattr(self, "_prompt_composer", None):
-            self._prompt_composer.unfreeze()
 
         base_prompt = self._build_system_prompt_with_adapter()
         if self.project_context.content:
@@ -1850,12 +1911,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Cache-friendly: prepend dynamic content to last user message
         # Gate on _kv_optimization_enabled so KV-only providers (Ollama) also benefit
         if self._kv_optimization_enabled and messages:
-            # Use PromptComposer if available (unified pipeline)
-            composer = getattr(self, "_prompt_composer", None)
-            if composer:
-                from victor.agent.prompt_composer import TurnContext
+            # Use UnifiedPromptPipeline for per-turn prefix composition
+            pipeline = getattr(self, "_prompt_pipeline", None)
+            if pipeline:
+                from victor.agent.prompt_pipeline import TurnContext
 
-                # Build turn context for the composer
+                # Build turn context for the pipeline
                 injector = getattr(self, "_optimization_injector", None)
                 turn_ctx = TurnContext(
                     provider_name=self.provider_name or "",
@@ -1885,7 +1946,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         last_user_msg = m.content[:200]
                         break
 
-                prefix = composer.compose_user_prefix(last_user_msg, turn_ctx)
+                prefix = pipeline.compose_turn_prefix(last_user_msg, turn_ctx)
 
                 # Clear failure state after injecting hint
                 if injector and turn_ctx.last_turn_failed:
@@ -1908,24 +1969,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _check_context_overflow(self, max_context_chars: int = 200000) -> bool:
         """Check if context is at risk of overflow.
 
-        Delegates to ContextManager (TD-002 refactoring).
-
         Args:
             max_context_chars: Maximum allowed context size in chars
 
         Returns:
             True if context is dangerously large
         """
+        if self._use_service_layer and self._context_service:
+            return self._context_service.check_context_overflow(max_context_chars)
         return self._context_manager.check_context_overflow(max_context_chars)
 
     def get_context_metrics(self) -> ContextMetrics:
         """Get detailed context metrics.
 
-        Delegates to ContextManager (TD-002 refactoring).
-
         Returns:
             ContextMetrics with size and overflow information
         """
+        if self._use_service_layer and self._context_service:
+            return self._context_service.get_context_metrics()
         return self._context_manager.get_context_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
@@ -2411,23 +2472,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_current_provider_info(self) -> Dict[str, Any]:
         """Get information about the current provider and model.
 
-        Combines ProviderManager's provider info with orchestrator-specific
-        runtime state (tool budget, tool calls used).
+        Combines provider info with orchestrator-specific runtime state.
 
         Returns:
             Dictionary with provider/model info and capabilities
         """
-        # Get base info from ProviderManager
+        if self._use_service_layer and self._provider_service:
+            info = self._provider_service.get_current_provider_info()
+            if hasattr(info, "__dict__"):
+                info = {
+                    "provider_name": getattr(info, "provider_name", ""),
+                    "model_name": getattr(info, "model_name", ""),
+                }
+            elif not isinstance(info, dict):
+                info = {}
+            info.update(
+                {
+                    "tool_budget": self.tool_budget,
+                    "tool_calls_used": self.tool_calls_used,
+                }
+            )
+            return info
+        # Fallback: direct coordinator path
         info = self._provider_manager.get_info()
-
-        # Add orchestrator-specific runtime state
         info.update(
             {
                 "tool_budget": self.tool_budget,
                 "tool_calls_used": self.tool_calls_used,
             }
         )
-
         return info
 
     def _parse_tool_calls_with_adapter(
@@ -2675,7 +2748,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Freeze system prompt after first build for prefix cache stability
         # Gate on _kv_optimization_enabled so both API-caching and KV-caching providers benefit
-        if self._kv_optimization_enabled and getattr(self, "_system_prompt_frozen", False):
+        # Check if system prompt is frozen (pipeline owns this state when available)
+        pipeline = getattr(self, "_prompt_pipeline", None)
+        is_frozen = (
+            pipeline.is_frozen if pipeline else getattr(self, "_system_prompt_frozen", False)
+        )
+        if self._kv_optimization_enabled and is_frozen:
             logger.debug("[cache] System prompt frozen — skipping rebuild for query classification")
             return
 
@@ -2706,16 +2784,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     )
 
     def _build_system_prompt_with_adapter(self) -> str:
-        """Build system prompt using the tool calling adapter.
+        """Build system prompt using the unified pipeline.
 
-        Delegates to SystemPromptCoordinator.build_system_prompt() when
-        available. Falls back to inline logic during __init__ before
-        the coordinator is created.
+        Delegates to UnifiedPromptPipeline.build_system_prompt() when
+        available. Falls back to SystemPromptCoordinator, then inline logic
+        during __init__ before the pipeline is created.
         """
+        pipeline = getattr(self, "_prompt_pipeline", None)
+        if pipeline is not None:
+            return pipeline.build_system_prompt()
+
         if hasattr(self, "_system_prompt_coordinator"):
             return self._system_prompt_coordinator.build_system_prompt()
 
-        # Fallback for calls during __init__ before coordinator is created
+        # Fallback for calls during __init__ before pipeline is created
         base_prompt = self.prompt_builder.build()
         context_window = self._get_model_context_window()
         budget = calculate_parallel_read_budget(context_window)
@@ -2726,15 +2808,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _emit_prompt_used_event(self, prompt: str) -> None:
         """Emit PROMPT_USED event for RL prompt template learner.
 
-        Delegates to SystemPromptCoordinator._emit_prompt_used_event().
+        Delegates to UnifiedPromptPipeline or SystemPromptCoordinator.
         """
-        self._system_prompt_coordinator._emit_prompt_used_event(prompt)
+        pipeline = getattr(self, "_prompt_pipeline", None)
+        if pipeline is not None:
+            pipeline._emit_prompt_used_event(prompt)
+        elif hasattr(self, "_system_prompt_coordinator"):
+            self._system_prompt_coordinator._emit_prompt_used_event(prompt)
 
     def _resolve_shell_variant(self, tool_name: str) -> str:
         """Resolve shell aliases to the appropriate enabled shell variant.
 
-        Delegates to SystemPromptCoordinator.resolve_shell_variant().
+        Delegates to UnifiedPromptPipeline or SystemPromptCoordinator.
         """
+        pipeline = getattr(self, "_prompt_pipeline", None)
+        if pipeline is not None:
+            return pipeline.resolve_shell_variant(tool_name)
         return self._system_prompt_coordinator.resolve_shell_variant(tool_name)
 
     def _get_thinking_disabled_prompt(self, base_prompt: str) -> str:
@@ -2779,6 +2868,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with classification results
         """
+        pipeline = getattr(self, "_prompt_pipeline", None)
+        if pipeline is not None:
+            return pipeline.classify_task_keywords(user_message)
         return self._system_prompt_coordinator.classify_task_keywords(user_message)
 
     def _classify_task_with_context(
@@ -2786,7 +2878,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> Dict[str, Any]:
         """Classify task with conversation context for improved accuracy.
 
-        Delegates to SystemPromptCoordinator.classify_task_with_context().
+        Delegates to UnifiedPromptPipeline or SystemPromptCoordinator.
 
         Args:
             user_message: The user's input message
@@ -2795,6 +2887,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with classification results
         """
+        pipeline = getattr(self, "_prompt_pipeline", None)
+        if pipeline is not None:
+            return pipeline.classify_task_with_context(user_message, history)
         return self._system_prompt_coordinator.classify_task_with_context(user_message, history)
 
     def _format_tool_output(self, tool_name: str, args: Dict[str, Any], output: Any) -> str:
@@ -3759,6 +3854,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Raises:
             ProviderNotFoundError: If provider not found
         """
+        if self._use_service_layer and self._provider_service:
+            await self._provider_service.switch_provider(provider_name, model)
+            # Sync orchestrator's attributes
+            self.model = self._provider_manager.model
+            self.provider_name = self._provider_manager.provider_name
+            if on_switch:
+                on_switch(self.provider_name, self.model)
+            return True
+
         result = await self._provider_coordinator.switch_provider_async(
             provider_name=provider_name,
             model=model,
