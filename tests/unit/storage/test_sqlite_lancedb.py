@@ -50,8 +50,13 @@ class TestInit:
                 return _FakeFactory()
 
         with (
-            patch("victor.storage.graph.sqlite_store.SqliteGraphStore", return_value=fake_graph_store) as mock_graph_store,
-            patch("victor.core.capability_registry.CapabilityRegistry.get_instance", return_value=_FakeRegistry()),
+            patch(
+                "victor.storage.graph.sqlite_store.SqliteGraphStore", return_value=fake_graph_store
+            ) as mock_graph_store,
+            patch(
+                "victor.core.capability_registry.CapabilityRegistry.get_instance",
+                return_value=_FakeRegistry(),
+            ),
             patch.object(store, "_init_vector_store", AsyncMock()),
         ):
             await store.initialize()

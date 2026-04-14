@@ -431,6 +431,7 @@ class TestBenchmarkSyncBridge:
             "pass_rate": 1.0,
             "duration_seconds": 1.0,
             "total_tokens": 42,
+            "total_tool_calls": 5,
         }
         result.task_results = []
 

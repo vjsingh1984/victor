@@ -547,10 +547,7 @@ class TestAsyncToolExecutor:
             ),
         ]
 
-        batches = executor._get_execution_batches(
-            executor._build_dependency_graph(specs),
-            specs
-        )
+        batches = executor._get_execution_batches(executor._build_dependency_graph(specs), specs)
 
         # Should have 3 batches: [a], [b, c], [d]
         assert len(batches) == 3

@@ -37,11 +37,11 @@ class TestRuntimeLazyInitialization:
     """Tests for lazy initialization of runtime components."""
 
     @pytest.mark.asyncio
-    async def test_coordination_runtime_components_are_lazy(
-        self, mock_ollama_provider
-    ):
+    async def test_coordination_runtime_components_are_lazy(self, mock_ollama_provider):
         """Test that coordination runtime components are NOT initialized during Agent.create()."""
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -79,11 +79,11 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_interaction_runtime_components_are_lazy(
-        self, mock_ollama_provider
-    ):
+    async def test_interaction_runtime_components_are_lazy(self, mock_ollama_provider):
         """Test that interaction runtime components are NOT initialized during Agent.create()."""
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -125,11 +125,11 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_resilience_runtime_components_are_lazy(
-        self, mock_ollama_provider
-    ):
+    async def test_resilience_runtime_components_are_lazy(self, mock_ollama_provider):
         """Test that resilience runtime components are NOT initialized during Agent.create()."""
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -158,11 +158,11 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_runtime_components_initialize_on_first_access(
-        self, mock_ollama_provider
-    ):
+    async def test_runtime_components_initialize_on_first_access(self, mock_ollama_provider):
         """Test that runtime components DO initialize when first accessed via get_instance()."""
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -197,11 +197,11 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_provider_runtime_components_are_lazy(
-        self, mock_ollama_provider
-    ):
+    async def test_provider_runtime_components_are_lazy(self, mock_ollama_provider):
         """Test that provider runtime components are NOT initialized during Agent.create()."""
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -235,11 +235,11 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_workflow_runtime_components_are_lazy(
-        self, mock_ollama_provider
-    ):
+    async def test_workflow_runtime_components_are_lazy(self, mock_ollama_provider):
         """Test that workflow runtime components are NOT initialized during Agent.create()."""
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -266,15 +266,15 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_metrics_runtime_components_initialized_during_setup(
-        self, mock_ollama_provider
-    ):
+    async def test_metrics_runtime_components_initialized_during_setup(self, mock_ollama_provider):
         """Test that metrics_collector is initialized during orchestrator setup.
 
         The metrics_collector is eagerly initialized because create_lifecycle_manager()
         accesses metrics_coordinator.metrics_collector during Agent.create().
         """
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -298,11 +298,11 @@ class TestRuntimeLazyInitialization:
                 await agent.close()
 
     @pytest.mark.asyncio
-    async def test_all_runtime_runtimes_exist(
-        self, mock_ollama_provider
-    ):
+    async def test_all_runtime_runtimes_exist(self, mock_ollama_provider):
         """Test that all runtime boundaries exist and have the expected structure."""
-        with patch("victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider):
+        with patch(
+            "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
+        ):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -317,7 +317,9 @@ class TestRuntimeLazyInitialization:
                 assert hasattr(orchestrator, "_memory_runtime"), "memory_runtime missing"
                 assert hasattr(orchestrator, "_metrics_runtime"), "metrics_runtime missing"
                 assert hasattr(orchestrator, "_workflow_runtime"), "workflow_runtime missing"
-                assert hasattr(orchestrator, "_coordination_runtime"), "coordination_runtime missing"
+                assert hasattr(
+                    orchestrator, "_coordination_runtime"
+                ), "coordination_runtime missing"
                 assert hasattr(orchestrator, "_interaction_runtime"), "interaction_runtime missing"
                 assert hasattr(orchestrator, "_resilience_runtime"), "resilience_runtime missing"
 

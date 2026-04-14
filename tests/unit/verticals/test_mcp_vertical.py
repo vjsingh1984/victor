@@ -71,6 +71,7 @@ class TestMCPVertical:
 
         # Create real async registry
         from victor.integrations.mcp.async_registry import AsyncMCPRegistry
+
         vertical._registry = AsyncMCPRegistry()
 
         await vertical.initialize(settings)
@@ -162,11 +163,7 @@ class TestMCPVertical:
         mock_registry.get_server = Mock(return_value=mock_server)
         vertical._registry = mock_registry
 
-        result = await vertical.call_mcp_tool(
-            "test-server",
-            "test_tool",
-            {"arg1": "value1"}
-        )
+        result = await vertical.call_mcp_tool("test-server", "test_tool", {"arg1": "value1"})
 
         assert result == {"result": "success"}
         mock_server.call_tool.assert_called_once_with("test_tool", {"arg1": "value1"})
@@ -242,14 +239,16 @@ class TestMCPKnowledgeContributor:
     @pytest.mark.asyncio
     async def test_get_prompt_sections_with_resources(self, contributor, vertical):
         """Test getting prompt sections with resources."""
-        vertical.get_mcp_resources = AsyncMock(return_value=[
-            {
-                "uri": "file:///test.txt",
-                "name": "test.txt",
-                "description": "A test file",
-                "server": "test-server",
-            }
-        ])
+        vertical.get_mcp_resources = AsyncMock(
+            return_value=[
+                {
+                    "uri": "file:///test.txt",
+                    "name": "test.txt",
+                    "description": "A test file",
+                    "server": "test-server",
+                }
+            ]
+        )
 
         sections = await contributor.get_prompt_sections(None)
 
@@ -260,13 +259,15 @@ class TestMCPKnowledgeContributor:
     @pytest.mark.asyncio
     async def test_get_prompt_sections_with_tools(self, contributor, vertical):
         """Test getting prompt sections with tools."""
-        vertical.get_mcp_tools = AsyncMock(return_value=[
-            {
-                "name": "test_tool",
-                "description": "A test tool",
-                "server": "test-server",
-            }
-        ])
+        vertical.get_mcp_tools = AsyncMock(
+            return_value=[
+                {
+                    "name": "test_tool",
+                    "description": "A test tool",
+                    "server": "test-server",
+                }
+            ]
+        )
 
         sections = await contributor.get_prompt_sections(None)
 
