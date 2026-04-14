@@ -154,9 +154,12 @@ class TestDeprecatedConstantDescriptor:
             call_count += 1
             return f"value_{call_count}"
 
+        # Use a unique message to avoid conflicts with other deprecation warnings
+        unique_msg = "TEST_CONSTANT_DEPRECATED_xyz123"
+
         descriptor = DeprecatedConstantDescriptor(
             constant_name="MY_CONSTANT",
-            deprecation_message="deprecated",
+            deprecation_message=unique_msg,
             loader=loader,
         )
 
@@ -166,7 +169,7 @@ class TestDeprecatedConstantDescriptor:
         # First access
         val1 = Container.const
         assert val1 == "value_1"
-        first_count = len([r for r in caplog.records if "deprecated" in r.message])
+        first_count = len([r for r in caplog.records if unique_msg in r.message])
         assert first_count == 1
 
         # Reset
@@ -175,7 +178,7 @@ class TestDeprecatedConstantDescriptor:
         # Access again should reload and warn again
         val2 = Container.const
         assert val2 == "value_2"
-        second_count = len([r for r in caplog.records if "deprecated" in r.message])
+        second_count = len([r for r in caplog.records if unique_msg in r.message])
         assert second_count == 2
 
     def test_loader_exception_propagates(self):
