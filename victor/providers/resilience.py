@@ -325,17 +325,24 @@ class ProviderRetryConfig:
 
     # Extended patterns that catch httpx transport errors by class name
     retryable_exception_names: tuple = (
+        "APIConnectionError",
         "RemoteProtocolError",
         "ProtocolError",
         "TransportError",
+        "ConnectTimeout",
         "ReadError",
+        "ReadTimeout",
         "ConnectError",
+        "WriteError",
     )
 
     retryable_status_codes: tuple = (429, 500, 502, 503, 504)
 
     # Retryable error message patterns
     retryable_patterns: tuple = (
+        r"connection.?error",
+        r"connection.?reset",
+        r"bad.?record.?mac",
         r"rate.?limit",
         r"overloaded",
         r"capacity",
@@ -459,32 +466,40 @@ class ProviderRetryStrategy:
         Returns:
             True if error should be retried
         """
-        # Check exception type
-        if isinstance(error, self.config.retryable_exceptions):
-            return True
+        seen: set[int] = set()
+        current: Optional[BaseException] = error
 
-        # Check exception class name (catches httpx.RemoteProtocolError etc.
-        # without requiring httpx as a dependency of the resilience module)
-        error_class = type(error).__name__
-        if hasattr(self.config, "retryable_exception_names"):
-            for name in self.config.retryable_exception_names:
-                if error_class == name:
-                    return True
-            # Also check parent classes
-            for parent in type(error).__mro__:
-                if parent.__name__ in self.config.retryable_exception_names:
-                    return True
+        while isinstance(current, Exception) and id(current) not in seen:
+            seen.add(id(current))
 
-        # Check error message patterns
-        error_str = str(error).lower()
-        for pattern in self._compiled_patterns:
-            if pattern.search(error_str):
+            # Check exception type
+            if isinstance(current, self.config.retryable_exceptions):
                 return True
 
-        # Check for status code in error
-        for status_code in self.config.retryable_status_codes:
-            if str(status_code) in error_str:
-                return True
+            # Check exception class name (catches httpx/openai transport errors
+            # without requiring those libraries as direct dependencies here)
+            error_class = type(current).__name__
+            if hasattr(self.config, "retryable_exception_names"):
+                for name in self.config.retryable_exception_names:
+                    if error_class == name:
+                        return True
+                # Also check parent classes
+                for parent in type(current).__mro__:
+                    if parent.__name__ in self.config.retryable_exception_names:
+                        return True
+
+            # Check error message patterns
+            error_str = str(current).lower()
+            for pattern in self._compiled_patterns:
+                if pattern.search(error_str):
+                    return True
+
+            # Check for status code in error
+            for status_code in self.config.retryable_status_codes:
+                if str(status_code) in error_str:
+                    return True
+
+            current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
 
         return False
 

@@ -466,6 +466,36 @@ class TestRetryStrategy:
         assert attempts[0] == 2
         assert sleeps == [0.1]
 
+    @pytest.mark.asyncio
+    async def test_retries_openai_api_connection_error(self, retry, monkeypatch):
+        """OpenAI API transport errors should be retried."""
+        import httpx
+        from openai import APIConnectionError
+
+        attempts = [0]
+        sleeps: list[float] = []
+
+        async def flaky():
+            attempts[0] += 1
+            if attempts[0] == 1:
+                error = APIConnectionError(
+                    request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+                )
+                error.__cause__ = OSError("connection reset by peer")
+                raise error
+            return "ok"
+
+        async def fake_sleep(delay: float) -> None:
+            sleeps.append(delay)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await retry.execute(flaky)
+
+        assert result == "ok"
+        assert attempts[0] == 2
+        assert len(sleeps) == 1
+
 
 # =============================================================================
 # Rate Limiter Tests

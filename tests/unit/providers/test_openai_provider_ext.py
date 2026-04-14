@@ -15,13 +15,18 @@
 """Comprehensive tests for OpenAI provider."""
 
 import json
+import ssl
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import httpx
+from openai import APIConnectionError
 
 from victor.providers.openai_provider import OpenAIProvider
 from victor.providers.base import (
     Message,
     ToolDefinition,
+    ProviderConnectionError,
     ProviderError,
     ProviderAuthError,
     ProviderRateLimitError,
@@ -353,6 +358,35 @@ async def test_chat_generic_error(openai_provider):
             )
 
         assert "openai API error" in str(exc_info.value)
+        assert exc_info.value.provider == "openai"
+
+
+@pytest.mark.asyncio
+async def test_chat_connection_error(openai_provider):
+    """Transport failures should surface as connection errors."""
+    connection_error = APIConnectionError(
+        request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    )
+    connection_error.__cause__ = ssl.SSLError(
+        "[SSL: SSLV3_ALERT_BAD_RECORD_MAC] sslv3 alert bad record mac (_ssl.c:2559)"
+    )
+
+    with patch.object(
+        openai_provider.client.chat.completions,
+        "create",
+        new_callable=AsyncMock,
+    ) as mock_create:
+        mock_create.side_effect = connection_error
+
+        messages = [Message(role="user", content="Hello")]
+
+        with pytest.raises(ProviderConnectionError) as exc_info:
+            await openai_provider.chat(
+                messages=messages,
+                model="gpt-4",
+            )
+
+        assert "Connection failed" in str(exc_info.value)
         assert exc_info.value.provider == "openai"
 
 

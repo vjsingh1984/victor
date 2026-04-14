@@ -15,6 +15,7 @@
 """Base provider interface for LLM providers."""
 
 import logging
+import ssl
 from abc import ABC, abstractmethod
 from typing import (
     Any,
@@ -397,6 +398,64 @@ class BaseProvider(ABC):
             return self._circuit_breaker.get_stats()
         return None
 
+    def _iter_exception_chain(self, error: Exception) -> List[Exception]:
+        """Yield the wrapped exception chain without looping forever."""
+        chain: List[Exception] = []
+        seen: set[int] = set()
+        current: Optional[BaseException] = error
+
+        while isinstance(current, Exception) and id(current) not in seen:
+            chain.append(current)
+            seen.add(id(current))
+            current = (
+                getattr(current, "__cause__", None)
+                or getattr(current, "__context__", None)
+                or getattr(current, "cause", None)
+            )
+
+        return chain
+
+    def _is_connection_error_like(self, error: Exception) -> bool:
+        """Check whether an exception looks like a transient transport failure."""
+        connection_exception_names = {
+            "APIConnectionError",
+            "ConnectError",
+            "ConnectTimeout",
+            "ReadError",
+            "ReadTimeout",
+            "RemoteProtocolError",
+            "TransportError",
+            "WriteError",
+        }
+        connection_tokens = (
+            "bad record mac",
+            "broken pipe",
+            "connection aborted",
+            "connection error",
+            "connection refused",
+            "connection reset",
+            "remote protocol error",
+            "server disconnected",
+            "ssl",
+            "tls",
+        )
+
+        for candidate in self._iter_exception_chain(error):
+            if isinstance(candidate, (ConnectionError, ssl.SSLError)):
+                return True
+
+            if any(
+                parent.__name__ in connection_exception_names
+                for parent in type(candidate).__mro__
+            ):
+                return True
+
+            candidate_str = str(candidate).lower()
+            if any(token in candidate_str for token in connection_tokens):
+                return True
+
+        return False
+
     def classify_error(self, error: Exception) -> ProviderError:
         """Classify a raw exception into the appropriate ProviderError subtype.
 
@@ -458,6 +517,13 @@ class BaseProvider(ABC):
                     status_code=429,
                     raw_error=error,
                 )
+
+        if self._is_connection_error_like(error):
+            return ProviderConnectionError(
+                message=f"Connection failed: {error}",
+                provider=self.name,
+                raw_error=error,
+            )
 
         # Tier 2: String-based classification (deprecated — providers should use
         # proper exception types or HTTP status codes instead)
