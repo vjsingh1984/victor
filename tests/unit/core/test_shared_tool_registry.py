@@ -265,6 +265,19 @@ class TestSharedToolRegistryWithToolRegistrar:
             # Discovery should only be called once
             assert mock_discover.call_count == 1
 
+    def test_graph_tool_is_discovered_for_registration(self):
+        """Graph tool should be present in shared discovery for orchestrators."""
+        from victor.agent.shared_tool_registry import SharedToolRegistry
+
+        SharedToolRegistry.reset_instance()
+        registry = SharedToolRegistry.get_instance()
+
+        tool_names = registry.get_tool_names()
+        decorated_tools = registry.get_decorated_tools()
+
+        assert "graph" in tool_names
+        assert "graph" in decorated_tools
+
 
 class TestSharedToolRegistryAirgappedMode:
     """Tests for airgapped mode filtering in SharedToolRegistry."""

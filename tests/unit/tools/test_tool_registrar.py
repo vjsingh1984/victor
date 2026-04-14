@@ -33,6 +33,7 @@ from victor.agent.tool_registrar import (
     ToolRegistrarConfig,
     RegistrationStats,
 )
+from victor.tools.registry import ToolRegistry
 
 
 class TestToolRegistrarConfig:
@@ -226,6 +227,20 @@ class TestDynamicToolRegistration:
 
         # Should return a count >= 0
         assert count >= 0
+
+    def test_register_dynamic_tools_includes_graph_tool(self):
+        """Dynamic tool registration should include the graph tool."""
+        settings = MagicMock()
+        settings.load_tool_config.return_value = {}
+        registrar = ToolRegistrar(
+            tools=ToolRegistry(),
+            settings=settings,
+        )
+
+        count = registrar._register_dynamic_tools()
+
+        assert count > 0
+        assert registrar.tools.get("graph") is not None
 
     def test_excluded_files(self, registrar):
         """Test that excluded files are not loaded."""

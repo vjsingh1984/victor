@@ -6,6 +6,7 @@
 """Tests for benchmark git timeout helper and pre-warm timeout."""
 
 import asyncio
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -47,3 +48,59 @@ class TestRunGitWithTimeout:
 
         # Verify we can still proceed after timeout
         assert True
+
+
+class TestCodeIntelligencePrewarm:
+    @pytest.mark.asyncio
+    async def test_prewarm_success_caches_graph_stats(self, tmp_path: Path):
+        from victor.ui.commands.benchmark import _prewarm_code_intelligence_index
+
+        warmed = {}
+        fake_graph_store = MagicMock()
+        fake_graph_store.stats = AsyncMock(return_value={"nodes": 12, "edges": 34})
+        fake_index = MagicMock(graph_store=fake_graph_store)
+
+        async def fake_get_or_build_index(*args, **kwargs):
+            return fake_index, False
+
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.tools.code_search_tool._get_or_build_index",
+                side_effect=fake_get_or_build_index,
+            ) as mock_get,
+        ):
+            first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+            second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+
+        assert first.status == "ready"
+        assert first.graph_nodes == 12
+        assert first.graph_edges == 34
+        assert second.cached_hit is True
+        assert second.status == "ready"
+        assert mock_get.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_prewarm_failure_is_cached_for_repo(self, tmp_path: Path):
+        from victor.ui.commands.benchmark import _prewarm_code_intelligence_index
+
+        warmed = {}
+
+        async def fake_get_or_build_index(*args, **kwargs):
+            raise RuntimeError("missing embedding dependency")
+
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.tools.code_search_tool._get_or_build_index",
+                side_effect=fake_get_or_build_index,
+            ) as mock_get,
+        ):
+            first = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+            second = await _prewarm_code_intelligence_index(tmp_path, warmed, timeout=1.0)
+
+        assert first.status == "failed"
+        assert "missing embedding dependency" in first.message
+        assert second.cached_hit is True
+        assert second.status == "failed"
+        assert mock_get.call_count == 1

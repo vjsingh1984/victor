@@ -34,9 +34,10 @@ import json
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,98 @@ benchmark_app = typer.Typer(
     help="Run AI coding benchmarks and compare against other frameworks.",
 )
 console = Console()
+
+
+@dataclass(frozen=True)
+class CodeIntelligencePrewarmResult:
+    """Outcome of benchmark code-intelligence prewarm for a repo."""
+
+    status: str
+    message: str
+    cached_hit: bool = False
+    graph_nodes: int = 0
+    graph_edges: int = 0
+
+
+async def _prewarm_code_intelligence_index(
+    work_dir: Optional[Path],
+    warmed_repos: Dict[str, CodeIntelligencePrewarmResult],
+    *,
+    timeout: float = 300.0,
+) -> CodeIntelligencePrewarmResult:
+    """Prewarm the shared code-search/graph index for a benchmark workspace."""
+    if work_dir is None:
+        return CodeIntelligencePrewarmResult(
+            status="skipped",
+            message="  [yellow]Code intelligence pre-warm skipped: workspace unavailable[/]",
+        )
+
+    repo_key = str(work_dir.resolve())
+    cached = warmed_repos.get(repo_key)
+    if cached is not None:
+        if cached.status == "ready":
+            message = "  Code search index pre-warmed (cached)"
+        elif cached.status == "timeout":
+            message = "  [yellow]Skipping index pre-warm after previous timeout[/]"
+        else:
+            message = "  [yellow]Skipping index pre-warm after previous failure[/]"
+        return CodeIntelligencePrewarmResult(
+            status=cached.status,
+            message=message,
+            cached_hit=True,
+            graph_nodes=cached.graph_nodes,
+            graph_edges=cached.graph_edges,
+        )
+
+    try:
+        from victor.config.settings import load_settings
+        from victor.tools.code_search_tool import _get_or_build_index
+
+        prewarm_settings = load_settings()
+        index, _rebuilt = await asyncio.wait_for(
+            _get_or_build_index(work_dir, prewarm_settings, force_reindex=False),
+            timeout=timeout,
+        )
+
+        graph_nodes = 0
+        graph_edges = 0
+        graph_store = getattr(index, "graph_store", None)
+        if graph_store is not None:
+            try:
+                stats = await graph_store.stats()
+                graph_nodes = int(stats.get("nodes", 0) or 0)
+                graph_edges = int(stats.get("edges", 0) or 0)
+            except Exception as exc:
+                logger.debug("Graph stats unavailable during prewarm: %s", exc)
+
+        message = "  Code search index pre-warmed"
+        if graph_nodes or graph_edges:
+            message += f" ({graph_nodes} graph nodes, {graph_edges} graph edges)"
+
+        result = CodeIntelligencePrewarmResult(
+            status="ready",
+            message=message,
+            graph_nodes=graph_nodes,
+            graph_edges=graph_edges,
+        )
+        warmed_repos[repo_key] = result
+        return result
+    except asyncio.TimeoutError:
+        logger.warning("Index pre-warm timed out after %.0fs, code_search may be slow", timeout)
+        result = CodeIntelligencePrewarmResult(
+            status="timeout",
+            message="  [yellow]Code search index pre-warm timed out[/]",
+        )
+        warmed_repos[repo_key] = result
+        return result
+    except Exception as exc:
+        logger.debug("Index pre-warm failed: %s", exc)
+        result = CodeIntelligencePrewarmResult(
+            status="failed",
+            message=f"  [yellow]Code search index pre-warm skipped: {exc}[/]",
+        )
+        warmed_repos[repo_key] = result
+        return result
 
 
 def _configure_log_level(
@@ -290,7 +383,6 @@ def run_benchmark(
 
     # Load profile to get model if not specified
     effective_model = model
-    effective_provider = None
     if not effective_model:
         settings = Settings()
         try:
@@ -299,7 +391,6 @@ def run_benchmark(
             if profile_config:
                 # ProfileConfig is a Pydantic model with .model attribute
                 effective_model = profile_config.model
-                effective_provider = profile_config.provider
             else:
                 console.print(
                     f"[yellow]Warning:[/] Profile '{profile}' not found, using default model"
@@ -666,7 +757,7 @@ async def _run_benchmark_async(
                 )
             workspace_manager = SWEBenchWorkspaceManager()
 
-            _warmed_repos: set = set()  # Track repos that have been pre-warmed this session
+            _warmed_repos: Dict[str, CodeIntelligencePrewarmResult] = {}
 
             async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
                 """Run agent on task and return generated code with metrics."""
@@ -701,35 +792,15 @@ async def _run_benchmark_async(
                         except asyncio.TimeoutError:
                             console.print(f"  [yellow]Git command timed out: {git_cmd[1]}[/]")
 
-                # Pre-warm code_search index BEFORE task timer starts.
+                # Pre-warm code_search/graph index BEFORE task timer starts.
                 # This is a fixed cost — NOT deducted from the per-task timeout.
-                # Only do full pre-warm once per repo; subsequent tasks skip.
-                repo_key = str(work_dir) if work_dir else ""
-                if repo_key in _warmed_repos:
-                    logger.info(
-                        "Index already warmed for %s, skipping pre-warm",
-                        work_dir.name if work_dir else "?",
-                    )
-                    console.print("  Code search index pre-warmed (cached)")
-                else:
-                    try:
-                        from victor.tools.code_search_tool import _get_or_build_index
-                        from victor.config.settings import load_settings
-
-                        _prewarm_settings = load_settings()
-                        await asyncio.wait_for(
-                            _get_or_build_index(work_dir, _prewarm_settings, force_reindex=False),
-                            timeout=300,  # Allow up to 5 min — outside task timer
-                        )
-                        _warmed_repos.add(repo_key)
-                        console.print("  Code search index pre-warmed")
-                    except asyncio.TimeoutError:
-                        logger.warning(
-                            "Index pre-warm timed out after 300s, code_search may be slow"
-                        )
-                        _warmed_repos.add(repo_key)  # Don't retry on next task
-                    except Exception as e:
-                        logger.debug(f"Index pre-warm skipped: {e}")
+                prewarm_result = await _prewarm_code_intelligence_index(
+                    work_dir,
+                    _warmed_repos,
+                    timeout=300.0,
+                )
+                if prewarm_result.message:
+                    console.print(prewarm_result.message)
 
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
@@ -1280,7 +1351,7 @@ def _show_compliance_scorecard() -> None:
         )
         table.add_row(f"{status} {name}", f"{pct}%", f"{target}%")
 
-    console.print(f"\n")
+    console.print("\n")
     console.print(table)
 
     # Efficiency scaling: tool calls per session over time
