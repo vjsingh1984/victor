@@ -607,12 +607,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._session_coordinator = self._interaction_runtime.session_coordinator
 
     def _initialize_services(self) -> None:
-        """Resolve service adapters from DI container when USE_SERVICE_LAYER flag is enabled.
+        """Initialize service layer by registering coordinators and bootstrapping services.
 
-        This implements the Strangler Fig pattern: when the flag is on, orchestrator
-        methods delegate to service adapters (which wrap coordinators) instead of
-        calling coordinators directly. When the flag is off, services are None and
-        methods fall through to coordinators as before.
+        This implements the Strangler Fig pattern:
+        1. Register coordinators in the container (for service dependencies)
+        2. Bootstrap services using the registered coordinators
+        3. Resolve service instances from the container
+
+        When USE_SERVICE_LAYER flag is enabled, orchestrator methods delegate to
+        services instead of calling coordinators directly. When disabled, services
+        are None and methods fall through to coordinators as before.
         """
         from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
@@ -626,6 +630,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._context_service = None
             return
 
+        # Register coordinators in container for service dependencies
+        self._register_coordinators_for_services()
+
+        # Bootstrap services using the registered coordinators
+        self._bootstrap_service_layer()
+
+        # Resolve service instances from container
         from victor.agent.services.protocols import (
             ChatServiceProtocol,
             ToolServiceProtocol,
@@ -645,6 +656,53 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._session_service is not None,
             self._context_service is not None,
         )
+
+    def _register_coordinators_for_services(self) -> None:
+        """Register coordinators in the container for service layer dependencies.
+
+        Services need access to coordinators through the container. This method
+        registers the coordinator protocols so services can resolve them.
+        """
+        from victor.agent.protocols import (
+            ConversationControllerProtocol,
+            StreamingCoordinatorProtocol,
+        )
+        from victor.core.container import ServiceLifetime
+
+        # Register conversation controller if not already registered
+        if not self._container.is_registered(ConversationControllerProtocol):
+            self._container.register(
+                ConversationControllerProtocol,
+                lambda c: self._conversation_controller,
+                ServiceLifetime.SINGLETON,
+            )
+
+        # Register streaming coordinator if not already registered
+        if not self._container.is_registered(StreamingCoordinatorProtocol):
+            self._container.register(
+                StreamingCoordinatorProtocol,
+                lambda c: self._interaction_runtime.streaming_controller,
+                ServiceLifetime.SINGLETON,
+            )
+
+        logger.debug("Registered coordinators in container for service layer")
+
+    def _bootstrap_service_layer(self) -> None:
+        """Bootstrap the service layer using registered coordinators.
+
+        This creates and registers all services (ChatService, ToolService, etc.)
+        using the coordinators that were registered in the container.
+        """
+        from victor.core.bootstrap_services import bootstrap_new_services
+
+        # Bootstrap services with the registered coordinators
+        bootstrap_new_services(
+            self._container,
+            conversation_controller=self._conversation_controller,
+            streaming_coordinator=self._interaction_runtime.streaming_controller,
+        )
+
+        logger.debug("Bootstrapped service layer")
 
     def __init__(
         self,
