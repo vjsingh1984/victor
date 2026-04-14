@@ -55,8 +55,9 @@ def bootstrap_new_services(
     """Bootstrap all new services with the container.
 
     This function creates and registers all the new service-oriented
-    implementations (ChatService, ToolService, etc.) when their
-    respective feature flags are enabled.
+    implementations (ChatService, ToolService, etc.). Services are
+    always created for availability, but the orchestrator only uses
+    them when USE_SERVICE_LAYER flag is enabled.
 
     Args:
         container: Service container to register services with
@@ -82,23 +83,6 @@ def bootstrap_new_services(
 
     feature_flags = get_feature_flag_manager()
 
-    # Check if any new services should be bootstrapped
-    has_new_services = any(
-        [
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE),
-        ]
-    )
-
-    if not has_new_services:
-        logger.info("No new service feature flags enabled, skipping bootstrap")
-        return
-
     # Import service protocols and implementations
     from victor.agent.services.protocols import (
         ChatServiceProtocol,
@@ -112,56 +96,51 @@ def bootstrap_new_services(
     # Create service dependencies first (lower-level services)
     services_created: Dict[str, Any] = {}
 
-    # Bootstrap ContextService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE):
-        context_service = _create_context_service(container)
-        services_created["context"] = context_service
-        container.register(
-            ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON
-        )
-        logger.info("Bootstrapped ContextService")
+    # Bootstrap ContextService (always create, used conditionally by orchestrator)
+    context_service = _create_context_service(container)
+    services_created["context"] = context_service
+    container.register(
+        ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON
+    )
+    logger.info("Bootstrapped ContextService")
 
-    # Bootstrap ProviderService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE):
-        provider_service = _create_provider_service(container)
-        services_created["provider"] = provider_service
-        container.register(
-            ProviderServiceProtocol,
-            lambda c: provider_service,
-            ServiceLifetime.SINGLETON,
-        )
-        logger.info("Bootstrapped ProviderService")
+    # Bootstrap ProviderService (always create)
+    provider_service = _create_provider_service(container)
+    services_created["provider"] = provider_service
+    container.register(
+        ProviderServiceProtocol,
+        lambda c: provider_service,
+        ServiceLifetime.SINGLETON,
+    )
+    logger.info("Bootstrapped ProviderService")
 
-    # Bootstrap RecoveryService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE):
-        recovery_service = _create_recovery_service(container)
-        services_created["recovery"] = recovery_service
-        container.register(
-            RecoveryServiceProtocol,
-            lambda c: recovery_service,
-            ServiceLifetime.SINGLETON,
-        )
-        logger.info("Bootstrapped RecoveryService")
+    # Bootstrap RecoveryService (always create)
+    recovery_service = _create_recovery_service(container)
+    services_created["recovery"] = recovery_service
+    container.register(
+        RecoveryServiceProtocol,
+        lambda c: recovery_service,
+        ServiceLifetime.SINGLETON,
+    )
+    logger.info("Bootstrapped RecoveryService")
 
-    # Bootstrap ToolService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE):
-        tool_service = _create_tool_service(
-            container,
-            tool_selector=tool_selector,
-            tool_executor=tool_executor,
-        )
-        services_created["tool"] = tool_service
-        container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
-        logger.info("Bootstrapped ToolService")
+    # Bootstrap ToolService (always create)
+    tool_service = _create_tool_service(
+        container,
+        tool_selector=tool_selector,
+        tool_executor=tool_executor,
+    )
+    services_created["tool"] = tool_service
+    container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
+    logger.info("Bootstrapped ToolService")
 
-    # Bootstrap SessionService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE):
-        session_service = _create_session_service(container)
-        services_created["session"] = session_service
-        container.register(
-            SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON
-        )
-        logger.info("Bootstrapped SessionService")
+    # Bootstrap SessionService (always create)
+    session_service = _create_session_service(container)
+    services_created["session"] = session_service
+    container.register(
+        SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON
+    )
+    logger.info("Bootstrapped SessionService")
 
     # Bootstrap decision service — prefer tiered (edge+balanced+performance),
     # fall back to single edge, then cloud
@@ -195,19 +174,18 @@ def bootstrap_new_services(
             ServiceLifetime.SINGLETON,
         )
 
-    # Bootstrap ChatService if enabled (depends on other services)
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-        chat_service = _create_chat_service(
-            container,
-            conversation_controller=conversation_controller,
-            streaming_coordinator=streaming_coordinator,
-            provider_service=services_created.get("provider"),
-            tool_service=services_created.get("tool"),
-            context_service=services_created.get("context"),
-            recovery_service=services_created.get("recovery"),
-        )
-        container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
-        logger.info("Bootstrapped ChatService")
+    # Bootstrap ChatService (always create - depends on other services)
+    chat_service = _create_chat_service(
+        container,
+        conversation_controller=conversation_controller,
+        streaming_coordinator=streaming_coordinator,
+        provider_service=services_created.get("provider"),
+        tool_service=services_created.get("tool"),
+        context_service=services_created.get("context"),
+        recovery_service=services_created.get("recovery"),
+    )
+    container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
+    logger.info("Bootstrapped ChatService")
 
 
 def _create_context_service(container: ServiceContainer) -> "ContextService":
