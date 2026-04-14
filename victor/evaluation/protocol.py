@@ -255,6 +255,8 @@ class TaskResult:
     cost_usd_micros: int = 0  # Direct API cost (xAI)
     tool_calls: int = 0
     turns: int = 0
+    code_search_calls: int = 0
+    graph_calls: int = 0
 
     # Code quality metrics
     code_quality: Optional[CodeQualityMetrics] = None
@@ -301,6 +303,26 @@ class TaskResult:
             return 0.0
         # Score based on success per 1K tokens
         return (self.completion_score * 1000) / self.tokens_used
+
+    @property
+    def code_intelligence_calls(self) -> int:
+        """Combined `code_search` and `graph` calls."""
+        return self.code_search_calls + self.graph_calls
+
+    @property
+    def used_code_search(self) -> bool:
+        """Whether the task used `code_search` at least once."""
+        return self.code_search_calls > 0
+
+    @property
+    def used_graph(self) -> bool:
+        """Whether the task used `graph` at least once."""
+        return self.graph_calls > 0
+
+    @property
+    def used_code_intelligence(self) -> bool:
+        """Whether the task used either `code_search` or `graph`."""
+        return self.code_intelligence_calls > 0
 
     def calculate_completion_score(self) -> float:
         """Calculate partial completion score based on tests and quality."""
@@ -417,6 +439,31 @@ class EvaluationResult:
         """Total tool calls made."""
         return sum(r.tool_calls for r in self.task_results)
 
+    @property
+    def total_code_search_calls(self) -> int:
+        """Total `code_search` calls across all tasks."""
+        return sum(r.code_search_calls for r in self.task_results)
+
+    @property
+    def total_graph_calls(self) -> int:
+        """Total `graph` calls across all tasks."""
+        return sum(r.graph_calls for r in self.task_results)
+
+    @property
+    def tasks_using_code_search(self) -> int:
+        """Number of tasks that used `code_search`."""
+        return sum(1 for r in self.task_results if r.used_code_search)
+
+    @property
+    def tasks_using_graph(self) -> int:
+        """Number of tasks that used `graph`."""
+        return sum(1 for r in self.task_results if r.used_graph)
+
+    @property
+    def tasks_using_code_intelligence(self) -> int:
+        """Number of tasks that used `code_search` or `graph`."""
+        return sum(1 for r in self.task_results if r.used_code_intelligence)
+
     def get_by_status(self, status: TaskStatus) -> list[TaskResult]:
         """Get results by status."""
         return [r for r in self.task_results if r.status == status]
@@ -431,6 +478,9 @@ class EvaluationResult:
         cached = sum(r.cached_tokens for r in self.task_results)
         reasoning = sum(r.reasoning_tokens for r in self.task_results)
         cost_micros = sum(r.cost_usd_micros for r in self.task_results)
+        code_search_calls = self.total_code_search_calls
+        graph_calls = self.total_graph_calls
+        code_intelligence_tasks = self.tasks_using_code_intelligence
         return {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
@@ -441,6 +491,13 @@ class EvaluationResult:
             "duration_seconds": self.duration_seconds,
             "total_tokens": self.total_tokens,
             "total_tool_calls": self.total_tool_calls,
+            "total_code_search_calls": code_search_calls,
+            "total_graph_calls": graph_calls,
+            "total_code_intelligence_calls": code_search_calls + graph_calls,
+            "tasks_using_code_search": self.tasks_using_code_search,
+            "tasks_using_graph": self.tasks_using_graph,
+            "tasks_using_code_intelligence": code_intelligence_tasks,
+            "code_intelligence_task_coverage": code_intelligence_tasks / max(1, self.total_tasks),
             "avg_tokens_per_task": self.total_tokens / max(1, self.total_tasks),
             "avg_duration_per_task": self.duration_seconds / max(1, self.total_tasks),
             # Extended token metrics

@@ -17,7 +17,10 @@
 import pytest
 
 from victor.evaluation import (
+    BenchmarkType,
     CodeQualityMetrics,
+    EvaluationConfig,
+    EvaluationResult,
     TaskResult,
     TaskStatus,
     pass_at_k,
@@ -263,6 +266,60 @@ class TestTaskResult:
 
         score = result.calculate_completion_score()
         assert 0.5 < score < 1.0  # Should have good score
+
+    def test_code_intelligence_usage_flags(self):
+        """TaskResult should expose code-search/graph usage flags."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.PASSED,
+            code_search_calls=2,
+            graph_calls=1,
+        )
+
+        assert result.code_intelligence_calls == 3
+        assert result.used_code_search is True
+        assert result.used_graph is True
+        assert result.used_code_intelligence is True
+
+
+class TestEvaluationResult:
+    """Tests for EvaluationResult aggregate metrics."""
+
+    def test_get_metrics_includes_code_intelligence_usage(self):
+        """Aggregate metrics should include code-search/graph usage counts and coverage."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.HUMAN_EVAL,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    tool_calls=5,
+                    code_search_calls=2,
+                    graph_calls=1,
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    tool_calls=1,
+                    code_search_calls=0,
+                    graph_calls=0,
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["total_tool_calls"] == 6
+        assert metrics["total_code_search_calls"] == 2
+        assert metrics["total_graph_calls"] == 1
+        assert metrics["total_code_intelligence_calls"] == 3
+        assert metrics["tasks_using_code_search"] == 1
+        assert metrics["tasks_using_graph"] == 1
+        assert metrics["tasks_using_code_intelligence"] == 1
+        assert metrics["code_intelligence_task_coverage"] == pytest.approx(0.5)
 
 
 class TestPassAtKResult:

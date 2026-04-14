@@ -527,6 +527,8 @@ class EvaluationHarness:
                     "tokens_output": r.tokens_output,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
                     "error_message": r.error_message,
                     "generated_code": r.generated_code,
@@ -576,6 +578,8 @@ class EvaluationHarness:
                     tokens_output=r.get("tokens_output", 0),
                     tool_calls=r.get("tool_calls", 0),
                     turns=r.get("turns", 0),
+                    code_search_calls=r.get("code_search_calls", 0),
+                    graph_calls=r.get("graph_calls", 0),
                     completion_score=r.get("completion_score"),
                     error_message=r.get("error_message"),
                     generated_code=r.get("generated_code"),
@@ -914,6 +918,8 @@ class EvaluationHarness:
                     task_result.tokens_used = partial_data.get("tokens_used", 0)
                     task_result.tool_calls = partial_data.get("tool_calls", 0)
                     task_result.turns = partial_data.get("turns", 0)
+                    task_result.code_search_calls = partial_data.get("code_search_calls", 0)
+                    task_result.graph_calls = partial_data.get("graph_calls", 0)
                     task_result.generated_code = partial_data.get("code", "")
                     logger.info(
                         f"Task timed out - partial metrics recovered: "
@@ -933,6 +939,8 @@ class EvaluationHarness:
                 task_result.tokens_used = agent_output.get("tokens_used", 0)
                 task_result.tool_calls = agent_output.get("tool_calls", 0)
                 task_result.turns = agent_output.get("turns", 0)
+                task_result.code_search_calls = agent_output.get("code_search_calls", 0)
+                task_result.graph_calls = agent_output.get("graph_calls", 0)
                 agent_output = agent_output.get("code", "")
 
             # Self-correction loop (if enabled)
@@ -1173,6 +1181,8 @@ class EvaluationHarness:
                     "tokens_output": r.tokens_output,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
                     "code_quality": (
                         {

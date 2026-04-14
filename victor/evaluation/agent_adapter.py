@@ -30,6 +30,7 @@ import asyncio
 import logging
 import os
 import time
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
@@ -119,6 +120,15 @@ class BenchmarkToolReadiness:
     def ready(self) -> bool:
         """Whether all required tools are present and enabled."""
         return not self.missing_tools and not self.disabled_tools
+
+
+def _summarize_eval_tool_calls(tool_calls: List[EvalToolCall]) -> Dict[str, int]:
+    """Summarize tool usage counts for benchmark telemetry."""
+    counts = Counter(call.name for call in tool_calls)
+    return {
+        "code_search_calls": int(counts.get("code_search", 0)),
+        "graph_calls": int(counts.get("graph", 0)),
+    }
 
 
 class VictorAgentAdapter:
@@ -399,6 +409,7 @@ class VictorAgentAdapter:
             "turns": self._turns,
             "file_edits": len(self._file_edits),
             "files_modified": [e.get("path", "") for e in self._file_edits[:10]],
+            **_summarize_eval_tool_calls(self._tool_calls),
         }
 
     def reset(self) -> None:

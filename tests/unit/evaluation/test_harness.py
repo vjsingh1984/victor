@@ -439,6 +439,71 @@ class TestGenerateReports:
         assert "claude-3-sonnet" in report
 
 
+class TestBenchmarkToolUsageMetrics:
+    """Tests for benchmark tool-usage telemetry persistence and mapping."""
+
+    @pytest.mark.asyncio
+    async def test_run_single_task_maps_code_intelligence_metrics(self):
+        """Dict-returning agent callbacks should populate code-search/graph metrics."""
+        harness = EvaluationHarness()
+        runner = MockBenchmarkRunner()
+        task = BenchmarkTask(
+            task_id="task-1",
+            benchmark=BenchmarkType.CUSTOM,
+            description="Test task",
+        )
+        config = EvaluationConfig(
+            benchmark=BenchmarkType.CUSTOM,
+            model="test-model",
+        )
+
+        async def agent_callback(_task):
+            return {
+                "code": "print('hi')",
+                "tokens_input": 10,
+                "tokens_output": 20,
+                "tokens_used": 30,
+                "tool_calls": 4,
+                "turns": 2,
+                "code_search_calls": 2,
+                "graph_calls": 1,
+            }
+
+        result = await harness._run_single_task(task, runner, agent_callback, config)
+
+        assert result.tool_calls == 4
+        assert result.turns == 2
+        assert result.code_search_calls == 2
+        assert result.graph_calls == 1
+
+    def test_save_results_persists_code_intelligence_metrics(self, tmp_path):
+        """Saved benchmark result JSON should include per-task tool telemetry."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.HUMAN_EVAL,
+                model="test",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.PASSED,
+                    tool_calls=3,
+                    code_search_calls=2,
+                    graph_calls=1,
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["summary"]["total_code_search_calls"] == 2
+        assert loaded["summary"]["total_graph_calls"] == 1
+        assert loaded["tasks"][0]["code_search_calls"] == 2
+        assert loaded["tasks"][0]["graph_calls"] == 1
+
+
 class TestSaveAndLoadResults:
     """Tests for saving and loading evaluation results."""
 

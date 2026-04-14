@@ -476,6 +476,14 @@ def run_benchmark(
     results_table.add_row("Pass Rate", f"[bold]{metrics['pass_rate']:.1%}[/]")
     results_table.add_row("Duration", f"{metrics['duration_seconds']:.1f}s")
     results_table.add_row("Total Tokens", f"{metrics['total_tokens']:,}")
+    results_table.add_row("Tool Calls", f"{metrics['total_tool_calls']:,}")
+    results_table.add_row("Code Search Calls", f"{metrics['total_code_search_calls']:,}")
+    results_table.add_row("Graph Calls", f"{metrics['total_graph_calls']:,}")
+    results_table.add_row(
+        "Code Intel Coverage",
+        f"{metrics['tasks_using_code_intelligence']}/{metrics['total_tasks']}"
+        f" ({metrics['code_intelligence_task_coverage']:.1%})",
+    )
 
     # Extended token metrics (if available)
     cached = metrics.get("cached_tokens", 0)
@@ -550,6 +558,9 @@ def run_benchmark(
                     "tests_passed": r.tests_passed,
                     "tests_total": r.tests_total,
                     "duration": r.duration_seconds,
+                    "tool_calls": r.tool_calls,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                 }
                 for r in result.task_results
             ],
@@ -882,6 +893,8 @@ async def _run_benchmark_async(
                     "tokens_used": trace.token_usage.total_tokens,
                     "tool_calls": len(trace.tool_calls),
                     "turns": trace.turns,
+                    "code_search_calls": trace.code_search_calls,
+                    "graph_calls": trace.graph_calls,
                 }
 
         except Exception as e:

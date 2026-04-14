@@ -27,6 +27,7 @@ import logging
 import re
 import time
 from abc import ABC, abstractmethod
+from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -141,6 +142,32 @@ class AgenticExecutionTrace:
         """Alias for turns (for compatibility with orchestrator)."""
         return self.turns
 
+    def count_tool_calls(self, *tool_names: str) -> int:
+        """Count tool calls matching one or more tool names."""
+        if not tool_names:
+            return self.total_tool_calls
+        requested = set(tool_names)
+        return sum(1 for call in self.tool_calls if call.name in requested)
+
+    def tool_usage_counts(self) -> dict[str, int]:
+        """Return tool call counts by tool name."""
+        return dict(Counter(call.name for call in self.tool_calls))
+
+    @property
+    def code_search_calls(self) -> int:
+        """Number of `code_search` tool calls."""
+        return self.count_tool_calls("code_search")
+
+    @property
+    def graph_calls(self) -> int:
+        """Number of `graph` tool calls."""
+        return self.count_tool_calls("graph")
+
+    @property
+    def code_intelligence_calls(self) -> int:
+        """Combined `code_search` and `graph` tool calls."""
+        return self.count_tool_calls("code_search", "graph")
+
     def to_dict(self) -> dict[str, Any]:
         """Export trace as dictionary for serialization."""
         return {
@@ -176,6 +203,9 @@ class AgenticExecutionTrace:
             "validation_errors": self.validation_errors,
             "total_tool_calls": self.total_tool_calls,
             "successful_tool_calls": self.successful_tool_calls,
+            "code_search_calls": self.code_search_calls,
+            "graph_calls": self.graph_calls,
+            "code_intelligence_calls": self.code_intelligence_calls,
             "files_modified": self.files_modified,
             "correction_metrics": self.correction_metrics,
             "token_usage": {
