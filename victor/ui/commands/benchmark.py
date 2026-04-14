@@ -67,6 +67,25 @@ class CodeIntelligencePrewarmResult:
     graph_edges: int = 0
 
 
+def _ensure_benchmark_runtime_tools(adapter) -> object:
+    """Fail fast when the benchmark session is missing required core tools."""
+    readiness = adapter.get_benchmark_tool_readiness()
+    if readiness.ready:
+        return readiness
+
+    issues = []
+    if readiness.missing_tools:
+        issues.append(f"missing tools: {', '.join(readiness.missing_tools)}")
+    if readiness.disabled_tools:
+        issues.append(f"disabled tools: {', '.join(readiness.disabled_tools)}")
+
+    raise RuntimeError(
+        "Benchmark runtime is not ready for code-intelligence execution: "
+        + "; ".join(issues)
+        + ". Check tool discovery and tool configuration before running benchmarks."
+    )
+
+
 async def _prewarm_code_intelligence_index(
     work_dir: Optional[Path],
     warmed_repos: Dict[str, CodeIntelligencePrewarmResult],
@@ -755,6 +774,12 @@ async def _run_benchmark_async(
                     timeout=timeout,
                     config=adapter_config,
                 )
+            readiness = _ensure_benchmark_runtime_tools(adapter)
+            console.print(
+                "  [dim]Benchmark tools ready: "
+                + ", ".join(readiness.enabled_tools)
+                + "[/]"
+            )
             workspace_manager = SWEBenchWorkspaceManager()
 
             _warmed_repos: Dict[str, CodeIntelligencePrewarmResult] = {}

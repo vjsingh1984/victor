@@ -104,3 +104,48 @@ class TestCodeIntelligencePrewarm:
         assert second.cached_hit is True
         assert second.status == "failed"
         assert mock_get.call_count == 1
+
+
+class TestBenchmarkRuntimeReadiness:
+    def test_runtime_readiness_passes_with_enabled_tools(self):
+        from victor.evaluation.agent_adapter import BenchmarkToolReadiness
+        from victor.ui.commands.benchmark import _ensure_benchmark_runtime_tools
+
+        adapter = MagicMock()
+        adapter.get_benchmark_tool_readiness.return_value = BenchmarkToolReadiness(
+            required_tools=("code_search", "graph", "read"),
+            enabled_tools=("code_search", "graph", "read"),
+        )
+
+        readiness = _ensure_benchmark_runtime_tools(adapter)
+
+        assert readiness.ready is True
+        assert "graph" in readiness.enabled_tools
+
+    def test_runtime_readiness_fails_fast_for_missing_graph(self):
+        from victor.evaluation.agent_adapter import BenchmarkToolReadiness
+        from victor.ui.commands.benchmark import _ensure_benchmark_runtime_tools
+
+        adapter = MagicMock()
+        adapter.get_benchmark_tool_readiness.return_value = BenchmarkToolReadiness(
+            required_tools=("code_search", "graph", "read"),
+            enabled_tools=("code_search", "read"),
+            missing_tools=("graph",),
+        )
+
+        with pytest.raises(RuntimeError, match="missing tools: graph"):
+            _ensure_benchmark_runtime_tools(adapter)
+
+    def test_runtime_readiness_fails_fast_for_disabled_graph(self):
+        from victor.evaluation.agent_adapter import BenchmarkToolReadiness
+        from victor.ui.commands.benchmark import _ensure_benchmark_runtime_tools
+
+        adapter = MagicMock()
+        adapter.get_benchmark_tool_readiness.return_value = BenchmarkToolReadiness(
+            required_tools=("code_search", "graph", "read"),
+            enabled_tools=("code_search", "read"),
+            disabled_tools=("graph",),
+        )
+
+        with pytest.raises(RuntimeError, match="disabled tools: graph"):
+            _ensure_benchmark_runtime_tools(adapter)

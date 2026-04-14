@@ -57,6 +57,18 @@ from victor.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 
+BENCHMARK_TOOL_ALLOWLIST = frozenset(
+    {
+        "read",
+        "edit",
+        "write",
+        "code_search",
+        "graph",
+        "ls",
+        "shell",
+    }
+)
+
 
 @dataclass
 class AdapterConfig:
@@ -92,6 +104,21 @@ class AdapterConfig:
 
         policy = SafeTimeoutPolicy(min_turn_timeout=self.min_turn_timeout)
         return policy.calculate(self.total_timeout, self.max_turns)
+
+
+@dataclass(frozen=True)
+class BenchmarkToolReadiness:
+    """Live benchmark tool readiness for a session-scoped tool registry."""
+
+    required_tools: tuple[str, ...]
+    enabled_tools: tuple[str, ...]
+    missing_tools: tuple[str, ...] = ()
+    disabled_tools: tuple[str, ...] = ()
+
+    @property
+    def ready(self) -> bool:
+        """Whether all required tools are present and enabled."""
+        return not self.missing_tools and not self.disabled_tools
 
 
 class VictorAgentAdapter:
@@ -276,6 +303,63 @@ class VictorAgentAdapter:
             )
         )
 
+    @classmethod
+    def benchmark_tool_allowlist(cls) -> frozenset[str]:
+        """Return the canonical benchmark tool allowlist."""
+        return BENCHMARK_TOOL_ALLOWLIST
+
+    def get_benchmark_tool_readiness(
+        self,
+        required_tools: Optional[set[str]] = None,
+    ) -> BenchmarkToolReadiness:
+        """Inspect the live session tool registry for benchmark-critical tools."""
+        required = set(required_tools or self.benchmark_tool_allowlist())
+        registry = getattr(self.orchestrator, "tools", None)
+        required_sorted = tuple(sorted(required))
+
+        if registry is None or not hasattr(registry, "list_tools"):
+            return BenchmarkToolReadiness(
+                required_tools=required_sorted,
+                enabled_tools=(),
+                missing_tools=required_sorted,
+            )
+
+        try:
+            tools = registry.list_tools(only_enabled=False)
+        except TypeError:
+            tools = registry.list_tools(False)
+        except Exception:
+            tools = []
+
+        registered = {
+            name
+            for tool in tools or []
+            for name in [getattr(tool, "name", None)]
+            if isinstance(name, str) and name
+        }
+        missing = sorted(required - registered)
+
+        enabled = []
+        disabled = []
+        for tool_name in sorted(required & registered):
+            is_enabled = True
+            if hasattr(registry, "is_tool_enabled"):
+                try:
+                    is_enabled = bool(registry.is_tool_enabled(tool_name))
+                except Exception:
+                    is_enabled = False
+            if is_enabled:
+                enabled.append(tool_name)
+            else:
+                disabled.append(tool_name)
+
+        return BenchmarkToolReadiness(
+            required_tools=required_sorted,
+            enabled_tools=tuple(enabled),
+            missing_tools=tuple(missing),
+            disabled_tools=tuple(disabled),
+        )
+
     def get_partial_trace(self) -> Dict[str, Any]:
         """Get partial trace data for timeout scenarios.
 
@@ -436,12 +520,12 @@ class VictorAgentAdapter:
         # The default semantic selector broadcasts 15+ tools which causes model
         # decision fatigue — models default to text responses instead of tool use.
         # A minimal set forces decisive tool use at each stage.
-        BENCHMARK_TOOLS = {"read", "edit", "write", "code_search", "ls", "shell"}
         try:
-            self.orchestrator.set_enabled_tools(BENCHMARK_TOOLS)
+            benchmark_tools = set(self.benchmark_tool_allowlist())
+            self.orchestrator.set_enabled_tools(benchmark_tools)
             logger.info(
-                f"Benchmark tool restriction: {len(BENCHMARK_TOOLS)} tools enabled "
-                f"({', '.join(sorted(BENCHMARK_TOOLS))})"
+                f"Benchmark tool restriction: {len(benchmark_tools)} tools enabled "
+                f"({', '.join(sorted(benchmark_tools))})"
             )
         except Exception as e:
             logger.debug(f"Could not restrict tools for benchmark: {e}")
@@ -504,10 +588,12 @@ class VictorAgentAdapter:
             "Fix the following issue by editing the source code in this repository.\n\n"
             "WORKFLOW:\n"
             "1. Use code_search to find relevant files\n"
-            "2. Use read to examine the code (use offset/limit for large files)\n"
-            "3. Use edit to apply your fix — COPY the old_str EXACTLY from the "
+            "2. Use graph to inspect callers, callees, dependencies, and impact when "
+            "the fix crosses symbol or file boundaries\n"
+            "3. Use read to examine the code (use offset/limit for large files)\n"
+            "4. Use edit to apply your fix — COPY the old_str EXACTLY from the "
             "read output, character-by-character. Do NOT type it from memory.\n"
-            "4. If an edit fails (transaction rolled back), re-read the file at "
+            "5. If an edit fails (transaction rolled back), re-read the file at "
             "that location and try again with the exact text.\n\n"
             "CRITICAL: The edit tool's old_str must match the file content exactly "
             "including whitespace, quotes, and line breaks. Even one wrong character "
