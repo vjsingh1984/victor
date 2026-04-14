@@ -3,6 +3,7 @@
 """Tests for ToolDependencyValidator."""
 
 from dataclasses import dataclass
+import logging
 from typing import Any, List, Optional, Set
 from unittest.mock import MagicMock
 
@@ -236,6 +237,28 @@ class TestToolDependencyValidator:
         assert result.valid is True  # Warnings don't invalidate
         assert "missing_tool" in result.missing_tools
         assert len(result.warnings) == 1
+
+    def test_validate_missing_tool_logs_debug_not_warning_or_error(self, caplog):
+        """Missing-tool validation should not spam operational logs."""
+        registry = MockToolRegistry(["tool1"])
+        validator = ToolDependencyValidator(registry, strict=True)
+        workflow = MockWorkflow(
+            nodes={
+                "node1": MockNode(id="node1", allowed_tools={"tool1", "missing_tool"}),
+            }
+        )
+
+        caplog.set_level(logging.DEBUG, logger="victor.workflows.validation.tool_validator")
+
+        result = validator.validate(workflow)
+
+        assert result.valid is False
+        assert any(
+            record.levelno == logging.DEBUG
+            and "missing_tool" in record.message
+            for record in caplog.records
+        )
+        assert not any(record.levelno >= logging.WARNING for record in caplog.records)
 
     def test_validate_compute_node_tools(self):
         """Should validate tools attribute on compute nodes."""

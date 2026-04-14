@@ -367,9 +367,6 @@ class SWEBenchRunner(BaseBenchmarkRunner):
             result.stdout = stdout_str[-2000:]  # Last 2KB for diagnostics
             result.stderr = stderr_str[-2000:]
 
-            logger.info("Test stdout (last 500): %s", stdout_str[-500:])
-            logger.info("Test stderr (last 500): %s", stderr_str[-500:])
-
             # Parse test results
             passed, total = self._parse_test_output(stdout_str + stderr_str)
             result.tests_passed = passed
@@ -378,14 +375,22 @@ class SWEBenchRunner(BaseBenchmarkRunner):
 
             if total > 0 and passed == total:
                 result.status = TaskStatus.PASSED
+                if stdout_str:
+                    logger.debug("Test stdout (last 500): %s", stdout_str[-500:])
+                if stderr_str:
+                    logger.debug("Test stderr (last 500): %s", stderr_str[-500:])
                 logger.info("Tests PASSED: %d/%d", passed, total)
             elif total > 0 and passed > 0:
                 result.status = TaskStatus.FAILED
                 result.error_message = f"Partial pass: {passed}/{total}"
+                logger.info("Test stdout (last 500): %s", stdout_str[-500:])
+                logger.info("Test stderr (last 500): %s", stderr_str[-500:])
                 logger.info("Tests partial: %d/%d", passed, total)
             elif total > 0:
                 result.status = TaskStatus.FAILED
                 result.error_message = f"All tests failed ({total} total)"
+                logger.info("Test stdout (last 500): %s", stdout_str[-500:])
+                logger.info("Test stderr (last 500): %s", stderr_str[-500:])
                 logger.info("Tests FAILED: %d/%d", passed, total)
             else:
                 # Tests couldn't run (0 collected) — likely missing project deps.

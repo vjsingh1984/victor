@@ -230,7 +230,7 @@ def reset_global_manager() -> None:
         _global_manager = None
         _tracer = None
 
-    logger.info("GlobalStateManager reset")
+    logger.debug("GlobalStateManager reset")
 
 
 def is_initialized() -> bool:

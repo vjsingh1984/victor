@@ -14,6 +14,8 @@
 
 """Unit tests for GlobalStateManager and factory functions."""
 
+import logging
+
 import pytest
 
 from victor.state.factory import (
@@ -411,6 +413,22 @@ class TestFactoryFunctions:
         # Create new manager
         manager2 = get_global_manager()
         assert manager1 is not manager2
+
+    def test_reset_global_manager_logs_debug_only(self, caplog):
+        """Reset noise should stay out of normal INFO logs."""
+        get_global_manager()
+        caplog.set_level(logging.DEBUG, logger="victor.state.factory")
+
+        reset_global_manager()
+
+        assert any(
+            record.levelno == logging.DEBUG and "GlobalStateManager reset" in record.message
+            for record in caplog.records
+        )
+        assert not any(
+            record.levelno == logging.INFO and "GlobalStateManager reset" in record.message
+            for record in caplog.records
+        )
 
     def test_set_tracer(self):
         """Test set_tracer sets tracer on global manager."""
