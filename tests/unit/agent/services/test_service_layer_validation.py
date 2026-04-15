@@ -117,12 +117,12 @@ class TestServiceBootstrap:
 class TestDelegationPointCoverage:
     """SVC-2: Validate all 16 delegation points are correctly wired."""
 
-    def test_orchestrator_uses_services_directly(self):
-        """Orchestrator must call services directly (no fallback guards)."""
+    def test_orchestrator_no_feature_flag_guards(self):
+        """Orchestrator must not use _use_service_layer flag in delegation."""
         source = _get_orchestrator_source()
         assert (
             "_use_service_layer and self._" not in source
-        ), "Coordinator fallback guards still present"
+        ), "Old-style _use_service_layer guards still present"
 
     def test_chat_delegation_points_exist(self):
         """3 chat delegation points must reference _chat_service."""
@@ -207,13 +207,13 @@ class TestDelegationPointCoverage:
         assert "ToolServiceProtocol" in source
         assert "SessionServiceProtocol" in source
 
-    def test_services_called_directly(self):
-        """All service calls should be direct (no guard pattern)."""
+    def test_no_feature_flag_in_delegation(self):
+        """No _use_service_layer flag should remain in delegation methods."""
         source = _get_orchestrator_source()
         delegation_guards = source.count("self._use_service_layer and self._")
         assert delegation_guards == 0, (
-            f"Found {delegation_guards} delegation guards. "
-            f"Phase 2 should have removed all coordinator fallbacks."
+            f"Found {delegation_guards} _use_service_layer guards. "
+            f"Use service-first with None-guard pattern instead."
         )
 
 
