@@ -1138,7 +1138,7 @@ class ChatCoordinator:
         # Persist to memory manager if available
         if memory_manager and memory_session_id:
             try:
-                from victor.agent.conversation_memory import MessageRole
+                from victor.agent.conversation.types import MessageRole
 
                 role_map = {
                     "user": MessageRole.USER,

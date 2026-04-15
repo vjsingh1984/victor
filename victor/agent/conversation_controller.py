@@ -22,7 +22,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
 from victor.agent.message_history import MessageHistory
-from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+from victor.agent.conversation.state_machine import ConversationStateMachine, ConversationStage
 from victor.agent.prompt_normalizer import PromptNormalizer, get_prompt_normalizer
 from victor.config.orchestrator_constants import (
     COMPACTION_CONFIG,
@@ -478,14 +478,8 @@ class ConversationController:
     ) -> List[MessageImportance]:
         """Score messages for importance during compaction.
 
-        Conforms to MessageScorerProtocol: accepts (messages, current_query).
-        If messages is None, scores self.messages (backward compatible).
-
-        Scoring factors:
-        - Role: Tool results score higher than discussion
-        - Recency: Recent messages get a boost
-        - Semantic: Messages similar to current query score higher
-        - Content length: Substantive messages score higher
+        Delegates to canonical score_messages() from conversation.scoring,
+        with pre-processing for system messages and pinned content.
 
         Args:
             messages: Messages to score (defaults to self.messages)
@@ -495,64 +489,75 @@ class ConversationController:
             List of MessageImportance objects
         """
         msgs_to_score = messages if messages is not None else self.messages
+
+        # Pre-process: handle system messages and pinned content before canonical scoring
         scored: List[MessageImportance] = []
-        total_messages = len(msgs_to_score)
+        scorable_msgs: List[Message] = []
+        scorable_indices: List[int] = []
 
         for i, msg in enumerate(msgs_to_score):
-            score = 0.0
-            reason_parts = []
-
-            # Skip system message in scoring (always kept)
             if msg.role == "system":
                 scored.append(MessageImportance(msg, i, 1000.0, "system"))
-                continue
-
-            # Pinned output requirements (never compacted)
-            # These contain user's deliverable format specifications
-            if _is_pinned_content(msg.content):
+            elif _is_pinned_content(msg.content):
                 scored.append(MessageImportance(msg, i, 999.0, "pinned_requirement"))
                 logger.debug(f"Message {i} marked as pinned (output requirement)")
-                continue
+            else:
+                scorable_msgs.append(msg)
+                scorable_indices.append(i)
 
-            # Role-based scoring
-            if msg.role == "tool":
-                score += 3.0 * self.config.tool_result_retention_weight
-                reason_parts.append("tool_result")
-            elif msg.role == "assistant":
-                score += 2.0
-                reason_parts.append("assistant")
-            elif msg.role == "user":
-                score += 2.5  # User messages slightly more important
-                reason_parts.append("user")
+        if not scorable_msgs:
+            return scored
 
-            # Recency scoring (exponential decay)
-            recency_position = (i + 1) / total_messages  # 0 to 1
-            recency_boost = recency_position**2 * self.config.recent_message_weight
-            score += recency_boost
-            if recency_position > 0.7:
-                reason_parts.append("recent")
+        # Lazy imports to avoid circular dependency
+        from victor.agent.conversation.types import ConversationMessage, MessagePriority
+        from victor.agent.conversation.scoring import score_messages, CONTROLLER_WEIGHTS
 
-            # Content length scoring (prefer substantive messages)
-            content_len = len(msg.content)
-            if content_len > 500:
-                score += 1.0
-                reason_parts.append("substantive")
-            elif content_len > 100:
-                score += 0.5
+        # Convert to ConversationMessage for canonical scorer
+        conv_messages = [
+            ConversationMessage.from_provider_message(
+                msg,
+                priority=(
+                    MessagePriority.HIGH
+                    if msg.role == "tool"
+                    else MessagePriority.MEDIUM
+                ),
+            )
+            for msg in scorable_msgs
+        ]
 
-            # Semantic relevance (if enabled and embedding service available)
-            if (
-                current_query
-                and self._embedding_service
-                and self.config.compaction_strategy
-                in (CompactionStrategy.SEMANTIC, CompactionStrategy.HYBRID)
-            ):
-                similarity = self._compute_semantic_similarity(msg.content, current_query)
-                if similarity > self.config.semantic_relevance_threshold:
-                    score += similarity * 3.0
-                    reason_parts.append(f"semantic:{similarity:.2f}")
+        # Build embedding function if semantic scoring is enabled
+        embedding_fn = None
+        if (
+            self._embedding_service
+            and self.config.compaction_strategy
+            in (CompactionStrategy.SEMANTIC, CompactionStrategy.HYBRID)
+        ):
 
-            scored.append(MessageImportance(msg, i, score, "+".join(reason_parts)))
+            def _embedding_fn(texts: List[str], query: str) -> List[float]:
+                similarities = []
+                for text in texts:
+                    sim = self._compute_semantic_similarity(text, query)
+                    similarities.append(sim)
+                return similarities
+
+            embedding_fn = _embedding_fn
+
+        # Delegate to canonical scorer
+        canonical_scored = score_messages(
+            conv_messages,
+            current_query=current_query,
+            weights=CONTROLLER_WEIGHTS,
+            embedding_fn=embedding_fn,
+        )
+
+        # Convert back to MessageImportance, mapping to original messages
+        conv_to_idx = {id(cm): idx for cm, idx in zip(conv_messages, scorable_indices)}
+        conv_to_msg = {id(cm): msg for cm, msg in zip(conv_messages, scorable_msgs)}
+
+        for conv_msg, canonical_score in canonical_scored:
+            orig_idx = conv_to_idx[id(conv_msg)]
+            orig_msg = conv_to_msg[id(conv_msg)]
+            scored.append(MessageImportance(orig_msg, orig_idx, canonical_score, "canonical"))
 
         return scored
 

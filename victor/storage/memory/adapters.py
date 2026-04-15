@@ -371,7 +371,7 @@ class ConversationMemoryAdapter:
             value: Message content or dict
             metadata: Additional metadata
         """
-        from victor.agent.conversation_memory import MessageRole
+        from victor.agent.conversation.types import MessageRole
 
         session_id = (metadata or {}).get("session_id") or self._session_id
         if not session_id:

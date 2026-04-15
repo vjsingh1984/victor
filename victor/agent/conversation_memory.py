@@ -59,342 +59,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class MessageRole(Enum):
-    """Message roles in conversation."""
-
-    SYSTEM = "system"
-    USER = "user"
-    ASSISTANT = "assistant"
-    TOOL_CALL = "tool_call"
-    TOOL_RESULT = "tool_result"
+# Canonical enums from conversation/types.py
+from victor.agent.conversation.types import MessageRole, MessagePriority
 
 
-class MessagePriority(Enum):
-    """Priority levels for context pruning.
-
-    Higher values indicate higher priority (kept longer).
-    """
-
-    CRITICAL = 100  # System prompts, current task
-    HIGH = 75  # Recent tool results, code context
-    MEDIUM = 50  # Previous exchanges
-    LOW = 25  # Old context, summaries
-    EPHEMERAL = 0  # Can be dropped immediately
-
-
-class ModelFamily(Enum):
-    """Model architecture family for ML/RL feature extraction."""
-
-    LLAMA = "llama"
-    QWEN = "qwen"
-    MISTRAL = "mistral"
-    MIXTRAL = "mixtral"
-    CLAUDE = "claude"
-    GPT = "gpt"
-    GEMINI = "gemini"
-    DEEPSEEK = "deepseek"
-    PHI = "phi"
-    CODELLAMA = "codellama"
-    COMMAND = "command"  # Cohere
-    GROK = "grok"
-    UNKNOWN = "unknown"
-
-
-class ModelSize(Enum):
-    """Model parameter size category for coarse comparison."""
-
-    TINY = "tiny"  # <1B params
-    SMALL = "small"  # 1-8B
-    MEDIUM = "medium"  # 8-32B
-    LARGE = "large"  # 32-70B
-    XLARGE = "xlarge"  # 70-175B
-    XXLARGE = "xxlarge"  # >175B
-
-
-class ContextSize(Enum):
-    """Context window size category."""
-
-    SMALL = "small"  # <8K tokens
-    MEDIUM = "medium"  # 8K-32K
-    LARGE = "large"  # 32K-128K
-    XLARGE = "xlarge"  # 128K+
-
-
-# =============================================================================
-# MODEL METADATA PARSER
-# Extracts ML-friendly features from model name strings
-# =============================================================================
-
-import re  # noqa: E402
-from dataclasses import dataclass as _dataclass  # noqa: E402
-
-
-@_dataclass
-class ModelMetadata:
-    """Parsed model metadata for ML/RL feature extraction."""
-
-    model_family: ModelFamily
-    model_size: ModelSize
-    model_params_b: Optional[float]  # Parameters in billions
-    context_size: ContextSize
-    context_tokens: Optional[int]  # Actual context window
-    is_moe: bool  # Mixture of Experts
-    is_reasoning: bool  # Explicit reasoning model
-
-
-# Model family detection patterns (order matters - more specific first)
-_MODEL_FAMILY_PATTERNS = [
-    (r"codellama|code-llama", ModelFamily.CODELLAMA),
-    (r"deepseek[-_]?r1|deepseek[-_]?coder", ModelFamily.DEEPSEEK),
-    (r"deepseek", ModelFamily.DEEPSEEK),
-    (r"mixtral", ModelFamily.MIXTRAL),
-    (r"mistral", ModelFamily.MISTRAL),
-    (r"llama[-_]?3\.3|llama3\.3|llama[-_]?3\.1|llama3[-_]?[12]?", ModelFamily.LLAMA),
-    (r"llama", ModelFamily.LLAMA),
-    (r"qwen[-_]?2\.5|qwen2\.5|qwen[-_]?3|qwen3", ModelFamily.QWEN),
-    (r"qwen", ModelFamily.QWEN),
-    (
-        r"claude[-_]?3|claude[-_]?opus|claude[-_]?sonnet|claude[-_]?haiku",
-        ModelFamily.CLAUDE,
-    ),
-    (r"claude", ModelFamily.CLAUDE),
-    (r"gpt[-_]?4|gpt[-_]?3\.5|chatgpt|openai", ModelFamily.GPT),
-    (r"gemini|palm|bard", ModelFamily.GEMINI),
-    (r"phi[-_]?[234]|phi[-_]?mini", ModelFamily.PHI),
-    (r"command[-_]?r|cohere", ModelFamily.COMMAND),
-    (r"grok", ModelFamily.GROK),
-]
-
-# MoE model patterns
-_MOE_PATTERNS = [r"mixtral", r"8x7b", r"8x22b", r"moe", r"mixture"]
-
-# MoE effective parameters (total active params)
-_MOE_EFFECTIVE_PARAMS = {
-    "8x7b": 46.7,  # Mixtral 8x7B
-    "8x22b": 141.0,  # Mixtral 8x22B
-}
-
-# Reasoning model patterns
-_REASONING_PATTERNS = [r"deepseek[-_]?r1", r"o1[-_]?", r"r1[-_]?", r"reasoning"]
-
-# Context size patterns (extract from model name like "32k", "128k")
-_CONTEXT_PATTERN = re.compile(r"(\d+)k", re.IGNORECASE)
-
-# Parameter size patterns (extract from model name like "70b", "8b", "7b")
-_PARAM_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*b(?:illion)?", re.IGNORECASE)
-_PARAM_PATTERN_ALT = re.compile(r"[-_:](\d+(?:\.\d+)?)b(?!yte)", re.IGNORECASE)
-
-
-def parse_model_metadata(
-    model: str,
-    provider: Optional[str] = None,
-    known_context: Optional[int] = None,
-    known_params_b: Optional[float] = None,
-) -> ModelMetadata:
-    """Parse model name to extract ML-friendly metadata.
-
-    Args:
-        model: Model name string (e.g., "llama-3.3-70b-versatile")
-        provider: Optional provider name for disambiguation
-        known_context: Optional known context window size
-        known_params_b: Optional known parameter count in billions
-
-    Returns:
-        ModelMetadata with extracted features
-
-    Examples:
-        >>> parse_model_metadata("llama-3.3-70b-versatile")
-        ModelMetadata(family=LLAMA, size=LARGE, params_b=70.0, ...)
-
-        >>> parse_model_metadata("mixtral-8x7b-32768")
-        ModelMetadata(family=MIXTRAL, size=MEDIUM, is_moe=True, ...)
-
-        >>> parse_model_metadata("deepseek-r1:32b")
-        ModelMetadata(family=DEEPSEEK, size=MEDIUM, is_reasoning=True, ...)
-    """
-    model_lower = model.lower()
-
-    # 1. Detect model family
-    model_family = ModelFamily.UNKNOWN
-    for pattern, family in _MODEL_FAMILY_PATTERNS:
-        if re.search(pattern, model_lower):
-            model_family = family
-            break
-
-    # Provider-based fallback
-    if model_family == ModelFamily.UNKNOWN and provider:
-        provider_lower = provider.lower()
-        if "anthropic" in provider_lower or "claude" in provider_lower:
-            model_family = ModelFamily.CLAUDE
-        elif "openai" in provider_lower:
-            model_family = ModelFamily.GPT
-        elif "google" in provider_lower or "gemini" in provider_lower:
-            model_family = ModelFamily.GEMINI
-        elif "groq" in provider_lower:
-            # Groq primarily serves Llama models
-            model_family = ModelFamily.LLAMA
-        elif "xai" in provider_lower or "grok" in provider_lower:
-            model_family = ModelFamily.GROK
-
-    # 2. Extract parameter count
-    params_b = known_params_b
-    if params_b is None:
-        # Check for MoE patterns first (special handling)
-        for moe_pattern, moe_params in _MOE_EFFECTIVE_PARAMS.items():
-            if moe_pattern in model_lower:
-                params_b = moe_params
-                break
-
-        # Try various patterns for non-MoE
-        if params_b is None:
-            match = _PARAM_PATTERN.search(model_lower)
-            if not match:
-                match = _PARAM_PATTERN_ALT.search(model_lower)
-            if match:
-                params_b = float(match.group(1))
-
-        # Special cases for well-known models
-        if params_b is None:
-            if "gpt-4" in model_lower:
-                params_b = 175.0  # Estimated
-            elif "gpt-3.5" in model_lower:
-                params_b = 175.0  # Estimated
-            elif "claude-3-opus" in model_lower:
-                params_b = 200.0  # Estimated
-            elif "claude-3-sonnet" in model_lower or "claude-3.5-sonnet" in model_lower:
-                params_b = 70.0  # Estimated
-            elif "claude-3-haiku" in model_lower:
-                params_b = 20.0  # Estimated
-
-    # 3. Categorize model size
-    if params_b is not None:
-        if params_b < 1:
-            model_size = ModelSize.TINY
-        elif params_b < 8:
-            model_size = ModelSize.SMALL
-        elif params_b < 32:
-            model_size = ModelSize.MEDIUM
-        elif params_b < 70:
-            model_size = ModelSize.LARGE
-        elif params_b < 175:
-            model_size = ModelSize.XLARGE
-        else:
-            model_size = ModelSize.XXLARGE
-    else:
-        # Default based on model family
-        model_size = ModelSize.MEDIUM  # Safe default
-
-    # 4. Extract context window size
-    context_tokens = known_context
-    if context_tokens is None:
-        match = _CONTEXT_PATTERN.search(model_lower)
-        if match:
-            context_tokens = int(match.group(1)) * 1024  # Convert K to actual tokens
-
-        # Well-known context windows
-        if context_tokens is None:
-            if model_family == ModelFamily.CLAUDE:
-                context_tokens = 200000
-            elif model_family == ModelFamily.GPT:
-                context_tokens = 128000 if "gpt-4" in model_lower else 16000
-            elif model_family == ModelFamily.GEMINI:
-                context_tokens = 1000000  # Gemini 1.5 Pro
-            elif "128k" in model_lower or "128000" in model_lower:
-                context_tokens = 128000
-
-    # Categorize context size
-    if context_tokens is not None:
-        if context_tokens < 8000:
-            context_size = ContextSize.SMALL
-        elif context_tokens < 32000:
-            context_size = ContextSize.MEDIUM
-        elif context_tokens < 128000:
-            context_size = ContextSize.LARGE
-        else:
-            context_size = ContextSize.XLARGE
-    else:
-        context_size = ContextSize.MEDIUM  # Safe default
-
-    # 5. Detect MoE architecture
-    is_moe = any(re.search(pattern, model_lower) for pattern in _MOE_PATTERNS)
-
-    # 6. Detect reasoning models
-    is_reasoning = any(re.search(pattern, model_lower) for pattern in _REASONING_PATTERNS)
-
-    return ModelMetadata(
-        model_family=model_family,
-        model_size=model_size,
-        model_params_b=params_b,
-        context_size=context_size,
-        context_tokens=context_tokens,
-        is_moe=is_moe,
-        is_reasoning=is_reasoning,
-    )
-
-
-# Known model context windows (for accuracy)
-_KNOWN_CONTEXT_WINDOWS = {
-    "llama-3.3-70b-versatile": 128000,
-    "llama-3.1-8b-instant": 128000,
-    "mixtral-8x7b-32768": 32768,
-    "claude-3-opus": 200000,
-    "claude-3-sonnet": 200000,
-    "claude-3.5-sonnet": 200000,
-    "claude-3-haiku": 200000,
-    "gpt-4-turbo": 128000,
-    "gpt-4o": 128000,
-    "gpt-4": 8192,
-    "gpt-3.5-turbo": 16385,
-    "gemini-pro": 32768,
-    "gemini-1.5-pro": 1000000,
-    "deepseek-chat": 128000,
-    "deepseek-coder": 128000,
-    "qwen2.5-coder:32b": 128000,
-    "qwen3:32b": 40960,
-}
-
-# Known model parameters (for accuracy)
-_KNOWN_MODEL_PARAMS = {
-    "llama-3.3-70b-versatile": 70.0,
-    "llama-3.1-8b-instant": 8.0,
-    "mixtral-8x7b-32768": 46.7,  # MoE effective
-    "deepseek-r1:32b": 32.0,
-    "deepseek-r1:70b": 70.0,
-    "qwen2.5-coder:32b": 32.0,
-    "qwen3:32b": 32.0,
-}
-
-
-def get_known_model_context(model: str) -> Optional[int]:
-    """Get known context window for a model.
-
-    Args:
-        model: Model name string
-
-    Returns:
-        Context window in tokens, or None if unknown
-    """
-    model_lower = model.lower()
-    for known_model, context in _KNOWN_CONTEXT_WINDOWS.items():
-        if known_model in model_lower or model_lower in known_model:
-            return context
-    return None
-
-
-def get_known_model_params(model: str) -> Optional[float]:
-    """Get known parameter count for a model.
-
-    Args:
-        model: Model name string
-
-    Returns:
-        Parameter count in billions, or None if unknown
-    """
-    model_lower = model.lower()
-    for known_model, params in _KNOWN_MODEL_PARAMS.items():
-        if known_model in model_lower or model_lower in known_model:
-            return params
-    return None
+# ML metadata extracted to victor/agent/ml_metadata.py
+from victor.agent.ml_metadata import (  # noqa: F401
+    ContextSize,
+    ModelFamily,
+    ModelMetadata,
+    ModelSize,
+    get_known_model_context,
+    get_known_model_params,
+    parse_model_metadata,
+)
 
 
 @dataclass
@@ -1641,42 +1319,38 @@ class ConversationStore:
     ) -> List[tuple[ConversationMessage, float]]:
         """Score messages for context selection.
 
-        Scoring factors:
-        - Priority level (40%)
-        - Recency (60%)
-
-        Uses Rust-accelerated batch scoring when available (4.8-9.9x speedup).
-        Falls back to Python loop if native extensions are not installed.
+        Delegates to canonical score_messages() with STORE_WEIGHTS
+        (priority 40% + recency 60%). Includes Rust-accelerated batch scoring.
         """
         if not messages:
             return []
 
-        # Extract priorities and timestamps for batch scoring
-        priorities = [int(msg.priority.value) for msg in messages]
-        timestamps = [msg.timestamp.timestamp() for msg in messages]
+        from victor.agent.conversation.scoring import score_messages, STORE_WEIGHTS
+        from victor.agent.conversation.types import (
+            ConversationMessage as CanonicalMessage,
+        )
 
-        try:
-            from victor.processing.native.context_fitter import batch_score_messages
+        # Convert store messages to canonical type for scoring
+        canonical_msgs = [
+            CanonicalMessage(
+                role=msg.role.value,
+                content=msg.content,
+                id=msg.id,
+                timestamp=msg.timestamp,
+                token_count=msg.token_count,
+                priority=msg.priority,
+                metadata=msg.metadata,
+                tool_name=msg.tool_name,
+                tool_call_id=msg.tool_call_id,
+            )
+            for msg in messages
+        ]
 
-            scored_indices = batch_score_messages(priorities, timestamps)
-            return [(messages[idx], score) for idx, score in scored_indices]
-        except (ImportError, Exception):
-            pass
+        scored = score_messages(canonical_msgs, weights=STORE_WEIGHTS)
 
-        # Python fallback
-        now = datetime.now()
-        max_age = max((now - msg.timestamp).total_seconds() for msg in messages) or 1
-
-        scored = []
-        for msg in messages:
-            priority_score = msg.priority.value / 100
-            age = (now - msg.timestamp).total_seconds()
-            recency_score = 1 - (age / max_age)
-            score = (priority_score * 0.4) + (recency_score * 0.6)
-            scored.append((msg, score))
-
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return scored
+        # Map back to original store messages
+        canonical_to_store = {id(cm): msg for cm, msg in zip(canonical_msgs, messages)}
+        return [(canonical_to_store[id(cm)], s) for cm, s in scored]
 
     def _prune_context(self, session: ConversationSession):
         """Prune conversation context to fit within token limits.

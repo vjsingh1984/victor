@@ -1376,10 +1376,8 @@ class PromptOptimizerLearner(BaseLearner):
         """
         traces: List[ExecutionTrace] = []
         try:
-            from victor.agent.conversation_memory import (
-                ConversationStore,
-                MessageRole,
-            )
+            from victor.agent.conversation_memory import ConversationStore
+            from victor.agent.conversation.types import MessageRole
         except ImportError:
             return traces
 
