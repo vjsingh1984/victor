@@ -43,6 +43,8 @@ import asyncio
 import logging
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
+from dataclasses import dataclass, field
+
 from victor.agent.response_completer import ToolFailureContext
 from victor.providers.base import CompletionResponse
 
@@ -53,6 +55,52 @@ if TYPE_CHECKING:
         ProviderContextProtocol,
     )
     from victor.agent.token_tracker import TokenTracker
+
+
+@dataclass
+class TurnResult:
+    """Result of a single execution turn (one LLM call + tool execution).
+
+    This is the primitive unit returned by execute_turn_with_tools().
+    AgenticLoop uses this to make per-turn evaluation decisions.
+
+    Attributes:
+        response: Raw model response
+        tool_results: Results from tool execution (empty if no tools called)
+        has_tool_calls: Whether the model requested tools
+        tool_calls_count: Number of tool calls in this turn
+        all_tools_blocked: Whether all tool calls were blocked by dedup
+        is_qa_response: Whether this was a Q&A shortcut
+        content: Response text content (convenience)
+    """
+
+    response: CompletionResponse
+    tool_results: List[Dict[str, Any]] = field(default_factory=list)
+    has_tool_calls: bool = False
+    tool_calls_count: int = 0
+    all_tools_blocked: bool = False
+    is_qa_response: bool = False
+
+    @property
+    def content(self) -> str:
+        """Response text content."""
+        return self.response.content or ""
+
+    @property
+    def has_content(self) -> bool:
+        """Whether the response has text content."""
+        return bool(self.response.content)
+
+    @property
+    def successful_tool_count(self) -> int:
+        """Number of tools that succeeded."""
+        return sum(1 for r in self.tool_results if r.get("success"))
+
+    @property
+    def failed_tool_count(self) -> int:
+        """Number of tools that failed."""
+        return sum(1 for r in self.tool_results if not r.get("success"))
+
 
 logger = logging.getLogger(__name__)
 
@@ -117,8 +165,10 @@ class ExecutionCoordinator:
     ) -> CompletionResponse:
         """Execute the full agentic loop.
 
-        Runs the model, executes tools, and continues until the model
-        provides a final response (no tool calls) or budget is exhausted.
+        When USE_AGENTIC_LOOP flag is enabled (default), delegates to
+        AgenticLoop for enhanced execution with perception, evaluation,
+        progress tracking, and adaptive termination. Falls back to the
+        legacy while-loop when disabled.
 
         Args:
             user_message: Initial user message
@@ -133,6 +183,15 @@ class ExecutionCoordinator:
 
         # Add user message to history
         self._chat_context.add_message("user", user_message)
+
+        # Phase 10: Delegate to AgenticLoop when enabled (Strangler Fig)
+        try:
+            from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+            if get_feature_flag_manager().is_enabled(FeatureFlag.USE_AGENTIC_LOOP):
+                return await self._execute_via_agentic_loop(user_message, max_iterations)
+        except Exception as e:
+            logger.warning(f"AgenticLoop delegation failed, falling back to legacy loop: {e}")
 
         # Initialize tracking for this conversation turn
         self._tool_context.tool_calls_used = 0
@@ -355,11 +414,10 @@ class ExecutionCoordinator:
         messages: List[Any],
         tools: Optional[List[Any]] = None,
     ) -> CompletionResponse:
-        """Execute a single model turn.
+        """Execute a single model turn (raw LLM call, no tool execution).
 
-        This is a simpler execution path that makes a single model call
-        without the agentic loop. Useful for simple queries or when
-        the caller wants full control over iteration.
+        This is the lowest-level execution path — a single LLM API call.
+        For a full turn with tool execution, use execute_turn_with_tools().
 
         Args:
             messages: Conversation history
@@ -375,6 +433,168 @@ class ExecutionCoordinator:
             max_tokens=self._provider_context.max_tokens,
             tools=tools,
         )
+
+    async def execute_turn_with_tools(
+        self,
+        user_message: str,
+        task_classification: Optional[Any] = None,
+        is_qa_task: bool = False,
+        enable_thinking: bool = False,
+    ) -> TurnResult:
+        """Execute a single complete turn: LLM call + tool execution.
+
+        This is the primitive unit for AgenticLoop. It performs exactly
+        one model call, executes any requested tools, and returns
+        structured results without looping.
+
+        The caller (AgenticLoop) owns the iteration loop and decides
+        whether to continue, retry, or complete based on TurnResult.
+
+        Args:
+            user_message: User message (for tool selection context)
+            task_classification: Task classification for tool selection
+            is_qa_task: Whether to skip tool selection for Q&A
+            enable_thinking: Whether to enable model thinking
+
+        Returns:
+            TurnResult with response, tool results, and metadata
+        """
+        # Select tools (unless Q&A task)
+        tools = None
+        if (
+            not is_qa_task
+            and self._provider_context.provider.supports_tools()
+            and self._tool_context.tool_calls_used < self._tool_context.tool_budget
+        ):
+            tools = await self._select_tools_for_turn(user_message)
+
+        # Prepare thinking parameter
+        provider_kwargs: Dict[str, Any] = {}
+        if enable_thinking or self._provider_context.thinking:
+            provider_kwargs["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": 10000,
+            }
+
+        # Check context compaction before API call
+        if task_classification:
+            await self._check_context_compaction(user_message, task_classification)
+
+        # Execute model turn
+        response = await self._execute_model_turn(tools=tools, **provider_kwargs)
+
+        # Track tokens
+        self._accumulate_token_usage(response)
+
+        # Add assistant response to conversation history
+        if response.content:
+            self._chat_context.add_message("assistant", response.content)
+            if task_classification:
+                await self._check_context_compaction(user_message, task_classification)
+
+        # Execute tool calls if present
+        tool_results: List[Dict[str, Any]] = []
+        all_blocked = False
+        if response.tool_calls:
+            tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
+
+            # Check for dedup-blocked spin
+            _pipeline = getattr(self._tool_context, "_tool_pipeline", None)
+            if _pipeline is None:
+                _orch = getattr(self, "_orchestrator", None) or getattr(
+                    self._chat_context, "_orchestrator", None
+                )
+                if _orch:
+                    _pipeline = getattr(_orch, "_tool_pipeline", None)
+            all_blocked = bool(_pipeline and getattr(_pipeline, "last_batch_all_skipped", False))
+
+            # Record failures for optimization hints
+            for result in tool_results:
+                if not result.get("success"):
+                    _orch = getattr(self, "_orchestrator", None) or getattr(
+                        self._chat_context, "_orchestrator", None
+                    )
+                    _injector = getattr(_orch, "_optimization_injector", None) if _orch else None
+                    if _injector and result.get("error"):
+                        _injector.record_failure(
+                            result.get("tool_name", "unknown"),
+                            result["error"],
+                        )
+
+        return TurnResult(
+            response=response,
+            tool_results=tool_results,
+            has_tool_calls=bool(response.tool_calls),
+            tool_calls_count=len(response.tool_calls) if response.tool_calls else 0,
+            all_tools_blocked=all_blocked,
+            is_qa_response=is_qa_task and bool(response.content),
+        )
+
+    # =====================================================================
+    # AgenticLoop Integration (Phase 10)
+    # =====================================================================
+
+    async def _execute_via_agentic_loop(
+        self,
+        user_message: str,
+        max_iterations: int,
+    ) -> CompletionResponse:
+        """Delegate execution to AgenticLoop for enhanced evaluation.
+
+        AgenticLoop runs the PERCEIVE -> PLAN -> ACT -> EVALUATE -> DECIDE
+        cycle, calling self.execute_turn_with_tools() for each turn.
+
+        Args:
+            user_message: User message (already added to conversation)
+            max_iterations: Maximum iterations
+
+        Returns:
+            CompletionResponse from the final turn
+        """
+        from victor.framework.agentic_loop import AgenticLoop
+
+        # Classify task for tool selection
+        task_classification = self._provider_context.task_classifier.classify(user_message)
+        is_qa = self._is_question_only(user_message)
+
+        # Run parallel exploration for complex tasks (before loop)
+        await self._run_parallel_exploration(user_message, task_classification)
+
+        # Calculate iteration budget same as legacy path
+        max_iterations_setting = getattr(self._chat_context.settings, "chat_max_iterations", 10)
+        task_budget = max(task_classification.tool_budget * 2, 1)
+        iteration_budget = min(task_budget, max_iterations_setting, max_iterations)
+
+        # Create AgenticLoop with self as execution_coordinator
+        # Use a lightweight mock orchestrator since AgenticLoop only needs
+        # execution_coordinator for single-turn execution
+        loop = AgenticLoop(
+            orchestrator=None,
+            execution_coordinator=self,
+            max_iterations=iteration_budget,
+            enable_fulfillment_check=False,  # Fulfillment needs file context
+            enable_adaptive_iterations=True,
+        )
+
+        # Inject task classification into state for execute_turn_with_tools()
+        context = {
+            "_task_classification": task_classification,
+            "_is_qa_task": is_qa,
+        }
+
+        loop_result = await loop.run(user_message, context=context)
+
+        # Extract the last TurnResult's response
+        if loop_result.iterations:
+            last = loop_result.iterations[-1]
+            if last.action_result is not None:
+                turn_result = last.action_result
+                if hasattr(turn_result, "response"):
+                    return turn_result.response
+
+        # Fallback: ensure we have a response
+        failure_context = ToolFailureContext()
+        return await self._ensure_complete_response(None, failure_context)
 
     # =====================================================================
     # Q&A Detection

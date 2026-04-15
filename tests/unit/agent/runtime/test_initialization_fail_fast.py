@@ -113,8 +113,8 @@ class TestNonCriticalPhaseFailure:
         assert not result.all_succeeded
         failed_names = [p.name for p in result.failed_phases]
         assert "metrics_runtime" in failed_names
-        # All 8 phases should still be present in results
-        assert len(result.phases) == 8
+        # All 9 phases should still be present in results
+        assert len(result.phases) == 9
 
     def test_memory_runtime_failure_continues(self):
         orch = _make_orchestrator(failing_phases={"memory_runtime": RuntimeError("no memory")})
@@ -239,7 +239,7 @@ class TestHappyPath:
         result = manager.run_all_phases(orch)
 
         assert result.all_succeeded
-        assert len(result.phases) == 8
+        assert len(result.phases) == 9
         assert result.skipped_phases == []
 
         phase_names = [p.name for p in result.phases]
@@ -252,6 +252,7 @@ class TestHappyPath:
             "coordination_runtime",
             "interaction_runtime",
             "services",
+            "credit_runtime",
         ]
 
     def test_all_phases_have_components(self):

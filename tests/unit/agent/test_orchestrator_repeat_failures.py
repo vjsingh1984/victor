@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 from victor.agent.orchestrator import AgentOrchestrator
@@ -65,13 +67,14 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch,
     provider = DummyProvider()
 
     # Minimal profile/model fields to construct orchestrator
-    orch = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
-        model="dummy-model",
-        temperature=0.0,
-        max_tokens=10,
-    )
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orch = AgentOrchestrator(
+            settings=settings,
+            provider=provider,
+            model="dummy-model",
+            temperature=0.0,
+            max_tokens=10,
+        )
 
     # Inject a failing tool into the orchestrator's existing tools registry
     failing_tool = AlwaysFailTool()

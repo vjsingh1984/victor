@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, AsyncIterator, Dict, List, Optional
+from unittest.mock import patch
 
 import pytest
 
@@ -90,13 +91,14 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     settings.tool_cache_enabled = False
     provider = DummyStreamProvider()
 
-    orch = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
-        model="dummy-model",
-        temperature=0.0,
-        max_tokens=32,
-    )
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orch = AgentOrchestrator(
+            settings=settings,
+            provider=provider,
+            model="dummy-model",
+            temperature=0.0,
+            max_tokens=32,
+        )
 
     dummy_tool = DummyTool()
     orch.tools.register(dummy_tool)

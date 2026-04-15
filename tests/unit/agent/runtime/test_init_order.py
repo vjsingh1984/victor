@@ -53,6 +53,7 @@ class TestInitializationOrderConsistency:
                 "coordination_runtime",
             ],
             "services": ["interaction_runtime"],
+            "credit_runtime": ["interaction_runtime"],
         }
 
         for phase, phase_deps in deps.items():
@@ -70,7 +71,7 @@ class TestInitializationOrderConsistency:
 
         # All phases succeed with mock, so we check the phase list
         # contains exactly 8 phases
-        assert len(phase_names) == 8
+        assert len(phase_names) == 9
 
         # Critical phases are the ones that would raise
         # InitializationError on failure. We verify the expected
@@ -91,5 +92,6 @@ class TestInitializationOrderConsistency:
             "coordination_runtime",
             "interaction_runtime",
             "services",
+            "credit_runtime",
         }
         assert set(phase_names) == expected

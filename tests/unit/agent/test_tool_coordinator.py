@@ -100,6 +100,7 @@ class TestToolCoordinator:
         """Create mock tool pipeline."""
         pipeline = MagicMock()
         pipeline.execute_tool_calls = AsyncMock()
+        pipeline.credit_tracking_service = MagicMock(pending_signals=0)
         return pipeline
 
     @pytest.fixture
