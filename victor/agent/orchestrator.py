@@ -3423,8 +3423,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
-        Applies skill auto-selection before streaming, then delegates
-        to service layer or ChatCoordinator.
+        When USE_AGENTIC_LOOP is enabled, streams through AgenticLoop
+        with perception/evaluation lifecycle. Falls back to ChatCoordinator.
 
         Args:
             user_message: User's input message
@@ -3432,9 +3432,42 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
-        # Skill auto-selection for streaming path (mirrors SyncChatCoordinator)
+        # Skill auto-selection
         self._apply_skill_for_turn(user_message)
 
+        # Phase 10: Route through AgenticLoop for perception/evaluation
+        try:
+            from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+            if get_feature_flag_manager().is_enabled(FeatureFlag.USE_AGENTIC_LOOP):
+                from victor.framework.agentic_loop import AgenticLoop
+
+                loop = AgenticLoop(
+                    orchestrator=self,
+                    turn_executor=getattr(self, "_turn_executor", None),
+                )
+
+                # Get streaming pipeline from ChatCoordinator
+                pipeline = None
+                if hasattr(self, "_chat_coordinator"):
+                    coord = self._chat_coordinator
+                    # Ensure pipeline exists
+                    if (
+                        not hasattr(coord, "_streaming_pipeline")
+                        or coord._streaming_pipeline is None
+                    ):
+                        from victor.agent.streaming import create_streaming_chat_pipeline
+
+                        coord._streaming_pipeline = create_streaming_chat_pipeline(coord)
+                    pipeline = coord._streaming_pipeline
+
+                async for chunk in loop.stream_chat(user_message, streaming_pipeline=pipeline):
+                    yield chunk
+                return
+        except Exception as e:
+            logger.warning(f"AgenticLoop streaming failed, falling back: {e}")
+
+        # Fallback: ChatCoordinator streaming
         async for chunk in self._chat_service.stream_chat(user_message):
             yield chunk
 
