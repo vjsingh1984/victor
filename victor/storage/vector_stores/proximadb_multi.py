@@ -254,6 +254,17 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             self._language_registry.discover_plugins()
 
         self._dimension = int(config.extra_config.get("dimension", 384))
+        self._batch_size = int(config.extra_config.get("batch_size", 16))
+        self._chunk_size = int(config.extra_config.get("chunk_size", 500))
+        self._chunk_overlap = int(config.extra_config.get("chunk_overlap", 50))
+        self._code_chunking_strategy = str(
+            config.extra_config.get("code_chunking_strategy", "symbol_span")
+        )
+        self._code_chunker = create_code_chunker(
+            self._code_chunking_strategy,
+            chunk_size=self._chunk_size,
+            chunk_overlap=self._chunk_overlap,
+        )
 
     @staticmethod
     def _discover_language_registry() -> Optional[Any]:
