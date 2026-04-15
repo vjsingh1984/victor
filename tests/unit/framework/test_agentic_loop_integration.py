@@ -861,10 +861,11 @@ class TestFeatureFlagIntegration:
     """Tests USE_AGENTIC_LOOP feature flag controls execution path."""
 
     def test_flag_defaults_to_enabled(self):
-        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+        from victor.core.feature_flags import FeatureFlag, FeatureFlagManager
 
-        mgr = get_feature_flag_manager()
-        assert mgr.is_enabled(FeatureFlag.USE_AGENTIC_LOOP) is True
+        # Use a fresh manager to avoid pollution from other tests
+        fresh_mgr = FeatureFlagManager()
+        assert fresh_mgr.is_enabled(FeatureFlag.USE_AGENTIC_LOOP) is True
 
     def test_flag_can_be_disabled(self):
         from unittest.mock import patch as mock_patch

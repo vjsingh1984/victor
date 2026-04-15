@@ -158,12 +158,8 @@ def test_plugin_registry_registers_sdk_vertical_into_vertical_registry(monkeypat
 
     registry = PluginRegistry()
     monkeypatch.setattr(
-        "victor.core.plugins.registry.get_entry_point_cache",
-        lambda: MagicMock(
-            get_entry_points=MagicMock(
-                return_value={"sdk_external": "victor_sdk_external.plugin:plugin"}
-            )
-        ),
+        "victor.core.plugins.registry.get_entry_point_values",
+        lambda *args, **kwargs: {"sdk_external": "victor_sdk_external.plugin:plugin"},
     )
     monkeypatch.setattr(
         registry,
