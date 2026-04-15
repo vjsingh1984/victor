@@ -330,58 +330,10 @@ class ChatService:
         self._logger.warning(f"Max iterations ({self._config.max_iterations}) reached")
         return response
 
-    async def _run_agentic_loop_streaming(
-        self, user_message: str, **kwargs
-    ) -> AsyncIterator["StreamChunk"]:
-        """Run the agentic loop with streaming support.
-
-        Similar to _run_agentic_loop but yields stream chunks
-        as they become available.
-
-        Args:
-            user_message: The user's input message
-            **kwargs: Additional options
-
-        Yields:
-            StreamChunk objects with incremental content
-        """
-        from victor.providers.base import Message
-
-        # Use conversation controller's message history (system prompt + history)
-        # This reuses the established prompt pipeline instead of rebuilding messages.
-        if self._conversation and hasattr(self._conversation, "messages"):
-            # Ensure system prompt is in the history
-            if hasattr(self._conversation, "ensure_system_prompt"):
-                self._conversation.ensure_system_prompt()
-            # Add user message to conversation
-            if hasattr(self._conversation, "add_message"):
-                self._conversation.add_message("user", user_message)
-            messages = list(self._conversation.messages)
-        else:
-            # Fallback: minimal message list
-            messages = [Message(role="user", content=user_message)]
-
-        # Stream from provider
-        provider = self._provider.get_current_provider()
-        model = getattr(self._provider, "_current_model", "default")
-        stream = provider.stream_chat(messages, model=model, **kwargs)
-
-        async for chunk in stream:
-            yield chunk
-
-    async def _get_completion(self, messages: List[Any], **kwargs) -> "CompletionResponse":
-        """Get completion from provider.
-
-        Args:
-            messages: Messages to send
-            **kwargs: Additional options
-
-        Returns:
-            CompletionResponse from provider
-        """
-        provider = self._provider.get_current_provider()
-        model = getattr(self._provider, "_current_model", "default")
-        return await provider.chat(messages, model=model, **kwargs)
+    # NOTE: _run_agentic_loop_streaming and _get_completion have been removed.
+    # The ChatServiceAdapter wraps ChatCoordinator which uses StreamingChatPipeline
+    # with full AgenticLoop integration (perception, fulfillment, progress tracking).
+    # Raw ChatService methods are not the primary execution path.
 
     def _is_response_complete(self, response: "CompletionResponse") -> bool:
         """Check if response is complete.

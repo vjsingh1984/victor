@@ -298,7 +298,15 @@ class ChatCoordinator:
         if self._streaming_pipeline is None:
             from victor.agent.streaming import create_streaming_chat_pipeline
 
-            self._streaming_pipeline = create_streaming_chat_pipeline(self)
+            # Wire AgenticLoop components into streaming pipeline for parity:
+            # - PerceptionIntegration: structured task understanding before iteration
+            # - FulfillmentDetector: task completion validation after tool execution
+            # Access via public attributes or capability protocol
+            perception = orch.get_capability_value("perception_integration") if orch.has_capability("perception_integration") else None
+            fulfillment = orch.get_capability_value("fulfillment_detector") if orch.has_capability("fulfillment_detector") else None
+            self._streaming_pipeline = create_streaming_chat_pipeline(
+                self, perception=perception, fulfillment=fulfillment
+            )
 
         pipeline = self._streaming_pipeline
         try:

@@ -48,8 +48,17 @@ def _get_decision_service(orchestrator: object) -> object | None:
 class StreamingChatPipeline:
     """Canonical streaming pipeline wired to ChatCoordinator helpers."""
 
-    def __init__(self, coordinator: "ChatCoordinator") -> None:
+    def __init__(
+        self,
+        coordinator: "ChatCoordinator",
+        perception: Optional[Any] = None,
+        fulfillment: Optional[Any] = None,
+    ) -> None:
         self._coordinator = coordinator
+        # AgenticLoop component integration (streaming parity)
+        self._perception = perception  # PerceptionIntegration instance
+        self._fulfillment = fulfillment  # FulfillmentDetector instance
+        self._progress_scores: List[float] = []  # For adaptive iteration
         # Tool selection cache — avoids redundant selection within same turn
         self._last_tool_context: Optional[str] = None
         self._last_tools: Optional[Any] = None
@@ -189,6 +198,34 @@ class StreamingChatPipeline:
 
         _spin = SpinDetector()
         _nudge_policy = NudgePolicy()
+
+        # === PRE-LOOP PERCEPTION (AgenticLoop parity) ===
+        # Structured task understanding before iteration begins. Reuses
+        # PerceptionIntegration from the AgenticLoop's PERCEIVE phase.
+        _perception = None
+        if self._perception is not None:
+            try:
+                _perception = await self._perception.perceive(
+                    user_message,
+                    context={
+                        "conversation_stage": getattr(stream_ctx, "conversation_stage", "initial"),
+                        "is_analysis_task": stream_ctx.is_analysis_task,
+                        "is_action_task": stream_ctx.is_action_task,
+                    },
+                )
+                if _perception:
+                    stream_ctx.perception = _perception
+                    logger.info(
+                        "Streaming perception: intent=%s, complexity=%s, confidence=%.2f",
+                        getattr(_perception, "intent", "unknown"),
+                        getattr(_perception, "complexity", "unknown"),
+                        getattr(_perception, "confidence", 0.0),
+                    )
+            except Exception as e:
+                logger.debug("Perception phase skipped: %s", e)
+
+        # Reset progress tracking for adaptive iteration
+        self._progress_scores.clear()
 
         while True:
             # === PRE-ITERATION CHECKS (via coordinator helper) ===
@@ -644,9 +681,65 @@ class StreamingChatPipeline:
                 if tool_exec_result.should_return:
                     return
 
+                # === FULFILLMENT CHECK (AgenticLoop parity) ===
+                # After tool execution, check if the task is fulfilled using
+                # the same FulfillmentDetector as the non-streaming path.
+                if self._fulfillment and _perception:
+                    try:
+                        from victor.framework.fulfillment import TaskType
+                        from victor.agent.turn_policy import FulfillmentCriteriaBuilder
+
+                        task_analysis = getattr(_perception, "task_analysis", None)
+                        task_type_str = getattr(task_analysis, "task_type", "unknown") if task_analysis else "unknown"
+                        try:
+                            task_type = TaskType(task_type_str)
+                        except (ValueError, KeyError):
+                            task_type = TaskType.UNKNOWN
+
+                        criteria = FulfillmentCriteriaBuilder.from_tool_results(
+                            tool_exec_result.tool_results if hasattr(tool_exec_result, "tool_results") else []
+                        )
+                        fulfillment_result = await self._fulfillment.check_fulfillment(
+                            task_type=task_type,
+                            criteria=criteria,
+                            context={"full_content": full_content, "user_message": user_message},
+                        )
+                        if fulfillment_result.is_fulfilled:
+                            logger.info(
+                                "Streaming fulfillment: task fulfilled (score=%.2f, reason=%s)",
+                                fulfillment_result.score,
+                                fulfillment_result.reason,
+                            )
+                            return  # Exit loop — task complete
+                    except Exception as e:
+                        logger.debug("Streaming fulfillment check skipped: %s", e)
+
+                # === PROGRESS TRACKING (AgenticLoop parity) ===
+                # Track progress for adaptive iteration (plateau detection).
+                tool_count = tool_exec_result.tool_calls_executed if tool_exec_result else 0
+                content_len = len(full_content) if full_content else 0
+                progress = min(1.0, (tool_count * 0.3 + min(content_len / 2000, 0.7)))
+                self._progress_scores.append(progress)
+
+                # Plateau detection: 3+ iterations with < 5% progress change
+                if len(self._progress_scores) >= 3:
+                    recent = self._progress_scores[-3:]
+                    if max(recent) - min(recent) < 0.05 and recent[-1] < 0.8:
+                        logger.info(
+                            "Streaming progress plateau detected (scores=%s), injecting nudge",
+                            [f"{s:.2f}" for s in recent],
+                        )
+                        orch.add_message(
+                            "system",
+                            "Progress seems stalled. Try a different approach or "
+                            "summarize what you've found so far.",
+                        )
+
 
 def create_streaming_chat_pipeline(
     coordinator: "ChatCoordinator",
+    perception: Optional[Any] = None,
+    fulfillment: Optional[Any] = None,
 ) -> StreamingChatPipeline:
     """Factory helper for creating a streaming pipeline bound to a coordinator."""
-    return StreamingChatPipeline(coordinator)
+    return StreamingChatPipeline(coordinator, perception=perception, fulfillment=fulfillment)
