@@ -1,78 +1,54 @@
-"""Phase 1: Service layer integration tests.
+"""Service layer integration tests.
 
-Validates that the service layer delegation produces consistent behavior
-when USE_SERVICE_LAYER is enabled. Tests exercise the delegation paths
-structurally — verifying the wiring is correct and services are reachable.
+Validates that the service layer is mandatory — all orchestrator delegation
+methods call services directly without coordinator fallback.
 """
 
-import ast
 import inspect
-from pathlib import Path
+import re
 from unittest.mock import MagicMock
-
-import pytest
-
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 class TestServiceDelegationCompleteness:
-    """Verify every delegation guard has both a service call and coordinator fallback."""
+    """Verify services are mandatory with no coordinator fallback."""
 
     def test_no_coordinator_fallback_remains(self):
-        """After Phase 2, all delegation guards should be removed.
+        """No service None-guards should exist in the orchestrator.
 
-        The orchestrator should call services directly without
-        `if self._use_service_layer` checks.
+        The orchestrator calls services directly — there should be zero
+        `if self._*_service:` patterns.
         """
         source = _get_orchestrator_source()
-        assert "_use_service_layer and self._" not in source, (
-            "Coordinator fallback guards still present. Phase 2 should have "
-            "removed all `if self._use_service_layer and self._*_service:` patterns."
+        guards = re.findall(r"if self\._\w+_service:", source)
+        assert len(guards) == 0, (
+            f"Found {len(guards)} service None-guards. "
+            f"Services are mandatory — remove coordinator fallbacks."
         )
 
-    def test_service_and_coordinator_produce_same_method_names(self):
-        """Service delegation methods should map to identically-named coordinator methods.
+    def test_service_methods_exist_on_orchestrator(self):
+        """Key service delegation methods must exist on the orchestrator."""
+        from victor.agent.orchestrator import AgentOrchestrator
 
-        This catches renaming drift between the two paths.
-        """
-        source = _get_orchestrator_source()
-        lines = source.split("\n")
-
-        mismatches = []
-        for i, line in enumerate(lines):
-            stripped = line.strip()
-            if not ("self._use_service_layer and self._" in stripped and "_service:" in stripped):
-                continue
-
-            # Look at next 2 lines for the service call
-            service_line = lines[i + 1].strip() if i + 1 < len(lines) else ""
-            # Look at the fallback (usually 2 lines after the guard)
-            fallback_line = lines[i + 2].strip() if i + 2 < len(lines) else ""
-
-            # Extract method name from service call
-            if "." in service_line and "(" in service_line:
-                svc_method = service_line.split(".")[-1].split("(")[0]
-            else:
-                continue
-
-            # Extract method name from coordinator fallback
-            if "." in fallback_line and "(" in fallback_line:
-                coord_method = fallback_line.split(".")[-1].split("(")[0]
-            else:
-                continue
-
-            # They should match (or be close variants)
-            if svc_method != coord_method and svc_method not in coord_method:
-                mismatches.append(
-                    f"  Line {i + 1}: service.{svc_method} vs coordinator.{coord_method}"
-                )
-
-        # Allow some mismatches (different naming conventions between service and coordinator)
-        assert (
-            len(mismatches) <= 5
-        ), "Too many method name mismatches between service and coordinator paths:\n" + "\n".join(
-            mismatches
-        )
+        expected_methods = [
+            "chat",
+            "chat_with_planning",
+            "stream_chat",
+            "get_available_tools",
+            "get_enabled_tools",
+            "set_enabled_tools",
+            "is_tool_enabled",
+            "save_checkpoint",
+            "restore_checkpoint",
+            "get_recent_sessions",
+            "get_session_stats",
+            "get_context_metrics",
+            "get_current_provider_info",
+            "switch_provider",
+        ]
+        for method_name in expected_methods:
+            assert hasattr(AgentOrchestrator, method_name), (
+                f"AgentOrchestrator missing expected method: {method_name}"
+            )
 
 
 class TestBootstrapServiceCreation:
@@ -175,25 +151,6 @@ class TestExecutionContextServiceAccess:
         assert ctx.services.context is not None, "context service not resolved"
         assert ctx.services.provider is not None, "provider service not resolved"
         assert ctx.services.recovery is not None, "recovery service not resolved"
-
-
-class TestFeatureFlagGating:
-    """Verify USE_SERVICE_LAYER flag controls delegation."""
-
-    def test_flag_is_enabled_by_default(self):
-        """USE_SERVICE_LAYER should be enabled by default."""
-        from victor.core.feature_flags import FeatureFlag, FeatureFlagConfig, FeatureFlagManager
-
-        manager = FeatureFlagManager(FeatureFlagConfig())
-        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is True
-
-    def test_flag_can_be_disabled(self, monkeypatch):
-        """Disabling the flag should skip service delegation."""
-        from victor.core.feature_flags import FeatureFlag, FeatureFlagConfig, FeatureFlagManager
-
-        monkeypatch.setenv("VICTOR_USE_SERVICE_LAYER", "false")
-        manager = FeatureFlagManager(FeatureFlagConfig())
-        assert manager.is_enabled(FeatureFlag.USE_SERVICE_LAYER) is False
 
 
 def _get_orchestrator_source() -> str:
