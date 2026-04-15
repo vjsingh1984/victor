@@ -94,6 +94,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
     from victor.agent.tool_output_formatter import ToolOutputFormatter
     from victor.agent.tool_pipeline import ToolPipeline
+    from victor.runtime.context import ExecutionContext
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.tool_registrar import ToolRegistrar

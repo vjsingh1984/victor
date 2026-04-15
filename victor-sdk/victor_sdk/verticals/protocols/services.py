@@ -5,7 +5,7 @@ These protocols define how verticals provide service configurations.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Type
+from typing import Callable, Protocol, runtime_checkable, Dict, Any, Optional, Type
 
 
 @runtime_checkable

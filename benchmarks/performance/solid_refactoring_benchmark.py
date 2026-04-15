@@ -129,9 +129,7 @@ class BenchmarkSuite:
             other_result = other_results[name]
 
             # Compare ops per second (higher is better)
-            ops_improvement = (
-                (my_result.ops_per_second / other_result.ops_per_second) - 1
-            ) * 100
+            ops_improvement = ((my_result.ops_per_second / other_result.ops_per_second) - 1) * 100
             improvements[name] = ops_improvement
 
         return improvements
@@ -248,6 +246,7 @@ async def benchmark_tool_registration() -> BenchmarkSuite:
     # New registration (strategy-based)
     async def register_new_style():
         from victor.tools.registry import ToolRegistry
+        from victor.tools.base import BaseTool
         from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
         # Enable strategy flag
@@ -412,9 +411,7 @@ async def benchmark_vertical_creation() -> BenchmarkSuite:
 
 async def run_all_benchmarks() -> None:
     """Run all performance benchmarks."""
-    console.print(
-        "\n[bold cyan]Running SOLID Refactoring Performance Benchmarks[/bold cyan]\n"
-    )
+    console.print("\n[bold cyan]Running SOLID Refactoring Performance Benchmarks[/bold cyan]\n")
 
     # Tool Registration
     console.print("[yellow]Tool Registration Benchmarks[/yellow]")
@@ -494,9 +491,7 @@ def print_comparison(
 
     # Overall verdict
     avg_improvement = statistics.mean([imp for _, imp, _ in improvements])
-    console.print(
-        f"\n[bold]Average Performance Change:[/bold] {avg_improvement:+.1f}%\n"
-    )
+    console.print(f"\n[bold]Average Performance Change:[/bold] {avg_improvement:+.1f}%\n")
 
     if avg_improvement > 5:
         console.print("[green]✓ New architecture shows performance improvement[/green]")

@@ -4,7 +4,6 @@ import pytest
 
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols import (
-    CapabilityProvider,
     ToolProvider,
     SafetyProvider,
     PromptProvider,

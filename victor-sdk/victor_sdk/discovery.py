@@ -678,9 +678,9 @@ def get_discovery_summary() -> str:
 
     lines = [
         "=== Victor SDK Protocol Discovery Summary ===",
-        f"",
+        "",
         f"Statistics: {stats}",
-        f"",
+        "",
         f"Verticals ({stats.total_verticals}):",
     ]
 
@@ -689,7 +689,7 @@ def get_discovery_summary() -> str:
         source = meta.source_package if meta else "unknown"
         lines.append(f"  - {name} (from {source})")
 
-    lines.append(f"")
+    lines.append("")
     lines.append(f"Protocols ({stats.total_protocols}):")
 
     # Count by type
@@ -706,7 +706,7 @@ def get_discovery_summary() -> str:
     lines.append(f"  - Prompt providers: {len(registry.get_prompt_providers())}")
     lines.append(f"  - Team providers: {len(registry.get_team_providers())}")
 
-    lines.append(f"")
+    lines.append("")
     lines.append(f"Capabilities ({stats.total_capabilities}):")
 
     for name in sorted(registry.list_capability_names()):
@@ -714,14 +714,14 @@ def get_discovery_summary() -> str:
         source = meta.source_package if meta else "unknown"
         lines.append(f"  - {name} (from {source})")
 
-    lines.append(f"")
+    lines.append("")
     lines.append(f"Validators ({stats.total_validators}):")
 
     for name in sorted(registry.list_validator_names()):
         lines.append(f"  - {name}")
 
     if stats.failed_loads > 0:
-        lines.append(f"")
+        lines.append("")
         lines.append(f"Failed Loads ({stats.failed_loads}):")
         for name in registry.get_failed_loads():
             meta = metadata.get(name, {})

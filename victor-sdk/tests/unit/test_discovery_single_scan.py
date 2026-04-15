@@ -8,12 +8,11 @@ separate times, and correctly partitions results by group.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
 
-from victor_sdk.discovery import ProtocolRegistry, DiscoveryStats
+from victor_sdk.discovery import ProtocolRegistry
 
 
 def _make_entry_point(name: str, group: str, load_return: Any = None) -> Any:

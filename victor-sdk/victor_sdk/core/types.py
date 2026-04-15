@@ -170,8 +170,8 @@ def normalize_stage_definition(
         # Accept richer runtime stage objects during the migration to the
         # SDK definition contract without importing runtime-only types here.
         return StageDefinition(
-            name=getattr(stage, "name"),
-            description=getattr(stage, "description"),
+            name=stage.name,
+            description=stage.description,
             required_tools=list(getattr(stage, "required_tools", [])),
             optional_tools=sorted(
                 list(
@@ -785,9 +785,9 @@ def _normalize_team_formation(formation: Any) -> str:
     if isinstance(formation, str):
         return formation.lower()
     if hasattr(formation, "value"):
-        return str(getattr(formation, "value")).lower()
+        return str(formation.value).lower()
     if hasattr(formation, "name"):
-        return str(getattr(formation, "name")).lower()
+        return str(formation.name).lower()
     raise TypeError(f"Unsupported team formation type: {type(formation)!r}")
 
 

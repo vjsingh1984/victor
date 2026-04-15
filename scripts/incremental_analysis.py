@@ -94,9 +94,7 @@ victor_nodes = {
     for k, v in nodes.items()
     if v["file"] and "victor/" in v["file"] and "/test" not in v["file"].lower()
 }
-victor_edges = [
-    e for e in edges if e["src"] in victor_nodes and e["dst"] in victor_nodes
-]
+victor_edges = [e for e in edges if e["src"] in victor_nodes and e["dst"] in victor_nodes]
 print(f"    Victor nodes: {len(victor_nodes):,}")
 print(f"    Victor edges: {len(victor_edges):,}")
 
@@ -106,13 +104,9 @@ for node_id, node in victor_nodes.items():
     G.add_node(node_id, **node)
 for edge in victor_edges:
     if edge["src"] in victor_nodes and edge["dst"] in victor_nodes:
-        G.add_edge(
-            edge["src"], edge["dst"], edge_type=edge["type"], weight=edge["weight"]
-        )
+        G.add_edge(edge["src"], edge["dst"], edge_type=edge["type"], weight=edge["weight"])
 
-print(
-    f"    NetworkX graph: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges"
-)
+print(f"    NetworkX graph: {G.number_of_nodes():,} nodes, {G.number_of_edges():,} edges")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -155,7 +149,7 @@ metrics = {
 }
 with open(OUTPUT_DIR / "01_metrics.json", "w") as f:
     json.dump(metrics, f, indent=2)
-print(f"\n  >> Saved to 01_metrics.json")
+print("\n  >> Saved to 01_metrics.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -170,9 +164,7 @@ strong_comps.sort(key=len, reverse=True)
 print(f"\n  Weakly connected components: {len(weak_comps)}")
 print(f"  Strongly connected components: {len(strong_comps)}")
 print(f"\n  Top 10 weak component sizes: {[len(c) for c in weak_comps[:10]]}")
-print(
-    f"  Largest component coverage: {len(weak_comps[0])/G.number_of_nodes()*100:.1f}%"
-)
+print(f"  Largest component coverage: {len(weak_comps[0])/G.number_of_nodes()*100:.1f}%")
 
 # Analyze top components
 comp_details = []
@@ -206,7 +198,7 @@ with open(OUTPUT_DIR / "02_components.json", "w") as f:
         f,
         indent=2,
     )
-print(f"\n  >> Saved to 02_components.json")
+print("\n  >> Saved to 02_components.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -242,7 +234,7 @@ with open(OUTPUT_DIR / "03_pagerank.json", "w") as f:
         f,
         indent=2,
     )
-print(f"\n  >> Saved to 03_pagerank.json")
+print("\n  >> Saved to 03_pagerank.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -275,7 +267,7 @@ with open(OUTPUT_DIR / "04_in_degree.json", "w") as f:
         f,
         indent=2,
     )
-print(f"\n  >> Saved to 04_in_degree.json")
+print("\n  >> Saved to 04_in_degree.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -308,7 +300,7 @@ with open(OUTPUT_DIR / "05_out_degree.json", "w") as f:
         f,
         indent=2,
     )
-print(f"\n  >> Saved to 05_out_degree.json")
+print("\n  >> Saved to 05_out_degree.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -461,15 +453,9 @@ for item in dead_code:
     by_module[item["module"]].append(item)
 
 print(f"\n  Total dead code candidates: {len(dead_code)}")
-print(
-    f"  Medium severity (public): {len([x for x in dead_code if x['severity'] == 'medium'])}"
-)
-print(
-    f"  Low severity (private): {len([x for x in dead_code if x['severity'] == 'low'])}"
-)
-print(
-    f"  Excluded dunder methods: {excluded_dunder_count} (implicitly called by Python)"
-)
+print(f"  Medium severity (public): {len([x for x in dead_code if x['severity'] == 'medium'])}")
+print(f"  Low severity (private): {len([x for x in dead_code if x['severity'] == 'low'])}")
+print(f"  Excluded dunder methods: {excluded_dunder_count} (implicitly called by Python)")
 
 print("\n  By Module:")
 for mod, items in sorted(by_module.items(), key=lambda x: len(x[1]), reverse=True)[:10]:
@@ -496,7 +482,7 @@ with open(OUTPUT_DIR / "06_dead_code.json", "w") as f:
         f,
         indent=2,
     )
-print(f"\n  >> Saved to 06_dead_code.json")
+print("\n  >> Saved to 06_dead_code.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -576,7 +562,7 @@ with open(OUTPUT_DIR / "07_coupling.json", "w") as f:
         f,
         indent=2,
     )
-print(f"\n  >> Saved to 07_coupling.json")
+print("\n  >> Saved to 07_coupling.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -697,7 +683,7 @@ with open(OUTPUT_DIR / "08_duplications.json", "w") as f:
         f,
         indent=2,
     )
-print(f"\n  >> Saved to 08_duplications.json")
+print("\n  >> Saved to 08_duplications.json")
 
 # ============================================================================
 print("\n" + "=" * 70)
@@ -711,10 +697,8 @@ for (src, dst), count in sorted(
         (
             (s, d),
             (
-                sum(v.values())
-                if isinstance(
-                    list(module_edges[s].values())[0] if module_edges[s] else 0, int
-                )
+                sum(module_edges[s].values())
+                if isinstance(list(module_edges[s].values())[0] if module_edges[s] else 0, int)
                 else module_edges[s][d]
             ),
         )
@@ -725,9 +709,7 @@ for (src, dst), count in sorted(
     reverse=True,
 ):
     if module_edges[src][dst] >= 5:
-        dep_data.append(
-            {"source": src, "target": dst, "weight": module_edges[src][dst]}
-        )
+        dep_data.append({"source": src, "target": dst, "weight": module_edges[src][dst]})
 
 dep_data.sort(key=lambda x: x["weight"], reverse=True)
 
@@ -743,7 +725,7 @@ modules_data = [
 
 with open(OUTPUT_DIR / "09_module_deps.json", "w") as f:
     json.dump({"modules": modules_data, "dependencies": dep_data}, f, indent=2)
-print(f"\n  >> Saved to 09_module_deps.json")
+print("\n  >> Saved to 09_module_deps.json")
 
 # ============================================================================
 print("\n" + "=" * 70)

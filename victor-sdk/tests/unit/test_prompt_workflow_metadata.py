@@ -2,8 +2,6 @@
 
 from victor_sdk import (
     PromptMetadata,
-    PromptTemplateDefinition,
-    TaskTypeHintDefinition,
     WorkflowMetadata,
     normalize_prompt_metadata,
     normalize_prompt_templates,

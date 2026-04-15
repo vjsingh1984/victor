@@ -274,30 +274,6 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         except Exception:
             pass
         return None
-        self._batch_size = int(config.extra_config.get("batch_size", 16))
-        self._chunk_size = int(config.extra_config.get("chunk_size", 500))
-        self._chunk_overlap = int(config.extra_config.get("chunk_overlap", 50))
-        self._code_chunking_strategy = str(
-            config.extra_config.get("code_chunking_strategy", "symbol_span")
-        )
-        self._code_chunker = create_code_chunker(
-            self._code_chunking_strategy,
-            chunk_size=self._chunk_size,
-            chunk_overlap=self._chunk_overlap,
-        )
-        self._graph_enabled = bool(config.extra_config.get("graph_enabled", True))
-        self._document_enabled = bool(config.extra_config.get("document_enabled", True))
-        self._metrics_enabled = bool(config.extra_config.get("metrics_enabled", True))
-        self._query_scan_limit = int(config.extra_config.get("query_scan_limit", 500))
-
-        workspace = config.extra_config.get("workspace")
-        if not workspace:
-            workspace = Path.cwd().name or "victor"
-        self._workspace = self._normalize_collection_name(str(workspace))
-        self._vector_collection = self._collection_name("vector_collection", "vectors")
-        self._document_collection = self._collection_name("document_collection", "documents")
-        self._metrics_collection = self._collection_name("metrics_collection", "metrics")
-        self._graph_collection = self._collection_name("graph_collection", "graph")
 
     async def initialize(self) -> None:
         """Initialize the embedding model and required ProximaDB collections."""

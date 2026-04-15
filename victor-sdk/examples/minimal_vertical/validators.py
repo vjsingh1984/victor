@@ -4,7 +4,7 @@ This module demonstrates how to provide validation functions
 through the entry point system.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 def validate_file_path(path: str) -> Dict[str, Any]:

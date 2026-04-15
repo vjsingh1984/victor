@@ -84,8 +84,8 @@ class TestContainerSingletonGuard:
 
         calls = _count_get_container_calls(runtime_root)
         assert not calls, (
-            f"victor/runtime/ must not use get_container(). "
-            f"Use ExecutionContext.container instead:\n"
+            "victor/runtime/ must not use get_container(). "
+            "Use ExecutionContext.container instead:\n"
             + "\n".join(f"  {f}:{line}" for f, line in calls)
         )
 

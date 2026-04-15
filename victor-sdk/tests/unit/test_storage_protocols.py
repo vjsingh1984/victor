@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from victor_sdk.verticals.protocols.storage import (
     EmbeddingConfigData,

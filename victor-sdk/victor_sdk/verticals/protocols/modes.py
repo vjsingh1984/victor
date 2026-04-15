@@ -5,7 +5,7 @@ These protocols define how verticals provide mode configurations.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Dict, Any, List, Optional
+from typing import Protocol, runtime_checkable, Dict, Any, List
 
 
 @runtime_checkable

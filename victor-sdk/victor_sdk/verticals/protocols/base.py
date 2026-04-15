@@ -13,25 +13,13 @@ from abc import ABC, abstractmethod
 from typing import Any, Callable, ClassVar, Dict, List, Optional
 
 from victor_sdk.core.types import (
-    CapabilityRequirementLike,
-    PromptMetadata,
-    TeamMetadata,
-    WorkflowMetadata,
-    TeamDefinitionLike,
-    ToolRequirementLike,
     VerticalConfig,
     VerticalDefinition,
     StageDefinition,
     Tier,
     ToolSet,
     normalize_capability_requirements,
-    normalize_prompt_metadata,
-    normalize_prompt_templates,
-    normalize_task_type_hints,
-    normalize_team_metadata,
-    normalize_team_definitions,
     normalize_tool_requirements,
-    normalize_workflow_metadata,
 )
 from victor_sdk.verticals.extensions import VerticalExtensions
 from victor_sdk.core.api_version import CURRENT_API_VERSION

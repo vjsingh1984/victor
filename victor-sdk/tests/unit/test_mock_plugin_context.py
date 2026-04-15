@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from victor_sdk.core.plugins import PluginContext
 from victor_sdk.testing.fixtures import MockPluginContext
@@ -106,7 +105,6 @@ class TestMockPluginContextRoundtrip:
     """End-to-end: a VictorPlugin registers via MockPluginContext."""
 
     def test_plugin_register_roundtrip(self):
-        from victor_sdk.core.plugins import VictorPlugin
 
         class MyPlugin:
             @property

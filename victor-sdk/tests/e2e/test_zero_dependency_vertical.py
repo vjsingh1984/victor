@@ -6,7 +6,6 @@ without any victor-ai runtime dependencies.
 
 import subprocess
 import sys
-from typing import List
 
 
 def run_python_script(script: str) -> tuple[bool, str, str]:

@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from victor_sdk.core.api_version import CURRENT_API_VERSION, MIN_SUPPORTED_API_VERSION
 from victor_sdk.verticals.manifest import ExtensionManifest

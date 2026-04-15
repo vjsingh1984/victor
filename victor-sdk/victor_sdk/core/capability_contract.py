@@ -6,8 +6,8 @@ independently, so verticals can declare "I need Tools v2, Safety v1".
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 
 @dataclass(frozen=True)

@@ -70,7 +70,7 @@ class TestServiceDelegationCompleteness:
         # Allow some mismatches (different naming conventions between service and coordinator)
         assert (
             len(mismatches) <= 5
-        ), f"Too many method name mismatches between service and coordinator paths:\n" + "\n".join(
+        ), "Too many method name mismatches between service and coordinator paths:\n" + "\n".join(
             mismatches
         )
 
