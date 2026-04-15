@@ -1974,7 +1974,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if context is dangerously large
         """
-        return self._context_service.check_context_overflow(max_context_chars)
+        # Use the sync context manager for context overflow check.
+        # ContextService is async and may not accept max_context_chars,
+        # so delegate to the conversation controller's sync check.
+        return self._context_manager.check_context_overflow(max_context_chars)
 
     def get_context_metrics(self) -> ContextMetrics:
         """Get detailed context metrics.
@@ -1982,7 +1985,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             ContextMetrics with size and overflow information
         """
-        return self._context_service.get_context_metrics()
+        return self._context_manager.get_context_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize embedding store. Delegates to SessionCoordinator."""
