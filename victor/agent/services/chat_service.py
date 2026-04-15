@@ -350,7 +350,8 @@ class ChatService:
 
         # Stream from provider
         provider = self._provider.get_current_provider()
-        stream = provider.stream_chat(messages, model=provider.model, **kwargs)
+        model = getattr(self._provider, "_current_model", "default")
+        stream = provider.stream_chat(messages, model=model, **kwargs)
 
         async for chunk in stream:
             yield chunk
@@ -366,7 +367,8 @@ class ChatService:
             CompletionResponse from provider
         """
         provider = self._provider.get_current_provider()
-        return await provider.chat(messages, model=provider.model, **kwargs)
+        model = getattr(self._provider, "_current_model", "default")
+        return await provider.chat(messages, model=model, **kwargs)
 
     def _is_response_complete(self, response: "CompletionResponse") -> bool:
         """Check if response is complete.

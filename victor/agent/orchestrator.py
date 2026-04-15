@@ -675,6 +675,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # active provider from orchestrator construction (not just from registry).
         if self._provider_service is not None and hasattr(self, "provider"):
             self._provider_service._current_provider = self.provider
+            self._provider_service._current_model = getattr(self, "model", "default")
 
         logger.info(
             "Service layer initialized: chat=%s, tool=%s, session=%s, "
