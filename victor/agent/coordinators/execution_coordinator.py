@@ -218,16 +218,19 @@ class ExecutionCoordinator:
         is_qa_task = self._is_question_only(user_message)
 
         # Agentic loop: continue until no tool calls or budget exhausted
-        final_response: Optional[CompletionResponse] = None
-        consecutive_zero_tool_turns = 0
-        MAX_ZERO_TOOL_TURNS = 3  # Nudge after 2, break after 3
-        # Search nudge: track read-heavy turns without code_search
-        consecutive_read_only_turns = 0
-        has_used_code_search = False
-        _READ_ONLY_TOOLS = {"read", "ls", "list_directory", "grep"}
+        # Uses shared turn_policy constants for consistency with AgenticLoop
+        from victor.agent.turn_policy import (
+            SpinDetector as _SpinDetector,
+            NudgePolicy as _NudgePolicy,
+            SpinState as _SpinState,
+            MAX_NO_TOOL_TURNS as _MAX_NO_TOOL_TURNS,
+            MAX_ALL_BLOCKED as _MAX_ALL_BLOCKED,
+            READ_ONLY_TOOLS as _READ_ONLY_TOOLS,
+        )
 
-        consecutive_all_blocked = 0  # Spin detection: dedup-blocked tool batches
-        MAX_ALL_BLOCKED = 3  # Break after 3 consecutive fully-blocked batches
+        final_response: Optional[CompletionResponse] = None
+        spin = _SpinDetector()
+        nudge_policy = _NudgePolicy()
 
         while iteration < iteration_budget:
             iteration += 1
@@ -269,25 +272,7 @@ class ExecutionCoordinator:
 
             # Check if model wants to use tools
             if response.tool_calls:
-                consecutive_zero_tool_turns = 0
-
-                # Track read-heavy turns for search nudge
                 turn_tools = {tc.get("name", "") for tc in response.tool_calls}
-                if "code_search" in turn_tools:
-                    has_used_code_search = True
-                if turn_tools.issubset(_READ_ONLY_TOOLS):
-                    consecutive_read_only_turns += 1
-                else:
-                    consecutive_read_only_turns = 0
-                # Nudge after 5+ read-only turns without code_search
-                if consecutive_read_only_turns >= 5 and not has_used_code_search:
-                    self._chat_context.add_message(
-                        "user",
-                        "You have been browsing files for several turns. "
-                        "Consider using code_search(query='...') to find "
-                        "relevant code more efficiently.",
-                    )
-                    consecutive_read_only_turns = 0
 
                 # Handle tool calls and track results
                 tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
@@ -299,7 +284,6 @@ class ExecutionCoordinator:
                     else:
                         failure_context.failed_tools.append(result)
                         failure_context.last_error = result.get("error")
-                        # Record failure in OptimizationInjector for next-turn hints
                         _orch = getattr(self, "_orchestrator", None) or getattr(
                             self._chat_context, "_orchestrator", None
                         )
@@ -312,78 +296,63 @@ class ExecutionCoordinator:
                                 result["error"],
                             )
 
-                # Spin detection: check if ALL tool calls were dedup-blocked
+                # Spin detection via shared SpinDetector
                 _pipeline = getattr(self._tool_context, "_tool_pipeline", None)
                 if _pipeline is None:
-                    # Try via orchestrator reference
                     _orch = getattr(self, "_orchestrator", None) or getattr(
                         self._chat_context, "_orchestrator", None
                     )
                     if _orch:
                         _pipeline = getattr(_orch, "_tool_pipeline", None)
+                _all_blocked = bool(
+                    _pipeline and getattr(_pipeline, "last_batch_all_skipped", False)
+                )
 
-                _all_blocked = _pipeline and getattr(_pipeline, "last_batch_all_skipped", False)
-                if _all_blocked:
-                    consecutive_all_blocked += 1
-                    logger.info(
-                        f"[spin-detect] All tools blocked by dedup "
-                        f"({consecutive_all_blocked}/{MAX_ALL_BLOCKED})"
+                spin.record_turn(
+                    has_tool_calls=True,
+                    all_blocked=_all_blocked,
+                    tool_names=turn_tools,
+                    tool_count=len(response.tool_calls),
+                )
+
+                # Inject nudges via shared NudgePolicy
+                nudge_decision = nudge_policy.evaluate(spin)
+                if nudge_decision.should_inject:
+                    self._chat_context.add_message(nudge_decision.role, nudge_decision.message)
+                    logger.info(f"[nudge] {nudge_decision.nudge_type.value}")
+
+                # Check for spin termination
+                if spin.state == _SpinState.TERMINATED:
+                    logger.warning(
+                        "[spin-detect] Terminated: blocked=%d, no_tool=%d",
+                        spin.consecutive_all_blocked,
+                        spin.consecutive_no_tool_turns,
                     )
-                    if consecutive_all_blocked == 2:
-                        self._chat_context.add_message(
-                            "system",
-                            "Your last tool calls were blocked because you already "
-                            "called them with the same arguments. Try a DIFFERENT "
-                            "tool or different arguments. If you've made your fix, "
-                            "provide your final answer.",
-                        )
-                    if consecutive_all_blocked >= MAX_ALL_BLOCKED:
-                        logger.warning(
-                            f"[spin-detect] {consecutive_all_blocked} consecutive "
-                            "fully-blocked tool batches — breaking spin loop"
-                        )
-                        final_response = response
-                        break
-                else:
-                    consecutive_all_blocked = 0
+                    final_response = response
+                    break
 
                 # Continue loop to get follow-up response
                 continue
 
-            # No tool calls — check if agent is stuck or truly done
-            consecutive_zero_tool_turns += 1
+            # No tool calls — record in spin detector
+            spin.record_turn(has_tool_calls=False)
 
-            if consecutive_zero_tool_turns >= MAX_ZERO_TOOL_TURNS:
-                # Agent has been chatting without tools for too many turns
+            if spin.state == _SpinState.TERMINATED:
                 logger.warning(
                     "Agent stuck: %d turns without tool calls, breaking loop",
-                    consecutive_zero_tool_turns,
+                    spin.consecutive_no_tool_turns,
                 )
                 final_response = response
                 break
 
-            if consecutive_zero_tool_turns >= 2 and tools:
-                # Nudge: inject tool-usage prompt and continue
-                logger.info(
-                    "Zero-tool nudge: %d turns without tools, prompting",
-                    consecutive_zero_tool_turns,
-                )
-                nudge = (
-                    "You have not called any tools in the last "
-                    f"{consecutive_zero_tool_turns} turns. You MUST use a tool now "
-                    "(read, edit, write, shell) to make progress on the task. "
-                    "Do not respond with text only."
-                )
-                self._chat_context.add_message("user", nudge)
-
-                # Budget awareness: warn when past halfway with no tool calls
-                if iteration > iteration_budget // 2:
-                    remaining = iteration_budget - iteration
-                    self._chat_context.add_message(
-                        "system",
-                        f"WARNING: {remaining} turns remaining out of {iteration_budget}. "
-                        "Make your edits NOW.",
-                    )
+            if spin.state == _SpinState.WARNING and tools:
+                # Inject nudge and budget warning via shared policy
+                nudge_decision = nudge_policy.evaluate(spin)
+                if nudge_decision.should_inject:
+                    self._chat_context.add_message(nudge_decision.role, nudge_decision.message)
+                budget_warning = nudge_policy.budget_warning(iteration, iteration_budget)
+                if budget_warning.should_inject:
+                    self._chat_context.add_message(budget_warning.role, budget_warning.message)
                 continue
 
             # First turn with no tool calls — allow it (model may be
