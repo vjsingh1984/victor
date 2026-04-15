@@ -1043,14 +1043,17 @@ class VictorAPIServer:
             logger.warning(f"Delayed shutdown encountered error: {e}")
 
     async def _get_orchestrator(self) -> Any:
-        """Get or create the orchestrator."""
+        """Get or create the orchestrator via AgentFactory."""
         if self._orchestrator is None:
-            from victor.agent.orchestrator import AgentOrchestrator
             from victor.config.settings import load_settings
+            from victor.framework.agent_factory import AgentFactory
 
             settings = load_settings()
-            # Create orchestrator with settings
-            self._orchestrator = await AgentOrchestrator.from_settings(settings)
+            factory = AgentFactory(
+                settings=settings,
+                enable_observability=True,
+            )
+            self._orchestrator = await factory.create()
 
         return self._orchestrator
 

@@ -167,8 +167,11 @@ async def _list_tools_async(profile: str) -> None:
     settings = load_settings()
     agent = None
     try:
-        # AgentOrchestrator.from_settings is an async static method
-        agent = await AgentOrchestrator.from_settings(settings, profile)
+        # Unified initialization via AgentFactory
+        from victor.framework.agent_factory import AgentFactory
+
+        factory = AgentFactory(settings=settings, profile=profile)
+        agent = await factory.create()
 
         # Retrieve tools from the agent's ToolRegistry
         # list_tools(only_enabled=False) gets all registered tools, regardless of current enable/disable status

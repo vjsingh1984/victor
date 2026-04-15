@@ -141,3 +141,16 @@ flowchart TB
 | **Opt-in complexity** | Simple `agent.run()` by default; workflows, teams, plugins when needed |
 | **Air-gapped capable** | Full functionality with local models (Ollama, LM Studio, vLLM) |
 | **Dynamic CLI Discovery** | Subcommands discovered from plugins at runtime; no static imports in core CLI |
+
+## Choose Your API
+
+| I want to... | Use | Example |
+|---|---|---|
+| Build a simple agent | `Agent.create()` | `agent = await Agent.create(provider="anthropic")` |
+| Customize initialization | `AgentFactory` | `AgentFactory(settings, profile="groq-fast", vertical="coding")` |
+| Run interactively | CLI | `victor chat --profile groq-fast` |
+| Build an HTTP service | API server | `victor serve --port 8000` |
+| Run diagnostics | Doctor | `victor doctor --verbose` |
+| Configure first time | Onboarding | `victor init` |
+
+**All paths use `AgentFactory` internally** — consistent initialization, error handling, and feature wiring regardless of entry point.

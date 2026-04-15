@@ -625,25 +625,29 @@ async def run_oneshot(
     agent = None
     shim: Optional[FrameworkShim] = None
     try:
-        if tool_budget is not None:
-            settings.tools.tool_call_budget = tool_budget
+        # Unified initialization via AgentFactory (replaces legacy/framework split)
+        from victor.framework.agent_factory import AgentFactory, InitializationError
 
-        if legacy_mode:
-            # Legacy path: direct orchestrator creation (no framework features)
-            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
-        else:
-            # Framework path: use FrameworkShim with observability and verticals
-            vertical_class = get_vertical(vertical) if vertical else None
-
-            shim = FrameworkShim(
-                settings,
-                profile_name=profile,
-                thinking=thinking,
-                vertical=vertical_class,
-                enable_observability=enable_observability,
-                session_id=session_id,
-            )
-            agent = await shim.create_orchestrator()
+        vertical_class = get_vertical(vertical) if vertical else None
+        factory = AgentFactory(
+            settings=settings,
+            profile=profile,
+            vertical=vertical_class,
+            thinking=thinking,
+            session_id=session_id,
+            enable_observability=enable_observability,
+            tool_budget=tool_budget,
+            max_iterations=max_iterations if "max_iterations" in dir() else None,
+        )
+        try:
+            agent = await factory.create()
+        except InitializationError as e:
+            formatter.error(f"{e.stage}: {e.message}")
+            for s in e.suggestions:
+                formatter.info(f"  → {s}")
+            if e.run_command:
+                formatter.info(f"Run: {e.run_command}")
+            raise typer.Exit(1)
 
             # Set planning model override if provided (for planning coordinator)
             if planning_model:
@@ -778,25 +782,28 @@ async def run_interactive(
             console.print(f"[bold red]Error:[/ ] Profile '{profile}' not found")
             raise typer.Exit(1)
 
-        if tool_budget is not None:
-            settings.tools.tool_call_budget = tool_budget
+        # Unified initialization via AgentFactory
+        from victor.framework.agent_factory import AgentFactory, InitializationError
 
-        if legacy_mode:
-            # Legacy path: direct orchestrator creation (no framework features)
-            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
-        else:
-            # Framework path: use FrameworkShim with observability and verticals
-            vertical_class = get_vertical(vertical) if vertical else None
-
-            shim = FrameworkShim(
-                settings,
-                profile_name=profile,
-                thinking=thinking,
-                vertical=vertical_class,
-                enable_observability=enable_observability,
-                session_id=session_id,
-            )
-            agent = await shim.create_orchestrator()
+        vertical_class = get_vertical(vertical) if vertical else None
+        factory = AgentFactory(
+            settings=settings,
+            profile=profile,
+            vertical=vertical_class,
+            thinking=thinking,
+            session_id=session_id,
+            enable_observability=enable_observability,
+            tool_budget=tool_budget,
+        )
+        try:
+            agent = await factory.create()
+        except InitializationError as e:
+            console.print(f"[red]Error ({e.stage}):[/] {e.message}")
+            for s in e.suggestions:
+                console.print(f"  → {s}")
+            if e.run_command:
+                console.print(f"\nRun: [bold]{e.run_command}[/]")
+            raise typer.Exit(1)
 
             # Set planning model override if provided (for planning coordinator)
             if planning_model:
