@@ -41,7 +41,7 @@ class TestRuntimeLazyInitialization:
         """Test that coordination runtime components are NOT initialized during Agent.create()."""
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -83,7 +83,7 @@ class TestRuntimeLazyInitialization:
         """Test that interaction runtime components are NOT initialized during Agent.create()."""
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -129,7 +129,7 @@ class TestRuntimeLazyInitialization:
         """Test that resilience runtime components are NOT initialized during Agent.create()."""
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -162,7 +162,7 @@ class TestRuntimeLazyInitialization:
         """Test that runtime components DO initialize when first accessed via get_instance()."""
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -201,7 +201,7 @@ class TestRuntimeLazyInitialization:
         """Test that provider runtime components are NOT initialized during Agent.create()."""
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -239,7 +239,7 @@ class TestRuntimeLazyInitialization:
         """Test that workflow runtime components are NOT initialized during Agent.create()."""
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -274,7 +274,7 @@ class TestRuntimeLazyInitialization:
         """
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",
@@ -302,7 +302,7 @@ class TestRuntimeLazyInitialization:
         """Test that all runtime boundaries exist and have the expected structure."""
         with patch(
             "victor.providers.registry.ProviderRegistry.create", return_value=mock_ollama_provider
-        ):
+        ), patch("victor.core.bootstrap_services.bootstrap_new_services"):
             agent = await Agent.create(
                 provider="ollama",
                 model="qwen3-coder:30b",

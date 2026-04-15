@@ -1,6 +1,6 @@
 from typing import List
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -58,7 +58,8 @@ class _DummyProvider(BaseProvider):
 @pytest.fixture()
 def orchestrator() -> AgentOrchestrator:
     settings = Settings(analytics_enabled=False, tool_selection_strategy="keyword")
-    orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
     try:
         yield orch
     finally:

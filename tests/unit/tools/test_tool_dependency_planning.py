@@ -41,15 +41,16 @@ class _DummyProvider(BaseProvider):
 
 
 def _orch():
-    return AgentOrchestrator(
-        Settings(
-            analytics_enabled=False,
-            tool_selection_strategy="keyword",
-            tool_cache_enabled=False,
-        ),
-        _DummyProvider(),
-        "dummy",
-    )
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        return AgentOrchestrator(
+            Settings(
+                analytics_enabled=False,
+                tool_selection_strategy="keyword",
+                tool_cache_enabled=False,
+            ),
+            _DummyProvider(),
+            "dummy",
+        )
 
 
 def test_core_tools_always_selected():
