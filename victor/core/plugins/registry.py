@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional, Type, TYPE_CHECKING
 from victor.core.aot_manifest import AOTManifestManager
 from victor.core.container import ServiceContainer, get_container
 from victor.core.plugins.protocol import VictorPlugin
-from victor.framework.module_loader import get_entry_point_cache
+from victor.framework.entry_point_registry import get_entry_point_values
 
 if TYPE_CHECKING:
     from victor.core.plugins.context import HostPluginContext
@@ -167,8 +167,8 @@ class PluginRegistry:
 
         Uses a three-tier discovery strategy:
         1. AOT manifest (O(1) file read, fastest)
-        2. EntryPointCache (memory/disk cache with env hash)
-        3. Full entry_points() scan (slowest, updates caches)
+        2. Shared entry-point registry helpers (single-pass scan, process cache)
+        3. Registry invalidation on forced refresh
 
         Args:
             force: Whether to force re-discovery.
@@ -187,8 +187,7 @@ class PluginRegistry:
         if aot_entries is not None:
             ep_entries = aot_entries.get(self.ENTRY_POINT_GROUP, {})
         else:
-            cache = get_entry_point_cache()
-            ep_entries = cache.get_entry_points(self.ENTRY_POINT_GROUP, force_refresh=force)
+            ep_entries = get_entry_point_values(self.ENTRY_POINT_GROUP, force=force)
 
         for name, value in ep_entries.items():
             try:
