@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Iterable
 
@@ -37,6 +38,14 @@ _IGNORED_DIR_NAMES = {
     "tests",
     "venv",
 }
+
+
+@dataclass(frozen=True)
+class ContractAuditConfig:
+    """Optional repo-local configuration for the contract auditor."""
+
+    source_roots: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -164,6 +173,7 @@ class VerticalContractAuditor:
 
         project = pyproject_data.get("project", {}) if isinstance(pyproject_data, dict) else {}
         report.project_name = str(project.get("name") or root_path.name)
+        audit_config = self._load_audit_config(pyproject_data)
 
         entry_points = project.get("entry-points", {}) if isinstance(project, dict) else {}
         plugin_entries = entry_points.get("victor.plugins", {})
@@ -195,10 +205,62 @@ class VerticalContractAuditor:
                 path="pyproject.toml",
             )
 
-        for issue in self._scan_python_sources(root_path):
+        for missing_root in self._find_missing_source_roots(root_path, audit_config):
+            report.add_issue(
+                "warning",
+                "missing_contract_audit_source_root",
+                f"Configured contract-audit source root '{missing_root}' does not exist.",
+                path="pyproject.toml",
+            )
+
+        for issue in self._scan_python_sources(root_path, audit_config):
             report.issues.append(issue)
 
         return report
+
+    def _load_audit_config(self, pyproject_data: dict[str, object]) -> ContractAuditConfig:
+        """Load repo-local contract-audit config from pyproject metadata."""
+
+        if not isinstance(pyproject_data, dict):
+            return ContractAuditConfig()
+
+        tool_data = pyproject_data.get("tool", {})
+        if not isinstance(tool_data, dict):
+            return ContractAuditConfig()
+
+        victor_data = tool_data.get("victor", {})
+        if not isinstance(victor_data, dict):
+            return ContractAuditConfig()
+
+        raw_config = victor_data.get("contract_audit", {})
+        if not isinstance(raw_config, dict):
+            return ContractAuditConfig()
+
+        raw_source_roots = raw_config.get("source_roots", [])
+        raw_exclude = raw_config.get("exclude", [])
+
+        source_roots = tuple(str(item) for item in raw_source_roots if str(item).strip())
+        exclude = tuple(str(item) for item in raw_exclude if str(item).strip())
+        return ContractAuditConfig(source_roots=source_roots, exclude=exclude)
+
+    def _find_missing_source_roots(
+        self,
+        root_path: Path,
+        config: ContractAuditConfig,
+    ) -> list[str]:
+        """Return configured source roots that do not exist."""
+
+        missing: list[str] = []
+        for raw_root in config.source_roots:
+            candidate = (root_path / raw_root).resolve()
+            try:
+                candidate.relative_to(root_path.resolve())
+            except ValueError:
+                missing.append(raw_root)
+                continue
+            if not candidate.exists():
+                missing.append(raw_root)
+        return missing
 
     def _collect_dependency_names(self, project: dict[str, object]) -> set[str]:
         """Return normalized dependency package names from project metadata."""
@@ -228,53 +290,102 @@ class VerticalContractAuditor:
                 names.add(token)
         return names
 
-    def _scan_python_sources(self, root_path: Path) -> list[AuditIssue]:
+    def _scan_python_sources(
+        self,
+        root_path: Path,
+        config: ContractAuditConfig,
+    ) -> list[AuditIssue]:
         """Scan repository Python sources for forbidden runtime imports."""
 
         issues: list[AuditIssue] = []
-        for source_path in root_path.rglob("*.py"):
-            if self._should_skip_path(root_path, source_path):
-                continue
-            relative_path = source_path.relative_to(root_path)
-            try:
-                tree = ast.parse(source_path.read_text(encoding="utf-8"))
-            except SyntaxError as exc:
-                issues.append(
-                    AuditIssue(
-                        level="warning",
-                        code="invalid_python_source",
-                        message=f"Could not parse Python source: {exc.msg}",
-                        path=str(relative_path),
-                        line=exc.lineno,
-                    )
-                )
-                continue
-
-            for node in ast.walk(tree):
-                module_name = self._extract_imported_module(node)
-                if module_name and self._is_forbidden_runtime_import(module_name):
+        seen_paths: set[Path] = set()
+        for scan_root in self._iter_scan_roots(root_path, config):
+            candidates = [scan_root] if scan_root.is_file() else list(scan_root.rglob("*.py"))
+            for source_path in candidates:
+                if source_path in seen_paths:
+                    continue
+                seen_paths.add(source_path)
+                if self._should_skip_path(root_path, source_path, config):
+                    continue
+                relative_path = source_path.relative_to(root_path)
+                try:
+                    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+                except SyntaxError as exc:
                     issues.append(
                         AuditIssue(
-                            level="error",
-                            code="forbidden_runtime_import",
-                            message=(
-                                f"Direct runtime import '{module_name}' leaks core internals "
-                                "into the extracted vertical boundary."
-                            ),
+                            level="warning",
+                            code="invalid_python_source",
+                            message=f"Could not parse Python source: {exc.msg}",
                             path=str(relative_path),
-                            line=getattr(node, "lineno", None),
+                            line=exc.lineno,
                         )
                     )
+                    continue
+
+                for node in ast.walk(tree):
+                    module_name = self._extract_imported_module(node)
+                    if module_name and self._is_forbidden_runtime_import(module_name):
+                        issues.append(
+                            AuditIssue(
+                                level="error",
+                                code="forbidden_runtime_import",
+                                message=(
+                                    f"Direct runtime import '{module_name}' leaks core internals "
+                                    "into the extracted vertical boundary."
+                                ),
+                                path=str(relative_path),
+                                line=getattr(node, "lineno", None),
+                            )
+                        )
         return issues
 
-    def _should_skip_path(self, root_path: Path, source_path: Path) -> bool:
+    def _iter_scan_roots(self, root_path: Path, config: ContractAuditConfig) -> Iterable[Path]:
+        """Yield filesystem roots to scan for Python sources."""
+
+        if not config.source_roots:
+            yield root_path
+            return
+
+        root_resolved = root_path.resolve()
+        for raw_root in config.source_roots:
+            candidate = (root_path / raw_root).resolve()
+            try:
+                candidate.relative_to(root_resolved)
+            except ValueError:
+                continue
+            if not candidate.exists():
+                continue
+            yield candidate
+
+    def _should_skip_path(
+        self,
+        root_path: Path,
+        source_path: Path,
+        config: ContractAuditConfig,
+    ) -> bool:
         """Return True for ignored files or directories."""
 
-        relative_parts = source_path.relative_to(root_path).parts
+        relative_path = source_path.relative_to(root_path)
+        relative_parts = relative_path.parts
         if any(part in _IGNORED_DIR_NAMES for part in relative_parts[:-1]):
+            return True
+        if self._matches_exclude_patterns(relative_path, config.exclude):
             return True
         filename = relative_parts[-1]
         return filename.startswith("test_")
+
+    def _matches_exclude_patterns(
+        self,
+        relative_path: Path,
+        patterns: tuple[str, ...],
+    ) -> bool:
+        """Return True when *relative_path* matches any configured exclude pattern."""
+
+        path_str = relative_path.as_posix()
+        for pattern in patterns:
+            if fnmatch(path_str, pattern) or relative_path.match(pattern):
+                return True
+        return False
 
     def _extract_imported_module(self, node: ast.AST) -> str | None:
         """Return the imported module path for an import node."""

@@ -14,6 +14,7 @@ from victor_sdk.capability_runtime import (
     detect_enhanced_index_factory,
 )
 from victor_sdk.chain_runtime import ChainRegistry, get_chain_registry
+from victor_sdk.graph_runtime import END, StateGraph
 from victor_sdk.init_runtime import InitSynthesizer
 from victor_sdk.lsp_runtime import LSPServiceProtocol
 from victor_sdk.handler_runtime import BaseHandler, handler_decorator
@@ -28,6 +29,7 @@ from victor_sdk.rl_runtime import RLManager, get_rl_coordinator
 from victor_sdk.provider_runtime import Message, ProviderRegistry
 from victor_sdk.search_runtime import QueryExpander, QueryExpansionConfig
 from victor_sdk.subagent_runtime import RoleToolProvider, set_role_tool_provider
+from victor_sdk.tool_runtime import RuntimeToolSet
 from victor_sdk.workflow_executor_runtime import (
     ComputeNode,
     ExecutorNodeStatus,
@@ -72,9 +74,12 @@ def test_capability_runtime_exports_host_helpers() -> None:
 def test_chain_provider_and_init_runtime_exports_host_helpers() -> None:
     assert ChainRegistry.__name__ == "ChainRegistry"
     assert callable(get_chain_registry)
+    assert StateGraph.__name__ == "StateGraph"
+    assert END == "__end__"
     assert InitSynthesizer.__name__ == "InitSynthesizer"
     assert Message.__name__ == "Message"
     assert ProviderRegistry.__name__ == "ProviderRegistry"
+    assert RuntimeToolSet.__name__ == "ToolSet"
 
 
 def test_agent_spec_subagent_and_workflow_executor_runtime_exports_host_helpers() -> None:
