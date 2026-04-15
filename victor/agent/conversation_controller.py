@@ -471,8 +471,15 @@ class ConversationController:
         )
         return removed_count
 
-    def _score_messages(self, current_query: Optional[str] = None) -> List[MessageImportance]:
+    def _score_messages(
+        self,
+        messages: Optional[List[Message]] = None,
+        current_query: Optional[str] = None,
+    ) -> List[MessageImportance]:
         """Score messages for importance during compaction.
+
+        Conforms to MessageScorerProtocol: accepts (messages, current_query).
+        If messages is None, scores self.messages (backward compatible).
 
         Scoring factors:
         - Role: Tool results score higher than discussion
@@ -481,15 +488,17 @@ class ConversationController:
         - Content length: Substantive messages score higher
 
         Args:
+            messages: Messages to score (defaults to self.messages)
             current_query: Optional query for semantic relevance
 
         Returns:
             List of MessageImportance objects
         """
+        msgs_to_score = messages if messages is not None else self.messages
         scored: List[MessageImportance] = []
-        total_messages = len(self.messages)
+        total_messages = len(msgs_to_score)
 
-        for i, msg in enumerate(self.messages):
+        for i, msg in enumerate(msgs_to_score):
             score = 0.0
             reason_parts = []
 
