@@ -541,7 +541,7 @@ class ExecutionCoordinator:
             orchestrator=None,
             execution_coordinator=self,
             max_iterations=iteration_budget,
-            enable_fulfillment_check=False,  # Fulfillment needs file context
+            enable_fulfillment_check=True,  # Auto-derived criteria via FulfillmentCriteriaBuilder
             enable_adaptive_iterations=True,
         )
 

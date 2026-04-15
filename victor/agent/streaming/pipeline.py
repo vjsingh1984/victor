@@ -184,10 +184,11 @@ class StreamingChatPipeline:
         if decision_service is not None:
             decision_service.reset_budget()
 
-        # Spin detection: consecutive non-tool short responses indicate the model
-        # is stuck describing actions instead of executing them (common with local models)
-        _consecutive_empty_tool_responses = 0
-        _MAX_CONSECUTIVE_EMPTY = 3  # Break after 3 consecutive non-tool short responses
+        # Spin detection via shared turn_policy (consistent with batch/AgenticLoop path)
+        from victor.agent.turn_policy import SpinDetector, NudgePolicy, SpinState
+
+        _spin = SpinDetector()
+        _nudge_policy = NudgePolicy()
 
         while True:
             # === PRE-ITERATION CHECKS (via coordinator helper) ===
@@ -309,11 +310,11 @@ class StreamingChatPipeline:
                 # Tool format assist: if model describes a tool but didn't call it,
                 # inject a format hint as a system message so it can self-correct.
                 # This is more effective than generic "use tools" encouragement.
-                if mentioned_tools_detected and _consecutive_empty_tool_responses >= 1:
+                if mentioned_tools_detected and _spin.consecutive_no_tool_turns >= 1:
                     tool_hint = mentioned_tools_detected[0]
                     logger.info(
                         f"[tool-format-assist] Model mentioned '{tool_hint}' without calling it "
-                        f"(spin #{_consecutive_empty_tool_responses}). Injecting format hint."
+                        f"(state={_spin.state.value}). Injecting format hint."
                     )
                     orch.add_message(
                         "system",
@@ -341,28 +342,17 @@ class StreamingChatPipeline:
                 if recovery_action.action in ("retry", "force_summary"):
                     continue
 
-            # Spin detection for ALL paths (including recovery "continue"):
-            # Check if the tool pipeline blocked all calls in the last batch.
-            # This catches loops where the model repeatedly calls the same tool
-            # and dedup blocks every attempt — regardless of recovery action.
+            # Spin detection for ALL paths (via shared SpinDetector)
             _pipeline_obj = getattr(orch, "_tool_pipeline", None)
             if _pipeline_obj and getattr(_pipeline_obj, "last_batch_all_skipped", False):
-                _consecutive_empty_tool_responses += 1
-                logger.info(
-                    f"[spin-check] all_blocked=True spin={_consecutive_empty_tool_responses}/{_MAX_CONSECUTIVE_EMPTY}"
-                )
-                if _consecutive_empty_tool_responses == 2:
-                    logger.info("[approach-pivot] All tools blocked. Injecting approach change.")
-                    orch.add_message(
-                        "system",
-                        "Your last tool calls were blocked because you already called them. "
-                        "Try a DIFFERENT tool or different arguments. "
-                        "If you've found what you need, proceed to edit the code. "
-                        "If you've already made the fix, say _DONE_.",
-                    )
-                if _consecutive_empty_tool_responses >= _MAX_CONSECUTIVE_EMPTY:
+                _spin.record_turn(has_tool_calls=True, all_blocked=True)
+                logger.info(f"[spin-check] all_blocked=True state={_spin.state.value}")
+                nudge = _nudge_policy.evaluate(_spin)
+                if nudge.should_inject:
+                    orch.add_message(nudge.role, nudge.message)
+                if _spin.state == SpinState.TERMINATED:
                     logger.warning(
-                        f"[spin-detect] {_consecutive_empty_tool_responses} consecutive "
+                        f"[spin-detect] {_spin.consecutive_all_blocked} consecutive "
                         f"blocked tool calls. Breaking loop."
                     )
                     yield orch._chunk_generator.generate_content_chunk(
@@ -446,55 +436,50 @@ class StreamingChatPipeline:
 
             content_length = len(full_content.strip())
 
-            # Spin detection: count iterations with no meaningful progress.
-            # Check AFTER tool execution (last_batch_all_skipped is set by pipeline)
+            # Spin detection via shared SpinDetector (consistent with batch path)
             _all_tools_blocked = False
             _pipeline_obj = getattr(orch, "_tool_pipeline", None)
             if _pipeline_obj and getattr(_pipeline_obj, "last_batch_all_skipped", False):
                 _all_tools_blocked = True
 
-            _no_progress = (not tool_calls and content_length < 120) or _all_tools_blocked
+            _has_tools = bool(tool_calls)
+            _no_progress = (not _has_tools and content_length < 120) or _all_tools_blocked
+
+            # Record turn in shared detector
+            tool_names_set = {tc.get("name", "") for tc in tool_calls} if tool_calls else set()
+            _spin.record_turn(
+                has_tool_calls=_has_tools,
+                all_blocked=_all_tools_blocked,
+                tool_names=tool_names_set,
+                tool_count=len(tool_calls) if tool_calls else 0,
+            )
+
             logger.info(
                 f"[spin-check] tool_calls={len(tool_calls) if tool_calls else 0} "
                 f"content_len={content_length} all_blocked={_all_tools_blocked} "
-                f"no_progress={_no_progress} spin={_consecutive_empty_tool_responses}"
+                f"no_progress={_no_progress} state={_spin.state.value}"
             )
+
             if _no_progress:
-                _consecutive_empty_tool_responses += 1
+                # Inject nudge via shared NudgePolicy
+                nudge = _nudge_policy.evaluate(_spin)
+                if nudge.should_inject:
+                    orch.add_message(nudge.role, nudge.message)
+                    logger.info(f"[nudge] {nudge.nudge_type.value}")
 
-                # Approach pivot: at spin 2, suggest the model try a different approach
-                if _consecutive_empty_tool_responses == 2:
-                    logger.info(
-                        "[approach-pivot] Model stuck for 2 iterations. "
-                        "Injecting approach change suggestion."
-                    )
-                    orch.add_message(
-                        "system",
-                        "You seem stuck. Try a DIFFERENT approach: "
-                        "if reading failed, try code_search instead. "
-                        "If editing failed, re-read the file first to get exact content. "
-                        "If you've already made the fix, say _DONE_.",
-                    )
-
-                if _consecutive_empty_tool_responses >= _MAX_CONSECUTIVE_EMPTY:
+                if _spin.state == SpinState.TERMINATED:
                     logger.warning(
-                        f"[spin-detect] {_consecutive_empty_tool_responses} consecutive non-tool "
-                        f"short responses — model is stuck describing actions instead of "
-                        f"executing them. Breaking loop. Last response: {full_content[:100]!r}"
+                        f"[spin-detect] Terminated after "
+                        f"no_tool={_spin.consecutive_no_tool_turns} "
+                        f"blocked={_spin.consecutive_all_blocked}. "
+                        f"Last response: {full_content[:100]!r}"
                     )
                     yield orch._chunk_generator.generate_content_chunk(
-                        "\n\n[Agent detected a response loop — breaking to prevent wasted time. "
-                        "The model described tool calls without executing them.]",
+                        "\n\n[Agent detected a response loop — breaking to "
+                        "prevent wasted time.]",
                         is_final=True,
                     )
                     return
-                logger.info(
-                    f"[spin-detect] Non-tool short response #{_consecutive_empty_tool_responses}"
-                    f"/{_MAX_CONSECUTIVE_EMPTY}: {content_length} chars, "
-                    f"content: {full_content[:80]!r}"
-                )
-            else:
-                _consecutive_empty_tool_responses = 0  # Reset on successful tool call
 
             # Record iteration in unified tracker
             orch.unified_tracker.record_iteration(content_length)
@@ -604,7 +589,7 @@ class StreamingChatPipeline:
                     logger.info(
                         f"[continuation] action={action} reason={action_result.get('reason', 'unknown')} "
                         f"content_len={content_length} tool_calls={len(tool_calls) if tool_calls else 0} "
-                        f"iteration={stream_ctx.total_iterations} spin={_consecutive_empty_tool_responses}"
+                        f"iteration={stream_ctx.total_iterations} spin_state={_spin.state.value}"
                     )
 
                     # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
