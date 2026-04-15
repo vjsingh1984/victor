@@ -33,3 +33,4 @@ env/
 *.swp
 *.swo
 *~
+.victor/
