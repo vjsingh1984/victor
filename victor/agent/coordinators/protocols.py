@@ -580,7 +580,7 @@ class ExecutionMode(Enum):
 class ExecutionProvider(Protocol):
     """Protocol for execution operations.
 
-    Used by ExecutionCoordinator for executing model turns.
+    Used by TurnExecutor for executing model turns.
     This enables coordinators to depend on protocol-based abstractions
     rather than concrete orchestrator implementations.
     """

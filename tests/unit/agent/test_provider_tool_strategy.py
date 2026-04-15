@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+from victor.agent.coordinators.turn_executor import TurnExecutor
 
 # =====================================================================
 # Step 1-2: Provider capability detection
@@ -231,7 +231,7 @@ class TestQADetection:
         ],
     )
     def test_qa_detected(self, msg):
-        assert ExecutionCoordinator._is_question_only(msg) is True
+        assert TurnExecutor._is_question_only(msg) is True
 
     @pytest.mark.parametrize(
         "msg",
@@ -254,14 +254,14 @@ class TestQADetection:
         ],
     )
     def test_action_not_qa(self, msg):
-        assert ExecutionCoordinator._is_question_only(msg) is False
+        assert TurnExecutor._is_question_only(msg) is False
 
     def test_empty_string_not_qa(self):
-        assert ExecutionCoordinator._is_question_only("") is False
+        assert TurnExecutor._is_question_only("") is False
 
     def test_long_question_with_action_not_qa(self):
         msg = "Can you fix the broken authentication in the login page?"
-        assert ExecutionCoordinator._is_question_only(msg) is False
+        assert TurnExecutor._is_question_only(msg) is False
 
 
 # =====================================================================

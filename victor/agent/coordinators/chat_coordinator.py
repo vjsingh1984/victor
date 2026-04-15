@@ -108,22 +108,22 @@ class ChatCoordinator:
         self._streaming_pipeline = pipeline
 
         # NEW: Execution coordinator for agentic loop (Phase 1)
-        self._execution_coordinator: Optional[Any] = None
+        self._turn_executor: Optional[Any] = None
 
     # =====================================================================
     # Public API
     # =====================================================================
 
     @property
-    def execution_coordinator(self) -> Any:
+    def turn_executor(self) -> Any:
         """Get the execution coordinator for agentic loop.
 
         Returns:
-            ExecutionCoordinator instance (lazy initialized)
+            TurnExecutor instance (lazy initialized)
         """
-        if self._execution_coordinator is None:
-            from victor.agent.coordinators.execution_coordinator import (
-                ExecutionCoordinator,
+        if self._turn_executor is None:
+            from victor.agent.coordinators.turn_executor import (
+                TurnExecutor,
             )
 
             # Create protocol adapter for orchestrator
@@ -134,14 +134,14 @@ class ChatCoordinator:
             adapter = OrchestratorProtocolAdapter(self._orchestrator)
 
             # Initialize execution coordinator with protocol-based dependencies
-            self._execution_coordinator = ExecutionCoordinator(
+            self._turn_executor = TurnExecutor(
                 chat_context=adapter,
                 tool_context=adapter,
                 provider_context=adapter,
                 execution_provider=adapter,
                 token_tracker=self._token_tracker,
             )
-        return self._execution_coordinator
+        return self._turn_executor
 
     async def chat(
         self,
@@ -167,7 +167,7 @@ class ChatCoordinator:
         """
         # If planning is explicitly disabled, skip planning check
         if use_planning is False:
-            return await self.execution_coordinator.execute_agentic_loop(user_message)
+            return await self.turn_executor.execute_agentic_loop(user_message)
 
         # Check if we should use planning for this task (explicit or auto-detected)
         if (use_planning is True or use_planning is None) and self._should_use_planning(
@@ -176,7 +176,7 @@ class ChatCoordinator:
             return await self._chat_with_planning(user_message)
 
         # Default: delegate to execution coordinator for agentic loop
-        return await self.execution_coordinator.execute_agentic_loop(user_message)
+        return await self.turn_executor.execute_agentic_loop(user_message)
 
     def _should_use_planning(self, user_message: str) -> bool:
         """Determine if planning should be used for this task.
@@ -557,9 +557,9 @@ class ChatCoordinator:
             )
 
         # Q&A detection: skip tools for pure question/display-only tasks
-        from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+        from victor.agent.coordinators.turn_executor import TurnExecutor
 
-        ctx.is_qa_task = ExecutionCoordinator._is_question_only(user_message)
+        ctx.is_qa_task = TurnExecutor._is_question_only(user_message)
 
         # Set goals for tool selection
         ctx.goals = orch._tool_planner.infer_goals_from_message(user_message)

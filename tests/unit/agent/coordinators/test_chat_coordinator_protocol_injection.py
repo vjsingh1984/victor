@@ -210,15 +210,15 @@ class TestChatCoordinatorProtocolInjection:
         assert coordinator._orchestrator._check_cancellation() is False
 
     @pytest.mark.asyncio
-    async def test_chat_coordinator_uses_execution_coordinator(self):
-        """ChatCoordinator should have execution_coordinator as a property."""
+    async def test_chat_coordinator_uses_turn_executor(self):
+        """ChatCoordinator should have turn_executor as a property."""
         mock_orchestrator = MockOrchestrator()
         coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
 
-        # Verify execution_coordinator is a property on the class
+        # Verify turn_executor is a property on the class
         # (It's lazily created when first accessed, but requires setup_streaming_pipeline first)
-        assert "execution_coordinator" in dir(ChatCoordinator)
-        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)
+        assert "turn_executor" in dir(ChatCoordinator)
+        assert isinstance(getattr(ChatCoordinator, "turn_executor", None), property)
 
     @pytest.mark.asyncio
     async def test_chat_coordinator_with_mock_provider_response(self):
@@ -243,7 +243,7 @@ class TestChatCoordinatorProtocolInjection:
         assert coordinator._orchestrator.provider is not None
         assert coordinator._orchestrator.provider.supports_tools() is True
 
-        # Note: Full chat() execution requires execution_coordinator setup
+        # Note: Full chat() execution requires turn_executor setup
         # This test verifies protocol injection works - coordinator accepts mock
         # and can access all protocol-required attributes
         assert coordinator is not None
@@ -401,7 +401,7 @@ class TestProtocolBasedInjectionBenefits:
         assert coordinator is not None
         assert coordinator._orchestrator is mock_orchestrator
 
-        # Verify execution_coordinator exists as a property on the class
+        # Verify turn_executor exists as a property on the class
         # (lazy initialization requires set_streaming_pipeline to be called first)
-        assert "execution_coordinator" in dir(ChatCoordinator)
-        assert isinstance(getattr(ChatCoordinator, "execution_coordinator", None), property)
+        assert "turn_executor" in dir(ChatCoordinator)
+        assert isinstance(getattr(ChatCoordinator, "turn_executor", None), property)

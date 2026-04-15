@@ -15,7 +15,7 @@
 """Agentic Loop - High-level task lifecycle orchestration.
 
 This module provides a PERCEIVE -> PLAN -> ACT -> EVALUATE -> DECIDE loop
-that sits ABOVE the AgentOrchestrator/ExecutionCoordinator layer:
+that sits ABOVE the AgentOrchestrator/TurnExecutor layer:
 
     AgenticLoop (this module)     -- task lifecycle: what to do, is it done?
         └── AgentOrchestrator     -- single-turn execution: LLM call + tools
@@ -79,8 +79,8 @@ from victor.framework.perception_integration import Perception, PerceptionIntegr
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.execution_coordinator import (
-        ExecutionCoordinator,
+    from victor.agent.coordinators.turn_executor import (
+        TurnExecutor,
         TurnResult,
     )
     from victor.storage.memory.unified import UnifiedMemoryCoordinator
@@ -206,7 +206,7 @@ class AgenticLoop:
     def __init__(
         self,
         orchestrator: Optional[Any] = None,  # PlanningContextProtocol
-        execution_coordinator: Optional["ExecutionCoordinator"] = None,
+        turn_executor: Optional["TurnExecutor"] = None,
         memory_coordinator: Optional["UnifiedMemoryCoordinator"] = None,
         max_iterations: int = 10,
         enable_fulfillment_check: bool = True,
@@ -219,8 +219,8 @@ class AgenticLoop:
 
         Args:
             orchestrator: Victor orchestrator (used for planning + fallback)
-            execution_coordinator: ExecutionCoordinator for single-turn execution.
-                If provided, AgenticLoop calls execute_turn_with_tools() directly
+            turn_executor: TurnExecutor for single-turn execution.
+                If provided, AgenticLoop calls execute_turn() directly
                 (one LLM call per iteration). If None, falls back to
                 orchestrator.chat() (which runs its own multi-turn loop).
             memory_coordinator: Optional unified memory for context retrieval
@@ -233,7 +233,7 @@ class AgenticLoop:
             config: Additional configuration
         """
         self.orchestrator = orchestrator
-        self.execution_coordinator = execution_coordinator
+        self.turn_executor = turn_executor
         self.memory_coordinator = memory_coordinator
         self.max_iterations = max_iterations
         self.enable_fulfillment_check = enable_fulfillment_check
@@ -257,11 +257,11 @@ class AgenticLoop:
 
         self.fulfillment = FulfillmentDetector() if enable_fulfillment_check else None
 
-        # Try to extract execution_coordinator from orchestrator if not provided
-        if self.execution_coordinator is None and hasattr(orchestrator, "execution_coordinator"):
-            self.execution_coordinator = orchestrator.execution_coordinator
+        # Try to extract turn_executor from orchestrator if not provided
+        if self.turn_executor is None and hasattr(orchestrator, "turn_executor"):
+            self.turn_executor = orchestrator.turn_executor
 
-        mode = "single-turn" if self.execution_coordinator else "orchestrator-fallback"
+        mode = "single-turn" if self.turn_executor else "orchestrator-fallback"
         logger.info(
             f"AgenticLoop initialized "
             f"(mode={mode}, max_iterations={max_iterations}, "
@@ -371,9 +371,9 @@ class AgenticLoop:
                 if (
                     evaluation.decision
                     not in (EvaluationDecision.COMPLETE, EvaluationDecision.FAIL)
-                    and self.execution_coordinator is not None
+                    and self.turn_executor is not None
                 ):
-                    chat_ctx = getattr(self.execution_coordinator, "_chat_context", None)
+                    chat_ctx = getattr(self.turn_executor, "_chat_context", None)
                     if chat_ctx and hasattr(chat_ctx, "add_message"):
                         nudge = self.nudge_policy.evaluate(self.spin_detector)
                         if nudge.should_inject:
@@ -502,23 +502,23 @@ class AgenticLoop:
     ) -> Any:
         """Execute a single turn: one LLM call + tool execution.
 
-        When execution_coordinator is available, calls execute_turn_with_tools()
+        When turn_executor is available, calls execute_turn()
         for true single-turn execution (no nested loops). Falls back to
         orchestrator methods when coordinator is not available.
 
         Returns:
-            TurnResult when using execution_coordinator, or Any from fallbacks.
+            TurnResult when using turn_executor, or Any from fallbacks.
         """
         query = state.get("query", "")
 
-        # PRIMARY: Use execution_coordinator for single-turn (no nested loop)
-        if self.execution_coordinator is not None:
-            from victor.agent.coordinators.execution_coordinator import TurnResult
+        # PRIMARY: Use turn_executor for single-turn (no nested loop)
+        if self.turn_executor is not None:
+            from victor.agent.coordinators.turn_executor import TurnResult
 
             task_classification = state.get("_task_classification")
             is_qa = state.get("_is_qa_task", False)
 
-            turn_result = await self.execution_coordinator.execute_turn_with_tools(
+            turn_result = await self.turn_executor.execute_turn(
                 user_message=query,
                 task_classification=task_classification,
                 is_qa_task=is_qa,
@@ -565,10 +565,10 @@ class AgenticLoop:
         When action_result is a TurnResult (single-turn mode), uses
         turn-level signals (tool calls, spin detection, Q&A shortcut)
         in addition to fulfillment checks. This replaces the nudge/spin
-        logic that was previously inside ExecutionCoordinator's while-loop.
+        logic that was previously inside TurnExecutor's while-loop.
         """
         # Check for TurnResult-specific signals (single-turn mode)
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         if isinstance(action_result, TurnResult):
             turn: TurnResult = action_result

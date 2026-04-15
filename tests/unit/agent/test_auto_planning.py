@@ -48,7 +48,7 @@ def _make_coordinator(query_classifier=None, orchestrator=None):
         chat_context=mock_chat_ctx,
         tool_context=mock_tool_ctx,
         provider_context=mock_provider_ctx,
-        execution_coordinator=mock_exec,
+        turn_executor=mock_exec,
         orchestrator=orchestrator or MagicMock(),
         query_classifier=query_classifier,
     )

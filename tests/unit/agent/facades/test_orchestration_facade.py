@@ -34,7 +34,7 @@ class TestOrchestrationFacadeInit:
             chat_coordinator=MagicMock(),
             tool_coordinator=MagicMock(),
             session_coordinator=MagicMock(),
-            execution_coordinator=MagicMock(),
+            turn_executor=MagicMock(),
             sync_chat_coordinator=MagicMock(),
             streaming_chat_coordinator=MagicMock(),
             unified_chat_coordinator=MagicMock(),
@@ -65,7 +65,7 @@ class TestOrchestrationFacadeInit:
         assert facade.chat_coordinator is None
         assert facade.tool_coordinator is None
         assert facade.session_coordinator is None
-        assert facade.execution_coordinator is None
+        assert facade.turn_executor is None
         assert facade.sync_chat_coordinator is None
         assert facade.streaming_chat_coordinator is None
         assert facade.unified_chat_coordinator is None
@@ -96,7 +96,7 @@ class TestOrchestrationFacadeProperties:
             chat_coordinator=MagicMock(name="chat"),
             tool_coordinator=MagicMock(name="tool"),
             session_coordinator=MagicMock(name="session"),
-            execution_coordinator=MagicMock(name="execution"),
+            turn_executor=MagicMock(name="execution"),
             sync_chat_coordinator=MagicMock(name="sync"),
             streaming_chat_coordinator=MagicMock(name="streaming_chat"),
             unified_chat_coordinator=MagicMock(name="unified"),
@@ -150,11 +150,11 @@ class TestOrchestrationFacadeProperties:
         facade.observability = new_obs
         assert facade.observability is new_obs
 
-    def test_execution_coordinator_setter(self, facade):
-        """ExecutionCoordinator setter updates the coordinator."""
+    def test_turn_executor_setter(self, facade):
+        """TurnExecutor setter updates the coordinator."""
         new_coord = MagicMock(name="new_coord")
-        facade.execution_coordinator = new_coord
-        assert facade.execution_coordinator is new_coord
+        facade.turn_executor = new_coord
+        assert facade.turn_executor is new_coord
 
     def test_intelligent_integration_setter(self, facade):
         """IntelligentIntegration setter updates the integration."""

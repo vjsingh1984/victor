@@ -14,10 +14,10 @@
 
 """Execution coordinator for agentic loop execution.
 
-This module contains the ExecutionCoordinator class that extracts the
+This module contains the TurnExecutor class that extracts the
 agentic loop logic from ChatCoordinator into a dedicated, focused coordinator.
 
-The ExecutionCoordinator handles:
+The TurnExecutor handles:
 - Multi-turn agentic loop (model → tools → model → tools → ...)
 - Iteration limit enforcement
 - Tool call execution coordination
@@ -26,7 +26,7 @@ The ExecutionCoordinator handles:
 
 Architecture:
 ------------
-The ExecutionCoordinator depends on protocol-based abstractions rather than
+The TurnExecutor depends on protocol-based abstractions rather than
 concrete classes, enabling the Dependency Inversion Principle (DIP):
 
 - ChatContextProtocol: For message/conversation access
@@ -34,7 +34,7 @@ concrete classes, enabling the Dependency Inversion Principle (DIP):
 - ProviderContextProtocol: For LLM calls
 - ExecutionProvider: For executing model turns
 
-Phase 1: Extract ExecutionCoordinator
+Phase 1: Extract TurnExecutor
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ if TYPE_CHECKING:
 class TurnResult:
     """Result of a single execution turn (one LLM call + tool execution).
 
-    This is the primitive unit returned by execute_turn_with_tools().
+    This is the primitive unit returned by execute_turn().
     AgenticLoop uses this to make per-turn evaluation decisions.
 
     Attributes:
@@ -108,7 +108,7 @@ logger = logging.getLogger(__name__)
 _EXPLORATION_IN_PROGRESS = False
 
 
-class ExecutionCoordinator:
+class TurnExecutor:
     """Coordinator for agentic execution loop.
 
     This coordinator extracts the core agentic loop logic from ChatCoordinator,
@@ -136,7 +136,7 @@ class ExecutionCoordinator:
         execution_provider: Any,  # ExecutionProvider protocol
         token_tracker: Optional["TokenTracker"] = None,
     ) -> None:
-        """Initialize the ExecutionCoordinator.
+        """Initialize the TurnExecutor.
 
         Args:
             chat_context: Chat context protocol implementation
@@ -386,7 +386,7 @@ class ExecutionCoordinator:
         """Execute a single model turn (raw LLM call, no tool execution).
 
         This is the lowest-level execution path — a single LLM API call.
-        For a full turn with tool execution, use execute_turn_with_tools().
+        For a full turn with tool execution, use execute_turn().
 
         Args:
             messages: Conversation history
@@ -403,7 +403,7 @@ class ExecutionCoordinator:
             tools=tools,
         )
 
-    async def execute_turn_with_tools(
+    async def execute_turn(
         self,
         user_message: str,
         task_classification: Optional[Any] = None,
@@ -511,7 +511,7 @@ class ExecutionCoordinator:
         """Delegate execution to AgenticLoop for enhanced evaluation.
 
         AgenticLoop runs the PERCEIVE -> PLAN -> ACT -> EVALUATE -> DECIDE
-        cycle, calling self.execute_turn_with_tools() for each turn.
+        cycle, calling self.execute_turn() for each turn.
 
         Args:
             user_message: User message (already added to conversation)
@@ -534,18 +534,18 @@ class ExecutionCoordinator:
         task_budget = max(task_classification.tool_budget * 2, 1)
         iteration_budget = min(task_budget, max_iterations_setting, max_iterations)
 
-        # Create AgenticLoop with self as execution_coordinator
+        # Create AgenticLoop with self as turn_executor
         # Use a lightweight mock orchestrator since AgenticLoop only needs
-        # execution_coordinator for single-turn execution
+        # turn_executor for single-turn execution
         loop = AgenticLoop(
             orchestrator=None,
-            execution_coordinator=self,
+            turn_executor=self,
             max_iterations=iteration_budget,
             enable_fulfillment_check=True,  # Auto-derived criteria via FulfillmentCriteriaBuilder
             enable_adaptive_iterations=True,
         )
 
-        # Inject task classification into state for execute_turn_with_tools()
+        # Inject task classification into state for execute_turn()
         context = {
             "_task_classification": task_classification,
             "_is_qa_task": is_qa,
@@ -1071,10 +1071,10 @@ class ExecutionCoordinator:
 
         Backward-compatible wrapper around _is_question_only_scored().
         """
-        is_qa, _ = ExecutionCoordinator._is_question_only_scored(message)
+        is_qa, _ = TurnExecutor._is_question_only_scored(message)
         return is_qa
 
 
 __all__ = [
-    "ExecutionCoordinator",
+    "TurnExecutor",
 ]

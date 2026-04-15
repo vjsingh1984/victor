@@ -201,18 +201,18 @@ def _protocol_adapter(self: "AgentOrchestrator") -> Any:
     return self._protocol_adapter
 
 
-def _execution_coordinator(self: "AgentOrchestrator") -> Any:
+def _turn_executor(self: "AgentOrchestrator") -> Any:
     """Get the execution coordinator for agentic loop (lazy init)."""
-    if self._execution_coordinator is None:
-        from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+    if self._turn_executor is None:
+        from victor.agent.coordinators.turn_executor import TurnExecutor
 
-        self._execution_coordinator = ExecutionCoordinator(
+        self._turn_executor = TurnExecutor(
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
             execution_provider=self.protocol_adapter,
         )
-    return self._execution_coordinator
+    return self._turn_executor
 
 
 def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
@@ -226,7 +226,7 @@ def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
-            execution_coordinator=self.execution_coordinator,
+            turn_executor=self.turn_executor,
             orchestrator=self,
             query_classifier=QueryClassifier(),
         )
@@ -494,7 +494,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "vertical_context": (_vertical_context, None),
     # Group 2: Lazy coordinators (getter only)
     "protocol_adapter": (_protocol_adapter, None),
-    "execution_coordinator": (_execution_coordinator, None),
+    "turn_executor": (_turn_executor, None),
     "sync_chat_coordinator": (_sync_chat_coordinator, None),
     "streaming_chat_coordinator": (_streaming_chat_coordinator, None),
     "unified_chat_coordinator": (_unified_chat_coordinator, None),

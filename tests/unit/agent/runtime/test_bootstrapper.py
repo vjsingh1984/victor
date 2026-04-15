@@ -80,7 +80,7 @@ class TestAgentRuntimeBootstrapper:
 
         # Verify lazy placeholders are None
         assert orch._mode_workflow_team_coordinator is None
-        assert orch._execution_coordinator is None
+        assert orch._turn_executor is None
         assert orch._sync_chat_coordinator is None
         assert orch._streaming_chat_coordinator is None
         assert orch._unified_chat_coordinator is None

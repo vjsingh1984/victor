@@ -43,7 +43,7 @@ class OrchestrationFacade:
         - chat_coordinator: Chat coordinator for chat operations
         - tool_coordinator: Tool coordinator for tool operations
         - session_coordinator: Session coordinator for session operations
-        - execution_coordinator: Execution coordinator for agentic loop
+        - turn_executor: Execution coordinator for agentic loop
         - sync_chat_coordinator: Sync chat coordinator (non-streaming)
         - streaming_chat_coordinator: Streaming chat coordinator
         - unified_chat_coordinator: Unified chat coordinator facade
@@ -70,7 +70,7 @@ class OrchestrationFacade:
         chat_coordinator: Optional[Any] = None,
         tool_coordinator: Optional[Any] = None,
         session_coordinator: Optional[Any] = None,
-        execution_coordinator: Optional[Any] = None,
+        turn_executor: Optional[Any] = None,
         sync_chat_coordinator: Optional[Any] = None,
         streaming_chat_coordinator: Optional[Any] = None,
         unified_chat_coordinator: Optional[Any] = None,
@@ -93,7 +93,7 @@ class OrchestrationFacade:
         self._chat_coordinator = chat_coordinator
         self._tool_coordinator = tool_coordinator
         self._session_coordinator = session_coordinator
-        self._execution_coordinator = execution_coordinator
+        self._turn_executor = turn_executor
         self._sync_chat_coordinator = sync_chat_coordinator
         self._streaming_chat_coordinator = streaming_chat_coordinator
         self._unified_chat_coordinator = unified_chat_coordinator
@@ -145,14 +145,14 @@ class OrchestrationFacade:
         return self._session_coordinator
 
     @property
-    def execution_coordinator(self) -> Optional[Any]:
+    def turn_executor(self) -> Optional[Any]:
         """Execution coordinator for agentic loop."""
-        return self._execution_coordinator
+        return self._turn_executor
 
-    @execution_coordinator.setter
-    def execution_coordinator(self, value: Any) -> None:
+    @turn_executor.setter
+    def turn_executor(self, value: Any) -> None:
         """Update the execution coordinator."""
-        self._execution_coordinator = value
+        self._turn_executor = value
 
     @property
     def sync_chat_coordinator(self) -> Optional[Any]:

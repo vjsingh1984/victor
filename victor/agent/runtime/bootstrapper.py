@@ -142,7 +142,7 @@ class AgentRuntimeBootstrapper:
             chat_coordinator=orchestrator._chat_coordinator,
             tool_coordinator=orchestrator._tool_coordinator,
             session_coordinator=orchestrator._session_coordinator,
-            execution_coordinator=orchestrator._execution_coordinator,
+            turn_executor=orchestrator._turn_executor,
             sync_chat_coordinator=orchestrator._sync_chat_coordinator,
             streaming_chat_coordinator=(orchestrator._streaming_chat_coordinator),
             unified_chat_coordinator=(orchestrator._unified_chat_coordinator),
@@ -259,7 +259,7 @@ class AgentRuntimeBootstrapper:
         orchestrator._initialize_services()
 
         # Sync/Streaming coordinators (lazy initialization)
-        orchestrator._execution_coordinator = None
+        orchestrator._turn_executor = None
         orchestrator._sync_chat_coordinator = None
         orchestrator._streaming_chat_coordinator = None
         orchestrator._unified_chat_coordinator = None

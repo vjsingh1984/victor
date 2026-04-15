@@ -47,7 +47,7 @@ if TYPE_CHECKING:
         ToolContextProtocol,
         ProviderContextProtocol,
     )
-    from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+    from victor.agent.coordinators.turn_executor import TurnExecutor
     from victor.agent.query_classifier import QueryClassifier
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ class SyncChatCoordinator:
         chat_context: Protocol providing conversation/message access
         tool_context: Protocol providing tool selection/execution
         provider_context: Protocol providing LLM provider access
-        execution_coordinator: Coordinator for agentic loop execution
+        turn_executor: Coordinator for agentic loop execution
     """
 
     def __init__(
@@ -77,7 +77,7 @@ class SyncChatCoordinator:
         chat_context: "ChatContextProtocol",
         tool_context: "ToolContextProtocol",
         provider_context: "ProviderContextProtocol",
-        execution_coordinator: "ExecutionCoordinator",
+        turn_executor: "TurnExecutor",
         orchestrator: Any = None,
         query_classifier: Optional["QueryClassifier"] = None,
     ) -> None:
@@ -87,14 +87,14 @@ class SyncChatCoordinator:
             chat_context: Chat context protocol implementation
             tool_context: Tool context protocol implementation
             provider_context: Provider context protocol implementation
-            execution_coordinator: Execution coordinator for agentic loop
+            turn_executor: Execution coordinator for agentic loop
             orchestrator: Optional orchestrator (required for planning path)
             query_classifier: Optional query classifier for auto-planning detection
         """
         self._chat_context = chat_context
         self._tool_context = tool_context
         self._provider_context = provider_context
-        self._execution_coordinator = execution_coordinator
+        self._turn_executor = turn_executor
         self._orchestrator = orchestrator
         self._query_classifier = query_classifier
 
@@ -161,7 +161,7 @@ class SyncChatCoordinator:
             )
 
         # Use execution coordinator for agentic loop
-        response = await self._execution_coordinator.execute_agentic_loop(user_message)
+        response = await self._turn_executor.execute_agentic_loop(user_message)
         return self._attach_skill_metadata(response, self._orchestrator.get_last_skill_match_info())
 
     # =====================================================================
@@ -247,7 +247,7 @@ class SyncChatCoordinator:
                 "Planning requested but orchestrator not provided to SyncChatCoordinator; "
                 "falling back to standard execution."
             )
-            return await self._execution_coordinator.execute_agentic_loop(user_message)
+            return await self._turn_executor.execute_agentic_loop(user_message)
 
         # Import here to avoid circular dependency
         from victor.agent.coordinators.planning_coordinator import PlanningCoordinator

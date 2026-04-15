@@ -15,7 +15,7 @@
 """Thread-safe token usage tracker.
 
 Centralizes all token usage accumulation to prevent divergence
-between ExecutionCoordinator and SessionStateManager.
+between TurnExecutor and SessionStateManager.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from typing import Dict
 class TokenTracker:
     """Thread-safe token usage tracker.
 
-    Centralizes token accumulation from ExecutionCoordinator,
+    Centralizes token accumulation from TurnExecutor,
     ChatCoordinator, and MetricsCoordinator into a single
     source of truth.
     """

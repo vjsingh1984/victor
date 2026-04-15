@@ -467,7 +467,7 @@ class TestTurnResultEvaluation:
 
     async def test_qa_response_completes(self):
         """Q&A response with content should complete immediately."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         loop = self._make_loop()
         turn = TurnResult(
@@ -480,7 +480,7 @@ class TestTurnResultEvaluation:
 
     async def test_spin_detection_fails(self):
         """3+ consecutive all-blocked turns should fail."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         loop = self._make_loop()
         loop.spin_detector.consecutive_all_blocked = 3
@@ -495,7 +495,7 @@ class TestTurnResultEvaluation:
 
     async def test_stuck_agent_fails(self):
         """3+ turns without tools should fail."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         loop = self._make_loop()
         loop.spin_detector.consecutive_no_tool_turns = 3
@@ -509,7 +509,7 @@ class TestTurnResultEvaluation:
 
     async def test_successful_tools_continue(self):
         """Successful tool execution should continue."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         loop = self._make_loop()
         turn = TurnResult(
@@ -524,7 +524,7 @@ class TestTurnResultEvaluation:
 
     async def test_final_answer_after_tools_completes(self):
         """No tools + content + previously used tools = done."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         loop = self._make_loop()
         loop.spin_detector.total_tool_calls = 5
@@ -536,30 +536,30 @@ class TestTurnResultEvaluation:
         assert result.decision == EvaluationDecision.COMPLETE
         assert result.score >= 0.8
 
-    async def test_act_with_execution_coordinator(self):
-        """_act() should call execute_turn_with_tools() when coordinator available."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+    async def test_act_with_turn_executor(self):
+        """_act() should call execute_turn() when coordinator available."""
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         mock_coord = AsyncMock()
         mock_turn = TurnResult(
             response=MagicMock(content="done", tool_calls=None),
             has_tool_calls=False,
         )
-        mock_coord.execute_turn_with_tools = AsyncMock(return_value=mock_turn)
+        mock_coord.execute_turn = AsyncMock(return_value=mock_turn)
 
         loop = AgenticLoop(
             orchestrator=MagicMock(spec=[]),
-            execution_coordinator=mock_coord,
+            turn_executor=mock_coord,
             enable_fulfillment_check=False,
         )
 
         result = await loop._act({}, {"query": "test"})
         assert isinstance(result, TurnResult)
-        mock_coord.execute_turn_with_tools.assert_called_once()
+        mock_coord.execute_turn.assert_called_once()
 
     async def test_act_tracks_tool_calls(self):
         """_act() should update turn-level tracking from TurnResult."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         mock_coord = AsyncMock()
         mock_turn = TurnResult(
@@ -568,11 +568,11 @@ class TestTurnResultEvaluation:
             tool_calls_count=2,
             all_tools_blocked=False,
         )
-        mock_coord.execute_turn_with_tools = AsyncMock(return_value=mock_turn)
+        mock_coord.execute_turn = AsyncMock(return_value=mock_turn)
 
         loop = AgenticLoop(
             orchestrator=MagicMock(spec=[]),
-            execution_coordinator=mock_coord,
+            turn_executor=mock_coord,
             enable_fulfillment_check=False,
         )
         assert loop.spin_detector.total_tool_calls == 0
@@ -589,7 +589,7 @@ class TestTurnResultDataclass:
     """Tests for TurnResult dataclass."""
 
     def test_properties(self):
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         turn = TurnResult(
             response=MagicMock(content="hello"),
@@ -607,7 +607,7 @@ class TestTurnResultDataclass:
         assert turn.failed_tool_count == 1
 
     def test_empty_content(self):
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         turn = TurnResult(response=MagicMock(content=None))
         assert turn.content == ""
@@ -625,7 +625,7 @@ class TestNudgeInjection:
 
     async def test_nudge_injected_on_no_tool_turns(self):
         """When agent doesn't use tools for 2+ turns, nudge is injected."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         mock_coord = AsyncMock()
         mock_chat_ctx = MagicMock()
@@ -636,10 +636,10 @@ class TestNudgeInjection:
             response=MagicMock(content="I think we should...", tool_calls=None),
             has_tool_calls=False,
         )
-        mock_coord.execute_turn_with_tools = AsyncMock(return_value=no_tool_turn)
+        mock_coord.execute_turn = AsyncMock(return_value=no_tool_turn)
 
         loop = AgenticLoop(
-            execution_coordinator=mock_coord,
+            turn_executor=mock_coord,
             max_iterations=4,
             enable_fulfillment_check=False,
             enable_adaptive_iterations=False,
@@ -663,7 +663,7 @@ class TestNudgeInjection:
 
     async def test_spin_nudge_injected_on_blocked_tools(self):
         """When all tools are blocked by dedup, spin nudge is injected."""
-        from victor.agent.coordinators.execution_coordinator import TurnResult
+        from victor.agent.coordinators.turn_executor import TurnResult
 
         mock_coord = AsyncMock()
         mock_chat_ctx = MagicMock()
@@ -676,10 +676,10 @@ class TestNudgeInjection:
             tool_calls_count=1,
             all_tools_blocked=True,
         )
-        mock_coord.execute_turn_with_tools = AsyncMock(return_value=blocked_turn)
+        mock_coord.execute_turn = AsyncMock(return_value=blocked_turn)
 
         loop = AgenticLoop(
-            execution_coordinator=mock_coord,
+            turn_executor=mock_coord,
             max_iterations=5,
             enable_fulfillment_check=False,
             enable_adaptive_iterations=False,
@@ -700,8 +700,8 @@ class TestNudgeInjection:
         spin_calls = [c for c in add_calls if "blocked" in str(c).lower()]
         assert len(spin_calls) >= 1, "Spin detection nudge should be injected"
 
-    async def test_no_nudge_without_execution_coordinator(self):
-        """Nudge injection is skipped when no execution_coordinator."""
+    async def test_no_nudge_without_turn_executor(self):
+        """Nudge injection is skipped when no turn_executor."""
         loop = AgenticLoop(
             orchestrator=MagicMock(spec=[]),
             max_iterations=2,
