@@ -25,7 +25,7 @@ from victor.agent.compaction_summarizer import (
     KeywordCompactionSummarizer,
     LedgerAwareCompactionSummarizer,
 )
-from victor.agent.context_assembler import TurnBoundaryContextAssembler
+from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 from victor.agent.referential_intent_resolver import ReferentialIntentResolver
 from victor.agent.session_ledger import SessionLedger
 from victor.agent.tool_result_deduplicator import ToolResultDeduplicator

@@ -59,7 +59,7 @@ from typing import (
     runtime_checkable,
 )
 
-from victor.agent.conversation_state import (
+from victor.agent.conversation.state_machine import (
     ConversationStage,
     ConversationState,
     STAGE_ORDER,
@@ -67,7 +67,7 @@ from victor.agent.conversation_state import (
 
 if TYPE_CHECKING:
     from victor.agent.conversation_controller import ConversationController
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)

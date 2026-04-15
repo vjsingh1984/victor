@@ -122,7 +122,7 @@ class TestStagePredictionInDecisionFallback:
     """Test that predict_next_stage is used as heuristic for stage detection."""
 
     def test_prediction_provides_heuristic(self):
-        from victor.agent.conversation_state import (
+        from victor.agent.conversation.state_machine import (
             ConversationStateMachine,
             STAGE_TRANSITION_PROBS,
         )

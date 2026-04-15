@@ -73,7 +73,7 @@ from typing import (
 )
 
 from victor.core.shared_types import ConversationStage
-from victor.agent.conversation_state import (
+from victor.agent.conversation.state_machine import (
     ConversationStateMachine,
     STAGE_ORDER,
 )

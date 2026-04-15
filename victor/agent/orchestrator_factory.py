@@ -101,7 +101,7 @@ if TYPE_CHECKING:
     from victor.agent.session_ledger import SessionLedger
     from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
-    from victor.agent.context_assembler import TurnBoundaryContextAssembler
+    from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
@@ -120,7 +120,7 @@ if TYPE_CHECKING:
     from victor.observability.tracing import ExecutionTracer, ToolCallTracer
     from victor.config.model_capabilities import ToolCallingMatrix
     from victor.agent.argument_normalizer import ArgumentNormalizer
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
     from victor.agent.protocols.streaming_protocols import (
         StreamingMetricsCollectorProtocol,

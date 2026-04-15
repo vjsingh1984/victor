@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from victor.agent.argument_normalizer import ArgumentNormalizer
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.search_router import SearchRouter
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.parallel_executor import ParallelToolExecutor
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator

@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.agent.context_assembler import TurnBoundaryContextAssembler
+from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 from victor.agent.session_ledger import SessionLedger
 from victor.config.orchestrator_constants import ContextAssemblerConfig
 from victor.providers.base import Message

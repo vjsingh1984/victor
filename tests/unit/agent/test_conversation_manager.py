@@ -31,7 +31,7 @@ from victor.agent.conversation_manager import (
     create_conversation_manager,
 )
 from victor.agent.conversation_controller import ContextMetrics
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 
 
 class TestConversationManagerConfig:

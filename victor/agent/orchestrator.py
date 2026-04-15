@@ -142,7 +142,7 @@ from victor.agent.capability_registry import CapabilityRegistryMixin
 # Config and enums (used at runtime)
 from victor.config.config_loaders import get_provider_limits
 from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
-from victor.agent.conversation_state import ConversationStateMachine, ConversationStage
+from victor.agent.conversation.state_machine import ConversationStateMachine, ConversationStage
 from victor.agent.action_authorizer import ActionIntent, INTENT_BLOCKED_TOOLS
 from victor.agent.prompt_builder import get_task_type_hint, SystemPromptBuilder
 from victor.agent.search_router import SearchRoute, SearchType

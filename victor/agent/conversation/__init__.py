@@ -6,10 +6,11 @@
 Canonical modules:
 - types: ConversationMessage, MessageRole, MessagePriority
 - scoring: score_messages(), ScoringWeights, weight presets
-- controller: ConversationController (runtime state)
-- store: ConversationStore (SQLite persistence)
-- state_machine: ConversationStateMachine (stage detection)
 - assembler: TurnBoundaryContextAssembler (context budget)
+- message_store: MessageStore (SOLID extraction)
+- context_handler: ContextOverflowHandler
+- session_manager: SessionManager
+- embedding_manager: EmbeddingManager
 """
 
 from victor.agent.conversation.types import (
@@ -24,8 +25,7 @@ from victor.agent.conversation.scoring import (
     ScoringWeights,
     score_messages,
 )
-
-# Legacy re-exports from SOLID extraction (will be absorbed in later phases)
+from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 from victor.agent.conversation.message_store import MessageStore
 from victor.agent.conversation.context_handler import ContextOverflowHandler
 from victor.agent.conversation.session_manager import SessionManager
@@ -42,7 +42,9 @@ __all__ = [
     "STORE_WEIGHTS",
     "ScoringWeights",
     "score_messages",
-    # Legacy (to be absorbed)
+    # Assembler
+    "TurnBoundaryContextAssembler",
+    # SOLID extraction modules
     "MessageStore",
     "ContextOverflowHandler",
     "SessionManager",

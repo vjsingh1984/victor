@@ -58,7 +58,7 @@ from victor.agent.conversation_controller import (
     ConversationConfig,
     ContextMetrics,
 )
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.agent.conversation import (
     MessageStore,
     ContextOverflowHandler,

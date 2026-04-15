@@ -242,7 +242,7 @@ class TestStageDetectionEdge:
 
     def test_edge_stage_detection_returns_none_gracefully(self):
         """Edge stage detection returns None when service container unavailable."""
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
 
         machine = ConversationStateMachine()
         # Should return (None, 0.0) gracefully (no service container in test)
@@ -251,7 +251,7 @@ class TestStageDetectionEdge:
         assert confidence == 0.0
 
     def test_keyword_detection_still_works(self):
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
 
         machine = ConversationStateMachine()
         # Simulate files already observed (post-exploration)

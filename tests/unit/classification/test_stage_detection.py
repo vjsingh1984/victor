@@ -20,7 +20,7 @@ Tools define their stages via @tool(stages=["reading", "execution"]) decorator.
 
 import pytest
 
-from victor.agent.conversation_state import (
+from victor.agent.conversation.state_machine import (
     ConversationStage,
     ConversationState,
     ConversationStateMachine,
@@ -197,7 +197,7 @@ class TestConversationStateMachine:
 
         # Mock registry to return specific tools for INITIAL stage
         with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
             return_value={"search", "ls"},
         ):
             assert machine.should_include_tool("search")
@@ -218,7 +218,7 @@ class TestConversationStateMachine:
 
         # Mock registry to return tools by stage
         with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
             side_effect=mock_get_tools,
         ):
             # Adjacent stage (PLANNING) tools should also be included
@@ -232,7 +232,7 @@ class TestConversationStateMachine:
 
         # Mock registry for INITIAL stage
         with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
             return_value={"search"},
         ):
             boost = machine.get_tool_priority_boost("search")

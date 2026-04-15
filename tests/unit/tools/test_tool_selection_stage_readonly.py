@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
+from victor.agent.conversation.state_machine import ConversationStage, ConversationStateMachine
 from victor.agent.tool_selection import ToolSelector
 from victor.tools.base import (
     AccessMode,

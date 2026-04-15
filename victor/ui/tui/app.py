@@ -1230,7 +1230,7 @@ class VictorTUI(App):
 
     def _load_project_session(self, session_id: str) -> None:
         """Load a project session with progress indication."""
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.sqlite_session_persistence import (
             get_sqlite_session_persistence,

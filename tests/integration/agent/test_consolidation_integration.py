@@ -410,7 +410,7 @@ class TestConversationStateIntegration:
 
     def test_conversation_stage_available(self):
         """Test ConversationStage enum is available."""
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         assert ConversationStage is not None
         # Check some stages exist
@@ -420,13 +420,13 @@ class TestConversationStateIntegration:
 
     def test_conversation_state_available(self):
         """Test ConversationState is available."""
-        from victor.agent.conversation_state import ConversationState
+        from victor.agent.conversation.state_machine import ConversationState
 
         assert ConversationState is not None
 
     def test_stage_order_available(self):
         """Test STAGE_ORDER is available."""
-        from victor.agent.conversation_state import STAGE_ORDER
+        from victor.agent.conversation.state_machine import STAGE_ORDER
 
         assert STAGE_ORDER is not None
         assert len(STAGE_ORDER) > 0

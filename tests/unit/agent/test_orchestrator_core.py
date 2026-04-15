@@ -324,7 +324,7 @@ class TestConversationStage:
 
     def test_get_conversation_stage(self, orchestrator):
         """Test get_conversation_stage returns stage (covers line 487)."""
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         stage = orchestrator.get_conversation_stage()
         assert isinstance(stage, ConversationStage)

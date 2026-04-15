@@ -226,7 +226,7 @@ class SwitchCommand(BaseSlashCommand):
 
             # Restore conversation
             from victor.agent.message_history import MessageHistory
-            from victor.agent.conversation_state import ConversationStateMachine
+            from victor.agent.conversation.state_machine import ConversationStateMachine
 
             metadata = session_data.get("metadata", {})
             conversation_dict = session_data.get("conversation", {})

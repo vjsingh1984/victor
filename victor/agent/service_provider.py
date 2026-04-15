@@ -473,7 +473,7 @@ class OrchestratorServiceProvider:
 
     def _create_conversation_state_machine(self) -> "ConversationStateMachineProtocol":
         """Create ConversationStateMachine instance."""
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
 
         return ConversationStateMachine()
 

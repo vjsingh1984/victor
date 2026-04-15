@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from victor.analytics.streaming_metrics import StreamingMetricsCollector
     from victor.agent.response_completer import ResponseCompleter
     from victor.agent.message_history import MessageHistory
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler

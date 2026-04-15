@@ -373,7 +373,7 @@ class TestAgentStream:
         """stream should notify state observers on stage changes."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         observer_called = []
 
@@ -412,7 +412,7 @@ class TestAgentStream:
         """stream should catch and suppress observer exceptions."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         # Create an observer that raises an exception
         def failing_observer(old_state, new_state):

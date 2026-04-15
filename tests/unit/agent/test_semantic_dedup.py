@@ -16,13 +16,13 @@ class TestSemanticDeduplication:
     """Test _deduplicate_semantic filter in context assembler."""
 
     def test_method_exists(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assert hasattr(TurnBoundaryContextAssembler, "_deduplicate_semantic")
 
     def test_identical_messages_deduplicated(self):
         """Two messages with identical content -> only one kept."""
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
 
@@ -44,7 +44,7 @@ class TestSemanticDeduplication:
 
     def test_different_messages_preserved(self):
         """Messages with different content are all preserved."""
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
 
@@ -59,7 +59,7 @@ class TestSemanticDeduplication:
 
     def test_near_duplicate_tool_results(self):
         """Tool results that differ only slightly (timestamps, whitespace) are deduplicated."""
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
 
@@ -80,7 +80,7 @@ class TestSemanticDeduplication:
 
     def test_short_messages_not_deduplicated(self):
         """Short messages (< 50 chars) are never deduplicated -- they're cheap."""
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
 
@@ -95,7 +95,7 @@ class TestSemanticDeduplication:
         assert len(result) == len(msgs)
 
     def test_empty_list_returns_empty(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         result = TurnBoundaryContextAssembler._deduplicate_semantic(assembler, [])

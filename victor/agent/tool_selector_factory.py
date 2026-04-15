@@ -33,7 +33,7 @@ from victor.agent.protocols import IToolSelector
 from victor.tools.base import ToolRegistry
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.config.settings import Settings
     from victor.storage.embeddings.service import EmbeddingService
 

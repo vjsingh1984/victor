@@ -66,7 +66,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage
+    from victor.agent.conversation.state_machine import ConversationStage
     from victor.agent.task_classifier import ClassificationResult
 
 

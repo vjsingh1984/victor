@@ -50,7 +50,7 @@ from victor.agent.protocols import (
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage
+    from victor.agent.conversation.state_machine import ConversationStage
     from victor.tools.base import ToolRegistry
 
 logger = logging.getLogger(__name__)

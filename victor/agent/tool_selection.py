@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tupl
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
 
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.tools.enums import SchemaLevel
 from victor.protocols.mode_aware import ModeAwareMixin
 from victor.tools.base import AccessMode, ExecutionCategory
@@ -52,7 +52,7 @@ from victor.core.verticals.protocols import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.task_tool_config_loader import TaskToolConfigLoader
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.vertical_context import VerticalContext

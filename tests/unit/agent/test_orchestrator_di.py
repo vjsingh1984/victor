@@ -343,7 +343,7 @@ class TestProtocolConformance:
 
     def test_conversation_state_machine_conforms(self):
         """Test ConversationStateMachine conforms to protocol."""
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
 
         state_machine = ConversationStateMachine()
 

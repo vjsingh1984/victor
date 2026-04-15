@@ -152,7 +152,7 @@ class LoadCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.session import get_session_manager
 
@@ -287,7 +287,7 @@ class ResumeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.sqlite_session_persistence import (
             get_sqlite_session_persistence,
@@ -356,7 +356,7 @@ class ResumeCommand(BaseSlashCommand):
             ctx: Command context
             session_id: Session ID to load
         """
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.sqlite_session_persistence import (
             get_sqlite_session_persistence,

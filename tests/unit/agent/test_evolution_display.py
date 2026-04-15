@@ -46,7 +46,7 @@ class TestPredictionAsHeuristic:
     """Test that predict_next_stage is wired as heuristic for stage detection."""
 
     def test_prediction_available(self):
-        from victor.agent.conversation_state import (
+        from victor.agent.conversation.state_machine import (
             ConversationStateMachine,
             STAGE_TRANSITION_PROBS,
         )
@@ -63,7 +63,7 @@ class TestPredictionAsHeuristic:
 
     def test_high_confidence_provides_nonzero_heuristic(self):
         """predict_next_stage with high confidence should give nonzero heuristic."""
-        from victor.agent.conversation_state import STAGE_TRANSITION_PROBS
+        from victor.agent.conversation.state_machine import STAGE_TRANSITION_PROBS
 
         # Reading -> execution has 0.5 probability >= 0.6 threshold? No, 0.5 < 0.6
         # Initial -> reading has 0.7 >= 0.6 -> used as heuristic

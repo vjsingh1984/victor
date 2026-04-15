@@ -30,7 +30,7 @@ import logging
 from enum import Enum
 from typing import TYPE_CHECKING, Dict, List, Optional, Set
 
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.agent.planning.constants import (
     COMPLEXITY_TOOL_LIMITS,
     STEP_TO_TASK_TYPE,

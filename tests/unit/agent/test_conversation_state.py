@@ -14,7 +14,7 @@
 
 """Tests for conversation_state module."""
 
-from victor.agent.conversation_state import (
+from victor.agent.conversation.state_machine import (
     ConversationStage,
     ConversationState,
     ConversationStateMachine,
@@ -463,7 +463,7 @@ class TestConversationStateMachineRegistryIntegration:
 
         # Mock the registry to return specific tools
         with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
             return_value={"mock_tool_from_registry"},
         ):
             tools = sm._get_tools_for_stage(ConversationStage.INITIAL)
@@ -479,7 +479,7 @@ class TestConversationStateMachineRegistryIntegration:
         sm.state.stage = ConversationStage.READING
 
         with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
             return_value={"registry_read_tool"},
         ):
             tools = sm.get_stage_tools()
@@ -517,7 +517,7 @@ class TestConversationStateMachineRegistryIntegration:
 
         # Mock registry to include a custom tool in ANALYSIS stage
         with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
             return_value={"custom_analysis_tool"},
         ):
             # Custom tool from registry should be included
@@ -531,7 +531,7 @@ class TestConversationStateMachineRegistryIntegration:
         sm.state.stage = ConversationStage.EXECUTION
 
         with patch(
-            "victor.agent.conversation_state.registry_get_tools_by_stage",
+            "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
             return_value={"custom_exec_tool"},
         ):
             # Custom tool from registry should get high boost
@@ -586,7 +586,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -610,10 +610,10 @@ class TestEdgeModelStageTransitionFallback:
 
         with (
             patch(
-                "victor.agent.conversation_state.registry_get_tools_by_stage",
+                "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
                 return_value={"edit", "write", "shell"},
             ),
-            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
         ):
             mock_container.return_value.get.return_value = mock_service
 
@@ -630,11 +630,11 @@ class TestEdgeModelStageTransitionFallback:
 
         with (
             patch(
-                "victor.agent.conversation_state.registry_get_tools_by_stage",
+                "victor.agent.conversation.state_machine.registry_get_tools_by_stage",
                 return_value={"read", "code_search"},
             ),
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
-            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
             mock_container.return_value.get.return_value = None  # No service
@@ -657,7 +657,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -678,7 +678,7 @@ class TestEdgeModelStageTransitionFallback:
 
         with (
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = False
@@ -704,7 +704,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True
@@ -728,7 +728,7 @@ class TestEdgeModelStageTransitionFallback:
         with (
             patch.object(sm, "_detect_stage_from_tools", return_value=ConversationStage.READING),
             patch.object(sm, "_get_tools_for_stage", side_effect=self._stage_tools_side_effect),
-            patch("victor.agent.conversation_state.get_container") as mock_container,
+            patch("victor.agent.conversation.state_machine.get_container") as mock_container,
             patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
         ):
             mock_ffm.return_value.is_enabled.return_value = True

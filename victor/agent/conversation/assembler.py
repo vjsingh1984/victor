@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Callable, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Callable, List, Optional, Tuple
 
 from victor.config.orchestrator_constants import (
     ContextAssemblerConfig,
@@ -31,76 +31,6 @@ from victor.config.orchestrator_constants import (
 from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)
-
-
-@runtime_checkable
-class MessageScorerProtocol(Protocol):
-    """Canonical protocol for message scoring functions.
-
-    Both ConversationMemory._score_messages and ConversationController._score_messages
-    should conform to this interface. The assembler expects:
-
-        score_fn(messages, current_query) → List[Tuple[message, float]]
-    """
-
-    def __call__(
-        self,
-        messages: List[Any],
-        current_query: Optional[str] = None,
-    ) -> List[Tuple[Any, float]]: ...
-
-
-def _call_score_fn(
-    score_fn: Callable,
-    messages: List[Any],
-    current_query: Optional[str] = None,
-) -> List[Tuple[Any, float]]:
-    """Call a score function with consistent signature handling.
-
-    Adapts between two existing implementations:
-    - ConversationMemory._score_messages(messages) → List[tuple[msg, float]]
-    - ConversationController._score_messages(current_query) → List[MessageImportance]
-
-    Both are normalized to List[tuple[message, float]] for the assembler.
-    """
-    # Try canonical signature: (messages, current_query)
-    try:
-        result = score_fn(messages, current_query)
-        return _normalize_scored(result)
-    except TypeError:
-        pass
-
-    # ConversationController: (current_query) — uses internal messages
-    try:
-        result = score_fn(current_query)
-        return _normalize_scored(result)
-    except TypeError:
-        pass
-
-    # No-arg fallback
-    result = score_fn()
-    return _normalize_scored(result)
-
-
-def _normalize_scored(scored: list) -> List[Tuple[Any, float]]:
-    """Normalize scored results to List[tuple[message, float]].
-
-    Handles both tuple format and MessageImportance dataclass format.
-    """
-    if not scored:
-        return []
-
-    first = scored[0]
-
-    # Already (message, float) tuple
-    if isinstance(first, tuple) and len(first) == 2:
-        return scored
-
-    # MessageImportance dataclass with .message and .score
-    if hasattr(first, "message") and hasattr(first, "score"):
-        return [(item.message, item.score) for item in scored]
-
-    return []
 
 
 class TurnBoundaryContextAssembler:
@@ -318,7 +248,7 @@ class TurnBoundaryContextAssembler:
         # 4. Score and select older messages
         older_chars = 0
         if older_messages and self._score_fn and older_budget > 0:
-            scored = _call_score_fn(self._score_fn, older_messages, current_query)
+            scored = self._score_fn(older_messages, current_query)
             # scored should be list of (message, score) or similar
             if scored and isinstance(scored[0], tuple):
                 scored.sort(key=lambda x: x[1], reverse=True)

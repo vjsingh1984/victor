@@ -13,12 +13,12 @@ class MockMessage:
 
 class TestFocusPhaseDetection:
     def test_method_exists(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assert hasattr(TurnBoundaryContextAssembler, "_detect_focus_phase")
 
     def test_detect_exploration_phase(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         messages = [
             MockMessage("assistant", "read_file result: def hello()..."),
@@ -28,7 +28,7 @@ class TestFocusPhaseDetection:
         assert TurnBoundaryContextAssembler._detect_focus_phase(messages) == "exploration"
 
     def test_detect_mutation_phase(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         messages = [
             MockMessage("assistant", "edit result: successfully replaced old_str"),
@@ -38,7 +38,7 @@ class TestFocusPhaseDetection:
         assert TurnBoundaryContextAssembler._detect_focus_phase(messages) == "mutation"
 
     def test_detect_execution_phase(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         messages = [
             MockMessage("assistant", "bash output: 5 tests passed"),
@@ -48,25 +48,25 @@ class TestFocusPhaseDetection:
         assert TurnBoundaryContextAssembler._detect_focus_phase(messages) == "execution"
 
     def test_mixed_when_no_tools(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         messages = [MockMessage("user", "hello"), MockMessage("assistant", "Hi!")]
         assert TurnBoundaryContextAssembler._detect_focus_phase(messages) == "mixed"
 
     def test_empty_messages(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assert TurnBoundaryContextAssembler._detect_focus_phase([]) == "mixed"
 
 
 class TestFocusScoring:
     def test_method_exists(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assert hasattr(TurnBoundaryContextAssembler, "_apply_focus_scoring")
 
     def test_mutation_phase_compresses_old_reads(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [
@@ -80,7 +80,7 @@ class TestFocusScoring:
         assert adjusted[1] > 1.0  # Edit boosted
 
     def test_mixed_phase_no_adjustment(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [MockMessage("assistant", "some content")]
@@ -90,7 +90,7 @@ class TestFocusScoring:
         assert adjusted == [1.0]
 
     def test_exploration_phase_compresses_old_edits(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [
@@ -104,7 +104,7 @@ class TestFocusScoring:
         assert adjusted[1] > 1.0
 
     def test_mutation_phase_boosts_edits(self):
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [MockMessage("assistant", "edit result: replaced function body")]

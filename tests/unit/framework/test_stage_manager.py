@@ -16,7 +16,7 @@
 
 import pytest
 
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.framework.stage_manager import (
     StageDefinition,
     StageManager,
