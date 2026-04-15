@@ -8,13 +8,11 @@ Feature-flagged via USE_SERVICE_LAYER — when disabled, the orchestrator
 continues using coordinators directly.
 """
 
-from victor.agent.services.adapters.chat_adapter import ChatServiceAdapter
 from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
 from victor.agent.services.adapters.context_adapter import ContextServiceAdapter
 from victor.agent.services.adapters.session_adapter import SessionServiceAdapter
 
 __all__ = [
-    "ChatServiceAdapter",
     "ToolServiceAdapter",
     "ContextServiceAdapter",
     "SessionServiceAdapter",

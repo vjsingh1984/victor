@@ -330,10 +330,9 @@ class ChatService:
         self._logger.warning(f"Max iterations ({self._config.max_iterations}) reached")
         return response
 
-    # NOTE: _run_agentic_loop_streaming and _get_completion have been removed.
-    # The ChatServiceAdapter wraps ChatCoordinator which uses StreamingChatPipeline
-    # with full AgenticLoop integration (perception, fulfillment, progress tracking).
-    # Raw ChatService methods are not the primary execution path.
+    # NOTE: Orchestrator wires directly to ChatCoordinator (Phase 2).
+    # ChatCoordinator uses StreamingChatPipeline + AgenticLoop for full
+    # perception, fulfillment, and progress tracking.
 
     def _is_response_complete(self, response: "CompletionResponse") -> bool:
         """Check if response is complete.

@@ -45,11 +45,6 @@ class TestFeatureFlagIntegration:
 class TestAdapterImports:
     """Test that adapter module imports work correctly."""
 
-    def test_import_chat_adapter(self):
-        from victor.agent.services.adapters.chat_adapter import ChatServiceAdapter
-
-        assert ChatServiceAdapter is not None
-
     def test_import_tool_adapter(self):
         from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
 
@@ -67,20 +62,12 @@ class TestAdapterImports:
 
     def test_import_all_from_package(self):
         from victor.agent.services.adapters import (
-            ChatServiceAdapter,
             ToolServiceAdapter,
             ContextServiceAdapter,
             SessionServiceAdapter,
         )
 
-        assert all(
-            [
-                ChatServiceAdapter,
-                ToolServiceAdapter,
-                ContextServiceAdapter,
-                SessionServiceAdapter,
-            ]
-        )
+        assert all([ToolServiceAdapter, ContextServiceAdapter, SessionServiceAdapter])
 
 
 class TestServiceProtocolImports:
@@ -150,16 +137,6 @@ class TestServiceProtocolImports:
 
 class TestAdapterProtocolConformance:
     """Test that adapters expose the expected interface methods."""
-
-    def test_chat_adapter_has_required_methods(self):
-        from victor.agent.services.adapters.chat_adapter import ChatServiceAdapter
-
-        adapter = ChatServiceAdapter(MagicMock())
-        assert callable(getattr(adapter, "chat", None))
-        assert callable(getattr(adapter, "stream_chat", None))
-        assert callable(getattr(adapter, "chat_with_planning", None))
-        assert callable(getattr(adapter, "reset_conversation", None))
-        assert callable(getattr(adapter, "is_healthy", None))
 
     def test_tool_adapter_has_required_methods(self):
         from victor.agent.services.adapters.tool_adapter import ToolServiceAdapter
