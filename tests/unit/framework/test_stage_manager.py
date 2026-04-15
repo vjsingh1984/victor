@@ -28,6 +28,7 @@ from victor.framework.stage_manager import (
     get_data_analysis_stages,
     get_research_stages,
 )
+from victor_sdk import StageDefinition as SdkStageDefinition
 
 
 class TestStageDefinition:
@@ -70,6 +71,33 @@ class TestStageDefinition:
         """Test that display_name is auto-generated from snake_case name."""
         defn = StageDefinition(name="my_custom_stage")
         assert defn.display_name == "My Custom Stage"
+
+    def test_to_sdk_definition_round_trip(self):
+        """Runtime stage definitions should convert cleanly to SDK definitions."""
+        runtime_defn = StageDefinition(
+            name="data_loading",
+            display_name="Loading Data",
+            description="Loading files",
+            keywords=["load", "read"],
+            tools={"read", "execute_code"},
+            order=2,
+            can_transition_to={"analysis"},
+            min_confidence=0.7,
+        )
+
+        sdk_defn = runtime_defn.to_sdk_definition()
+        restored = StageDefinition.from_sdk_definition(
+            sdk_defn,
+            display_name=runtime_defn.display_name,
+            order=runtime_defn.order,
+        )
+
+        assert isinstance(sdk_defn, SdkStageDefinition)
+        assert sdk_defn.tools == {"read", "execute_code"}
+        assert sdk_defn.next_stages == {"analysis"}
+        assert restored.display_name == "Loading Data"
+        assert restored.order == 2
+        assert restored.can_transition_to == {"analysis"}
 
 
 class TestStageManagerConfig:
@@ -238,6 +266,26 @@ class TestStageManager:
         defn = stage_manager.get_stage_definition("custom_stage")
         assert defn is not None
         assert defn.tools == {"custom_tool"}
+
+    def test_register_sdk_stage(self, stage_manager):
+        """StageManager should accept SDK stage definitions and normalize them to runtime stages."""
+        sdk_stage = SdkStageDefinition(
+            name="sdk_stage",
+            description="SDK stage",
+            tools={"sdk_tool"},
+            keywords=["sdk"],
+            next_stages={"completion"},
+            min_confidence=0.8,
+        )
+
+        stage_manager.register_stage(sdk_stage)
+
+        defn = stage_manager.get_stage_definition("sdk_stage")
+        assert defn is not None
+        assert isinstance(defn, StageDefinition)
+        assert defn.description == "SDK stage"
+        assert defn.tools == {"sdk_tool"}
+        assert defn.can_transition_to == {"completion"}
 
     def test_get_all_stage_definitions(self, custom_stage_manager):
         """Test getting all custom stage definitions."""
@@ -417,6 +465,24 @@ class TestFactoryFunction:
         }
         manager = create_stage_manager(custom_stages=custom_stages)
         assert manager.get_stage_definition("my_stage") is not None
+
+    def test_create_with_sdk_custom_stages(self):
+        """Factory should accept SDK stage definitions and normalize to runtime stages."""
+        custom_stages = {
+            "my_stage": SdkStageDefinition(
+                name="my_stage",
+                description="SDK-backed stage",
+                tools={"my_tool"},
+            )
+        }
+
+        manager = create_stage_manager(custom_stages=custom_stages)
+        definition = manager.get_stage_definition("my_stage")
+
+        assert definition is not None
+        assert isinstance(definition, StageDefinition)
+        assert definition.tools == {"my_tool"}
+        assert definition.description == "SDK-backed stage"
 
 
 class TestStageTransition:

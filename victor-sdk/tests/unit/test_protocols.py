@@ -222,6 +222,19 @@ class TestCoreTypes:
         assert stage.keywords == ["search"]
         assert stage.next_stages == {"verify"}
         assert stage.min_confidence == 0.8
+        assert stage.to_dict()["tools"] == ["read", "write"]
+
+    def test_stage_definition_accepts_legacy_tools_alias(self):
+        """Legacy ``tools=`` construction should remain supported during migration."""
+        stage = StageDefinition(
+            name="test",
+            tools={"write", "read"},
+        )
+
+        assert stage.description == ""
+        assert stage.required_tools == []
+        assert stage.optional_tools == ["read", "write"]
+        assert stage.tools == {"read", "write"}
 
     def test_stage_definition_get_effective_tools(self):
         """get_effective_tools() returns correct tool list."""

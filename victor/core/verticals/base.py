@@ -548,16 +548,11 @@ class VerticalBase(
 
         # Convert framework stage dicts to StageDefinition objects
         # This maintains backward compatibility while using framework capabilities
-        from victor.core.vertical_types import StageDefinition
+        from victor.core.vertical_types import normalize_stage_definition
 
         stages = {}
         for stage_name, stage_def in framework_stages.items():
-            stages[stage_name] = StageDefinition(
-                name=stage_def["name"],
-                description=stage_def["description"],
-                keywords=stage_def.get("keywords", []),
-                next_stages=stage_def.get("next_stages", set()),
-            )
+            stages[stage_name] = normalize_stage_definition(stage_name, stage_def)
 
         # Validate stages against contract (Phase 2: LSP compliance)
         # Use validator directly since VerticalBase is abstract

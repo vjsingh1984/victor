@@ -40,7 +40,13 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Dict, List, Optional, Set, TYPE_CHECKING, Union
 
-from victor_sdk.core.types import Tier
+from victor_sdk.core.types import (
+    StageDefinition,
+    StageDefinitionLike,
+    Tier,
+    normalize_stage_definition,
+    normalize_stage_definitions,
+)
 from victor_sdk.verticals.protocols.promoted_types import (
     MiddlewarePriority,
     MiddlewareResult,
@@ -55,66 +61,9 @@ if TYPE_CHECKING:
 # Stage Types
 # =============================================================================
 
-
-@dataclass
-class StageDefinition:
-    """Definition of a conversation stage for a vertical.
-
-    Stages represent distinct phases in a conversation workflow (e.g., planning,
-    execution, verification). Each vertical can define its own stages with
-    appropriate tools and transitions.
-
-    This type is used by:
-    - VerticalBase.get_stages() to define vertical stages
-    - ConversationStateMachine for stage tracking
-    - Agent orchestration for stage-based tool selection
-
-    Attributes:
-        name: Stage name (e.g., "PLANNING", "EXECUTION")
-        description: Human-readable description
-        tools: Tools relevant to this stage
-        keywords: Keywords that suggest this stage
-        next_stages: Valid stages to transition to
-        min_confidence: Minimum confidence to enter this stage
-    """
-
-    name: str
-    description: str = ""
-    tools: Set[str] = field(default_factory=set)
-    keywords: List[str] = field(default_factory=list)
-    next_stages: Set[str] = field(default_factory=set)
-    min_confidence: float = 0.5
-    required_tools: List[str] = field(default_factory=list)
-    optional_tools: List[str] = field(default_factory=list)
-    allow_custom_tools: bool = True
-
-    def __post_init__(self) -> None:
-        """Normalize legacy and SDK-compatible tool declarations."""
-
-        self.required_tools = list(self.required_tools)
-        self.optional_tools = list(self.optional_tools)
-
-        if not self.required_tools and not self.optional_tools and self.tools:
-            self.optional_tools = sorted(self.tools)
-
-        normalized_tools = set(self.tools)
-        normalized_tools.update(self.required_tools)
-        normalized_tools.update(self.optional_tools)
-        self.tools = normalized_tools
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "name": self.name,
-            "description": self.description,
-            "tools": sorted(self.tools),
-            "required_tools": self.required_tools.copy(),
-            "optional_tools": self.optional_tools.copy(),
-            "allow_custom_tools": self.allow_custom_tools,
-            "keywords": self.keywords.copy(),
-            "next_stages": sorted(self.next_stages),
-            "min_confidence": self.min_confidence,
-        }
+# Canonical stage contract now lives in victor-sdk. This module re-exports the
+# shared definition for in-repo compatibility while StageBuilder and older
+# framework shims continue to use the familiar import path.
 
 
 # =============================================================================

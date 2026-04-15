@@ -96,19 +96,39 @@ class StageDefinition:
     """
 
     name: str
-    description: str
+    description: str = ""
     required_tools: List[str] = field(default_factory=list)
     optional_tools: List[str] = field(default_factory=list)
     allow_custom_tools: bool = True
     keywords: List[str] = field(default_factory=list)
     next_stages: Set[str] = field(default_factory=set)
     min_confidence: float = 0.5
+    tools: Set[str] = field(default_factory=set)
 
-    @property
-    def tools(self) -> Set[str]:
-        """Return the runtime-compatible union of required and optional tools."""
+    def __post_init__(self) -> None:
+        """Normalize constructor inputs while preserving SDK immutability.
 
-        return set(self.required_tools) | set(self.optional_tools)
+        ``tools`` is accepted as a compatibility alias for legacy runtime code.
+        When explicit required/optional tool lists are absent, the legacy set is
+        promoted into ``optional_tools`` to preserve prior semantics.
+        """
+        normalized_required = list(self.required_tools)
+        normalized_optional = list(self.optional_tools)
+        normalized_keywords = list(self.keywords)
+        normalized_next_stages = set(self.next_stages)
+        normalized_tools = set(self.tools)
+
+        if normalized_tools and not normalized_required and not normalized_optional:
+            normalized_optional = sorted(normalized_tools)
+
+        normalized_tools.update(normalized_required)
+        normalized_tools.update(normalized_optional)
+
+        object.__setattr__(self, "required_tools", normalized_required)
+        object.__setattr__(self, "optional_tools", normalized_optional)
+        object.__setattr__(self, "keywords", normalized_keywords)
+        object.__setattr__(self, "next_stages", normalized_next_stages)
+        object.__setattr__(self, "tools", normalized_tools)
 
     def get_effective_tools(self, available_tools: List[str]) -> List[str]:
         """Get effective tool list for this stage.
@@ -134,6 +154,7 @@ class StageDefinition:
         return {
             "name": self.name,
             "description": self.description,
+            "tools": sorted(self.tools),
             "required_tools": self.required_tools.copy(),
             "optional_tools": self.optional_tools.copy(),
             "allow_custom_tools": self.allow_custom_tools,
@@ -174,12 +195,10 @@ def normalize_stage_definition(
             description=stage.description,
             required_tools=list(getattr(stage, "required_tools", [])),
             optional_tools=sorted(
-                list(
-                    getattr(
-                        stage,
-                        "optional_tools",
-                        getattr(stage, "tools", []),
-                    )
+                getattr(
+                    stage,
+                    "optional_tools",
+                    getattr(stage, "tools", []),
                 )
             ),
             allow_custom_tools=bool(getattr(stage, "allow_custom_tools", True)),
