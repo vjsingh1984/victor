@@ -664,7 +664,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             ToolServiceProtocol,
         )
 
-        self._chat_service = self._container.get_optional(ChatServiceProtocol)
+        # Use ChatServiceAdapter wrapping the ChatCoordinator — this preserves
+        # the full pipeline (StreamingChatPipeline, AgenticLoop, perception,
+        # evaluation, fulfillment, tools) instead of the raw ChatService which
+        # bypasses all orchestration sophistication.
+        from victor.agent.services.adapters.chat_adapter import ChatServiceAdapter
+
+        if hasattr(self, "_chat_coordinator"):
+            self._chat_service = ChatServiceAdapter(self._chat_coordinator)
+        else:
+            self._chat_service = self._container.get_optional(ChatServiceProtocol)
+
         self._tool_service = self._container.get_optional(ToolServiceProtocol)
         self._session_service = self._container.get_optional(SessionServiceProtocol)
         self._context_service = self._container.get_optional(ContextServiceProtocol)
