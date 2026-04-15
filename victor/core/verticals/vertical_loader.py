@@ -738,7 +738,6 @@ class VerticalLoader:
             # Also invalidate the entry point cache
             cache = get_entry_point_cache()
             cache.invalidate("victor.plugins")
-            cache.invalidate("victor.verticals")
             cache.invalidate("victor.tools")
             try:
                 get_entry_point_registry().invalidate()

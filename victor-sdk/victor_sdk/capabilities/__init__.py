@@ -60,37 +60,9 @@ class FileOperation:
     required: bool = True
 
 
-class FileOperationsCapability:
-    """Declarative file-operation capability contract."""
-
-    DEFAULT_OPERATIONS: ClassVar[List[FileOperation]] = [
-        FileOperation(FileOperationType.READ, "read", required=True),
-        FileOperation(FileOperationType.WRITE, "write", required=True),
-        FileOperation(FileOperationType.EDIT, "edit", required=True),
-        FileOperation(FileOperationType.SEARCH, "grep", required=True),
-    ]
-
-    def __init__(self, operations: Optional[Iterable[FileOperation]] = None) -> None:
-        self.operations = (
-            list(operations)
-            if operations is not None
-            else list(self.DEFAULT_OPERATIONS)
-        )
-
-    def get_tools(self) -> Set[str]:
-        """Return the required tool names for this capability."""
-
-        return {op.tool_name for op in self.operations if op.required}
-
-    def get_tool_list(self) -> List[str]:
-        """Return the required tool names in declaration order."""
-
-        return [op.tool_name for op in self.operations if op.required]
-
-
 @dataclass(frozen=True)
 class PromptContribution:
-    """Serializable prompt contribution contract."""
+    """Serializable prompt contribution contract (pure data, stays in SDK)."""
 
     name: str
     task_type: str
@@ -100,50 +72,17 @@ class PromptContribution:
     system_section: str = ""
 
 
-class PromptContributionCapability:
-    """Declarative prompt contribution capability contract."""
-
-    COMMON_HINTS: ClassVar[List[PromptContribution]] = [
-        PromptContribution(
-            name="read_first",
-            task_type="edit",
-            hint="Always read the file before making edits",
-            tool_budget=5,
-        ),
-        PromptContribution(
-            name="verify_changes",
-            task_type="edit",
-            hint="Verify changes compile and pass tests",
-            tool_budget=10,
-        ),
-        PromptContribution(
-            name="search_code",
-            task_type="search",
-            hint="Use grep to search code before reading",
-            tool_budget=10,
-        ),
-    ]
-
-    def __init__(
-        self,
-        contributions: Optional[Iterable[PromptContribution]] = None,
-    ) -> None:
-        self.contributions = (
-            list(contributions)
-            if contributions is not None
-            else list(self.COMMON_HINTS)
-        )
-
-    def get_task_hints(self) -> Dict[str, Dict[str, Any]]:
-        """Return prompt hints in a pure-serializable form."""
-
-        hints: Dict[str, Dict[str, Any]] = {}
-        for contribution in self.contributions:
-            hints[contribution.task_type] = {
-                "hint": contribution.hint,
-                "tool_budget": contribution.tool_budget,
-            }
-        return hints
+# Runtime capability classes moved to victor.framework.capabilities.standard
+# Re-exported here for backward compatibility.
+try:
+    from victor.framework.capabilities.standard import (
+        FileOperationsCapability,
+        PromptContributionCapability,
+    )
+except ImportError:
+    # SDK-only mode: these require victor-ai runtime
+    FileOperationsCapability = None  # type: ignore[assignment,misc]
+    PromptContributionCapability = None  # type: ignore[assignment,misc]
 
 
 __all__ = [

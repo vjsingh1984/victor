@@ -200,17 +200,32 @@ class VerticalBase(
         return f"{prefix}{suffix}"
 
     @classmethod
-    def _get_extension_factory(
+    def _get_extension_instance(
         cls,
         extension_key: str,
         import_path: str,
         attribute_name: Optional[str] = None,
     ) -> Any:
-        """Lazily import and instantiate an extension class.
+        """Lazily import and instantiate an extension class (cached).
 
-        This mirrors the most common helper used by extracted verticals while
-        staying definition-layer only: it relies only on importlib and a
-        conventional class naming pattern.
+        Loads a module via importlib, finds a class by naming convention
+        (e.g., extension_key="safety_extension" → CodingSafetyExtension),
+        instantiates it, and caches the instance.
+
+        Args:
+            extension_key: Cache key and naming convention base
+                (e.g., "safety_extension", "prompt_contributor")
+            import_path: Dotted module path to import
+                (e.g., "victor_coding.safety")
+            attribute_name: Explicit class name. If None, derived from
+                extension_key via _auto_extension_class_name().
+
+        Returns:
+            An instance of the loaded extension class.
+
+        Note:
+            Despite the former name "_get_extension_factory", this method
+            returns an *instance*, not a factory callable.
         """
 
         def _create() -> Any:
@@ -222,6 +237,9 @@ class VerticalBase(
             return extension_cls()
 
         return cls._get_cached_extension(extension_key, _create)
+
+    # Backward-compat alias
+    _get_extension_factory = _get_extension_instance
 
     @classmethod
     def clear_config_cache(cls, *, clear_all: bool = False) -> None:

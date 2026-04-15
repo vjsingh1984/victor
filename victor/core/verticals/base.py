@@ -822,7 +822,7 @@ class VerticalRegistry:
     _provenance: Dict[str, str] = {}
     _external_discovered: bool = False
     _legacy_entry_point_warning_emitted: bool = False
-    ENTRY_POINT_GROUP: str = "victor.verticals"
+    ENTRY_POINT_GROUP: str = "victor.plugins"  # Consolidated from legacy "victor.verticals"
     MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = SDK_MIN_SUPPORTED_API_VERSION
     CURRENT_API_VERSION: ClassVar[int] = SDK_CURRENT_API_VERSION
 

@@ -40,7 +40,6 @@ logger = logging.getLogger(__name__)
 # All Victor entry point groups used by the framework
 ENTRY_POINT_GROUPS = frozenset(
     {
-        "victor.verticals",
         "victor.plugins",
         "victor.tools",
         "victor.tool_dependencies",
