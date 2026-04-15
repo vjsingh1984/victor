@@ -52,7 +52,7 @@ Usage:
 
 from typing import List, Optional, Tuple
 
-from victor.framework.workflows import BaseYAMLWorkflowProvider
+from victor_sdk import BaseYAMLWorkflowProvider
 
 
 class RAGWorkflowProvider(BaseYAMLWorkflowProvider):

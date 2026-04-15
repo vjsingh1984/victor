@@ -42,14 +42,14 @@ import logging
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 
-from victor.framework.protocols import CapabilityType, OrchestratorCapability
+from victor_sdk import CapabilityType, OrchestratorCapability
 from victor.framework.capability_loader import CapabilityEntry, capability
 from victor.framework.capability_config_helpers import (
     load_capability_config,
     store_capability_config,
     update_capability_config_section,
 )
-from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
+from victor_sdk import BaseCapabilityProvider, CapabilityMetadata
 
 if TYPE_CHECKING:
     from victor_sdk.protocols import OrchestratorProtocol as AgentOrchestrator
