@@ -18,42 +18,12 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Sequence
 
-DEFAULT_RELATIVE_PATHS = (
-    "../victor-coding",
-    "../victor-research",
-    "../victor-devops",
+from victor.core.verticals.extracted_repo_paths import (
+    discover_default_extracted_repo_paths,
+    normalize_extracted_repo_paths,
 )
-
-
-def normalize_paths(paths: Iterable[str | Path], *, cwd: Path) -> list[Path]:
-    """Return de-duplicated absolute paths preserving input order."""
-    normalized: list[Path] = []
-    seen: set[Path] = set()
-
-    for raw_path in paths:
-        path = Path(raw_path).expanduser()
-        if not path.is_absolute():
-            path = (cwd / path).resolve()
-        else:
-            path = path.resolve()
-
-        if path in seen:
-            continue
-        seen.add(path)
-        normalized.append(path)
-
-    return normalized
-
-
-def discover_default_paths(*, repo_root: Path) -> list[Path]:
-    """Discover existing extracted vertical repo paths next to the core repo."""
-    return [
-        path
-        for path in normalize_paths(DEFAULT_RELATIVE_PATHS, cwd=repo_root)
-        if path.exists() and path.is_dir()
-    ]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -121,9 +91,9 @@ def main(
     output = stdout or sys.stdout
 
     if args.paths:
-        paths = normalize_paths(args.paths, cwd=root)
+        paths = normalize_extracted_repo_paths(args.paths, cwd=root)
     else:
-        paths = discover_default_paths(repo_root=root)
+        paths = discover_default_extracted_repo_paths(repo_root=root)
 
     if not paths:
         output.write("No extracted vertical repositories found to audit.\n")

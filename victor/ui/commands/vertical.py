@@ -15,6 +15,7 @@
 """Vertical management commands."""
 
 import json
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -308,15 +309,39 @@ def search_verticals(
 
 @vertical_app.command("audit")
 def audit_verticals(
-    paths: list[str] = typer.Argument(..., help="One or more extracted vertical repository paths"),
+    paths: list[str] = typer.Argument(
+        None,
+        help="One or more extracted vertical repository paths",
+    ),
     json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    workspace: bool = typer.Option(
+        False,
+        "--workspace",
+        help="Audit the default extracted sibling repos next to the core checkout",
+    ),
 ) -> None:
     """Audit extracted vertical repositories against the supported plugin contract."""
     _deprecation_notice()
 
     from victor.core.verticals.contract_audit import VerticalContractAuditor
+    from victor.core.verticals.extracted_repo_paths import (
+        discover_default_extracted_repo_paths,
+        normalize_extracted_repo_paths,
+    )
 
-    reports = VerticalContractAuditor().audit_paths(paths)
+    if workspace:
+        repo_root = Path(__file__).resolve().parents[3]
+        resolved_paths = discover_default_extracted_repo_paths(repo_root=repo_root)
+        if not resolved_paths:
+            console.print("[yellow]No extracted vertical repositories found to audit.[/]")
+            raise typer.Exit(0)
+    elif paths:
+        resolved_paths = normalize_extracted_repo_paths(paths, cwd=Path.cwd())
+    else:
+        _handle_error("Provide at least one path or pass --workspace")
+        return
+
+    reports = VerticalContractAuditor().audit_paths(resolved_paths)
 
     if json_output:
         console.print_json(json.dumps([report.to_dict() for report in reports], indent=2))

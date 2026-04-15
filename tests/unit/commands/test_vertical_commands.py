@@ -666,6 +666,13 @@ good = "victor_good.plugin:get_plugin"
         assert result.exit_code == 0
         assert "PASSED" in result.stdout
 
+    def test_audit_command_requires_paths_or_workspace(self):
+        """Audit command should reject empty invocation without --workspace."""
+        result = runner.invoke(vertical_app, ["audit"])
+
+        assert result.exit_code == 1
+        assert "Provide at least one path or pass --workspace" in result.stdout
+
 
 class TestVerticalFiltering:
     """Tests for vertical filtering functionality."""
