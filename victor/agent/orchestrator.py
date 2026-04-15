@@ -3061,7 +3061,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
-        Delegates to ChatService.
+        When USE_AGENTIC_LOOP is enabled, routes directly through
+        AgenticLoop.run() → TurnExecutor.execute_turn() (2 hops).
+        Falls back to ChatCoordinator path when disabled.
 
         Args:
             user_message: User's message
@@ -3071,7 +3073,79 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             CompletionResponse from the model with complete response
         """
+        # Phase 10: Route through AgenticLoop directly (2 hops)
+        try:
+            from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+            if get_feature_flag_manager().is_enabled(FeatureFlag.USE_AGENTIC_LOOP):
+                return await self._chat_via_agentic_loop(user_message)
+        except Exception as e:
+            logger.warning(f"AgenticLoop batch failed, falling back: {e}")
+
+        # Fallback: ChatCoordinator path
         return await self._chat_service.chat(user_message)
+
+    async def _chat_via_agentic_loop(self, user_message: str) -> CompletionResponse:
+        """Execute batch chat through AgenticLoop (2-hop path).
+
+        orchestrator.chat() → AgenticLoop.run() → TurnExecutor.execute_turn()
+        """
+        from victor.framework.agentic_loop import AgenticLoop
+
+        # Get or create turn executor
+        turn_executor = getattr(self, "_turn_executor", None)
+        if turn_executor is None and hasattr(self, "_chat_coordinator"):
+            turn_executor = self._chat_coordinator.turn_executor
+
+        loop = AgenticLoop(
+            orchestrator=self,
+            turn_executor=turn_executor,
+            enable_fulfillment_check=True,
+        )
+
+        # Classify task for context
+        task_classification = None
+        if turn_executor:
+            task_classification = turn_executor._provider_context.task_classifier.classify(
+                user_message
+            )
+
+        is_qa = False
+        if turn_executor:
+            is_qa = turn_executor._is_question_only(user_message)
+
+        # Ensure conversation is initialized
+        if turn_executor:
+            turn_executor._chat_context.conversation.ensure_system_prompt()
+            turn_executor._chat_context._system_added = True
+            turn_executor._chat_context.add_message("user", user_message)
+            turn_executor._tool_context.tool_calls_used = 0
+
+            # Run parallel exploration
+            if task_classification:
+                await turn_executor._run_parallel_exploration(user_message, task_classification)
+
+        context = {
+            "_task_classification": task_classification,
+            "_is_qa_task": is_qa,
+        }
+
+        loop_result = await loop.run(user_message, context=context)
+
+        # Extract CompletionResponse from last TurnResult
+        if loop_result.iterations:
+            last = loop_result.iterations[-1]
+            if last.action_result is not None and hasattr(last.action_result, "response"):
+                return last.action_result.response
+
+        # Fallback: ensure we have a response
+        from victor.agent.response_completer import ToolFailureContext
+
+        if turn_executor:
+            return await turn_executor._ensure_complete_response(None, ToolFailureContext())
+
+        # Last resort
+        return CompletionResponse(content="No response generated.", tool_calls=[])
 
     async def chat_with_planning(
         self,
