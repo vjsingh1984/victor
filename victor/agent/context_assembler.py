@@ -248,7 +248,14 @@ class TurnBoundaryContextAssembler:
         # 4. Score and select older messages
         older_chars = 0
         if older_messages and self._score_fn and older_budget > 0:
-            scored = self._score_fn(older_messages, current_query)
+            try:
+                scored = self._score_fn(older_messages, current_query)
+            except TypeError:
+                # ConversationController._score_messages(current_query) — no messages param
+                try:
+                    scored = self._score_fn(current_query)
+                except TypeError:
+                    scored = self._score_fn()
             # scored should be list of (message, score) or similar
             if scored and isinstance(scored[0], tuple):
                 scored.sort(key=lambda x: x[1], reverse=True)
