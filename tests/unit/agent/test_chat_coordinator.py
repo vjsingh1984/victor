@@ -307,7 +307,7 @@ class TestStreamingPipelineIntegration:
         pipeline = StubStreamingPipeline()
         created = []
 
-        def fake_factory(coordinator):
+        def fake_factory(coordinator, **kwargs):
             created.append(coordinator)
             return pipeline
 
@@ -330,7 +330,7 @@ class TestStreamingPipelineIntegration:
         pipeline = StubStreamingPipeline()
         factory_calls = 0
 
-        def fake_factory(_):
+        def fake_factory(_, **kwargs):
             nonlocal factory_calls
             factory_calls += 1
             return pipeline

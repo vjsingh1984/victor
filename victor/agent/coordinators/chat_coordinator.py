@@ -302,8 +302,16 @@ class ChatCoordinator:
             # - PerceptionIntegration: structured task understanding before iteration
             # - FulfillmentDetector: task completion validation after tool execution
             # Access via public attributes or capability protocol
-            perception = orch.get_capability_value("perception_integration") if orch.has_capability("perception_integration") else None
-            fulfillment = orch.get_capability_value("fulfillment_detector") if orch.has_capability("fulfillment_detector") else None
+            perception = (
+                orch.get_capability_value("perception_integration")
+                if orch.has_capability("perception_integration")
+                else None
+            )
+            fulfillment = (
+                orch.get_capability_value("fulfillment_detector")
+                if orch.has_capability("fulfillment_detector")
+                else None
+            )
             self._streaming_pipeline = create_streaming_chat_pipeline(
                 self, perception=perception, fulfillment=fulfillment
             )
@@ -525,14 +533,21 @@ class ChatCoordinator:
         ctx.task_classification = task_classification
         ctx.complexity_tool_budget = complexity_tool_budget
 
-        # Add task keyword results
-        ctx.is_analysis_task = task_keywords["is_analysis_task"] or unified_task_type.value in (
-            "analyze",
-            "analysis",
+        # Add task keyword results (compat with both old and new format)
+        task_type_val = task_keywords.get("task_type", "default")
+        ctx.is_analysis_task = task_keywords.get(
+            "is_analysis_task",
+            task_type_val in ("analysis", "analyze"),
+        ) or unified_task_type.value in ("analyze", "analysis")
+        ctx.is_action_task = task_keywords.get(
+            "is_action_task",
+            task_type_val in ("action", "create_simple", "create_complex"),
         )
-        ctx.is_action_task = task_keywords["is_action_task"]
-        ctx.needs_execution = task_keywords["needs_execution"]
-        ctx.coarse_task_type = task_keywords["coarse_task_type"]
+        ctx.needs_execution = task_keywords.get(
+            "needs_execution",
+            task_type_val in ("execution", "action"),
+        )
+        ctx.coarse_task_type = task_keywords.get("coarse_task_type", task_type_val)
 
         # Set is_complex_task from ComplexityClassifier for lenient progress checking
         if task_classification and hasattr(task_classification, "complexity"):
