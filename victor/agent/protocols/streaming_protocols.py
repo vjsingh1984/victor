@@ -542,3 +542,7 @@ class StreamingMetricsCollectorProtocol(Protocol):
     def reset(self) -> None:
         """Reset metrics for new session."""
         ...
+
+
+# Alias: some modules reference StreamingCoordinatorProtocol
+StreamingCoordinatorProtocol = StreamingControllerProtocol
