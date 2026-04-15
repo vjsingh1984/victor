@@ -52,7 +52,9 @@ class TestCacheInvalidation:
         reg = CacheRegistry.get_instance()
         cleared = []
         reg.register("tool1", None, category="tool", invalidate_fn=lambda: cleared.append("tool1"))
-        reg.register("emb1", None, category="embedding", invalidate_fn=lambda: cleared.append("emb1"))
+        reg.register(
+            "emb1", None, category="embedding", invalidate_fn=lambda: cleared.append("emb1")
+        )
         count = reg.invalidate_category("tool")
         assert count == 1
         assert cleared == ["tool1"]

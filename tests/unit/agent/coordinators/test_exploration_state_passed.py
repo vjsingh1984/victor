@@ -75,7 +75,10 @@ class TestExplorationStatePassedExplore:
             await coord.explore(snapshot, "test task")
             mock.assert_called_once()
             call_kwargs = mock.call_args
-            assert call_kwargs.kwargs.get("provider") == "anthropic" or call_kwargs[1].get("provider") == "anthropic"
+            assert (
+                call_kwargs.kwargs.get("provider") == "anthropic"
+                or call_kwargs[1].get("provider") == "anthropic"
+            )
 
     @pytest.mark.asyncio
     async def test_reads_complexity_from_capabilities(self):
@@ -93,7 +96,10 @@ class TestExplorationStatePassedExplore:
         ) as mock:
             await coord.explore(snapshot, "complex task")
             call_kwargs = mock.call_args
-            assert call_kwargs.kwargs.get("complexity") == "planning" or call_kwargs[1].get("complexity") == "planning"
+            assert (
+                call_kwargs.kwargs.get("complexity") == "planning"
+                or call_kwargs[1].get("complexity") == "planning"
+            )
 
     @pytest.mark.asyncio
     async def test_returns_no_op_when_no_results(self):
@@ -207,7 +213,9 @@ class TestExplorationStatePassedTransitions:
 
         # 1 file → low confidence
         result1 = coord._to_coordinator_result(
-            ExplorationResult(file_paths=["a.py"], summary="found", duration_seconds=0.1, tool_calls=1)
+            ExplorationResult(
+                file_paths=["a.py"], summary="found", duration_seconds=0.1, tool_calls=1
+            )
         )
         assert result1.confidence < 1.0
 

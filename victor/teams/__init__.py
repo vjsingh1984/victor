@@ -265,4 +265,11 @@ def __getattr__(name: str) -> Any:
         # Store in module globals for future access
         globals()[name] = locals()[name]
         return locals()[name]
+    # Communication infrastructure (lazy to avoid agent.teams → coordinator chain)
+    if name in {"TeamMessageBus", "TeamSharedMemory"}:
+        from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
+
+        globals()["TeamMessageBus"] = TeamMessageBus
+        globals()["TeamSharedMemory"] = TeamSharedMemory
+        return globals()[name]
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

@@ -11,8 +11,7 @@ from victor.framework.protocols import CapabilityType
 
 def test_loader_accepts_sdk_capability_entries_from_module_path() -> None:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as handle:
-        handle.write(
-            """
+        handle.write("""
 from victor_sdk.capabilities import (
     CapabilityEntry,
     CapabilityType,
@@ -32,8 +31,7 @@ CAPABILITIES = [
         handler=apply_sdk_capability,
     )
 ]
-""".strip()
-        )
+""".strip())
         temp_path = handle.name
 
     try:
@@ -51,8 +49,7 @@ CAPABILITIES = [
 
 def test_loader_accepts_sdk_capability_decorator_metadata() -> None:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as handle:
-        handle.write(
-            """
+        handle.write("""
 from victor_sdk.capabilities import CapabilityType, capability
 
 @capability(
@@ -62,8 +59,7 @@ from victor_sdk.capabilities import CapabilityType, capability
 )
 def sdk_decorated_cap(payload):
     return payload
-""".strip()
-        )
+""".strip())
         temp_path = handle.name
 
     try:

@@ -84,7 +84,9 @@ class TestSystemPromptClassify:
 
     @pytest.mark.asyncio
     async def test_stores_task_type_in_transitions(self):
-        analyzer = _make_mock_analyzer({"task_type": "research", "complexity": "high", "confidence": 0.9})
+        analyzer = _make_mock_analyzer(
+            {"task_type": "research", "complexity": "high", "confidence": 0.9}
+        )
         coord = SystemPromptStatePassedCoordinator(task_analyzer=analyzer)
         snapshot = _make_snapshot()
 
@@ -99,7 +101,9 @@ class TestSystemPromptClassify:
 
     @pytest.mark.asyncio
     async def test_stores_complexity_in_transitions(self):
-        analyzer = _make_mock_analyzer({"task_type": "coding", "complexity": "high", "confidence": 0.8})
+        analyzer = _make_mock_analyzer(
+            {"task_type": "coding", "complexity": "high", "confidence": 0.8}
+        )
         coord = SystemPromptStatePassedCoordinator(task_analyzer=analyzer)
         snapshot = _make_snapshot()
 
@@ -107,7 +111,8 @@ class TestSystemPromptClassify:
         complexity_transitions = [
             t
             for t in result.transitions.transitions
-            if t.transition_type == TransitionType.UPDATE_STATE and t.data.get("key") == "task_complexity"
+            if t.transition_type == TransitionType.UPDATE_STATE
+            and t.data.get("key") == "task_complexity"
         ]
         assert len(complexity_transitions) == 1
         assert complexity_transitions[0].data["value"] == "high"
@@ -115,7 +120,12 @@ class TestSystemPromptClassify:
     @pytest.mark.asyncio
     async def test_stores_keywords_in_transitions(self):
         analyzer = _make_mock_analyzer(
-            {"task_type": "coding", "complexity": "low", "keywords": ["test", "unit"], "confidence": 0.7}
+            {
+                "task_type": "coding",
+                "complexity": "low",
+                "keywords": ["test", "unit"],
+                "confidence": 0.7,
+            }
         )
         coord = SystemPromptStatePassedCoordinator(task_analyzer=analyzer)
         snapshot = _make_snapshot()
@@ -124,7 +134,8 @@ class TestSystemPromptClassify:
         kw_transitions = [
             t
             for t in result.transitions.transitions
-            if t.transition_type == TransitionType.UPDATE_STATE and t.data.get("key") == "task_keywords"
+            if t.transition_type == TransitionType.UPDATE_STATE
+            and t.data.get("key") == "task_keywords"
         ]
         assert len(kw_transitions) == 1
         assert kw_transitions[0].data["value"] == ["test", "unit"]
@@ -156,7 +167,9 @@ class TestSystemPromptClassify:
 
     @pytest.mark.asyncio
     async def test_confidence_from_classification(self):
-        analyzer = _make_mock_analyzer({"task_type": "devops", "complexity": "low", "confidence": 0.95})
+        analyzer = _make_mock_analyzer(
+            {"task_type": "devops", "complexity": "low", "confidence": 0.95}
+        )
         coord = SystemPromptStatePassedCoordinator(task_analyzer=analyzer)
         snapshot = _make_snapshot()
 
@@ -165,7 +178,12 @@ class TestSystemPromptClassify:
 
     @pytest.mark.asyncio
     async def test_metadata_contains_full_classification(self):
-        classification = {"task_type": "coding", "complexity": "medium", "confidence": 0.8, "extra": "data"}
+        classification = {
+            "task_type": "coding",
+            "complexity": "medium",
+            "confidence": 0.8,
+            "extra": "data",
+        }
         analyzer = _make_mock_analyzer(classification)
         coord = SystemPromptStatePassedCoordinator(task_analyzer=analyzer)
         snapshot = _make_snapshot()

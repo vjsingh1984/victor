@@ -152,9 +152,7 @@ class TraceContext:
     def add_event(self, name: str, **attributes: Any) -> None:
         """Add an event to the current active span."""
         if self._active_span:
-            self._active_span.events.append(
-                TraceEvent(name=name, attributes=attributes)
-            )
+            self._active_span.events.append(TraceEvent(name=name, attributes=attributes))
 
     def get_spans(self) -> List[TraceSpan]:
         """Get all spans in this trace."""

@@ -73,8 +73,7 @@ class TestContainerSingletonGuard:
         assert len(non_infra_calls) <= MAX_ALLOWED, (
             f"Found {len(non_infra_calls)} get_container() calls outside infrastructure "
             f"(cap is {MAX_ALLOWED}). Use constructor injection or ExecutionContext instead.\n"
-            f"New calls:\n"
-            + "\n".join(f"  {f}:{line}" for f, line in sorted(non_infra_calls))
+            f"New calls:\n" + "\n".join(f"  {f}:{line}" for f, line in sorted(non_infra_calls))
         )
 
     def test_no_get_container_in_new_runtime_module(self):

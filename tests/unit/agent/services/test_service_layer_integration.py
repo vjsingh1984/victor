@@ -41,10 +41,7 @@ class TestServiceDelegationCompleteness:
         mismatches = []
         for i, line in enumerate(lines):
             stripped = line.strip()
-            if not (
-                "self._use_service_layer and self._" in stripped
-                and "_service:" in stripped
-            ):
+            if not ("self._use_service_layer and self._" in stripped and "_service:" in stripped):
                 continue
 
             # Look at next 2 lines for the service call
@@ -71,9 +68,10 @@ class TestServiceDelegationCompleteness:
                 )
 
         # Allow some mismatches (different naming conventions between service and coordinator)
-        assert len(mismatches) <= 5, (
-            f"Too many method name mismatches between service and coordinator paths:\n"
-            + "\n".join(mismatches)
+        assert (
+            len(mismatches) <= 5
+        ), f"Too many method name mismatches between service and coordinator paths:\n" + "\n".join(
+            mismatches
         )
 
 
@@ -113,9 +111,7 @@ class TestBootstrapServiceCreation:
             svc = container.get_optional(proto)
             resolved[name] = svc is not None
 
-        assert all(resolved.values()), (
-            f"Not all services registered: {resolved}"
-        )
+        assert all(resolved.values()), f"Not all services registered: {resolved}"
 
     def test_services_have_is_healthy_method(self):
         """Every resolved service must implement is_healthy() for monitoring."""
@@ -148,9 +144,7 @@ class TestBootstrapServiceCreation:
         ]:
             svc = container.get_optional(proto)
             if svc is not None:
-                assert hasattr(svc, "is_healthy"), (
-                    f"{proto.__name__} service missing is_healthy()"
-                )
+                assert hasattr(svc, "is_healthy"), f"{proto.__name__} service missing is_healthy()"
 
 
 class TestExecutionContextServiceAccess:
@@ -204,4 +198,5 @@ class TestFeatureFlagGating:
 
 def _get_orchestrator_source() -> str:
     from victor.agent.orchestrator import AgentOrchestrator
+
     return inspect.getsource(AgentOrchestrator)

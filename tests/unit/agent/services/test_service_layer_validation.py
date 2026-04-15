@@ -120,9 +120,9 @@ class TestDelegationPointCoverage:
     def test_orchestrator_uses_services_directly(self):
         """Orchestrator must call services directly (no fallback guards)."""
         source = _get_orchestrator_source()
-        assert "_use_service_layer and self._" not in source, (
-            "Coordinator fallback guards still present"
-        )
+        assert (
+            "_use_service_layer and self._" not in source
+        ), "Coordinator fallback guards still present"
 
     def test_chat_delegation_points_exist(self):
         """3 chat delegation points must reference _chat_service."""
