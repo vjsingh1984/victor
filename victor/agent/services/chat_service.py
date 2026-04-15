@@ -345,8 +345,24 @@ class ChatService:
         Yields:
             StreamChunk objects with incremental content
         """
-        # Get messages from context
-        messages = self._context.get_messages()
+        from victor.providers.base import Message
+
+        # Build messages: system prompt + conversation history + user message
+        messages = []
+
+        # Add system prompt if conversation controller has one
+        if self._conversation and hasattr(self._conversation, "get_system_prompt"):
+            system_prompt = self._conversation.get_system_prompt()
+            if system_prompt:
+                messages.append(Message(role="system", content=system_prompt))
+
+        # Add conversation history from context
+        context_messages = self._context.get_messages()
+        if context_messages:
+            messages.extend(context_messages)
+
+        # Always add the current user message
+        messages.append(Message(role="user", content=user_message))
 
         # Stream from provider
         provider = self._provider.get_current_provider()
