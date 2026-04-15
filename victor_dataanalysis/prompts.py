@@ -2,7 +2,8 @@
 
 from typing import Dict, Optional
 
-from victor.framework.extensions import PromptContributorProtocol, TaskTypeHint
+from victor_sdk.verticals.protocols import PromptContributorProtocol
+from victor_sdk import TaskTypeHint
 
 # Data analysis-specific task type hints
 # Keys align with TaskTypeClassifier task types (data_analysis, visualization)
