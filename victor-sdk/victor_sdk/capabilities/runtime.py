@@ -258,6 +258,14 @@ class CapabilityConfigService:
         for name, config in configs.items():
             self.set_config(name, config, merge_policy=merge_policy, scope_key=scope_key)
 
+    def list_names(self, *, scope_key: Optional[str] = None) -> list:
+        """List all config names in a scope."""
+        return sorted(self._get_scope_bucket(scope_key).keys())
+
+    def snapshot(self, *, scope_key: Optional[str] = None) -> Dict[str, Any]:
+        """Return a copy of all configs in a scope."""
+        return dict(self._get_scope_bucket(scope_key))
+
     def clear(
         self,
         name: Optional[str] = None,
