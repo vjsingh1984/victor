@@ -207,6 +207,11 @@ from victor_sdk.discovery import (
 )
 from victor_sdk.skills import SkillDefinition, SkillProvider
 
+# Phase 4 promotions: types heavily used by external verticals
+from victor_sdk.multi_agent import TeamFormation, TeamMemberSpec
+from victor_sdk.rl import RLOutcome, RLRecommendation
+from victor_sdk.safety import SafetyLevel
+
 from victor_sdk.validation import (
     ValidationIssue,
     ValidationReport,
@@ -419,4 +424,10 @@ __all__ = [
     # Skills
     "SkillDefinition",
     "SkillProvider",
+    # Phase 4 promotions: types used by 6+ external verticals
+    "TeamFormation",
+    "TeamMemberSpec",
+    "SafetyLevel",
+    "RLOutcome",
+    "RLRecommendation",
 ]

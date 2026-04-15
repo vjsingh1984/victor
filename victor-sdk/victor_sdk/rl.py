@@ -83,9 +83,48 @@ class BaseRLConfig:
         )
 
 
+import time
+
+
+# ── Promoted from victor.framework.rl.base ─────────────────────────────
+
+
+@dataclass
+class RLOutcome:
+    """Result of a model execution, used for RL learning.
+
+    Promoted from victor.framework.rl.base for SDK-only vertical development.
+    """
+
+    provider: str
+    model: str
+    task_type: str
+    success: bool
+    quality_score: float = 0.0
+    timestamp: float = field(default_factory=time.time)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    vertical: str = ""
+
+
+@dataclass
+class RLRecommendation:
+    """RL learner recommendation for decision-making.
+
+    Promoted from victor.framework.rl.base for SDK-only vertical development.
+    """
+
+    value: Any = None
+    confidence: float = 0.0
+    reason: str = ""
+    sample_size: int = 0
+    is_baseline: bool = True
+
+
 __all__ = [
     "BaseRLConfig",
     "DEFAULT_ACTIVE_LEARNERS",
     "DEFAULT_PATIENCE_MAP",
     "LearnerType",
+    "RLOutcome",
+    "RLRecommendation",
 ]

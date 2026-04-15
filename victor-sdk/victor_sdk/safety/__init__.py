@@ -14,11 +14,27 @@ from victor_sdk.safety.runtime import (
     SafetyStats,
 )
 
+from enum import Enum
+
+
+class SafetyLevel(str, Enum):
+    """Safety enforcement level.
+
+    Promoted from victor.framework.config for SDK-only vertical development.
+    """
+
+    OFF = "off"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
 __all__ = [
     "SafetyAction",
     "SafetyCategory",
     "SafetyCheckResult",
     "SafetyCoordinator",
+    "SafetyLevel",
     "SafetyPatternDeclaration",
     "SafetyPatternType",
     "SafetyRule",

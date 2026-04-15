@@ -244,8 +244,51 @@ __all__ = [
     "PersonaTemplate",
     "PersonaTraits",
     "TaskAssignmentStrategy",
+    "TeamFormation",
     "TeamMember",
+    "TeamMemberSpec",
     "TeamSpec",
     "TeamTemplate",
     "TeamTopology",
 ]
+
+
+# ── Promoted from victor.teams.types / victor.framework.teams ──────────
+
+
+class TeamFormation(str, Enum):
+    """Team coordination formation types.
+
+    Promoted from victor.teams.types for SDK-only vertical development.
+    """
+
+    SEQUENTIAL = "sequential"
+    PARALLEL = "parallel"
+    HIERARCHICAL = "hierarchical"
+    PIPELINE = "pipeline"
+    CONSENSUS = "consensus"
+
+
+@dataclass
+class TeamMemberSpec:
+    """Specification for a team member agent.
+
+    Promoted from victor.framework.teams for SDK-only vertical development.
+    """
+
+    role: str
+    goal: str
+    name: str = ""
+    tool_budget: int = 10
+    allowed_tools: List[str] = field(default_factory=list)
+    is_manager: bool = False
+    priority: int = 0
+    backstory: str = ""
+    expertise: str = ""
+    personality: str = ""
+    max_delegation_depth: int = 1
+    memory: bool = False
+    memory_config: Dict[str, Any] = field(default_factory=dict)
+    cache: bool = False
+    verbose: bool = False
+    max_iterations: int = 10
