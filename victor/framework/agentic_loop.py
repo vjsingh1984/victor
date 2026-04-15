@@ -62,6 +62,12 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
 
+from victor.agent.turn_policy import (
+    FulfillmentCriteriaBuilder,
+    NudgePolicy,
+    SpinDetector,
+    SpinState,
+)
 from victor.framework.evaluation_nodes import (
     EvaluationDecision,
     EvaluationResult,
@@ -239,12 +245,10 @@ class AgenticLoop:
         # Progress tracking (SubSearch arXiv:2604.07415 intermediate rewards)
         self._progress_scores: List[float] = []
 
-        # Turn-level state (absorbed from ExecutionCoordinator's while-loop)
-        self._consecutive_no_tool_turns: int = 0
-        self._consecutive_all_blocked: int = 0
-        self._total_tool_calls: int = 0
-        self._MAX_NO_TOOL_TURNS: int = 3
-        self._MAX_ALL_BLOCKED: int = 3
+        # Shared turn policy (consistent between batch and streaming paths)
+        self.spin_detector = SpinDetector()
+        self.nudge_policy = NudgePolicy()
+        self.criteria_builder = FulfillmentCriteriaBuilder()
 
         # Initialize components
         self.perception = PerceptionIntegration(
@@ -287,9 +291,8 @@ class AgenticLoop:
         iterations: List[LoopIteration] = []
         state: Dict[str, Any] = {"query": query, **(context or {})}
         self._progress_scores = []
-        self._consecutive_no_tool_turns = 0
-        self._consecutive_all_blocked = 0
-        self._total_tool_calls = 0
+        self.spin_detector.reset()
+        self.criteria_builder.reset()
         effective_max = self.max_iterations
 
         try:
@@ -363,50 +366,23 @@ class AgenticLoop:
                     logger.warning("Task failed - exiting loop")
                     break
 
-                # NUDGE INJECTION: when agent isn't using tools, inject
-                # a nudge into the conversation so the LLM sees it on
-                # the next turn. This replaces the nudge logic that was
-                # previously inside ExecutionCoordinator's while-loop.
+                # NUDGE INJECTION via shared NudgePolicy (consistent with streaming)
+                # Inject on any non-terminal decision (RETRY or CONTINUE)
                 if (
-                    evaluation.decision == EvaluationDecision.RETRY
+                    evaluation.decision
+                    not in (EvaluationDecision.COMPLETE, EvaluationDecision.FAIL)
                     and self.execution_coordinator is not None
-                    and self._consecutive_no_tool_turns >= 2
                 ):
-                    nudge = (
-                        "You have not called any tools in the last "
-                        f"{self._consecutive_no_tool_turns} turns. You MUST use "
-                        "a tool now (read, edit, write, shell) to make progress "
-                        "on the task. Do not respond with text only."
-                    )
                     chat_ctx = getattr(self.execution_coordinator, "_chat_context", None)
                     if chat_ctx and hasattr(chat_ctx, "add_message"):
-                        chat_ctx.add_message("user", nudge)
-                        logger.info(
-                            f"Nudge injected after {self._consecutive_no_tool_turns} "
-                            "no-tool turns"
-                        )
+                        nudge = self.nudge_policy.evaluate(self.spin_detector)
+                        if nudge.should_inject:
+                            chat_ctx.add_message(nudge.role, nudge.message)
+                            logger.info(f"Nudge injected: {nudge.nudge_type.value}")
 
-                    # Budget warning when past halfway
-                    if i > effective_max // 2:
-                        remaining = effective_max - i
-                        if chat_ctx and hasattr(chat_ctx, "add_message"):
-                            chat_ctx.add_message(
-                                "system",
-                                f"WARNING: {remaining} turns remaining out of "
-                                f"{effective_max}. Make your edits NOW.",
-                            )
-
-                # Spin detection nudge: all tools blocked by dedup
-                if self._consecutive_all_blocked >= 2 and self.execution_coordinator is not None:
-                    chat_ctx = getattr(self.execution_coordinator, "_chat_context", None)
-                    if chat_ctx and hasattr(chat_ctx, "add_message"):
-                        chat_ctx.add_message(
-                            "system",
-                            "Your last tool calls were blocked because you "
-                            "already called them with the same arguments. Try "
-                            "a DIFFERENT tool or different arguments. If you've "
-                            "made your fix, provide your final answer.",
-                        )
+                        budget_nudge = self.nudge_policy.budget_warning(i, effective_max)
+                        if budget_nudge.should_inject:
+                            chat_ctx.add_message(budget_nudge.role, budget_nudge.message)
 
             # Determine success
             success = self._determine_success(iterations)
@@ -548,16 +524,21 @@ class AgenticLoop:
                 is_qa_task=is_qa,
             )
 
-            # Update turn-level tracking (absorbed from ExecutionCoordinator loop)
-            if turn_result.has_tool_calls:
-                self._consecutive_no_tool_turns = 0
-                self._total_tool_calls += turn_result.tool_calls_count
-                if turn_result.all_tools_blocked:
-                    self._consecutive_all_blocked += 1
-                else:
-                    self._consecutive_all_blocked = 0
-            else:
-                self._consecutive_no_tool_turns += 1
+            # Update shared spin detector
+            tool_names = set()
+            if turn_result.has_tool_calls and hasattr(turn_result, "tool_results"):
+                tool_names = {r.get("tool_name", "") for r in turn_result.tool_results}
+            self.spin_detector.record_turn(
+                has_tool_calls=turn_result.has_tool_calls,
+                all_blocked=turn_result.all_tools_blocked,
+                tool_names=tool_names,
+                tool_count=turn_result.tool_calls_count,
+            )
+
+            # Record tool results for fulfillment criteria auto-derivation
+            if turn_result.tool_results:
+                for tr in turn_result.tool_results:
+                    self.criteria_builder.record_tool_result(tr)
 
             return turn_result
 
@@ -600,37 +581,40 @@ class AgenticLoop:
                     reason="Q&A shortcut: accepted direct answer",
                 )
 
-            # Spin detection: all tool calls blocked by dedup
-            if self._consecutive_all_blocked >= self._MAX_ALL_BLOCKED:
-                return EvaluationResult(
-                    decision=EvaluationDecision.FAIL,
-                    score=0.1,
-                    reason=(
-                        f"Spin detected: {self._consecutive_all_blocked} "
-                        "consecutive fully-blocked tool batches"
-                    ),
-                )
-
-            # Agent stuck: no tool calls for too many turns
-            if self._consecutive_no_tool_turns >= self._MAX_NO_TOOL_TURNS:
+            # Use shared SpinDetector for consistent detection
+            spin_state = self.spin_detector.state
+            if spin_state == SpinState.TERMINATED:
+                if self.spin_detector.consecutive_all_blocked > 0:
+                    return EvaluationResult(
+                        decision=EvaluationDecision.FAIL,
+                        score=0.1,
+                        reason=(
+                            f"Spin detected: {self.spin_detector.consecutive_all_blocked} "
+                            "consecutive fully-blocked tool batches"
+                        ),
+                    )
                 return EvaluationResult(
                     decision=EvaluationDecision.FAIL,
                     score=0.2,
                     reason=(
-                        f"Agent stuck: {self._consecutive_no_tool_turns} "
+                        f"Agent stuck: {self.spin_detector.consecutive_no_tool_turns} "
                         "turns without tool calls"
                     ),
                 )
 
-            # Model used tools and produced content = normal progress
-            if turn.has_tool_calls and not turn.all_tools_blocked:
+            # Model used tools = normal progress
+            if turn.has_tool_calls and spin_state == SpinState.NORMAL:
                 # Check fulfillment if enabled
                 if self.fulfillment:
                     try:
                         task_type = self._map_to_task_type(perception)
+                        # Use auto-derived criteria from tool results
+                        criteria = state.get("criteria", {})
+                        auto_criteria = self.criteria_builder.build().to_dict()
+                        merged_criteria = {**auto_criteria, **criteria}
                         fulfillment = await self.fulfillment.check_fulfillment(
                             task_type=task_type,
-                            criteria=state.get("criteria", {}),
+                            criteria=merged_criteria,
                             context=state,
                         )
                         if fulfillment.is_fulfilled:
@@ -661,7 +645,11 @@ class AgenticLoop:
 
             # No tools + has content + previously used tools = likely done
             # Refine with edge model to validate completion
-            if not turn.has_tool_calls and turn.has_content and self._total_tool_calls > 0:
+            if (
+                not turn.has_tool_calls
+                and turn.has_content
+                and self.spin_detector.total_tool_calls > 0
+            ):
                 heuristic = EvaluationResult(
                     decision=EvaluationDecision.COMPLETE,
                     score=0.8,
@@ -670,7 +658,7 @@ class AgenticLoop:
                 return await self._refine_with_edge_model(heuristic, action_result, state)
 
             # No tools, no previous tools = needs nudge (continue to retry)
-            if not turn.has_tool_calls and self._consecutive_no_tool_turns < 2:
+            if not turn.has_tool_calls and spin_state == SpinState.NORMAL:
                 return EvaluationResult(
                     decision=EvaluationDecision.CONTINUE,
                     score=0.3,
@@ -678,7 +666,7 @@ class AgenticLoop:
                 )
 
             # Nudge territory: inject tool-use prompt
-            if self._consecutive_no_tool_turns >= 2:
+            if spin_state == SpinState.WARNING:
                 return EvaluationResult(
                     decision=EvaluationDecision.RETRY,
                     score=0.2,
@@ -810,7 +798,7 @@ class AgenticLoop:
             context = {
                 "response_tail": response_content[-500:] if response_content else "",
                 "deliverable_count": deliverable_count,
-                "signal_count": self._total_tool_calls,
+                "signal_count": self.spin_detector.total_tool_calls,
             }
 
             # Call edge model asynchronously

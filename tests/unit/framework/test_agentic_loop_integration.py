@@ -483,7 +483,7 @@ class TestTurnResultEvaluation:
         from victor.agent.coordinators.execution_coordinator import TurnResult
 
         loop = self._make_loop()
-        loop._consecutive_all_blocked = 3
+        loop.spin_detector.consecutive_all_blocked = 3
         turn = TurnResult(
             response=MagicMock(content="", tool_calls=[{"name": "read"}]),
             has_tool_calls=True,
@@ -498,7 +498,7 @@ class TestTurnResultEvaluation:
         from victor.agent.coordinators.execution_coordinator import TurnResult
 
         loop = self._make_loop()
-        loop._consecutive_no_tool_turns = 3
+        loop.spin_detector.consecutive_no_tool_turns = 3
         turn = TurnResult(
             response=MagicMock(content="I think...", tool_calls=None),
             has_tool_calls=False,
@@ -527,7 +527,7 @@ class TestTurnResultEvaluation:
         from victor.agent.coordinators.execution_coordinator import TurnResult
 
         loop = self._make_loop()
-        loop._total_tool_calls = 5
+        loop.spin_detector.total_tool_calls = 5
         turn = TurnResult(
             response=MagicMock(content="Here's the fixed code", tool_calls=None),
             has_tool_calls=False,
@@ -575,14 +575,14 @@ class TestTurnResultEvaluation:
             execution_coordinator=mock_coord,
             enable_fulfillment_check=False,
         )
-        assert loop._total_tool_calls == 0
-        assert loop._consecutive_no_tool_turns == 0
+        assert loop.spin_detector.total_tool_calls == 0
+        assert loop.spin_detector.consecutive_no_tool_turns == 0
 
         await loop._act({}, {"query": "test"})
 
-        assert loop._total_tool_calls == 2
-        assert loop._consecutive_no_tool_turns == 0
-        assert loop._consecutive_all_blocked == 0
+        assert loop.spin_detector.total_tool_calls == 2
+        assert loop.spin_detector.consecutive_no_tool_turns == 0
+        assert loop.spin_detector.consecutive_all_blocked == 0
 
 
 class TestTurnResultDataclass:
