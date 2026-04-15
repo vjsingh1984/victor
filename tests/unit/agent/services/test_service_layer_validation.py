@@ -117,16 +117,12 @@ class TestServiceBootstrap:
 class TestDelegationPointCoverage:
     """SVC-2: Validate all 16 delegation points are correctly wired."""
 
-    def test_orchestrator_has_use_service_layer_attribute(self):
-        """Orchestrator must have _use_service_layer flag."""
-        from victor.agent.orchestrator import AgentOrchestrator
-
-        # Check the class defines the pattern
-        import ast
-        import inspect
-
-        source = inspect.getsource(AgentOrchestrator)
-        assert "_use_service_layer" in source
+    def test_orchestrator_uses_services_directly(self):
+        """Orchestrator must call services directly (no fallback guards)."""
+        source = _get_orchestrator_source()
+        assert "_use_service_layer and self._" not in source, (
+            "Coordinator fallback guards still present"
+        )
 
     def test_chat_delegation_points_exist(self):
         """3 chat delegation points must reference _chat_service."""
@@ -211,15 +207,13 @@ class TestDelegationPointCoverage:
         assert "ToolServiceProtocol" in source
         assert "SessionServiceProtocol" in source
 
-    def test_delegation_pattern_consistency(self):
-        """All delegation points must use the same if/else pattern."""
+    def test_services_called_directly(self):
+        """All service calls should be direct (no guard pattern)."""
         source = _get_orchestrator_source()
-        # Count delegation guard patterns
         delegation_guards = source.count("self._use_service_layer and self._")
-        # We expect at least 16 (original 12 + 4 new)
-        assert delegation_guards >= 14, (
-            f"Expected >= 14 delegation guards (self._use_service_layer and self._*), "
-            f"found {delegation_guards}"
+        assert delegation_guards == 0, (
+            f"Found {delegation_guards} delegation guards. "
+            f"Phase 2 should have removed all coordinator fallbacks."
         )
 
 
