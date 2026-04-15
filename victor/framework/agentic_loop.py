@@ -639,10 +639,14 @@ class AgenticLoop:
                                 score=fulfillment.score,
                                 reason=f"Fulfilled: {fulfillment.reason}",
                             )
-                        return EvaluationResult(
+                        # Partial fulfillment — refine with edge model
+                        partial_result = EvaluationResult(
                             decision=EvaluationDecision.CONTINUE,
                             score=fulfillment.score,
                             reason=f"Progress: {fulfillment.reason}",
+                        )
+                        return await self._refine_with_edge_model(
+                            partial_result, action_result, state
                         )
                     except Exception as e:
                         logger.warning(f"Fulfillment check failed: {e}")
@@ -656,12 +660,14 @@ class AgenticLoop:
                 )
 
             # No tools + has content + previously used tools = likely done
+            # Refine with edge model to validate completion
             if not turn.has_tool_calls and turn.has_content and self._total_tool_calls > 0:
-                return EvaluationResult(
+                heuristic = EvaluationResult(
                     decision=EvaluationDecision.COMPLETE,
                     score=0.8,
                     reason="Model provided final answer after using tools",
                 )
+                return await self._refine_with_edge_model(heuristic, action_result, state)
 
             # No tools, no previous tools = needs nudge (continue to retry)
             if not turn.has_tool_calls and self._consecutive_no_tool_turns < 2:
@@ -747,6 +753,102 @@ class AgenticLoop:
             criteria=state.get("criteria", {}),
             context=state,
         )
+
+    async def _refine_with_edge_model(
+        self,
+        heuristic_result: EvaluationResult,
+        action_result: Any,
+        state: Dict[str, Any],
+    ) -> EvaluationResult:
+        """Refine evaluation using edge model for semantic quality scoring.
+
+        When USE_EDGE_MODEL is enabled, consults the LLM decision service
+        with TaskCompletionDecision to validate whether the task is truly
+        complete. Uses heuristic-first, edge model on low confidence.
+
+        Falls back to heuristic_result if edge model is unavailable,
+        disabled, or errors out. This is a refinement, not a replacement.
+
+        Args:
+            heuristic_result: Result from heuristic evaluation
+            action_result: TurnResult from execution
+            state: Current execution state
+
+        Returns:
+            Refined EvaluationResult (may be unchanged)
+        """
+        # Only refine ambiguous decisions (score 0.4-0.8)
+        if heuristic_result.score < 0.4 or heuristic_result.score > 0.8:
+            return heuristic_result
+
+        try:
+            from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+            if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_EDGE_MODEL):
+                return heuristic_result
+
+            from victor.agent.decisions.schemas import DecisionType
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+            from victor.core import get_container
+
+            container = get_container()
+            decision_svc = container.get_optional(LLMDecisionServiceProtocol)
+            if decision_svc is None:
+                return heuristic_result
+
+            # Build context for TaskCompletionDecision
+            response_content = ""
+            if hasattr(action_result, "content"):
+                response_content = action_result.content or ""
+
+            deliverable_count = 0
+            if hasattr(action_result, "successful_tool_count"):
+                deliverable_count = action_result.successful_tool_count
+
+            context = {
+                "response_tail": response_content[-500:] if response_content else "",
+                "deliverable_count": deliverable_count,
+                "signal_count": self._total_tool_calls,
+            }
+
+            # Call edge model asynchronously
+            result = await decision_svc.decide_async(
+                decision_type=DecisionType.TASK_COMPLETION,
+                context=context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_result.score,
+            )
+
+            # Interpret TaskCompletionDecision
+            decision_obj = result.result
+            if decision_obj and hasattr(decision_obj, "is_complete"):
+                if decision_obj.is_complete and decision_obj.confidence >= 0.7:
+                    return EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=decision_obj.confidence,
+                        reason=f"Edge model: complete (phase={decision_obj.phase})",
+                        metadata={"source": "edge_model"},
+                    )
+                elif decision_obj.phase == "stuck":
+                    return EvaluationResult(
+                        decision=EvaluationDecision.RETRY,
+                        score=decision_obj.confidence,
+                        reason="Edge model: agent appears stuck",
+                        metadata={"source": "edge_model"},
+                    )
+
+            logger.debug(
+                "Edge model refinement: source=%s, confidence=%.2f",
+                result.source,
+                result.confidence,
+            )
+
+        except Exception as e:
+            logger.debug("Edge model refinement skipped: %s", e)
+
+        return heuristic_result
 
     def _check_adaptive_termination(
         self,

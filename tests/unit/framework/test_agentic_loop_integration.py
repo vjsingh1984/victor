@@ -723,6 +723,136 @@ class TestNudgeInjection:
 
 
 # ============================================================================
+# Edge Model Semantic Evaluation Tests
+# ============================================================================
+
+
+class TestEdgeModelRefinement:
+    """Tests for _refine_with_edge_model() semantic evaluation."""
+
+    def _make_loop(self):
+        return AgenticLoop(
+            orchestrator=MagicMock(spec=[]),
+            enable_fulfillment_check=False,
+        )
+
+    async def test_skips_high_confidence(self):
+        """High confidence (>0.8) should skip edge model."""
+        loop = self._make_loop()
+        heuristic = EvaluationResult(decision=EvaluationDecision.COMPLETE, score=0.95)
+        result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+        assert result is heuristic  # Unchanged
+
+    async def test_skips_low_confidence(self):
+        """Low confidence (<0.4) should skip edge model."""
+        loop = self._make_loop()
+        heuristic = EvaluationResult(decision=EvaluationDecision.RETRY, score=0.1)
+        result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+        assert result is heuristic  # Unchanged
+
+    async def test_refines_ambiguous_confidence(self):
+        """Ambiguous range (0.4-0.8) should attempt edge model refinement."""
+        from unittest.mock import patch
+
+        loop = self._make_loop()
+        loop._total_tool_calls = 3
+
+        heuristic = EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.6)
+
+        # Mock edge model to say task is complete
+        mock_decision = MagicMock()
+        mock_decision.is_complete = True
+        mock_decision.confidence = 0.85
+        mock_decision.phase = "done"
+
+        mock_result = MagicMock()
+        mock_result.result = mock_decision
+        mock_result.source = "edge"
+        mock_result.confidence = 0.85
+
+        mock_svc = AsyncMock()
+        mock_svc.decide_async = AsyncMock(return_value=mock_result)
+
+        mock_container = MagicMock()
+        mock_container.get_optional = MagicMock(return_value=mock_svc)
+
+        with (
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+            patch("victor.core.get_container", return_value=mock_container),
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+
+            result = await loop._refine_with_edge_model(
+                heuristic, MagicMock(content="Done!", successful_tool_count=2), {}
+            )
+
+        assert result.decision == EvaluationDecision.COMPLETE
+        assert result.score == 0.85
+        assert "edge model" in result.reason.lower()
+
+    async def test_falls_back_on_edge_model_error(self):
+        """Edge model failure should return heuristic unchanged."""
+        from unittest.mock import patch
+
+        loop = self._make_loop()
+        heuristic = EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.6)
+
+        with (
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+            patch("victor.core.get_container", side_effect=RuntimeError("no container")),
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+            result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+
+        assert result is heuristic  # Unchanged on error
+
+    async def test_stuck_phase_triggers_retry(self):
+        """Edge model detecting 'stuck' phase should return RETRY."""
+        from unittest.mock import patch
+
+        loop = self._make_loop()
+        heuristic = EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.5)
+
+        mock_decision = MagicMock()
+        mock_decision.is_complete = False
+        mock_decision.confidence = 0.7
+        mock_decision.phase = "stuck"
+
+        mock_result = MagicMock()
+        mock_result.result = mock_decision
+
+        mock_svc = AsyncMock()
+        mock_svc.decide_async = AsyncMock(return_value=mock_result)
+
+        mock_container = MagicMock()
+        mock_container.get_optional = MagicMock(return_value=mock_svc)
+
+        with (
+            patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm,
+            patch("victor.core.get_container", return_value=mock_container),
+        ):
+            mock_ffm.return_value.is_enabled.return_value = True
+
+            result = await loop._refine_with_edge_model(heuristic, MagicMock(content="hmm"), {})
+
+        assert result.decision == EvaluationDecision.RETRY
+        assert "stuck" in result.reason
+
+    async def test_skipped_when_edge_model_disabled(self):
+        """When USE_EDGE_MODEL=False, returns heuristic unchanged."""
+        from unittest.mock import patch
+
+        loop = self._make_loop()
+        heuristic = EvaluationResult(decision=EvaluationDecision.CONTINUE, score=0.6)
+
+        with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm:
+            mock_ffm.return_value.is_enabled.return_value = False
+            result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+
+        assert result is heuristic
+
+
+# ============================================================================
 # Feature Flag Integration Tests
 # ============================================================================
 
