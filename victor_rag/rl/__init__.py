@@ -25,7 +25,7 @@ This module provides:
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from victor.framework.rl import LearnerType
+from victor_sdk import LearnerType
 from victor.framework.rl.config import BaseRLConfig
 from victor.framework.tool_naming import ToolNames
 

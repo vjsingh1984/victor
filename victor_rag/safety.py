@@ -430,7 +430,8 @@ Example:
         print(f"Blocked: {reason}")
 """
 
-from victor.framework.config import SafetyEnforcer, SafetyRule, SafetyLevel
+from victor.framework.config import SafetyEnforcer, SafetyRule
+from victor_sdk import SafetyLevel
 
 
 def create_rag_deletion_safety_rules(
