@@ -60,9 +60,13 @@ def _extract_imports(filepath: Path) -> list:
 class TestContribImportBoundaries:
     """Guard: contrib directory must not regress with internal imports."""
 
-    def test_contrib_directory_exists(self):
+    def test_contrib_directory_removed(self):
+        """Contrib directory was removed — all verticals extracted to external packages."""
         contrib = _get_contrib_dir()
-        assert contrib.exists(), f"Contrib directory not found at {contrib}"
+        assert not contrib.exists(), (
+            f"Contrib directory still exists at {contrib}. "
+            f"It was removed in v0.7.0 — all verticals are external packages now."
+        )
 
     def test_contrib_files_have_no_forbidden_imports(self):
         contrib = _get_contrib_dir()

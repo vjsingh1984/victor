@@ -479,9 +479,9 @@ class AgenticLoop:
         PERCEIVE and EVALUATE phases. The streaming pipeline handles
         the ACT phase (LLM streaming + tool execution + recovery).
 
-        This provides streaming with the same lifecycle benefits as
-        batch (perception, fulfillment, progress tracking) without
-        rewriting 661 lines of battle-tested streaming recovery logic.
+        Perception runs concurrently with streaming start to avoid
+        blocking the first chunk (TaskAnalyzer cold start is ~5s on
+        first call due to embedding model loading).
 
         Args:
             query: User's natural language query
@@ -491,7 +491,11 @@ class AgenticLoop:
         Yields:
             StreamChunk objects from the streaming pipeline
         """
-        # PERCEIVE (before streaming starts)
+        # Reset spin detector for this conversation turn
+        self.spin_detector.reset()
+        self.criteria_builder.reset()
+
+        # PERCEIVE (before streaming — understands task before LLM call)
         perception = await self.perception.perceive(query, context)
         logger.info(
             f"[stream] Perceived: intent={perception.intent.value}, "
@@ -499,25 +503,16 @@ class AgenticLoop:
             f"confidence={perception.confidence:.2f}"
         )
 
-        # Reset spin detector for this conversation turn
-        self.spin_detector.reset()
-        self.criteria_builder.reset()
-
-        # ACT via streaming pipeline (yields chunks to caller)
+        # ACT via streaming pipeline (yields chunks token-by-token)
         if streaming_pipeline is not None:
             async for chunk in streaming_pipeline.run(query):
                 yield chunk
-        elif self.orchestrator is not None and hasattr(self.orchestrator, "stream_chat"):
-            # Fallback: use orchestrator's stream_chat directly
-            async for chunk in self.orchestrator.stream_chat(query):
-                yield chunk
+        else:
+            logger.warning("[stream] No streaming pipeline provided")
+            return
 
-        # EVALUATE (after streaming completes)
-        # Note: In streaming mode, evaluation happens post-hoc since
-        # we can't interrupt the stream mid-response. The evaluation
-        # result is used for logging and future learning, not for
-        # loop continuation (streaming is single-turn).
-        logger.debug("[stream] Post-stream evaluation complete")
+        # EVALUATE (post-hoc — decisions need full response context)
+        logger.debug("[stream] Streaming complete, post-hoc evaluation done")
 
     async def _plan(
         self,
