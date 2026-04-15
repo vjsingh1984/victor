@@ -506,14 +506,14 @@ class ChatService:
             error: Error that occurred
 
         Returns:
-            Recovery context object
+            RecoveryContextImpl with error details
         """
-        # This would create a proper recovery context
-        # For now, return a simple dict
-        return {
-            "error": error,
-            "error_type": type(error).__name__,
-            "attempt_count": 1,
-            "state": {},
-            "metadata": {},
-        }
+        from victor.agent.services.recovery_service import RecoveryContextImpl
+
+        return RecoveryContextImpl(
+            error=error,
+            error_type=type(error).__name__,
+            attempt_count=1,
+            state={},
+            metadata={},
+        )

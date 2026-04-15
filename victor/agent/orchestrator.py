@@ -671,6 +671,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._provider_service = self._container.get_optional(ProviderServiceProtocol)
         self._recovery_service = self._container.get_optional(RecoveryServiceProtocol)
 
+        # Inject the current provider into ProviderService so it knows the
+        # active provider from orchestrator construction (not just from registry).
+        if self._provider_service is not None and hasattr(self, "provider"):
+            self._provider_service._current_provider = self.provider
+
         logger.info(
             "Service layer initialized: chat=%s, tool=%s, session=%s, "
             "context=%s, provider=%s, recovery=%s",
