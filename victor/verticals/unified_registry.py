@@ -25,10 +25,15 @@ This registry provides a single point of entry for:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Mapping, Optional, Set
+
+from victor.core.verticals.adapters import ensure_runtime_vertical
+from victor.core.verticals.manifest_contract import get_or_create_vertical_manifest
+from victor.framework.entry_point_registry import get_entry_point_registry
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +62,50 @@ class VerticalInfo:
     def is_available(self) -> bool:
         """Check if vertical is available for use."""
         return self.status == VerticalStatus.INSTALLED
+
+
+class _RegistryPluginContext:
+    """Minimal plugin context that registers verticals into the unified registry."""
+
+    def __init__(self, registry: "UnifiedVerticalRegistry", entry_point: Any) -> None:
+        self._registry = registry
+        self._entry_point = entry_point
+
+    def register_vertical(self, vertical_class: type[Any]) -> None:
+        """Register a plugin vertical into the unified registry."""
+
+        runtime_vertical = ensure_runtime_vertical(vertical_class)
+        manifest = get_or_create_vertical_manifest(vertical_class) or get_or_create_vertical_manifest(
+            runtime_vertical
+        )
+
+        if manifest is not None:
+            name = manifest.name
+            version = manifest.version
+            capabilities = {extension.value for extension in manifest.provides}
+            metadata = {
+                "manifest": manifest,
+                "vertical_class": vertical_class,
+                "runtime_vertical_class": runtime_vertical,
+                "plugin_name": getattr(self._entry_point, "name", ""),
+            }
+        else:
+            name = getattr(runtime_vertical, "name", getattr(vertical_class, "__name__", "unknown"))
+            version = getattr(runtime_vertical, "version", "1.0.0")
+            capabilities = set()
+            metadata = {
+                "vertical_class": vertical_class,
+                "runtime_vertical_class": runtime_vertical,
+                "plugin_name": getattr(self._entry_point, "name", ""),
+            }
+
+        self._registry.register_vertical(
+            name=name,
+            version=version,
+            capabilities=capabilities,
+            entry_point=getattr(self._entry_point, "value", None),
+            metadata=metadata,
+        )
 
 
 class UnifiedVerticalRegistry:
@@ -114,17 +163,13 @@ class UnifiedVerticalRegistry:
             group: Entry point group name
         """
         try:
-            import importlib.metadata as metadata
+            registry = get_entry_point_registry()
+            group_obj = registry.get_group(group)
+            if not group_obj:
+                return
 
-            eps = metadata.entry_points()
-
-            # Python 3.10+ compatibility
-            if hasattr(eps, "select"):
-                group_eps = eps.select(group=group)
-            else:
-                group_eps = eps.get(group, [])
-
-            for ep in group_eps:
+            for entry_point_tuple in group_obj.entry_points.values():
+                ep = entry_point_tuple[0]
                 try:
                     await self._load_entry_point(ep)
                 except Exception as e:
@@ -145,10 +190,10 @@ class UnifiedVerticalRegistry:
 
             # Call register if it's a VictorPlugin
             if hasattr(plugin, "register"):
-                from victor.core.verticals import RegistrationContext
-
-                context = RegistrationContext(self)
-                await plugin.register(context)
+                context = _RegistryPluginContext(self, entry_point)
+                result = plugin.register(context)
+                if inspect.isawaitable(result):
+                    await result
 
         except Exception as e:
             logger.debug(f"Failed to load entry point {entry_point.name}: {e}")
@@ -165,9 +210,8 @@ class UnifiedVerticalRegistry:
 
     async def _check_compatibility(self) -> None:
         """Check version compatibility for all verticals."""
-        # Implementation would check versions against requirements
-        # This is a placeholder for future version checking
-        pass
+        for info in self._verticals.values():
+            self._apply_compatibility(info)
 
     def register_vertical(
         self,
@@ -215,6 +259,9 @@ class UnifiedVerticalRegistry:
                 self._capability_index[capability] = set()
             self._capability_index[capability].add(name)
 
+        if self._initialized:
+            self._apply_compatibility(info)
+
     def _check_installed_version(self, package_name: str) -> Optional[str]:
         """
         Check if a package is installed and return its version.
@@ -231,6 +278,91 @@ class UnifiedVerticalRegistry:
             return metadata.version(package_name)
         except metadata.PackageNotFoundError:
             return None
+
+    def _apply_compatibility(self, info: VerticalInfo) -> None:
+        """Apply shared compatibility checks to an installed vertical."""
+
+        if info.status != VerticalStatus.INSTALLED:
+            return
+
+        try:
+            from victor.core.verticals.compatibility_gate import VerticalCompatibilityGate
+
+            manifest = self._manifest_from_metadata(info)
+            report = VerticalCompatibilityGate().assess_vertical(
+                vertical_name=info.name,
+                vertical_version=info.version,
+                manifest=manifest,
+            )
+            info.metadata["compatibility"] = report.to_dict()
+            if not report.compatible:
+                info.status = VerticalStatus.INCOMPATIBLE
+        except Exception as exc:
+            logger.debug("Compatibility check failed for vertical %s: %s", info.name, exc)
+
+    def _manifest_from_metadata(self, info: VerticalInfo):
+        """Rehydrate an ExtensionManifest from registry metadata when possible."""
+
+        try:
+            from victor_sdk.verticals.manifest import ExtensionManifest, ExtensionType
+        except Exception:
+            return None
+
+        manifest = info.metadata.get("manifest")
+        if isinstance(manifest, ExtensionManifest):
+            return manifest
+
+        vertical_class = info.metadata.get("vertical_class")
+        if vertical_class is not None:
+            try:
+                from victor.core.verticals.manifest_contract import (
+                    get_or_create_vertical_manifest,
+                )
+
+                return get_or_create_vertical_manifest(vertical_class)
+            except Exception:
+                return None
+
+        if not isinstance(info.metadata, Mapping):
+            return None
+
+        raw_provides = info.metadata.get("provides")
+        raw_requires = info.metadata.get("requires")
+        raw_min_framework_version = info.metadata.get("min_framework_version")
+        raw_api_version = info.metadata.get("api_version", 1)
+        raw_required_features = info.metadata.get("requires_features", ())
+
+        if (
+            raw_provides is None
+            and raw_requires is None
+            and raw_min_framework_version is None
+            and "api_version" not in info.metadata
+            and "requires_features" not in info.metadata
+        ):
+            return None
+
+        def _coerce_types(values: Any) -> set[ExtensionType]:
+            if not isinstance(values, (list, tuple, set, frozenset)):
+                return set()
+            normalized: set[ExtensionType] = set()
+            for value in values:
+                try:
+                    normalized.add(value if isinstance(value, ExtensionType) else ExtensionType(value))
+                except Exception:
+                    continue
+            return normalized
+
+        return ExtensionManifest(
+            name=info.name,
+            version=info.version,
+            api_version=int(raw_api_version or 1),
+            min_framework_version=(
+                str(raw_min_framework_version) if raw_min_framework_version else None
+            ),
+            provides=_coerce_types(raw_provides),
+            requires=_coerce_types(raw_requires),
+            requires_features={str(value) for value in raw_required_features or ()},
+        )
 
     def get_vertical(self, name: str) -> Optional[VerticalInfo]:
         """

@@ -40,6 +40,26 @@ from victor.ui.commands.vertical import vertical_app
 runner = CliRunner()
 
 
+def _write_vertical_metadata(path: Path, *, name: str = "benchmark") -> None:
+    """Write a minimal valid ``victor-vertical.toml`` for tests."""
+    path.write_text(
+        f"""
+[vertical]
+name = "{name}"
+version = "1.0.0"
+description = "{name} vertical"
+license = "Apache-2.0"
+requires_victor = ">=0.1.0"
+authors = [{{name = "Victor"}}]
+
+[vertical.class]
+module = "{name}"
+class_name = "{name.title()}Vertical"
+""".strip(),
+        encoding="utf-8",
+    )
+
+
 class TestPackageSpec:
     """Tests for PackageSpec class."""
 
@@ -125,21 +145,113 @@ class TestVerticalRegistryManager:
 
     def test_list_builtin_verticals(self):
         """Test listing built-in verticals."""
-        # Create a temporary directory structure
         with tempfile.TemporaryDirectory() as tmpdir:
             victor_dir = Path(tmpdir)
-
-            # Create fake vertical directories
-            (victor_dir / "coding").mkdir()
-            (victor_dir / "devops").mkdir()
+            benchmark_dir = victor_dir / "benchmark"
+            benchmark_dir.mkdir()
 
             manager = VerticalRegistryManager()
 
-            with patch.object(manager, "BUILTIN_VERTICALS", ["coding", "devops"]):
+            with patch.object(
+                manager,
+                "_discover_builtin_vertical_locations",
+                return_value={"benchmark": benchmark_dir},
+            ):
                 verticals = manager._list_builtin_verticals(victor_dir)
 
-        assert len(verticals) == 2
+        assert len(verticals) == 1
+        assert verticals[0].name == "benchmark"
         assert all(v.is_builtin for v in verticals)
+
+    def test_discover_builtin_verticals_falls_back_to_source_metadata(self):
+        """Built-in detection should fall back to source-tree metadata instead of hardcoded names."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            victor_dir = Path(tmpdir)
+            benchmark_dir = victor_dir / "benchmark"
+            benchmark_dir.mkdir()
+            _write_vertical_metadata(benchmark_dir / "victor-vertical.toml")
+
+            manager = VerticalRegistryManager()
+            locations = manager._discover_builtin_vertical_locations(victor_dir)
+
+        assert locations == {"benchmark": benchmark_dir}
+
+    def test_load_metadata_from_dist_prefers_packaged_metadata_file(self):
+        """Wheel-installed metadata should win over editable/source fallbacks."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            wheel_metadata = root / "wheel" / "victor-vertical.toml"
+            wheel_metadata.parent.mkdir()
+            _write_vertical_metadata(wheel_metadata, name="wheel")
+
+            source_metadata = root / "victor_pkg" / "victor-vertical.toml"
+            source_metadata.parent.mkdir()
+            _write_vertical_metadata(source_metadata, name="source")
+
+            manager = VerticalRegistryManager()
+            entry_point = Mock(name="wheel")
+            entry_point.value = "victor_pkg.plugin:plugin"
+            dist = Mock()
+            dist.files = ["wheel/victor-vertical.toml"]
+            dist.locate_file.side_effect = lambda path: root / path
+
+            metadata = manager._load_metadata_from_dist(entry_point, dist, root)
+
+        assert metadata is not None
+        assert metadata.name == "wheel"
+
+    def test_load_metadata_from_dist_uses_flat_package_layout(self):
+        """Editable installs with flat package layout should resolve package-local metadata."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_file = root / "victor_pkg" / "victor-vertical.toml"
+            metadata_file.parent.mkdir()
+            _write_vertical_metadata(metadata_file, name="flatpkg")
+
+            manager = VerticalRegistryManager()
+            entry_point = Mock(name="flatpkg")
+            entry_point.value = "victor_pkg.plugin:plugin"
+            dist = Mock(files=[])
+
+            metadata = manager._load_metadata_from_dist(entry_point, dist, root)
+
+        assert metadata is not None
+        assert metadata.name == "flatpkg"
+
+    def test_load_metadata_from_dist_uses_src_package_layout(self):
+        """Editable installs with src layout should resolve package-local metadata."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_file = root / "src" / "victor_pkg" / "victor-vertical.toml"
+            metadata_file.parent.mkdir(parents=True)
+            _write_vertical_metadata(metadata_file, name="srcpkg")
+
+            manager = VerticalRegistryManager()
+            entry_point = Mock(name="srcpkg")
+            entry_point.value = "victor_pkg.plugin:plugin"
+            dist = Mock(files=[])
+
+            metadata = manager._load_metadata_from_dist(entry_point, dist, root)
+
+        assert metadata is not None
+        assert metadata.name == "srcpkg"
+
+    def test_load_metadata_from_dist_falls_back_to_source_root_metadata(self):
+        """Repository-root metadata remains a compatibility fallback when package-local files are absent."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            metadata_file = root / "victor-vertical.toml"
+            _write_vertical_metadata(metadata_file, name="rootpkg")
+
+            manager = VerticalRegistryManager()
+            entry_point = Mock(name="rootpkg")
+            entry_point.value = "victor_pkg.plugin:plugin"
+            dist = Mock(files=[])
+
+            metadata = manager._load_metadata_from_dist(entry_point, dist, root)
+
+        assert metadata is not None
+        assert metadata.name == "rootpkg"
 
     def test_list_installed_verticals(self):
         """Test listing installed verticals."""
@@ -384,7 +496,12 @@ class TestVerticalRegistryManager:
         """Test uninstalling built-in vertical (should fail)."""
         manager = VerticalRegistryManager()
 
-        success, message = manager.uninstall("coding")
+        with patch.object(
+            manager,
+            "_discover_builtin_vertical_locations",
+            return_value={"benchmark": Path("/fake/benchmark")},
+        ):
+            success, message = manager.uninstall("benchmark")
 
         assert success is False
         assert "Cannot uninstall built-in" in message
@@ -424,12 +541,31 @@ class TestVerticalRegistryManager:
     def test_validate_package_builtin_name(self):
         """Test validation fails for built-in name."""
         manager = VerticalRegistryManager()
-        spec = PackageSpec(name="coding")
+        spec = PackageSpec(name="benchmark")
 
-        errors = manager._validate_package(spec)
+        with patch.object(
+            manager,
+            "_discover_builtin_vertical_locations",
+            return_value={"benchmark": Path("/fake/benchmark")},
+        ):
+            errors = manager._validate_package(spec)
 
         assert len(errors) > 0
         assert "conflicts with built-in" in errors[0]
+
+    def test_validate_package_extracted_name_no_longer_conflicts_with_stale_builtin_list(self):
+        """Extracted vertical names should not be blocked by old hardcoded builtin state."""
+        manager = VerticalRegistryManager()
+        spec = PackageSpec(name="coding")
+
+        with patch.object(
+            manager,
+            "_discover_builtin_vertical_locations",
+            return_value={"benchmark": Path("/fake/benchmark")},
+        ):
+            errors = manager._validate_package(spec)
+
+        assert errors == []
 
     def test_validate_package_invalid_name(self):
         """Test validation fails for invalid package name."""
@@ -897,9 +1033,13 @@ class TestVerticalUninstallation:
     """Tests for vertical uninstallation workflow."""
 
     @patch("subprocess.run")
-    def test_uninstall_builtin_fails(self, mock_run):
+    @patch(
+        "victor.core.verticals.registry_manager.VerticalRegistryManager._discover_builtin_vertical_locations",
+        return_value={"benchmark": Path("/fake/benchmark")},
+    )
+    def test_uninstall_builtin_fails(self, _mock_builtin_locations, mock_run):
         """Test uninstalling built-in vertical fails."""
-        result = runner.invoke(vertical_app, ["uninstall", "coding"])
+        result = runner.invoke(vertical_app, ["uninstall", "benchmark"])
 
         assert result.exit_code == 1
         assert "Cannot uninstall built-in" in result.stdout

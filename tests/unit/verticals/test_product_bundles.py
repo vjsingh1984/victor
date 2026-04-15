@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import pytest
 
+from victor_sdk.verticals.protocols.base import VerticalBase as SdkVerticalBase
 from victor.verticals.product_bundle import (
     ProductBundle,
     BundleTier,
@@ -212,10 +213,16 @@ class TestUnifiedVerticalRegistry:
     """Test suite for UnifiedVerticalRegistry."""
 
     @pytest.fixture
-    def registry(self):
+    def registry(self, monkeypatch):
         """Create a fresh registry for each test."""
         reset_registry()
-        return UnifiedVerticalRegistry()
+        registry = UnifiedVerticalRegistry()
+
+        async def _no_discovery() -> None:
+            return None
+
+        monkeypatch.setattr(registry, "_discover_from_entry_points", _no_discovery)
+        return registry
 
     @pytest.mark.asyncio
     async def test_registry_initialization(self, registry):
@@ -311,6 +318,115 @@ class TestUnifiedVerticalRegistry:
         assert len(coding_verticals) == 2
         names = {v.name for v in coding_verticals}
         assert names == {"vertical1", "vertical2"}
+
+    @pytest.mark.asyncio
+    async def test_register_vertical_applies_shared_compatibility_gate(self, registry, monkeypatch):
+        """Installed verticals should be marked incompatible when the shared gate fails."""
+
+        await registry.initialize()
+        monkeypatch.setattr(registry, "_check_installed_version", lambda _: "1.0.0")
+        monkeypatch.setattr(
+            "victor.core.verticals.compatibility_gate.get_framework_version",
+            lambda: "1.2.3",
+        )
+
+        registry.register_vertical(
+            "future-vertical",
+            "1.0.0",
+            {"cap1"},
+            metadata={"min_framework_version": ">=9.9.9"},
+        )
+
+        info = registry.get_vertical("future-vertical")
+        assert info is not None
+        assert info.status == VerticalStatus.INCOMPATIBLE
+        assert info.metadata["compatibility"]["compatible"] is False
+
+    @pytest.mark.asyncio
+    async def test_load_entry_point_registers_plugin_vertical(self, registry, monkeypatch):
+        """Plugin entry points should register verticals through the unified registry context."""
+
+        await registry.initialize()
+        monkeypatch.setattr(registry, "_check_installed_version", lambda _: "1.2.3")
+
+        class _TestVertical(SdkVerticalBase):
+            name = "test-plugin-vertical"
+            description = "Test plugin vertical"
+            version = "1.2.3"
+
+            @classmethod
+            def get_name(cls) -> str:
+                return cls.name
+
+            @classmethod
+            def get_description(cls) -> str:
+                return cls.description
+
+            @classmethod
+            def get_tools(cls):
+                return ["read"]
+
+            @classmethod
+            def get_system_prompt(cls) -> str:
+                return "test"
+
+        class _Plugin:
+            def register(self, context):
+                context.register_vertical(_TestVertical)
+
+        class _EntryPoint:
+            name = "test-plugin"
+            value = "test_plugin:plugin"
+
+            @staticmethod
+            def load():
+                return _Plugin()
+
+        await registry._load_entry_point(_EntryPoint())
+
+        info = registry.get_vertical("test-plugin-vertical")
+        assert info is not None
+        assert info.status == VerticalStatus.INSTALLED
+        assert info.version == "1.2.3"
+        assert info.entry_point == "test_plugin:plugin"
+        assert info.metadata["plugin_name"] == "test-plugin"
+
+    @pytest.mark.asyncio
+    async def test_load_from_entry_point_group_uses_shared_registry(self, registry, monkeypatch):
+        """Unified registry discovery should reuse the shared entry-point registry."""
+
+        class _EntryPoint:
+            def __init__(self, name: str, value: str) -> None:
+                self.name = name
+                self.value = value
+
+        class _Group:
+            def __init__(self) -> None:
+                self.entry_points = {
+                    "first": (_EntryPoint("first", "pkg:first"), False),
+                    "second": (_EntryPoint("second", "pkg:second"), False),
+                }
+
+        class _Registry:
+            @staticmethod
+            def get_group(group_name: str):
+                assert group_name == "victor.plugins"
+                return _Group()
+
+        seen: list[str] = []
+
+        async def _load_entry_point(entry_point):
+            seen.append(entry_point.name)
+
+        monkeypatch.setattr(
+            "victor.verticals.unified_registry.get_entry_point_registry",
+            lambda: _Registry(),
+        )
+        monkeypatch.setattr(registry, "_load_entry_point", _load_entry_point)
+
+        await registry._load_from_entry_point_group("victor.plugins")
+
+        assert seen == ["first", "second"]
 
     @pytest.mark.asyncio
     async def test_get_capabilities(self, registry):

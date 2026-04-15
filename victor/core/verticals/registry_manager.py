@@ -66,6 +66,7 @@ import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from importlib.metadata import PackageNotFoundError, distribution
+from importlib.util import find_spec
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from urllib.parse import urlparse
@@ -233,15 +234,8 @@ class VerticalRegistryManager:
     - Search functionality
     """
 
-    # Built-in verticals
-    BUILTIN_VERTICALS = [
-        "coding",
-        "devops",
-        "rag",
-        "dataanalysis",
-        "research",
-        "benchmark",
-    ]
+    # Core distribution that owns built-in plugin entry points.
+    CORE_DISTRIBUTION_NAME = "victor-ai"
 
     # Default registry URL (can be overridden via settings)
     DEFAULT_REGISTRY_URL = (
@@ -302,29 +296,87 @@ class VerticalRegistryManager:
         """List built-in verticals."""
         verticals = []
 
-        for name in self.BUILTIN_VERTICALS:
-            vertical_dir = victor_dir / name
-            if vertical_dir.exists():
-                # Try to load metadata
-                metadata = None
-                metadata_file = vertical_dir / "victor-vertical.toml"
-                if metadata_file.exists():
-                    try:
-                        metadata = VerticalPackageMetadata.from_toml(metadata_file)
-                    except Exception as e:
-                        logger.warning(f"Failed to load metadata for {name}: {e}")
+        for name, location in sorted(self._discover_builtin_vertical_locations(victor_dir).items()):
+            metadata = None
+            metadata_file = location / "victor-vertical.toml"
+            if metadata_file.exists():
+                try:
+                    metadata = VerticalPackageMetadata.from_toml(metadata_file)
+                except Exception as e:
+                    logger.warning(f"Failed to load metadata for {name}: {e}")
 
-                verticals.append(
-                    InstalledVertical(
-                        name=name,
-                        version="builtin",
-                        location=vertical_dir,
-                        metadata=metadata,
-                        is_builtin=True,
-                    )
+            verticals.append(
+                InstalledVertical(
+                    name=name,
+                    version="builtin",
+                    location=location,
+                    metadata=metadata,
+                    is_builtin=True,
                 )
+            )
 
         return verticals
+
+    def _discover_builtin_vertical_locations(self, victor_dir: Optional[Path] = None) -> Dict[str, Path]:
+        """Discover built-in verticals from the core distribution and source tree.
+
+        Built-in verticals are those owned by the core Victor package itself, not
+        extracted external packages that happen to be installed in the same
+        environment. The canonical source of truth is the current ``victor-ai``
+        distribution's ``victor.plugins`` entry points. A source-tree metadata
+        fallback keeps editable and in-repo workflows working even if distribution
+        metadata is temporarily unavailable.
+        """
+        root = victor_dir or Path(__file__).parent.parent.parent
+        locations: Dict[str, Path] = {}
+
+        try:
+            dist = distribution(self.CORE_DISTRIBUTION_NAME)
+            for ep in dist.entry_points:
+                if ep.group != "victor.plugins":
+                    continue
+                module_path = getattr(ep, "module", None) or ep.value.split(":", 1)[0]
+                if not module_path.startswith("victor."):
+                    continue
+                location = self._resolve_builtin_module_location(module_path, root)
+                if location is not None:
+                    locations.setdefault(ep.name, location)
+        except PackageNotFoundError:
+            logger.debug("Core Victor distribution metadata not available for builtin discovery")
+        except Exception as exc:
+            logger.debug("Failed to inspect core distribution entry points: %s", exc)
+
+        for metadata_file in root.glob("*/victor-vertical.toml"):
+            locations.setdefault(metadata_file.parent.name, metadata_file.parent)
+
+        return locations
+
+    def _resolve_builtin_module_location(self, module_path: str, victor_dir: Path) -> Optional[Path]:
+        """Resolve a module path to its owning source location inside the Victor tree."""
+        try:
+            spec = find_spec(module_path)
+        except Exception as exc:
+            logger.debug("Failed to resolve builtin module %s: %s", module_path, exc)
+            return None
+
+        if spec is None:
+            return None
+        if spec.submodule_search_locations:
+            location = Path(next(iter(spec.submodule_search_locations)))
+        elif spec.origin:
+            location = Path(spec.origin).parent
+        else:
+            return None
+
+        try:
+            location.relative_to(victor_dir)
+        except ValueError:
+            return None
+        return location
+
+    def _is_builtin_vertical(self, name: str) -> bool:
+        """Return True when the name belongs to a core-owned builtin vertical."""
+        return name in self._discover_builtin_vertical_locations()
 
     def _list_installed_verticals(self) -> List[InstalledVertical]:
         """List installed external verticals.
@@ -405,34 +457,60 @@ class VerticalRegistryManager:
             if source_root is None:
                 source_root = self._resolve_source_root(dist)
 
-            # 1. Check dist.files for victor-vertical.toml (wheel installs)
-            if dist.files:
-                for file_path in dist.files:
-                    if str(file_path).endswith("victor-vertical.toml"):
-                        full_path = Path(dist.locate_file(str(file_path)))
-                        if full_path.exists():
-                            return VerticalPackageMetadata.from_toml(full_path)
-
-            # 2. Check source root directly
-            metadata_file = source_root / "victor-vertical.toml"
-            if metadata_file.exists():
-                return VerticalPackageMetadata.from_toml(metadata_file)
-
-            # 3. Check inside package directory (src layout or flat layout)
-            if hasattr(entry_point, "value"):
-                module_path = entry_point.value.split(":")[0]
-                package_name = module_path.split(".")[0]
-                for candidate in [
-                    source_root / "src" / package_name / "victor-vertical.toml",
-                    source_root / package_name / "victor-vertical.toml",
-                ]:
-                    if candidate.exists():
-                        return VerticalPackageMetadata.from_toml(candidate)
+            for candidate in self._iter_metadata_candidates(entry_point, dist, source_root):
+                if candidate.exists():
+                    return VerticalPackageMetadata.from_toml(candidate)
 
         except Exception as e:
             logger.debug(f"Failed to load metadata for {entry_point.name}: {e}")
 
         return None
+
+    def _iter_metadata_candidates(
+        self,
+        entry_point: Any,
+        dist: Any,
+        source_root: Path,
+    ) -> List[Path]:
+        """Return ordered metadata candidates for an installed distribution.
+
+        Search order is deliberately deterministic:
+        1. Files explicitly packaged in the wheel/sdist metadata.
+        2. Package-local metadata for editable installs (`src/` or flat layout).
+        3. Repository-root metadata as a compatibility fallback.
+        """
+        candidates: List[Path] = []
+        seen: Set[Path] = set()
+
+        def _append(path: Path) -> None:
+            if path not in seen:
+                seen.add(path)
+                candidates.append(path)
+
+        dist_files = getattr(dist, "files", None) or []
+        for file_path in dist_files:
+            if str(file_path).endswith("victor-vertical.toml"):
+                _append(Path(dist.locate_file(str(file_path))))
+
+        for package_name in self._entry_point_package_candidates(entry_point):
+            _append(source_root / package_name / "victor-vertical.toml")
+            _append(source_root / "src" / package_name / "victor-vertical.toml")
+
+        _append(source_root / "victor-vertical.toml")
+        return candidates
+
+    def _entry_point_package_candidates(self, entry_point: Any) -> List[str]:
+        """Return likely package roots for an entry point module path."""
+        module_path = getattr(entry_point, "module", None)
+        if not isinstance(module_path, str) or not module_path:
+            module_path = None
+        if module_path is None and hasattr(entry_point, "value"):
+            module_path = entry_point.value.split(":", 1)[0]
+        if not module_path:
+            return []
+
+        package_name = module_path.split(".", 1)[0]
+        return [package_name] if package_name else []
 
     def _list_available_verticals(self) -> List[InstalledVertical]:
         """List verticals available in the remote registry.
@@ -682,7 +760,7 @@ class VerticalRegistryManager:
             Tuple of (success, message)
         """
         # Check if it's a built-in vertical
-        if name in self.BUILTIN_VERTICALS:
+        if self._is_builtin_vertical(name):
             return False, f"Cannot uninstall built-in vertical: {name}"
 
         # Build pip command
@@ -726,7 +804,7 @@ class VerticalRegistryManager:
         errors = []
 
         # Check for reserved names
-        if package_spec.name in self.BUILTIN_VERTICALS:
+        if self._is_builtin_vertical(package_spec.name):
             errors.append(f"Package name '{package_spec.name}' conflicts with built-in vertical")
 
         # For git and local packages, try to load metadata

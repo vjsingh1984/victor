@@ -51,9 +51,11 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
+from victor.framework.entry_point_registry import get_entry_point_registry, get_entry_point_values
 from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.compatibility_gate import VerticalCompatibilityGate
 from victor.core.verticals.framework_version import get_framework_version
 from victor.core.verticals.manifest_contract import (
     get_or_create_vertical_manifest,
@@ -262,8 +264,18 @@ class VerticalLoader:
             if self._discovered_vertical_entry_points is not None and not force_refresh:
                 return self._discovered_vertical_entry_points
 
-            cache = get_entry_point_cache()
-            entries = dict(cache.get_entry_points("victor.plugins", force_refresh=force_refresh))
+            registry = get_entry_point_registry()
+            if force_refresh:
+                registry.invalidate()
+            group = registry.get_group("victor.plugins")
+            entries = (
+                {
+                    name: entry_point_tuple[0].value
+                    for name, entry_point_tuple in group.entry_points.items()
+                }
+                if group is not None
+                else {}
+            )
             self._discovered_vertical_entry_points = entries
             return entries
 
@@ -646,13 +658,7 @@ class VerticalLoader:
             self._discovered_tools = {}
 
             try:
-                # Use cached entry points for fast startup
-                cache = get_entry_point_cache()
-                ep_entries = cache.get_entry_points(
-                    "victor.tools",
-                    force_refresh=force_refresh,
-                )
-
+                ep_entries = get_entry_point_values("victor.tools", force=force_refresh)
                 self._load_tool_entries(ep_entries)
             except Exception as e:
                 logger.warning("Failed to discover tool entry points: %s", e)
@@ -734,6 +740,10 @@ class VerticalLoader:
             cache.invalidate("victor.plugins")
             cache.invalidate("victor.verticals")
             cache.invalidate("victor.tools")
+            try:
+                get_entry_point_registry().invalidate()
+            except Exception as e:
+                logger.debug("Failed invalidating unified entry-point registry: %s", e)
 
             # Clear extension cache for consistency (Phase 3.3 fix)
             from victor.core.verticals.extension_loader import VerticalExtensionLoader
@@ -888,98 +898,10 @@ class VerticalLoader:
             logger.debug("Vertical manifest not available: %s", exc)
             return
 
-        # 1. Version Negotiation (Core Framework v. Vertical Requirement)
-        required = getattr(manifest, "min_framework_version", None)
-        if required:
-            try:
-                from packaging import version
-                from packaging.specifiers import SpecifierSet
-
-                framework_version = get_framework_version()
-                spec = SpecifierSet(required)
-                if version.parse(framework_version) not in spec:
-                    raise ValueError(
-                        f"Incompatible framework version: {framework_version} "
-                        f"does not meet requirement {required} for vertical {manifest.name}"
-                    )
-            except ImportError as exc:
-                logger.debug("Core version negotiation skipped: %s", exc)
-
-        # 2. Capability/Protocol Negotiation
-        try:
-            from victor.core.verticals.capability_negotiator import (
-                CapabilityNegotiator,
-            )
-            from victor.framework.capability_negotiation import (
-                NegotiationResult,
-            )
-
-            negotiator = CapabilityNegotiator()
-            result: NegotiationResult = negotiator.negotiate(manifest)
-
-            for warning in result.warnings:
-                logger.warning("Manifest negotiation warning for '%s': %s", manifest.name, warning)
-
-            if not result.compatible:
-                errors = "; ".join(result.errors)
-                raise ValueError(
-                    f"Vertical '{manifest.name}' manifest negotiation failed: {errors}"
-                )
-        except (ImportError, AttributeError) as exc:
-            # Graceful degradation if manifest/negotiator not available
-            logger.debug("Manifest negotiation skipped: %s", exc)
-
-        # 3. Version Compatibility Matrix Check
-        try:
-            from victor.core.verticals.version_matrix import (
-                get_compatibility_matrix,
-            )
-
-            vertical_version = getattr(manifest, "version", "1.0.0")
-            vertical_name = manifest.name
-            framework_version = get_framework_version()
-
-            # Get compatibility matrix
-            matrix = get_compatibility_matrix()
-
-            # Load default rules if not loaded
-            if not matrix.is_loaded():
-                matrix.load_default_rules()
-
-            # Check compatibility
-            result = matrix.check_compatibility(
-                vertical_name=vertical_name,
-                vertical_version=vertical_version,
-                framework_version=framework_version,
-            )
-
-            if result.is_incompatible:
-                raise ValueError(
-                    f"Vertical '{vertical_name}' is incompatible with framework {framework_version}: "
-                    f"{result.message}"
-                )
-
-            if result.status.value == "degraded":
-                logger.warning(
-                    "Vertical '%s' is running in degraded mode: %s",
-                    vertical_name,
-                    result.message,
-                )
-
-            if result.required_features:
-                logger.warning(
-                    "Vertical '%s' requires features that are not available: %s",
-                    vertical_name,
-                    ", ".join(sorted(result.required_features)),
-                )
-
-        except (ImportError, AttributeError) as exc:
-            logger.debug("Version compatibility check skipped: %s", exc)
-        except ValueError:
-            # Re-raise ValueError as it indicates incompatibility
-            raise
-        except Exception as exc:
-            logger.debug("Version compatibility check failed: %s", exc)
+        report = VerticalCompatibilityGate().assess_manifest(manifest)
+        for warning in report.warnings:
+            logger.warning("Manifest negotiation warning for '%s': %s", manifest.name, warning)
+        report.raise_if_incompatible()
 
     def _validate_dependencies(self, vertical: Type[VerticalBase]) -> None:
         """Validate vertical dependencies before activation.
