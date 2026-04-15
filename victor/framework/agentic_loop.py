@@ -629,9 +629,7 @@ class AgenticLoop:
                             score=fulfillment.score,
                             reason=f"Progress: {fulfillment.reason}",
                         )
-                        return await self._refine_with_edge_model(
-                            partial_result, action_result, state
-                        )
+                        return await self._refine_with_llm(partial_result, action_result, state)
                     except Exception as e:
                         logger.warning(f"Fulfillment check failed: {e}")
 
@@ -655,7 +653,7 @@ class AgenticLoop:
                     score=0.8,
                     reason="Model provided final answer after using tools",
                 )
-                return await self._refine_with_edge_model(heuristic, action_result, state)
+                return await self._refine_with_llm(heuristic, action_result, state)
 
             # No tools, no previous tools = needs nudge (continue to retry)
             if not turn.has_tool_calls and spin_state == SpinState.NORMAL:
@@ -742,19 +740,20 @@ class AgenticLoop:
             context=state,
         )
 
-    async def _refine_with_edge_model(
+    async def _refine_with_llm(
         self,
         heuristic_result: EvaluationResult,
         action_result: Any,
         state: Dict[str, Any],
     ) -> EvaluationResult:
-        """Refine evaluation using edge model for semantic quality scoring.
+        """Refine evaluation via TieredDecisionService (canonical decision path).
 
-        When USE_EDGE_MODEL is enabled, consults the LLM decision service
-        with TaskCompletionDecision to validate whether the task is truly
-        complete. Uses heuristic-first, edge model on low confidence.
+        Uses the same decision service and tier routing as all other LLM
+        decisions in Victor. The tier (edge/balanced/performance) is
+        determined by TieredDecisionService's per-DecisionType routing,
+        which can be escalated/de-escalated based on confidence feedback.
 
-        Falls back to heuristic_result if edge model is unavailable,
+        Falls back to heuristic_result if decision service is unavailable,
         disabled, or errors out. This is a refinement, not a replacement.
 
         Args:
@@ -801,7 +800,7 @@ class AgenticLoop:
                 "signal_count": self.spin_detector.total_tool_calls,
             }
 
-            # Call edge model asynchronously
+            # Call via canonical decision service (tier-aware)
             result = await decision_svc.decide_async(
                 decision_type=DecisionType.TASK_COMPLETION,
                 context=context,
@@ -812,29 +811,45 @@ class AgenticLoop:
             # Interpret TaskCompletionDecision
             decision_obj = result.result
             if decision_obj and hasattr(decision_obj, "is_complete"):
+                tier = result.source  # "edge", "balanced", "performance", etc.
+
                 if decision_obj.is_complete and decision_obj.confidence >= 0.7:
+                    # High confidence from LLM — de-escalate for next call
+                    if hasattr(decision_svc, "deescalate_tier"):
+                        decision_svc.deescalate_tier(
+                            DecisionType.TASK_COMPLETION, "high_confidence"
+                        )
                     return EvaluationResult(
                         decision=EvaluationDecision.COMPLETE,
                         score=decision_obj.confidence,
-                        reason=f"Edge model: complete (phase={decision_obj.phase})",
-                        metadata={"source": "edge_model"},
+                        reason=f"LLM ({tier}): complete (phase={decision_obj.phase})",
+                        metadata={"source": tier},
                     )
+
                 elif decision_obj.phase == "stuck":
+                    # Stuck — escalate for next call
+                    if hasattr(decision_svc, "escalate_tier"):
+                        decision_svc.escalate_tier(DecisionType.TASK_COMPLETION, "stuck_phase")
                     return EvaluationResult(
                         decision=EvaluationDecision.RETRY,
                         score=decision_obj.confidence,
-                        reason="Edge model: agent appears stuck",
-                        metadata={"source": "edge_model"},
+                        reason=f"LLM ({tier}): agent appears stuck",
+                        metadata={"source": tier},
                     )
 
+                elif decision_obj.confidence < 0.5:
+                    # Low confidence from LLM — escalate tier
+                    if hasattr(decision_svc, "escalate_tier"):
+                        decision_svc.escalate_tier(DecisionType.TASK_COMPLETION, "low_confidence")
+
             logger.debug(
-                "Edge model refinement: source=%s, confidence=%.2f",
+                "LLM refinement: source=%s, confidence=%.2f",
                 result.source,
                 result.confidence,
             )
 
         except Exception as e:
-            logger.debug("Edge model refinement skipped: %s", e)
+            logger.debug("LLM refinement skipped: %s", e)
 
         return heuristic_result
 

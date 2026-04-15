@@ -727,8 +727,8 @@ class TestNudgeInjection:
 # ============================================================================
 
 
-class TestEdgeModelRefinement:
-    """Tests for _refine_with_edge_model() semantic evaluation."""
+class TestLLMRefinement:
+    """Tests for _refine_with_llm() tiered semantic evaluation."""
 
     def _make_loop(self):
         return AgenticLoop(
@@ -740,14 +740,14 @@ class TestEdgeModelRefinement:
         """High confidence (>0.8) should skip edge model."""
         loop = self._make_loop()
         heuristic = EvaluationResult(decision=EvaluationDecision.COMPLETE, score=0.95)
-        result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+        result = await loop._refine_with_llm(heuristic, MagicMock(), {})
         assert result is heuristic  # Unchanged
 
     async def test_skips_low_confidence(self):
         """Low confidence (<0.4) should skip edge model."""
         loop = self._make_loop()
         heuristic = EvaluationResult(decision=EvaluationDecision.RETRY, score=0.1)
-        result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+        result = await loop._refine_with_llm(heuristic, MagicMock(), {})
         assert result is heuristic  # Unchanged
 
     async def test_refines_ambiguous_confidence(self):
@@ -782,13 +782,13 @@ class TestEdgeModelRefinement:
         ):
             mock_ffm.return_value.is_enabled.return_value = True
 
-            result = await loop._refine_with_edge_model(
+            result = await loop._refine_with_llm(
                 heuristic, MagicMock(content="Done!", successful_tool_count=2), {}
             )
 
         assert result.decision == EvaluationDecision.COMPLETE
         assert result.score == 0.85
-        assert "edge model" in result.reason.lower()
+        assert "llm" in result.reason.lower()
 
     async def test_falls_back_on_edge_model_error(self):
         """Edge model failure should return heuristic unchanged."""
@@ -802,7 +802,7 @@ class TestEdgeModelRefinement:
             patch("victor.core.get_container", side_effect=RuntimeError("no container")),
         ):
             mock_ffm.return_value.is_enabled.return_value = True
-            result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+            result = await loop._refine_with_llm(heuristic, MagicMock(), {})
 
         assert result is heuristic  # Unchanged on error
 
@@ -833,7 +833,7 @@ class TestEdgeModelRefinement:
         ):
             mock_ffm.return_value.is_enabled.return_value = True
 
-            result = await loop._refine_with_edge_model(heuristic, MagicMock(content="hmm"), {})
+            result = await loop._refine_with_llm(heuristic, MagicMock(content="hmm"), {})
 
         assert result.decision == EvaluationDecision.RETRY
         assert "stuck" in result.reason
@@ -847,7 +847,7 @@ class TestEdgeModelRefinement:
 
         with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ffm:
             mock_ffm.return_value.is_enabled.return_value = False
-            result = await loop._refine_with_edge_model(heuristic, MagicMock(), {})
+            result = await loop._refine_with_llm(heuristic, MagicMock(), {})
 
         assert result is heuristic
 

@@ -205,6 +205,77 @@ class TieredDecisionService:
             heuristic_confidence=heuristic_confidence,
         )
 
+    def escalate_tier(
+        self,
+        decision_type: DecisionType,
+        reason: str = "low_confidence",
+    ) -> str:
+        """Escalate a decision type to a higher tier.
+
+        Called when repeated low-confidence results suggest the current
+        tier isn't powerful enough for this decision. Follows the
+        GEPATierManager pattern: edge → balanced → performance.
+
+        Args:
+            decision_type: Decision type to escalate
+            reason: Why escalating (for logging)
+
+        Returns:
+            New tier name after escalation
+        """
+        current = self._tier_routing.get(decision_type.value, "edge")
+        escalation = {"edge": "balanced", "balanced": "performance"}
+        new_tier = escalation.get(current, current)
+
+        if new_tier != current:
+            self._tier_routing[decision_type.value] = new_tier
+            logger.info(
+                "Decision %s: tier escalated %s → %s (reason: %s)",
+                decision_type.value,
+                current,
+                new_tier,
+                reason,
+            )
+
+        return new_tier
+
+    def deescalate_tier(
+        self,
+        decision_type: DecisionType,
+        reason: str = "high_confidence",
+    ) -> str:
+        """De-escalate a decision type to a lower tier.
+
+        Called when consistent high-confidence results suggest a cheaper
+        tier is sufficient. performance → balanced → edge.
+
+        Args:
+            decision_type: Decision type to de-escalate
+            reason: Why de-escalating (for logging)
+
+        Returns:
+            New tier name after de-escalation
+        """
+        current = self._tier_routing.get(decision_type.value, "edge")
+        deescalation = {"performance": "balanced", "balanced": "edge"}
+        new_tier = deescalation.get(current, current)
+
+        if new_tier != current:
+            self._tier_routing[decision_type.value] = new_tier
+            logger.info(
+                "Decision %s: tier de-escalated %s → %s (reason: %s)",
+                decision_type.value,
+                current,
+                new_tier,
+                reason,
+            )
+
+        return new_tier
+
+    def get_tier(self, decision_type: DecisionType) -> str:
+        """Get current tier for a decision type."""
+        return self._tier_routing.get(decision_type.value, "edge")
+
     def get_metrics(self) -> Dict[str, Any]:
         """Export metrics from all active tier services."""
         return {
