@@ -190,7 +190,7 @@ class StreamingChatPipeline:
 
         # Reset LLM decision service budget for this turn (if available)
         decision_service = _get_decision_service(orch)
-        if decision_service is not None:
+        if decision_service is not None and hasattr(decision_service, "reset_budget"):
             decision_service.reset_budget()
 
         # Spin detection via shared turn_policy (consistent with batch/AgenticLoop path)
