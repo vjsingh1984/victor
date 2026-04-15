@@ -195,7 +195,8 @@ class VerticalCompatibilityGate:
             )
             return
 
-        if result.status.value == "degraded":
+        status_val = result.status.value if hasattr(result.status, "value") else str(result.status)
+        if status_val == "degraded":
             report.warnings.append(
                 f"Vertical '{vertical_name}' is running in degraded mode: {result.message}"
             )

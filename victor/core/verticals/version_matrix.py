@@ -74,7 +74,10 @@ class CompatibilityRule:
     message: str = ""
 
     def __post_init__(self) -> None:
-        """Validate version constraints."""
+        """Validate version constraints and coerce types."""
+        # Coerce string status to enum (e.g., from JSON/dict data)
+        if isinstance(self.status, str):
+            object.__setattr__(self, "status", CompatibilityStatus(self.status))
         try:
             # Validate min version
             SpecifierSet(self.min_framework_version)
