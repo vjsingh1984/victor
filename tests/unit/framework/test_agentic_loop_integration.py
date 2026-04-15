@@ -613,3 +613,142 @@ class TestTurnResultDataclass:
         assert turn.content == ""
         assert turn.has_content is False
         assert turn.successful_tool_count == 0
+
+
+# ============================================================================
+# Nudge Injection Tests
+# ============================================================================
+
+
+class TestNudgeInjection:
+    """Tests that nudge messages are injected into conversation on RETRY."""
+
+    async def test_nudge_injected_on_no_tool_turns(self):
+        """When agent doesn't use tools for 2+ turns, nudge is injected."""
+        from victor.agent.coordinators.execution_coordinator import TurnResult
+
+        mock_coord = AsyncMock()
+        mock_chat_ctx = MagicMock()
+        mock_coord._chat_context = mock_chat_ctx
+
+        # Simulate agent not using tools
+        no_tool_turn = TurnResult(
+            response=MagicMock(content="I think we should...", tool_calls=None),
+            has_tool_calls=False,
+        )
+        mock_coord.execute_turn_with_tools = AsyncMock(return_value=no_tool_turn)
+
+        loop = AgenticLoop(
+            execution_coordinator=mock_coord,
+            max_iterations=4,
+            enable_fulfillment_check=False,
+            enable_adaptive_iterations=False,
+        )
+
+        # Mock perception
+        perception = Perception(
+            intent=ActionIntent.WRITE_ALLOWED,
+            complexity=TaskComplexity.MEDIUM,
+            task_analysis=MagicMock(task_type=None),
+            confidence=0.5,
+        )
+        loop.perception.perceive = AsyncMock(return_value=perception)
+
+        await loop.run("Fix the bug")
+
+        # Check that nudge was injected into conversation
+        add_calls = mock_chat_ctx.add_message.call_args_list
+        nudge_calls = [c for c in add_calls if "MUST use a tool" in str(c)]
+        assert len(nudge_calls) >= 1, "Nudge message should be injected"
+
+    async def test_spin_nudge_injected_on_blocked_tools(self):
+        """When all tools are blocked by dedup, spin nudge is injected."""
+        from victor.agent.coordinators.execution_coordinator import TurnResult
+
+        mock_coord = AsyncMock()
+        mock_chat_ctx = MagicMock()
+        mock_coord._chat_context = mock_chat_ctx
+
+        # First turn: tools blocked
+        blocked_turn = TurnResult(
+            response=MagicMock(content="", tool_calls=[{"name": "read"}]),
+            has_tool_calls=True,
+            tool_calls_count=1,
+            all_tools_blocked=True,
+        )
+        mock_coord.execute_turn_with_tools = AsyncMock(return_value=blocked_turn)
+
+        loop = AgenticLoop(
+            execution_coordinator=mock_coord,
+            max_iterations=5,
+            enable_fulfillment_check=False,
+            enable_adaptive_iterations=False,
+        )
+
+        perception = Perception(
+            intent=ActionIntent.WRITE_ALLOWED,
+            complexity=TaskComplexity.MEDIUM,
+            task_analysis=MagicMock(task_type=None),
+            confidence=0.5,
+        )
+        loop.perception.perceive = AsyncMock(return_value=perception)
+
+        await loop.run("Fix the bug")
+
+        # Check spin nudge was injected
+        add_calls = mock_chat_ctx.add_message.call_args_list
+        spin_calls = [c for c in add_calls if "blocked" in str(c).lower()]
+        assert len(spin_calls) >= 1, "Spin detection nudge should be injected"
+
+    async def test_no_nudge_without_execution_coordinator(self):
+        """Nudge injection is skipped when no execution_coordinator."""
+        loop = AgenticLoop(
+            orchestrator=MagicMock(spec=[]),
+            max_iterations=2,
+            enable_fulfillment_check=False,
+            enable_adaptive_iterations=False,
+        )
+
+        perception = Perception(
+            intent=ActionIntent.WRITE_ALLOWED,
+            complexity=TaskComplexity.MEDIUM,
+            task_analysis=MagicMock(task_type=None),
+            confidence=0.5,
+        )
+        loop.perception.perceive = AsyncMock(return_value=perception)
+
+        # Should not crash — nudge is just skipped
+        result = await loop.run("Fix the bug")
+        assert isinstance(result, LoopResult)
+
+
+# ============================================================================
+# Feature Flag Integration Tests
+# ============================================================================
+
+
+class TestFeatureFlagIntegration:
+    """Tests USE_AGENTIC_LOOP feature flag controls execution path."""
+
+    def test_flag_defaults_to_enabled(self):
+        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+        mgr = get_feature_flag_manager()
+        assert mgr.is_enabled(FeatureFlag.USE_AGENTIC_LOOP) is True
+
+    def test_flag_can_be_disabled(self):
+        from unittest.mock import patch as mock_patch
+
+        from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+        mgr = get_feature_flag_manager()
+        mgr.disable(FeatureFlag.USE_AGENTIC_LOOP)
+        try:
+            assert mgr.is_enabled(FeatureFlag.USE_AGENTIC_LOOP) is False
+        finally:
+            mgr.enable(FeatureFlag.USE_AGENTIC_LOOP)
+
+    def test_flag_env_var_name(self):
+        from victor.core.feature_flags import FeatureFlag
+
+        assert FeatureFlag.USE_AGENTIC_LOOP.get_env_var_name() == "VICTOR_USE_AGENTIC_LOOP"

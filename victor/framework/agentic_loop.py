@@ -363,9 +363,50 @@ class AgenticLoop:
                     logger.warning("Task failed - exiting loop")
                     break
 
-                # Update query for next iteration based on feedback
-                if evaluation.reason:
-                    query = f"{query}\n\nPrevious attempt: {evaluation.reason}"
+                # NUDGE INJECTION: when agent isn't using tools, inject
+                # a nudge into the conversation so the LLM sees it on
+                # the next turn. This replaces the nudge logic that was
+                # previously inside ExecutionCoordinator's while-loop.
+                if (
+                    evaluation.decision == EvaluationDecision.RETRY
+                    and self.execution_coordinator is not None
+                    and self._consecutive_no_tool_turns >= 2
+                ):
+                    nudge = (
+                        "You have not called any tools in the last "
+                        f"{self._consecutive_no_tool_turns} turns. You MUST use "
+                        "a tool now (read, edit, write, shell) to make progress "
+                        "on the task. Do not respond with text only."
+                    )
+                    chat_ctx = getattr(self.execution_coordinator, "_chat_context", None)
+                    if chat_ctx and hasattr(chat_ctx, "add_message"):
+                        chat_ctx.add_message("user", nudge)
+                        logger.info(
+                            f"Nudge injected after {self._consecutive_no_tool_turns} "
+                            "no-tool turns"
+                        )
+
+                    # Budget warning when past halfway
+                    if i > effective_max // 2:
+                        remaining = effective_max - i
+                        if chat_ctx and hasattr(chat_ctx, "add_message"):
+                            chat_ctx.add_message(
+                                "system",
+                                f"WARNING: {remaining} turns remaining out of "
+                                f"{effective_max}. Make your edits NOW.",
+                            )
+
+                # Spin detection nudge: all tools blocked by dedup
+                if self._consecutive_all_blocked >= 2 and self.execution_coordinator is not None:
+                    chat_ctx = getattr(self.execution_coordinator, "_chat_context", None)
+                    if chat_ctx and hasattr(chat_ctx, "add_message"):
+                        chat_ctx.add_message(
+                            "system",
+                            "Your last tool calls were blocked because you "
+                            "already called them with the same arguments. Try "
+                            "a DIFFERENT tool or different arguments. If you've "
+                            "made your fix, provide your final answer.",
+                        )
 
             # Determine success
             success = self._determine_success(iterations)
