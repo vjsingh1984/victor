@@ -498,6 +498,14 @@ _provider_mappings: Dict[str, type] = {
     "gpt": OpenAIToolGuidance,
     "google": OpenAIToolGuidance,  # Similar to OpenAI in tool handling
     "gemini": OpenAIToolGuidance,
+    "zai": OpenAIToolGuidance,  # Z.AI GLM uses OpenAI-compatible tool calling
+    "zhipu": OpenAIToolGuidance,
+    "moonshot": OpenAIToolGuidance,  # Kimi uses OpenAI-compatible format
+    "cerebras": OpenAIToolGuidance,
+    "groqcloud": OpenAIToolGuidance,
+    "fireworks": OpenAIToolGuidance,
+    "mistral": OpenAIToolGuidance,
+    "together": OpenAIToolGuidance,
 }
 
 

@@ -2175,52 +2175,60 @@ class Settings(BaseSettings):
     ) -> Dict[str, Any]:
         """Get settings for a specific provider.
 
-        This method now uses the new AccountManager for configuration while maintaining
-        backward compatibility with the old ProviderConfigRegistry.
+        Uses ProviderConfigRegistry as the single resolution authority.
+        AccountManager (config.yaml) provides credential data only — it never
+        bypasses provider-specific strategy logic (endpoint switching, URL probing).
 
-        Priority order:
-        1. AccountManager (config.yaml) - new unified configuration
-        2. ProviderConfigRegistry (profiles.yaml) - legacy configuration
-        3. Environment variables - CI/CD support
+        Merge precedence (lowest to highest):
+        1. profiles.yaml providers section
+        2. AccountManager credentials (api_key, auth_mode from config.yaml)
+        3. Profile overrides (--coding-plan, --auth-mode from CLI)
+        4. Provider strategy logic (endpoint switching, URL probing)
 
         Args:
             provider: Provider name (or alias like 'gemini' for 'google')
-            profile_overrides: Optional profile-level overrides (e.g., auth_mode from ProfileConfig)
+            profile_overrides: Runtime overrides (e.g., coding_plan, auth_mode)
 
         Returns:
             Dictionary of provider settings
         """
-        # Try new AccountManager first
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        # Extract credential data from AccountManager (if config.yaml exists)
+        account_data = None
         try:
             from victor.config.accounts import get_account_manager
-            from victor.config.resolution import get_provider_resolver
 
-            account_manager = get_account_manager()
-            resolver = get_provider_resolver()
-
-            # Check if new config exists
-            if account_manager.config_path.exists():
-                # Use new unified configuration system
-                config = resolver.resolve_quick(
-                    provider=provider,
-                    model=self.default_model,
-                )
-                return config
-
+            manager = get_account_manager()
+            if manager.config_path.exists():
+                account = manager.get_account(provider=provider)
+                if account:
+                    account_data = {}
+                    # Extract auth info
+                    if account.auth.method == "oauth":
+                        account_data["auth_mode"] = "oauth"
+                    elif account.auth.method == "api_key":
+                        # Try resolving API key from account's configured source
+                        resolved = manager.resolve_provider_config(account)
+                        if "api_key" in resolved:
+                            account_data["api_key"] = resolved["api_key"]
+                    # Include endpoint if account specifies one
+                    if account.endpoint:
+                        account_data["base_url"] = account.endpoint
+                    logger.debug(
+                        f"AccountManager credentials for '{provider}': "
+                        f"keys={list(account_data.keys())}"
+                    )
         except Exception as e:
-            # Fall back to old system if new system fails
-            import logging
+            logger.debug(f"AccountManager lookup skipped: {e}")
 
-            logger = logging.getLogger(__name__)
-            logger.debug(
-                f"AccountManager not available or failed: {e}, falling back to ProviderConfigRegistry"
-            )
-
-        # Fall back to old ProviderConfigRegistry for backward compatibility
+        # Always use ProviderConfigRegistry — it handles all provider-specific logic
         from victor.config.provider_config_registry import get_provider_config_registry
 
         registry = get_provider_config_registry()
-        return registry.get_settings(provider, self, profile_overrides)
+        return registry.get_settings(provider, self, profile_overrides, account_data)
 
 
 def load_settings() -> Settings:

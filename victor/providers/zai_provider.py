@@ -53,8 +53,10 @@ from victor.providers.logging import ProviderLogger
 # Reference: https://docs.z.ai/api-reference/introduction
 ZAI_BASE_URLS = {
     "standard": "https://api.z.ai/api/paas/v4/",
+    # Coding Plan keys require the /coding/ endpoint (standard endpoint returns 429)
     "coding": "https://api.z.ai/api/coding/paas/v4/",
     "china": "https://open.bigmodel.cn/api/paas/v4/",
+    "china-coding": "https://open.bigmodel.cn/api/coding/paas/v4/",
     "anthropic": "https://api.z.ai/api/anthropic/v1/",
 }
 
@@ -218,21 +220,23 @@ class ZAIProvider(BaseProvider):
         # 4. Model suffix parsing
         # 5. Default to standard
 
-        if base_url is None:
-            # Try model suffix first (e.g., "glm-4.6:coding" -> endpoint="coding")
-            model_endpoint = None
-            if model and ":" in model:
-                # Parse model suffix for endpoint variant
-                _model_name, endpoint_variant = model.rsplit(":", 1)
-                if endpoint_variant in ZAI_BASE_URLS:
-                    model_endpoint = endpoint_variant
+        # Strip model suffix for endpoint routing (e.g., "glm-5.1:coding" -> model="glm-5.1")
+        model_endpoint = None
+        self._model_suffix_stripped = None
+        if model and ":" in model:
+            model_name, endpoint_variant = model.rsplit(":", 1)
+            if endpoint_variant in ZAI_BASE_URLS:
+                model_endpoint = endpoint_variant
+                self._model_suffix_stripped = model  # Keep original for reference
+                model = model_name  # Strip suffix from model name sent to API
+        self._clean_model = model  # Model name without endpoint suffix
 
+        if base_url is None:
             if endpoint is not None:
                 base_url = ZAI_BASE_URLS.get(endpoint, ZAI_BASE_URLS["standard"])
             elif coding_plan:
                 base_url = ZAI_BASE_URLS["coding"]
             elif model_endpoint is not None:
-                # Use endpoint from model suffix
                 base_url = ZAI_BASE_URLS[model_endpoint]
             else:
                 base_url = ZAI_BASE_URLS["standard"]
@@ -345,6 +349,12 @@ class ZAIProvider(BaseProvider):
             ProviderTimeoutError: If request times out
             ProviderError: For other errors
         """
+        # Strip endpoint suffix from model name (e.g., "glm-5.1:coding" -> "glm-5.1")
+        if ":" in model:
+            parts = model.rsplit(":", 1)
+            if parts[1] in ZAI_BASE_URLS:
+                model = parts[0]
+
         # Use structured logging context manager
         with self._provider_logger.log_api_call(
             endpoint="/chat/completions",
@@ -445,6 +455,13 @@ class ZAIProvider(BaseProvider):
             ProviderTimeoutError: If request times out
             ProviderError: For other errors
         """
+        # Strip Z.AI endpoint suffix from model name (e.g., "glm-5.1:coding" -> "glm-5.1")
+        # Only strips known endpoint suffixes, not Ollama-style tags like "gemma4:31b"
+        if ":" in model:
+            parts = model.rsplit(":", 1)
+            if parts[1] in ZAI_BASE_URLS:
+                model = parts[0]
+
         try:
             payload = self._build_request_payload(
                 messages=messages,
@@ -458,7 +475,28 @@ class ZAIProvider(BaseProvider):
             )
 
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
-                response.raise_for_status()
+                # Read status before accessing stream content
+                if response.status_code != 200:
+                    await response.aread()
+                    error_text = response.text[:500] if response.text else ""
+                    if response.status_code == 401:
+                        raise ProviderAuthError(
+                            message=f"Authentication failed: {error_text or 'HTTP 401'}",
+                            provider=self.name,
+                            status_code=401,
+                        )
+                    elif response.status_code == 429:
+                        raise ProviderRateLimitError(
+                            message=f"Rate limit exceeded: {error_text or 'HTTP 429'}",
+                            provider=self.name,
+                            status_code=429,
+                        )
+                    else:
+                        raise ProviderError(
+                            message=f"z.ai HTTP error {response.status_code}: {error_text}",
+                            provider=self.name,
+                            status_code=response.status_code,
+                        )
 
                 accumulated_tool_calls: List[Dict[str, Any]] = []
                 has_sent_final = False
