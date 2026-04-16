@@ -29,6 +29,7 @@ from victor.agent.provider_tool_guidance import (
     ToolGuidanceStrategy,
 )
 from victor.agent.prompt_normalizer import get_prompt_normalizer
+from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
     from victor.agent.query_classifier import QueryClassification
@@ -303,7 +304,7 @@ class SystemPromptBuilder:
         self.task_type = task_type
         self.available_tools = available_tools or []
         self.enrichment_service = enrichment_service
-        self.vertical = vertical or "coding"
+        self.vertical = vertical or DEFAULT_VERTICAL
         self.concise_mode = concise_mode
         self.query_classification = query_classification
         self.provider_caches = provider_caches

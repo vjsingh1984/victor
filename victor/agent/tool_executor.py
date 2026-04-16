@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from typing import TYPE_CHECKING
 
 from victor.agent.debug_logger import TRACE
+from victor.core.constants import DEFAULT_VERTICAL
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.safety import SafetyChecker, get_safety_checker
@@ -930,7 +931,7 @@ class ToolExecutor:
                 provider=provider,
                 model=model,
                 task_type=context.get("task_type", "general"),
-                vertical=context.get("vertical", "coding"),
+                vertical=context.get("vertical", DEFAULT_VERTICAL),
                 metadata={
                     "execution_time": execution_time,
                 },

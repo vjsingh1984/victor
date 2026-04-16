@@ -63,7 +63,7 @@ class ObservabilityMixin:
 
     _task_type: str = "unknown"
     _complexity: str = "medium"
-    _vertical_name: str = "coding"
+    _vertical_name: str = DEFAULT_VERTICAL
     _trigger: str = "auto"
     _on_progress: Optional[Callable[[str, str, float], None]] = None
     _observability_enabled: bool = True
@@ -77,7 +77,7 @@ class ObservabilityMixin:
         self._observability_enabled = enable_observability
         self._task_type = "unknown"
         self._complexity = "medium"
-        self._vertical_name = "coding"
+        self._vertical_name = DEFAULT_VERTICAL
         self._trigger = "auto"
         self._on_progress = None
 

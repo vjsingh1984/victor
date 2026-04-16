@@ -165,7 +165,7 @@ class TeamCoordinator(ITeamCoordinator):
         # Execution context for observability
         self._task_type: str = "unknown"
         self._complexity: str = "medium"
-        self._vertical_name: str = "coding"
+        self._vertical_name: str = DEFAULT_VERTICAL
         self._trigger: str = "auto"  # auto, manual, suggestion
         self._rl_coordinator: Optional[Any] = None
 

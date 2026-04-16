@@ -37,14 +37,28 @@ def _try_entry_point(group: str, name: str) -> object:
         return None
 
 
+# Migration bridge: importlib fallback paths tried after entry points.
+# These are runtime importlib.import_module() calls, NOT static imports.
+# Remove once all deployments use the victor-coding entry point package.
+_FALLBACK_MODULES: dict[str, tuple[str, ...]] = {
+    "codebase_analyzer": (
+        "victor_coding.codebase_analyzer",
+        "victor.verticals.contrib.coding.codebase_analyzer",
+    ),
+    "tree_sitter": (
+        "victor_coding.codebase.tree_sitter_manager",
+        "victor.verticals.contrib.coding.codebase.tree_sitter_manager",
+    ),
+    "analyze": (
+        "victor_coding.commands.analyze",
+        "victor.verticals.contrib.coding.commands.analyze",
+    ),
+}
+
+
 # ---------------------------------------------------------------------------
 # Codebase Analyzer
 # ---------------------------------------------------------------------------
-
-_CODEBASE_ANALYZER_MODULES = (
-    "victor_coding.codebase_analyzer",
-    "victor.verticals.contrib.coding.codebase_analyzer",
-)
 
 
 def load_codebase_analyzer_module() -> ModuleType:
@@ -65,7 +79,7 @@ def load_codebase_analyzer_module() -> ModuleType:
 
     # Try module paths
     last_error: ImportError | None = None
-    for module_path in _CODEBASE_ANALYZER_MODULES:
+    for module_path in _FALLBACK_MODULES["codebase_analyzer"]:
         try:
             return _try_import(module_path)
         except ImportError as exc:
@@ -91,11 +105,6 @@ def load_codebase_analyzer_attr(name: str) -> object:
 # Tree-Sitter Manager
 # ---------------------------------------------------------------------------
 
-_TREE_SITTER_MODULES = (
-    "victor_coding.codebase.tree_sitter_manager",
-    "victor.verticals.contrib.coding.codebase.tree_sitter_manager",
-)
-
 
 def load_tree_sitter_get_parser() -> Callable[[str], object]:
     """Resolve the canonical get_parser function for tree-sitter support.
@@ -114,7 +123,7 @@ def load_tree_sitter_get_parser() -> Callable[[str], object]:
 
     # Try module paths
     last_error: ImportError | None = None
-    for module_path in _TREE_SITTER_MODULES:
+    for module_path in _FALLBACK_MODULES["tree_sitter"]:
         try:
             module = _try_import(module_path)
         except ImportError as exc:
@@ -134,11 +143,6 @@ def load_tree_sitter_get_parser() -> Callable[[str], object]:
 # Coding Analyze CLI App
 # ---------------------------------------------------------------------------
 
-_ANALYZE_APP_MODULES = (
-    "victor_coding.commands.analyze",
-    "victor.verticals.contrib.coding.commands.analyze",
-)
-
 
 def load_coding_analyze_app() -> object:
     """Resolve the coding analyze CLI app.
@@ -155,7 +159,7 @@ def load_coding_analyze_app() -> object:
 
     # Try module paths
     last_error: ImportError | None = None
-    for module_path in _ANALYZE_APP_MODULES:
+    for module_path in _FALLBACK_MODULES["analyze"]:
         try:
             module = _try_import(module_path)
         except ImportError as exc:
@@ -168,28 +172,6 @@ def load_coding_analyze_app() -> object:
     raise ImportError(
         "coding analyze command requires victor-coding. " "Install with: pip install victor-coding"
     ) from last_error
-
-
-def _load_tree_sitter_provider() -> object:
-    """Factory for auto-detection: returns a TreeSitterParserProtocol-compatible object.
-
-    Used by _AUTO_DETECT_SPECS in bootstrap.py to replace NullTreeSitterParser.
-    Returns None if no tree-sitter provider is available.
-    """
-    _TREE_SITTER_MODULES = (
-        "victor_coding.codebase.tree_sitter_manager",
-        "victor.verticals.contrib.coding.codebase.tree_sitter_manager",
-    )
-    for module_path in _TREE_SITTER_MODULES:
-        try:
-            module = _try_import(module_path)
-            # The module itself satisfies TreeSitterParserProtocol
-            # (has get_parser() and get_supported_languages())
-            if hasattr(module, "get_parser"):
-                return module
-        except ImportError:
-            continue
-    return None
 
 
 __all__ = [
