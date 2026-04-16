@@ -432,6 +432,10 @@ class TestBenchmarkSyncBridge:
             "duration_seconds": 1.0,
             "total_tokens": 42,
             "total_tool_calls": 5,
+            "total_code_search_calls": 0,
+            "total_graph_calls": 0,
+            "tasks_using_code_intelligence": 0,
+            "code_intelligence_task_coverage": 0.0,
         }
         result.task_results = []
 

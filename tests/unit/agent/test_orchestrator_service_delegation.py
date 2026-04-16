@@ -1,6 +1,6 @@
 """Tests for mandatory service layer in the orchestrator."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -57,7 +57,9 @@ class TestServiceDelegation:
     async def test_chat_delegates_to_service(self):
         obj = self._make_stub()
         obj._chat_service.chat = AsyncMock(return_value="response")
-        result = await obj.chat("hello")
+        with patch("victor.core.feature_flags.get_feature_flag_manager") as mock_ff:
+            mock_ff.return_value.is_enabled.return_value = False
+            result = await obj.chat("hello")
         obj._chat_service.chat.assert_called_once_with("hello")
 
     @pytest.mark.asyncio

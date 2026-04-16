@@ -1985,7 +1985,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             ContextMetrics with size and overflow information
         """
-        return self._context_manager.get_context_metrics()
+        return self._context_service.get_context_metrics()
 
     def _init_conversation_embedding_store(self) -> None:
         """Initialize embedding store. Delegates to SessionCoordinator."""

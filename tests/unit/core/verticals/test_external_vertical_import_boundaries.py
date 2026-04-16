@@ -70,10 +70,7 @@ FORBIDDEN_PREFIXES = frozenset(
 # Known violations to track migration progress (baseline).
 # All external verticals have been migrated to use victor.framework.extensions,
 # victor.framework.processing, and victor.framework.lsp re-export modules.
-KNOWN_VIOLATIONS: Dict[str, Set[str]] = {
-    # victor_invest uses victor.workflows.executor directly; migration deferred
-    "victor_invest": {"victor.workflows.executor"},
-}
+KNOWN_VIOLATIONS: Dict[str, Set[str]] = {}
 
 
 def _find_package_root(package_name: str) -> Path | None:
