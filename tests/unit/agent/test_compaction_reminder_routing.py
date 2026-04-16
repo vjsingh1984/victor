@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from victor.agent.conversation_controller import ConversationController
+from victor.agent.conversation.controller import ConversationController
 from victor.providers.base import Message
 
 

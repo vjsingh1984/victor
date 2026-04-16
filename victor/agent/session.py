@@ -24,7 +24,7 @@ This module provides JSON file-based session persistence:
 The primary class is `SessionPersistence`.
 
 For in-memory message history, see `victor.agent.message_history.MessageHistory`.
-For SQLite-based persistence with token management, see `victor.agent.conversation_memory.ConversationStore`.
+For SQLite-based persistence with token management, see `victor.agent.conversation.store.ConversationStore`.
 
 Usage:
     from victor.agent.session import SessionPersistence

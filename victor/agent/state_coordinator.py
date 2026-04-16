@@ -66,7 +66,7 @@ from victor.agent.conversation.state_machine import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.providers.base import Message
 

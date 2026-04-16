@@ -33,7 +33,7 @@ from victor.providers.base import Message
 
 if TYPE_CHECKING:
     from victor.storage.embeddings.service import EmbeddingService
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
     from victor.agent.compaction_summarizer import CompactionSummaryStrategy
     from victor.agent.context_reminder import ContextReminderManager
     from victor.agent.compaction_hierarchy import HierarchicalCompactionManager

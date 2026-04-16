@@ -58,7 +58,7 @@ from typing import Any, Optional, TYPE_CHECKING
 from victor.providers.base import StreamChunk
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_controller import (
+    from victor.agent.conversation.controller import (
         ConversationController,
         ContextMetrics,
     )

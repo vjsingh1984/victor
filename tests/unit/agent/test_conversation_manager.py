@@ -30,7 +30,7 @@ from victor.agent.conversation_manager import (
     ConversationManagerConfig,
     create_conversation_manager,
 )
-from victor.agent.conversation_controller import ContextMetrics
+from victor.agent.conversation.controller import ContextMetrics
 from victor.agent.conversation.state_machine import ConversationStage
 
 

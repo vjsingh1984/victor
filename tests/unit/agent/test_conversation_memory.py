@@ -20,7 +20,7 @@ Tests for model metadata parsing, known model lookups, and message serialization
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
-from victor.agent.conversation_memory import (
+from victor.agent.conversation.store import (
     MessageRole,
     MessagePriority,
     ModelFamily,

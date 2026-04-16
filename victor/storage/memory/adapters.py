@@ -57,7 +57,7 @@ from victor.storage.memory.unified import (
 if TYPE_CHECKING:
     from victor.storage.memory.entity_memory import EntityMemory
     from victor.storage.memory.entity_graph import EntityGraph
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
 
 logger = logging.getLogger(__name__)
 

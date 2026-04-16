@@ -20,7 +20,7 @@ The primary class is `MessageHistory`.
 
 For persistent storage:
 - File-based: see `victor.agent.session.SessionPersistence`
-- SQLite-based with token management: see `victor.agent.conversation_memory.ConversationStore`
+- SQLite-based with token management: see `victor.agent.conversation.store.ConversationStore`
 
 """
 

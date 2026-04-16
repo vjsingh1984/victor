@@ -33,7 +33,7 @@ if TYPE_CHECKING:
         ToolCallingCapabilities,
     )
     from victor.agent.response_sanitizer import ResponseSanitizer
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.context_compactor import ContextCompactor
@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_sequence_tracker import ToolSequenceTracker
     from victor.agent.tool_output_formatter import ToolOutputFormatter
     from victor.agent.metrics_collector import MetricsCollector
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
     from victor.analytics.logger import UsageLogger
     from victor.analytics.streaming_metrics import StreamingMetricsCollector
     from victor.agent.response_completer import ResponseCompleter
@@ -213,7 +213,7 @@ class RuntimeBuildersMixin:
         Returns:
             ConversationController instance configured with model-aware settings
         """
-        from victor.agent.conversation_controller import (
+        from victor.agent.conversation.controller import (
             ConversationController,
             ConversationConfig,
             CompactionStrategy,
@@ -292,7 +292,7 @@ class RuntimeBuildersMixin:
 
         try:
             from victor.config.settings import get_project_paths
-            from victor.agent.conversation_memory import ConversationStore
+            from victor.agent.conversation.store import ConversationStore
 
             paths = get_project_paths()
             paths.project_victor_dir.mkdir(parents=True, exist_ok=True)

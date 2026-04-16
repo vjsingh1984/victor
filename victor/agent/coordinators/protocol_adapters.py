@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     import asyncio
 
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.message_history import MessageHistory
     from victor.agent.session_state_manager import SessionStateManager

@@ -53,7 +53,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 
-from victor.agent.conversation_controller import (
+from victor.agent.conversation.controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,
@@ -67,7 +67,7 @@ from victor.agent.conversation import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_memory import ConversationStore, ConversationSession
+    from victor.agent.conversation.store import ConversationStore, ConversationSession
     from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
     from victor.config.settings import Settings
     from victor.storage.embeddings.service import EmbeddingService
@@ -763,7 +763,7 @@ def create_conversation_manager(
     store = None
     if enable_persistence:
         try:
-            from victor.agent.conversation_memory import ConversationStore
+            from victor.agent.conversation.store import ConversationStore
 
             store = ConversationStore()
         except Exception as e:

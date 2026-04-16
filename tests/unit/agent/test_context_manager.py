@@ -33,7 +33,7 @@ from victor.agent.context_manager import (
     ContextManagerConfig,
     create_context_manager,
 )
-from victor.agent.conversation_controller import ContextMetrics
+from victor.agent.conversation.controller import ContextMetrics
 
 
 class TestContextManagerConfig:

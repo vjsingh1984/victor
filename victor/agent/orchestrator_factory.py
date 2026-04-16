@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from victor.agent.action_authorizer import ActionAuthorizer
     from victor.agent.search_router import SearchRouter
     from victor.agent.metrics_collector import MetricsCollector
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.context_compactor import ContextCompactor
@@ -78,7 +78,7 @@ if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.tool_registrar import ToolRegistrar
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
     from victor.analytics.logger import UsageLogger  # noqa: F811
     from victor.analytics.streaming_metrics import StreamingMetricsCollector
     from victor.agent.middleware_chain import MiddlewareChain

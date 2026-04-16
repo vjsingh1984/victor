@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from victor.agent.session_ledger import SessionLedger
     from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
     from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.observability.integration import ObservabilityIntegration
     from victor.observability.tracing import ExecutionTracer, ToolCallTracer
     from victor.analytics.logger import UsageLogger

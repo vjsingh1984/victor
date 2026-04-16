@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from victor.agent.conversation_memory import ConversationStore
+from victor.agent.conversation.store import ConversationStore
 from victor.context.manager import ProjectContextLoader
 from victor.providers.base import BaseProvider, CompletionResponse, Message, StreamChunk
 

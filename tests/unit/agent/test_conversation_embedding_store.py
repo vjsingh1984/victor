@@ -466,7 +466,7 @@ class TestConversationStoreIntegration:
         Note: The embedding store uses lazy embedding, so messages added to
         ConversationStore are only embedded when search_similar is called.
         """
-        from victor.agent.conversation_memory import ConversationStore
+        from victor.agent.conversation.store import ConversationStore
         from victor.agent.conversation.types import MessageRole
         from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 

@@ -32,7 +32,7 @@ if TYPE_CHECKING:
         BaseToolCallingAdapter,
         ToolCallingCapabilities,
     )
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.recovery import RecoveryHandler
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration

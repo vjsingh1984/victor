@@ -47,7 +47,7 @@ if not _LIGHT_IMPORT:
     from victor.agent.tool_executor import ToolExecutor, ToolExecutionResult
 
     # New decomposed components
-    from victor.agent.conversation_controller import (
+    from victor.agent.conversation.controller import (
         ConversationController,
         ConversationConfig,
         ContextMetrics,

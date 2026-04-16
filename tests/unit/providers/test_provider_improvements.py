@@ -31,7 +31,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 # Import components
-from victor.agent.conversation_memory import ConversationStore
+from victor.agent.conversation.store import ConversationStore
 from victor.agent.conversation.types import MessagePriority, MessageRole
 from victor.analytics.streaming_metrics import (
     StreamingMetricsCollector,
@@ -980,7 +980,7 @@ class TestSharedInfrastructureIntegration:
         from victor.providers.resilience import ResilientProvider
         from victor.providers.concurrency import RequestQueue, ConcurrencyConfig
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
-        from victor.agent.conversation_memory import ConversationStore
+        from victor.agent.conversation.store import ConversationStore
         from victor.agent.conversation.types import MessageRole
         import tempfile
         from pathlib import Path

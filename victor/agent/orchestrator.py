@@ -86,7 +86,7 @@ if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
     from victor.framework.task import TaskComplexityService as ComplexityClassifier
     from victor.agent.metrics_collector import MetricsCollector
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.usage_analytics import UsageAnalytics
     from victor.agent.tool_sequence_tracker import ToolSequenceTracker
@@ -112,7 +112,7 @@ if TYPE_CHECKING:
 # Runtime imports - used for instantiation, enums, constants, or function calls
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.message_history import MessageHistory
-from victor.agent.conversation_memory import ConversationStore
+from victor.agent.conversation.store import ConversationStore
 
 # DI container bootstrap
 from victor.core.bootstrap import ensure_bootstrapped, get_service_optional
@@ -154,7 +154,7 @@ from victor.agent.prompt_requirement_extractor import extract_prompt_requirement
 
 # Decomposed components - configs, strategies, functions
 from victor.core.context import session_id as ctx_session_id, set_session_id
-from victor.agent.conversation_controller import (
+from victor.agent.conversation.controller import (
     ConversationConfig,
     ContextMetrics,
     CompactionStrategy,

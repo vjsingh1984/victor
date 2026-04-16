@@ -9,7 +9,7 @@ when called from async contexts.
 
 import sqlite3
 
-from victor.agent.conversation_memory import (
+from victor.agent.conversation.store import (
     ConversationStore,
     MessageRole,
 )

@@ -25,7 +25,7 @@ from victor.agent.context_compactor import (
     TruncationStrategy,
     create_context_compactor,
 )
-from victor.agent.conversation_controller import ContextMetrics
+from victor.agent.conversation.controller import ContextMetrics
 from victor.providers.base import Message
 
 

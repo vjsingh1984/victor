@@ -14,7 +14,7 @@
 
 """Tests for ConversationController."""
 
-from victor.agent.conversation_controller import (
+from victor.agent.conversation.controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,

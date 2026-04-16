@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from victor.agent.services.recovery_service import RecoveryService
     from victor.agent.services.session_service import SessionService
     from victor.agent.services.tool_service import ToolService
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.streaming_coordinator import StreamingCoordinator
 
 logger = logging.getLogger(__name__)

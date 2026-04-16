@@ -70,7 +70,7 @@ def orchestrator(mock_provider, orchestrator_settings):
     orch._tool_service = mock_tool_svc
 
     mock_ctx_svc = MagicMock()
-    from victor.agent.conversation_controller import ContextMetrics
+    from victor.agent.conversation.controller import ContextMetrics
 
     mock_ctx_svc.get_context_metrics.return_value = ContextMetrics(
         char_count=0, estimated_tokens=0, message_count=0
@@ -1513,7 +1513,7 @@ class TestComponentAccessors:
 
     def test_conversation_controller_property(self, orchestrator):
         """conversation_controller property returns valid controller."""
-        from victor.agent.conversation_controller import ConversationController
+        from victor.agent.conversation.controller import ConversationController
 
         controller = orchestrator.conversation_controller
         assert controller is not None
@@ -3385,7 +3385,7 @@ class TestComponentAccessors:
         """Test conversation_controller property returns controller."""
         controller = orchestrator.conversation_controller
         assert controller is not None
-        from victor.agent.conversation_controller import ConversationController
+        from victor.agent.conversation.controller import ConversationController
 
         assert isinstance(controller, ConversationController)
 

@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
     from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.task_analyzer import TaskAnalyzer

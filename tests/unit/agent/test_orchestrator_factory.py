@@ -493,7 +493,7 @@ class TestCreateMemoryComponents:
             mock_project.project_root = "/tmp/project"
             mock_paths.return_value = mock_project
 
-            with patch("victor.agent.conversation_memory.ConversationStore") as mock_store_cls:
+            with patch("victor.agent.conversation.store.ConversationStore") as mock_store_cls:
                 mock_store = MagicMock()
                 mock_session = MagicMock()
                 mock_session.session_id = "test-session-id"

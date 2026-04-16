@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
     from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
