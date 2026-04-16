@@ -110,6 +110,8 @@ class GoogleProvider(BaseProvider):
         timeout: int = DEFAULT_TIMEOUT,
         safety_level: str = "block_none",
         non_interactive: Optional[bool] = None,
+        auth_mode: str = "api_key",
+        oauth_tokens: Optional[Any] = None,
         **kwargs: Any,
     ):
         """Initialize Google provider.
@@ -120,6 +122,8 @@ class GoogleProvider(BaseProvider):
             safety_level: Safety filter level - "block_none", "block_few",
                          "block_some", or "block_most" (default: "block_none")
             non_interactive: Force non-interactive mode (None = auto-detect)
+            auth_mode: Authentication mode - "api_key" or "oauth"
+            oauth_tokens: Pre-obtained OAuth tokens (optional)
             **kwargs: Additional configuration
 
         Raises:
@@ -127,41 +131,84 @@ class GoogleProvider(BaseProvider):
         """
         # Initialize structured logger
         self._provider_logger = ProviderLogger("google", __name__)
-
-        # Resolve API key using unified resolver
-        resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
-        key_result = resolver.get_api_key("google", explicit_key=api_key)
-
-        # Log API key resolution
-        self._provider_logger.log_api_key_resolution(key_result)
-
-        if key_result.key is None:
-            # Raise detailed error with actionable suggestions
-            raise APIKeyNotFoundError(
-                provider="google",
-                sources_attempted=key_result.sources_attempted,
-                non_interactive=key_result.non_interactive,
-            )
-
-        self._api_key = key_result.key
+        self._oauth_manager = None
+        self._current_token = None
 
         if not HAS_GOOGLE_GENAI:
             raise ImportError(
                 "google-genai package not installed. Install with: pip install victor[google]"
             )
 
-        # Log provider initialization
-        self._provider_logger.log_provider_init(
-            model="gemini",  # Will be set on chat()
-            key_source=key_result.source_detail,
-            non_interactive=key_result.non_interactive,
-            config={"timeout": timeout, "safety_level": safety_level, **kwargs},
-        )
+        if auth_mode == "oauth":
+            # OAuth mode: use Google subscription (AI Pro/Ultra) instead of API key
+            from victor.providers.oauth_manager import OAuthTokenManager
 
-        super().__init__(api_key=self._api_key, timeout=timeout, **kwargs)
+            self._oauth_manager = OAuthTokenManager("google")
 
-        # Initialize client with API key (new SDK pattern)
-        self.client = genai.Client(api_key=self._api_key)
+            # Load cached token
+            access_token = None
+            refresh_token = None
+            if oauth_tokens and hasattr(oauth_tokens, "access_token"):
+                access_token = oauth_tokens.access_token
+                refresh_token = getattr(oauth_tokens, "refresh_token", None)
+            else:
+                cached = self._oauth_manager._load_cached()
+                if cached and not cached.is_expired:
+                    access_token = cached.access_token
+                    refresh_token = cached.refresh_token
+
+            # Build google.oauth2.credentials for native SDK integration
+            from google.oauth2.credentials import Credentials as OAuthCredentials
+
+            creds = OAuthCredentials(
+                token=access_token or "oauth-pending",
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=(
+                    "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j" ".apps.googleusercontent.com"
+                ),
+                client_secret="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",
+            )
+            self._google_credentials = creds
+            self._current_token = access_token
+            self._api_key = "oauth"
+
+            self._provider_logger.log_provider_init(
+                model="gemini",
+                key_source="oauth",
+                non_interactive=non_interactive,
+                config={"timeout": timeout, "safety_level": safety_level, **kwargs},
+            )
+
+            super().__init__(api_key="oauth", timeout=timeout, **kwargs)
+            self.client = genai.Client(credentials=creds)
+        else:
+            # Standard API key mode
+            self._google_credentials = None
+
+            resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
+            key_result = resolver.get_api_key("google", explicit_key=api_key)
+
+            self._provider_logger.log_api_key_resolution(key_result)
+
+            if key_result.key is None:
+                raise APIKeyNotFoundError(
+                    provider="google",
+                    sources_attempted=key_result.sources_attempted,
+                    non_interactive=key_result.non_interactive,
+                )
+
+            self._api_key = key_result.key
+
+            self._provider_logger.log_provider_init(
+                model="gemini",
+                key_source=key_result.source_detail,
+                non_interactive=key_result.non_interactive,
+                config={"timeout": timeout, "safety_level": safety_level, **kwargs},
+            )
+
+            super().__init__(api_key=self._api_key, timeout=timeout, **kwargs)
+            self.client = genai.Client(api_key=self._api_key)
 
         # Configure safety settings using string-based thresholds
         threshold = SAFETY_LEVELS.get(safety_level, "BLOCK_NONE")
@@ -190,6 +237,28 @@ class GoogleProvider(BaseProvider):
         """Gemini reuses KV cache for matching prompt prefixes."""
         return True
 
+    async def _ensure_valid_token(self) -> None:
+        """Ensure OAuth token is valid, refreshing if needed."""
+        if self._oauth_manager is None:
+            return
+        token = await self._oauth_manager.get_valid_token()
+        if token != self._current_token:
+            from google.oauth2.credentials import Credentials as OAuthCredentials
+
+            self._google_credentials = OAuthCredentials(
+                token=token,
+                refresh_token=(
+                    self._google_credentials.refresh_token if self._google_credentials else None
+                ),
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=(
+                    "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j" ".apps.googleusercontent.com"
+                ),
+                client_secret="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",
+            )
+            self.client = genai.Client(credentials=self._google_credentials)
+            self._current_token = token
+
     async def chat(
         self,
         messages: List[Message],
@@ -216,6 +285,8 @@ class GoogleProvider(BaseProvider):
         Raises:
             ProviderError: If request fails
         """
+        await self._ensure_valid_token()
+
         try:
             # Convert tools to Gemini format
             gemini_tools = self._convert_tools(tools) if tools else None
@@ -321,6 +392,8 @@ class GoogleProvider(BaseProvider):
         Raises:
             ProviderError: If request fails
         """
+        await self._ensure_valid_token()
+
         # When tools are provided, use non-streaming to properly handle native function calls
         # Gemini's native function calling returns structured parts that need to be processed
         # differently from streaming text chunks

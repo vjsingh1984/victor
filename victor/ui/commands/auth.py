@@ -476,7 +476,7 @@ def auth_test(
             account = manager.get_account(provider)
             if not account:
                 console.print(f"[red]✗[/] No account or provider named '{provider}'")
-                console.print(f"[dim]Hint: use --name/-n to test by account name[/]")
+                console.print("[dim]Hint: use --name/-n to test by account name[/]")
                 raise typer.Exit(1)
             console.print(f"[dim]Matched account '{provider}' (hint: use -n for account names)[/]")
     else:
@@ -528,6 +528,145 @@ def auth_test(
                 console.print(f"  [yellow]⚠[/] {validation.message}")
 
         raise typer.Exit(1)
+
+
+# =============================================================================
+# OAuth Commands (consolidated from victor providers auth)
+# =============================================================================
+
+OAUTH_SUPPORTED_PROVIDERS = ["openai", "qwen", "google", "github-copilot"]
+
+
+@auth_app.command("login")
+def auth_login(
+    provider: str = typer.Argument(
+        ..., help=f"Provider to authenticate ({', '.join(OAUTH_SUPPORTED_PROVIDERS)})"
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Force re-authentication even if token is cached"
+    ),
+) -> None:
+    """Log in to a provider via OAuth (opens browser).
+
+    Example:
+        victor auth login openai
+        victor auth login qwen --force
+    """
+    provider = provider.lower()
+    if provider not in OAUTH_SUPPORTED_PROVIDERS:
+        console.print(
+            f"[red]\u2717[/] OAuth not supported for '{provider}'. "
+            f"Supported: {', '.join(OAUTH_SUPPORTED_PROVIDERS)}"
+        )
+        raise typer.Exit(1)
+
+    from victor.core.async_utils import run_sync
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    async def _login():
+        mgr = OAuthTokenManager(provider)
+        if not force:
+            cached = mgr._load_cached()
+            if cached is not None and not cached.is_expired:
+                console.print(f"[green]\u2713[/] Already authenticated with {provider}")
+                console.print(
+                    f"  Token expires: {cached.expires_at.strftime('%Y-%m-%d %H:%M UTC')}"
+                )
+                console.print("[dim]Use --force to re-authenticate[/]")
+                return
+        console.print(f"[cyan]Opening browser for {provider} OAuth login...[/]")
+        try:
+            token = await mgr.get_valid_token()
+            if token:
+                console.print(f"[green]\u2713[/] Successfully authenticated with {provider}")
+            else:
+                console.print(f"[red]\u2717[/] Authentication failed for {provider}")
+                raise typer.Exit(1)
+        except typer.Exit:
+            raise
+        except Exception as e:
+            console.print(f"[red]\u2717[/] OAuth login failed: {e}")
+            raise typer.Exit(1)
+
+    run_sync(_login())
+
+
+@auth_app.command("logout")
+def auth_logout(
+    provider: str = typer.Argument(
+        ..., help=f"Provider to log out from ({', '.join(OAUTH_SUPPORTED_PROVIDERS)})"
+    ),
+) -> None:
+    """Remove cached OAuth tokens for a provider.
+
+    Example:
+        victor auth logout openai
+    """
+    provider = provider.lower()
+    if provider not in OAUTH_SUPPORTED_PROVIDERS:
+        console.print(
+            f"[red]\u2717[/] OAuth not supported for '{provider}'. "
+            f"Supported: {', '.join(OAUTH_SUPPORTED_PROVIDERS)}"
+        )
+        raise typer.Exit(1)
+
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    mgr = OAuthTokenManager(provider)
+    mgr._clear_cached()
+    console.print(f"[green]\u2713[/] Logged out from {provider} (tokens cleared)")
+
+
+@auth_app.command("oauth-status")
+def auth_oauth_status(
+    provider: Optional[str] = typer.Argument(
+        None, help="Check specific provider (or all if omitted)"
+    ),
+) -> None:
+    """Show OAuth authentication status for providers.
+
+    Example:
+        victor auth oauth-status
+        victor auth oauth-status openai
+    """
+    from victor.providers.oauth_manager import OAuthTokenManager
+
+    providers_to_check = [provider.lower()] if provider else OAUTH_SUPPORTED_PROVIDERS
+
+    table = Table(title="OAuth Authentication Status", show_header=True)
+    table.add_column("Provider", style="cyan")
+    table.add_column("Status")
+    table.add_column("Expires")
+    table.add_column("Token Preview", style="dim")
+
+    for prov in providers_to_check:
+        if prov not in OAUTH_SUPPORTED_PROVIDERS:
+            table.add_row(prov, "[red]Not supported[/]", "", "")
+            continue
+
+        mgr = OAuthTokenManager(prov)
+        cached = mgr._load_cached()
+
+        if cached is None:
+            table.add_row(prov, "[dim]Not authenticated[/]", "", "")
+        elif cached.is_expired:
+            table.add_row(
+                prov,
+                "[yellow]Expired[/]",
+                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                "",
+            )
+        else:
+            preview = cached.access_token[:8] + "..." if cached.access_token else ""
+            table.add_row(
+                prov,
+                "[green]\u2713 Active[/]",
+                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                preview,
+            )
+
+    console.print(table)
+    console.print("\n[dim]Login: victor auth login <provider>[/]")
 
 
 # =============================================================================
