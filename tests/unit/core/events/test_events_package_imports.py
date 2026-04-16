@@ -27,7 +27,7 @@ def test_event_backend_importable():
 
 
 def test_sync_wrappers_importable():
-    from victor.core.events import SyncEventWrapper, SyncObservabilityBus
+    from victor.core.events import SyncEventWrapper
 
     assert SyncEventWrapper is not None
 
