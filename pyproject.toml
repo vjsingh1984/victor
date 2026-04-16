@@ -115,6 +115,11 @@ embeddings = [
     "pyarrow>=14.0",
 ]
 
+# LangChain interop: adapt LangChain tools as native Victor tools
+langchain = [
+    "langchain-core>=0.2.0",
+]
+
 # Interactive examples and playground (typer, rich already in main deps)
 examples = []
 
