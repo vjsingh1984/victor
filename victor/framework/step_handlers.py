@@ -805,6 +805,86 @@ class ConfigStepHandler(BaseStepHandler):
 
 
 # =============================================================================
+# Compatibility Step Handler — Version Gating (Contract Hardening)
+# =============================================================================
+
+
+class CompatibilityStepHandler(BaseStepHandler):
+    """Handler for vertical compatibility validation.
+
+    Runs FIRST in the pipeline (order=1) to fail fast if a vertical is
+    incompatible with the running framework version. Uses the existing
+    VerticalCompatibilityGate which checks:
+    - min_framework_version (PEP 440 specifier)
+    - API version range (min/max supported)
+    - Capability negotiation (required vs available)
+    - Version matrix (known compatible/broken combinations)
+
+    On incompatibility: raises VerticalCompatibilityError with actionable message.
+    On warnings: records in result.warnings but does not block.
+    """
+
+    parallel_safe = True
+    depends_on = ()
+    side_effects = False
+
+    @property
+    def name(self) -> str:
+        return "compatibility"
+
+    @property
+    def order(self) -> int:
+        return 1  # Runs before ALL other handlers
+
+    def _do_apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Validate vertical compatibility before any other step runs."""
+        try:
+            from victor.core.verticals.compatibility_gate import (
+                VerticalCompatibilityGate,
+                VerticalCompatibilityError,
+            )
+            from victor.core.verticals.manifest_contract import (
+                get_or_create_vertical_manifest,
+            )
+        except ImportError:
+            return
+
+        try:
+            manifest = get_or_create_vertical_manifest(vertical)
+        except (ImportError, AttributeError, NotImplementedError):
+            # No manifest available — skip validation (graceful degradation)
+            logger.debug("No manifest for %s, skipping compatibility check", vertical)
+            return
+
+        gate = VerticalCompatibilityGate()
+        report = gate.assess_manifest(manifest)
+
+        # Store report for downstream handlers
+        context.set_capability_config("compatibility_report", report.to_dict())
+
+        # Record warnings
+        for warning in report.warnings:
+            result.add_warning(f"Compatibility: {warning}")
+
+        # Fail fast on incompatibility
+        if not report.compatible:
+            raise VerticalCompatibilityError(report)
+
+        logger.debug(
+            "Vertical %s v%s compatible with framework v%s",
+            report.vertical_name,
+            report.vertical_version,
+            report.framework_version,
+        )
+
+
+# =============================================================================
 # Capability Config Step Handler (SOLID: Centralized Config Storage)
 # =============================================================================
 
@@ -2358,6 +2438,7 @@ class StepHandlerRegistry:
         """
         return cls(
             handlers=[
+                CompatibilityStepHandler(),  # Version gating (fail fast)
                 CapabilityConfigStepHandler(),  # SOLID: Centralized config storage
                 ToolStepHandler(),
                 McpStepHandler(),  # MCP server declarations from vertical

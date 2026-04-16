@@ -21,6 +21,22 @@ from victor_sdk.verticals.manifest import ExtensionManifest
 logger = logging.getLogger(__name__)
 
 
+class VerticalCompatibilityError(ValueError):
+    """Raised when a vertical is incompatible with the running framework.
+
+    Provides a clear, actionable error message instead of confusing
+    ModuleNotFoundError or silent degradation.
+    """
+
+    def __init__(self, report: "VerticalCompatibilityReport"):
+        self.report = report
+        errors = "; ".join(report.errors)
+        super().__init__(
+            f"Vertical '{report.vertical_name}' v{report.vertical_version} "
+            f"is incompatible with framework v{report.framework_version}: {errors}"
+        )
+
+
 @dataclass
 class VerticalCompatibilityReport:
     """Structured result of checking a vertical against the running framework."""
@@ -40,11 +56,11 @@ class VerticalCompatibilityReport:
         return not self.errors
 
     def raise_if_incompatible(self) -> None:
-        """Raise ``ValueError`` when the report contains hard errors."""
+        """Raise ``VerticalCompatibilityError`` when the report contains hard errors."""
 
         if not self.errors:
             return
-        raise ValueError("; ".join(self.errors))
+        raise VerticalCompatibilityError(self)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation."""
