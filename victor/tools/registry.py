@@ -748,18 +748,12 @@ class ToolRegistry(BaseRegistry[str, Any]):
             count = registry.discover_plugins()
             print(f"Registered {count} tool plugins")
         """
-        import importlib.metadata
+        from victor.framework.entry_point_registry import get_entry_point_objects
 
         count = 0
 
         try:
-            eps = importlib.metadata.entry_points()
-
-            # Python 3.12+ returns a SelectableGroups, older returns dict
-            if hasattr(eps, "select"):
-                plugin_eps = eps.select(group="victor.plugins")
-            else:
-                plugin_eps = eps.get("victor.plugins", [])
+            plugin_eps = get_entry_point_objects("victor.plugins")
 
             for ep in plugin_eps:
                 try:
@@ -767,14 +761,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
                     self.register_plugin(plugin)
                     count += 1
                 except Exception as e:
-                    # Log but don't fail - allow other plugins to load
                     import logging
 
                     logger = logging.getLogger(__name__)
-                    logger.warning(f"Failed to load tool plugin '{ep.name}': {e}")
+                    ep_name = getattr(ep, "name", "unknown")
+                    logger.warning(f"Failed to load tool plugin '{ep_name}': {e}")
 
         except Exception:
-            # Entry points not available or other error
             pass
 
         return count
@@ -786,8 +779,8 @@ class ToolRegistry(BaseRegistry[str, Any]):
     ) -> int:
         """Discover and register tools from entry points.
 
-        Legacy method for discovering tools from entry points.
-        Prefer discover_plugins() for new code.
+        Uses UnifiedEntryPointRegistry for efficient single-pass discovery
+        instead of redundant importlib.metadata.entry_points() calls.
 
         Args:
             entry_point_group: Entry point group to scan (default: victor.plugins)
@@ -795,50 +788,37 @@ class ToolRegistry(BaseRegistry[str, Any]):
 
         Returns:
             Number of entry points discovered and registered
-
-        Note:
-            This method scans for both VictorPlugin implementations
-            and lists/tuples of tool instances.
         """
-        import importlib.metadata
+        from victor.framework.entry_point_registry import get_entry_point_objects
 
         count = 0
 
         try:
-            eps = importlib.metadata.entry_points()
-
-            if hasattr(eps, "select"):
-                group_eps = eps.select(group=entry_point_group)
-            else:
-                group_eps = eps.get(entry_point_group, [])
+            group_eps = get_entry_point_objects(entry_point_group)
 
             for ep in group_eps:
                 try:
                     plugin = ep.load()
 
-                    # Register if it has a register method
                     if hasattr(plugin, "register"):
                         self.register_plugin(plugin)
                         count += 1
-                    # Or if it's a list/callable of tool factories
                     elif isinstance(plugin, (list, tuple)):
                         from victor_sdk.verticals.protocols import ToolPluginHelper
 
-                        # Convert list of tools to plugin
                         tools = {f"tool_{i}": tool for i, tool in enumerate(plugin)}
                         adapter = ToolPluginHelper.from_instances(tools)
                         self.register_plugin(adapter)
                         count += 1
 
                 except Exception as e:
-                    # Log but don't fail
                     import logging
 
                     logger = logging.getLogger(__name__)
-                    logger.warning(f"Failed to load tool plugin from '{ep.name}': {e}")
+                    ep_name = getattr(ep, "name", "unknown")
+                    logger.warning(f"Failed to load tool plugin from '{ep_name}': {e}")
 
         except Exception:
-            # Entry points not available
             pass
 
         return count
