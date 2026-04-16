@@ -321,7 +321,8 @@ class TestCLIVerticalFlag:
 
         settings = Settings()
         assert hasattr(settings, "default_vertical")
-        assert settings.default_vertical == "coding"
+        # Default is empty string (no vertical applied by default)
+        assert settings.default_vertical == ""
 
     def test_settings_has_auto_detect_vertical(self):
         """Settings has auto_detect_vertical attribute."""
