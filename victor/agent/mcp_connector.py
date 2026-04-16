@@ -96,6 +96,7 @@ class MCPConnectResult:
     servers_discovered: int = 0
     servers_connected: int = 0
     tools_registered: int = 0
+    tools_flattened: int = 0
     errors: List[str] = field(default_factory=list)
 
 
@@ -238,7 +239,10 @@ class MCPConnector:
         return result
 
     async def _start_registry(self) -> int:
-        """Start MCP registry and connect to discovered servers.
+        """Start MCP registry, connect to servers, and flatten tools.
+
+        After connecting, projects MCP tools as first-class BaseTool
+        instances into the ToolRegistry via MCPToolProjector (Adapter Pattern).
 
         Returns:
             Number of servers connected
@@ -257,10 +261,51 @@ class MCPConnector:
                 if mcp_tools:
                     logger.info(f"MCPConnector: discovered {len(mcp_tools)} MCP tools")
 
+                # Flatten MCP tools as first-class BaseTool instances
+                self._flatten_mcp_tools()
+
             return connected
 
         except Exception as e:
             logger.warning(f"Failed to start MCP registry: {e}")
+            return 0
+
+    def _flatten_mcp_tools(self) -> int:
+        """Project MCP tools as first-class tools in the ToolRegistry.
+
+        Uses MCPToolProjector (Adapter Pattern) to create MCPAdapterTool
+        instances that wrap each MCP tool as a native BaseTool. The LLM
+        sees tool names like 'github_search' instead of 'mcp(name=...)'.
+
+        Returns:
+            Number of tools flattened and registered
+        """
+        if not self._mcp_registry:
+            return 0
+
+        try:
+            from victor.tools.mcp_adapter_tool import MCPToolProjector
+
+            adapter_tools = MCPToolProjector.project(self._mcp_registry)
+
+            registered = 0
+            for tool in adapter_tools:
+                try:
+                    self._registry.register(tool)
+                    registered += 1
+                except Exception as e:
+                    logger.debug("Failed to register MCP tool %s: %s", tool.name, e)
+
+            if registered > 0:
+                logger.info(f"MCPConnector: flattened {registered} MCP tools as first-class")
+
+            return registered
+
+        except ImportError:
+            logger.debug("MCPToolProjector not available, using bridge tool only")
+            return 0
+        except Exception as e:
+            logger.warning(f"Failed to flatten MCP tools: {e}")
             return 0
 
     def _setup_legacy_client(self, mcp_command: Optional[str]) -> None:
