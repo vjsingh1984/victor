@@ -27,6 +27,7 @@ from typing import Any, Dict, List, Optional, Type, TYPE_CHECKING
 from victor.core.aot_manifest import AOTManifestManager
 from victor.core.container import ServiceContainer, get_container
 from victor.core.plugins.protocol import VictorPlugin
+from victor.core.registry_base import SingletonRegistry
 from victor.framework.entry_point_registry import get_entry_point_values
 
 if TYPE_CHECKING:
@@ -135,32 +136,22 @@ class _ExternalPluginAdapter:
         }
 
 
-class PluginRegistry:
+class PluginRegistry(SingletonRegistry["PluginRegistry"]):
     """Registry for discovering and managing Victor plugins.
 
     Discovers plugins via the 'victor.plugins' entry point group
     and optionally from external manifest-based plugins.
     """
 
-    _instance: Optional[PluginRegistry] = None
-    _lock = threading.Lock()
     ENTRY_POINT_GROUP = "victor.plugins"
     AOT_GROUPS = ["victor.plugins"]
 
     def __init__(self) -> None:
         """Initialize registry."""
+        super().__init__()
         self._plugins: Dict[str, VictorPlugin] = {}
         self._context: Optional[HostPluginContext] = None
         self._discovered = False
-
-    @classmethod
-    def get_instance(cls) -> PluginRegistry:
-        """Get the singleton instance of PluginRegistry."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = PluginRegistry()
-        return cls._instance
 
     def discover(self, force: bool = False) -> List[VictorPlugin]:
         """Discover and load plugins from entry points.

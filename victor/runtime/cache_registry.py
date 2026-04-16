@@ -26,6 +26,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
+
+from victor.core.registry_base import SingletonRegistry
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
@@ -106,34 +108,22 @@ class CacheRegistryStatus:
     entries: List[Dict[str, Any]]
 
 
-class CacheRegistry:
+class CacheRegistry(SingletonRegistry["CacheRegistry"]):
     """Unified registry for all framework caches.
 
     Thread-safe singleton that tracks all caches for coordinated
     invalidation and monitoring.
     """
 
-    _instance: Optional[CacheRegistry] = None
-    _lock = threading.Lock()
-
     def __init__(self) -> None:
+        super().__init__()
         self._entries: Dict[str, CacheEntry] = {}
         self._entry_lock = threading.Lock()
 
     @classmethod
-    def get_instance(cls) -> CacheRegistry:
-        """Get the singleton registry instance."""
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = cls()
-        return cls._instance
-
-    @classmethod
     def reset(cls) -> None:
         """Reset the singleton. For testing only."""
-        with cls._lock:
-            cls._instance = None
+        cls.reset_instance()
 
     def register(
         self,

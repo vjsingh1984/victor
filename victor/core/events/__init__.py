@@ -116,7 +116,6 @@ from victor.core.events.adapter import (
 # Sync wrappers for gradual migration
 from victor.core.events.sync_wrapper import (
     SyncEventWrapper,
-    SyncObservabilityBus,
     SyncEventHandler,
 )
 from victor.core.events.emit_helper import (
@@ -167,7 +166,6 @@ __all__ = [
     # Migration utilities removed (migration complete)
     # Sync wrappers for gradual migration
     "SyncEventWrapper",
-    "SyncObservabilityBus",
     "SyncEventHandler",
     # Sync emit helper APIs
     # Event taxonomy

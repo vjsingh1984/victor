@@ -339,6 +339,8 @@ class EnhancedUsageLogger:
         self.session_id = str(uuid.uuid4())
         self._lock = threading.Lock()
         self._sampling_filter = sampling_filter
+        # Backward compat: UsageLogger used self._logger
+        self._logger = logger
 
         # Initialize components
         self._scrubber = PIIScrubber() if scrub_pii else None
@@ -505,10 +507,5 @@ def create_usage_logger(
     Returns:
         Logger instance
     """
-    if enhanced:
-        return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)
-
-    # Fall back to basic logger
-    from victor.observability.analytics.logger import UsageLogger
-
-    return UsageLogger(log_file=log_file, enabled=enabled)
+    # EnhancedUsageLogger is the canonical implementation (UsageLogger is now an alias)
+    return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)

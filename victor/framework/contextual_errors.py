@@ -39,13 +39,24 @@ import os
 import sys
 from typing import Any
 
+from victor.core.errors import VictorError, ErrorCategory
+
 # =============================================================================
 # Contextual Error Classes
 # =============================================================================
 
 
-class ContextualError(Exception):
-    """Base error class with context and suggestions."""
+class ContextualError(VictorError):
+    """Error class with context and actionable suggestions.
+
+    Extends VictorError to provide user-facing errors with:
+    - What operation was being attempted
+    - Why it failed (technical reason)
+    - How to fix it (actionable suggestions)
+
+    This is part of the unified VictorError hierarchy, so these errors
+    are caught by `except VictorError` handlers.
+    """
 
     def __init__(
         self,
@@ -55,35 +66,35 @@ class ContextualError(Exception):
         error_code: str | None = None,
         details: dict[str, Any] | None = None,
     ):
-        self.message = message
         self.operation = operation
         self.suggestion = suggestion
         self.error_code = error_code
-        self.details = details or {}
 
         # Build full error message
-        full_message = self._build_message()
-        super().__init__(full_message)
+        full_message = self._build_message_parts(message)
+        super().__init__(
+            message=full_message,
+            category=ErrorCategory.UNKNOWN,
+            recovery_hint=suggestion,
+            details=details,
+        )
+        # Override message to keep original (not the full built one)
+        self.message = message
 
-    def _build_message(self) -> str:
+    def _build_message_parts(self, message: str) -> str:
         """Build the full error message with context."""
         parts = []
 
         if self.operation:
             parts.append(f"[{self.operation}]")
 
-        parts.append(self.message)
+        parts.append(message)
 
         if self.suggestion:
             parts.append(f"\n\n💡 Suggestion: {self.suggestion}")
 
         if self.error_code:
             parts.append(f"\n\nError Code: {self.error_code}")
-
-        if self.details:
-            parts.append("\n\nDetails:")
-            for key, value in self.details.items():
-                parts.append(f"  • {key}: {value}")
 
         return "\n".join(parts)
 
