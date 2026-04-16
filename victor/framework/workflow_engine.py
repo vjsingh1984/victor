@@ -877,9 +877,7 @@ class WorkflowEngine:
         if self._graph_coordinator is None:
             from victor.framework.coordinators import GraphTurnExecutor
 
-            self._graph_coordinator = GraphTurnExecutor(
-                runner_registry=self._runner_registry
-            )
+            self._graph_coordinator = GraphTurnExecutor(runner_registry=self._runner_registry)
         return self._graph_coordinator
 
     def _get_hitl_coordinator(self) -> "HITLCoordinator":

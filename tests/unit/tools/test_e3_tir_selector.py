@@ -58,14 +58,20 @@ class TestToolExperienceStore:
         store = ToolExperienceStore()
         store.record(
             ToolExperience(
-                tool_name="read", task_type="coding",
-                experience_type=ExperienceType.DEMONSTRATION, success=True, reward=1.0,
+                tool_name="read",
+                task_type="coding",
+                experience_type=ExperienceType.DEMONSTRATION,
+                success=True,
+                reward=1.0,
             )
         )
         store.record(
             ToolExperience(
-                tool_name="write", task_type="coding",
-                experience_type=ExperienceType.SELF_PLAY, success=True, reward=0.7,
+                tool_name="write",
+                task_type="coding",
+                experience_type=ExperienceType.SELF_PLAY,
+                success=True,
+                reward=0.7,
             )
         )
         demos = store.sample_experiences(experience_type=ExperienceType.DEMONSTRATION)
@@ -156,9 +162,7 @@ class TestE3TIRSelector:
         for _ in range(5):
             selector.record_outcome("read", "coding", success=True, reward=0.9)
 
-        result = selector.select(
-            TOOLS, task_type="coding", base_ranking=["read"] + TOOLS[1:]
-        )
+        result = selector.select(TOOLS, task_type="coding", base_ranking=["read"] + TOOLS[1:])
         # "read" should be demoted from position 0
         assert result[0] != "read" or result[1] != "read"
 

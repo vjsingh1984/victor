@@ -46,9 +46,9 @@ class TestServiceDelegationCompleteness:
             "switch_provider",
         ]
         for method_name in expected_methods:
-            assert hasattr(AgentOrchestrator, method_name), (
-                f"AgentOrchestrator missing expected method: {method_name}"
-            )
+            assert hasattr(
+                AgentOrchestrator, method_name
+            ), f"AgentOrchestrator missing expected method: {method_name}"
 
 
 class TestBootstrapServiceCreation:

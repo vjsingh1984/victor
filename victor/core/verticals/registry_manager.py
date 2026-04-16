@@ -317,7 +317,9 @@ class VerticalRegistryManager:
 
         return verticals
 
-    def _discover_builtin_vertical_locations(self, victor_dir: Optional[Path] = None) -> Dict[str, Path]:
+    def _discover_builtin_vertical_locations(
+        self, victor_dir: Optional[Path] = None
+    ) -> Dict[str, Path]:
         """Discover built-in verticals from the core distribution and source tree.
 
         Built-in verticals are those owned by the core Victor package itself, not
@@ -351,7 +353,9 @@ class VerticalRegistryManager:
 
         return locations
 
-    def _resolve_builtin_module_location(self, module_path: str, victor_dir: Path) -> Optional[Path]:
+    def _resolve_builtin_module_location(
+        self, module_path: str, victor_dir: Path
+    ) -> Optional[Path]:
         """Resolve a module path to its owning source location inside the Victor tree."""
         try:
             spec = find_spec(module_path)

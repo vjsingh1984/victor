@@ -8,7 +8,6 @@ from typing import Any, ClassVar, List, Optional
 
 import pytest
 
-
 # ── BaseExtensionHandler Tests ──
 
 
@@ -25,7 +24,10 @@ class TestBaseExtensionHandler:
         class BadHandler(BaseExtensionHandler):
             pass
 
-        assert not hasattr(BadHandler, "extension_type") or BadHandler.extension_type is BaseExtensionHandler.extension_type
+        assert (
+            not hasattr(BadHandler, "extension_type")
+            or BadHandler.extension_type is BaseExtensionHandler.extension_type
+        )
 
 
 # ── ExtensionHandlerRegistry Tests ──
@@ -34,10 +36,12 @@ class TestBaseExtensionHandler:
 class TestExtensionHandlerRegistry:
     def setup_method(self):
         from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+
         self._saved = dict(ExtensionHandlerRegistry._handlers)
 
     def teardown_method(self):
         from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+
         ExtensionHandlerRegistry._handlers = self._saved
 
     def test_register_and_retrieve(self):
@@ -56,10 +60,12 @@ class TestExtensionHandlerRegistry:
 
     def test_get_returns_none_for_unknown(self):
         from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+
         assert ExtensionHandlerRegistry.get("nonexistent_type_xyz") is None
 
     def test_all_handlers_returns_copy(self):
         from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+
         handlers = ExtensionHandlerRegistry.all_handlers()
         assert isinstance(handlers, dict)
         # Mutating the copy should not affect registry
@@ -129,12 +135,17 @@ class TestMiddlewareHandler:
 
     def test_extension_type(self):
         from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler
+
         assert MiddlewareHandler.extension_type == "middleware"
 
     def test_registered_in_registry(self):
         from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
+
         # Import triggers @register decorator
-        from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler  # noqa: F401
+        from victor.core.verticals.extension_handlers.middleware import (
+            MiddlewareHandler,
+        )  # noqa: F401
+
         assert ExtensionHandlerRegistry.get("middleware") is MiddlewareHandler
 
 
@@ -162,11 +173,13 @@ class TestSafetyHandler:
 
     def test_extension_type(self):
         from victor.core.verticals.extension_handlers.safety import SafetyHandler
+
         assert SafetyHandler.extension_type == "safety"
 
     def test_registered_in_registry(self):
         from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
         from victor.core.verticals.extension_handlers.safety import SafetyHandler  # noqa: F401
+
         assert ExtensionHandlerRegistry.get("safety") is SafetyHandler
 
 
@@ -208,9 +221,11 @@ class TestPromptHandler:
 
     def test_extension_type(self):
         from victor.core.verticals.extension_handlers.prompt import PromptHandler
+
         assert PromptHandler.extension_type == "prompt"
 
     def test_registered_in_registry(self):
         from victor.core.verticals.extension_handlers.registry import ExtensionHandlerRegistry
         from victor.core.verticals.extension_handlers.prompt import PromptHandler  # noqa: F401
+
         assert ExtensionHandlerRegistry.get("prompt") is PromptHandler

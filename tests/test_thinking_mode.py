@@ -80,8 +80,10 @@ async def test_from_settings_passes_thinking_parameter():
     mock_provider.supports_tools.return_value = True
     mock_provider.supports_streaming.return_value = True
 
-    with patch("victor.agent.orchestrator.ProviderRegistry.create", return_value=mock_provider), \
-         patch("victor.core.bootstrap_services.bootstrap_new_services"):
+    with (
+        patch("victor.agent.orchestrator.ProviderRegistry.create", return_value=mock_provider),
+        patch("victor.core.bootstrap_services.bootstrap_new_services"),
+    ):
         orchestrator = await AgentOrchestrator.from_settings(
             settings=mock_settings, profile_name="default", thinking=True
         )

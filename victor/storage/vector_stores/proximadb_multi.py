@@ -275,12 +275,8 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             workspace = Path.cwd().name or "victor"
         self._workspace = self._normalize_collection_name(str(workspace))
         self._vector_collection = self._collection_name("vector_collection", "vectors")
-        self._document_collection = self._collection_name(
-            "document_collection", "documents"
-        )
-        self._metrics_collection = self._collection_name(
-            "metrics_collection", "metrics"
-        )
+        self._document_collection = self._collection_name("document_collection", "documents")
+        self._metrics_collection = self._collection_name("metrics_collection", "metrics")
         self._graph_collection = self._collection_name("graph_collection", "graph")
 
     @staticmethod

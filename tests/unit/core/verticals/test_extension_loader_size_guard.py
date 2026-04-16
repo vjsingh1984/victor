@@ -13,7 +13,6 @@ from pathlib import Path
 
 import pytest
 
-
 EXTENSION_LOADER_PATH = (
     Path(__file__).parent.parent.parent.parent.parent
     / "victor"
@@ -54,14 +53,25 @@ class TestExtensionLoaderSizeGuard:
         """
         tree = ast.parse(EXTENSION_LOADER_PATH.read_text())
         DELEGATION_METHODS = {
-            "get_middleware", "get_safety_extension", "get_prompt_contributor",
-            "get_mode_config_provider", "get_mode_config", "get_task_type_hints",
-            "get_tool_dependency_provider", "get_tool_graph", "get_tiered_tool_config",
-            "get_rl_config_provider", "get_rl_hooks",
-            "get_team_spec_provider", "get_team_specs",
-            "get_capability_provider", "get_service_provider",
-            "get_composed_chains", "get_personas",
-            "get_enrichment_strategy", "get_workflow_provider",
+            "get_middleware",
+            "get_safety_extension",
+            "get_prompt_contributor",
+            "get_mode_config_provider",
+            "get_mode_config",
+            "get_task_type_hints",
+            "get_tool_dependency_provider",
+            "get_tool_graph",
+            "get_tiered_tool_config",
+            "get_rl_config_provider",
+            "get_rl_hooks",
+            "get_team_spec_provider",
+            "get_team_specs",
+            "get_capability_provider",
+            "get_service_provider",
+            "get_composed_chains",
+            "get_personas",
+            "get_enrichment_strategy",
+            "get_workflow_provider",
         }
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and node.name == "VerticalExtensionLoader":
@@ -96,9 +106,20 @@ class TestExtensionHandlerRegistryCompleteness:
 
         handlers = ExtensionHandlerRegistry.all_handlers()
         EXPECTED = {
-            "middleware", "safety", "prompt", "mode_config", "tool_deps",
-            "rl_config", "rl_hooks", "team_spec", "capability", "service",
-            "workflow", "enrichment", "chains", "personas",
+            "middleware",
+            "safety",
+            "prompt",
+            "mode_config",
+            "tool_deps",
+            "rl_config",
+            "rl_hooks",
+            "team_spec",
+            "capability",
+            "service",
+            "workflow",
+            "enrichment",
+            "chains",
+            "personas",
         }
         missing = EXPECTED - set(handlers.keys())
         assert not missing, f"Missing handlers: {missing}"
@@ -106,9 +127,18 @@ class TestExtensionHandlerRegistryCompleteness:
     def test_handler_files_exist(self):
         """Each handler must have its own file in extension_handlers/."""
         expected_files = [
-            "middleware.py", "safety.py", "prompt.py", "mode_config.py",
-            "tool_deps.py", "rl.py", "team.py", "service.py",
-            "workflow.py", "enrichment.py", "chains.py", "personas.py",
+            "middleware.py",
+            "safety.py",
+            "prompt.py",
+            "mode_config.py",
+            "tool_deps.py",
+            "rl.py",
+            "team.py",
+            "service.py",
+            "workflow.py",
+            "enrichment.py",
+            "chains.py",
+            "personas.py",
         ]
         for filename in expected_files:
             path = HANDLERS_DIR / filename

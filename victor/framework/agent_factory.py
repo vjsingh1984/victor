@@ -204,12 +204,14 @@ class AgentFactory:
         # Check config directory
         config_dir = Path.home() / ".victor"
         if not config_dir.exists():
-            issues.append({
-                "stage": "config",
-                "severity": "warning",
-                "message": "No ~/.victor directory found. Run 'victor init' to set up.",
-                "suggestions": ["victor init"],
-            })
+            issues.append(
+                {
+                    "stage": "config",
+                    "severity": "warning",
+                    "message": "No ~/.victor directory found. Run 'victor init' to set up.",
+                    "suggestions": ["victor init"],
+                }
+            )
 
         # Check common API key env vars for the target provider
         provider = self._provider or "openai"
@@ -221,15 +223,17 @@ class AgentFactory:
             "cohere": "COHERE_API_KEY",
         }
         if provider in key_vars and not os.environ.get(key_vars[provider]):
-            issues.append({
-                "stage": "credentials",
-                "severity": "warning",
-                "message": f"{key_vars[provider]} not set for provider '{provider}'",
-                "suggestions": [
-                    f"export {key_vars[provider]}=...",
-                    "victor doctor",
-                ],
-            })
+            issues.append(
+                {
+                    "stage": "credentials",
+                    "severity": "warning",
+                    "message": f"{key_vars[provider]} not set for provider '{provider}'",
+                    "suggestions": [
+                        f"export {key_vars[provider]}=...",
+                        "victor doctor",
+                    ],
+                }
+            )
 
         return issues
 
@@ -267,9 +271,7 @@ class AgentFactory:
         try:
             from victor.framework._internal import setup_observability_integration
 
-            setup_observability_integration(
-                self._orchestrator, session_id=self._session_id
-            )
+            setup_observability_integration(self._orchestrator, session_id=self._session_id)
         except Exception as e:
             logger.debug(f"Observability wiring failed: {e}")
 

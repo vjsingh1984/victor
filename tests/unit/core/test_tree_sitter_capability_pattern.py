@@ -12,7 +12,6 @@ by registering the same entry point.
 import ast
 from pathlib import Path
 
-
 CORE_DIR = Path(__file__).parent.parent.parent.parent / "victor"
 
 
@@ -65,9 +64,9 @@ class TestTreeSitterCapabilityPattern:
         """capability_loader.py must use entry point discovery for tree_sitter."""
         source = (CORE_DIR / "core" / "utils" / "capability_loader.py").read_text()
 
-        assert "entry_point" in source.lower() or "_try_entry_point" in source, (
-            "capability_loader.py should use entry point discovery for tree_sitter"
-        )
+        assert (
+            "entry_point" in source.lower() or "_try_entry_point" in source
+        ), "capability_loader.py should use entry point discovery for tree_sitter"
 
     def test_no_victor_coding_in_core_tree_sitter_consumers(self):
         """Files that use tree_sitter in core must not import from victor_coding."""

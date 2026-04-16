@@ -12,7 +12,10 @@ class TestStagePredictor:
         assert hasattr(ConversationStateMachine, "predict_next_stage")
 
     def test_predict_from_reading(self):
-        from victor.agent.conversation.state_machine import ConversationStateMachine, STAGE_TRANSITION_PROBS
+        from victor.agent.conversation.state_machine import (
+            ConversationStateMachine,
+            STAGE_TRANSITION_PROBS,
+        )
 
         sm = MagicMock(spec=ConversationStateMachine)
         sm.state = MagicMock()

@@ -75,9 +75,9 @@ class _RegistryPluginContext:
         """Register a plugin vertical into the unified registry."""
 
         runtime_vertical = ensure_runtime_vertical(vertical_class)
-        manifest = get_or_create_vertical_manifest(vertical_class) or get_or_create_vertical_manifest(
-            runtime_vertical
-        )
+        manifest = get_or_create_vertical_manifest(
+            vertical_class
+        ) or get_or_create_vertical_manifest(runtime_vertical)
 
         if manifest is not None:
             name = manifest.name
@@ -347,7 +347,9 @@ class UnifiedVerticalRegistry:
             normalized: set[ExtensionType] = set()
             for value in values:
                 try:
-                    normalized.add(value if isinstance(value, ExtensionType) else ExtensionType(value))
+                    normalized.add(
+                        value if isinstance(value, ExtensionType) else ExtensionType(value)
+                    )
                 except Exception:
                     continue
             return normalized

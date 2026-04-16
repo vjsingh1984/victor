@@ -10,7 +10,6 @@ redundant direct importlib.metadata.entry_points() calls.
 import ast
 from pathlib import Path
 
-
 REGISTRY_FILE = Path(__file__).parent.parent.parent.parent / "victor" / "tools" / "registry.py"
 
 

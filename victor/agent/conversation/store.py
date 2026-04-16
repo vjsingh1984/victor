@@ -62,7 +62,6 @@ logger = logging.getLogger(__name__)
 # Canonical enums from conversation/types.py
 from victor.agent.conversation.types import MessageRole, MessagePriority
 
-
 # ML metadata extracted to victor/agent/ml_metadata.py
 from victor.agent.ml_metadata import (  # noqa: F401
     ContextSize,

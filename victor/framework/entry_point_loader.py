@@ -250,7 +250,9 @@ def load_runtime_extension_from_entry_points(
         loaded_ep = get_entry_point(group, normalized_vertical)
     except Exception as e:
         _increment_group_loader_stat(group, "failures")
-        logger.debug("Failed to resolve entry point group '%s' for vertical '%s': %s", group, vertical, e)
+        logger.debug(
+            "Failed to resolve entry point group '%s' for vertical '%s': %s", group, vertical, e
+        )
         return None
 
     if loaded_ep is not None:
