@@ -12,7 +12,7 @@ from victor.config.settings import load_settings
 # ToolDefinition is imported for type hinting, though not directly used in the logic
 from victor.providers.base import ToolDefinition  # noqa: F401
 
-tools_app = typer.Typer(name="tools", help="Manage Victor's integrated tools.")
+tools_app = typer.Typer(name="tool", help="Manage Victor's integrated tools.")
 console = Console()
 
 
@@ -78,7 +78,7 @@ def _discover_tools_lightweight() -> List[Tuple[str, str, str]]:
                         except Exception:
                             # Skip tools that can't be instantiated
                             pass
-            except Exception as e:
+            except Exception:
                 # Log but continue with other modules
                 pass
 

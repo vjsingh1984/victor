@@ -57,7 +57,7 @@ class CostCommand(BaseSlashCommand):
             name="cost",
             description="Show estimated token usage and cost for this session",
             usage="/cost",
-            aliases=["usage", "tokens", "stats"],
+            aliases=["usage"],
             category="metrics",
             requires_agent=True,
         )

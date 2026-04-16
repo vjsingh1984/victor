@@ -27,7 +27,7 @@ from rich.table import Table
 
 from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
-sessions_app = typer.Typer(name="sessions", help="Manage conversation sessions.")
+sessions_app = typer.Typer(name="session", help="Manage conversation sessions.")
 console = Console()
 
 

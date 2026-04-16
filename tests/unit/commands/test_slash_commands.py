@@ -497,8 +497,8 @@ class TestAllCommandsRegistered:
 
     # Expected aliases mapping
     EXPECTED_ALIASES = {
-        "help": ["?", "commands"],
-        "model": ["models"],
+        "help": ["?"],
+        "model": ["models", "switch"],
         "profile": ["profiles"],
         "provider": ["providers"],
         "clear": ["reset"],
@@ -509,13 +509,13 @@ class TestAllCommandsRegistered:
         "compact": ["summarize"],
         "mcp": ["servers"],
         "bug": ["issue", "feedback"],
-        "exit": ["quit", "bye"],
+        "exit": ["quit"],
         "theme": ["dark", "light"],
-        "changes": ["diff", "rollback"],
-        "cost": ["usage", "tokens", "stats"],
+        "changes": ["diff"],
+        "cost": ["usage"],
         "approvals": ["safety"],
         "search": ["web"],
-        "directory": ["dir", "cd", "pwd"],
+        "directory": ["cd"],
         "snapshots": ["snap"],
         "commit": ["ci"],
         "mode": ["m"],

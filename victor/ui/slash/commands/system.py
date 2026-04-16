@@ -72,7 +72,7 @@ class HelpCommand(BaseSlashCommand):
             name="help",
             description="Show available commands",
             usage="/help [command]",
-            aliases=["?", "commands"],
+            aliases=["?"],
             category="system",
         )
 
@@ -239,7 +239,7 @@ class ExitCommand(BaseSlashCommand):
             name="exit",
             description="Exit Victor",
             usage="/exit",
-            aliases=["quit", "bye"],
+            aliases=["quit"],
             category="system",
         )
 

@@ -233,8 +233,8 @@ class TestSwitchCommandSwitchProvider:
 
     @pytest.mark.asyncio
     async def test_switch_command_calls_with_provider_name(self):
-        """SwitchCommand._switch_provider must use provider_name= kwarg."""
-        from victor.ui.slash.commands.switch import SwitchCommand
+        """ModelCommand._switch_provider must use provider_name= kwarg."""
+        from victor.ui.slash.commands.model import ModelCommand
 
         agent = MagicMock()
         agent.switch_provider = AsyncMock(return_value=True)
@@ -246,7 +246,7 @@ class TestSwitchCommandSwitchProvider:
         }
 
         ctx = self._make_ctx(agent=agent)
-        cmd = SwitchCommand()
+        cmd = ModelCommand()
         await cmd._switch_provider(ctx, "openai", "gpt-4o")
 
         agent.switch_provider.assert_called_once_with(

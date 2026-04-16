@@ -39,7 +39,7 @@ class DirectoryCommand(BaseSlashCommand):
             name="directory",
             description="Show or change working directory",
             usage="/directory [path]",
-            aliases=["dir", "cd", "pwd"],
+            aliases=["cd"],
             category="navigation",
         )
 
@@ -85,7 +85,7 @@ class ChangesCommand(BaseSlashCommand):
             name="changes",
             description="View, diff, or revert file changes",
             usage="/changes [show|revert|stash] [file]",
-            aliases=["diff", "rollback"],
+            aliases=["diff"],
             category="navigation",
             requires_agent=True,
         )

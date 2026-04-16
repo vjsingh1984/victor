@@ -12,9 +12,7 @@ from victor.storage.cache.embedding_cache_manager import (
     EmbeddingCacheManager,
 )
 
-embeddings_app = typer.Typer(
-    name="embeddings", help="Manage Victor embeddings for troubleshooting."
-)
+embeddings_app = typer.Typer(name="embedding", help="Manage Victor embeddings for troubleshooting.")
 console = Console()
 
 

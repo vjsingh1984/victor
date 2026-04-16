@@ -106,65 +106,77 @@ def chat(
         "-l",
         help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to WARNING or VICTOR_LOG_LEVEL env var.",
         case_sensitive=False,
+        rich_help_panel="Logging",
     ),
     debug_modules: str = typer.Option(
         None,
         "--debug-modules",
         help="Comma-separated modules to set to DEBUG level (e.g., code_search,agent_adapter).",
+        rich_help_panel="Logging",
     ),
     thinking: bool = typer.Option(
         False,
         "--thinking/--no-thinking",
         help="Enable extended thinking/reasoning mode (Claude models). Shows model's reasoning process.",
+        rich_help_panel="Agent Behavior",
     ),
     # Automation-friendly options
     json_output: bool = typer.Option(
         False,
         "--json",
         help="Output response as JSON object (for automation/scripting).",
+        rich_help_panel="Output Format",
     ),
     plain: bool = typer.Option(
         False,
         "--plain",
         help="Output plain text without Rich formatting.",
+        rich_help_panel="Output Format",
     ),
     code_only: bool = typer.Option(
         False,
         "--code-only",
         help="Extract and output only code blocks from response.",
+        rich_help_panel="Output Format",
     ),
     stdin: bool = typer.Option(
         False,
         "--stdin",
         help="Read input from stdin (supports multi-line).",
+        rich_help_panel="Input",
     ),
     quiet: bool = typer.Option(
         False,
         "--quiet",
         "-q",
         help="Suppress status messages (only output response).",
+        rich_help_panel="Output Format",
     ),
     renderer: str = typer.Option(
         "auto",
         "--renderer",
         help="Renderer to use for streaming output: auto, rich, rich-text, or text.",
         case_sensitive=False,
+        rich_help_panel="Output Format",
     ),
     mode: Optional[str] = typer.Option(
         None,
         "--mode",
         help="Initial agent mode: build, plan, or explore.",
         case_sensitive=False,
+        rich_help_panel="Agent Behavior",
     ),
     tool_budget: Optional[int] = typer.Option(
         None,
         "--tool-budget",
         help="Override tool call budget for this session.",
+        rich_help_panel="Agent Behavior",
     ),
     max_iterations: Optional[int] = typer.Option(
         None,
         "--max-iterations",
         help="Override maximum total iterations for this session.",
+        rich_help_panel="Agent Behavior",
     ),
     provider: Optional[str] = typer.Option(
         None,
@@ -181,17 +193,20 @@ def chat(
         None,
         "--endpoint",
         help="Override base URL for local providers (ollama, lmstudio, vllm).",
+        rich_help_panel="Auth & Compatibility",
     ),
     input_file: Optional[str] = typer.Option(
         None,
         "--input-file",
         "-f",
         help="Read input from file instead of argument.",
+        rich_help_panel="Input",
     ),
     preindex: bool = typer.Option(
         False,
         "--preindex",
         help="Preload semantic code index at startup (avoids 20-30s delay on first search).",
+        rich_help_panel="Agent Behavior",
     ),
     vertical: Optional[str] = typer.Option(
         None,
@@ -199,93 +214,110 @@ def chat(
         "-V",
         help=f"Vertical template to use ({', '.join(list_verticals()) or 'coding, research, devops'}). "
         "By default, no vertical is applied (uses standard CodingAssistant behavior with framework features).",
+        rich_help_panel="Agent Behavior",
     ),
     workflow: Optional[str] = typer.Option(
         None,
         "--workflow",
         "-w",
         help="Path to YAML workflow file to execute. Runs workflow instead of chat mode.",
+        rich_help_panel="Workflow",
     ),
     validate_workflow: bool = typer.Option(
         False,
         "--validate",
         help="Validate YAML workflow file without executing. Use with --workflow.",
+        rich_help_panel="Workflow",
     ),
     render_format: Optional[str] = typer.Option(
         None,
         "--render",
         "-r",
         help="Render workflow DAG (ascii, mermaid, d2, dot, plantuml, svg, png). Use with --workflow.",
+        rich_help_panel="Workflow",
     ),
     render_output: Optional[str] = typer.Option(
         None,
         "--render-output",
         "-o",
         help="Output file for rendered diagram. Required for svg/png formats.",
+        rich_help_panel="Workflow",
     ),
     auth_mode: Optional[str] = typer.Option(
         None,
         "--auth-mode",
         help="Authentication mode: 'api_key' (default) or 'oauth' (for OpenAI Codex, Qwen Coding Plan).",
         case_sensitive=False,
+        rich_help_panel="Auth & Compatibility",
     ),
     coding_plan: bool = typer.Option(
         False,
         "--coding-plan",
         help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
+        rich_help_panel="Auth & Compatibility",
     ),
     legacy_mode: bool = typer.Option(
         False,
         "--legacy",
         help="Use legacy orchestrator creation path (bypasses FrameworkShim). "
         "For backward compatibility and troubleshooting.",
+        rich_help_panel="Auth & Compatibility",
     ),
     enable_observability: bool = typer.Option(
         True,
         "--observability/--no-observability",
         help="Enable observability integration for event tracking.",
+        rich_help_panel="Logging",
     ),
     log_events: bool = typer.Option(
         False,
         "--log-events",
         help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
+        rich_help_panel="Logging",
     ),
     show_reasoning: bool = typer.Option(
         False,
         "--show-reasoning",
         help="Show LLM reasoning/thinking content in output.",
+        rich_help_panel="Output Format",
     ),
     auto_skill: Optional[bool] = typer.Option(
         None,
         "--auto-skill/--no-auto-skill",
         help="Enable/disable automatic skill selection based on message content. Default: from settings.",
+        rich_help_panel="Agent Behavior",
     ),
     enable_planning: Optional[bool] = typer.Option(
         None,
         "--planning/--no-planning",
         help="Enable structured planning for complex multi-step tasks. Default: auto-detect via query classification.",
+        rich_help_panel="Agent Behavior",
     ),
     planning_model: Optional[str] = typer.Option(
         None,
         "--planning-model",
         help="Override model for planning tasks (e.g., 'qwen3-coder-tools:30b-128K', 'deepseek-chat'). "
         "Takes precedence over profile planning_model setting.",
+        rich_help_panel="Agent Behavior",
     ),
     # Session management options
     list_sessions: bool = typer.Option(
         False,
         "--sessions",
         help="List saved sessions and exit (top 20).",
+        rich_help_panel="Session",
     ),
     session_id: Optional[str] = typer.Option(
         None,
         "--sessionid",
         help="Resume specific session by ID.",
+        rich_help_panel="Session",
     ),
     tui: bool = typer.Option(
         False,
         "--tui/--no-tui",
         help="Use modern TUI interface. Use --no-tui for simple CLI mode (default).",
+        rich_help_panel="Logging",
     ),
 ):
     """Start interactive chat or send a one-shot message."""
@@ -622,6 +654,20 @@ async def run_oneshot(
         )
         thinking = False
 
+    # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
+    if not show_reasoning:
+        try:
+            from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+
+            caps = ModelCapabilityLoader().get_capabilities(
+                settings.provider.default_provider,
+                settings.provider.default_model,
+            )
+            if caps and caps.thinking_mode:
+                show_reasoning = True
+        except Exception:
+            pass
+
     agent = None
     shim: Optional[FrameworkShim] = None
     try:
@@ -767,6 +813,20 @@ async def run_interactive(
         use_tui: If True, use the modern TUI interface. If False, use simple CLI.
         show_reasoning: If True, show LLM reasoning/thinking content in output.
     """
+    # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
+    if not show_reasoning:
+        try:
+            from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+
+            caps = ModelCapabilityLoader().get_capabilities(
+                settings.provider.default_provider,
+                settings.provider.default_model,
+            )
+            if caps and caps.thinking_mode:
+                show_reasoning = True
+        except Exception:
+            pass
+
     agent = None
     shim: Optional[FrameworkShim] = None
     start_time = time.time()

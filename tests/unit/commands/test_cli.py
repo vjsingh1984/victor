@@ -428,7 +428,7 @@ class TestCliCommands:
         """Test embeddings command help."""
         from victor.ui.cli import app
 
-        result = runner.invoke(app, ["embeddings", "--help"])
+        result = runner.invoke(app, ["embedding", "--help"])
         assert result.exit_code == 0
 
     def test_keys_help(self, runner):
