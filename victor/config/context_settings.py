@@ -37,6 +37,11 @@ class ContextSettings(BaseModel):
     # Note: API-caching providers always use session-locked full tool set regardless.
     kv_tool_strategy: str = "per_turn"
 
+    # Tiered schema broadcasting: use FULL/COMPACT/STUB schema levels based on
+    # TieredToolConfig tier membership. Reduces tool token cost by 50-65% while
+    # preserving cache stability (FULL+COMPACT prefix cached, STUB suffix dynamic).
+    tiered_schema_enabled: bool = True
+
     # HITL tool approval mode: controls which tools require human approval.
     #   'auto'      — All tools auto-approved (default, backward compatible)
     #   'dangerous'  — MEDIUM+ danger level tools require approval

@@ -107,6 +107,11 @@ class MCPAdapterTool(BaseTool):
         return False  # Cannot guarantee for external MCP tools
 
     @property
+    def default_schema_level(self) -> str:
+        """MCP tools default to STUB schema for token efficiency."""
+        return "stub"
+
+    @property
     def mcp_server_name(self) -> str:
         """The MCP server providing this tool."""
         return self._server_name

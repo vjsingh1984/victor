@@ -205,7 +205,12 @@ class AnthropicProvider(BaseProvider):
                 if tools:
                     converted = self._convert_tools(tools)
                     if converted:
-                        converted[-1]["cache_control"] = {"type": "ephemeral"}
+                        # Place cache_control at the stable/dynamic tier boundary.
+                        # Tools are sorted FULL -> COMPACT -> STUB; caching the
+                        # FULL+COMPACT prefix means STUB tools can change per-turn
+                        # without invalidating the cached prefix.
+                        cache_idx = self._find_cache_boundary(tools, converted)
+                        converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
                     request_params["tools"] = converted
 
                 # Make API call with circuit breaker protection
@@ -318,9 +323,8 @@ class AnthropicProvider(BaseProvider):
             if tools:
                 converted = self._convert_tools(tools)
                 if converted:
-                    # Mark last tool with cache_control to cache the entire
-                    # tools prefix. Tools are first in Anthropic's cache hierarchy.
-                    converted[-1]["cache_control"] = {"type": "ephemeral"}
+                    cache_idx = self._find_cache_boundary(tools, converted)
+                    converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
                 request_params["tools"] = converted
 
             tool_calls: Dict[str, Dict[str, Any]] = {}
@@ -449,6 +453,25 @@ class AnthropicProvider(BaseProvider):
     def _convert_tools(self, tools: List[ToolDefinition]) -> List[Dict[str, Any]]:
         """Convert standard tools to Anthropic format."""
         return convert_tools_to_anthropic_format(tools)
+
+    @staticmethod
+    def _find_cache_boundary(
+        tools: List[ToolDefinition],
+        converted: List[Dict[str, Any]],
+    ) -> int:
+        """Find the index for cache_control placement at the stable/dynamic boundary.
+
+        Tools are sorted FULL -> COMPACT -> STUB. The cache boundary is placed
+        on the last FULL or COMPACT tool so Anthropic caches the stable prefix.
+        STUB tools after the boundary can change per-turn without cache invalidation.
+        """
+        last_stable = len(converted) - 1
+        for i, tool_def in enumerate(tools):
+            level = getattr(tool_def, "schema_level", None)
+            if level == "stub" and i > 0:
+                last_stable = i - 1
+                break
+        return last_stable
 
     def _parse_response(self, response: AnthropicMessage, model: str) -> CompletionResponse:
         """Parse Anthropic API response.

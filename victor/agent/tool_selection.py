@@ -389,6 +389,36 @@ MIN_TOOLS: int = 5
 MAX_TOOLS: int = 15
 
 
+def tool_to_definition(
+    tool: Any,
+    level: SchemaLevel = SchemaLevel.FULL,
+) -> "ToolDefinition":
+    """Create a ToolDefinition from a BaseTool at the specified schema level.
+
+    Uses BaseTool.to_schema(level) for COMPACT/STUB truncation.
+    The schema_level is stored on the ToolDefinition for cache-aware ordering
+    but excluded from provider serialization.
+    """
+    from victor.providers.base import ToolDefinition
+
+    if level == SchemaLevel.FULL or not hasattr(tool, "to_schema"):
+        return ToolDefinition(
+            name=tool.name,
+            description=tool.description,
+            parameters=tool.parameters,
+            schema_level=level.value,
+        )
+
+    schema = tool.to_schema(level)
+    fn = schema.get("function", schema)
+    return ToolDefinition(
+        name=fn.get("name", tool.name),
+        description=fn.get("description", tool.description),
+        parameters=fn.get("parameters", tool.parameters),
+        schema_level=level.value,
+    )
+
+
 @dataclass
 class ToolSelectionStats:
     """Statistics for tool selection tracking."""
@@ -1373,17 +1403,13 @@ class ToolSelector(ModeAwareMixin):
         all_tools_map = {tool.name: tool for tool in self.tools.list_tools()}
         selected: Dict[str, ToolDefinition] = {}
 
-        # Tier 1: Mandatory tools (always included)
+        # Tier 1: Mandatory tools (always included, FULL schema)
         for name in config.mandatory:
             if name in all_tools_map:
                 tool = all_tools_map[name]
-                selected[name] = ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters,
-                )
+                selected[name] = tool_to_definition(tool, SchemaLevel.FULL)
 
-        # Tier 2: Vertical core tools (always included for this vertical)
+        # Tier 2: Vertical core tools (always included, COMPACT schema)
         for name in config.vertical_core:
             if name in all_tools_map and name not in selected:
                 tool = all_tools_map[name]
@@ -1391,11 +1417,7 @@ class ToolSelector(ModeAwareMixin):
                 if is_analysis_task and config.readonly_only_for_analysis:
                     if not self._is_readonly_tool(name):
                         continue
-                selected[name] = ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.parameters,
-                )
+                selected[name] = tool_to_definition(tool, SchemaLevel.COMPACT)
 
         # Tier 3: Stage-specific tools
         # Use config helper method that prefers registry metadata over static stage_tools
@@ -1412,13 +1434,9 @@ class ToolSelector(ModeAwareMixin):
                     if is_analysis_task and config.readonly_only_for_analysis:
                         if not self._is_readonly_tool(name):
                             continue
-                    selected[name] = ToolDefinition(
-                        name=tool.name,
-                        description=tool.description,
-                        parameters=tool.parameters,
-                    )
+                    selected[name] = tool_to_definition(tool, SchemaLevel.COMPACT)
 
-        # Tier 4: Semantic pool (selected based on query)
+        # Tier 4: Semantic pool (selected based on query, STUB schema)
         # Use config helper method that prefers registry metadata over static semantic_pool
         semantic_pool = (
             config.get_effective_semantic_pool()
@@ -1452,11 +1470,7 @@ class ToolSelector(ModeAwareMixin):
                             should_include = False
 
                     if should_include:
-                        selected[name] = ToolDefinition(
-                            name=tool.name,
-                            description=tool.description,
-                            parameters=tool.parameters,
-                        )
+                        selected[name] = tool_to_definition(tool, SchemaLevel.STUB)
 
         result = list(selected.values())
         logger.info(
@@ -1466,6 +1480,17 @@ class ToolSelector(ModeAwareMixin):
             f"stage={stage or 'None'}, "
             f"analysis={is_analysis_task}): "
             f"{', '.join(t.name for t in result)}"
+        )
+        # Token estimation per schema tier
+        full_n = sum(1 for t in result if getattr(t, "schema_level", None) == "full")
+        compact_n = sum(1 for t in result if getattr(t, "schema_level", None) == "compact")
+        stub_n = sum(1 for t in result if getattr(t, "schema_level", None) == "stub")
+        est_tokens = full_n * 125 + compact_n * 70 + stub_n * 32
+        baseline = len(result) * 125
+        logger.info(
+            "Tiered schema: FULL=%d COMPACT=%d STUB=%d "
+            "est_tokens=%d (saved ~%d vs all-FULL)",
+            full_n, compact_n, stub_n, est_tokens, baseline - est_tokens,
         )
         self._record_selection("tiered", len(result))
         return result

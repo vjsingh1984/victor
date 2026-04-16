@@ -117,6 +117,11 @@ class LangChainAdapterTool(BaseTool):
         return False  # Cannot guarantee for LangChain tools
 
     @property
+    def default_schema_level(self) -> str:
+        """LangChain tools default to STUB schema for token efficiency."""
+        return "stub"
+
+    @property
     def langchain_tool_name(self) -> str:
         """The original LangChain tool name (without prefix)."""
         return self._lc_tool.name

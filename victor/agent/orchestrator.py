@@ -3312,11 +3312,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return self._sort_tools_for_kv_stability(tools)
 
     def _sort_tools_for_kv_stability(self, tools):
-        """Sort tools deterministically by name for KV prefix cache stability.
+        """Sort tools by schema level then name for cache-optimal ordering.
 
-        When KV prefix caching is active, the tool definitions are part of the
-        prompt prefix. Sorting ensures the same subset of tools always produces
-        the same byte sequence, maximizing KV cache reuse across turns.
+        Tools are ordered: FULL -> COMPACT -> STUB, then alphabetically within
+        each level. This ensures the stable prefix (FULL+COMPACT tools) remains
+        byte-identical across turns, maximizing API cache hits (90% discount on
+        Anthropic). STUB tools at the end form a dynamic suffix that can change
+        per-turn without invalidating the cached prefix.
 
         Caches the sorted result keyed on tool names to avoid redundant sorting.
         """
@@ -3325,14 +3327,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not self._kv_optimization_enabled:
             return tools
 
-        # Check cache: same tool names → same sorted result
+        # Check cache: same tool names -> same sorted result
         current_names = frozenset(t.name for t in tools)
         last_names = getattr(self, "_last_sorted_tool_names", None)
         last_tools = getattr(self, "_last_sorted_tools", None)
         if last_names == current_names and last_tools is not None:
             return last_tools
 
-        sorted_tools = sorted(tools, key=lambda t: t.name)
+        # Sort by schema level priority (FULL first = stable prefix), then name
+        level_order = {"full": 0, "compact": 1, "stub": 2, None: 2}
+        sorted_tools = sorted(
+            tools,
+            key=lambda t: (
+                level_order.get(getattr(t, "schema_level", None), 2),
+                t.name,
+            ),
+        )
         self._last_sorted_tool_names = current_names
         self._last_sorted_tools = sorted_tools
         return sorted_tools

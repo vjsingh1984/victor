@@ -219,11 +219,18 @@ class Message(BaseModel):
 
 
 class ToolDefinition(BaseModel):
-    """Standard tool definition format."""
+    """Standard tool definition format.
+
+    The optional schema_level tracks which verbosity tier was used to
+    generate the description and parameters. It is excluded from
+    serialization (never sent to providers) — used only for internal
+    cache-aware ordering.
+    """
 
     name: str = Field(..., description="Tool name")
     description: str = Field(..., description="What the tool does")
     parameters: Dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
+    schema_level: Optional[str] = Field(default=None, exclude=True)
 
 
 class CompletionResponse(BaseModel):
