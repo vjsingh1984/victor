@@ -921,57 +921,24 @@ class VerticalExtensionLoader(ABC):
 
     @classmethod
     def get_middleware(cls) -> List[Any]:
-        """Get middleware implementations for this vertical.
+        """Get middleware implementations for this vertical."""
+        from victor.core.verticals.extension_handlers.middleware import MiddlewareHandler
 
-        Default implementation resolves a ``get_middleware()`` factory from the
-        vertical's runtime middleware module when present.
-
-        Returns:
-            List of middleware implementations (MiddlewareProtocol)
-        """
-        candidate_paths = cls._find_available_candidates("middleware")
-        if not candidate_paths:
-            return []
-
-        try:
-            factory = cls._module_resolver.try_load_from_candidates(
-                candidate_paths, "get_middleware"
-            )
-        except ImportError:
-            return []
-
-        if factory is None:
-            return []
-
-        return cls._get_cached_extension(
-            "middleware",
-            lambda factory=factory: list(factory() or []),
-        )
+        return MiddlewareHandler.load(cls)
 
     @classmethod
     def get_safety_extension(cls) -> Optional[Any]:
-        """Get safety extension for this vertical.
+        """Get safety extension for this vertical."""
+        from victor.core.verticals.extension_handlers.safety import SafetyHandler
 
-        Returns:
-            Safety extension (SafetyExtensionProtocol) or None
-        """
-        return cls._resolve_factory_extension("safety_extension", "safety")
+        return SafetyHandler.load(cls)
 
     @classmethod
     def get_prompt_contributor(cls) -> Optional[Any]:
-        """Get prompt contributor for this vertical.
+        """Get prompt contributor for this vertical."""
+        from victor.core.verticals.extension_handlers.prompt import PromptHandler
 
-        Returns:
-            Prompt contributor (PromptContributorProtocol) or None
-        """
-        contributor = cls._load_named_entry_point_extension(
-            "prompt_contributor",
-            "victor.prompt_contributors",
-        )
-        if contributor is not None:
-            return contributor
-
-        return cls._resolve_factory_extension("prompt_contributor", "prompts")
+        return PromptHandler.load(cls)
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[Any]:
