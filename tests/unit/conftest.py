@@ -152,13 +152,21 @@ def reset_service_container():
     yield
     import sys
 
-    if "victor.core.bootstrap" in sys.modules:
+    # Reset via container module directly (not bootstrap which may not be imported)
+    if "victor.core.container" in sys.modules:
+        try:
+            from victor.core.container import reset_container
+
+            reset_container()
+        except ImportError:
+            pass  # Module not loaded, nothing to reset
+    elif "victor.core.bootstrap" in sys.modules:
         try:
             from victor.core.bootstrap import reset_container
 
             reset_container()
         except ImportError:
-            pass  # Module not loaded, nothing to reset
+            pass
 
 
 @pytest.fixture(autouse=True)
