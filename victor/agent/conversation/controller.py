@@ -421,6 +421,14 @@ class ConversationController:
         if strategy == CompactionStrategy.SIMPLE:
             return self.compact_history(keep_recent=target)
 
+        # Filter non-Message objects before scoring (defensive against malformed history)
+        valid_count = sum(1 for m in self.messages if hasattr(m, "role"))
+        if valid_count != len(self.messages):
+            logger.warning(
+                "Filtered %d non-Message objects from history before compaction",
+                len(self.messages) - valid_count,
+            )
+
         # Score all messages for importance
         scored_messages = self._score_messages(current_query)
 
@@ -429,7 +437,11 @@ class ConversationController:
 
         # Always keep system message
         system_msg = None
-        if self.messages and self.messages[0].role == "system":
+        if (
+            self.messages
+            and hasattr(self.messages[0], "role")
+            and self.messages[0].role == "system"
+        ):
             system_msg = self.messages[0]
             # Remove system from scored list (we'll add it back)
             scored_messages = [sm for sm in scored_messages if sm.index != 0]
@@ -495,6 +507,24 @@ class ConversationController:
         scorable_msgs: List[Message] = []
         scorable_indices: List[int] = []
 
+        # Defensive: convert raw strings to Message objects
+        non_message_count = sum(1 for m in msgs_to_score if not hasattr(m, "role"))
+        if non_message_count > 0:
+            logger.warning(
+                "Converting %d raw strings to Message objects in history (%d total items)",
+                non_message_count,
+                len(msgs_to_score),
+            )
+            converted = []
+            for m in msgs_to_score:
+                if hasattr(m, "role"):
+                    converted.append(m)
+                elif isinstance(m, str):
+                    converted.append(Message(role="assistant", content=m))
+                elif isinstance(m, dict) and "role" in m:
+                    converted.append(Message(**m))
+            msgs_to_score = converted
+
         for i, msg in enumerate(msgs_to_score):
             if msg.role == "system":
                 scored.append(MessageImportance(msg, i, 1000.0, "system"))
@@ -516,21 +546,16 @@ class ConversationController:
         conv_messages = [
             ConversationMessage.from_provider_message(
                 msg,
-                priority=(
-                    MessagePriority.HIGH
-                    if msg.role == "tool"
-                    else MessagePriority.MEDIUM
-                ),
+                priority=(MessagePriority.HIGH if msg.role == "tool" else MessagePriority.MEDIUM),
             )
             for msg in scorable_msgs
         ]
 
         # Build embedding function if semantic scoring is enabled
         embedding_fn = None
-        if (
-            self._embedding_service
-            and self.config.compaction_strategy
-            in (CompactionStrategy.SEMANTIC, CompactionStrategy.HYBRID)
+        if self._embedding_service and self.config.compaction_strategy in (
+            CompactionStrategy.SEMANTIC,
+            CompactionStrategy.HYBRID,
         ):
 
             def _embedding_fn(texts: List[str], query: str) -> List[float]:

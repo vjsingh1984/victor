@@ -74,6 +74,7 @@ class LLMDecisionService:
 
         # Metrics
         self._metrics = DecisionMetrics()
+        self._auto_disable_warned = False
 
     async def decide(
         self,
@@ -222,12 +223,14 @@ class LLMDecisionService:
             self._metrics.total_calls >= 10
             and self._metrics.timeouts / max(self._metrics.total_calls, 1) > 0.6
         ):
-            logger.warning(
-                "Edge model auto-disabled: %.0f%% timeout rate (%d/%d calls)",
-                100 * self._metrics.timeouts / self._metrics.total_calls,
-                self._metrics.timeouts,
-                self._metrics.total_calls,
-            )
+            if not self._auto_disable_warned:
+                logger.warning(
+                    "Edge model auto-disabled: %.0f%% timeout rate (%d/%d calls)",
+                    100 * self._metrics.timeouts / self._metrics.total_calls,
+                    self._metrics.timeouts,
+                    self._metrics.total_calls,
+                )
+                self._auto_disable_warned = True
             self._metrics.total_calls += 1
             return DecisionResult(
                 decision_type=decision_type,

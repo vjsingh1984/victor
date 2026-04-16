@@ -226,8 +226,14 @@ class StreamingChatPipeline:
 
         # Reset progress tracking for adaptive iteration
         self._progress_scores.clear()
+        _prev_iteration_had_content = False
 
         while True:
+            # Yield separator between iterations when content was emitted
+            if _prev_iteration_had_content and stream_ctx.total_iterations > 1:
+                yield StreamChunk(content="\n\n")
+            _prev_iteration_had_content = False
+
             # === PRE-ITERATION CHECKS (via coordinator helper) ===
             cancelled = False
             async for pre_chunk in coord._run_iteration_pre_checks(stream_ctx, user_message):
@@ -400,6 +406,7 @@ class StreamingChatPipeline:
                     return
 
             if full_content:
+                _prev_iteration_had_content = True
                 # Sanitize response to remove malformed patterns from local models
                 sanitized = orch.sanitizer.sanitize(full_content)
                 if sanitized:
@@ -690,14 +697,20 @@ class StreamingChatPipeline:
                         from victor.agent.turn_policy import FulfillmentCriteriaBuilder
 
                         task_analysis = getattr(_perception, "task_analysis", None)
-                        task_type_str = getattr(task_analysis, "task_type", "unknown") if task_analysis else "unknown"
+                        task_type_str = (
+                            getattr(task_analysis, "task_type", "unknown")
+                            if task_analysis
+                            else "unknown"
+                        )
                         try:
                             task_type = TaskType(task_type_str)
                         except (ValueError, KeyError):
                             task_type = TaskType.UNKNOWN
 
                         criteria = FulfillmentCriteriaBuilder.from_tool_results(
-                            tool_exec_result.tool_results if hasattr(tool_exec_result, "tool_results") else []
+                            tool_exec_result.tool_results
+                            if hasattr(tool_exec_result, "tool_results")
+                            else []
                         )
                         fulfillment_result = await self._fulfillment.check_fulfillment(
                             task_type=task_type,

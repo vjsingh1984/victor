@@ -106,6 +106,9 @@ def configure_logging_levels(log_level: str = "INFO", file_logging_enabled: bool
     for logger_name in NOISY_LOGGERS:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
 
+    # HuggingFace auth warnings are noise for local embedding models
+    logging.getLogger("huggingface_hub.utils._http").setLevel(logging.ERROR)
+
 
 @dataclass
 class ConversationStats:

@@ -124,6 +124,9 @@ class ToolCallingAdapterRegistry:
                 "xai": OpenAIToolCallingAdapter,
                 # Together AI uses OpenAI-compatible API format
                 "together": OpenAIToolCallingAdapter,
+                # Z.AI (Zhipu) uses OpenAI-compatible API format
+                "zai": OpenAIToolCallingAdapter,
+                "zhipu": OpenAIToolCallingAdapter,
             }
 
         # Check for exact match

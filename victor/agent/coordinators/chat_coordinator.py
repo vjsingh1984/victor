@@ -872,6 +872,7 @@ class ChatCoordinator:
                         f"Rate limit hit (attempt {attempt + 1}/{max_retries + 1}). "
                         f"Waiting {wait_time:.1f}s before retry..."
                     )
+                    logger.debug(f"Rate limit detail: {str(e)[:300]}")
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
@@ -885,6 +886,7 @@ class ChatCoordinator:
                             f"Rate limit hit (attempt {attempt + 1}/{max_retries + 1}). "
                             f"Waiting {wait_time:.1f}s before retry..."
                         )
+                        logger.debug(f"Rate limit detail: {type(e).__name__}: {str(e)[:200]}")
                         await asyncio.sleep(wait_time)
                     else:
                         logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
