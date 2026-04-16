@@ -113,14 +113,21 @@ class TestParallelToolExecutor:
         ]
         assert executor._can_parallelize(tool_calls) is True
 
-    def test_cannot_parallelize_with_writes(self):
-        """Test that tools cannot parallelize when writes are present."""
+    def test_can_parallelize_with_writes_to_different_files(self):
+        """Test that writes to different files CAN parallelize via dependency graph.
+
+        Per-file write parallelism allows writes targeting distinct files
+        to run concurrently. The dependency graph ensures serialization
+        only for same-file conflicts.
+        """
         executor = ParallelToolExecutor(self.mock_tool_executor)
         tool_calls = [
             {"name": "read_file", "arguments": {}},
             {"name": "write_file", "arguments": {}},
         ]
-        assert executor._can_parallelize(tool_calls) is False
+        # With per-file parallelism, _can_parallelize returns True
+        # (safety is enforced by the dependency graph in execute_parallel)
+        assert executor._can_parallelize(tool_calls) is True
 
     def test_cannot_parallelize_when_disabled(self):
         """Test that parallelization respects enable flag."""

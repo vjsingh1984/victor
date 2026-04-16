@@ -507,16 +507,17 @@ class TestDashboardSyncBridge:
 
 
 class TestInitSyncBridge:
-    def test_generate_enhanced_init_content_uses_shared_sync_bridge(self) -> None:
+    def test_generate_init_content_enhanced_uses_shared_sync_bridge(self) -> None:
         coro = object()
         mock_async = Mock(return_value=coro)
         on_progress = Mock()
 
         with (
-            patch.object(init_cmd, "_generate_enhanced_init_content_async", mock_async),
+            patch.object(init_cmd, "_generate_init_content_async", mock_async),
             patch.object(init_cmd, "run_sync", return_value="content") as mock_run_sync,
         ):
-            result = init_cmd._generate_enhanced_init_content(
+            result = init_cmd._generate_init_content(
+                mode="enhanced",
                 use_llm=True,
                 include_conversations=False,
                 on_progress=on_progress,
@@ -527,24 +528,28 @@ class TestInitSyncBridge:
 
         assert result == "content"
         mock_async.assert_called_once_with(
+            mode="enhanced",
             use_llm=True,
             include_conversations=False,
             on_progress=on_progress,
             force=True,
             include_dirs=["src"],
             exclude_dirs=["tests"],
+            provider=None,
+            model=None,
         )
         mock_run_sync.assert_called_once_with(coro)
 
-    def test_generate_index_init_content_uses_shared_sync_bridge(self) -> None:
+    def test_generate_init_content_index_uses_shared_sync_bridge(self) -> None:
         coro = object()
         mock_async = Mock(return_value=coro)
 
         with (
-            patch.object(init_cmd, "_generate_index_init_content_async", mock_async),
+            patch.object(init_cmd, "_generate_init_content_async", mock_async),
             patch.object(init_cmd, "run_sync", return_value="content") as mock_run_sync,
         ):
-            result = init_cmd._generate_index_init_content(
+            result = init_cmd._generate_init_content(
+                mode="index",
                 force=False,
                 include_dirs=["src"],
                 exclude_dirs=["tests"],
@@ -552,11 +557,34 @@ class TestInitSyncBridge:
 
         assert result == "content"
         mock_async.assert_called_once_with(
+            mode="index",
+            use_llm=False,
+            include_conversations=False,
+            on_progress=None,
             force=False,
             include_dirs=["src"],
             exclude_dirs=["tests"],
+            provider=None,
+            model=None,
         )
         mock_run_sync.assert_called_once_with(coro)
+
+    def test_generate_init_content_quick_bypasses_run_sync(self) -> None:
+        """Quick mode is sync — should not call run_sync."""
+        mock_smart = Mock(return_value="quick content")
+
+        with (
+            patch.object(init_cmd, "load_codebase_analyzer_attr", return_value=mock_smart),
+            patch.object(init_cmd, "run_sync") as mock_run_sync,
+        ):
+            result = init_cmd._generate_init_content(
+                mode="quick",
+                include_dirs=["src"],
+                exclude_dirs=["tests"],
+            )
+
+        assert result == "quick content"
+        mock_run_sync.assert_not_called()
 
 
 class TestServeSyncBridge:

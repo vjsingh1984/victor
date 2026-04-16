@@ -88,6 +88,109 @@ victor keys check
 victor chat --tool-budget 50 "quick fix"   # Limit tool calls
 ```
 
+## Tool Schema Broadcasting & Token Optimization
+
+Controls how tool definitions are sent to the LLM and how tokens are managed. Victor uses a tiered schema system (FULL/COMPACT/STUB) with KV-cache-aware ordering.
+
+### Schema Tiering
+
+Tool schemas are broadcast at three verbosity levels to reduce token cost:
+
+| Level | ~Tokens | Description Chars | Param Desc Chars | Optional Params |
+|-------|---------|-------------------|------------------|-----------------|
+| FULL | 125 | 500 | 100 | Yes |
+| COMPACT | 70 | 150 | 50 | Yes |
+| STUB | 32 | 80 | 25 | No (required only) |
+
+Tools are assigned levels by `TieredToolConfig` tier membership:
+- **Mandatory** tools (read, write, shell) → FULL
+- **Vertical core** tools → COMPACT
+- **Semantic pool** tools → STUB
+
+### Schema Token Budget
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `max_tool_schema_tokens` | `4000` | Max tokens for all tool schemas combined. When exceeded, COMPACT tools demote to STUB, then tail STUBs are dropped. Set `0` to disable. |
+| `schema_promotion_threshold` | `0.8` | Semantic similarity above which STUB tools promote to COMPACT for richer schemas |
+
+With `fallback_max_tools=8` (default), typical usage is ~650 tokens — well under the 4000 budget. The budget is a safety net for large registries (30+ tools).
+
+```yaml
+# Profile: conservative token usage
+tools:
+  max_tool_schema_tokens: 2500
+  schema_promotion_threshold: 0.85
+```
+
+### Cache Optimization
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `cache_optimization_enabled` | `true` | API prompt caching — lock tools for billing discount (90% on Anthropic) |
+| `kv_optimization_enabled` | `true` | KV prefix stability — freeze system prompt, sort tools deterministically |
+| `kv_tool_strategy` | `per_turn` | `per_turn` = fresh selection each turn; `session_stable` = lock after first query |
+| `tiered_schema_enabled` | `true` | Enable FULL/COMPACT/STUB schema levels |
+
+These settings live in `context` (not `tools`):
+
+```yaml
+context:
+  cache_optimization_enabled: true
+  kv_optimization_enabled: true
+  kv_tool_strategy: per_turn
+  tiered_schema_enabled: true
+```
+
+### MCP Tool Filtering
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `max_mcp_tools_per_turn` | `12` | Max MCP tools broadcast per turn when relevance filtering is active |
+
+MCP tools default to STUB schema level. When relevance filtering is active, only MCP tools matching the query are broadcast (keyword overlap on name + description), capped at this limit.
+
+## Tool Selection
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `use_semantic_tool_selection` | `true` | Embedding-based tool selection |
+| `embedding_provider` | `sentence-transformers` | Embedding provider |
+| `embedding_model` | `BAAI/bge-small-en-v1.5` | Embedding model |
+| `tool_selection_cache_enabled` | `true` | Cache selection results across turns |
+| `tool_selection_cache_ttl` | `300` | Selection cache TTL (seconds) |
+
+### Adaptive Selection by Model Size
+
+| Model Size | Threshold | Max Tools |
+|-----------|-----------|-----------|
+| tiny (0.5B-3B) | 0.35 | 5 |
+| small (7B-8B) | 0.25 | 7 |
+| medium (13B-15B) | 0.20 | 10 |
+| large (30B+) | 0.15 | 12 |
+| cloud (Claude/GPT) | 0.18 | 10 |
+
+## Tool Execution Pipeline
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `enable_tool_deduplication` | `true` | Prevent duplicate tool calls within a batch |
+| `tool_deduplication_window_size` | `20` | Number of recent calls to track for dedup |
+| `cross_turn_dedup_enabled` | `true` | Cache results for effectively-idempotent tools across turns |
+| `cross_turn_dedup_ttl` | `300` | Cross-turn dedup cache TTL (seconds) |
+
+Cross-turn dedup covers tools that produce identical results for identical args within a session window: `web_search`, `web_fetch`, `http_request`, `grep_search`, `plan_files`, `git`.
+
+### Parallel Execution
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `enable_parallel_execution` | `true` | Enable parallel tool execution |
+| `max_concurrent_tools` | `5` | Max concurrent tool calls |
+| `parallel_timeout_per_tool` | `60.0` | Timeout per tool in parallel batch |
+
+Writes to different files parallelize automatically. Same-file writes serialize via dependency graph.
+
 ## Skills & Auto-Selection
 
 Skills are composable expertise units that inject focused prompts + tools based on the user's message. Auto-selection uses embedding similarity to match messages to skills.
@@ -146,16 +249,19 @@ Routes different decision types to different model tiers. Fallback always goes D
 
 ### Default Routing
 
-| Decision Type | Default Tier |
-|--------------|-------------|
-| `tool_selection` | edge |
-| `skill_selection` | edge |
-| `intent_classification` | edge |
-| `task_completion` | edge |
-| `error_classification` | edge |
-| `stage_detection` | edge |
-| `task_type_classification` | balanced |
-| `multi_skill_decomposition` | balanced |
+| Decision Type | Default Tier | Purpose |
+|--------------|-------------|---------|
+| `tool_selection` | edge | Select which tools to broadcast |
+| `tool_necessity` | edge | Skip tools entirely for Q&A turns (saves ~2-4K tokens) |
+| `skill_selection` | edge | Match user message to skills |
+| `intent_classification` | edge | Classify model response intent |
+| `task_completion` | edge | Detect when task is done |
+| `error_classification` | edge | Classify error types for recovery |
+| `stage_detection` | edge | Detect conversation stage transitions |
+| `task_type_classification` | balanced | Classify task type with deliverables |
+| `multi_skill_decomposition` | balanced | Decompose complex requests into skills |
+
+**Tool Necessity gate**: Before tool selection runs, a fast heuristic checks if the message is pure Q&A (greeting, explanation request, clarification). If the heuristic is confident (keyword scan), tools are skipped immediately. For ambiguous cases, the edge model is consulted via `TOOL_NECESSITY` decision type. This saves ~2-4K tokens per conversational turn (~30-40% of messages).
 
 Performance tier is never used by default — opt-in via custom `tier_routing` config.
 

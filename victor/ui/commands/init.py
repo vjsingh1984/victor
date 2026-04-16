@@ -3,7 +3,7 @@ import re
 from rich.console import Console
 from rich.prompt import Confirm, Prompt
 from pathlib import Path
-from typing import Awaitable, Callable, List, Mapping, Optional, cast
+from typing import Any, Awaitable, Callable, List, Mapping, Optional, cast
 import yaml
 
 from victor.config.settings import (
@@ -19,82 +19,130 @@ init_app = typer.Typer(name="init", help="Initialize project context and configu
 console = Console()
 
 
-async def _generate_enhanced_init_content_async(
+async def _generate_init_content_async(
     *,
-    use_llm: bool,
-    include_conversations: bool,
-    on_progress,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
+    mode: str,
+    use_llm: bool = False,
+    include_conversations: bool = False,
+    on_progress: Optional[Callable] = None,
+    force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> str:
-    generate_enhanced_init_md = cast(
-        Callable[..., Awaitable[str]],
-        load_codebase_analyzer_attr("generate_enhanced_init_md"),
-    )
+    """Unified async content generator for all init analysis modes.
 
-    return await generate_enhanced_init_md(
-        use_llm=use_llm,
-        include_conversations=include_conversations,
-        on_progress=on_progress,
-        force=force,
-        include_dirs=include_dirs,
-        exclude_dirs=exclude_dirs,
-    )
+    Args:
+        mode: One of "enhanced" (LLM/learn), "index" (symbol store), "quick" (regex).
+        use_llm: Whether to use LLM for deep analysis (enhanced mode).
+        include_conversations: Include conversation history insights (enhanced mode).
+        on_progress: Progress callback.
+        force: Force reindex/regeneration.
+        include_dirs: Directories to include in analysis.
+        exclude_dirs: Directories to exclude from analysis.
+        provider: Override LLM provider (e.g., "anthropic", "openai"). Enhanced mode only.
+        model: Override LLM model (e.g., "claude-sonnet-4-20250514"). Enhanced mode only.
 
+    Returns:
+        Generated init.md content string.
+    """
+    if mode == "enhanced":
+        generate_enhanced_init_md = cast(
+            Callable[..., Awaitable[str]],
+            load_codebase_analyzer_attr("generate_enhanced_init_md"),
+        )
 
-def _generate_enhanced_init_content(
-    *,
-    use_llm: bool,
-    include_conversations: bool,
-    on_progress,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
-) -> str:
-    return run_sync(
-        _generate_enhanced_init_content_async(
+        # Build agent with provider/model override if specified
+        agent = None
+        if provider and use_llm:
+            agent = await _create_init_agent(provider, model)
+
+        return await generate_enhanced_init_md(
             use_llm=use_llm,
             include_conversations=include_conversations,
             on_progress=on_progress,
             force=force,
             include_dirs=include_dirs,
             exclude_dirs=exclude_dirs,
+            agent=agent,
         )
-    )
-
-
-async def _generate_index_init_content_async(
-    *,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
-) -> str:
-    generate_victor_md_from_index = cast(
-        Callable[..., Awaitable[str]],
-        load_codebase_analyzer_attr("generate_victor_md_from_index"),
-    )
-
-    return await generate_victor_md_from_index(
-        force=force,
-        include_dirs=include_dirs,
-        exclude_dirs=exclude_dirs,
-    )
-
-
-def _generate_index_init_content(
-    *,
-    force: bool,
-    include_dirs: Optional[List[str]],
-    exclude_dirs: Optional[List[str]],
-) -> str:
-    return run_sync(
-        _generate_index_init_content_async(
+    elif mode == "index":
+        generate_victor_md_from_index = cast(
+            Callable[..., Awaitable[str]],
+            load_codebase_analyzer_attr("generate_victor_md_from_index"),
+        )
+        return await generate_victor_md_from_index(
             force=force,
             include_dirs=include_dirs,
             exclude_dirs=exclude_dirs,
         )
+    else:
+        # "quick" mode — sync regex-based, no LLM
+        generate_smart_victor_md = cast(
+            Callable[..., str],
+            load_codebase_analyzer_attr("generate_smart_victor_md"),
+        )
+        return generate_smart_victor_md(
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+        )
+
+
+def _generate_init_content(
+    *,
+    mode: str,
+    use_llm: bool = False,
+    include_conversations: bool = False,
+    on_progress: Optional[Callable] = None,
+    force: bool = False,
+    include_dirs: Optional[List[str]] = None,
+    exclude_dirs: Optional[List[str]] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+) -> str:
+    """Sync wrapper for _generate_init_content_async."""
+    if mode == "quick":
+        # Quick mode is sync — no need for run_sync
+        generate_smart_victor_md = cast(
+            Callable[..., str],
+            load_codebase_analyzer_attr("generate_smart_victor_md"),
+        )
+        return generate_smart_victor_md(
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+        )
+    return run_sync(
+        _generate_init_content_async(
+            mode=mode,
+            use_llm=use_llm,
+            include_conversations=include_conversations,
+            on_progress=on_progress,
+            force=force,
+            include_dirs=include_dirs,
+            exclude_dirs=exclude_dirs,
+            provider=provider,
+            model=model,
+        )
     )
+
+
+async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
+    """Create an Agent configured for init analysis with the given provider.
+
+    Args:
+        provider: LLM provider name (e.g., "anthropic", "openai", "ollama")
+        model: Optional model override. If None, uses provider's default.
+
+    Returns:
+        Agent instance ready for codebase analysis.
+    """
+    from victor.framework.agent import Agent
+
+    kwargs: dict = {"provider": provider, "temperature": 0.3}
+    if model:
+        kwargs["model"] = model
+    return await Agent.create(**kwargs)
 
 
 def _ensure_profile_preset(
@@ -218,6 +266,19 @@ def init(
         "--wizard",
         "-w",
         help="Run interactive setup wizard for first-time users",
+    ),
+    provider: Optional[str] = typer.Option(
+        None,
+        "--provider",
+        "-p",
+        help="Override LLM provider for deep analysis (e.g., anthropic, openai, ollama).",
+        case_sensitive=False,
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        "-m",
+        help="Override LLM model for deep analysis (e.g., claude-sonnet-4-20250514).",
     ),
 ) -> None:
     """Initialize project context and configuration."""
@@ -443,11 +504,29 @@ providers:
             )
             exclude_dirs = [d.strip() for d in exclude_str.split(",")]
 
-        # Determine analysis mode and print status
+        # Determine analysis mode
+        if deep or learn:
+            mode = "enhanced"
+        elif index:
+            mode = "index"
+        else:
+            mode = "quick"
+
+        # Print status (include provider override if specified)
+        provider_note = ""
+        if provider and mode == "enhanced" and deep:
+            provider_note = f" via {provider}"
+            if model:
+                provider_note += f"/{model}"
+
         if deep and learn:
-            console.print("[dim]Comprehensive analysis: Index → Learn → LLM (default)...[/]")
+            console.print(
+                f"[dim]Comprehensive analysis: Index → Learn → LLM{provider_note} (default)...[/]"
+            )
         elif deep:
-            console.print("[dim]Analysis: Index → LLM (no conversation insights)...[/]")
+            console.print(
+                f"[dim]Analysis: Index → LLM{provider_note} (no conversation insights)...[/]"
+            )
         elif learn:
             console.print("[dim]Analysis: Index → Learn (no LLM)...[/]")
         elif index:
@@ -460,49 +539,21 @@ providers:
             def on_progress(stage: str, msg: str) -> None:
                 console.print(f"[dim]  {msg}[/]")
 
-            if deep or learn:
-                try:
-                    new_content = _generate_enhanced_init_content(
-                        use_llm=deep,
-                        include_conversations=learn,
-                        on_progress=on_progress,
-                        force=force,
-                        include_dirs=include_dirs or None,
-                        exclude_dirs=exclude_dirs or None,
-                    )
-                except ImportError:
-                    console.print(
-                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-                    )
-                    return
-            elif index:
-                try:
-                    console.print("[dim]  Building symbol index...[/]")
-                    new_content = _generate_index_init_content(
-                        force=force,
-                        include_dirs=include_dirs or None,
-                        exclude_dirs=exclude_dirs or None,
-                    )
-                except ImportError:
-                    console.print(
-                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-                    )
-                    return
-            else:
-                try:
-                    generate_smart_victor_md = cast(
-                        Callable[..., str],
-                        load_codebase_analyzer_attr("generate_smart_victor_md"),
-                    )
-                except ImportError:
-                    console.print(
-                        "[red]Error: codebase_analyzer requires victor-coding vertical.[/]"
-                    )
-                    return
-
-                new_content = generate_smart_victor_md(
-                    include_dirs=include_dirs or None, exclude_dirs=exclude_dirs or None
+            try:
+                new_content = _generate_init_content(
+                    mode=mode,
+                    use_llm=deep,
+                    include_conversations=learn,
+                    on_progress=on_progress,
+                    force=force,
+                    include_dirs=include_dirs or None,
+                    exclude_dirs=exclude_dirs or None,
+                    provider=provider,
+                    model=model,
                 )
+            except ImportError:
+                console.print("[red]Error: codebase_analyzer requires victor-coding vertical.[/]")
+                return
 
             if update and existing_content:
                 from victor.ui.slash.commands.codebase import InitCommand
