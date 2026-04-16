@@ -149,13 +149,23 @@ class MCPToolProjector:
 
     Iterates all connected MCP servers, creates an MCPAdapterTool for each
     tool, and handles name collisions by prefixing with server name.
+
+    Supports optional relevance filtering: when a user_message is provided,
+    only MCP tools whose name or description match the query are included.
+    This prevents broadcasting all 48+ MCP tools every turn (~1,500 token
+    savings for MCP-heavy setups).
     """
+
+    # Default relevance threshold for keyword-based MCP filtering
+    DEFAULT_RELEVANCE_THRESHOLD: float = 0.3
 
     @staticmethod
     def project(
         registry: "MCPRegistry",
         prefix: str = "",
         conflict_strategy: str = "prefix_server",
+        user_message: Optional[str] = None,
+        max_mcp_tools: int = 12,
     ) -> List[MCPAdapterTool]:
         """Create adapter tools for all tools in connected MCP servers.
 
@@ -165,6 +175,12 @@ class MCPToolProjector:
             conflict_strategy: How to handle name collisions:
                 "prefix_server" — prepend server name (default)
                 "skip" — skip duplicates, keep first
+            user_message: Optional query for relevance filtering.
+                When provided, only MCP tools relevant to the query
+                are returned (keyword matching on name + description).
+                When None, all MCP tools are returned (backward compat).
+            max_mcp_tools: Maximum MCP tools to include when filtering
+                by relevance. Ignored when user_message is None.
 
         Returns:
             List of MCPAdapterTool instances ready for registration
@@ -189,7 +205,9 @@ class MCPToolProjector:
                     if conflict_strategy == "skip":
                         logger.debug(
                             "Skipping duplicate MCP tool %s from %s (already from %s)",
-                            tool_name, server_name, seen_names[tool_name],
+                            tool_name,
+                            server_name,
+                            seen_names[tool_name],
                         )
                         continue
                     # prefix_server: create with server-prefixed name
@@ -202,18 +220,81 @@ class MCPToolProjector:
                     tool_name = adapter.name
                     logger.info(
                         "MCP tool name collision: %s → %s (from %s)",
-                        mcp_tool.name, tool_name, server_name,
+                        mcp_tool.name,
+                        tool_name,
+                        server_name,
                     )
 
                 seen_names[tool_name] = server_name
                 tools.append(adapter)
 
+        total_projected = len(tools)
+
+        # --- Relevance filtering: keyword match on name + description ---
+        if user_message is not None and tools:
+            tools = MCPToolProjector._filter_by_relevance(
+                tools,
+                user_message,
+                max_mcp_tools,
+            )
+
         logger.info(
-            "Projected %d MCP tools from %d servers",
+            "Projected %d MCP tools from %d servers%s",
             len(tools),
             len({t.mcp_server_name for t in tools}),
+            f" (filtered from {total_projected})" if len(tools) < total_projected else "",
         )
         return tools
+
+    @staticmethod
+    def _filter_by_relevance(
+        tools: List[MCPAdapterTool],
+        user_message: str,
+        max_tools: int,
+    ) -> List[MCPAdapterTool]:
+        """Filter MCP tools by keyword relevance to the user message.
+
+        Scores each tool by counting keyword overlaps between the query
+        and the tool's name + description. Tools with zero relevance
+        are excluded. Results are capped at max_tools.
+
+        This is intentionally lightweight (no embeddings) since MCP tools
+        are already STUB-level and the filtering runs per-turn.
+        """
+        msg_words = set(user_message.lower().split())
+        # Remove very short/common words
+        msg_words = {w for w in msg_words if len(w) > 2}
+
+        scored: List[tuple] = []  # (score, tool)
+        for tool in tools:
+            # Build searchable text from tool name and description
+            tool_text = f"{tool.name} {tool.description}".lower()
+            tool_words = set(tool_text.split())
+            tool_words = {w for w in tool_words if len(w) > 2}
+
+            # Score: Jaccard-like overlap normalized by query size
+            overlap = len(msg_words & tool_words)
+            if overlap > 0:
+                score = overlap / max(len(msg_words), 1)
+                scored.append((score, tool))
+
+        if not scored:
+            # No matches — return top tools by name similarity as fallback
+            # (at least return a few MCP tools so the model isn't blind)
+            return tools[: min(3, max_tools)]
+
+        # Sort by score descending, cap at max_tools
+        scored.sort(key=lambda x: x[0], reverse=True)
+        filtered = [tool for _, tool in scored[:max_tools]]
+
+        logger.debug(
+            "MCP relevance filter: %d/%d tools matched query " "(top: %s %.2f)",
+            len(filtered),
+            len(tools),
+            filtered[0].name if filtered else "none",
+            scored[0][0] if scored else 0.0,
+        )
+        return filtered
 
 
 __all__ = [

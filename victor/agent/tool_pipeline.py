@@ -131,6 +131,11 @@ class ToolPipelineConfig:
     # Enables intelligent caching based on semantic similarity, reducing redundant tool calls
     enable_semantic_caching: bool = True
 
+    # Cross-turn dedup: cache results for "effectively idempotent" tools
+    # (web_search, grep_search, http_request, git) across turns within a session.
+    enable_cross_turn_dedup: bool = True
+    cross_turn_dedup_ttl: float = 300.0  # seconds
+
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
 # Include both lowercase and capitalized variants for tool name normalization
@@ -147,6 +152,22 @@ IDEMPOTENT_TOOLS = IdempotentTools.IDEMPOTENT_TOOLS | frozenset(
         "code_search",  # Semantic code search alias
         "semantic_code_search",
         "refs",  # Reference lookup
+    }
+)
+
+# Cross-turn dedup: tools that are "effectively idempotent" within a session
+# window even though they may be classified as non-idempotent. These produce
+# the same result for identical args within a short time window (e.g., 5 min),
+# making re-execution wasteful. Separate from IDEMPOTENT_TOOLS to allow
+# a shorter TTL and explicit opt-in.
+CROSS_TURN_DEDUP_TOOLS = frozenset(
+    {
+        "web_search",
+        "web_fetch",
+        "http_request",
+        "grep_search",
+        "plan_files",
+        "git",  # git status/log/diff are read-only
     }
 )
 
@@ -561,6 +582,16 @@ class ToolPipeline:
 
         # Batch-level deduplication tracking
         self._batch_dedup_count = 0  # Total duplicates skipped
+
+        # Cross-turn dedup cache for "effectively idempotent" tools
+        # Uses the same LRU structure but covers tools outside IDEMPOTENT_TOOLS
+        # (web_search, http_request, grep_search, etc.) with configurable TTL.
+        self._cross_turn_enabled = self.config.enable_cross_turn_dedup
+        self._cross_turn_cache: LRUToolCache = LRUToolCache(
+            max_size=30,
+            ttl_seconds=self.config.cross_turn_dedup_ttl,
+        )
+        self._cross_turn_hits = 0
 
         # File read timestamp tracking for deduplication (prompting loop fix)
         # Prevents re-reading identical files within TTL window
@@ -1018,6 +1049,8 @@ class ToolPipeline:
                 else 0.0
             ),
             "batch_dedup_count": self._batch_dedup_count,
+            "cross_turn_hits": self._cross_turn_hits,
+            "cross_turn_cache_size": len(self._cross_turn_cache),
         }
         # Include semantic cache stats if available
         if self.semantic_cache is not None:
@@ -1540,6 +1573,31 @@ class ToolPipeline:
                     logger.warning(f"on_tool_complete callback failed: {e}")
             return cached_result
 
+        # Cross-turn dedup: cache "effectively idempotent" tools (web_search, etc.)
+        # These produce identical results for identical args within a session window.
+        if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+            signature = self._get_call_signature(tool_name, normalized_args)
+            cross_cached = self._cross_turn_cache.get(signature)
+            if cross_cached is not None:
+                self._cross_turn_hits += 1
+                logger.info(
+                    "[Pipeline] Cross-turn dedup hit for %s (hits=%d)",
+                    tool_name,
+                    self._cross_turn_hits,
+                )
+                self._executed_tools.append(tool_name)
+                if self.on_tool_start:
+                    try:
+                        self.on_tool_start(tool_name, normalized_args)
+                    except Exception as e:
+                        logger.warning(f"on_tool_start callback failed: {e}")
+                if self.on_tool_complete:
+                    try:
+                        self.on_tool_complete(cross_cached)
+                    except Exception as e:
+                        logger.warning(f"on_tool_complete callback failed: {e}")
+                return cross_cached
+
         # Check semantic cache (FAISS-based with mtime invalidation)
         # This catches similar-but-not-identical queries that would return same results
         if self.config.enable_semantic_caching and self.semantic_cache is not None:
@@ -1879,6 +1937,21 @@ class ToolPipeline:
         # Cache successful results for idempotent tools
         if call_result.success:
             self.cache_result(tool_name, normalized_args, call_result)
+
+            # Cross-turn dedup: cache results for effectively-idempotent tools
+            if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+                signature = self._get_call_signature(tool_name, normalized_args)
+                dedup_result = ToolCallResult(
+                    tool_name=call_result.tool_name,
+                    arguments=call_result.arguments,
+                    success=call_result.success,
+                    result=call_result.result,
+                    error=call_result.error,
+                    execution_time_ms=0.0,
+                    cached=True,
+                    normalization_applied=call_result.normalization_applied,
+                )
+                self._cross_turn_cache.set(signature, dedup_result)
 
             # Store in semantic cache (FAISS-based with mtime tracking)
             if self.config.enable_semantic_caching and self.semantic_cache is not None:

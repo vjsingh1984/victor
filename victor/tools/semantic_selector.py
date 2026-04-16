@@ -1424,11 +1424,24 @@ class SemanticToolSelector:
             excluded_count=0,
         )
 
+        # Store last selection scores for schema promotion (STUB→COMPACT)
+        self._last_selection_scores: Dict[str, float] = {
+            tool.name: score for tool, score in selected_tools
+        }
+
         # Convert to ToolDefinition
         return [
             ToolDefinition(name=tool.name, description=tool.description, parameters=tool.parameters)
             for tool, _ in selected_tools
         ]
+
+    def get_last_selection_scores(self) -> Dict[str, float]:
+        """Return similarity scores from the most recent selection.
+
+        Used by ToolSelector to promote high-confidence STUB tools to
+        COMPACT schema level for better LLM call accuracy.
+        """
+        return getattr(self, "_last_selection_scores", {})
 
     async def select_relevant_tools(
         self,

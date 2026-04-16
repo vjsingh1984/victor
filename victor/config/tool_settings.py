@@ -47,3 +47,18 @@ class ToolSettings(BaseModel):
     tool_selection_cache_enabled: bool = True
     tool_selection_cache_ttl: int = 300
     tool_validation_mode: str = "lenient"
+    # Token budget for tool schemas broadcast to LLM.
+    # When total estimated tokens exceed this budget, lowest-ranked tools
+    # are demoted (COMPACT→STUB) or dropped (tail STUBs removed).
+    # Default 4000 is a safe ceiling: with fallback_max_tools=8, the tiered
+    # selection typically uses ~650 tokens, so this only triggers if someone
+    # raises fallback_max_tools significantly. Set 0 to disable enforcement.
+    max_tool_schema_tokens: int = 4000
+    # Promote high-confidence semantic matches from STUB→COMPACT.
+    # Tools with semantic similarity >= this threshold get richer schemas.
+    schema_promotion_threshold: float = 0.8
+    # Maximum MCP tools to broadcast per turn (when relevance filtering is active)
+    max_mcp_tools_per_turn: int = 12
+    # Enable cross-turn tool result deduplication (session-scoped cache)
+    cross_turn_dedup_enabled: bool = True
+    cross_turn_dedup_ttl: int = 300  # seconds

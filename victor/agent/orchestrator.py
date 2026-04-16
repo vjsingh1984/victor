@@ -3276,11 +3276,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self.tool_budget = self.task_coordinator.tool_budget
 
     async def _select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
-        """Select and prioritize tools for the current turn."""
+        """Select and prioritize tools for the current turn.
+
+        Applies TOOL_NECESSITY check first: if the edge model (or heuristic)
+        determines the request is purely conversational (Q&A, greeting,
+        clarification), tool selection and broadcasting are skipped entirely.
+        This saves ~2-4K tokens per conversational turn.
+        """
         provider_supports_tools = self.provider.supports_tools()
         tooling_allowed = provider_supports_tools and self._model_supports_tool_calls()
 
         if not tooling_allowed:
+            return None
+
+        # --- TOOL_NECESSITY gate: skip tools for pure Q&A turns ---
+        if self._should_skip_tools_for_turn(context_msg):
             return None
 
         planned_tools = None
@@ -3310,6 +3320,178 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         tools = self._tool_planner.filter_tools_by_intent(tools, current_intent)
         tools = self._apply_kv_tool_strategy(tools)
         return self._sort_tools_for_kv_stability(tools)
+
+    # ------------------------------------------------------------------
+    # Tool Necessity Gate (HDPO-inspired Q&A bypass)
+    # ------------------------------------------------------------------
+
+    # Keywords that strongly suggest tool usage is required
+    _TOOL_SIGNAL_KEYWORDS = frozenset(
+        {
+            "file",
+            "code",
+            "search",
+            "edit",
+            "write",
+            "read",
+            "create",
+            "delete",
+            "run",
+            "test",
+            "debug",
+            "fix",
+            "build",
+            "deploy",
+            "docker",
+            "git",
+            "commit",
+            "branch",
+            "install",
+            "refactor",
+            "implement",
+            "function",
+            "class",
+            "import",
+            "variable",
+            "error",
+            "bug",
+            "compile",
+            "execute",
+            "database",
+            "query",
+            "api",
+            "endpoint",
+            "config",
+            "log",
+            "trace",
+            "mkdir",
+            "move",
+            "rename",
+            "grep",
+            "find",
+            "ls",
+            "bash",
+            "shell",
+            "pip",
+            "npm",
+            "make",
+            "curl",
+            "fetch",
+            "download",
+            "upload",
+        }
+    )
+
+    # Patterns that indicate pure Q&A (no tools needed)
+    _QA_SIGNAL_PATTERNS = (
+        "what is",
+        "what are",
+        "what does",
+        "what do",
+        "how does",
+        "how do",
+        "how is",
+        "how are",
+        "why does",
+        "why do",
+        "why is",
+        "why are",
+        "can you explain",
+        "explain",
+        "describe",
+        "tell me about",
+        "what's the difference",
+        "thanks",
+        "thank you",
+        "hello",
+        "hi ",
+        "good morning",
+        "good evening",
+    )
+
+    def _should_skip_tools_for_turn(self, context_msg: str) -> bool:
+        """Determine if tools are unnecessary for this turn (HDPO-inspired).
+
+        Uses a fast heuristic first (keyword scan), then optionally consults
+        the edge model via DecisionService if confidence is ambiguous.
+        Returns True to skip tool selection entirely for pure Q&A turns.
+        """
+        msg_lower = context_msg.lower().strip()
+
+        # Very short messages are almost always Q&A or greetings
+        if len(msg_lower) < 15:
+            # Unless they look like commands: "fix it", "run tests", etc.
+            if any(kw in msg_lower for kw in ("fix", "run", "edit", "create", "delete")):
+                return False
+            return True
+
+        # Heuristic: count tool-signal keywords vs Q&A patterns
+        words = set(msg_lower.split())
+        tool_signals = len(words & self._TOOL_SIGNAL_KEYWORDS)
+        qa_match = any(msg_lower.startswith(pat) for pat in self._QA_SIGNAL_PATTERNS)
+
+        # High-confidence heuristic paths
+        if tool_signals >= 2:
+            return False  # Clearly needs tools
+        if qa_match and tool_signals == 0:
+            # Consult edge model for borderline Q&A (might still need tools)
+            return self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.85)
+
+        # Ambiguous: 0-1 tool signals, no Q&A pattern — default to providing tools
+        if tool_signals == 0 and qa_match:
+            return self._check_tool_necessity_via_edge(context_msg, heuristic_conf=0.6)
+
+        return False  # Default: provide tools
+
+    def _check_tool_necessity_via_edge(self, context_msg: str, heuristic_conf: float) -> bool:
+        """Consult edge model for tool necessity decision.
+
+        Falls back to heuristic if edge model is unavailable or times out.
+        """
+        try:
+            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+            if not is_feature_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
+                return heuristic_conf >= 0.7  # Trust heuristic if no edge model
+
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+            from victor.agent.decisions.schemas import DecisionType
+
+            container = getattr(self, "_container", None)
+            if container is None:
+                return heuristic_conf >= 0.7
+
+            service = container.get(LLMDecisionServiceProtocol)
+            if service is None:
+                return heuristic_conf >= 0.7
+
+            decision = service.decide_sync(
+                DecisionType.TOOL_NECESSITY,
+                context={"message_excerpt": context_msg[:300]},
+                heuristic_result={"requires_tools": heuristic_conf < 0.7},
+                heuristic_confidence=heuristic_conf,
+            )
+
+            if decision.source == "heuristic" or decision.result is None:
+                return heuristic_conf >= 0.7
+
+            # Edge model returned a ToolNecessityDecision
+            requires = decision.result.get("requires_tools", True)
+            conf = decision.result.get("confidence", 0.5)
+            if not requires and conf >= 0.6:
+                logger.info(
+                    "TOOL_NECESSITY: skipping tools for Q&A turn " "(confidence=%.2f, source=%s)",
+                    conf,
+                    decision.source,
+                )
+                return True
+            return False
+
+        except Exception:
+            logger.debug("Tool necessity check failed, defaulting to provide tools")
+            return False
 
     def _sort_tools_for_kv_stability(self, tools):
         """Sort tools by schema level then name for cache-optimal ordering.
