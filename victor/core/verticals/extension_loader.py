@@ -942,448 +942,110 @@ class VerticalExtensionLoader(ABC):
 
     @classmethod
     def get_mode_config_provider(cls) -> Optional[Any]:
-        """Get mode configuration provider for this vertical.
+        """Get mode configuration provider for this vertical."""
+        from victor.core.verticals.extension_handlers.mode_config import ModeConfigHandler
 
-        Returns:
-            Mode config provider (ModeConfigProviderProtocol) or None
-        """
-        provider = cls._load_named_entry_point_extension(
-            "mode_config_provider",
-            "victor.mode_configs",
-        )
-        if provider is not None:
-            return provider
-
-        # Use VerticalMetadata for type-safe name extraction (replaces .replace() pattern)
-        metadata = VerticalMetadata.from_class(cls)
-        vertical_prefix = metadata.class_prefix
-        return cls._resolve_class_or_factory_extension(
-            "mode_config_provider",
-            "mode_config",
-            class_name=f"{vertical_prefix}ModeConfigProvider",
-        )
+        return ModeConfigHandler.load(cls)
 
     @classmethod
     def get_mode_config(cls) -> Dict[str, Any]:
-        """Get mode configurations for this vertical.
+        """Get default mode configurations (fast, thorough, explore)."""
+        from victor.core.verticals.extension_handlers.mode_config import ModeConfigHandler
 
-        Returns operational modes like 'fast', 'thorough', 'explore' with
-        their configurations (tool_budget, max_iterations, temperature).
-
-        Default implementation provides standard modes. Override in subclasses
-        for vertical-specific mode configurations.
-
-        Returns:
-            Dictionary mapping mode names to ModeConfig-like dicts.
-        """
-        return {
-            "fast": {
-                "name": "fast",
-                "tool_budget": 10,
-                "max_iterations": 20,
-                "temperature": 0.7,
-                "description": "Quick responses with limited tool usage",
-            },
-            "thorough": {
-                "name": "thorough",
-                "tool_budget": 50,
-                "max_iterations": 50,
-                "temperature": 0.7,
-                "description": "Comprehensive analysis with extensive tool usage",
-            },
-            "explore": {
-                "name": "explore",
-                "tool_budget": 30,
-                "max_iterations": 30,
-                "temperature": 0.9,
-                "description": "Exploratory mode with higher creativity",
-            },
-        }
+        return ModeConfigHandler.load_defaults(cls)
 
     @classmethod
     def get_task_type_hints(cls) -> Dict[str, Any]:
-        """Get task-type-specific prompt hints.
+        """Get task-type-specific prompt hints."""
+        from victor.core.verticals.extension_handlers.mode_config import ModeConfigHandler
 
-        Returns hints for common task types (edit, search, explain, etc.)
-        with tool priorities and budget recommendations.
-
-        Default implementation provides standard hints. Override in subclasses
-        for vertical-specific task type hints.
-
-        Returns:
-            Dictionary mapping task types to TaskTypeHint-like dicts.
-        """
-        return {
-            "edit": {
-                "task_type": "edit",
-                "hint": "[EDIT MODE] Read target files first, then make focused modifications.",
-                "tool_budget": 15,
-                "priority_tools": ["read", "edit", "grep"],
-            },
-            "search": {
-                "task_type": "search",
-                "hint": "[SEARCH MODE] Use semantic search and grep for efficient discovery.",
-                "tool_budget": 10,
-                "priority_tools": ["grep", "code_search", "ls"],
-            },
-            "explain": {
-                "task_type": "explain",
-                "hint": "[EXPLAIN MODE] Read relevant code and provide clear explanations.",
-                "tool_budget": 8,
-                "priority_tools": ["read", "grep", "overview"],
-            },
-            "debug": {
-                "task_type": "debug",
-                "hint": "[DEBUG MODE] Investigate systematically, check logs and error messages.",
-                "tool_budget": 20,
-                "priority_tools": ["read", "grep", "shell", "run_tests"],
-            },
-            "implement": {
-                "task_type": "implement",
-                "hint": "[IMPLEMENT MODE] Plan first, implement incrementally, verify each step.",
-                "tool_budget": 30,
-                "priority_tools": ["read", "write", "edit", "shell"],
-            },
-        }
+        return ModeConfigHandler.load_task_type_hints(cls)
 
     @classmethod
     def get_tool_dependency_provider(cls) -> Optional[Any]:
-        """Get tool dependency provider for this vertical.
+        """Get tool dependency provider for this vertical."""
+        from victor.core.verticals.extension_handlers.tool_deps import ToolDepsHandler
 
-        Default implementation uses the framework's create_vertical_tool_dependency_provider()
-        factory function with the vertical's name. Override only if custom behavior needed.
-
-        This eliminates ~25 LOC of duplicated wrapper code across verticals.
-
-        Returns:
-            Tool dependency provider (ToolDependencyProviderProtocol) or None
-        """
-        try:
-            from victor.framework.entry_point_loader import (
-                load_tool_dependency_provider_from_entry_points,
-            )
-
-            return cls._load_cached_optional_extension(
-                "tool_dependency_provider",
-                lambda: load_tool_dependency_provider_from_entry_points(cls.name),
-            )
-        except ImportError:
-            try:
-                from victor.core.tool_dependency_loader import (
-                    create_vertical_tool_dependency_provider,
-                )
-
-                return cls._load_cached_optional_extension(
-                    "tool_dependency_provider",
-                    lambda: create_vertical_tool_dependency_provider(cls.name),
-                )
-            except (ImportError, ValueError):
-                # If factory not available or vertical not recognized, return None
-                return None
+        return ToolDepsHandler.load(cls)
 
     @classmethod
     def get_tool_graph(cls) -> Optional[Any]:
-        """Get tool execution graph for this vertical.
+        """Get tool execution graph for this vertical."""
+        from victor.core.verticals.extension_handlers.tool_deps import ToolDepsHandler
 
-        Override to provide a custom ToolExecutionGraph that defines
-        tool dependencies, transitions, and execution sequences.
-        The graph is registered with the global ToolGraphRegistry.
-
-        Returns:
-            ToolExecutionGraph instance or None (no graph registered)
-        """
-        return None
+        return ToolDepsHandler.load_tool_graph(cls)
 
     @classmethod
     def get_tiered_tool_config(cls) -> Optional["TieredToolConfig"]:
-        """Get tiered tool configuration for this vertical.
+        """Get tiered tool configuration for this vertical."""
+        from victor.core.verticals.extension_handlers.tool_deps import ToolDepsHandler
 
-        This is a placeholder for compatibility. The actual implementation
-        is in VerticalMetadataProvider but duplicated here for standalone use.
-
-        Returns:
-            TieredToolConfig or None if vertical doesn't use tiered config.
-        """
-        return None
+        return ToolDepsHandler.load_tiered_tool_config(cls)
 
     # get_tiered_tools() removed (E5 M3) — use get_tiered_tool_config() instead
 
     @classmethod
     def get_rl_config_provider(cls) -> Optional[Any]:
-        """Get RL configuration provider for this vertical.
+        """Get RL configuration provider for this vertical."""
+        from victor.core.verticals.extension_handlers.rl import RLConfigHandler
 
-        Returns:
-            RL config provider (RLConfigProviderProtocol) or None
-        """
-        try:
-            from victor.framework.entry_point_loader import (
-                load_rl_config_provider_from_entry_points,
-            )
-        except ImportError:
-            pass
-        else:
-            provider = cls._load_cached_optional_extension(
-                "rl_config_provider",
-                lambda: load_rl_config_provider_from_entry_points(cls.name),
-            )
-            if provider is not None:
-                return provider
-
-        # Use VerticalMetadata for type-safe name extraction
-        metadata = VerticalMetadata.from_class(cls)
-        vertical_prefix = metadata.class_prefix
-        return cls._resolve_class_or_factory_extension(
-            "rl_config_provider",
-            "rl",
-            class_name=f"{vertical_prefix}RLConfig",
-        )
+        return RLConfigHandler.load(cls)
 
     @classmethod
     def get_rl_hooks(cls) -> Optional[Any]:
-        """Get RL hooks for outcome recording.
+        """Get RL hooks for outcome recording."""
+        from victor.core.verticals.extension_handlers.rl import RLHooksHandler
 
-        Returns:
-            RLHooks instance or None
-        """
-        # Use VerticalMetadata for type-safe name extraction
-        metadata = VerticalMetadata.from_class(cls)
-        vertical_prefix = metadata.class_prefix
-        return cls._resolve_class_or_factory_extension(
-            "rl_hooks",
-            "rl",
-            class_name=f"{vertical_prefix}RLHooks",
-        )
+        return RLHooksHandler.load(cls)
 
     @classmethod
     def get_team_spec_provider(cls) -> Optional[Any]:
-        """Get team specification provider for this vertical.
+        """Get team specification provider for this vertical."""
+        from victor.core.verticals.extension_handlers.team import TeamHandler
 
-        Default implementation tries direct import pattern first, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~30 LOC of duplicated wrapper code across verticals.
-
-        Returns:
-            Team spec provider (TeamSpecProviderProtocol) or None
-        """
-        provider = cls._load_named_entry_point_extension(
-            "team_spec_provider",
-            "victor.team_spec_providers",
-        )
-        if provider is not None:
-            return provider
-
-        # Use VerticalMetadata for type-safe name extraction
-        metadata = VerticalMetadata.from_class(cls)
-        vertical_prefix = metadata.class_prefix
-        class_name = f"{vertical_prefix}TeamSpecProvider"
-        candidate_paths = [
-            path
-            for path in cls._extension_module_candidates("teams")
-            if cls._extension_module_available(path)
-        ]
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = __import__(module_path, fromlist=[class_name])
-                provider_cls = getattr(module, class_name, None)
-                if provider_cls is not None:
-                    return provider_cls()
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "team_spec_provider",
-                    module_path,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        try:
-            defn = cls.get_definition() if hasattr(cls, "get_definition") else None
-            if defn and hasattr(defn, "team_metadata") and defn.team_metadata.teams:
-                provider = _build_team_spec_provider_from_definition(defn)
-                if provider is not None:
-                    return provider
-        except Exception as exc:
-            if last_error is None:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return TeamHandler.load(cls)
 
     @classmethod
     def get_team_specs(cls) -> Dict[str, Any]:
-        """Get team specifications for this vertical.
+        """Get team specifications for this vertical."""
+        from victor.core.verticals.extension_handlers.team import TeamHandler
 
-        Returns:
-            Dict mapping team names to TeamSpec instances
-        """
-
-        provider = cls.get_team_spec_provider()
-        if provider is None or not hasattr(provider, "get_team_specs"):
-            return {}
-        return provider.get_team_specs()
+        return TeamHandler.load_team_specs(cls)
 
     @classmethod
     def get_capability_provider(cls) -> Optional[Any]:
-        """Get capability provider for this vertical.
+        """Get capability provider for this vertical."""
+        from victor.core.verticals.extension_handlers.service import CapabilityHandler
 
-        Returns:
-            Capability provider (BaseCapabilityProvider) or None
-        """
-        provider = cls._load_named_entry_point_extension(
-            "capability_provider",
-            "victor.capability_providers",
-        )
-        if provider is not None:
-            return provider
-
-        # Use VerticalMetadata for type-safe name extraction
-        metadata = VerticalMetadata.from_class(cls)
-        vertical_prefix = metadata.class_prefix
-        return cls._resolve_class_or_factory_extension(
-            "capability_provider",
-            "capabilities",
-            class_name=f"{vertical_prefix}CapabilityProvider",
-        )
+        return CapabilityHandler.load(cls)
 
     @classmethod
     def get_service_provider(cls) -> Optional[Any]:
-        """Get service provider for this vertical.
+        """Get service provider for this vertical."""
+        from victor.core.verticals.extension_handlers.service import ServiceHandler
 
-        Returns:
-            Service provider (ServiceProviderProtocol) or factory-created provider
-        """
-        provider = cls._load_named_entry_point_extension(
-            "service_provider",
-            "victor.service_providers",
-        )
-        if provider is not None:
-            return provider
-
-        # Use VerticalMetadata for type-safe name extraction
-        metadata = VerticalMetadata.from_class(cls)
-        vertical_prefix = metadata.class_prefix
-        class_name = f"{vertical_prefix}ServiceProvider"
-        candidate_paths = cls._find_available_candidates("service_provider")
-        last_error: Optional[Exception] = None
-
-        for module_path in candidate_paths:
-            try:
-                module = importlib.import_module(module_path)
-            except ImportError as exc:
-                last_error = exc
-                continue
-
-            provider_cls = getattr(module, class_name, None)
-            if provider_cls is not None:
-                return cls._get_cached_extension(
-                    "service_provider",
-                    lambda provider_cls=provider_cls: provider_cls(),
-                )
-
-            factory = getattr(module, "get_service_provider", None)
-            if callable(factory):
-                return cls._get_cached_extension("service_provider", factory)
-
-        try:
-            from victor.core.verticals.base_service_provider import (
-                VerticalServiceProviderFactory,
-            )
-
-            return VerticalServiceProviderFactory.create(cls)
-        except ImportError:
-            if last_error is not None:
-                raise last_error
-            return None
+        return ServiceHandler.load(cls)
 
     @classmethod
     def get_composed_chains(cls) -> Dict[str, Any]:
-        """Get composed tool chains for this vertical from runtime modules."""
-        candidate_paths = cls._find_available_candidates("composed_chains")
-        if not candidate_paths:
-            return {}
+        """Get composed tool chains for this vertical."""
+        from victor.core.verticals.extension_handlers.chains import ChainsHandler
 
-        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_CHAINS"
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = importlib.import_module(module_path)
-            except ImportError as exc:
-                last_error = exc
-                continue
-
-            factory = getattr(module, "get_composed_chains", None)
-            if callable(factory):
-                return cls._get_cached_extension(
-                    "composed_chains",
-                    lambda factory=factory: dict(factory() or {}),
-                )
-
-            chains = getattr(module, constant_name, None)
-            if isinstance(chains, dict):
-                return cls._get_cached_extension(
-                    "composed_chains",
-                    lambda chains=chains: dict(chains),
-                )
-
-        if last_error:
-            raise last_error
-        return {}
+        return ChainsHandler.load(cls)
 
     @classmethod
     def get_personas(cls) -> Dict[str, Any]:
-        """Get vertical personas from runtime team modules when available."""
-        candidate_paths = cls._find_available_candidates("teams")
-        if not candidate_paths:
-            return {}
+        """Get vertical personas from runtime team modules."""
+        from victor.core.verticals.extension_handlers.personas import PersonasHandler
 
-        constant_name = f"{getattr(cls, 'name', cls.__name__).upper().replace('-', '_')}_PERSONAS"
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = importlib.import_module(module_path)
-            except ImportError as exc:
-                last_error = exc
-                continue
-
-            factory = getattr(module, "get_personas", None)
-            if callable(factory):
-                return cls._get_cached_extension(
-                    "personas",
-                    lambda factory=factory: dict(factory() or {}),
-                )
-
-            personas = getattr(module, constant_name, None)
-            if isinstance(personas, dict):
-                return cls._get_cached_extension(
-                    "personas",
-                    lambda personas=personas: dict(personas),
-                )
-
-        if last_error:
-            raise last_error
-        return {}
+        return PersonasHandler.load(cls)
 
     @classmethod
     def get_enrichment_strategy(cls) -> Optional[Any]:
-        """Get vertical-specific enrichment strategy.
+        """Get vertical-specific enrichment strategy."""
+        from victor.core.verticals.extension_handlers.enrichment import EnrichmentHandler
 
-        Override to provide vertical-specific prompt enrichment strategies
-        for DSPy-like auto prompt optimization. Enrichments can include:
-        - Knowledge graph symbols and related code snippets (coding)
-        - Web search results and source citations (research)
-        - Infrastructure context and command patterns (devops)
-        - Schema context and query patterns (data analysis)
-
-        Returns:
-            EnrichmentStrategyProtocol implementation or None
-        """
-        return None
+        return EnrichmentHandler.load(cls)
 
     @classmethod
     def get_extensions(
@@ -1781,59 +1443,10 @@ class VerticalExtensionLoader(ABC):
 
     @classmethod
     def get_workflow_provider(cls) -> Optional[Any]:
-        """Get workflow provider for this vertical.
+        """Get workflow provider for this vertical."""
+        from victor.core.verticals.extension_handlers.workflow import WorkflowHandler
 
-        Default implementation tries direct import pattern, then falls back
-        to extension factory. Override only if custom behavior needed.
-
-        This eliminates ~6-8 LOC of duplicated wrapper code across verticals.
-
-        Returns:
-            Workflow provider instance (WorkflowProviderProtocol) or None
-        """
-        provider = cls._load_named_entry_point_extension(
-            "workflow_provider",
-            "victor.workflow_providers",
-        )
-        if provider is not None:
-            return provider
-
-        # Use VerticalMetadata for type-safe name extraction
-        metadata = VerticalMetadata.from_class(cls)
-        vertical_prefix = metadata.class_prefix
-        class_name = f"{vertical_prefix}WorkflowProvider"
-
-        candidate_paths: List[str] = []
-        for suffix in ("workflows", "workflows.provider"):
-            for module_path in cls._extension_module_candidates(suffix):
-                if cls._extension_module_available(module_path):
-                    candidate_paths.append(module_path)
-
-        if not candidate_paths:
-            return None
-
-        last_error: Optional[Exception] = None
-        for module_path in candidate_paths:
-            try:
-                module = __import__(module_path, fromlist=[class_name])
-                provider_class = getattr(module, class_name, None)
-                if provider_class is not None:
-                    return provider_class()
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        for module_path in candidate_paths:
-            try:
-                return cls._get_extension_factory(
-                    "workflow_provider",
-                    module_path,
-                )
-            except (ImportError, AttributeError) as exc:
-                last_error = exc
-
-        if last_error:
-            raise last_error
-        return None
+        return WorkflowHandler.load(cls)
 
     @classmethod
     def clear_extension_cache(cls, *, clear_all: bool = False) -> None:
