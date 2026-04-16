@@ -507,22 +507,33 @@ class ConversationController:
         scorable_msgs: List[Message] = []
         scorable_indices: List[int] = []
 
-        # Defensive: convert raw strings to Message objects
-        non_message_count = sum(1 for m in msgs_to_score if not hasattr(m, "role"))
+        # Defensive: convert non-Message objects (dicts, strings) to Message objects.
+        # This can happen when session restore or external callers inject dicts
+        # into the history, or after serialization round-trips.
+        non_message_count = sum(1 for m in msgs_to_score if not isinstance(m, Message))
         if non_message_count > 0:
-            logger.warning(
-                "Converting %d raw strings to Message objects in history (%d total items)",
+            logger.info(
+                "Normalizing %d non-Message items in history (%d total)",
                 non_message_count,
                 len(msgs_to_score),
             )
             converted = []
             for m in msgs_to_score:
-                if hasattr(m, "role"):
+                if isinstance(m, Message):
                     converted.append(m)
+                elif isinstance(m, dict) and "role" in m:
+                    try:
+                        converted.append(Message(**m))
+                    except Exception:
+                        converted.append(
+                            Message(
+                                role=m.get("role", "assistant"), content=str(m.get("content", ""))
+                            )
+                        )
                 elif isinstance(m, str):
                     converted.append(Message(role="assistant", content=m))
-                elif isinstance(m, dict) and "role" in m:
-                    converted.append(Message(**m))
+                else:
+                    converted.append(Message(role="assistant", content=str(m)))
             msgs_to_score = converted
 
         for i, msg in enumerate(msgs_to_score):

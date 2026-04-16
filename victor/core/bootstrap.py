@@ -754,9 +754,64 @@ def bootstrap_capabilities() -> None:
     except Exception as e:
         logger.debug(f"Entry point discovery failed: {e}")
 
-    # 3. Auto-detect installed vertical packages that provide enhanced capabilities
+    # 3. Discover enhanced capabilities from plugin verticals.
+    #    Plugins (victor.plugins entry points) register verticals that declare
+    #    capabilities via get_capability_registrations(). This path ensures
+    #    tools like graph/search that run outside AgentFactory still get
+    #    the enhanced CodebaseIndex factory from victor-coding.
+    _discover_plugin_capabilities(registry)
+
+    # 4. Auto-detect installed vertical packages that provide enhanced capabilities
     #    but haven't registered via entry points (e.g., victor-coding's CodebaseIndex).
     _auto_detect_enhanced_capabilities(registry)
+
+
+def _discover_plugin_capabilities(registry: Any) -> None:
+    """Discover enhanced capabilities declared by plugin verticals.
+
+    Scans 'victor.plugins' entry points, loads each plugin, and checks
+    if its vertical class exposes get_capability_registrations(). This
+    bridges the gap where bootstrap_capabilities() discovers entry point
+    capabilities but not plugin-declared capabilities (e.g., CodebaseIndex
+    from victor-coding).
+    """
+    import importlib
+    import importlib.metadata
+
+    from victor.core.capability_registry import CapabilityStatus
+
+    # Known plugin → vertical mappings for capability discovery.
+    # Each entry maps a plugin entry point name to its vertical module path.
+    _PLUGIN_VERTICAL_MAP = {
+        "coding": "victor_coding.assistant:CodingAssistant",
+    }
+
+    try:
+        eps = {ep.name: ep for ep in importlib.metadata.entry_points(group="victor.plugins")}
+    except Exception:
+        return
+
+    for plugin_name, vertical_path in _PLUGIN_VERTICAL_MAP.items():
+        if plugin_name not in eps:
+            continue
+        try:
+            module_path, class_name = vertical_path.rsplit(":", 1)
+            module = importlib.import_module(module_path)
+            vertical_cls = getattr(module, class_name)
+
+            if hasattr(vertical_cls, "get_capability_registrations"):
+                for protocol_type, provider in vertical_cls.get_capability_registrations():
+                    if not registry.is_enhanced(protocol_type):
+                        registry.register(protocol_type, provider, CapabilityStatus.ENHANCED)
+                        logger.debug(
+                            "Plugin %s: registered enhanced %s",
+                            plugin_name,
+                            protocol_type.__name__,
+                        )
+        except ImportError:
+            logger.debug("Plugin %s: vertical package not installed", plugin_name)
+        except Exception as e:
+            logger.debug("Plugin %s: capability discovery failed: %s", plugin_name, e)
 
 
 # ---------------------------------------------------------------------------

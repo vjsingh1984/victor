@@ -1898,6 +1898,29 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     max_chars // 1024,
                 )
 
+        # Boundary guard: ensure all items are Message objects before sending
+        # to the provider. Converts dicts/strings that may have leaked in from
+        # session restore, compaction, or serialization round-trips.
+        from victor.providers.base import Message as _Msg
+
+        normalized = []
+        for m in messages:
+            if isinstance(m, _Msg):
+                normalized.append(m)
+            elif isinstance(m, dict) and "role" in m:
+                normalized.append(_Msg(**{k: v for k, v in m.items() if k in _Msg.model_fields}))
+            elif isinstance(m, str):
+                normalized.append(_Msg(role="assistant", content=m))
+            else:
+                logger.debug("Dropping non-Message item from assembled messages: %s", type(m))
+        if len(normalized) != len(messages):
+            logger.info(
+                "[context] Normalized %d/%d non-Message items in assembled messages",
+                len(messages) - len(normalized),
+                len(messages),
+            )
+        messages = normalized
+
         # Log KV prefix fingerprint for observability
         if self._kv_optimization_enabled:
             logger.debug(
@@ -3035,10 +3058,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             content: Message content
         """
         max_history = getattr(self.settings, "max_conversation_history", 100)
-        if len(self.conversation.messages) >= max_history:
-            for i, msg in enumerate(self.conversation.messages):
-                if msg.get("role") != "system":
-                    self.conversation.messages.pop(i)
+        # Trim oldest non-system message when history exceeds limit.
+        # Note: conversation.messages returns a copy, so we must modify
+        # the internal list via the MessageHistory API.
+        if len(self.conversation._messages) >= max_history:
+            for i, msg in enumerate(self.conversation._messages):
+                if getattr(msg, "role", None) != "system":
+                    self.conversation._messages.pop(i)
                     break
 
         self.conversation.add_message(role, content)

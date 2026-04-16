@@ -600,16 +600,71 @@ class ZAIProvider(BaseProvider):
         Returns:
             Request payload dictionary
         """
-        # Build messages in OpenAI format
+        # Build messages in OpenAI format with tool-call pair validation.
+        # Z.AI (GLM) requires:
+        # 1. Assistant messages with tool_calls must include the tool_calls field
+        # 2. Tool response messages must have tool_call_id
+        # 3. Tool responses must follow an assistant message with matching tool_calls
+        # After context compaction, pairs can become orphaned — sanitize here.
         formatted_messages = []
+        # Track which tool_call_ids have a matching assistant message
+        valid_tool_call_ids: set = set()
+
         for msg in messages:
             formatted_msg: Dict[str, Any] = {
                 "role": msg.role,
-                "content": msg.content,
+                "content": msg.content if msg.content is not None else "",
             }
-            # Handle tool results (tool response messages)
-            if msg.role == "tool" and hasattr(msg, "tool_call_id") and msg.tool_call_id:
-                formatted_msg["tool_call_id"] = msg.tool_call_id
+
+            # Assistant messages: include tool_calls if present
+            if msg.role == "assistant":
+                tool_calls = getattr(msg, "tool_calls", None)
+                if tool_calls:
+                    # Convert to OpenAI format
+                    openai_tool_calls = []
+                    for tc in tool_calls:
+                        if isinstance(tc, dict):
+                            tc_id = tc.get("id", "")
+                            tc_name = tc.get("name", "")
+                            tc_args = tc.get("arguments", {})
+                            if isinstance(tc_args, dict):
+                                import json as _json
+
+                                tc_args = _json.dumps(tc_args)
+                            openai_tool_calls.append(
+                                {
+                                    "id": tc_id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc_name,
+                                        "arguments": tc_args,
+                                    },
+                                }
+                            )
+                            valid_tool_call_ids.add(tc_id)
+                    if openai_tool_calls:
+                        formatted_msg["tool_calls"] = openai_tool_calls
+                        # Z.AI/GLM: content must be null when tool_calls present
+                        if not formatted_msg["content"]:
+                            formatted_msg["content"] = None
+
+            # Tool response messages: validate tool_call_id exists
+            elif msg.role == "tool":
+                tool_call_id = getattr(msg, "tool_call_id", None)
+                if tool_call_id:
+                    formatted_msg["tool_call_id"] = tool_call_id
+                    if tool_call_id not in valid_tool_call_ids:
+                        # Orphaned tool response — skip to avoid API error
+                        self._provider_logger.logger.debug(
+                            "Skipping orphaned tool response (tool_call_id=%s)",
+                            tool_call_id,
+                        )
+                        continue
+                else:
+                    # Tool message without tool_call_id — skip
+                    self._provider_logger.logger.debug("Skipping tool message without tool_call_id")
+                    continue
+
             formatted_messages.append(formatted_msg)
 
         payload: Dict[str, Any] = {

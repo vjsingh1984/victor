@@ -522,13 +522,16 @@ async def _get_or_build_index(
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 
-    _index_factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
-    if _index_factory is None or not CapabilityRegistry.get_instance().is_enhanced(
-        CodebaseIndexFactoryProtocol
-    ):
+    registry = CapabilityRegistry.get_instance()
+    # Ensure plugins are bootstrapped so victor-coding registers its factory
+    registry.ensure_bootstrapped()
+
+    _index_factory = registry.get(CodebaseIndexFactoryProtocol)
+    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
         raise ImportError(
-            "Codebase indexing requires victor-coding package. "
-            "Install with: pip install victor-coding"
+            "CodebaseIndex requires a codebase indexing provider "
+            "(e.g., pip install victor-coding). The provider registers "
+            "its factory via CapabilityRegistry at bootstrap."
         )
 
     # Get cache using DI-aware accessor

@@ -101,17 +101,30 @@ class EnhancedCodebaseIndexFactory(CodebaseIndexFactoryProtocol):
     """
 
     def create(self, root_path: str, **kwargs: Any) -> Any:
-        """Create a CodebaseIndex from a registered codebase indexing provider.
+        """Create a CodebaseIndex from an installed codebase indexing provider.
 
-        Discovers the factory via CapabilityRegistry (populated by external
-        vertical packages at bootstrap time).
+        Discovery order:
+        1. CapabilityRegistry (if a different factory was registered)
+        2. Direct import of victor_coding.codebase.indexer.CodebaseIndex
+        3. ImportError with install instructions
         """
+        # 1. Check registry for a different (non-self) factory
         from victor.core.capability_registry import CapabilityRegistry
 
         registry = CapabilityRegistry.get_instance()
         factory = registry.get(CodebaseIndexFactoryProtocol)
         if factory is not None and factory is not self:
             return factory.create(root_path, **kwargs)
+
+        # 2. Direct import fallback — handles the case where the plugin
+        #    system registers EnhancedCodebaseIndexFactory (self-referencing)
+        #    but the actual CodebaseIndex class is importable.
+        try:
+            from victor_coding.codebase.indexer import CodebaseIndex
+
+            return CodebaseIndex(Path(root_path), **kwargs)
+        except ImportError:
+            pass
 
         raise ImportError(
             "CodebaseIndex requires a codebase indexing provider "
