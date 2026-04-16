@@ -1667,6 +1667,75 @@ class FrameworkStepHandler(BaseStepHandler):
 
 
 # =============================================================================
+# MCP Step Handler — Vertical MCP Dependency Declaration
+# =============================================================================
+
+
+class McpStepHandler(BaseStepHandler):
+    """Handler for MCP server configuration from vertical declarations.
+
+    Detects if a vertical implements the McpProvider protocol (from victor-sdk)
+    and applies its MCP server configurations to the VerticalContext. The
+    MCPConnector reads these configs during server discovery to auto-provision
+    MCP servers declared by the active vertical.
+
+    Design: Strategy Pattern via protocol detection (isinstance check on
+    runtime_checkable McpProvider). Zero coupling to specific verticals.
+    """
+
+    parallel_safe = True
+    depends_on = ("tools",)
+    side_effects = False
+
+    @property
+    def name(self) -> str:
+        return "mcp"
+
+    @property
+    def order(self) -> int:
+        return 12  # After tools (10), before tiered_config (15)
+
+    def _do_apply(
+        self,
+        orchestrator: Any,
+        vertical: Type["VerticalBase"],
+        context: "VerticalContext",
+        result: "IntegrationResult",
+    ) -> None:
+        """Apply MCP configuration if vertical implements McpProvider."""
+        try:
+            from victor_sdk.verticals.protocols.mcp import McpProvider, McpToolProvider
+        except ImportError:
+            return
+
+        if not isinstance(vertical, McpProvider):
+            return
+
+        mcp_servers = vertical.get_mcp_servers()
+        if not mcp_servers:
+            return
+
+        context.set_capability_config("mcp_servers", mcp_servers)
+
+        tool_filters = vertical.get_mcp_tool_filters()
+        if tool_filters:
+            context.set_capability_config("mcp_tool_filters", tool_filters)
+
+        if isinstance(vertical, McpToolProvider):
+            tool_overrides = vertical.get_mcp_tool_overrides()
+            if tool_overrides:
+                context.set_capability_config("mcp_tool_overrides", tool_overrides)
+
+        server_names = ", ".join(mcp_servers.keys())
+        result.add_info(f"MCP servers declared: {server_names}")
+        logger.info(
+            "McpStepHandler: vertical declares %d MCP server(s): %s",
+            len(mcp_servers),
+            server_names,
+        )
+
+
+# =============================================================================
 # Tiered Config Step Handler (Phase 1: Gap Fix)
 # =============================================================================
 
@@ -2291,6 +2360,7 @@ class StepHandlerRegistry:
             handlers=[
                 CapabilityConfigStepHandler(),  # SOLID: Centralized config storage
                 ToolStepHandler(),
+                McpStepHandler(),  # MCP server declarations from vertical
                 TieredConfigStepHandler(),  # Phase 1: Gap fix
                 PromptStepHandler(),
                 ConfigStepHandler(),

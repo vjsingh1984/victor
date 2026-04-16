@@ -180,13 +180,22 @@ class MCPConnector:
             self._pending_tasks.append(task)
             return task
 
-    async def connect(self) -> MCPConnectResult:
+    async def connect(
+        self,
+        vertical_mcp_servers: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> MCPConnectResult:
         """Connect to MCP servers and register tools.
 
         This method:
         1. Discovers MCP servers from standard locations
-        2. Connects to discovered servers
-        3. Registers MCP bridge tools
+        2. Registers servers declared by the active vertical (McpProvider)
+        3. Connects to all discovered servers
+        4. Flattens MCP tools as first-class BaseTool instances
+
+        Args:
+            vertical_mcp_servers: Optional MCP servers declared by the vertical
+                via McpProvider.get_mcp_servers(). Merged with auto-discovered
+                servers.
 
         Returns:
             MCPConnectResult with connection statistics
@@ -194,8 +203,10 @@ class MCPConnector:
         result = MCPConnectResult()
 
         if not self._config.enabled and not getattr(self._settings, "use_mcp_tools", False):
-            logger.debug("MCP integration disabled")
-            return result
+            # Still connect if vertical declares MCP servers
+            if not vertical_mcp_servers:
+                logger.debug("MCP integration disabled")
+                return result
 
         mcp_command = getattr(self._settings, "mcp_command", None)
 
@@ -208,6 +219,24 @@ class MCPConnector:
                 self._mcp_registry = MCPRegistry.discover_servers()
             else:
                 self._mcp_registry = MCPRegistry()
+
+            # Register servers declared by the active vertical
+            if vertical_mcp_servers:
+                for name, config in vertical_mcp_servers.items():
+                    try:
+                        command = config.get("command", "")
+                        args = config.get("args", [])
+                        cmd = [command] + args if isinstance(command, str) else list(command)
+                        self._mcp_registry.register_server(
+                            MCPServerConfig(
+                                name=name,
+                                command=cmd,
+                                description=config.get("description", f"Vertical MCP: {name}"),
+                                auto_connect=True,
+                            )
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to register vertical MCP server %s: %s", name, e)
 
             # Also register command from settings if specified
             if mcp_command:
