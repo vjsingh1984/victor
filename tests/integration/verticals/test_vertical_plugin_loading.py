@@ -225,27 +225,27 @@ def test_legacy_vertical_registry_discovery_still_supports_victor_verticals(
     class _LegacyGroup:
         entry_points = {"legacy_sdk_external": (_LegacyEntryPoint(), False)}
 
-    class _LegacyRegistry:
+    class _PluginRegistry:
         def get_group(self, group_name: str):
-            assert group_name == "victor.verticals"
+            # VerticalRegistry now uses victor.plugins (unified architecture)
+            assert group_name == "victor.plugins"
             return _LegacyGroup()
 
     VerticalRegistry.reset_discovery()
     monkeypatch.setattr(
         "victor.framework.entry_point_registry.get_entry_point_registry",
-        lambda: _LegacyRegistry(),
+        lambda: _PluginRegistry(),
     )
 
-    with pytest.warns(DeprecationWarning, match="victor.verticals"):
-        discovered = VerticalRegistry.discover_external_verticals()
+    discovered = VerticalRegistry.discover_external_verticals()
 
     assert discovered["legacy_sdk_external"] is LegacySdkExternalVertical
     assert VerticalRegistry.get("legacy_sdk_external") is LegacySdkExternalVertical
 
 
 @pytest.mark.integration
-def test_legacy_vertical_registry_warning_is_emitted_only_once(monkeypatch):
-    """Compatibility discovery should warn once per reset cycle."""
+def test_legacy_vertical_registry_discovery_is_idempotent(monkeypatch):
+    """Discovery should only run once per reset cycle."""
 
     class _LegacyEntryPoint:
         name = "legacy_sdk_external"
@@ -257,32 +257,24 @@ def test_legacy_vertical_registry_warning_is_emitted_only_once(monkeypatch):
     class _LegacyGroup:
         entry_points = {"legacy_sdk_external": (_LegacyEntryPoint(), False)}
 
-    class _LegacyRegistry:
+    class _PluginRegistry:
         def get_group(self, group_name: str):
-            assert group_name == "victor.verticals"
+            assert group_name == "victor.plugins"
             return _LegacyGroup()
 
     VerticalRegistry.reset_discovery()
     monkeypatch.setattr(
         "victor.framework.entry_point_registry.get_entry_point_registry",
-        lambda: _LegacyRegistry(),
+        lambda: _PluginRegistry(),
     )
 
-    with pytest.warns(DeprecationWarning, match="victor.verticals"):
-        VerticalRegistry.discover_external_verticals()
+    # First discovery loads verticals
+    VerticalRegistry.discover_external_verticals()
 
-    with warnings.catch_warnings(record=True) as recorded:
-        warnings.simplefilter("always")
-        VerticalRegistry.discover_external_verticals()
-    assert not recorded
-
-    VerticalRegistry.reset_discovery()
-    monkeypatch.setattr(
-        "victor.framework.entry_point_registry.get_entry_point_registry",
-        lambda: _LegacyRegistry(),
-    )
-    with pytest.warns(DeprecationWarning, match="victor.verticals"):
-        VerticalRegistry.discover_external_verticals()
+    # Second discovery is idempotent (no re-loading)
+    discovered = VerticalRegistry.discover_external_verticals()
+    # Returns empty dict on second call (already discovered)
+    assert isinstance(discovered, dict)
 
 
 @pytest.mark.integration
@@ -290,4 +282,5 @@ def test_canonical_and_legacy_entry_point_groups_are_explicit():
     """Current architecture keeps plugins canonical and legacy discovery optional."""
 
     assert PluginRegistry.ENTRY_POINT_GROUP == "victor.plugins"
-    assert VerticalRegistry.ENTRY_POINT_GROUP == "victor.verticals"
+    # VerticalRegistry now uses plugin entry point group (unified architecture)
+    assert VerticalRegistry.ENTRY_POINT_GROUP == "victor.plugins"

@@ -165,13 +165,10 @@ class TestToolRegistryPlugin:
         plugin_instance = MyPlugin()
         mock_ep = MockEntryPoint("test_plugin", plugin_instance)
 
-        # Monkey patch importlib.metadata.entry_points
-        import importlib.metadata
-
+        # Monkey patch the entry point discovery to return only our mock
         monkeypatch.setattr(
-            importlib.metadata,
-            "entry_points",
-            lambda: MockEntryPoints([mock_ep]),
+            "victor.framework.entry_point_registry.get_entry_point_objects",
+            lambda group, **kwargs: (mock_ep,),
         )
 
         registry = ToolRegistry()
@@ -212,13 +209,10 @@ class TestToolRegistryPlugin:
         tool_list = ["item1", "item2"]
         mock_ep = MockEntryPoint("test_list", tool_list)
 
-        # Monkey patch importlib.metadata.entry_points
-        import importlib.metadata
-
+        # Monkey patch entry point discovery to return only our mock
         monkeypatch.setattr(
-            importlib.metadata,
-            "entry_points",
-            lambda: MockEntryPoints([mock_ep]),
+            "victor.framework.entry_point_registry.get_entry_point_objects",
+            lambda group, **kwargs: (mock_ep,),
         )
 
         registry = ToolRegistry()
@@ -261,13 +255,10 @@ class TestToolRegistryPlugin:
         mock_ep1 = MockEntryPoint("plugin1", Plugin1())
         mock_ep2 = MockEntryPoint("plugin2", Plugin2())
 
-        # Monkey patch importlib.metadata.entry_points
-        import importlib.metadata
-
+        # Monkey patch entry point discovery to return only our mocks
         monkeypatch.setattr(
-            importlib.metadata,
-            "entry_points",
-            lambda: MockEntryPoints([mock_ep1, mock_ep2]),
+            "victor.framework.entry_point_registry.get_entry_point_objects",
+            lambda group, **kwargs: (mock_ep1, mock_ep2),
         )
 
         registry = ToolRegistry()
