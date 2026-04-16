@@ -57,9 +57,7 @@ class TeamHandler(BaseExtensionHandler):
 
         for module_path in candidate_paths:
             try:
-                return ctx._get_extension_factory(
-                    "team_spec_provider", module_path
-                )
+                return ctx._get_extension_factory("team_spec_provider", module_path)
             except (ImportError, AttributeError) as exc:
                 last_error = exc
 

@@ -27,9 +27,7 @@ class ExtensionHandlerRegistry:
     _handlers: Dict[str, Type[BaseExtensionHandler]] = {}
 
     @classmethod
-    def register(
-        cls, handler_cls: Type[BaseExtensionHandler]
-    ) -> Type[BaseExtensionHandler]:
+    def register(cls, handler_cls: Type[BaseExtensionHandler]) -> Type[BaseExtensionHandler]:
         """Register a handler class. Can be used as a decorator."""
         ext_type = handler_cls.extension_type
         cls._handlers[ext_type] = handler_cls

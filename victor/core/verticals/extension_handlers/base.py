@@ -32,9 +32,7 @@ class ExtensionLoaderContext(Protocol):
     def _get_cached_extension(cls, key: str, factory: Any) -> Any: ...
 
     @classmethod
-    def _load_named_entry_point_extension(
-        cls, extension_key: str, group: str
-    ) -> Optional[Any]: ...
+    def _load_named_entry_point_extension(cls, extension_key: str, group: str) -> Optional[Any]: ...
 
     @classmethod
     def _find_available_candidates(cls, suffix: str) -> List[str]: ...
@@ -73,6 +71,4 @@ class BaseExtensionHandler:
         Returns:
             Extension instance, list, or None depending on type
         """
-        raise NotImplementedError(
-            f"{cls.__name__} must implement load()"
-        )
+        raise NotImplementedError(f"{cls.__name__} must implement load()")

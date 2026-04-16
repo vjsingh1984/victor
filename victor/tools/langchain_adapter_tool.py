@@ -88,9 +88,7 @@ class LangChainAdapterTool(BaseTool):
         self._lc_tool = langchain_tool
         self._name_prefix = name_prefix
         self._source = source
-        self._json_schema = _pydantic_to_json_schema(
-            getattr(langchain_tool, "args_schema", None)
-        )
+        self._json_schema = _pydantic_to_json_schema(getattr(langchain_tool, "args_schema", None))
 
     @property
     def name(self) -> str:
