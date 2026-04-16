@@ -325,15 +325,20 @@ class DebugLogger:
         if not self.enabled:
             return
 
-        # Adjusted thresholds for modern models with larger context windows
-        # DeepSeek-V3: 64K tokens, Claude 3.5: 200K tokens, GPT-4: 128K tokens
-        # 150K chars ≈ 37K tokens is still comfortable for most models
-        if char_count > 150000:
+        # Dynamic threshold based on model context window (default 128K tokens)
+        # Warning at 70% utilization, info at 40%
+        max_context_chars = getattr(self, "_max_context_chars", 358_400)  # 128K * 3.5 * 0.8
+        warn_threshold = int(max_context_chars * 0.70)
+        info_threshold = int(max_context_chars * 0.40)
+
+        if char_count > warn_threshold:
             warning_icon = self._presentation.icon("warning", with_color=False)
+            pct = int(100 * char_count / max_context_chars)
             self.logger.warning(
-                f"   {warning_icon} Large context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
+                f"   {warning_icon} Large context: {char_count:,} chars "
+                f"(~{estimated_tokens:,} tokens, {pct}% of budget)"
             )
-        elif char_count > 75000:
+        elif char_count > info_threshold:
             chart_icon = self._presentation.icon("chart", with_color=False)
             self.logger.info(
                 f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens)"

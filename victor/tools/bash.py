@@ -389,13 +389,18 @@ async def shell(
     timeout: Optional[int] = None,
     dangerous: bool = False,
 ) -> Dict[str, Any]:
-    """Run shell command with safety checks. Returns stdout/stderr/return_code.
+    """Execute a shell command. The `cmd` parameter is required.
+
+    Example: shell(cmd="ls -la") or shell(cmd="git status")
 
     Args:
-        cmd: Shell command to run
-        cwd: Working directory
-        timeout: Seconds before timeout
-        dangerous: Allow risky commands
+        cmd: The shell command string to execute (required)
+        cwd: Working directory for the command
+        timeout: Maximum seconds before timeout
+        dangerous: Set true only for destructive commands (rm, kill, etc.)
+
+    Returns:
+        Dict with stdout, stderr, return_code keys
     """
     if not cmd:
         return {
