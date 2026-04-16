@@ -116,16 +116,8 @@ class EnhancedCodebaseIndexFactory(CodebaseIndexFactoryProtocol):
         if factory is not None and factory is not self:
             return factory.create(root_path, **kwargs)
 
-        # 2. Direct import fallback — handles the case where the plugin
-        #    system registers EnhancedCodebaseIndexFactory (self-referencing)
-        #    but the actual CodebaseIndex class is importable.
-        try:
-            from victor_coding.codebase.indexer import CodebaseIndex
-
-            return CodebaseIndex(Path(root_path), **kwargs)
-        except ImportError:
-            pass
-
+        # No fallback — external verticals must register via CapabilityRegistry.
+        # Direct imports of victor_coding violate the core→external boundary.
         raise ImportError(
             "CodebaseIndex requires a codebase indexing provider "
             "(e.g., pip install victor-coding). The provider registers "
