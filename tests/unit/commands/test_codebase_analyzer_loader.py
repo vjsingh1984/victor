@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 import pytest
 
-import victor.core.utils.coding_support as coding_support
+import victor.core.utils.capability_loader as coding_support
 
 
 def test_analyzer_loader_prefers_extracted_victor_coding() -> None:

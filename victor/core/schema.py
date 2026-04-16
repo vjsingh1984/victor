@@ -289,7 +289,7 @@ class Schema:
             provider TEXT,
             model TEXT,
             task_type TEXT,
-            vertical TEXT DEFAULT 'coding',
+            vertical TEXT DEFAULT '',
             repo_id TEXT DEFAULT NULL,
             success INTEGER,
             quality_score REAL,

@@ -13,7 +13,7 @@ from victor.config.settings import (
 )
 from victor.core.async_utils import run_sync
 from victor.core.database import get_database, get_project_database
-from victor.core.utils.coding_support import load_codebase_analyzer_attr
+from victor.core.utils.capability_loader import load_codebase_analyzer_attr
 
 init_app = typer.Typer(name="init", help="Initialize project context and configuration.")
 console = Console()

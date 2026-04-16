@@ -3,7 +3,7 @@
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 
-"""Tests for decoupled coding_support.py — no direct victor_coding imports."""
+"""Tests for decoupled capability_loader.py — no direct victor_coding imports."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class TestNoCodingImports:
             / "victor"
             / "core"
             / "utils"
-            / "coding_support.py"
+            / "capability_loader.py"
         )
         source = source_file.read_text()
         tree = ast.parse(source)
@@ -46,7 +46,7 @@ class TestNoCodingImports:
 
     def test_load_functions_exist(self):
         """The public API must still be available."""
-        from victor.core.utils.coding_support import (
+        from victor.core.utils.capability_loader import (
             load_codebase_analyzer_module,
             load_codebase_analyzer_attr,
             load_tree_sitter_get_parser,

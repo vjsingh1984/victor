@@ -9,4 +9,4 @@ import os
 # The fallback vertical used when no explicit vertical is specified.
 # Override via VICTOR_DEFAULT_VERTICAL env var.
 # User-configurable default also lives in victor.config.settings.default_vertical.
-DEFAULT_VERTICAL: str = os.environ.get("VICTOR_DEFAULT_VERTICAL", "") or "coding"
+DEFAULT_VERTICAL: str = os.environ.get("VICTOR_DEFAULT_VERTICAL", "")

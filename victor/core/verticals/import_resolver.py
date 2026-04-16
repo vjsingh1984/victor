@@ -22,10 +22,6 @@ from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-_PACKAGE_OVERRIDES = {
-    "dataanalysis": "victor_dataanalysis",
-}
-
 _RUNTIME_MODULE_PREFIXES = frozenset(
     {
         "capabilities",
@@ -80,12 +76,7 @@ def _external_package_candidates(vertical_name: str) -> List[str]:
     """Return external package candidates for a vertical."""
     normalized = normalize_vertical_name(vertical_name)
 
-    candidates: List[str] = []
-    override = _PACKAGE_OVERRIDES.get(normalized) or _PACKAGE_OVERRIDES.get(vertical_name)
-    if override:
-        candidates.append(override)
-    else:
-        candidates.append(f"victor_{normalized}")
+    candidates: List[str] = [f"victor_{normalized}"]
 
     # Support historical spellings like data_analysis vs dataanalysis.
     if "_" in normalized:

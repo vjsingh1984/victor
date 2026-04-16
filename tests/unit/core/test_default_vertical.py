@@ -13,14 +13,14 @@ from unittest.mock import patch
 
 
 class TestDefaultVertical:
-    def test_default_is_coding(self):
-        """Default value is 'coding' when no env var set."""
+    def test_default_is_empty(self):
+        """Default value is empty when no env var set (vertical-agnostic)."""
         env = {k: v for k, v in os.environ.items() if k != "VICTOR_DEFAULT_VERTICAL"}
         with patch.dict(os.environ, env, clear=True):
             import victor.core.constants
 
             importlib.reload(victor.core.constants)
-            assert victor.core.constants.DEFAULT_VERTICAL == "coding"
+            assert victor.core.constants.DEFAULT_VERTICAL == ""
 
     def test_env_var_override(self):
         """VICTOR_DEFAULT_VERTICAL env var overrides the default."""
@@ -30,10 +30,10 @@ class TestDefaultVertical:
             importlib.reload(victor.core.constants)
             assert victor.core.constants.DEFAULT_VERTICAL == "research"
 
-    def test_env_var_empty_keeps_coding(self):
-        """Empty env var falls back to 'coding'."""
+    def test_env_var_empty_stays_empty(self):
+        """Empty env var stays empty (no hardcoded fallback)."""
         with patch.dict(os.environ, {"VICTOR_DEFAULT_VERTICAL": ""}):
             import victor.core.constants
 
             importlib.reload(victor.core.constants)
-            assert victor.core.constants.DEFAULT_VERTICAL == "coding"
+            assert victor.core.constants.DEFAULT_VERTICAL == ""

@@ -45,7 +45,7 @@ from victor.storage.vector_stores.base import (
     EmbeddingConfig,
     EmbeddingSearchResult,
 )
-from victor.core.utils.coding_support import load_tree_sitter_get_parser
+from victor.core.utils.capability_loader import load_tree_sitter_get_parser
 from victor.storage.vector_stores.code_chunking import (
     CodeChunk,
     CodeChunkingContext,
