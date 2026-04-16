@@ -358,7 +358,8 @@ class AnthropicProvider(BaseProvider):
 
                     elif event_type == "content_block_start":
                         block = getattr(event, "content_block", None)
-                        if block and getattr(block, "type", "") == "tool_use":
+                        block_type = getattr(block, "type", "") if block else ""
+                        if block_type == "tool_use":
                             tc_id = getattr(block, "id", None) or f"tool_{len(tool_calls) + 1}"
                             tool_calls[tc_id] = {
                                 "id": tc_id,
@@ -371,6 +372,14 @@ class AnthropicProvider(BaseProvider):
                                 getattr(block, "index", len(block_index_to_id)),
                             )
                             block_index_to_id[block_index] = tc_id
+                        elif block_type == "thinking":
+                            # Claude extended thinking block — track index
+                            block_index = getattr(
+                                event,
+                                "index",
+                                getattr(block, "index", -1),
+                            )
+                            block_index_to_id[block_index] = "__thinking__"
 
                     elif event_type == "content_block_delta":
                         delta = getattr(event, "delta", None)
@@ -378,7 +387,16 @@ class AnthropicProvider(BaseProvider):
                         block_index = getattr(
                             event, "index", getattr(event, "content_block_index", None)
                         )
-                        if delta_type == "text_delta" and hasattr(delta, "text"):
+                        if delta_type == "thinking_delta":
+                            # Claude extended thinking — stream as metadata
+                            thinking_text = getattr(delta, "thinking", "")
+                            if thinking_text:
+                                yield StreamChunk(
+                                    content="",
+                                    is_final=False,
+                                    metadata={"reasoning_content": thinking_text},
+                                )
+                        elif delta_type == "text_delta" and hasattr(delta, "text"):
                             yield StreamChunk(content=delta.text or "", is_final=False)
                         elif delta_type in {"input_json_delta", "input_delta"}:
                             tc_id = block_index_to_id.get(block_index)
@@ -483,13 +501,17 @@ class AnthropicProvider(BaseProvider):
         Returns:
             Normalized CompletionResponse
         """
-        # Extract text content
+        # Extract text content, tool calls, and thinking blocks
         content = ""
         tool_calls = []
+        thinking_content = ""
 
         for block in response.content:
             if block.type == "text":
                 content += block.text
+            elif block.type == "thinking":
+                # Claude extended thinking block — extract reasoning content
+                thinking_content += getattr(block, "thinking", "")
             elif block.type == "tool_use":
                 tool_calls.append(
                     {
@@ -508,6 +530,11 @@ class AnthropicProvider(BaseProvider):
                 "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
             }
 
+        # Include thinking content in metadata for downstream rendering
+        metadata = None
+        if thinking_content:
+            metadata = {"reasoning_content": thinking_content}
+
         return CompletionResponse(
             content=content,
             role="assistant",
@@ -515,6 +542,7 @@ class AnthropicProvider(BaseProvider):
             stop_reason=response.stop_reason,
             usage=usage,
             model=model,
+            metadata=metadata,
             raw_response=(response.model_dump() if hasattr(response, "model_dump") else None),
         )
 
