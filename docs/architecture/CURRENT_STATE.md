@@ -1,7 +1,57 @@
 # Victor Architecture — Current State & Active Initiatives
 
-**Last Updated**: 2026-04-14
+**Last Updated**: 2026-04-15
 **Supersedes**: `post-extraction-analysis.md` (Mar 7), `post-extraction-architecture-review-2026-03-16.md` (Mar 16), `post-extraction-analysis-2026-04-10.md` (Apr 10), `victor-post-extraction-analysis.md` (Apr 14)
+
+## Recent Changes (2026-04-15)
+
+### Conversation Consolidation
+- Unified `conversation/` package with 9 modules: types, scoring, controller, store, state_machine, assembler + 3 SOLID modules
+- Single canonical `score_messages()` with `STORE_WEIGHTS` and `CONTROLLER_WEIGHTS` presets
+- ML metadata extracted to `victor/agent/ml_metadata.py`
+- All 120+ import sites updated to canonical paths
+
+### MCP Ecosystem
+- **MCPAdapterTool** (Adapter Pattern): projects MCP tools as first-class `BaseTool` instances — LLM sees `github_search` not `mcp(name=...)`
+- **MCPToolProjector** (Factory Pattern): batch-creates adapters with name collision handling and relevance filtering
+- **McpStepHandler** (order=12): verticals declare MCP dependencies via `McpProvider` protocol, auto-provisioned in pipeline
+- **MCPConnector._flatten_mcp_tools()**: registers adapter tools after server connection
+
+### Framework Interop
+- **LangChainAdapterTool**: wraps any LangChain `BaseTool` as Victor `BaseTool` — `pip install victor-ai[langchain]`
+- **LangChainToolProjector**: batch creation with collision handling
+- Pydantic v1/v2 schema conversion, async bridging via `ainvoke()`
+
+### Contract Hardening
+- **CompatibilityStepHandler** (order=1): validates vertical compatibility FIRST in pipeline
+- **VerticalCompatibilityError**: clear exception replacing silent degradation on version mismatch
+- PEP 440 version checking via `VerticalCompatibilityGate`
+
+### Core Decoupling (Phase 0 Complete)
+- Removed hardcoded "coding" default from `DEFAULT_VERTICAL`, RL schema, `import_resolver`
+- Marketplace uses entry-point discovery (`victor.marketplace` group) with fallback list
+- `coding_support.py` renamed to `capability_loader.py` (SRP)
+- Plugin discovery: `ToolRegistry` uses `UnifiedEntryPointRegistry` (eliminates redundant scans)
+
+### Tiered Tool Schema Broadcasting
+- `ToolDefinition.schema_level`: FULL/COMPACT/STUB metadata (excluded from provider serialization)
+- `tool_to_definition()` factory using `BaseTool.to_schema(level)` truncation
+- `select_tiered()`: mandatory→FULL, vertical_core→COMPACT, semantic_pool→STUB
+- Tier-aware ordering in `_sort_tools_for_kv_stability()`: stable FULL+COMPACT prefix, dynamic STUB suffix
+- Smart `cache_control` placement at stable/dynamic boundary in Anthropic provider
+- MCP/LangChain adapters default to STUB
+- **Token savings**: 48 tools 6000→2590 tokens (57%), 100 tools 65% reduction
+
+### Thinking/Reasoning Pipeline
+- **Claude extended thinking**: Anthropic provider now parses `ThinkingBlock` (type="thinking") in both chat and streaming paths
+- Streaming thinking deltas (`thinking_delta`) yielded as `StreamChunk` with `metadata["reasoning_content"]`
+- Existing dual-mode rendering pipeline handles both API-based (DeepSeek) and inline markers (`<think>`) seamlessly
+- CI: fixed 3 thinking mode test failures (mock response structure)
+
+### CI/CD
+- Python 3.13 added to ci-test.yml and version-matrix.yml
+- version-matrix.yml expanded: 3.10, 3.11, 3.12, 3.13 (was 3.11, 3.12)
+- Guard tests: plugin discovery perf (AST-based), tree_sitter capability pattern (5 tests)
 
 ---
 
