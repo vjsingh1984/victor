@@ -380,9 +380,9 @@ class ConversationController:
 
         self._history.clear()
         if system_msg:
-            self._history._messages.append(system_msg)
+            self._history.append_message(system_msg)
         for msg in recent:
-            self._history._messages.append(msg)
+            self._history.append_message(msg)
 
         logger.info(f"Compacted history: removed {removed} messages")
         return removed
@@ -421,13 +421,29 @@ class ConversationController:
         if strategy == CompactionStrategy.SIMPLE:
             return self.compact_history(keep_recent=target)
 
-        # Filter non-Message objects before scoring (defensive against malformed history)
-        valid_count = sum(1 for m in self.messages if hasattr(m, "role"))
-        if valid_count != len(self.messages):
+        # Normalize non-Message items IN-PLACE before compaction.
+        # Prevents HTTP 400 from providers when compacted history contains
+        # raw strings or dicts instead of Message objects.
+        non_msg_count = sum(1 for m in self._history._messages if not isinstance(m, Message))
+        if non_msg_count > 0:
             logger.warning(
-                "Filtered %d non-Message objects from history before compaction",
-                len(self.messages) - valid_count,
+                "Normalizing %d non-Message objects in history before compaction",
+                non_msg_count,
             )
+            normalized = []
+            for m in self._history._messages:
+                if isinstance(m, Message):
+                    normalized.append(m)
+                elif isinstance(m, dict) and "role" in m:
+                    safe = {
+                        k: v
+                        for k, v in m.items()
+                        if k in ("role", "content", "name", "tool_calls", "tool_call_id")
+                    }
+                    normalized.append(Message(**safe))
+                elif isinstance(m, str):
+                    normalized.append(Message(role="assistant", content=m))
+            self._history._messages = normalized
 
         # Score all messages for importance
         scored_messages = self._score_messages(current_query)
@@ -472,10 +488,10 @@ class ConversationController:
         self._history.clear()
 
         if system_msg:
-            self._history._messages.append(system_msg)
+            self._history.append_message(system_msg)
 
         for scored_msg in messages_to_keep:
-            self._history._messages.append(scored_msg.message)
+            self._history.append_message(scored_msg.message)
 
         logger.info(
             f"Smart compacted: removed {removed_count} messages, "
@@ -923,7 +939,7 @@ class ConversationController:
         """
         controller = cls(config=config)
         for msg in messages:
-            controller._history._messages.append(msg)
+            controller._history.append_message(msg)
         if messages and messages[0].role == "system":
             controller._system_prompt = messages[0].content
             controller._system_added = True

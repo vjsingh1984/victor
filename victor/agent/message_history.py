@@ -92,6 +92,28 @@ class MessageHistory:
         self._trim_history()
         return message
 
+    def append_message(self, message: Any) -> None:
+        """Append a pre-constructed message with type validation.
+
+        Ensures only Message objects enter _messages. Converts dicts and
+        strings defensively to prevent HTTP 400 from malformed history.
+
+        Args:
+            message: Message object, dict with 'role' key, or string
+        """
+        if isinstance(message, Message):
+            self._messages.append(message)
+        elif isinstance(message, dict) and "role" in message:
+            safe_keys = {k: v for k, v in message.items() if k in Message.model_fields}
+            self._messages.append(Message(**safe_keys))
+        elif isinstance(message, str):
+            logger.warning("Converting raw string to Message in history")
+            self._messages.append(Message(role="assistant", content=message))
+        else:
+            logger.error("Dropping non-Message object from history: %s", type(message).__name__)
+            return
+        self._trim_history()
+
     def add_user_message(self, content: str) -> Message:
         """Add a user message to conversation history."""
         return self.add_message("user", content)
