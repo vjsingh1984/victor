@@ -3068,6 +3068,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     self.conversation._messages.pop(i)
                     break
 
+        if role == "tool":
+            logger.info(
+                "add_message(role=tool): name=%s tool_call_id=%s content_len=%d",
+                kwargs.get("name"),
+                kwargs.get("tool_call_id"),
+                len(content),
+            )
         self.conversation.add_message(role, content, **kwargs)
 
         # Delegate persistence + usage logging to ChatCoordinator

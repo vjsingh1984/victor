@@ -111,7 +111,7 @@ class ToolResultContext:
     conversation_state: Optional[Any] = None
     unified_tracker: Optional[Any] = None
     usage_logger: Optional[Any] = None
-    add_message: Optional[Callable[[str, str], None]] = None
+    add_message: Optional[Callable[..., None]] = None  # (role, content, **kwargs)
     format_tool_output: Optional[Callable[..., str]] = None
     console: Optional[Any] = None
     presentation: Optional[Any] = None
@@ -938,7 +938,7 @@ class ToolCoordinator:
         required_files: Optional[List[str]] = None,
         required_outputs: Optional[List[str]] = None,
         nudge_sent_flag: Optional[List[bool]] = None,
-        add_message: Optional[Callable[[str, str], None]] = None,
+        add_message: Optional[Callable[..., None]] = None,
         observability: Optional[Any] = None,
         pipeline_calls_used: int = 0,
     ) -> None:
