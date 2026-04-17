@@ -410,20 +410,18 @@ class StreamingChatPipeline:
                 # Sanitize response to remove malformed patterns from local models
                 sanitized = orch.sanitizer.sanitize(full_content)
                 if sanitized:
-                    orch.add_message("assistant", sanitized)
+                    orch.add_message("assistant", sanitized, tool_calls=tool_calls)
                 else:
                     plain_text = orch.sanitizer.strip_markup(full_content)
                     if plain_text:
-                        orch.add_message("assistant", plain_text)
-
-                # Log if model mentioned tools but didn't execute them
-                if mentioned_tools_detected:
-                    tools_str = ", ".join(mentioned_tools_detected)
-                    logger.info(
-                        f"Model mentioned tool(s) [{tools_str}] in text without executing. "
-                        "Common with local models - tool syntax detected in response content."
-                    )
-            elif not tool_calls:
+                        orch.add_message("assistant", plain_text, tool_calls=tool_calls)
+            elif tool_calls:
+                # OpenAI spec: assistant message with tool_calls must be in
+                # conversation even when content is empty. Without this,
+                # tool responses have no matching assistant message and
+                # the model can't see its own tool_calls/results.
+                orch.add_message("assistant", "", tool_calls=tool_calls)
+            else:
                 # No content and no tool calls - check for natural completion
                 recovery_ctx = orch._create_recovery_context(stream_ctx)
                 final_chunk = orch._recovery_coordinator.check_natural_completion(
