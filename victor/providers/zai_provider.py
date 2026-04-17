@@ -63,27 +63,41 @@ ZAI_BASE_URLS = {
 # Available zhipuAI GLM models
 # Reference: https://open.bigmodel.cn/dev/api
 ZAI_MODELS = {
-    # Paid flagship models
+    # Paid flagship models (context windows from docs.z.ai and OpenRouter)
+    "glm-5.1": {
+        "description": "GLM-5.1 - Latest SOTA model, rivals Claude Opus 4.6",
+        "context_window": 200000,
+        "max_output": 65535,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
     "glm-5": {
         "description": "GLM-5 - SOTA flagship model with agentic capabilities",
-        "context_window": 128000,
-        "max_output": 8192,
+        "context_window": 200000,
+        "max_output": 65535,
+        "supports_tools": True,
+        "supports_thinking": True,
+    },
+    "glm-5-turbo": {
+        "description": "GLM-5-Turbo - Fast flagship model for coding",
+        "context_window": 200000,
+        "max_output": 16384,
         "supports_tools": True,
         "supports_thinking": True,
     },
     "glm-5-code": {
-        "description": "GLM-5-Code - Specialized coding model (coming soon)",
-        "context_window": 128000,
-        "max_output": 8192,
+        "description": "GLM-5-Code - Specialized coding model",
+        "context_window": 200000,
+        "max_output": 65535,
         "supports_tools": True,
         "supports_thinking": True,
     },
     "glm-4.7": {
-        "description": "GLM-4.7 - Latest flagship model",
-        "context_window": 128000,
-        "max_output": 4096,
+        "description": "GLM-4.7 - Flagship model with 200K context",
+        "context_window": 200000,
+        "max_output": 8192,
         "supports_tools": True,
-        "supports_thinking": False,
+        "supports_thinking": True,
     },
     "glm-4.6": {
         "description": "GLM-4.6 - Advanced agentic, reasoning, and coding",
