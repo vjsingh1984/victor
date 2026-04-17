@@ -23,13 +23,17 @@ if TYPE_CHECKING:
 
 
 class MessageRole(Enum):
-    """Message roles in conversation."""
+    """Message roles in conversation.
+
+    Values match the OpenAI Chat Completions API spec.
+    Non-OpenAI providers should adapt at the provider layer.
+    """
 
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
-    TOOL_CALL = "tool_call"
-    TOOL_RESULT = "tool_result"
+    TOOL = "tool"  # OpenAI spec: role=tool with tool_call_id
+    TOOL_CALL = "tool_call"  # Internal: assistant requesting tool execution
 
 
 class MessagePriority(Enum):

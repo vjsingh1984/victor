@@ -102,7 +102,7 @@ class ConversationMessage:
         }
 
         # Handle tool-related messages
-        if self.role == MessageRole.TOOL_RESULT and self.tool_call_id:
+        if self.role == MessageRole.TOOL and self.tool_call_id:
             base["tool_call_id"] = self.tool_call_id
 
         return base
@@ -492,7 +492,7 @@ class ConversationStore:
             -- Index for tool result retrieval (high-value messages for context)
             CREATE INDEX IF NOT EXISTS idx_messages_tool_results
             ON messages(session_id, role, tool_name, timestamp DESC)
-            WHERE role IN ('tool_call', 'tool_result');
+            WHERE role IN ('tool_call', 'tool');
 
             -- Index for user-assistant exchanges
             CREATE INDEX IF NOT EXISTS idx_messages_exchange
@@ -944,7 +944,7 @@ class ConversationStore:
         session.last_activity = datetime.now()
 
         # Track tool usage
-        if role in (MessageRole.TOOL_CALL, MessageRole.TOOL_RESULT):
+        if role in (MessageRole.TOOL_CALL, MessageRole.TOOL):
             session.tool_usage_count += 1
 
         # Check if pruning is needed
@@ -1291,7 +1291,7 @@ class ConversationStore:
         if role == MessageRole.ASSISTANT:
             return MessagePriority.HIGH
 
-        if role == MessageRole.TOOL_RESULT:
+        if role == MessageRole.TOOL:
             # File contents and search results are valuable context
             if tool_name in ("read_file", "code_search", "list_directory"):
                 return MessagePriority.HIGH
@@ -1489,7 +1489,7 @@ class ConversationStore:
         content = message.content
         # Truncate large tool outputs for storage
         if len(content) > self._TOOL_OUTPUT_STORE_LIMIT and (
-            message.role in (MessageRole.TOOL_CALL, MessageRole.TOOL_RESULT)
+            message.role in (MessageRole.TOOL_CALL, MessageRole.TOOL)
             or (message.role == MessageRole.USER and content.startswith("<TOOL_OUTPUT"))
         ):
             content = (
@@ -1571,7 +1571,7 @@ class ConversationStore:
         session.current_tokens += token_count
         session.last_activity = datetime.now()
 
-        if role in (MessageRole.TOOL_CALL, MessageRole.TOOL_RESULT):
+        if role in (MessageRole.TOOL_CALL, MessageRole.TOOL):
             session.tool_usage_count += 1
 
         if session.current_tokens > (session.max_tokens - session.reserved_tokens):
@@ -2097,7 +2097,7 @@ class ConversationStore:
                     f"""
                     SELECT * FROM messages
                     WHERE session_id = ?
-                    AND role = 'tool_result'
+                    AND role = 'tool'
                     AND tool_name IN ({placeholders})
                     ORDER BY timestamp DESC
                     LIMIT ?
@@ -2109,7 +2109,7 @@ class ConversationStore:
                     """
                     SELECT * FROM messages
                     WHERE session_id = ?
-                    AND role = 'tool_result'
+                    AND role = 'tool'
                     ORDER BY timestamp DESC
                     LIMIT ?
                     """,
@@ -2417,7 +2417,7 @@ class ConversationStore:
                     COUNT(m.id) AS message_count,
                     SUM(CASE WHEN m.role = 'user' THEN 1 ELSE 0 END) AS user_messages,
                     SUM(CASE WHEN m.role = 'assistant' THEN 1 ELSE 0 END) AS assistant_messages,
-                    SUM(CASE WHEN m.role IN ('tool_call', 'tool_result')
+                    SUM(CASE WHEN m.role IN ('tool_call', 'tool')
                         THEN 1 ELSE 0 END) AS tool_messages,
                     ROUND(
                         (JULIANDAY(MAX(m.timestamp)) - JULIANDAY(MIN(m.timestamp))) * 24 * 60,

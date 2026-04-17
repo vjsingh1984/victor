@@ -624,6 +624,18 @@ class ZAIProvider(BaseProvider):
         # Track which tool_call_ids have a matching assistant message
         valid_tool_call_ids: set = set()
 
+        # Log message composition for debugging tool-call flow
+        tool_msg_count = sum(1 for m in messages if getattr(m, "role", "") == "tool")
+        if tool_msg_count > 0:
+            for m in messages:
+                if getattr(m, "role", "") == "tool":
+                    self._provider_logger.logger.debug(
+                        "payload tool msg: name=%s tc_id=%s len=%d",
+                        getattr(m, "name", None),
+                        getattr(m, "tool_call_id", None),
+                        len(getattr(m, "content", "") or ""),
+                    )
+
         for msg in messages:
             formatted_msg: Dict[str, Any] = {
                 "role": msg.role,

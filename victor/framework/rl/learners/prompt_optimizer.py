@@ -1419,7 +1419,7 @@ class PromptOptimizerLearner(BaseLearner):
                                     reasoning_before="",
                                 )
                             )
-                        elif msg.role == MessageRole.TOOL_RESULT:
+                        elif msg.role == MessageRole.TOOL:
                             is_error = "error" in msg.content.lower()[:200]
                             if details:
                                 last = details[-1]

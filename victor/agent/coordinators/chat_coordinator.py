@@ -1146,8 +1146,8 @@ class ChatCoordinator:
                     "user": MessageRole.USER,
                     "assistant": MessageRole.ASSISTANT,
                     "system": MessageRole.SYSTEM,
-                    "tool": MessageRole.TOOL_RESULT,
-                    "tool_result": MessageRole.TOOL_RESULT,
+                    "tool": MessageRole.TOOL,
+                    "tool_result": MessageRole.TOOL,  # Legacy compat
                     "tool_call": MessageRole.TOOL_CALL,
                 }
                 msg_role = role_map.get(role, MessageRole.USER)
