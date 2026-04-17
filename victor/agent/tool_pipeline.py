@@ -1180,10 +1180,11 @@ class ToolPipeline:
         tool_history: List[Dict[str, Any]] = []
 
         for tool_call in unique_calls:
+            # Capture tool_call_id BEFORE execution so it's set even if the call fails
+            tc_id = tool_call.get("id") if isinstance(tool_call, dict) else None
             call_result = await self._execute_single_call(tool_call, context)
             # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec
-            if isinstance(tool_call, dict):
-                call_result.tool_call_id = tool_call.get("id")
+            call_result.tool_call_id = tc_id
             result.results.append(call_result)
 
             # Store result by signature for duplicate resolution (only for dict items)

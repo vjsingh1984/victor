@@ -51,7 +51,7 @@ class OrchestratorStub:
         self._all_files_read_nudge_sent = False
         self._task_completion_detector = None
         self.sanitizer = SimpleNamespace(sanitize=lambda text: text, strip_markup=lambda text: text)
-        self.add_message = lambda role, content: None
+        self.add_message = lambda role, content, **kwargs: None
         self._recovery_coordinator = SimpleNamespace(
             check_natural_completion=lambda *_, **__: None,
             get_recovery_fallback_message=lambda *_, **__: "fallback",

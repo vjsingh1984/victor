@@ -178,7 +178,7 @@ class TestConversationStore:
 
         manager.add_message(session.session_id, MessageRole.USER, "Hello")
         manager.add_message(session.session_id, MessageRole.ASSISTANT, "Hi there")
-        manager.add_message(session.session_id, MessageRole.TOOL_RESULT, "Tool output")
+        manager.add_message(session.session_id, MessageRole.TOOL, "Tool output")
 
         stats = manager.get_session_stats(session.session_id)
 

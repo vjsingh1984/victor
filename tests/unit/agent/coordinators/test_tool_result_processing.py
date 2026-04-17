@@ -23,6 +23,7 @@ class FakeCallResult:
     arguments: Optional[Dict[str, Any]] = None
     execution_time_ms: float = 100.0
     skipped: bool = False
+    tool_call_id: Optional[str] = None
 
 
 @dataclass
@@ -99,8 +100,10 @@ class TestProcessToolResults:
         assert "read" in ctx.executed_tools
         assert "/tmp/test.py" in ctx.observed_files
 
-        # Conversation injection
-        ctx.add_message.assert_called_once_with("user", "formatted")
+        # Conversation injection (role=tool per OpenAI spec with name and tool_call_id)
+        ctx.add_message.assert_called_once_with(
+            "tool", "formatted", name="read", tool_call_id=None
+        )
 
     def test_failed_tool_call(self):
         coord = self._make_coordinator()

@@ -658,7 +658,9 @@ class ContinuationStrategy:
         # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
         # If model says "let me call search()" but didn't actually call it, try to extract
         # the intended tool call from the text and execute it automatically.
-        if mentioned_tools and len(mentioned_tools) > 0:
+        # BUT: If the model indicated COMPLETION, don't override it — the model may
+        # mention tool names in its summary text without intending to call them.
+        if mentioned_tools and len(mentioned_tools) > 0 and not is_completion:
             logger.info(
                 f"Model mentioned tools but didn't call them: {mentioned_tools}. "
                 "Attempting to extract tool call from text."

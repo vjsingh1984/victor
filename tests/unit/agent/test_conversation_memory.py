@@ -48,7 +48,7 @@ class TestMessageRole:
         assert MessageRole.USER.value == "user"
         assert MessageRole.ASSISTANT.value == "assistant"
         assert MessageRole.TOOL_CALL.value == "tool_call"
-        assert MessageRole.TOOL_RESULT.value == "tool_result"
+        assert MessageRole.TOOL.value == "tool"
 
 
 # =============================================================================
@@ -545,7 +545,7 @@ class TestConversationMessageSerialization:
         """Convert tool result to provider format."""
         msg = ConversationMessage(
             id="msg-1",
-            role=MessageRole.TOOL_RESULT,
+            role=MessageRole.TOOL,
             content="Result",
             timestamp=datetime.now(),
             token_count=6,
