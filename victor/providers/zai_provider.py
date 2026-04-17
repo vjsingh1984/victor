@@ -681,6 +681,24 @@ class ZAIProvider(BaseProvider):
 
             formatted_messages.append(formatted_msg)
 
+        # Second pass: strip orphaned tool_calls from assistant messages.
+        # After compaction, an assistant message may have tool_calls but its
+        # tool responses were removed. Z.AI rejects this — tool_calls must
+        # have matching tool responses in the conversation.
+        present_tool_response_ids = {
+            m.get("tool_call_id")
+            for m in formatted_messages
+            if m.get("role") == "tool" and m.get("tool_call_id")
+        }
+        for msg in formatted_messages:
+            if msg.get("role") == "assistant" and "tool_calls" in msg:
+                tc_ids = {tc["id"] for tc in msg["tool_calls"] if "id" in tc}
+                if not tc_ids.issubset(present_tool_response_ids):
+                    # Remove tool_calls — responses were compacted away
+                    del msg["tool_calls"]
+                    if msg.get("content") is None:
+                        msg["content"] = ""
+
         payload: Dict[str, Any] = {
             "model": model,
             "messages": formatted_messages,
