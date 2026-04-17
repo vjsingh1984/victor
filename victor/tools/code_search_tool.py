@@ -719,8 +719,6 @@ async def _literal_search(
 
             try:
                 # Use asyncio subprocess to avoid blocking event loop
-                import asyncio
-
                 proc = await asyncio.create_subprocess_exec(
                     *find_cmd,
                     cwd=find_cwd,

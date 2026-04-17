@@ -1309,7 +1309,11 @@ def ensure_bootstrapped(
 
     # Check if already bootstrapped (Settings registered)
     if container.is_registered(Settings):
-        # Container already bootstrapped, but check if we need to switch verticals
+        # Container already bootstrapped — still run plugin discovery so capabilities
+        # from installed verticals (e.g. CodebaseIndex for graph tool) are registered
+        # even when no --vertical flag is passed.
+        _discover_plugin_capabilities(None)
+        # Check if we need to switch verticals
         if vertical is not None:
             _ensure_vertical_activated(container, settings or container.get(Settings), vertical)
         return container

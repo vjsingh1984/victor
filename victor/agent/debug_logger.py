@@ -56,6 +56,11 @@ logging.Logger.trace = trace  # type: ignore[attr-defined]
 
 logger = logging.getLogger(__name__)
 
+# Suppress HuggingFace auth warning EARLY — before any embedding model import
+# triggers it. The configure_logging_levels() call happens later, but the warning
+# fires during module-level import of sentence_transformers/huggingface_hub.
+logging.getLogger("huggingface_hub.utils._http").setLevel(logging.ERROR)
+
 # Third-party loggers to silence (they generate too much noise)
 NOISY_LOGGERS = [
     "httpcore",
