@@ -676,15 +676,13 @@ class ZAIProvider(BaseProvider):
                         )
                         continue
                 else:
-                    # Tool message without tool_call_id — convert to user message
-                    # so the model sees the tool output as context.
-                    # This happens when tool results don't have matching tool_calls
-                    # (e.g., injected by the streaming pipeline without proper pairing).
-                    formatted_msg["role"] = "user"
-                    if tool_name:
-                        # Preserve tool name context in the content
-                        prefix = f"[Tool result: {tool_name}]\n"
-                        formatted_msg["content"] = prefix + (formatted_msg.get("content") or "")
+                    # Tool message without tool_call_id — shouldn't happen with
+                    # proper propagation. Log and skip to avoid API rejection.
+                    self._provider_logger.logger.warning(
+                        "Tool message missing tool_call_id for '%s', skipping",
+                        tool_name or "unknown",
+                    )
+                    continue
 
             formatted_messages.append(formatted_msg)
 

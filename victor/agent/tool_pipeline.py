@@ -440,6 +440,9 @@ class ToolCallResult:
     code_corrected: bool = False
     code_validation_errors: Optional[List[str]] = None
 
+    # OpenAI-compatible tool_call_id — links response to assistant's tool_calls[].id
+    tool_call_id: Optional[str] = None
+
 
 @dataclass
 class PipelineExecutionResult:
@@ -1178,6 +1181,9 @@ class ToolPipeline:
 
         for tool_call in unique_calls:
             call_result = await self._execute_single_call(tool_call, context)
+            # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec
+            if isinstance(tool_call, dict):
+                call_result.tool_call_id = tool_call.get("id")
             result.results.append(call_result)
 
             # Store result by signature for duplicate resolution (only for dict items)
