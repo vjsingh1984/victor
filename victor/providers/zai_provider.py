@@ -662,9 +662,10 @@ class ZAIProvider(BaseProvider):
                         if not formatted_msg["content"]:
                             formatted_msg["content"] = None
 
-            # Tool response messages: validate tool_call_id exists
+            # Tool response messages: include tool_call_id if available
             elif msg.role == "tool":
                 tool_call_id = getattr(msg, "tool_call_id", None)
+                tool_name = getattr(msg, "name", None)
                 if tool_call_id:
                     formatted_msg["tool_call_id"] = tool_call_id
                     if tool_call_id not in valid_tool_call_ids:
@@ -675,9 +676,15 @@ class ZAIProvider(BaseProvider):
                         )
                         continue
                 else:
-                    # Tool message without tool_call_id — skip
-                    self._provider_logger.logger.debug("Skipping tool message without tool_call_id")
-                    continue
+                    # Tool message without tool_call_id — convert to user message
+                    # so the model sees the tool output as context.
+                    # This happens when tool results don't have matching tool_calls
+                    # (e.g., injected by the streaming pipeline without proper pairing).
+                    formatted_msg["role"] = "user"
+                    if tool_name:
+                        # Preserve tool name context in the content
+                        prefix = f"[Tool result: {tool_name}]\n"
+                        formatted_msg["content"] = prefix + (formatted_msg.get("content") or "")
 
             formatted_messages.append(formatted_msg)
 
