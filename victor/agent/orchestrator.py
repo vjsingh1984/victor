@@ -3046,7 +3046,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._tool_capability_warned = True
         return False
 
-    def add_message(self, role: str, content: str) -> None:
+    def add_message(self, role: str, content: str, **kwargs: Any) -> None:
         """Add a message to conversation history.
 
         Enforces max_conversation_history ceiling by removing oldest
@@ -3054,8 +3054,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         and usage logging are delegated to ``ChatCoordinator.persist_message``.
 
         Args:
-            role: Message role (user, assistant, system)
+            role: Message role (user, assistant, system, tool)
             content: Message content
+            **kwargs: Additional fields (name, tool_call_id, tool_calls)
         """
         max_history = getattr(self.settings, "max_conversation_history", 100)
         # Trim oldest non-system message when history exceeds limit.
@@ -3067,7 +3068,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     self.conversation._messages.pop(i)
                     break
 
-        self.conversation.add_message(role, content)
+        self.conversation.add_message(role, content, **kwargs)
 
         # Delegate persistence + usage logging to ChatCoordinator
         from victor.agent.coordinators.chat_coordinator import ChatCoordinator

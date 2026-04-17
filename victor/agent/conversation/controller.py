@@ -465,6 +465,27 @@ class ConversationController:
         # Keep top messages (up to target)
         messages_to_keep = scored_messages[:target]
 
+        # Preserve tool-call pairs: if an assistant message with tool_calls
+        # is kept, ensure its corresponding tool responses are also kept.
+        # This prevents orphaned tool_calls that cause HTTP 400 on Z.AI/OpenAI.
+        kept_indices = {sm.index for sm in messages_to_keep}
+        all_messages = self._history._messages  # Use normalized list
+        for sm in list(messages_to_keep):
+            if sm.message.role == "assistant" and getattr(sm.message, "tool_calls", None):
+                for tc in sm.message.tool_calls:
+                    tc_id = tc.get("id") if isinstance(tc, dict) else getattr(tc, "id", None)
+                    if tc_id:
+                        for i, msg in enumerate(all_messages):
+                            if (
+                                getattr(msg, "role", "") == "tool"
+                                and getattr(msg, "tool_call_id", "") == tc_id
+                                and i not in kept_indices
+                            ):
+                                messages_to_keep.append(
+                                    MessageImportance(msg, i, 999.0, "paired_tool_response")
+                                )
+                                kept_indices.add(i)
+
         # Sort by original index to maintain conversation order
         messages_to_keep.sort(key=lambda x: x.index)
 

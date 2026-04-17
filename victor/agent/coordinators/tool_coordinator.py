@@ -1216,7 +1216,7 @@ class ToolCoordinator:
                     else str(output)
                 )
                 if ctx.add_message:
-                    ctx.add_message("user", formatted_output)
+                    ctx.add_message("tool", formatted_output, name=tool_name)
                 results.append(
                     {
                         "name": tool_name,
@@ -1249,7 +1249,7 @@ class ToolCoordinator:
                     else str(error_output)
                 )
                 if ctx.add_message:
-                    ctx.add_message("user", formatted_error)
+                    ctx.add_message("tool", formatted_error, name=tool_name)
                 results.append(
                     {
                         "name": tool_name,
