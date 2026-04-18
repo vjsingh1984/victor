@@ -311,8 +311,20 @@ def _create_session_service(container: ServiceContainer) -> "SessionService":
         Configured SessionService instance
     """
     from victor.agent.services.session_service import SessionService
+    from victor.agent.session_state_manager import create_session_state_manager
 
-    return SessionService()
+    # Create required session state manager
+    session_state_manager = create_session_state_manager(
+        tool_budget=200,  # Default tool budget
+    )
+
+    # Create session service with required dependencies
+    # lifecycle_manager and memory_manager are optional and will be set later
+    return SessionService(
+        session_state_manager=session_state_manager,
+        lifecycle_manager=None,  # Will be set by component_assembler
+        memory_manager=None,  # Will be set by component_assembler
+    )
 
 
 def _create_chat_service(
