@@ -785,6 +785,47 @@ builtins_FileNotFoundError = (
 T = TypeVar("T")
 
 
+def _handle_error_impl(
+    e: Exception,
+    handler: ErrorHandler,
+    func_name: str,
+    args_count: int,
+    category: ErrorCategory,
+    recovery_hint: Optional[str],
+    reraise: bool,
+    default_return: Optional[Any],
+) -> Any:
+    """Shared error handling logic for sync and async decorators.
+
+    Args:
+        e: The exception to handle
+        handler: ErrorHandler instance
+        func_name: Name of the function that raised the error
+        args_count: Number of arguments passed to the function
+        category: Error category for logging
+        recovery_hint: Recovery hint to include in error
+        reraise: Whether to reraise the exception after logging
+        default_return: Value to return on error (if not reraising)
+
+    Returns:
+        default_return if not reraising
+
+    Raises:
+        VictorError: If reraise is True
+    """
+    error_info = handler.handle(
+        e, context={"function": func_name, "args_count": args_count}
+    )
+    if reraise:
+        raise VictorError(
+            str(e),
+            category=category,
+            recovery_hint=recovery_hint or error_info.recovery_hint,
+            cause=e,
+        ) from e
+    return default_return  # type: ignore
+
+
 def handle_errors(
     category: ErrorCategory = ErrorCategory.UNKNOWN,
     recovery_hint: Optional[str] = None,
@@ -814,17 +855,10 @@ def handle_errors(
             except VictorError:
                 raise  # Don't wrap VictorError
             except Exception as e:
-                error_info = handler.handle(
-                    e, context={"function": func.__name__, "args_count": len(args)}
+                return _handle_error_impl(
+                    e, handler, func.__name__, len(args),
+                    category, recovery_hint, reraise, default_return
                 )
-                if reraise:
-                    raise VictorError(
-                        str(e),
-                        category=category,
-                        recovery_hint=recovery_hint or error_info.recovery_hint,
-                        cause=e,
-                    ) from e
-                return default_return  # type: ignore
 
         return wrapper
 
@@ -848,17 +882,10 @@ def handle_errors_async(
             except VictorError:
                 raise
             except Exception as e:
-                error_info = handler.handle(
-                    e, context={"function": func.__name__, "args_count": len(args)}
+                return _handle_error_impl(
+                    e, handler, func.__name__, len(args),
+                    category, recovery_hint, reraise, default_return
                 )
-                if reraise:
-                    raise VictorError(
-                        str(e),
-                        category=category,
-                        recovery_hint=recovery_hint or error_info.recovery_hint,
-                        cause=e,
-                    ) from e
-                return default_return  # type: ignore
 
         return wrapper  # type: ignore
 
