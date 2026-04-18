@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 
 # Canonical enums from conversation/types.py
-from victor.agent.conversation.types import MessageRole, MessagePriority
+from victor.agent.conversation.types import ConversationMessage, MessageRole, MessagePriority
 
 # ML metadata extracted to victor/agent/ml_metadata.py
 from victor.agent.ml_metadata import (  # noqa: F401
@@ -74,67 +74,8 @@ from victor.agent.ml_metadata import (  # noqa: F401
 )
 
 
-@dataclass
-class ConversationMessage:
-    """A single message in the conversation."""
-
-    id: str
-    role: MessageRole
-    content: str
-    timestamp: datetime
-    token_count: int
-    priority: MessagePriority = MessagePriority.MEDIUM
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    # For tool calls/results
-    tool_name: Optional[str] = None
-    tool_call_id: Optional[str] = None
-
-    def to_provider_format(self) -> Dict[str, Any]:
-        """Convert to provider message format."""
-        base = {
-            "role": (
-                self.role.value
-                if self.role in (MessageRole.USER, MessageRole.ASSISTANT, MessageRole.SYSTEM)
-                else "assistant"
-            ),
-            "content": self.content,
-        }
-
-        # Handle tool-related messages
-        if self.role == MessageRole.TOOL and self.tool_call_id:
-            base["tool_call_id"] = self.tool_call_id
-
-        return base
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for serialization."""
-        return {
-            "id": self.id,
-            "role": self.role.value,
-            "content": self.content,
-            "timestamp": self.timestamp.isoformat(),
-            "token_count": self.token_count,
-            "priority": self.priority.value,
-            "tool_name": self.tool_name,
-            "tool_call_id": self.tool_call_id,
-            "metadata": self.metadata,
-        }
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "ConversationMessage":
-        """Create from dictionary."""
-        return cls(
-            id=data["id"],
-            role=MessageRole(data["role"]),
-            content=data["content"],
-            timestamp=datetime.fromisoformat(data["timestamp"]),
-            token_count=data["token_count"],
-            priority=MessagePriority(data["priority"]),
-            tool_name=data.get("tool_name"),
-            tool_call_id=data.get("tool_call_id"),
-            metadata=data.get("metadata", {}),
-        )
+# ConversationMessage is imported from types.py — single canonical definition.
+# Previously duplicated here; consolidated to avoid field drift.
 
 
 @dataclass
@@ -894,26 +835,31 @@ class ConversationStore:
 
             return sessions
 
-    def add_message(
+    def _add_message_impl(
         self,
         session_id: str,
         role: MessageRole,
         content: str,
-        priority: Optional[MessagePriority] = None,
-        tool_name: Optional[str] = None,
-        tool_call_id: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        priority: Optional[MessagePriority],
+        tool_name: Optional[str],
+        tool_call_id: Optional[str],
+        metadata: Optional[Dict[str, Any]],
+        tool_calls: Optional[List],
     ) -> ConversationMessage:
-        """Add a message to the conversation.
+        """Shared implementation for adding a message.
+
+        This contains all the common logic for both sync and async versions.
+        The only difference between sync/async is how persistence is handled.
 
         Args:
             session_id: Session identifier
-            role: Message role (user, assistant, system, etc.)
+            role: Message role
             content: Message content
-            priority: Message priority for pruning. Auto-determined if not provided.
-            tool_name: Tool name for tool calls/results
-            tool_call_id: Tool call ID for correlation
+            priority: Message priority (auto-determined if None)
+            tool_name: Tool name for tool calls
+            tool_call_id: Tool call ID
             metadata: Additional metadata
+            tool_calls: Tool calls list
 
         Returns:
             Created ConversationMessage
@@ -937,6 +883,7 @@ class ConversationStore:
             tool_name=tool_name,
             tool_call_id=tool_call_id,
             metadata=metadata or {},
+            tool_calls=tool_calls,
         )
 
         session.messages.append(message)
@@ -951,7 +898,41 @@ class ConversationStore:
         if session.current_tokens > (session.max_tokens - session.reserved_tokens):
             self._prune_context(session)
 
-        # Persist
+        return message
+
+    def add_message(
+        self,
+        session_id: str,
+        role: MessageRole,
+        content: str,
+        priority: Optional[MessagePriority] = None,
+        tool_name: Optional[str] = None,
+        tool_call_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        tool_calls: Optional[List] = None,
+    ) -> ConversationMessage:
+        """Add a message to the conversation.
+
+        Args:
+            session_id: Session identifier
+            role: Message role (user, assistant, system, etc.)
+            content: Message content
+            priority: Message priority for pruning. Auto-determined if not provided.
+            tool_name: Tool name for tool calls/results
+            tool_call_id: Tool call ID for correlation
+            metadata: Additional metadata
+            tool_calls: Tool calls list for assistant messages (OpenAI spec)
+
+        Returns:
+            Created ConversationMessage
+        """
+        # Call shared implementation
+        message = self._add_message_impl(
+            session_id, role, content, priority,
+            tool_name, tool_call_id, metadata, tool_calls
+        )
+
+        # Persist (sync SQLite I/O)
         self._persist_message(session_id, message)
         self._update_session_activity(session_id)
 
@@ -960,7 +941,7 @@ class ConversationStore:
 
         logger.debug(
             f"Added {role.value} message to {session_id}. "
-            f"Tokens: {token_count}, Total: {session.current_tokens}"
+            f"Tokens: {message.token_count}"
         )
 
         return message
@@ -1476,7 +1457,7 @@ class ConversationStore:
     # Max chars for tool output content stored in SQLite.
     # Full content is only needed during the active session (in-memory).
     # Historical records keep a truncated version to save space.
-    _TOOL_OUTPUT_STORE_LIMIT = 2000
+    _TOOL_OUTPUT_STORE_LIMIT = 8000
 
     def _persist_message(self, session_id: str, message: ConversationMessage):
         """Persist message to database.
@@ -1498,6 +1479,12 @@ class ConversationStore:
                 f"for storage]"
             )
 
+        # Merge tool_calls into metadata for persistence so assistant
+        # messages that requested tool calls can be fully reconstructed.
+        meta = dict(message.metadata) if message.metadata else {}
+        if message.tool_calls:
+            meta["tool_calls"] = message.tool_calls
+
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
                 """
@@ -1516,7 +1503,7 @@ class ConversationStore:
                     message.priority.value,
                     message.tool_name,
                     message.tool_call_id,
-                    json_dumps(message.metadata),
+                    json_dumps(meta),
                 ),
             )
 
@@ -1542,42 +1529,22 @@ class ConversationStore:
         tool_name: Optional[str] = None,
         tool_call_id: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        tool_calls: Optional[List] = None,
     ) -> "ConversationMessage":
         """Async variant of add_message.
 
         In-memory work runs on the calling coroutine. Blocking
         SQLite I/O is offloaded to the default thread executor.
         """
-        session = self._get_or_create_session(session_id)
+        import asyncio
 
-        if priority is None:
-            priority = self._determine_priority(role, tool_name)
-
-        token_count = self._estimate_tokens(content)
-
-        message = ConversationMessage(
-            id=self._generate_message_id(),
-            role=role,
-            content=content,
-            timestamp=datetime.now(),
-            token_count=token_count,
-            priority=priority,
-            tool_name=tool_name,
-            tool_call_id=tool_call_id,
-            metadata=metadata or {},
+        # Call shared implementation
+        message = self._add_message_impl(
+            session_id, role, content, priority,
+            tool_name, tool_call_id, metadata, tool_calls
         )
 
-        session.messages.append(message)
-        session.current_tokens += token_count
-        session.last_activity = datetime.now()
-
-        if role in (MessageRole.TOOL_CALL, MessageRole.TOOL):
-            session.tool_usage_count += 1
-
-        if session.current_tokens > (session.max_tokens - session.reserved_tokens):
-            self._prune_context(session)
-
-        # Offload blocking SQLite I/O to thread pool
+        # Persist (async SQLite I/O - offloaded to thread pool)
         await asyncio.to_thread(self._persist_message, session_id, message)
         await asyncio.to_thread(self._update_session_activity, session_id)
 
@@ -1585,8 +1552,8 @@ class ConversationStore:
             "Added %s message to %s (async). " "Tokens: %d, Total: %d",
             role.value,
             session_id,
-            token_count,
-            session.current_tokens,
+            message.token_count,
+            message.session.current_tokens,
         )
         return message
 
