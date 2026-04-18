@@ -2,10 +2,15 @@
 
 These types were originally defined in victor.core.vertical_types and
 victor.security.safety.types. They are promoted here so that external
-verticals can use SDK protocols without importing from victor.core.*.
+verticals can use SDK protocols without importing from victor.core.*
 
 All types in this module are pure data structures with ZERO runtime
 dependencies on the victor package.
+
+NOTE: StageValidationResult and ValidationError are duplicated from
+victor.core.verticals.protocols.stages. This duplication is INTENTIONAL
+and NECESSARY to avoid circular imports between victor.core and victor_sdk.
+When updating either definition, please update BOTH to maintain consistency.
 """
 
 from __future__ import annotations
@@ -184,9 +189,16 @@ class ToolSelectionResult:
 # Stage Contract Types (promoted from victor.core.verticals.protocols.stages)
 # =============================================================================
 
+# NOTE: These definitions are duplicated from victor.core.verticals.protocols.stages
+# to maintain SDK independence. When updating, update BOTH files.
+
 
 class ValidationError(Enum):
-    """Types of validation errors for stage definitions."""
+    """Types of validation errors for stage definitions.
+
+    NOTE: Duplicated from victor.core.verticals.protocols.stages
+    to avoid circular imports. Keep both definitions in sync.
+    """
 
     MISSING_REQUIRED_STAGE = "missing_required_stage"
     INVALID_TRANSITION = "invalid_transition"
@@ -206,6 +218,9 @@ class StageValidationResult:
         errors: List of validation errors
         warnings: List of validation warnings
         details: Additional validation details
+
+    NOTE: Duplicated from victor.core.verticals.protocols.stages
+    to avoid circular imports. Keep both definitions in sync.
     """
 
     is_valid: bool
@@ -232,6 +247,7 @@ class StageValidationResult:
         }
 
 
+# Type aliases for backward compatibility
 SafetyPattern = SafetyPatternData
 TaskTypeHint = TaskTypeHintData
 
