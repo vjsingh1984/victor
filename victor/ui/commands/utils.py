@@ -471,10 +471,21 @@ async def preload_semantic_index(
         if cache_entry and not force:
             console_obj.print("[dim]✓ Semantic index already loaded[/]")
             return True
-        console_obj.print("[dim]⏳ Building semantic code index (one-time)...[/]")
-        start_time = time.time()
-        index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
-        elapsed = time.time() - start_time
+
+        # Show progress during indexing (can take 20-30s)
+        from rich.console import Console as RichConsole
+
+        if isinstance(console_obj, RichConsole):
+            with console_obj.status("[bold green]Building semantic code index (one-time)...[/]", spinner="dots") as status:
+                status.update("Indexing files...")
+                start_time = time.time()
+                index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
+                elapsed = time.time() - start_time
+        else:
+            console_obj.print("[dim]⏳ Building semantic code index (one-time)...[/]")
+            start_time = time.time()
+            index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)
+            elapsed = time.time() - start_time
 
         # Get graph stats if available
         graph_stats = ""
