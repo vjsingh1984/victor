@@ -89,38 +89,35 @@ def chat(
         "-m",
         help="Message to send (alternative to positional arg, works anywhere in command).",
     ),
+    # Core options (always visible - beginner friendly)
     profile: str = typer.Option(
         "default",
         "--profile",
         "-p",
         help="Profile to use from profiles.yaml",
     ),
+    provider: Optional[str] = typer.Option(
+        None,
+        "--provider",
+        help="Override provider (e.g., ollama, anthropic, openai). Uses provider's default model if --model not specified.",
+        case_sensitive=False,
+    ),
+    model: Optional[str] = typer.Option(
+        None,
+        "--model",
+        help="Override model identifier (optional if --provider specified).",
+    ),
     stream: bool = typer.Option(
         True,
         "--stream/--no-stream",
-        help="Stream responses",
-    ),
-    log_level: str = typer.Option(
-        None,
-        "--log-level",
-        "-l",
-        help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to WARNING or VICTOR_LOG_LEVEL env var.",
-        case_sensitive=False,
-        rich_help_panel="Logging",
-    ),
-    debug_modules: str = typer.Option(
-        None,
-        "--debug-modules",
-        help="Comma-separated modules to set to DEBUG level (e.g., code_search,agent_adapter).",
-        rich_help_panel="Logging",
+        help="Stream responses in real-time",
     ),
     thinking: bool = typer.Option(
         False,
         "--thinking/--no-thinking",
         help="Enable extended thinking/reasoning mode (Claude models). Shows model's reasoning process.",
-        rich_help_panel="Agent Behavior",
     ),
-    # Automation-friendly options
+    # Output options
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -139,12 +136,6 @@ def chat(
         help="Extract and output only code blocks from response.",
         rich_help_panel="Output Format",
     ),
-    stdin: bool = typer.Option(
-        False,
-        "--stdin",
-        help="Read input from stdin (supports multi-line).",
-        rich_help_panel="Input",
-    ),
     quiet: bool = typer.Option(
         False,
         "--quiet",
@@ -152,48 +143,12 @@ def chat(
         help="Suppress status messages (only output response).",
         rich_help_panel="Output Format",
     ),
-    renderer: str = typer.Option(
-        "auto",
-        "--renderer",
-        help="Renderer to use for streaming output: auto, rich, rich-text, or text.",
-        case_sensitive=False,
-        rich_help_panel="Output Format",
-    ),
-    mode: Optional[str] = typer.Option(
-        None,
-        "--mode",
-        help="Initial agent mode: build, plan, or explore.",
-        case_sensitive=False,
-        rich_help_panel="Agent Behavior",
-    ),
-    tool_budget: Optional[int] = typer.Option(
-        None,
-        "--tool-budget",
-        help="Override tool call budget for this session.",
-        rich_help_panel="Agent Behavior",
-    ),
-    max_iterations: Optional[int] = typer.Option(
-        None,
-        "--max-iterations",
-        help="Override maximum total iterations for this session.",
-        rich_help_panel="Agent Behavior",
-    ),
-    provider: Optional[str] = typer.Option(
-        None,
-        "--provider",
-        help="Override provider (e.g., ollama, lmstudio, vllm, openai).",
-        case_sensitive=False,
-    ),
-    model: Optional[str] = typer.Option(
-        None,
-        "--model",
-        help="Override model identifier.",
-    ),
-    endpoint: Optional[str] = typer.Option(
-        None,
-        "--endpoint",
-        help="Override base URL for local providers (ollama, lmstudio, vllm).",
-        rich_help_panel="Auth & Compatibility",
+    # Input options
+    stdin: bool = typer.Option(
+        False,
+        "--stdin",
+        help="Read input from stdin (supports multi-line).",
+        rich_help_panel="Input",
     ),
     input_file: Optional[str] = typer.Option(
         None,
@@ -202,20 +157,98 @@ def chat(
         help="Read input from file instead of argument.",
         rich_help_panel="Input",
     ),
+    # Logging options
+    log_level: str = typer.Option(
+        None,
+        "--log-level",
+        "-l",
+        help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to WARNING or VICTOR_LOG_LEVEL env var.",
+        case_sensitive=False,
+        rich_help_panel="Logging",
+    ),
+    # Advanced options (grouped for progressive disclosure)
+    debug_modules: str = typer.Option(
+        None,
+        "--debug-modules",
+        help="Comma-separated modules to set to DEBUG level (e.g., code_search,agent_adapter).",
+        rich_help_panel="Advanced Logging",
+    ),
+    enable_observability: bool = typer.Option(
+        True,
+        "--observability/--no-observability",
+        help="Enable observability integration for event tracking.",
+        rich_help_panel="Advanced Logging",
+    ),
+    log_events: bool = typer.Option(
+        False,
+        "--log-events",
+        help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
+        rich_help_panel="Advanced Logging",
+    ),
+    show_reasoning: bool = typer.Option(
+        False,
+        "--show-reasoning",
+        help="Show LLM reasoning/thinking content in output.",
+        rich_help_panel="Advanced Output",
+    ),
+    renderer: str = typer.Option(
+        "auto",
+        "--renderer",
+        help="Renderer to use for streaming output: auto, rich, rich-text, or text.",
+        case_sensitive=False,
+        rich_help_panel="Advanced Output",
+    ),
+    mode: Optional[str] = typer.Option(
+        None,
+        "--mode",
+        help="Initial agent mode: build, plan, or explore.",
+        case_sensitive=False,
+        rich_help_panel="Advanced Agent Behavior",
+    ),
+    tool_budget: Optional[int] = typer.Option(
+        None,
+        "--tool-budget",
+        help="Override tool call budget for this session.",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
+    max_iterations: Optional[int] = typer.Option(
+        None,
+        "--max-iterations",
+        help="Override maximum total iterations for this session.",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
     preindex: bool = typer.Option(
         False,
         "--preindex",
         help="Preload semantic code index at startup (avoids 20-30s delay on first search).",
-        rich_help_panel="Agent Behavior",
+        rich_help_panel="Advanced Agent Behavior",
     ),
     vertical: Optional[str] = typer.Option(
         None,
         "--vertical",
         "-V",
-        help=f"Vertical template to use ({', '.join(list_verticals()) or 'coding, research, devops'}). "
-        "By default, no vertical is applied (uses standard CodingAssistant behavior with framework features).",
-        rich_help_panel="Agent Behavior",
+        help=f"Vertical template to use ({', '.join(list_verticals()) or 'coding, research, devops'}).",
+        rich_help_panel="Advanced Agent Behavior",
     ),
+    auto_skill: Optional[bool] = typer.Option(
+        None,
+        "--auto-skill/--no-auto-skill",
+        help="Enable/disable automatic skill selection based on message content.",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
+    enable_planning: Optional[bool] = typer.Option(
+        None,
+        "--planning/--no-planning",
+        help="Enable structured planning for complex multi-step tasks.",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
+    planning_model: Optional[str] = typer.Option(
+        None,
+        "--planning-model",
+        help="Override model for planning tasks (e.g., 'deepseek-chat').",
+        rich_help_panel="Advanced Agent Behavior",
+    ),
+    # Workflow options (grouped separately)
     workflow: Optional[str] = typer.Option(
         None,
         "--workflow",
@@ -233,7 +266,7 @@ def chat(
         None,
         "--render",
         "-r",
-        help="Render workflow DAG (ascii, mermaid, d2, dot, plantuml, svg, png). Use with --workflow.",
+        help="Render workflow DAG (ascii, mermaid, d2, dot, plantuml, svg, png).",
         rich_help_panel="Workflow",
     ),
     render_output: Optional[str] = typer.Option(
@@ -243,64 +276,7 @@ def chat(
         help="Output file for rendered diagram. Required for svg/png formats.",
         rich_help_panel="Workflow",
     ),
-    auth_mode: Optional[str] = typer.Option(
-        None,
-        "--auth-mode",
-        help="Authentication mode: 'api_key' (default) or 'oauth' (for OpenAI Codex, Qwen Coding Plan).",
-        case_sensitive=False,
-        rich_help_panel="Auth & Compatibility",
-    ),
-    coding_plan: bool = typer.Option(
-        False,
-        "--coding-plan",
-        help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
-        rich_help_panel="Auth & Compatibility",
-    ),
-    legacy_mode: bool = typer.Option(
-        False,
-        "--legacy",
-        help="Use legacy orchestrator creation path (bypasses FrameworkShim). "
-        "For backward compatibility and troubleshooting.",
-        rich_help_panel="Auth & Compatibility",
-    ),
-    enable_observability: bool = typer.Option(
-        True,
-        "--observability/--no-observability",
-        help="Enable observability integration for event tracking.",
-        rich_help_panel="Logging",
-    ),
-    log_events: bool = typer.Option(
-        False,
-        "--log-events",
-        help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
-        rich_help_panel="Logging",
-    ),
-    show_reasoning: bool = typer.Option(
-        False,
-        "--show-reasoning",
-        help="Show LLM reasoning/thinking content in output.",
-        rich_help_panel="Output Format",
-    ),
-    auto_skill: Optional[bool] = typer.Option(
-        None,
-        "--auto-skill/--no-auto-skill",
-        help="Enable/disable automatic skill selection based on message content. Default: from settings.",
-        rich_help_panel="Agent Behavior",
-    ),
-    enable_planning: Optional[bool] = typer.Option(
-        None,
-        "--planning/--no-planning",
-        help="Enable structured planning for complex multi-step tasks. Default: auto-detect via query classification.",
-        rich_help_panel="Agent Behavior",
-    ),
-    planning_model: Optional[str] = typer.Option(
-        None,
-        "--planning-model",
-        help="Override model for planning tasks (e.g., 'qwen3-coder-tools:30b-128K', 'deepseek-chat'). "
-        "Takes precedence over profile planning_model setting.",
-        rich_help_panel="Agent Behavior",
-    ),
-    # Session management options
+    # Session options (grouped separately)
     list_sessions: bool = typer.Option(
         False,
         "--sessions",
@@ -313,11 +289,37 @@ def chat(
         help="Resume specific session by ID.",
         rich_help_panel="Session",
     ),
+    # Auth & Compatibility (expert options)
+    endpoint: Optional[str] = typer.Option(
+        None,
+        "--endpoint",
+        help="Override base URL for local providers (ollama, lmstudio, vllm).",
+        rich_help_panel="Expert Auth & Compatibility",
+    ),
+    auth_mode: Optional[str] = typer.Option(
+        None,
+        "--auth-mode",
+        help="Authentication mode: 'api_key' (default) or 'oauth' (for OpenAI Codex, Qwen).",
+        case_sensitive=False,
+        rich_help_panel="Expert Auth & Compatibility",
+    ),
+    coding_plan: bool = typer.Option(
+        False,
+        "--coding-plan",
+        help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
+        rich_help_panel="Expert Auth & Compatibility",
+    ),
+    legacy_mode: bool = typer.Option(
+        False,
+        "--legacy",
+        help="Use legacy orchestrator creation path (bypasses FrameworkShim). For troubleshooting only.",
+        rich_help_panel="Expert Auth & Compatibility",
+    ),
     tui: bool = typer.Option(
         False,
         "--tui/--no-tui",
         help="Use modern TUI interface. Use --no-tui for simple CLI mode (default).",
-        rich_help_panel="Logging",
+        rich_help_panel="Expert Interface",
     ),
 ):
     """Start interactive chat or send a one-shot message."""
@@ -496,12 +498,48 @@ def chat(
 
         # Apply provider/model/endpoint overrides by creating a synthetic profile
         if provider or model or endpoint:
-            if not provider or not model:
-                console.print(
-                    "[bold red]Error:[/] --provider and --model must be provided together when overriding profiles."
-                )
-                raise typer.Exit(1)
-            provider = provider.lower()
+            # Early validation: endpoint is only supported for local providers
+            if endpoint and provider:
+                provider_lower = provider.lower()
+                local_providers = {"ollama", "lmstudio", "vllm", "mlx", "llama.cpp"}
+                if provider_lower not in local_providers:
+                    console.print(
+                        f"[bold red]Error:[/] --endpoint is only supported for local providers "
+                        f"(ollama, lmstudio, vllm, mlx, llama.cpp). Got: {provider}"
+                    )
+                    console.print(
+                        "[dim]Hint: Cloud providers (anthropic, openai, google, etc.) use fixed endpoints.[/]"
+                    )
+                    raise typer.Exit(1)
+
+            # If only provider is specified, resolve default model
+            if provider and not model:
+                provider = provider.lower()
+                # Default models for each provider
+                default_models = {
+                    "anthropic": "claude-3-5-sonnet-20241022",
+                    "openai": "gpt-4o",
+                    "google": "gemini-2.0-flash-exp",
+                    "ollama": "qwen2.5-coder:7b",
+                    "lmstudio": "local-model",
+                    "vllm": "local-model",
+                    "deepseek": "deepseek-chat",
+                    "xai": "grok-beta",
+                    "zai": "glm-4.7",
+                    "cohere": "command-r-plus",
+                    "azure": "gpt-4o",
+                }
+
+                model = default_models.get(provider)
+                if model is None:
+                    console.print(
+                        f"[bold red]Error:[/] No default model known for provider '{provider}'. "
+                        f"Please specify --model."
+                    )
+                    raise typer.Exit(1)
+                console.print(f"[dim]Using default model for {provider}: {model}[/]")
+            elif provider:
+                provider = provider.lower()
 
             extra_fields = {}
             if endpoint:
@@ -513,10 +551,6 @@ def chat(
                         settings.provider.lmstudio_base_urls = [endpoint]
                     elif provider == "vllm":
                         settings.provider.vllm_base_url = endpoint
-                else:
-                    console.print(
-                        "[bold yellow]Warning:[/] --endpoint is ignored for this provider."
-                    )
 
             if auth_mode:
                 extra_fields["auth_mode"] = auth_mode.lower()
@@ -635,14 +669,13 @@ async def run_oneshot(
     session_id = str(uuid.uuid4())
     success = False
     tool_calls_made = 0
-    task_type: Optional[str] = None
 
     try:
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
 
         classifier = ComplexityClassifier(use_semantic=False)
         classification = classifier.classify(message)
-        task_type = classification.complexity.value
+        _task_type = classification.complexity.value  # Currently unused, logged for debugging
     except Exception:
         pass
 
@@ -675,17 +708,22 @@ async def run_oneshot(
         from victor.framework.agent_factory import AgentFactory, InitializationError
 
         vertical_class = get_vertical(vertical) if vertical else None
-        factory = AgentFactory(
-            settings=settings,
-            profile=profile,
-            vertical=vertical_class,
-            thinking=thinking,
-            session_id=session_id,
-            enable_observability=enable_observability,
-            tool_budget=tool_budget,
-            max_iterations=max_iterations if "max_iterations" in dir() else None,
-        )
-        try:
+
+        # Show initialization progress for first-time setup (can take 20-30s)
+        with console.status("[bold green]Initializing Victor...[/]", spinner="dots") as status:
+            status.update("Loading configuration...")
+            factory = AgentFactory(
+                settings=settings,
+                profile=profile,
+                vertical=vertical_class,
+                thinking=thinking,
+                session_id=session_id,
+                enable_observability=enable_observability,
+                tool_budget=tool_budget,
+                max_iterations=max_iterations if "max_iterations" in dir() else None,
+            )
+
+            status.update("Creating agent...")
             agent = await factory.create()
 
             # Set planning model override if provided (for planning coordinator)
@@ -694,13 +732,6 @@ async def run_oneshot(
 
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
-        except InitializationError as e:
-            formatter.error(f"{e.stage}: {e.message}")
-            for s in e.suggestions:
-                formatter.info(f"  → {s}")
-            if e.run_command:
-                formatter.info(f"Run: {e.run_command}")
-            raise typer.Exit(1)
 
         if tool_budget is not None:
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
@@ -761,6 +792,14 @@ async def run_oneshot(
         if hasattr(agent, "get_session_metrics"):
             metrics = agent.get_session_metrics()
             tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
+
+    except InitializationError as e:
+        formatter.error(f"{e.stage}: {e.message}")
+        for s in e.suggestions:
+            formatter.info(f"  → {s}")
+        if e.run_command:
+            formatter.info(f"Run: {e.run_command}")
+        raise typer.Exit(1)
     except Exception as e:
         formatter.error(str(e))
         raise typer.Exit(1)
