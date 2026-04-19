@@ -365,8 +365,12 @@ class ProviderRetryStrategy:
     """
     Intelligent provider retry strategy with exponential backoff and jitter.
 
+    This class now extends BaseRetryStrategy from victor.core.retry to
+    eliminate duplicate retry logic. Provider-specific features (retryable
+    patterns, status codes, Retry-After headers) are handled via adapter methods.
+
     Renamed from RetryStrategy to be semantically distinct:
-    - ProviderRetryStrategy (here): Concrete provider retry with execute()
+    - ProviderRetryStrategy (here): Concrete provider retry with provider-specific logic
     - BaseRetryStrategy (victor.core.retry): Abstract base with should_retry(), get_delay()
     - BatchRetryStrategy (victor.workflows.batch_executor): Enum for batch retry modes
 
@@ -374,7 +378,12 @@ class ProviderRetryStrategy:
     - Exponential backoff with configurable base
     - Random jitter to prevent thundering herd
     - Respects Retry-After headers from rate limit responses
-    - Configurable retryable conditions
+    - Configurable retryable conditions (provider-specific patterns, status codes)
+    - Integrates with core BaseRetryStrategy for consistent retry behavior
+
+    Architecture:
+        Uses BaseRetryStrategy internally for retry decision logic, while
+        providing provider-specific enhancements through adapter methods.
 
     Usage:
         retry = ProviderRetryStrategy()
@@ -391,10 +400,26 @@ class ProviderRetryStrategy:
         Args:
             config: Retry configuration
         """
+        from victor.core.retry import (
+            BaseRetryStrategy,
+            ExponentialBackoffStrategy,
+            RetryContext,
+        )
+
         self.config = config or ProviderRetryConfig()
         self._compiled_patterns = [
             re.compile(p, re.IGNORECASE) for p in self.config.retryable_patterns
         ]
+
+        # Use core BaseRetryStrategy for standard retry logic
+        # ProviderRetryConfig maps to ExponentialBackoffStrategy parameters
+        self._base_strategy = ExponentialBackoffStrategy(
+            max_attempts=self.config.max_retries + 1,  # BaseRetryStrategy counts attempts, ProviderRetryStrategy counts retries
+            base_delay=self.config.base_delay_seconds,
+            max_delay=self.config.max_delay_seconds,
+            multiplier=self.config.exponential_base,
+            jitter=self.config.jitter_factor,
+        )
 
         logger.debug(
             f"ProviderRetryStrategy initialized. "
@@ -410,6 +435,9 @@ class ProviderRetryStrategy:
     ) -> T:
         """Execute function with retry logic.
 
+        Uses core BaseRetryStrategy for retry decisions, with provider-specific
+        enhancements for error detection and Retry-After header handling.
+
         Args:
             func: Async function to execute
             *args: Positional arguments for func
@@ -421,32 +449,43 @@ class ProviderRetryStrategy:
         Raises:
             RetryExhaustedError: If all retries are exhausted
         """
-        last_exception: Optional[Exception] = None
+        from victor.core.retry import RetryContext
 
-        for attempt in range(self.config.max_retries + 1):
+        last_exception: Optional[Exception] = None
+        context = RetryContext(max_attempts=self.config.max_retries + 1)
+
+        while context.attempt < context.max_attempts:
+            context.attempt += 1
+
             try:
-                return await func(*args, **kwargs)
+                result = await func(*args, **kwargs)
+                # Notify base strategy of success
+                self._base_strategy.on_success(context)
+                return result
 
             except Exception as e:
                 last_exception = e
+                context.record_exception(e)
 
-                # Check if retryable
+                # Check provider-specific retryability (patterns, status codes, etc.)
                 if not self._is_retryable(e):
                     logger.debug(f"Non-retryable error: {e}")
                     raise
 
-                # Check if max retries exceeded
-                if attempt >= self.config.max_retries:
-                    logger.error(
-                        f"Max retries ({self.config.max_retries}) exceeded. " f"Last error: {e}"
-                    )
-                    raise RetryExhaustedError(self.config.max_retries, e)
+                # Use base strategy to determine if we should retry
+                if not self._base_strategy.should_retry(context):
+                    self._base_strategy.on_failure(context)
+                    raise RetryExhaustedError(context.attempt - 1, e)
 
-                # Calculate delay
-                delay = self._calculate_delay(attempt, e)
+                # Calculate delay using base strategy, with provider-specific override
+                delay = self._get_delay(context, e)
+
+                # Notify base strategy of retry
+                self._base_strategy.on_retry(context)
+                context.record_delay(delay)
 
                 logger.warning(
-                    f"Retry {attempt + 1}/{self.config.max_retries} "
+                    f"Retry {context.attempt}/{self.config.max_retries} "
                     f"after {delay:.2f}s. Error: {e}"
                 )
 
@@ -454,8 +493,29 @@ class ProviderRetryStrategy:
 
         # Should not reach here, but just in case
         if last_exception:
-            raise RetryExhaustedError(self.config.max_retries, last_exception)
+            raise RetryExhaustedError(context.attempt, last_exception)
         raise RuntimeError("Unexpected state in retry loop")
+
+    def _get_delay(self, context: "RetryContext", error: Exception) -> float:
+        """Calculate delay before next retry attempt.
+
+        Uses provider-specific Retry-After header if available, otherwise
+        delegates to base strategy's delay calculation.
+
+        Args:
+            context: Current retry context
+            error: Exception that triggered retry
+
+        Returns:
+            Delay in seconds before next attempt
+        """
+        # Check for Retry-After header in error (provider-specific)
+        retry_after = self._extract_retry_after(error)
+        if retry_after is not None:
+            return min(retry_after, self.config.max_delay_seconds)
+
+        # Use base strategy's delay calculation
+        return self._base_strategy.get_delay(context)
 
     def _is_retryable(self, error: Exception) -> bool:
         """Check if error is retryable.
@@ -502,32 +562,6 @@ class ProviderRetryStrategy:
             current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
 
         return False
-
-    def _calculate_delay(self, attempt: int, error: Exception) -> float:
-        """Calculate delay before next retry.
-
-        Args:
-            attempt: Current attempt number (0-based)
-            error: Exception that triggered retry
-
-        Returns:
-            Delay in seconds
-        """
-        # Check for Retry-After header in error
-        retry_after = self._extract_retry_after(error)
-        if retry_after is not None:
-            return min(retry_after, self.config.max_delay_seconds)
-
-        # Exponential backoff
-        delay = self.config.base_delay_seconds * (self.config.exponential_base**attempt)
-
-        # Add jitter
-        jitter_range = delay * self.config.jitter_factor
-        jitter = random.uniform(-jitter_range, jitter_range)
-        delay += jitter
-
-        # Cap at max delay
-        return min(max(0, delay), self.config.max_delay_seconds)
 
     def _extract_retry_after(self, error: Exception) -> Optional[float]:
         """Extract Retry-After value from error if present.

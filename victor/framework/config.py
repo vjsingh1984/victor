@@ -1,23 +1,33 @@
 """Simplified configuration for the Victor framework API.
 
-For most use cases, you don't need this module - use Agent.create()
-keyword arguments instead. AgentConfig is for advanced configurations
-that go beyond the simple API.
+.. deprecated::
+    AgentConfig is deprecated. For simple cases, use Agent.create()
+    keyword arguments directly. For advanced multi-mode configuration,
+    use UnifiedAgentConfig from victor.agent.config.
+
+    Migration guide:
+    - Simple: agent = await Agent.create(tool_budget=100)
+    - Advanced: from victor.agent.config import UnifiedAgentConfig
+               config = UnifiedAgentConfig(mode="foreground", tool_budget=100)
+               agent = await factory.create_agent(config=config)
 
 Example:
     # Simple use case - no config needed
     agent = await Agent.create(provider="anthropic")
 
-    # Advanced use case
-    config = AgentConfig(
+    # Advanced use case with UnifiedAgentConfig
+    from victor.agent.config import UnifiedAgentConfig
+    config = UnifiedAgentConfig(
+        mode="foreground",
         tool_budget=100,
-        max_iterations=50,
         enable_semantic_search=True,
     )
-    agent = await Agent.create(config=config)
+    agent = await factory.create_agent(config=config)
 """
 
 from __future__ import annotations
+
+import warnings as _warnings
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
@@ -26,6 +36,11 @@ from typing import Any, Dict, Optional
 @dataclass
 class AgentConfig:
     """Advanced configuration options for agents.
+
+    .. deprecated::
+        Use UnifiedAgentConfig from victor.agent.config for advanced
+        multi-mode configuration. For simple foreground agents, use
+        Agent.create() keyword arguments directly.
 
     This class provides fine-grained control over agent behavior.
     For simple use cases, prefer Agent.create() keyword arguments.
@@ -47,10 +62,12 @@ class AgentConfig:
         extra: Additional settings passed through to Settings
 
     Example:
-        config = AgentConfig(
+        # Deprecated - use UnifiedAgentConfig instead
+        from victor.agent.config import UnifiedAgentConfig
+        config = UnifiedAgentConfig(
+            mode="foreground",
             tool_budget=100,
             enable_semantic_search=True,
-            extra={"custom_setting": "value"}
         )
     """
 
@@ -81,6 +98,16 @@ class AgentConfig:
 
     # Additional settings (pass-through to Settings)
     extra: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        """Emit deprecation warning on instantiation."""
+        _warnings.warn(
+            "AgentConfig is deprecated. Use UnifiedAgentConfig from "
+            "victor.agent.config for advanced configuration, or Agent.create() "
+            "keyword arguments for simple cases. This will be removed in v0.10.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def to_settings_dict(self) -> Dict[str, Any]:
         """Convert to Settings-compatible dictionary.
