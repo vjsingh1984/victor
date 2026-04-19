@@ -36,7 +36,9 @@ class CompactionSettings(BaseModel):
         "strategy selection between rule-based, LLM-based, and hybrid approaches."
     )
 
-    feature_flags: Optional[CompactionFeatureFlags] = Field(
+    # Feature flags for compaction (renamed from 'feature_flags' to avoid collision
+    # with Settings.feature_flags which is a different type)
+    compaction_feature_flags: Optional[CompactionFeatureFlags] = Field(
         default=None,
         description="Feature flags for compaction enhancements. "
         "Controls availability of different compaction strategies."
@@ -56,13 +58,25 @@ class CompactionSettings(BaseModel):
             )
         return self.strategy
 
-    def get_feature_flags(self) -> CompactionFeatureFlags:
+    def get_compaction_feature_flags(self) -> CompactionFeatureFlags:
         """Get compaction feature flags with defaults.
 
         Returns:
             CompactionFeatureFlags instance
         """
-        if self.feature_flags is None:
+        if self.compaction_feature_flags is None:
             # Enable all features by default
             return CompactionFeatureFlags()
-        return self.feature_flags
+        return self.compaction_feature_flags
+
+    # Backward compatibility alias
+    def get_feature_flags(self) -> CompactionFeatureFlags:
+        """Get compaction feature flags with defaults.
+
+        Deprecated: Use get_compaction_feature_flags() instead.
+        This method name collides with Settings.feature_flags which is a different type.
+
+        Returns:
+            CompactionFeatureFlags instance
+        """
+        return self.get_compaction_feature_flags()

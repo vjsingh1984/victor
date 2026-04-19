@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from victor.agent.compaction_hybrid import HybridCompactionSummarizer
     from victor.agent.compaction_rule_based import RuleBasedCompactionSummarizer
     from victor.agent.llm_compaction_summarizer import LLMCompactionSummarizer
+    from victor.agent.conversation.store import ConversationStore
 
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,7 @@ class CompactionRouter:
         rule_summarizer: "RuleBasedCompactionSummarizer",
         llm_summarizer: Optional["LLMCompactionSummarizer"] = None,
         hybrid_summarizer: Optional["HybridCompactionSummarizer"] = None,
+        conversation_store: Optional["ConversationStore"] = None,
     ):
         """Initialize compaction router.
 
@@ -150,12 +152,27 @@ class CompactionRouter:
             rule_summarizer: Rule-based summarizer (required)
             llm_summarizer: Optional LLM-based summarizer
             hybrid_summarizer: Optional hybrid summarizer
+            conversation_store: Optional conversation store for analytics logging
         """
         self._settings = settings
         self._feature_flags = feature_flags
         self._rule_summarizer = rule_summarizer
         self._llm_summarizer = llm_summarizer
         self._hybrid_summarizer = hybrid_summarizer
+        self._conversation_store = conversation_store
+
+        # Metrics collection
+        self._metrics = {
+            "total_compactions": 0,
+            "rule_based_count": 0,
+            "llm_based_count": 0,
+            "hybrid_count": 0,
+            "rule_based_success": 0,
+            "llm_based_success": 0,
+            "hybrid_success": 0,
+            "total_duration_ms": 0,
+            "total_tokens_saved": 0,
+        }
 
     async def compact(
         self,
@@ -220,6 +237,14 @@ class CompactionRouter:
             duration_ms = int((time.time() - start_time) * 1000)
             result.duration_ms = duration_ms
 
+            # Update metrics
+            self._update_metrics(
+                strategy=strategy,
+                duration_ms=duration_ms,
+                tokens_saved=result.tokens_saved,
+                success=True,
+            )
+
             # Log success
             await self._log_compaction_event(
                 messages,
@@ -244,6 +269,14 @@ class CompactionRouter:
                 complexity_score,
             )
             fallback_result.duration_ms = duration_ms
+
+            # Update metrics for fallback
+            self._update_metrics(
+                strategy=CompactionType.RULE_BASED,  # Always rule-based on fallback
+                duration_ms=duration_ms,
+                tokens_saved=fallback_result.tokens_saved,
+                success=True,  # Fallback succeeded even if original failed
+            )
 
             # Log fallback
             await self._log_compaction_event(
@@ -296,9 +329,11 @@ class CompactionRouter:
         if complexity_score < self._settings.llm_min_complexity:
             return CompactionType.RULE_BASED
 
-        # Medium path: borderline cases use hybrid
+        # Medium path: borderline cases use hybrid (if available)
+        # Check if hybrid summarizer is available before selecting hybrid strategy
         if (
-            message_count < self._settings.llm_min_messages
+            self._hybrid_summarizer is not None
+            and message_count < self._settings.llm_min_messages
             and estimated_tokens < self._settings.llm_min_tokens
         ):
             return CompactionType.HYBRID
@@ -504,8 +539,12 @@ class CompactionRouter:
         if not self._settings.store_compaction_history:
             return
 
+        if not self._conversation_store:
+            logger.debug("No conversation store provided, skipping compaction history logging")
+            return
+
         try:
-            # Log to analytics (in production, persist to database)
+            # Log to analytics (persist to database)
             logger.info(
                 f"Compaction event: strategy={strategy.value}, "
                 f"messages={len(messages)}, "
@@ -516,11 +555,56 @@ class CompactionRouter:
                 f"error={error_message}"
             )
 
-            # TODO: Persist to compaction_history table
-            # This would integrate with ConversationStore in production
+            # Persist to compaction_history table
+            self._conversation_store.store_compaction_history(
+                session_id=result.session_id or "unknown",
+                strategy_used=strategy.value,
+                message_count_before=len(messages),
+                message_count_after=result.removed_count,
+                token_count_before=result.tokens_saved + len(result.summary) * 4,  # Estimate
+                token_count_after=len(result.summary) * 4,  # Estimate
+                duration_ms=result.duration_ms,
+                llm_provider=None,  # TODO: Extract from result
+                llm_model=None,  # TODO: Extract from result
+                success=success,
+                error_message=error_message,
+            )
 
         except Exception as e:
             logger.warning(f"Failed to log compaction event: {e}")
+
+    def _update_metrics(
+        self,
+        strategy: CompactionType,
+        duration_ms: int,
+        tokens_saved: int,
+        success: bool,
+    ) -> None:
+        """Update in-memory metrics after compaction.
+
+        Args:
+            strategy: Strategy that was used
+            duration_ms: Duration in milliseconds
+            tokens_saved: Estimated tokens saved
+            success: Whether compaction succeeded
+        """
+        self._metrics["total_compactions"] += 1
+        self._metrics["total_duration_ms"] += duration_ms
+        self._metrics["total_tokens_saved"] += tokens_saved
+
+        # Update strategy-specific counters
+        if strategy == CompactionType.RULE_BASED:
+            self._metrics["rule_based_count"] += 1
+            if success:
+                self._metrics["rule_based_success"] += 1
+        elif strategy == CompactionType.LLM_BASED:
+            self._metrics["llm_based_count"] += 1
+            if success:
+                self._metrics["llm_based_success"] += 1
+        elif strategy == CompactionType.HYBRID:
+            self._metrics["hybrid_count"] += 1
+            if success:
+                self._metrics["hybrid_success"] += 1
 
     def get_strategy_statistics(self) -> Dict[str, Any]:
         """Get statistics about strategy usage.
@@ -528,13 +612,64 @@ class CompactionRouter:
         Returns:
             Dictionary with strategy usage statistics
         """
-        # TODO: Implement statistics tracking
+        return self._metrics.copy()
+
+    def get_performance_report(self) -> Dict[str, Any]:
+        """Get comprehensive performance report.
+
+        Returns:
+            Dictionary with detailed performance metrics:
+            - total_compactions: Total number of compactions
+            - strategy_usage: Breakdown by strategy type
+            - success_rates: Success rate per strategy
+            - performance_metrics: Duration and token savings per strategy
+        """
+        metrics = self._metrics
+
+        # Calculate success rates
+        rule_based_rate = (
+            metrics["rule_based_success"] / metrics["rule_based_count"]
+            if metrics["rule_based_count"] > 0 else 0.0
+        )
+        llm_based_rate = (
+            metrics["llm_based_success"] / metrics["llm_based_count"]
+            if metrics["llm_based_count"] > 0 else 0.0
+        )
+        hybrid_rate = (
+            metrics["hybrid_success"] / metrics["hybrid_count"]
+            if metrics["hybrid_count"] > 0 else 0.0
+        )
+
+        # Calculate averages
+        avg_duration = (
+            metrics["total_duration_ms"] / metrics["total_compactions"]
+            if metrics["total_compactions"] > 0 else 0.0
+        )
+        avg_tokens_saved = (
+            metrics["total_tokens_saved"] / metrics["total_compactions"]
+            if metrics["total_compactions"] > 0 else 0.0
+        )
+
         return {
-            "total_compactions": 0,
-            "rule_based_count": 0,
-            "llm_based_count": 0,
-            "hybrid_count": 0,
-            "fallback_count": 0,
-            "average_duration_ms": 0,
-            "average_tokens_saved": 0,
+            "total_compactions": metrics["total_compactions"],
+            "strategy_usage": {
+                "rule_based": metrics["rule_based_count"],
+                "llm_based": metrics["llm_based_count"],
+                "hybrid": metrics["hybrid_count"],
+            },
+            "success_rates": {
+                "rule_based": rule_based_rate,
+                "llm_based": llm_based_rate,
+                "hybrid": hybrid_rate,
+                "overall": (
+                    metrics["rule_based_success"] + metrics["llm_based_success"] + metrics["hybrid_success"]
+                ) / metrics["total_compactions"]
+                if metrics["total_compactions"] > 0 else 0.0
+            },
+            "performance_metrics": {
+                "avg_duration_ms": avg_duration,
+                "avg_tokens_saved": avg_tokens_saved,
+                "total_duration_ms": metrics["total_duration_ms"],
+                "total_tokens_saved": metrics["total_tokens_saved"],
+            },
         }

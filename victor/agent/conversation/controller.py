@@ -129,6 +129,14 @@ class ConversationConfig:
     recent_message_weight: float = COMPACTION_CONFIG.recent_message_weight
     semantic_relevance_threshold: float = SEMANTIC_THRESHOLDS.compaction_relevance
 
+    def __post_init__(self):
+        """Ensure compaction_strategy is a CompactionStrategy enum.
+
+        Allows passing strategy as string (e.g., "hybrid") and converts to enum.
+        """
+        if isinstance(self.compaction_strategy, str):
+            self.compaction_strategy = CompactionStrategy(self.compaction_strategy.lower())
+
 
 class ConversationController:
 
