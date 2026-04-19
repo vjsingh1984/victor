@@ -115,6 +115,9 @@ class FeatureFlag(Enum):
     # Phase 10 - Agentic Loop (single-turn execution with perception/evaluation)
     USE_AGENTIC_LOOP = "use_agentic_loop"
 
+    # Priority 4 - Learning from Execution (meta-learning, user feedback, explainability)
+    USE_LEARNING_FROM_EXECUTION = "use_learning_from_execution"
+
     # Phase 9 - Prompt Optimization (controlled via settings.prompt_optimization)
     # USE_PROMPT_OPTIMIZER → settings.prompt_optimization.enabled
     # USE_GEPA_V2          → settings.prompt_optimization.gepa.enabled

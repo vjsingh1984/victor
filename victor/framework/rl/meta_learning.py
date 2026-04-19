@@ -212,8 +212,19 @@ class MetaLearningCoordinator(RLCoordinator):
 _meta_coordinator: Optional[MetaLearningCoordinator] = None
 
 
-def get_meta_learning_coordinator() -> MetaLearningCoordinator:
-    """Get or create the singleton MetaLearningCoordinator."""
+def get_meta_learning_coordinator() -> "RLCoordinator":
+    """Get or create the MetaLearningCoordinator if the feature flag is enabled.
+
+    Returns MetaLearningCoordinator when USE_LEARNING_FROM_EXECUTION is enabled
+    (the default), or falls back to the base RLCoordinator for gradual rollout.
+    Disable with: VICTOR_USE_LEARNING_FROM_EXECUTION=false
+    """
+    from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+    if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
+        logger.debug("MetaLearning: USE_LEARNING_FROM_EXECUTION disabled, using base coordinator")
+        return get_rl_coordinator()
+
     global _meta_coordinator
     if _meta_coordinator is None:
         base = get_rl_coordinator()

@@ -311,3 +311,27 @@ class RecommendationExplainer:
             f"Tool '{tool_name}' for '{task_type}': {label} confidence ({blended:.0%}) "
             f"from {len(sources)} signal(s): {', '.join(sources)}"
         )
+
+
+def get_recommendation_explainer(coordinator: Any = None) -> Optional["RecommendationExplainer"]:
+    """Get a RecommendationExplainer if USE_LEARNING_FROM_EXECUTION is enabled.
+
+    Returns None when the flag is disabled so callers can gracefully skip
+    explanation without touching prod-critical paths.
+
+    Args:
+        coordinator: RLCoordinator instance; defaults to get_rl_coordinator()
+
+    Returns:
+        RecommendationExplainer, or None if feature flag is off
+    """
+    from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+    if not get_feature_flag_manager().is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
+        return None
+
+    if coordinator is None:
+        from victor.framework.rl.coordinator import get_rl_coordinator
+        coordinator = get_rl_coordinator()
+
+    return RecommendationExplainer(coordinator)

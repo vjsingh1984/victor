@@ -347,7 +347,80 @@ class RLMetricsExporter:
         for event_type, count in system.event_counts.items():
             lines.append(f'victor_rl_events_total{{event="{event_type}"}} {count}')
 
+        # Priority 4: Learning from Execution metrics (gated by feature flag)
+        try:
+            from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+            if get_feature_flag_manager().is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
+                lines.extend(self._export_priority4_metrics())
+        except Exception:
+            pass
+
         return "\n".join(lines)
+
+    def _export_priority4_metrics(self) -> List[str]:
+        """Export Priority 4 (Learning from Execution) Prometheus metrics.
+
+        Reads from existing learners and UsageAnalytics — no new DB queries.
+        """
+        lines: List[str] = []
+
+        if self._coordinator is None:
+            return lines
+
+        # User feedback learner metrics
+        try:
+            fb_learner = self._coordinator.get_learner("user_feedback")
+            if fb_learner is not None:
+                stats = fb_learner.get_feedback_stats()  # type: ignore[attr-defined]
+                lines.append("")
+                lines.append("# HELP victor_rl_user_feedback_total Total user feedback events")
+                lines.append("# TYPE victor_rl_user_feedback_total counter")
+                lines.append(f"victor_rl_user_feedback_total {stats.get('total_feedback', 0)}")
+
+                avg_rating = stats.get("avg_rating")
+                if avg_rating is not None:
+                    lines.append("")
+                    lines.append("# HELP victor_rl_user_feedback_avg_rating Average user rating (0-1)")
+                    lines.append("# TYPE victor_rl_user_feedback_avg_rating gauge")
+                    lines.append(f"victor_rl_user_feedback_avg_rating {avg_rating:.4f}")
+        except Exception as e:
+            logger.debug("Priority4 metrics: user_feedback skipped: %s", e)
+
+        # Model selector confidence thresholds
+        try:
+            model_learner = self._coordinator.get_learner("model_selector")
+            if model_learner is not None and hasattr(model_learner, "get_optimal_threshold"):
+                for decision_type in ("tool_necessity", "complexity", "task_type"):
+                    threshold = model_learner.get_optimal_threshold(decision_type)
+                    if threshold is not None:
+                        lines.append("")
+                        lines.append(
+                            f"# HELP victor_rl_confidence_threshold_{decision_type} "
+                            f"Learned confidence threshold for {decision_type}"
+                        )
+                        lines.append(f"# TYPE victor_rl_confidence_threshold_{decision_type} gauge")
+                        lines.append(
+                            f"victor_rl_confidence_threshold_{decision_type} {threshold:.4f}"
+                        )
+        except Exception as e:
+            logger.debug("Priority4 metrics: model_selector thresholds skipped: %s", e)
+
+        # Quality weights per-task personalization count
+        try:
+            qw_learner = self._coordinator.get_learner("quality_weights")
+            if qw_learner is not None and hasattr(qw_learner, "export_metrics"):
+                metrics = qw_learner.export_metrics()
+                pref_count = metrics.get("user_preference_count", 0)
+                lines.append("")
+                lines.append(
+                    "# HELP victor_rl_user_preferences_total Personalized quality weight preferences stored"
+                )
+                lines.append("# TYPE victor_rl_user_preferences_total counter")
+                lines.append(f"victor_rl_user_preferences_total {pref_count}")
+        except Exception as e:
+            logger.debug("Priority4 metrics: quality_weights skipped: %s", e)
+
+        return lines
 
 
 # Global singleton
