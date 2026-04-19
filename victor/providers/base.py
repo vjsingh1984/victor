@@ -103,6 +103,24 @@ class StreamingProvider(Protocol):
 
 
 @runtime_checkable
+class VisionProvider(Protocol):
+    """Protocol for providers that support multimodal (image) input.
+
+    Providers implementing this protocol can receive messages with
+    `images` populated and include image content in API requests.
+
+    Type checking:
+        if is_vision_provider(provider):
+            msg = Message(role="user", content="What's in this image?", images=[data_uri])
+            response = await provider.chat([msg], model=model)
+    """
+
+    def supports_vision(self) -> bool:
+        """Whether the provider supports image input in messages."""
+        ...
+
+
+@runtime_checkable
 class ToolCallingProvider(Protocol):
     """Protocol for providers that support tool/function calling.
 
@@ -138,6 +156,13 @@ class ToolCallingProvider(Protocol):
 
 
 # Helper functions for type checking
+def is_vision_provider(provider: Any) -> bool:
+    """Check if a provider supports multimodal (image) input."""
+    if hasattr(provider, "supports_vision"):
+        return provider.supports_vision()
+    return False
+
+
 def is_streaming_provider(provider: Any) -> bool:
     """Check if a provider supports streaming.
 
@@ -211,6 +236,10 @@ class Message(BaseModel):
     )
     tool_call_id: Optional[str] = Field(
         default=None, description="ID of the tool call being responded to"
+    )
+    images: Optional[List[str]] = Field(
+        default=None,
+        description="Image data URIs (data:image/png;base64,...) for multimodal user messages",
     )
 
     def to_dict(self) -> Dict[str, Any]:

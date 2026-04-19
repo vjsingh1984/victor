@@ -124,6 +124,31 @@ class AnthropicProvider(BaseProvider):
         """Anthropic supports streaming."""
         return True
 
+    def supports_vision(self) -> bool:
+        """Claude 3+ models support image input."""
+        return True
+
+    @staticmethod
+    def _serialize_message(msg: "Message") -> Dict[str, Any]:
+        """Serialize a Message to Anthropic API format, handling images."""
+        if msg.role == "user" and msg.images:
+            content: List[Dict[str, Any]] = []
+            for data_uri in msg.images:
+                # Strip the data URI prefix to get raw base64
+                if "," in data_uri:
+                    header, b64_data = data_uri.split(",", 1)
+                    media_type = header.split(":")[1].split(";")[0] if ":" in header else "image/png"
+                else:
+                    b64_data, media_type = data_uri, "image/png"
+                content.append({
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": b64_data},
+                })
+            if msg.content:
+                content.append({"type": "text", "text": msg.content})
+            return {"role": "user", "content": content}
+        return {"role": msg.role, "content": msg.content}
+
     def supports_prompt_caching(self) -> bool:
         """Anthropic explicit cache_control (90% read, 1.25x write premium, 5m-1h TTL)."""
         return True
@@ -177,12 +202,7 @@ class AnthropicProvider(BaseProvider):
                     if msg.role == "system":
                         system_message = msg.content
                     else:
-                        conversation_messages.append(
-                            {
-                                "role": msg.role,
-                                "content": msg.content,
-                            }
-                        )
+                        conversation_messages.append(self._serialize_message(msg))
 
                 # Build request parameters
                 request_params = {
