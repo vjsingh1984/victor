@@ -14,58 +14,28 @@
 
 """Unified execution context for all workflow runtimes.
 
-MIGRATION NOTICE: This module is deprecated for state management.
-
-For new code, use the canonical state management system:
-    - victor.state.WorkflowStateManager - Single workflow scope state
-    - victor.state.get_global_manager() - Unified access to all scopes
-
-This module is kept for backward compatibility and type definitions only.
-
----
-
-Legacy Documentation:
-
-This module provides a single, unified state type for workflow execution,
-consolidating the previously fragmented state types:
-
-- WorkflowContext (dataclass in executor.py) - used by WorkflowExecutor
-- WorkflowState (TypedDict in runtime_types.py) - used by StateGraphExecutor
-- WorkflowState (TypedDict in adapters.py) - used by workflow adapters
-
-The ExecutionContext TypedDict is designed to be compatible with all runtimes
-while providing a consistent interface for state management.
-
-Example:
-    # Create execution context
-    ctx: ExecutionContext = {
-        "data": {"input": "test"},
-        "_workflow_id": "wf-123",
-        "_current_node": "start",
-    }
-
-    # Access data
-    input_val = ctx.get("data", {}).get("input")
-
-    # Update state
-    ctx["_current_node"] = "process"
-    ctx["_node_results"] = {"start": {"success": True}}
+This module now uses Pydantic models for type-safe state management,
+replacing the legacy TypedDict-based approach.
 
 Migration Example:
-    # OLD (deprecated):
+    # OLD (TypedDict - deprecated):
     from victor.workflows.context import ExecutionContext, create_execution_context
     ctx = create_execution_context({"input": "test"})
 
-    # NEW (recommended):
-    from victor.state import WorkflowStateManager, StateScope
-    mgr = WorkflowStateManager()
-    await mgr.set("input", "test")  # Workflow scope
-    value = await mgr.get("input")
+    # NEW (Pydantic - recommended):
+    from victor.workflows.models import WorkflowExecutionContextModel
+    from victor.workflows.models.adapters import WorkflowExecutionContextAdapter
+    ctx = WorkflowExecutionContextAdapter.create_initial(
+        workflow_name="my_workflow",
+        initial_data={"input": "test"}
+    )
 
-    # OR for unified access across all scopes:
-    from victor.state import get_global_manager
-    state = get_global_manager()
-    await state.set("input", "test", scope=StateScope.WORKFLOW)
+    # Access is the same
+    input_val = ctx.data["input"]
+
+    # Update state
+    ctx.current_node = "process"
+    ctx.add_node_result("start", {"success": True})
 """
 
 from __future__ import annotations
@@ -81,12 +51,12 @@ from typing import (
     Dict,
     List,
     Optional,
-    TypedDict,
     Union,
 )
 
 from victor.core.async_utils import run_sync
-from victor.workflows.runtime_types import create_initial_workflow_state
+from victor.workflows.models import WorkflowExecutionContextModel
+from victor.workflows.models.adapters import WorkflowExecutionContextAdapter
 
 if TYPE_CHECKING:
     from victor.workflows.executor import NodeResult, TemporalContext, WorkflowContext
@@ -95,142 +65,19 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Unified Execution Context (TypedDict)
+# Type Aliases for Backward Compatibility
 # =============================================================================
 
-
-class ExecutionContext(TypedDict, total=False):
-    """Unified execution context for all workflow runtimes.
-
-    This TypedDict consolidates the state models from:
-    - WorkflowContext (executor.py) - dataclass for WorkflowExecutor
-    - WorkflowState (runtime_types.py) - TypedDict for StateGraphExecutor
-    - WorkflowState (adapters.py) - TypedDict for workflow adapters
-
-    All execution metadata uses underscore prefix to avoid conflicts with
-    user data keys.
-
-    Attributes:
-        # Core data (user-defined workflow data)
-        data: Shared context data dictionary
-        messages: Conversation messages (for agent workflows)
-
-        # Execution metadata (system-managed)
-        _workflow_id: Unique workflow execution ID
-        _workflow_name: Name of the workflow being executed
-        _current_node: Currently executing node ID
-        _node_results: Results from each executed node
-        _error: Error message if execution failed
-
-        # Iteration tracking (for loop detection)
-        _iteration: Current iteration count
-        _visited_nodes: List of visited node IDs
-
-        # Parallel execution
-        _parallel_results: Results from parallel node execution
-
-        # Human-in-the-loop
-        _hitl_pending: Whether waiting for human input
-        _hitl_response: Human response data
-
-        # Temporal context (for backtesting)
-        _as_of_date: Point-in-time date for temporal queries
-        _lookback_periods: Number of periods to look back
-        _include_end_date: Whether to include end date in ranges
-
-        # Completion tracking
-        _is_complete: Whether workflow has completed
-        _success: Whether workflow completed successfully
-    """
-
-    # Core data
-    data: Dict[str, Any]
-    messages: List[Dict[str, Any]]
-
-    # Execution metadata
-    _workflow_id: str
-    _workflow_name: str
-    _current_node: str
-    _node_results: Dict[str, Any]
-    _error: Optional[str]
-
-    # Iteration tracking
-    _iteration: int
-    _visited_nodes: List[str]
-
-    # Parallel execution
-    _parallel_results: Dict[str, Any]
-
-    # Human-in-the-loop
-    _hitl_pending: bool
-    _hitl_response: Optional[Dict[str, Any]]
-
-    # Temporal context
-    _as_of_date: Optional[str]
-    _lookback_periods: Optional[int]
-    _include_end_date: bool
-
-    # Completion tracking
-    _is_complete: bool
-    _success: bool
-
-
+# Type alias for backward compatibility
+ExecutionContext = WorkflowExecutionContextModel
 # =============================================================================
-# Context Factory Functions
-# =============================================================================
-
-
-def _build_execution_context(
-    *,
-    initial_data: Optional[Dict[str, Any]] = None,
-    messages: Optional[List[Dict[str, Any]]] = None,
-    workflow_id: Optional[str] = None,
-    workflow_name: str = "",
-    current_node: str = "",
-    node_results: Optional[Dict[str, Any]] = None,
-    error: Optional[str] = None,
-    iteration: int = 0,
-    visited_nodes: Optional[List[str]] = None,
-    parallel_results: Optional[Dict[str, Any]] = None,
-    hitl_pending: bool = False,
-    hitl_response: Optional[Dict[str, Any]] = None,
-    as_of_date: Optional[str] = None,
-    lookback_periods: Optional[int] = None,
-    include_end_date: bool = True,
-    is_complete: bool = False,
-    success: bool = False,
-) -> ExecutionContext:
-    """Build ExecutionContext values on top of the shared compiled-state defaults."""
-    runtime_state = create_initial_workflow_state(
-        workflow_id=workflow_id,
-        workflow_name=workflow_name,
-        current_node=current_node,
-    )
-    runtime_state["_node_results"] = dict(node_results or {})
-    runtime_state["_error"] = error
-    runtime_state["_iteration"] = iteration
-    runtime_state["_parallel_results"] = dict(parallel_results or {})
-    runtime_state["_hitl_pending"] = hitl_pending
-    runtime_state["_hitl_response"] = hitl_response
-
-    return {
-        "data": dict(initial_data or {}),
-        "messages": list(messages or []),
-        **runtime_state,
-        "_visited_nodes": list(visited_nodes or []),
-        "_as_of_date": as_of_date,
-        "_lookback_periods": lookback_periods,
-        "_include_end_date": include_end_date,
-        "_is_complete": is_complete,
-        "_success": success,
-    }
 
 
 def create_execution_context(
     initial_data: Optional[Dict[str, Any]] = None,
     workflow_id: Optional[str] = None,
     workflow_name: Optional[str] = None,
-) -> ExecutionContext:
+) -> WorkflowExecutionContextModel:
     """Create a new ExecutionContext with sensible defaults.
 
     Args:
@@ -239,7 +86,7 @@ def create_execution_context(
         workflow_name: Optional workflow name
 
     Returns:
-        New ExecutionContext with defaults set
+        New WorkflowExecutionContextModel with defaults set
 
     Example:
         ctx = create_execution_context(
@@ -247,10 +94,10 @@ def create_execution_context(
             workflow_name="my_workflow",
         )
     """
-    return _build_execution_context(
-        initial_data=initial_data,
-        workflow_id=workflow_id or str(uuid.uuid4()),
+    return WorkflowExecutionContextAdapter.create_initial(
+        workflow_id=workflow_id,
         workflow_name=workflow_name or "",
+        initial_data=initial_data,
     )
 
 
@@ -543,14 +390,14 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
     )
 
 
-def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
+def from_compiler_workflow_state(state: Dict[str, Any]) -> WorkflowExecutionContextModel:
     """Convert compiled runtime WorkflowState to ExecutionContext.
 
     Args:
         state: WorkflowState dict from compiled workflow runtime
 
     Returns:
-        ExecutionContext with data migrated
+        WorkflowExecutionContextModel with data migrated
     """
     # Extract system fields and user data
     system_keys = {
@@ -568,87 +415,89 @@ def from_compiler_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
     # User data is everything not in system keys
     user_data = {k: v for k, v in state.items() if k not in system_keys}
 
-    return _build_execution_context(
-        initial_data=user_data,
-        workflow_id=state.get("_workflow_id", str(uuid.uuid4())),
+    model = WorkflowExecutionContextAdapter.create_initial(
+        workflow_id=state.get("_workflow_id"),
         workflow_name=state.get("_workflow_name", ""),
-        current_node=state.get("_current_node", ""),
-        node_results=state.get("_node_results", {}),
-        error=state.get("_error"),
-        iteration=state.get("_iteration", 0),
-        visited_nodes=list(state.get("_node_results", {}).keys()),
-        parallel_results=state.get("_parallel_results", {}),
-        hitl_pending=state.get("_hitl_pending", False),
-        hitl_response=state.get("_hitl_response"),
-        success=state.get("_error") is None,
+        initial_data=user_data,
     )
 
+    # Set additional fields
+    if state.get("_current_node"):
+        model.current_node = state.get("_current_node", "")
+    if state.get("_node_results"):
+        model.node_results = state.get("_node_results", {})
+    if state.get("_error"):
+        model.error = state.get("_error")
+    if state.get("_iteration"):
+        model.iteration = state.get("_iteration", 0)
+    if state.get("_parallel_results"):
+        model.parallel_results = state.get("_parallel_results", {})
+    if state.get("_hitl_pending"):
+        model.hitl_pending = state.get("_hitl_pending", False)
+    if state.get("_hitl_response"):
+        model.hitl_response = state.get("_hitl_response")
 
-def to_compiler_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
+    # Populate visited_nodes from node_results keys
+    if state.get("_node_results"):
+        for node_id in state.get("_node_results", {}).keys():
+            model.visit_node(node_id)
+
+    return model
+
+
+def to_compiler_workflow_state(ctx: WorkflowExecutionContextModel) -> Dict[str, Any]:
     """Convert ExecutionContext to compiled runtime WorkflowState format.
 
     Args:
-        ctx: ExecutionContext
+        ctx: WorkflowExecutionContextModel
 
     Returns:
         Dict compatible with compiled runtime WorkflowState
     """
-    # Start with user data
-    state: Dict[str, Any] = ctx.get("data", {}).copy()
+    # Get the base dict from the model
+    state = ctx.to_dict()
 
-    # Add system fields
-    state["_workflow_id"] = ctx.get("_workflow_id", "")
-    state["_workflow_name"] = ctx.get("_workflow_name", "")
-    state["_current_node"] = ctx.get("_current_node", "")
-    state["_node_results"] = ctx.get("_node_results", {})
-    state["_error"] = ctx.get("_error")
-    state["_iteration"] = ctx.get("_iteration", 0)
-    state["_parallel_results"] = ctx.get("_parallel_results", {})
-    state["_hitl_pending"] = ctx.get("_hitl_pending", False)
-    state["_hitl_response"] = ctx.get("_hitl_response")
+    # Merge user data to top level (for backward compatibility)
+    if "data" in state and state["data"]:
+        state.update(state["data"])
+        del state["data"]
 
     return state
 
 
-def from_adapter_workflow_state(state: Dict[str, Any]) -> ExecutionContext:
+def from_adapter_workflow_state(state: Dict[str, Any]) -> WorkflowExecutionContextModel:
     """Convert adapters.py WorkflowState to ExecutionContext.
 
     Args:
         state: WorkflowState dict from adapters.py
 
     Returns:
-        ExecutionContext with data migrated
+        WorkflowExecutionContextModel with data migrated
     """
-    return _build_execution_context(
-        initial_data=state.get("context", {}),
-        messages=state.get("messages", []),
+    return WorkflowExecutionContextAdapter.create_initial(
         workflow_id=str(uuid.uuid4()),
         current_node=state.get("current_node", ""),
-        node_results=state.get("results", {}),
-        error=state.get("error"),
-        visited_nodes=state.get("visited_nodes", []),
-        is_complete=state.get("is_complete", False),
-        success=state.get("error") is None,
+        initial_data=state.get("context", {}),
     )
 
 
-def to_adapter_workflow_state(ctx: ExecutionContext) -> Dict[str, Any]:
+def to_adapter_workflow_state(ctx: WorkflowExecutionContextModel) -> Dict[str, Any]:
     """Convert ExecutionContext to adapters.py WorkflowState format.
 
     Args:
-        ctx: ExecutionContext
+        ctx: WorkflowExecutionContextModel
 
     Returns:
         Dict compatible with adapters.py WorkflowState
     """
     return {
-        "context": ctx.get("data", {}),
-        "messages": ctx.get("messages", []),
-        "current_node": ctx.get("_current_node", ""),
-        "visited_nodes": ctx.get("_visited_nodes", []),
-        "results": ctx.get("_node_results", {}),
-        "error": ctx.get("_error"),
-        "is_complete": ctx.get("_is_complete", False),
+        "context": ctx.data,
+        "messages": ctx.messages,
+        "current_node": ctx.current_node,
+        "visited_nodes": ctx.visited_nodes,
+        "results": ctx.node_results,
+        "error": ctx.error,
+        "is_complete": ctx.is_complete,
     }
 
 

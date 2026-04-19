@@ -77,24 +77,24 @@ def test_create_initial_workflow_state_uses_explicit_workflow_id() -> None:
         workflow_id="thread-123",
         workflow_name="example-workflow",
         current_node="start",
-        initial_state={"input": "value"},
+        initial_state={"_node_results": {"start": {"success": True}}},
     )
 
-    assert state["_workflow_id"] == "thread-123"
-    assert state["_workflow_name"] == "example-workflow"
-    assert state["_current_node"] == "start"
-    assert state["_node_results"] == {}
-    assert state["_parallel_results"] == {}
-    assert state["_hitl_pending"] is False
-    assert state["_hitl_response"] is None
-    assert state["input"] == "value"
+    # Pydantic models use attribute access
+    assert state.workflow_id == "thread-123"
+    assert state.workflow_name == "example-workflow"
+    assert state.current_node == "start"
+    assert state.node_results == {"start": {"success": True}}
+    assert state.parallel_results == {}
+    assert state.hitl_pending is False
+    assert state.hitl_response is None
 
 
 def test_create_initial_workflow_state_generates_workflow_id() -> None:
     state = create_initial_workflow_state()
 
-    assert state["_workflow_id"]
-    assert state["_workflow_name"] == ""
-    assert state["_current_node"] == ""
-    assert state["_node_results"] == {}
-    assert state["_parallel_results"] == {}
+    assert state.workflow_id
+    assert state.workflow_name == ""
+    assert state.current_node == ""
+    assert state.node_results == {}
+    assert state.parallel_results == {}

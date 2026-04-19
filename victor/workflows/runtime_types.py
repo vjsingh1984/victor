@@ -18,21 +18,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, TypedDict
+from typing import Any, Dict, Optional
+
+from victor.workflows.models import WorkflowStateModel
 
 
-class WorkflowState(TypedDict, total=False):
-    """Generic state for compiled workflow execution."""
-
-    _workflow_id: str
-    _workflow_name: str
-    _current_node: str
-    _node_results: Dict[str, Any]
-    _error: Optional[str]
-    _iteration: int
-    _parallel_results: Dict[str, Any]
-    _hitl_pending: bool
-    _hitl_response: Optional[Dict[str, Any]]
+# Type alias for backward compatibility
+WorkflowState = WorkflowStateModel
 
 
 @dataclass
@@ -53,21 +45,33 @@ def create_initial_workflow_state(
     workflow_id: Optional[str] = None,
     workflow_name: str = "",
     initial_state: Optional[Dict[str, Any]] = None,
-) -> WorkflowState:
+) -> WorkflowStateModel:
     """Create the canonical initial state for compiled workflow execution."""
-    state: WorkflowState = {
-        "_workflow_id": workflow_id or uuid.uuid4().hex,
-        "_workflow_name": workflow_name,
-        "_current_node": current_node,
-        "_node_results": {},
-        "_error": None,
-        "_iteration": 0,
-        "_parallel_results": {},
-        "_hitl_pending": False,
-        "_hitl_response": None,
+    # Build kwargs, only including workflow_id if provided
+    kwargs = {
+        "workflow_name": workflow_name,
+        "current_node": current_node,
     }
+    if workflow_id is not None:
+        kwargs["workflow_id"] = workflow_id
+
+    state = WorkflowStateModel(**kwargs)
+
     if initial_state:
-        state.update(initial_state)
+        # Update system fields from initial_state
+        if "_node_results" in initial_state:
+            state.node_results = initial_state["_node_results"]
+        if "_error" in initial_state:
+            state.error = initial_state["_error"]
+        if "_iteration" in initial_state:
+            state.iteration = initial_state["_iteration"]
+        if "_parallel_results" in initial_state:
+            state.parallel_results = initial_state["_parallel_results"]
+        if "_hitl_pending" in initial_state:
+            state.hitl_pending = initial_state["_hitl_pending"]
+        if "_hitl_response" in initial_state:
+            state.hitl_response = initial_state["_hitl_response"]
+
     return state
 
 
