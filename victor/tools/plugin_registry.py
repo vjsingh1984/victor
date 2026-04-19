@@ -46,8 +46,9 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.framework.module_loader import DynamicModuleLoader
-from victor.tools.base import BaseTool, ToolRegistry
+from victor.tools.base import BaseTool
 from victor.tools.plugin import PluginMetadata, ToolPlugin
+from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

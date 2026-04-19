@@ -73,7 +73,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.providers.base import BaseProvider, ToolDefinition
-from victor.tools.base import ToolRegistry, CostTier
+from victor.tools.enums import CostTier
+from victor.tools.registry import ToolRegistry
 
 # Import specialized components (lazy to avoid circular imports)
 # These are imported at runtime in methods that use them

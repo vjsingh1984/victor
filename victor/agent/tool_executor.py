@@ -50,15 +50,9 @@ from victor.core.retry import (
     RetryExecutor,
     tool_retry_strategy,
 )
-from victor.tools.base import (
-    AccessMode,
-    BaseTool,
-    Hook,
-    HookError,
-    ToolRegistry,
-    ToolResult,
-    ToolValidationResult,
-)
+from victor.tools.base import BaseTool, ToolResult, ToolValidationResult
+from victor.tools.enums import AccessMode
+from victor.tools.registry import Hook, HookError, ToolRegistry
 
 # RL hook integration (lazy import to avoid circular dependencies)
 _rl_hooks = None

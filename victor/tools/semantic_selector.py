@@ -31,7 +31,9 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import httpx
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import CostTier, ToolMetadataRegistry, ToolRegistry
+from victor.tools.enums import CostTier
+from victor.tools.metadata import ToolMetadataRegistry
+from victor.tools.registry import ToolRegistry
 from victor.agent.tool_sequence_tracker import (
     ToolSequenceTracker,
     create_sequence_tracker,

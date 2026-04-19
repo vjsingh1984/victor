@@ -29,7 +29,7 @@ Key design principles:
 from __future__ import annotations
 
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CompactionStrategySettings(BaseModel):
@@ -157,15 +157,14 @@ class CompactionStrategySettings(BaseModel):
         description="Max number of pending compaction jobs when async is enabled.",
     )
 
-    class Config:
-        """Pydantic config."""
-
-        validate_assignment = True
-        extra = "forbid"
-        json_encoders = {
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+        json_encoders={
             # Encode frozenset as list for JSON serialization
             frozenset: lambda v: list(v),
-        }
+        },
+    )
 
 
 class CompactionFeatureFlags(BaseModel):
@@ -200,8 +199,7 @@ class CompactionFeatureFlags(BaseModel):
         description="Enable compaction history tracking for monitoring and optimization.",
     )
 
-    class Config:
-        """Pydantic config."""
-
-        validate_assignment = True
-        extra = "forbid"
+    model_config = ConfigDict(
+        validate_assignment=True,
+        extra="forbid",
+    )
