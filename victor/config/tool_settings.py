@@ -36,6 +36,11 @@ class ToolSettings(BaseModel):
     tool_cache_ttl: int = 600
     tool_cache_allowlist: List[str] = Field(
         default_factory=lambda: [
+            "read",
+            "ls",
+            "grep",
+            "overview",
+            "diff",
             "code_search",
             "semantic_code_search",
             "list_directory",
