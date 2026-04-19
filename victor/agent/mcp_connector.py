@@ -314,19 +314,21 @@ class MCPConnector:
 
         try:
             from victor.tools.mcp_adapter_tool import MCPToolProjector
+            from victor.tools.batch_registration import BatchRegistrar
 
             adapter_tools = MCPToolProjector.project(self._mcp_registry)
 
-            registered = 0
-            for tool in adapter_tools:
-                try:
-                    self._registry.register(tool)
-                    registered += 1
-                except Exception as e:
-                    logger.debug("Failed to register MCP tool %s: %s", tool.name, e)
+            # Use batch registration for performance (10-30 tools → single cache invalidation)
+            registrar = BatchRegistrar(self._registry)
+            result = registrar.register_batch(adapter_tools, fail_fast=False)
 
+            if result.failure_count > 0:
+                for tool_name, error_msg in result.failed:
+                    logger.debug("Failed to register MCP tool %s: %s", tool_name, error_msg)
+
+            registered = result.success_count
             if registered > 0:
-                logger.info(f"MCPConnector: flattened {registered} MCP tools as first-class")
+                logger.info(f"MCPConnector: batch registered {registered}/{len(adapter_tools)} MCP tools")
 
             return registered
 

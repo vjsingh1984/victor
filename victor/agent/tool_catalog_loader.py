@@ -154,16 +154,17 @@ class ToolCatalogLoader:
             airgapped_mode=self._config.airgapped_mode
         )
 
-        registered_count = 0
-        for tool in tools_to_register:
-            try:
-                self._registry.register(tool)
-                registered_count += 1
-            except Exception as e:
-                tool_name = getattr(tool, "name", getattr(tool, "__name__", str(tool)))
-                logger.debug(f"Skipped registering {tool_name}: {e}")
+        # Use batch registration for performance (30-50 tools → single cache invalidation)
+        from victor.tools.batch_registration import BatchRegistrar
 
-        return registered_count
+        registrar = BatchRegistrar(self._registry)
+        result = registrar.register_batch(tools_to_register, fail_fast=False)
+
+        if result.failure_count > 0:
+            for tool_name, error_msg in result.failed:
+                logger.debug(f"Skipped registering {tool_name}: {error_msg}")
+
+        return result.success_count
 
     def _apply_configuration(self) -> int:
         """Apply tool configuration from settings.
