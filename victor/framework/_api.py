@@ -10,8 +10,8 @@ from victor.framework.config import AgentConfig
 from victor.framework.protocols import (
     ChunkType,
     ConversationStateProtocol,
+    FrameworkOrchestratorProtocol,
     MessagesProtocol,
-    OrchestratorProtocol,
     OrchestratorStreamChunk,
     ProviderProtocol,
     StreamingProtocol,
@@ -19,6 +19,9 @@ from victor.framework.protocols import (
     ToolsProtocol,
     verify_protocol_conformance,
 )
+
+# Backward compatibility alias
+OrchestratorProtocol = FrameworkOrchestratorProtocol
 from victor.framework.errors import (
     AgentError,
     BudgetExhaustedError,
@@ -75,7 +78,8 @@ PUBLIC_API_NAMES = [
     "StateHooks",
     "StateObserver",
     # Protocols
-    "OrchestratorProtocol",
+    "FrameworkOrchestratorProtocol",
+    "OrchestratorProtocol",  # Backward compatibility alias
     "ConversationStateProtocol",
     "ProviderProtocol",
     "ToolsProtocol",

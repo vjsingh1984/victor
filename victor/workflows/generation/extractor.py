@@ -26,7 +26,7 @@ Design Pattern: Structured Extraction
 
 Example:
     from victor.workflows.generation.extractor import RequirementExtractor
-    from victor.framework.protocols import OrchestratorProtocol
+    from victor.framework.protocols import FrameworkOrchestratorProtocol as OrchestratorProtocol
 
     extractor = RequirementExtractor(orchestrator)
     requirements = await extractor.extract(
@@ -41,7 +41,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
-from victor.framework.protocols import OrchestratorProtocol
+from victor.framework.protocols import FrameworkOrchestratorProtocol as OrchestratorProtocol
 from victor.workflows.generation.requirements import (
     BranchRequirement,
     ContextRequirements,

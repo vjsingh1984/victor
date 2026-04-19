@@ -392,7 +392,7 @@ class StreamingProtocol(Protocol):
 
 
 @runtime_checkable
-class OrchestratorProtocol(
+class FrameworkOrchestratorProtocol(
     ConversationStateProtocol,
     ProviderProtocol,
     ToolsProtocol,
@@ -423,8 +423,12 @@ class OrchestratorProtocol(
     - Core modules: Use victor.core.protocols.OrchestratorProtocol for minimal interface
     - SubAgents: Use SubAgentContext for ISP-compliant minimal interface
 
+    Note: Renamed from OrchestratorProtocol to avoid name collision with
+    victor.core.protocols.OrchestratorProtocol. Use FrameworkOrchestratorProtocol
+    when importing from victor.framework.protocols.
+
     Usage:
-        async def run_agent(orch: OrchestratorProtocol, prompt: str):
+        async def run_agent(orch: FrameworkOrchestratorProtocol, prompt: str):
             print(f"Provider: {orch.current_provider}")
             print(f"Stage: {orch.get_stage()}")
 
@@ -834,7 +838,7 @@ def verify_protocol_conformance(obj: Any, protocol: type) -> Tuple[bool, List[st
         Tuple of (conforms: bool, missing: List[str])
 
     Example:
-        conforms, missing = verify_protocol_conformance(orch, OrchestratorProtocol)
+        conforms, missing = verify_protocol_conformance(orch, FrameworkOrchestratorProtocol)
         if not conforms:
             raise TypeError(f"Missing protocol methods: {missing}")
     """

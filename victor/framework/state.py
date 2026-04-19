@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Union
 from victor.core.shared_types import ConversationStage
 
 if TYPE_CHECKING:
-    from victor.framework.protocols import OrchestratorProtocol
+    from victor.framework.protocols import FrameworkOrchestratorProtocol as OrchestratorProtocol
 
 
 # Stage is an alias to ConversationStage for framework API compatibility

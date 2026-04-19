@@ -20,16 +20,16 @@ This module documents when to use each protocol type for ISP compliance
 Protocol Selection Guide:
 =========================
 
-1. OrchestratorProtocol (framework/protocols.py)
+1. FrameworkOrchestratorProtocol (framework/protocols.py)
    Use: Framework code, workflows, external integrations
    Provides: Complete orchestrator interface (6 sub-protocols combined)
    Size: Large (composite protocol)
    When: You need full orchestrator access in framework code
 
    Example:
-        from victor.framework.protocols import OrchestratorProtocol
+        from victor.framework.protocols import FrameworkOrchestratorProtocol
 
-        def process(orch: OrchestratorProtocol):
+        def process(orch: FrameworkOrchestratorProtocol):
             tools = orch.get_available_tools()
             stage = orch.get_stage()
 

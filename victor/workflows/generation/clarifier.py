@@ -65,7 +65,7 @@ from victor.workflows.generation.requirements import (
 )
 
 if TYPE_CHECKING:
-    from victor.framework.protocols import OrchestratorProtocol
+    from victor.framework.protocols import FrameworkOrchestratorProtocol as OrchestratorProtocol
 
 logger = logging.getLogger(__name__)
 
