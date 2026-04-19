@@ -342,6 +342,17 @@ class ChatCoordinator:
                                 + orch._cumulative_token_usage["completion_tokens"]
                             )
 
+                    # Feed actual prompt_tokens back to ConversationController
+                    # so get_context_metrics() uses real counts instead of char estimation.
+                    prompt_tokens = ctx.cumulative_usage.get("prompt_tokens", 0)
+                    if prompt_tokens > 0:
+                        try:
+                            ctrl = orch._conversation_controller
+                            total_chars = sum(len(m.content) for m in ctrl.messages)
+                            ctrl.record_actual_usage(prompt_tokens, total_chars)
+                        except Exception:
+                            pass  # Never break streaming over metrics
+
     # =====================================================================
     # Stream Preparation and Context
     # =====================================================================

@@ -171,6 +171,9 @@ class ConversationController:
         self._hierarchical_manager = hierarchical_manager
         # PromptNormalizer for input deduplication (DIP compliance)
         self._normalizer = prompt_normalizer or get_prompt_normalizer()
+        # Token accounting: actual API-returned token counts replace char estimation
+        self._last_actual_prompt_tokens: Optional[int] = None
+        self._observed_chars_per_token: float = float(self.config.chars_per_token_estimate)
 
     @property
     def messages(self) -> List[Message]:
@@ -317,14 +320,51 @@ class ConversationController:
             # For other roles, use add_message from history
             return self._history.add_message(role, content, **kwargs)
 
+    def record_actual_usage(self, prompt_tokens: int, total_chars: int) -> None:
+        """Update token accounting with actual API-returned prompt token count.
+
+        Replaces char-based estimation for the next get_context_metrics() call
+        and calibrates the per-session chars-per-token ratio (rolling update
+        clamped to [2, 8] to guard against noise from very short messages).
+
+        Args:
+            prompt_tokens: Actual prompt_tokens from the provider API response
+            total_chars: Total characters in conversation at the time of the call
+        """
+        if prompt_tokens <= 0:
+            return
+        self._last_actual_prompt_tokens = prompt_tokens
+        if total_chars > 0:
+            observed = total_chars / prompt_tokens
+            # Rolling average: 80% old, 20% new observation
+            self._observed_chars_per_token = (
+                0.8 * self._observed_chars_per_token + 0.2 * observed
+            )
+            # Clamp to sane range: 2–8 chars per token
+            self._observed_chars_per_token = max(2.0, min(8.0, self._observed_chars_per_token))
+            logger.debug(
+                "Token accounting calibrated: %.2f chars/token (prompt_tokens=%d, chars=%d)",
+                self._observed_chars_per_token,
+                prompt_tokens,
+                total_chars,
+            )
+
     def get_context_metrics(self) -> ContextMetrics:
         """Calculate current context metrics.
+
+        Uses actual API-returned prompt_tokens when available (set via
+        record_actual_usage()), falling back to calibrated char estimation.
 
         Returns:
             ContextMetrics with size and overflow information
         """
         total_chars = sum(len(m.content) for m in self.messages)
-        estimated_tokens = total_chars // self.config.chars_per_token_estimate
+
+        if self._last_actual_prompt_tokens is not None:
+            # Project current size using the calibrated chars-per-token ratio
+            estimated_tokens = int(total_chars / self._observed_chars_per_token)
+        else:
+            estimated_tokens = total_chars // self.config.chars_per_token_estimate
 
         return ContextMetrics(
             char_count=total_chars,

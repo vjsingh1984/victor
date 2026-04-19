@@ -866,6 +866,17 @@ class TurnExecutor:
                 cum["completion_tokens"] += response.usage.get("completion_tokens", 0)
                 cum["total_tokens"] += response.usage.get("total_tokens", 0)
 
+            # Feed actual prompt_tokens back to ConversationController so that
+            # get_context_metrics() uses real counts instead of char estimation.
+            prompt_tokens = response.usage.get("prompt_tokens", 0)
+            if prompt_tokens > 0:
+                try:
+                    ctrl = self._chat_context.conversation
+                    total_chars = sum(len(m.content) for m in ctrl.messages)
+                    ctrl.record_actual_usage(prompt_tokens, total_chars)
+                except Exception:
+                    pass  # Never break the hot path over metrics
+
             # Extract extended token fields from raw_response
             raw = getattr(response, "raw_response", None)
             if raw and isinstance(raw, dict):
