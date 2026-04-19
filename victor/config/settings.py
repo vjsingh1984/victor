@@ -2247,3 +2247,50 @@ def load_settings() -> Settings:
 
 # Alias for compatibility with packages/victor-core
 get_settings = load_settings
+
+
+def is_first_time_user() -> bool:
+    """Detect if this is a first-time user.
+
+    A user is considered a first-time user if:
+    1. No profiles.yaml exists in ~/.victor/
+    2. No API keys are configured in environment
+
+    Returns:
+        True if this appears to be a first-time user
+    """
+    from pathlib import Path
+
+    # Check if profiles.yaml exists
+    victor_dir = Path.home() / ".victor"
+    profiles_path = victor_dir / "profiles.yaml"
+
+    if not profiles_path.exists():
+        return True
+
+    # Check if any API keys are configured
+    # We check environment variables for common cloud providers
+    has_keys = bool(
+        os.getenv("ANTHROPIC_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+        or os.getenv("GOOGLE_API_KEY")
+        or os.getenv("AZURE_API_KEY")
+        or os.getenv("COHERE_API_KEY")
+        or os.getenv("XAI_API_KEY")
+    )
+
+    # Also check if Ollama is available (local provider)
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            timeout=2,
+        )
+        has_ollama = result.returncode == 0
+    except Exception:
+        has_ollama = False
+
+    # If no keys and no Ollama, consider it first-time
+    return not (has_keys or has_ollama)

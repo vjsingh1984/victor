@@ -34,14 +34,25 @@ from victor.ui.commands.experiments import experiment_app
 from victor.ui.commands.fep import fep_app
 from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
-from victor.ui.commands.keys import keys_app
+# Lazy imports for deprecated/hidden commands (startup performance)
+def _get_keys_app():
+    """Lazy import for deprecated keys command."""
+    from victor.ui.commands.keys import keys_app
+    return keys_app
+
+def _get_test_provider_app():
+    """Lazy import for hidden test_provider command."""
+    from victor.ui.commands.test_provider import test_provider_app
+    return test_provider_app
+
+# Regular imports (alphabetically ordered)
+from victor.ui.commands.mcp import mcp_app
 from victor.ui.commands.mcp import mcp_app
 from victor.ui.commands.models import models_app
 from victor.ui.commands.profiles import profiles_app
 from victor.ui.commands.providers import providers_app
 from victor.ui.commands.security import security_app
 from victor.ui.commands.serve import serve_app
-from victor.ui.commands.test_provider import test_provider_app
 from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
@@ -262,9 +273,28 @@ app.add_typer(fep_app, rich_help_panel="Advanced")
 coding_app = typer.Typer(name="coding", help="Coding vertical specialized commands.")
 app.add_typer(coding_app, rich_help_panel="Advanced")
 
-# --- Deprecated / Hidden ---
-app.add_typer(keys_app, deprecated=True)
-app.add_typer(test_provider_app, hidden=True)
+# --- Deprecated / Hidden (lazy-loaded for startup performance) ---
+# Lazy loading wrapper for deprecated/hidden commands
+class LazyTyper:
+    """Lazy wrapper for Typer apps to defer import until first use."""
+
+    def __init__(self, import_func):
+        self._import_func = import_func
+        self._app = None
+
+    @property
+    def app(self):
+        if self._app is None:
+            self._app = self._import_func()
+        return self._app
+
+    def __getattr__(self, name):
+        return getattr(self.app, name)
+
+
+# Register lazy-loaded deprecated/hidden commands
+app.add_typer(LazyTyper(_get_keys_app), deprecated=True)
+app.add_typer(LazyTyper(_get_test_provider_app), hidden=True)
 
 
 def _register_plugin_commands():
@@ -345,9 +375,31 @@ def callback(
         is_eager=True,
         help="Show version and exit",
     ),
+    skip_onboarding: bool = typer.Option(
+        False,
+        "--skip-onboarding",
+        help="Skip first-time onboarding wizard",
+    ),
 ) -> None:
     """Victor - Open-source agentic AI framework with multi-provider support."""
     if ctx.invoked_subcommand is None:
+        # Check if this is a first-time user
+        if not skip_onboarding:
+            from victor.config.settings import is_first_time_user
+
+            if is_first_time_user():
+                console.print("\n[bold cyan]Welcome to Victor![/]")
+                console.print(
+                    "Let's get you set up in 2 minutes...\n"
+                )
+                from victor.ui.commands.onboarding import run_onboarding
+
+                exit_code = run_onboarding()
+                if exit_code != 0:
+                    console.print("\n[yellow]Onboarding interrupted. Starting chat anyway...[/]")
+                else:
+                    console.print("\n[green]✓[/] Setup complete! Starting chat...\n")
+
         _run_default_interactive()
 
 
