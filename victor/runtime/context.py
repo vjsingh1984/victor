@@ -97,7 +97,7 @@ class ServiceAccessor:
 
 
 @dataclass
-class ExecutionContext:
+class RuntimeExecutionContext:
     """Explicit context object replacing global singletons.
 
     Carries all runtime dependencies needed during agent execution.
@@ -127,7 +127,7 @@ class ExecutionContext:
         container: Any,
         session_id: str = "",
         state_manager: Optional[Any] = None,
-    ) -> ExecutionContext:
+    ) -> RuntimeExecutionContext:
         """Create an ExecutionContext from application settings and container.
 
         Args:
@@ -139,7 +139,7 @@ class ExecutionContext:
                           existing code during migration).
 
         Returns:
-            Fully initialized ExecutionContext
+            Fully initialized RuntimeExecutionContext
         """
         if state_manager is None:
             try:
@@ -158,12 +158,12 @@ class ExecutionContext:
             metadata={},
         )
 
-    def with_session(self, session_id: str) -> ExecutionContext:
+    def with_session(self, session_id: str) -> RuntimeExecutionContext:
         """Create a new context with a different session ID.
 
         Returns a shallow copy — services and state are shared.
         """
-        return ExecutionContext(
+        return RuntimeExecutionContext(
             session_id=session_id,
             settings=self.settings,
             state=self.state,
@@ -172,11 +172,11 @@ class ExecutionContext:
             metadata=dict(self.metadata),
         )
 
-    def with_metadata(self, **kwargs: Any) -> ExecutionContext:
+    def with_metadata(self, **kwargs: Any) -> RuntimeExecutionContext:
         """Create a new context with additional metadata."""
         new_meta = dict(self.metadata)
         new_meta.update(kwargs)
-        return ExecutionContext(
+        return RuntimeExecutionContext(
             session_id=self.session_id,
             settings=self.settings,
             state=self.state,
@@ -231,3 +231,18 @@ class ExecutionContext:
                 logger.warning("Cleanup hook %s failed: %s", hook, e)
         self._cleanup_hooks.clear()
         return success_count
+
+
+# =============================================================================
+# Backward Compatibility Alias
+# =============================================================================
+
+
+# Alias for backward compatibility (renamed 2026-04-19)
+ExecutionContext = RuntimeExecutionContext
+"""Deprecated: Use RuntimeExecutionContext instead.
+
+This alias will be removed in v0.10.0. Migration:
+  OLD: from victor.runtime.context import ExecutionContext
+  NEW: from victor.runtime.context import RuntimeExecutionContext
+"""
