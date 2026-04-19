@@ -1571,6 +1571,53 @@ class ConversationStore:
     # Historical records keep a truncated version to save space.
     _TOOL_OUTPUT_STORE_LIMIT = 8000
 
+    def _sanitize_metadata_for_json(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Sanitize metadata dict for JSON serialization.
+
+        Converts non-JSON-serializable objects to safe string representations.
+        This handles edge cases like Ellipsis, Path objects, etc.
+
+        Args:
+            metadata: Raw metadata dict
+
+        Returns:
+            Sanitized metadata dict that is JSON-serializable
+        """
+        if not metadata:
+            return {}
+
+        def _sanitize_value(value: Any) -> Any:
+            """Recursively sanitize a value for JSON serialization."""
+            # Handle Ellipsis (...)
+            if value is ...:
+                return "<ellipsis>"
+            # Handle Path objects
+            elif hasattr(value, "__fspath__"):  # Path-like objects
+                return str(value)
+            # Handle types that can't be JSON serialized
+            elif isinstance(value, type(lambda: None)):  # Functions/lambdas
+                return f"<function: {getattr(value, '__name__', 'lambda')}>"
+            # Handle objects with __dict__
+            elif hasattr(value, "__dict__") and not isinstance(value, (str, bytes, dict, list, tuple, int, float, bool)):
+                return f"<object: {value.__class__.__name__}>"
+            # Recursively handle lists and dicts
+            elif isinstance(value, dict):
+                return {k: _sanitize_value(v) for k, v in value.items()}
+            elif isinstance(value, (list, tuple)):
+                return [_sanitize_value(v) for v in value]
+            else:
+                return value
+
+        try:
+            # Try to serialize as-is first
+            from victor.core.json_utils import json_dumps
+            json_dumps(metadata)
+            return metadata
+        except (TypeError, ValueError):
+            # If that fails, sanitize the metadata
+            logger.debug(f"Sanitizing metadata for JSON serialization: {list(metadata.keys())}")
+            return {k: _sanitize_value(v) for k, v in metadata.items()}
+
     def _persist_message(self, session_id: str, message: ConversationMessage):
         """Persist message to database.
 
@@ -1596,6 +1643,9 @@ class ConversationStore:
         meta = dict(message.metadata) if message.metadata else {}
         if message.tool_calls:
             meta["tool_calls"] = message.tool_calls
+
+        # Sanitize metadata for JSON serialization (handles Ellipsis, Path objects, etc.)
+        meta = self._sanitize_metadata_for_json(meta)
 
         with sqlite3.connect(self.db_path) as conn:
             conn.execute(
