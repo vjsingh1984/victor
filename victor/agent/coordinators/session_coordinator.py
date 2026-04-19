@@ -770,8 +770,11 @@ class SessionCoordinator:
             logger.warning(
                 f"ConversationEmbeddingStore not available: {e}. "
                 "Semantic search in conversations will be disabled. "
-                "This is optional - Victor will work normally without it. "
-                "To enable, install victor-coding: pip install victor-coding"
+                "This is optional - Victor will work normally without it."
+            )
+            logger.debug(
+                "ConversationEmbeddingStore is part of victor-ai, not victor-coding. "
+                "Check that lancedb is installed: pip install lancedb"
             )
             conversation_embedding_store = None
         except Exception as e:
