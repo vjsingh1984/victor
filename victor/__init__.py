@@ -88,7 +88,20 @@ if not _LIGHT_IMPORT:
         ToolSet,
     )
 
+    # Decorator API — @victor.agent / @victor.task
+    from victor.framework.decorators import (
+        agent,
+        task,
+        AgentCallable,
+        TaskDefinition,
+    )
+
     __all__ = [
+        # Decorator API
+        "agent",
+        "task",
+        "AgentCallable",
+        "TaskDefinition",
         # Framework API (5 core concepts + supporting classes)
         "Agent",
         "Task",
