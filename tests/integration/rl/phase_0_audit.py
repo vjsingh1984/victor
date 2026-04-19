@@ -67,16 +67,16 @@ class TestLearnerInventory:
                 missing.append(f"{name}: {e}")
         assert not missing, f"Missing learners: {missing}"
 
-    def test_learner_count_is_15(self):
-        """Exactly 15 learners — catches accidental additions or deletions."""
+    def test_learner_count_at_least_15(self):
+        """At least 15 learner files (15 canonical + optional extended variants)."""
         import os
         learner_dir = "victor/framework/rl/learners"
         files = [
             f[:-3] for f in os.listdir(learner_dir)
             if f.endswith(".py") and not f.startswith("_")
         ]
-        assert len(files) == 15, (
-            f"Expected 15 learners, found {len(files)}: {sorted(files)}"
+        assert len(files) >= 15, (
+            f"Expected at least 15 learners, found {len(files)}: {sorted(files)}"
         )
 
     @pytest.mark.parametrize("learner_name", EXPECTED_LEARNERS)

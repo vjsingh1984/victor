@@ -556,4 +556,127 @@ class QualityWeightLearner(BaseLearner):
             "default_weights": self.DEFAULT_WEIGHTS,
             "top_weight_adjustments": top_adjustments,
             "samples_per_task": dict(self._sample_counts),
+            "user_preference_count": len(getattr(self, "_user_preferences", {})),
         }
+
+    # ------------------------------------------------------------------
+    # Priority 4 Phase 3: Preference Learning — per-user weight overrides
+    # ------------------------------------------------------------------
+
+    def record_user_preference(
+        self,
+        user_id: str,
+        dimension: str,
+        preferred_weight: float,
+        task_type: str = "default",
+    ) -> None:
+        """Record an explicit user preference for a quality dimension weight.
+
+        Stored separately from the global gradient-learned weights so that
+        personalization can be toggled without corrupting the shared model.
+
+        Args:
+            user_id: Opaque user identifier
+            dimension: Quality dimension name (must be in QualityDimension.ALL)
+            preferred_weight: Desired weight (clamped to MIN_WEIGHT–MAX_WEIGHT)
+            task_type: Task scope for the preference
+        """
+        if not hasattr(self, "_user_preferences"):
+            self._user_preferences: Dict[str, Dict[str, Dict[str, float]]] = {}
+
+        if user_id not in self._user_preferences:
+            self._user_preferences[user_id] = {}
+        if task_type not in self._user_preferences[user_id]:
+            self._user_preferences[user_id][task_type] = {}
+
+        clamped = max(self.MIN_WEIGHT, min(self.MAX_WEIGHT, preferred_weight))
+        self._user_preferences[user_id][task_type][dimension] = clamped
+
+        self._persist_user_preference(user_id, task_type, dimension, clamped)
+        logger.debug(
+            "quality_weights: user=%s preference %s[%s]=%s recorded",
+            user_id, task_type, dimension, clamped,
+        )
+
+    def get_personalized_weights(
+        self, user_id: str, task_type: str = "default"
+    ) -> Dict[str, float]:
+        """Return weights blended from global learned weights and user preferences.
+
+        Blend: 70% global learned weight + 30% user preference (when preference exists).
+        Falls back to global learned weights when no preference recorded for a dimension.
+
+        Args:
+            user_id: User identifier
+            task_type: Task type to look up
+
+        Returns:
+            Dict of dimension → blended weight (same shape as DEFAULT_WEIGHTS)
+        """
+        global_weights = self.get_weights(task_type)
+
+        if not hasattr(self, "_user_preferences"):
+            self._load_user_preferences()
+
+        user_prefs = (
+            self._user_preferences.get(user_id, {}).get(task_type, {})
+            or self._user_preferences.get(user_id, {}).get("default", {})
+        )
+
+        if not user_prefs:
+            return global_weights
+
+        blended = {}
+        for dim, global_w in global_weights.items():
+            if dim in user_prefs:
+                blended[dim] = 0.7 * global_w + 0.3 * user_prefs[dim]
+            else:
+                blended[dim] = global_w
+
+        return blended
+
+    def _persist_user_preference(
+        self, user_id: str, task_type: str, dimension: str, weight: float
+    ) -> None:
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS rl_user_weight_preference (
+                    user_id TEXT NOT NULL,
+                    task_type TEXT NOT NULL,
+                    dimension TEXT NOT NULL,
+                    weight REAL NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY (user_id, task_type, dimension)
+                )
+            """)
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO rl_user_weight_preference
+                (user_id, task_type, dimension, weight, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (user_id, task_type, dimension, weight, datetime.now().isoformat()),
+            )
+            self.db.commit()
+        except Exception as e:
+            logger.debug("quality_weights: preference persist failed: %s", e)
+
+    def _load_user_preferences(self) -> None:
+        if not hasattr(self, "_user_preferences"):
+            self._user_preferences = {}
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                "SELECT user_id, task_type, dimension, weight FROM rl_user_weight_preference"
+            )
+            for row in cursor.fetchall():
+                rd = dict(row)
+                uid, tt, dim, w = rd["user_id"], rd["task_type"], rd["dimension"], rd["weight"]
+                if uid not in self._user_preferences:
+                    self._user_preferences[uid] = {}
+                if tt not in self._user_preferences[uid]:
+                    self._user_preferences[uid][tt] = {}
+                self._user_preferences[uid][tt][dim] = w
+        except Exception as e:
+            logger.debug("quality_weights: preference load skipped: %s", e)
