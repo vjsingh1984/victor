@@ -344,8 +344,6 @@ class DebugLogger:
 
         # Calculate percentage of capacity used
         chars_pct = char_count / self.max_context_chars if self.max_context_chars > 0 else 0
-        tokens_pct = estimated_tokens / self.max_context_tokens if self.max_context_tokens > 0 else 0
-
         if char_count >= self.warn_threshold_chars:
             warning_icon = self._presentation.icon("warning", with_color=False)
             self.logger.warning(

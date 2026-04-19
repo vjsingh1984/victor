@@ -40,36 +40,30 @@ def summarizer(settings):
 def sample_messages():
     """Create sample messages for testing."""
     return [
-        Message(
-            role="user",
-            content="Please help me fix the bug in the authentication module"
-        ),
+        Message(role="user", content="Please help me fix the bug in the authentication module"),
         Message(
             role="assistant",
             content="I'll help you fix the authentication bug. Let me start by reading the relevant files.",
-            tool_calls=[{"name": "read_file", "id": "call_1"}]
+            tool_calls=[{"name": "read_file", "id": "call_1"}],
         ),
         Message(
             role="tool",
             tool_call_id="call_1",
             tool_name="read_file",
-            content="File: src/auth/login.py\n\ndef login(username, password):\n    # TODO: Add validation\n    return authenticate(username, password)"
+            content="File: src/auth/login.py\n\ndef login(username, password):\n    # TODO: Add validation\n    return authenticate(username, password)",
         ),
         Message(
             role="assistant",
             content="I found the issue. The login function is missing input validation. Let me add that.",
-            tool_calls=[{"name": "write_file", "id": "call_2"}]
+            tool_calls=[{"name": "write_file", "id": "call_2"}],
         ),
         Message(
             role="tool",
             tool_call_id="call_2",
             tool_name="write_file",
-            content="Successfully wrote to src/auth/login.py"
+            content="Successfully wrote to src/auth/login.py",
         ),
-        Message(
-            role="user",
-            content="Great! Now can you also add tests for the login function?"
-        ),
+        Message(role="user", content="Great! Now can you also add tests for the login function?"),
     ]
 
 
@@ -84,6 +78,7 @@ class TestRuleBasedCompactionSummarizer:
     def test_summarize_basic_messages(self, summarizer, sample_messages):
         """Test basic summarization of messages."""
         import json
+
         summary = summarizer.summarize(sample_messages)
 
         # Verify JSON format
@@ -105,18 +100,19 @@ class TestRuleBasedCompactionSummarizer:
     def test_summarize_with_tools(self, summarizer):
         """Test tool extraction from messages."""
         import json
+
         messages = [
             Message(role="user", content="Read the file"),
             Message(
                 role="assistant",
                 content="I'll read it",
-                tool_calls=[{"name": "read_file", "id": "call_1"}]
+                tool_calls=[{"name": "read_file", "id": "call_1"}],
             ),
             Message(role="tool", tool_call_id="call_1", tool_name="read_file", content="..."),
             Message(
                 role="assistant",
                 content="Now I'll write to it",
-                tool_calls=[{"name": "write_file", "id": "call_2"}]
+                tool_calls=[{"name": "write_file", "id": "call_2"}],
             ),
             Message(role="tool", tool_call_id="call_2", tool_name="write_file", content="..."),
         ]
@@ -129,6 +125,7 @@ class TestRuleBasedCompactionSummarizer:
     def test_extract_file_paths(self, summarizer):
         """Test file path extraction from messages."""
         import json
+
         messages = [
             Message(role="user", content="Fix the bug in src/auth/login.py"),
             Message(role="assistant", content="I'll also check tests/test_auth.py"),
@@ -146,6 +143,7 @@ class TestRuleBasedCompactionSummarizer:
     def test_infer_pending_work(self, summarizer):
         """Test pending work inference from messages."""
         import json
+
         messages = [
             Message(role="user", content="Fix the authentication bug"),
             Message(role="assistant", content="Done! Next, we need to add tests"),
@@ -160,6 +158,7 @@ class TestRuleBasedCompactionSummarizer:
     def test_truncation(self, summarizer):
         """Test content truncation in summaries."""
         import json
+
         long_content = "x" * 500
         messages = [
             Message(role="user", content=long_content),
@@ -173,6 +172,7 @@ class TestRuleBasedCompactionSummarizer:
     def test_no_system_messages_in_timeline(self, summarizer):
         """Test that system messages are excluded from timeline."""
         import json
+
         messages = [
             Message(role="system", content="System prompt"),
             Message(role="user", content="User message"),
@@ -205,10 +205,10 @@ class TestRuleBasedCompactionSummarizer:
     def test_max_files_limit(self, summarizer):
         """Test that file extraction is limited to 8 files."""
         import json
+
         # Create messages with more than 8 files
         messages = [
-            Message(role="user", content=f"Check src/file{i}.py for bugs")
-            for i in range(20)
+            Message(role="user", content=f"Check src/file{i}.py for bugs") for i in range(20)
         ]
 
         summary = summarizer.summarize(messages)
@@ -248,6 +248,7 @@ class TestCompactionSettingsIntegration:
     def test_settings_integration(self):
         """Test that summarizer respects settings."""
         import json
+
         settings = CompactionStrategySettings(
             rule_preserve_recent=10,
         )
@@ -275,7 +276,9 @@ class TestEdgeCases:
         messages = [
             Message(role="user", content="Valid message"),
             Message(role="assistant", content=""),  # Empty string instead of None
-            Message(role="tool", tool_call_id="call_1", tool_name="read_file", content=""),  # Empty string
+            Message(
+                role="tool", tool_call_id="call_1", tool_name="read_file", content=""
+            ),  # Empty string
         ]
 
         # Should not raise an error
@@ -285,6 +288,7 @@ class TestEdgeCases:
     def test_messages_with_unicode(self, summarizer):
         """Test handling messages with unicode characters."""
         import json
+
         messages = [
             Message(role="user", content="Fix the bug in 文件.py"),
             Message(role="assistant", content="I'll help with the fix 🐛"),
@@ -299,6 +303,7 @@ class TestEdgeCases:
     def test_very_long_message(self, summarizer):
         """Test handling very long messages."""
         import json
+
         long_content = "word " * 10000  # ~50KB
         messages = [
             Message(role="user", content=long_content),
@@ -322,7 +327,7 @@ class TestEdgeCases:
                 tool_calls=[
                     {"name": "read_file", "id": "call_1"},
                     {"name": "write_file", "id": "call_2"},  # Dict format
-                ]
+                ],
             ),
         ]
 

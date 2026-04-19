@@ -155,13 +155,18 @@ SYNTHESIS_PROMPT = _SYNTHESIS_FRAME_BEFORE.format(
     rules=SYNTHESIS_RULES, base_content="{base_content}"
 )
 
+
 def _parse_makefile_targets(path: Any) -> str:
     """Extract phony/documented make targets (up to 1000 chars)."""
     lines = path.read_text(encoding="utf-8").splitlines()
     targets = [
-        l for l in lines
-        if l and not l.startswith("\t") and ":" in l
-        and not l.startswith("#") and len(l) < 100
+        line
+        for line in lines
+        if line
+        and not line.startswith("\t")
+        and ":" in line
+        and not line.startswith("#")
+        and len(line) < 100
     ][:25]
     return "\n".join(targets)[:1000]
 
@@ -588,7 +593,12 @@ class InitSynthesizer:
         enrichments: list[str] = []
 
         # 1. AI assistant rules files — highest signal: architecture, patterns, dev commands
-        for name in ("CLAUDE.md", ".claude/CLAUDE.md", ".cursor/rules", ".github/copilot-instructions.md"):
+        for name in (
+            "CLAUDE.md",
+            ".claude/CLAUDE.md",
+            ".cursor/rules",
+            ".github/copilot-instructions.md",
+        ):
             path = cwd / name
             if path.exists():
                 try:
@@ -647,6 +657,7 @@ class InitSynthesizer:
         for name, _ in build_manifests:
             if name == "*.csproj":
                 import glob as _glob
+
                 matches = _glob.glob(str(cwd / "**" / "*.csproj"), recursive=True)
                 if matches:
                     path = Path(matches[0])

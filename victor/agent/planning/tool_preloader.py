@@ -207,8 +207,7 @@ class ToolPreloader:
 
             # Filter by confidence threshold
             high_confidence = [
-                p for p in predictions
-                if p.probability >= self.config.preload_threshold
+                p for p in predictions if p.probability >= self.config.preload_threshold
             ]
 
             # Limit to max_preload_tools
@@ -228,8 +227,7 @@ class ToolPreloader:
                 )
 
             logger.debug(
-                f"Preloading {len(to_preload)} tools: "
-                f"{[p.tool_name for p in to_preload]}"
+                f"Preloading {len(to_preload)} tools: " f"{[p.tool_name for p in to_preload]}"
             )
 
             self._preload_count += len(to_preload)
@@ -311,7 +309,10 @@ class ToolPreloader:
                 logger.debug(f"L1 cache hit: {tool_name}")
 
                 # Check for L2 promotion after threshold accesses
-                if self._l2_cache is not None and entry.access_count >= self.config.promotion_threshold:
+                if (
+                    self._l2_cache is not None
+                    and entry.access_count >= self.config.promotion_threshold
+                ):
                     self._add_to_l2_cache(tool_name, entry)
 
                 return entry.schema
@@ -446,9 +447,8 @@ class ToolPreloader:
                     access_count=l1_entry.access_count,
                     last_accessed=l1_entry.last_accessed,
                     last_preloaded=entry.last_preloaded,
-                    expires_at=datetime.now(timezone.utc) + timedelta(
-                        seconds=self.config.l2_ttl_seconds
-                    ),
+                    expires_at=datetime.now(timezone.utc)
+                    + timedelta(seconds=self.config.l2_ttl_seconds),
                 )
                 self._l2_cache[tool_name] = l2_entry
                 logger.debug(f"L2 cache promoted: {tool_name}")
@@ -503,23 +503,29 @@ class ToolPreloader:
             "l1_max_size": self.config.l1_max_size,
             "l1_hits": self._l1_hits,
             "l1_misses": self._l1_misses,
-            "l1_hit_rate": self._l1_hits / (self._l1_hits + self._l1_misses)
-            if (self._l1_hits + self._l1_misses) > 0
-            else 0.0,
+            "l1_hit_rate": (
+                self._l1_hits / (self._l1_hits + self._l1_misses)
+                if (self._l1_hits + self._l1_misses) > 0
+                else 0.0
+            ),
             "preload_count": self._preload_count,
             "background_loads": self._background_loads,
         }
 
         if self._l2_cache is not None:
-            stats.update({
-                "l2_cache_size": len(self._l2_cache),
-                "l2_max_size": self.config.l2_max_size,
-                "l2_hits": self._l2_hits,
-                "l2_misses": self._l2_misses,
-                "l2_hit_rate": self._l2_hits / (self._l2_hits + self._l2_misses)
-                if (self._l2_hits + self._l2_misses) > 0
-                else 0.0,
-            })
+            stats.update(
+                {
+                    "l2_cache_size": len(self._l2_cache),
+                    "l2_max_size": self.config.l2_max_size,
+                    "l2_hits": self._l2_hits,
+                    "l2_misses": self._l2_misses,
+                    "l2_hit_rate": (
+                        self._l2_hits / (self._l2_hits + self._l2_misses)
+                        if (self._l2_hits + self._l2_misses) > 0
+                        else 0.0
+                    ),
+                }
+            )
 
         return stats
 

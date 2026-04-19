@@ -46,21 +46,21 @@ class CompactionStrategySettings(BaseModel):
         ge=0.0,
         le=1.0,
         description="Minimum complexity score (0.0-1.0) to use LLM compaction. "
-        "Lower values use LLM more frequently; higher values prefer rules."
+        "Lower values use LLM more frequently; higher values prefer rules.",
     )
     llm_min_tokens: int = Field(
         default=5000,
         ge=1000,
         le=100000,
         description="Minimum estimated token count to consider LLM compaction. "
-        "Smaller conversations use rules or hybrid approach."
+        "Smaller conversations use rules or hybrid approach.",
     )
     llm_min_messages: int = Field(
         default=20,
         ge=5,
         le=100,
         description="Minimum message count to consider LLM compaction. "
-        "Shorter conversations prefer faster rule-based compaction."
+        "Shorter conversations prefer faster rule-based compaction.",
     )
 
     # Rule-based settings (claudecode-style)
@@ -69,92 +69,92 @@ class CompactionStrategySettings(BaseModel):
         ge=1,
         le=20,
         description="Number of recent messages to preserve verbatim in rule-based compaction. "
-        "Recent context is most valuable for continuation."
+        "Recent context is most valuable for continuation.",
     )
     rule_max_estimated_tokens: int = Field(
         default=10000,
         ge=1000,
         le=100000,
         description="Token threshold for rule-based compaction. "
-        "Conversations below this threshold can use fast rule-based compaction."
+        "Conversations below this threshold can use fast rule-based compaction.",
     )
     rule_xml_format: bool = Field(
         default=True,
         description="Generate XML format summaries (machine-readable). "
-        "XML format enables structured parsing and better context preservation."
+        "XML format enables structured parsing and better context preservation.",
     )
 
     # LLM-based settings
     llm_provider: Optional[str] = Field(
         default=None,
         description="Provider to use for LLM compaction (e.g., 'anthropic', 'openai'). "
-        "None = auto-detect from main session provider."
+        "None = auto-detect from main session provider.",
     )
     llm_model: Optional[str] = Field(
         default=None,
         description="Model to use for LLM compaction (e.g., 'claude-3-haiku'). "
-        "None = auto-detect based on provider and complexity."
+        "None = auto-detect based on provider and complexity.",
     )
     llm_timeout_seconds: float = Field(
         default=5.0,
         ge=1.0,
         le=30.0,
         description="Timeout for LLM summarization calls. "
-        "LLM failures fall back to rule-based compaction automatically."
+        "LLM failures fall back to rule-based compaction automatically.",
     )
     llm_max_retries: int = Field(
         default=2,
         ge=0,
         le=5,
-        description="Maximum retries for LLM compaction on transient failures."
+        description="Maximum retries for LLM compaction on transient failures.",
     )
     llm_max_input_chars: int = Field(
         default=8000,
         ge=1000,
         le=100000,
-        description="Maximum input characters to send to LLM for summarization."
+        description="Maximum input characters to send to LLM for summarization.",
     )
     llm_max_summary_tokens: int = Field(
         default=300,
         ge=100,
         le=1000,
-        description="Maximum tokens to generate for LLM-based summary."
+        description="Maximum tokens to generate for LLM-based summary.",
     )
 
     # Hybrid settings
     hybrid_llm_enhancement: bool = Field(
         default=True,
         description="Whether to enhance rule-based summaries with LLM in hybrid mode. "
-        "When True, hybrid mode uses rules for structure + LLM for key sections."
+        "When True, hybrid mode uses rules for structure + LLM for key sections.",
     )
     hybrid_llm_sections: List[str] = Field(
         default=["pending_work", "current_work"],
         description="Which summary sections to enhance with LLM in hybrid mode. "
-        "Options: 'pending_work', 'current_work', 'tools_mentioned', 'key_files_referenced'."
+        "Options: 'pending_work', 'current_work', 'tools_mentioned', 'key_files_referenced'.",
     )
 
     # Storage settings
     store_both_formats: bool = Field(
         default=True,
         description="Store both XML and natural language summaries in database. "
-        "Enables dual-format retrieval for different use cases."
+        "Enables dual-format retrieval for different use cases.",
     )
     store_compaction_history: bool = Field(
         default=True,
-        description="Log compaction events to analytics table for monitoring and optimization."
+        description="Log compaction events to analytics table for monitoring and optimization.",
     )
 
     # Performance settings
     enable_async_compaction: bool = Field(
         default=False,
         description="Enable asynchronous compaction (experimental). "
-        "When True, compaction runs in background to avoid blocking main thread."
+        "When True, compaction runs in background to avoid blocking main thread.",
     )
     compaction_queue_size: int = Field(
         default=10,
         ge=1,
         le=100,
-        description="Max number of pending compaction jobs when async is enabled."
+        description="Max number of pending compaction jobs when async is enabled.",
     )
 
     class Config:
@@ -178,26 +178,26 @@ class CompactionFeatureFlags(BaseModel):
     enable_rule_based: bool = Field(
         default=True,
         description="Enable rule-based compaction (claudecode-style). "
-        "Fast, deterministic, sub-100ms compaction using structured rules."
+        "Fast, deterministic, sub-100ms compaction using structured rules.",
     )
     enable_llm_based: bool = Field(
         default=True,
         description="Enable LLM-based compaction. "
-        "Rich, intelligent summaries using fast LLM calls with fallback."
+        "Rich, intelligent summaries using fast LLM calls with fallback.",
     )
     enable_hybrid: bool = Field(
         default=True,
         description="Enable hybrid compaction combining rules + LLM. "
-        "Best of both worlds: fast base with rich enhancements."
+        "Best of both worlds: fast base with rich enhancements.",
     )
     enable_json_storage: bool = Field(
         default=True,
         description="Enable JSON1 extension usage for structured data storage. "
-        "Improves query performance and enables complex JSON operations."
+        "Improves query performance and enables complex JSON operations.",
     )
     enable_compaction_analytics: bool = Field(
         default=True,
-        description="Enable compaction history tracking for monitoring and optimization."
+        description="Enable compaction history tracking for monitoring and optimization.",
     )
 
     class Config:

@@ -69,8 +69,8 @@ logger = logging.getLogger(__name__)
 class ChatCoordinator:
     """[DEPRECATED] Coordinator for chat and streaming chat operations.
 
-    This class is being superseded by ChatService as part of the 
-    state-passed architectural migration. It remains for backward 
+    This class is being superseded by ChatService as part of the
+    state-passed architectural migration. It remains for backward
     compatibility with facade-driven components.
 
     The coordinator depends on ``ChatOrchestratorProtocol`` (defined in
@@ -797,10 +797,14 @@ class ChatCoordinator:
                         return True, chunk
             except (ProviderRateLimitError, ProviderTimeoutError) as e:
                 logger.error(f"Rate limit/timeout during final response: {e}")
-                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n", is_final=True)
+                chunk = StreamChunk(
+                    content="Rate limited or timeout. Please retry in a moment.\n", is_final=True
+                )
             except ProviderAuthError as e:
                 logger.error(f"Auth error during final response: {e}")
-                chunk = StreamChunk(content="Authentication error. Check API credentials.\n", is_final=True)
+                chunk = StreamChunk(
+                    content="Authentication error. Check API credentials.\n", is_final=True
+                )
             except (ConnectionError, TimeoutError) as e:
                 logger.error(f"Network error during final response: {e}")
                 chunk = StreamChunk(content="Network error. Check connection.\n", is_final=True)
@@ -808,7 +812,7 @@ class ChatCoordinator:
                 logger.exception("Unexpected error during final response generation")
                 chunk = StreamChunk(
                     content="Unable to generate final summary due to iteration limit.\n",
-                    is_final=True
+                    is_final=True,
                 )
 
             orch._record_intelligent_outcome(
@@ -856,7 +860,7 @@ class ChatCoordinator:
         orch = self._orchestrator
         # [CANONICAL] Use state-passed service for rate limit calculation
         base_wait = orch._provider_service.get_rate_limit_wait_time(exc)
-        
+
         backoff_multiplier = 2**attempt
         wait_time = base_wait * backoff_multiplier
         return min(wait_time, 300.0)

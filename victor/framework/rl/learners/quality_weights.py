@@ -595,7 +595,10 @@ class QualityWeightLearner(BaseLearner):
         self._persist_user_preference(user_id, task_type, dimension, clamped)
         logger.debug(
             "quality_weights: user=%s preference %s[%s]=%s recorded",
-            user_id, task_type, dimension, clamped,
+            user_id,
+            task_type,
+            dimension,
+            clamped,
         )
 
     def get_personalized_weights(
@@ -618,10 +621,9 @@ class QualityWeightLearner(BaseLearner):
         if not hasattr(self, "_user_preferences"):
             self._load_user_preferences()
 
-        user_prefs = (
-            self._user_preferences.get(user_id, {}).get(task_type, {})
-            or self._user_preferences.get(user_id, {}).get("default", {})
-        )
+        user_prefs = self._user_preferences.get(user_id, {}).get(
+            task_type, {}
+        ) or self._user_preferences.get(user_id, {}).get("default", {})
 
         if not user_prefs:
             return global_weights

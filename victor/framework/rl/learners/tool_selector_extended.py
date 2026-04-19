@@ -33,7 +33,7 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
         db_connection: Any,
         learning_rate: float = 0.05,
         provider_adapter: Optional[Any] = None,
-        **kwargs
+        **kwargs,
     ):
         """Initialize extended learner with predictor and analytics.
 
@@ -50,7 +50,7 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
             db_connection=db_connection,
             learning_rate=learning_rate,
             provider_adapter=provider_adapter,
-            **kwargs
+            **kwargs,
         )
 
         # Integrate ToolPredictor from Priority 3
@@ -97,41 +97,41 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
             # Create recommendation based on success rate
             if insights["success_rate"] > 0.7:
                 # High success rate - recommend using
-                recommendations.append(RLRecommendation(
-                    learner_name="tool_selector",
-                    recommendation_type="tool_usage",
-                    key=tool_name,
-                    value="use",
-                    confidence=insights["success_rate"],
-                    metadata={
-                        "avg_execution_ms": insights["avg_execution_ms"],
-                        "sample_size": insights["execution_count"],
-                        "reason": "high_success_rate",
-                    }
-                ))
+                recommendations.append(
+                    RLRecommendation(
+                        learner_name="tool_selector",
+                        recommendation_type="tool_usage",
+                        key=tool_name,
+                        value="use",
+                        confidence=insights["success_rate"],
+                        metadata={
+                            "avg_execution_ms": insights["avg_execution_ms"],
+                            "sample_size": insights["execution_count"],
+                            "reason": "high_success_rate",
+                        },
+                    )
+                )
             elif insights["success_rate"] < 0.3:
                 # Low success rate - recommend avoiding
-                recommendations.append(RLRecommendation(
-                    learner_name="tool_selector",
-                    recommendation_type="tool_usage",
-                    key=tool_name,
-                    value="avoid",
-                    confidence=1.0 - insights["success_rate"],
-                    metadata={
-                        "avg_execution_ms": insights["avg_execution_ms"],
-                        "sample_size": insights["execution_count"],
-                        "reason": "low_success_rate",
-                    }
-                ))
+                recommendations.append(
+                    RLRecommendation(
+                        learner_name="tool_selector",
+                        recommendation_type="tool_usage",
+                        key=tool_name,
+                        value="avoid",
+                        confidence=1.0 - insights["success_rate"],
+                        metadata={
+                            "avg_execution_ms": insights["avg_execution_ms"],
+                            "sample_size": insights["execution_count"],
+                            "reason": "low_success_rate",
+                        },
+                    )
+                )
 
         return recommendations
 
     def predict_next_tool(
-        self,
-        task_description: str,
-        current_step: str,
-        recent_tools: List[str],
-        task_type: str
+        self, task_description: str, current_step: str, recent_tools: List[str], task_type: str
     ) -> Optional[str]:
         """Predict next tool using ToolPredictor.
 
@@ -160,10 +160,7 @@ class ExtendedToolSelectorLearner(ToolSelectorLearner):
         # Return top prediction
         return predictions[0].tool_name if predictions else None
 
-    def get_tool_insights(
-        self,
-        tool_name: str
-    ) -> Dict[str, Any]:
+    def get_tool_insights(self, tool_name: str) -> Dict[str, Any]:
         """Get insights for a specific tool.
 
         Args:

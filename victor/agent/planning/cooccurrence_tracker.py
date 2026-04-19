@@ -228,9 +228,7 @@ class CooccurrenceTracker:
         self._history.append((task_key, list(tools), success, now))
         self._total_sequences += 1
 
-        logger.debug(
-            f"Recorded tool sequence: {tools} (task={task_type}, success={success})"
-        )
+        logger.debug(f"Recorded tool sequence: {tools} (task={task_type}, success={success})")
 
     def _record_pattern(
         self,
@@ -265,7 +263,9 @@ class CooccurrenceTracker:
 
         # Update success rate
         new_success_count, new_total_count = self._pattern_success[task_key][pattern_key]
-        pattern_obj.success_rate = new_success_count / new_total_count if new_total_count > 0 else 0.5
+        pattern_obj.success_rate = (
+            new_success_count / new_total_count if new_total_count > 0 else 0.5
+        )
 
     def _find_or_create_pattern(
         self,
@@ -283,8 +283,6 @@ class CooccurrenceTracker:
         Returns:
             ToolPattern object
         """
-        pattern_key = "→".join(sequence)
-
         # Check if pattern exists
         if len(sequence) == 2:
             patterns = self._bigrams[task_key]
@@ -375,9 +373,7 @@ class CooccurrenceTracker:
                 predictions[tool] += prob * 1.0  # Medium weight for trigrams
 
         # Apply success rate boosting
-        boosted_predictions = self._apply_success_rate_boosting(
-            predictions, task_key
-        )
+        boosted_predictions = self._apply_success_rate_boosting(predictions, task_key)
 
         # Normalize probabilities
         total = sum(boosted_predictions.values())
@@ -387,9 +383,7 @@ class CooccurrenceTracker:
             normalized = {}
 
         # Sort and convert to ToolPrediction objects
-        sorted_predictions = sorted(
-            normalized.items(), key=lambda x: x[1], reverse=True
-        )[:top_k]
+        sorted_predictions = sorted(normalized.items(), key=lambda x: x[1], reverse=True)[:top_k]
 
         result = []
         for tool_name, probability in sorted_predictions:
@@ -433,7 +427,8 @@ class CooccurrenceTracker:
 
         # Find all bigrams starting with last_tool and calculate confidence
         matching_patterns = [
-            p for p in self._bigrams[task_key]
+            p
+            for p in self._bigrams[task_key]
             if len(p.sequence) == 2 and p.sequence[0] == last_tool
         ]
 
@@ -474,7 +469,8 @@ class CooccurrenceTracker:
 
         # Find all trigrams matching the last 2 tools
         matching_patterns = [
-            p for p in self._trigrams[task_key]
+            p
+            for p in self._trigrams[task_key]
             if (
                 len(p.sequence) == 3
                 and p.sequence[0] == last_two[0]

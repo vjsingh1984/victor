@@ -88,7 +88,7 @@ class ContextMetricsImpl:
 class ContextService:
     """[CANONICAL] Service for context and state management.
 
-    The target implementation for context operations following the 
+    The target implementation for context operations following the
     state-passed architectural pattern. Supersedes logic previously
     managed by ConversationController and ContextCompactor.
 
@@ -433,7 +433,9 @@ class ContextService:
             excess_tokens = current_tokens - target_tokens
 
             if excess_tokens > 0:
-                avg_tokens_per_message = current_tokens / len(self._messages) if self._messages else 1
+                avg_tokens_per_message = (
+                    current_tokens / len(self._messages) if self._messages else 1
+                )
                 messages_to_remove = int(excess_tokens / avg_tokens_per_message) + 1
 
         return {
@@ -720,50 +722,60 @@ class ContextService:
 
         # Critical alerts
         if current_util >= 95:
-            alerts.append({
-                "level": "critical",
-                "message": f"Context at {current_util:.1f}% capacity",
-                "action": "compact_immediately",
-                "urgency": "critical",
-            })
+            alerts.append(
+                {
+                    "level": "critical",
+                    "message": f"Context at {current_util:.1f}% capacity",
+                    "action": "compact_immediately",
+                    "urgency": "critical",
+                }
+            )
 
         # Warning alerts
         elif current_util >= 85:
-            alerts.append({
-                "level": "warning",
-                "message": f"Context at {current_util:.1f}% capacity",
-                "action": "consider_compaction",
-                "urgency": "high",
-            })
+            alerts.append(
+                {
+                    "level": "warning",
+                    "message": f"Context at {current_util:.1f}% capacity",
+                    "action": "consider_compaction",
+                    "urgency": "high",
+                }
+            )
 
         # Info alerts
         elif current_util >= 75:
-            alerts.append({
-                "level": "info",
-                "message": f"Context at {current_util:.1f}% capacity",
-                "action": "monitor_closely",
-                "urgency": "medium",
-            })
+            alerts.append(
+                {
+                    "level": "info",
+                    "message": f"Context at {current_util:.1f}% capacity",
+                    "action": "monitor_closely",
+                    "urgency": "medium",
+                }
+            )
 
         # Risk-based alerts
         if risk_score >= 0.7:
-            alerts.append({
-                "level": "warning",
-                "message": f"High overflow risk score: {risk_score:.2f}",
-                "action": "review_growth_patterns",
-                "urgency": "high",
-            })
+            alerts.append(
+                {
+                    "level": "warning",
+                    "message": f"High overflow risk score: {risk_score:.2f}",
+                    "action": "review_growth_patterns",
+                    "urgency": "high",
+                }
+            )
 
         # Growth rate alerts
         trends = self.analyze_context_trends()
         growth_rate = trends.get("growth_rate", 0)
         if growth_rate > 50:  # tokens per minute
-            alerts.append({
-                "level": "info",
-                "message": f"Elevated growth rate: {growth_rate:.1f} tokens/min",
-                "action": "monitor_closely",
-                "urgency": "medium",
-            })
+            alerts.append(
+                {
+                    "level": "info",
+                    "message": f"Elevated growth rate: {growth_rate:.1f} tokens/min",
+                    "action": "monitor_closely",
+                    "urgency": "medium",
+                }
+            )
 
         return alerts
 
@@ -790,7 +802,6 @@ class ContextService:
             # }
         """
         current_tokens = self.get_context_size()
-        max_tokens = self.get_max_tokens()
         current_util = self.get_context_utilization()
 
         priority_actions = []
@@ -804,13 +815,15 @@ class ContextService:
         if system_tokens > 5000:
             priority_actions.append("reduce_system_prompt")
             savings_potential += system_tokens - 3000
-            detailed_recs.append({
-                "action": "reduce_system_prompt",
-                "description": "System prompt is large",
-                "current_tokens": system_tokens,
-                "suggested_tokens": 3000,
-                "potential_savings": system_tokens - 3000,
-            })
+            detailed_recs.append(
+                {
+                    "action": "reduce_system_prompt",
+                    "description": "System prompt is large",
+                    "current_tokens": system_tokens,
+                    "suggested_tokens": 3000,
+                    "potential_savings": system_tokens - 3000,
+                }
+            )
 
         # Analyze message count
         message_count = len(self.get_messages())
@@ -818,26 +831,30 @@ class ContextService:
             priority_actions.append("compact_messages")
             estimated_savings = int(current_tokens * 0.3)
             savings_potential += estimated_savings
-            detailed_recs.append({
-                "action": "compact_messages",
-                "description": f"High message count: {message_count}",
-                "current_messages": message_count,
-                "suggested_messages": 10,
-                "potential_savings": estimated_savings,
-            })
+            detailed_recs.append(
+                {
+                    "action": "compact_messages",
+                    "description": f"High message count: {message_count}",
+                    "current_messages": message_count,
+                    "suggested_messages": 10,
+                    "potential_savings": estimated_savings,
+                }
+            )
 
         # Analyze tool results
         tool_results = metrics.get("tool", 0)
         if tool_results > 10000:
             priority_actions.append("truncate_tool_results")
             savings_potential += tool_results - 5000
-            detailed_recs.append({
-                "action": "truncate_tool_results",
-                "description": "Large tool result tokens",
-                "current_tokens": tool_results,
-                "suggested_tokens": 5000,
-                "potential_savings": tool_results - 5000,
-            })
+            detailed_recs.append(
+                {
+                    "action": "truncate_tool_results",
+                    "description": "Large tool result tokens",
+                    "current_tokens": tool_results,
+                    "suggested_tokens": 5000,
+                    "potential_savings": tool_results - 5000,
+                }
+            )
 
         # Calculate optimization score
         optimization_score = self._calculate_optimization_score()
@@ -913,7 +930,7 @@ class ContextService:
         recent = history[-5:]
         recent_avg = sum(h.get("utilization", 0) for h in recent) / len(recent)
 
-        older = history[:5] if len(history) >= 10 else history[:len(history)//2]
+        older = history[:5] if len(history) >= 10 else history[: len(history) // 2]
         older_avg = sum(h.get("utilization", 0) for h in older) / len(older)
 
         if recent_avg > older_avg + 5:
@@ -1041,4 +1058,3 @@ class ContextService:
             return 0.0
 
         return last_saved / (last_saved + current_tokens)
-

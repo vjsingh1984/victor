@@ -259,8 +259,10 @@ def retry_with_backoff(
     # Note: backoff_strategy parameter is ignored - canonical handles this internally
     # Convert default (Exception,) to None to mean "retry all exceptions"
     # The canonical implementation checks for exact type match, not subclass relationships
-    canonical_retryable = None if retryable_exceptions == (Exception,) else (
-        set(retryable_exceptions) if retryable_exceptions else None
+    canonical_retryable = (
+        None
+        if retryable_exceptions == (Exception,)
+        else (set(retryable_exceptions) if retryable_exceptions else None)
     )
 
     strategy = CanonicalExponentialBackoffStrategy(
@@ -278,8 +280,11 @@ def retry_with_backoff(
     def decorator(func: F) -> F:
         # Preserve on_retry callback if provided
         if on_retry:
-            original_on_retry = strategy.on_retry
-            strategy.on_retry = lambda ctx: on_retry(ctx.attempt, ctx.last_exception, strategy.get_delay(ctx)) if ctx.last_exception else None
+            strategy.on_retry = lambda ctx: (
+                on_retry(ctx.attempt, ctx.last_exception, strategy.get_delay(ctx))
+                if ctx.last_exception
+                else None
+            )
 
         # Use canonical executor
         if asyncio.iscoroutinefunction(func):

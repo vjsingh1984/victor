@@ -86,7 +86,7 @@ class SQLiteSessionPersistence:
             "SQLiteSessionPersistence is deprecated. Use ConversationStore from "
             "victor.agent.conversation.store instead. This will be removed in version 0.10.0.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         from victor.config.settings import get_project_paths
         from victor.core.database import get_project_database
@@ -508,7 +508,7 @@ def get_sqlite_session_persistence(
         "get_sqlite_session_persistence() is deprecated. Use ConversationStore from "
         "victor.agent.conversation.store instead. This will be removed in version 0.10.0.",
         DeprecationWarning,
-        stacklevel=2
+        stacklevel=2,
     )
 
     # Support test database override via environment variable

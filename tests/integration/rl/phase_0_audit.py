@@ -58,6 +58,7 @@ class TestLearnerInventory:
     def test_all_learners_exist(self):
         """All expected learner files must be importable."""
         import importlib
+
         missing = []
         for name in EXPECTED_LEARNERS:
             mod_path = f"victor.framework.rl.learners.{name}"
@@ -70,14 +71,14 @@ class TestLearnerInventory:
     def test_learner_count_at_least_15(self):
         """At least 15 learner files (15 canonical + optional extended variants)."""
         import os
+
         learner_dir = "victor/framework/rl/learners"
         files = [
-            f[:-3] for f in os.listdir(learner_dir)
-            if f.endswith(".py") and not f.startswith("_")
+            f[:-3] for f in os.listdir(learner_dir) if f.endswith(".py") and not f.startswith("_")
         ]
-        assert len(files) >= 15, (
-            f"Expected at least 15 learners, found {len(files)}: {sorted(files)}"
-        )
+        assert (
+            len(files) >= 15
+        ), f"Expected at least 15 learners, found {len(files)}: {sorted(files)}"
 
     @pytest.mark.parametrize("learner_name", EXPECTED_LEARNERS)
     def test_coordinator_can_retrieve_learner(self, learner_name):
@@ -90,6 +91,7 @@ class TestLearnerInventory:
 # ---------------------------------------------------------------------------
 # Part 2: UsageAnalytics API Contract
 # ---------------------------------------------------------------------------
+
 
 class TestUsageAnalyticsAPI:
     """Part 2: UsageAnalytics integration surface for Priority 4."""
@@ -111,9 +113,9 @@ class TestUsageAnalyticsAPI:
     def test_get_session_summary_returns_dict(self):
         """get_session_summary() returns a dict (shape varies before/after sessions)."""
         summary = self.ua.get_session_summary()
-        assert isinstance(summary, dict), (
-            f"get_session_summary() must return a dict, got {type(summary)}"
-        )
+        assert isinstance(
+            summary, dict
+        ), f"get_session_summary() must return a dict, got {type(summary)}"
 
     def test_get_session_summary_with_session_data(self):
         """get_session_summary() returns aggregation keys when sessions exist."""
@@ -166,6 +168,7 @@ class TestUsageAnalyticsAPI:
 # Part 3: RL Database Schema
 # ---------------------------------------------------------------------------
 
+
 class TestRLDatabaseSchema:
     """Part 3: rl_outcomes table must have all required columns."""
 
@@ -178,9 +181,9 @@ class TestRLDatabaseSchema:
     def test_rl_coordinator_has_async_record_outcome(self):
         """Async variant must exist for non-blocking use."""
         coord = get_rl_coordinator()
-        assert hasattr(coord, "record_outcome_async"), (
-            "record_outcome_async() missing — needed for async tool pipeline"
-        )
+        assert hasattr(
+            coord, "record_outcome_async"
+        ), "record_outcome_async() missing — needed for async tool pipeline"
 
     def test_record_outcome_accepts_rl_outcome(self):
         """record_outcome() must accept an RLOutcome without raising."""
@@ -223,12 +226,14 @@ class TestRLDatabaseSchema:
 # Part 4: RLOutcome Quality Score
 # ---------------------------------------------------------------------------
 
+
 class TestRLOutcomeQualityScore:
     """Part 4: RLOutcome.quality_score field for user feedback integration."""
 
     def test_rl_outcome_has_quality_score_field(self):
         """RLOutcome must have a quality_score field."""
         import dataclasses
+
         fields = {f.name for f in dataclasses.fields(RLOutcome)}
         assert "quality_score" in fields, (
             "RLOutcome.quality_score is required for user feedback. "
@@ -238,6 +243,7 @@ class TestRLOutcomeQualityScore:
     def test_rl_outcome_has_metadata_field(self):
         """RLOutcome must have a metadata dict for feedback_source tracking."""
         import dataclasses
+
         fields = {f.name for f in dataclasses.fields(RLOutcome)}
         assert "metadata" in fields
 
@@ -267,13 +273,19 @@ class TestRLOutcomeQualityScore:
     def test_automatic_vs_user_feedback_distinguished_via_metadata(self):
         """feedback_source in metadata distinguishes automatic from human scores."""
         auto = RLOutcome(
-            provider="anthropic", model="claude-sonnet-4-6",
-            task_type="tool_call", success=True, quality_score=0.8,
+            provider="anthropic",
+            model="claude-sonnet-4-6",
+            task_type="tool_call",
+            success=True,
+            quality_score=0.8,
             metadata={"feedback_source": "auto"},
         )
         human = RLOutcome(
-            provider="user", model="feedback",
-            task_type="feedback", success=True, quality_score=0.95,
+            provider="user",
+            model="feedback",
+            task_type="feedback",
+            success=True,
+            quality_score=0.95,
             metadata={"feedback_source": "user", "helpful": True},
         )
         assert auto.metadata["feedback_source"] == "auto"
@@ -284,6 +296,7 @@ class TestRLOutcomeQualityScore:
         Priority 4 must NOT add a separate feedback table or field.
         """
         import dataclasses
+
         fields = {f.name for f in dataclasses.fields(RLOutcome)}
         # Must NOT have a separate 'user_rating' or 'feedback_score' field
         duplicates = fields & {"user_rating", "feedback_score", "human_score"}
@@ -296,6 +309,7 @@ class TestRLOutcomeQualityScore:
 # ---------------------------------------------------------------------------
 # Part 5: ToolPredictor (Priority 3) Integration
 # ---------------------------------------------------------------------------
+
 
 class TestToolPredictorIntegration:
     """Part 5: ToolPredictor from Priority 3 must be available for Priority 4."""
@@ -311,14 +325,16 @@ class TestToolPredictorIntegration:
     def test_tool_predictor_has_predict_tools(self):
         """ToolPredictor.predict_tools() must exist."""
         from victor.agent.planning.tool_predictor import ToolPredictor
+
         tp = ToolPredictor()
-        assert hasattr(tp, "predict_tools") and callable(tp.predict_tools), (
-            "ToolPredictor.predict_tools() missing — Priority 4 extends this method"
-        )
+        assert hasattr(tp, "predict_tools") and callable(
+            tp.predict_tools
+        ), "ToolPredictor.predict_tools() missing — Priority 4 extends this method"
 
     def test_tool_predictor_predict_tools_returns_list(self):
         """predict_tools() must return a list (may be empty for unknown task)."""
         from victor.agent.planning.tool_predictor import ToolPredictor
+
         tp = ToolPredictor()
         result = tp.predict_tools(
             task_description="read a file",
@@ -326,9 +342,7 @@ class TestToolPredictorIntegration:
             recent_tools=["ls"],
             task_type="analysis",
         )
-        assert isinstance(result, list), (
-            f"predict_tools() returned {type(result)}, expected list"
-        )
+        assert isinstance(result, list), f"predict_tools() returned {type(result)}, expected list"
 
     def test_tool_selector_learner_exists_and_instantiable(self):
         """tool_selector learner must be retrievable from coordinator."""
@@ -341,22 +355,24 @@ class TestToolPredictorIntegration:
         Priority 4 must EXTEND it, not create a new prediction class.
         """
         from victor.agent.planning import tool_predictor as tp_mod
+
         # Only one ToolPredictor class should exist in the planning package
         import inspect
+
         predictors = [
-            name for name, obj in inspect.getmembers(tp_mod, inspect.isclass)
+            name
+            for name, obj in inspect.getmembers(tp_mod, inspect.isclass)
             if "Predict" in name and "Tool" in name
         ]
         assert len(predictors) >= 1, "ToolPredictor class not found"
         # Ensure it hasn't been duplicated elsewhere with a different name
-        assert "ToolPredictor" in predictors, (
-            f"Expected 'ToolPredictor', found: {predictors}"
-        )
+        assert "ToolPredictor" in predictors, f"Expected 'ToolPredictor', found: {predictors}"
 
 
 # ---------------------------------------------------------------------------
 # Part 6: No-Duplication Guards + Performance Baselines
 # ---------------------------------------------------------------------------
+
 
 class TestNoDuplicationGuards:
     """Part 6: Guard tests that prevent Priority 4 from duplicating existing work."""
@@ -364,6 +380,7 @@ class TestNoDuplicationGuards:
     def test_all_learners_extended_not_replaced(self):
         """All 15 learners must still be present after any Priority 4 work."""
         import importlib
+
         for name in EXPECTED_LEARNERS:
             try:
                 importlib.import_module(f"victor.framework.rl.learners.{name}")
@@ -389,9 +406,18 @@ class TestNoDuplicationGuards:
         Priority 4 should use metadata dict for new data, not new fields.
         """
         import dataclasses
+
         fields = {f.name for f in dataclasses.fields(RLOutcome)}
-        essential = {"provider", "model", "task_type", "success", "quality_score",
-                     "timestamp", "metadata", "vertical"}
+        essential = {
+            "provider",
+            "model",
+            "task_type",
+            "success",
+            "quality_score",
+            "timestamp",
+            "metadata",
+            "vertical",
+        }
         unknown = fields - essential
         assert not unknown, (
             f"Unexpected fields in RLOutcome: {unknown}. "
@@ -434,9 +460,7 @@ class TestPerformanceBaselines:
         start = time.monotonic()
         summary = ua.get_session_summary()
         elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 50, (
-            f"get_session_summary() took {elapsed_ms:.1f}ms (limit: 50ms)"
-        )
+        assert elapsed_ms < 50, f"get_session_summary() took {elapsed_ms:.1f}ms (limit: 50ms)"
         assert isinstance(summary, dict)
 
     def test_rl_coordinator_record_outcome_performance(self):
@@ -461,6 +485,4 @@ class TestPerformanceBaselines:
             except Exception:
                 pass  # DB not available in test env — just time the call
         elapsed_ms = (time.monotonic() - start) * 1000
-        assert elapsed_ms < 1000, (
-            f"record_outcome() x10 took {elapsed_ms:.0f}ms (limit: 1000ms)"
-        )
+        assert elapsed_ms < 1000, f"record_outcome() x10 took {elapsed_ms:.0f}ms (limit: 1000ms)"

@@ -806,11 +806,10 @@ class TurnExecutor:
                 if blocked:
                     before = len(tools)
                     tools = [
-                        t for t in tools
-                        if (
-                            t.get("name") if isinstance(t, dict)
-                            else getattr(t, "name", None)
-                        ) not in blocked
+                        t
+                        for t in tools
+                        if (t.get("name") if isinstance(t, dict) else getattr(t, "name", None))
+                        not in blocked
                     ]
                     removed = before - len(tools)
                     if removed:

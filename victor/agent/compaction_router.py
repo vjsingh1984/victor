@@ -446,12 +446,7 @@ class CompactionRouter:
 
         # Combine all factors
         complexity = (
-            count_score
-            + token_score
-            + tool_score
-            + coherence_score
-            + role_score
-            + query_score
+            count_score + token_score + tool_score + coherence_score + role_score + query_score
         )
 
         return min(complexity, 1.0)
@@ -503,8 +498,25 @@ class CompactionRouter:
 
         files = set()
         file_extensions = {
-            "rs", "ts", "tsx", "js", "jsx", "json", "md", "py", "go", "java",
-            "cpp", "c", "h", "cs", "php", "rb", "swift", "kt", "scala",
+            "rs",
+            "ts",
+            "tsx",
+            "js",
+            "jsx",
+            "json",
+            "md",
+            "py",
+            "go",
+            "java",
+            "cpp",
+            "c",
+            "h",
+            "cs",
+            "php",
+            "rb",
+            "swift",
+            "kt",
+            "scala",
         }
 
         for msg in messages:
@@ -513,7 +525,7 @@ class CompactionRouter:
 
             # Extract file paths using regex
             # Pattern: paths with known extensions
-            pattern = r'[\w/\\-]+\.(?:' + '|'.join(file_extensions) + ')'
+            pattern = r"[\w/\\-]+\.(?:" + "|".join(file_extensions) + ")"
             matches = re.findall(pattern, msg.content)
             files.update(matches)
 
@@ -629,25 +641,30 @@ class CompactionRouter:
         # Calculate success rates
         rule_based_rate = (
             metrics["rule_based_success"] / metrics["rule_based_count"]
-            if metrics["rule_based_count"] > 0 else 0.0
+            if metrics["rule_based_count"] > 0
+            else 0.0
         )
         llm_based_rate = (
             metrics["llm_based_success"] / metrics["llm_based_count"]
-            if metrics["llm_based_count"] > 0 else 0.0
+            if metrics["llm_based_count"] > 0
+            else 0.0
         )
         hybrid_rate = (
             metrics["hybrid_success"] / metrics["hybrid_count"]
-            if metrics["hybrid_count"] > 0 else 0.0
+            if metrics["hybrid_count"] > 0
+            else 0.0
         )
 
         # Calculate averages
         avg_duration = (
             metrics["total_duration_ms"] / metrics["total_compactions"]
-            if metrics["total_compactions"] > 0 else 0.0
+            if metrics["total_compactions"] > 0
+            else 0.0
         )
         avg_tokens_saved = (
             metrics["total_tokens_saved"] / metrics["total_compactions"]
-            if metrics["total_compactions"] > 0 else 0.0
+            if metrics["total_compactions"] > 0
+            else 0.0
         )
 
         return {
@@ -662,9 +679,15 @@ class CompactionRouter:
                 "llm_based": llm_based_rate,
                 "hybrid": hybrid_rate,
                 "overall": (
-                    metrics["rule_based_success"] + metrics["llm_based_success"] + metrics["hybrid_success"]
-                ) / metrics["total_compactions"]
-                if metrics["total_compactions"] > 0 else 0.0
+                    (
+                        metrics["rule_based_success"]
+                        + metrics["llm_based_success"]
+                        + metrics["hybrid_success"]
+                    )
+                    / metrics["total_compactions"]
+                    if metrics["total_compactions"] > 0
+                    else 0.0
+                ),
             },
             "performance_metrics": {
                 "avg_duration_ms": avg_duration,

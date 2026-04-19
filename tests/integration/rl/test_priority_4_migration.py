@@ -320,7 +320,7 @@ class TestPriority4Migration:
                 "session_id": "test_session_123",
                 "feedback_source": "user",
             },
-            vertical="general"
+            vertical="general",
         )
 
         assert outcome.metadata["session_id"] == "test_session_123"
@@ -401,7 +401,7 @@ class TestPriority4BackwardCompatibility:
                 "session_id": "test_session",
                 "feedback_source": "user",
             },
-            vertical="general"
+            vertical="general",
         )
 
         # Should not raise

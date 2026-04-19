@@ -145,7 +145,8 @@ class FeatureFlagSettings(BaseModel):
             "phase_aware_context_enabled": self.enable_phase_aware_context,
             "predictive_tools_enabled": self.enable_predictive_tools,
             "tool_predictor_enabled": self.enable_tool_predictor and self.enable_predictive_tools,
-            "cooccurrence_tracking_enabled": self.enable_cooccurrence_tracking and self.enable_predictive_tools,
+            "cooccurrence_tracking_enabled": self.enable_cooccurrence_tracking
+            and self.enable_predictive_tools,
             "tool_preloading_enabled": self.enable_tool_preloading and self.enable_predictive_tools,
             "rollout_percentage": self.predictive_rollout_percentage,
             "confidence_threshold": self.predictive_confidence_threshold,

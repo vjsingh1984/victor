@@ -201,9 +201,7 @@ class SystemPromptOptimizationDecision(BaseModel):
     add_context_reminder: bool = Field(
         description="Whether to add a reminder about recent compaction"
     )
-    add_failure_hints: bool = Field(
-        description="Whether to include hints based on recent failures"
-    )
+    add_failure_hints: bool = Field(description="Whether to include hints based on recent failures")
     adjust_for_complexity: bool = Field(
         description="Whether to tailor prompt based on task complexity"
     )

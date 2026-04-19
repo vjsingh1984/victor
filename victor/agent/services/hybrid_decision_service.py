@@ -775,12 +775,7 @@ class HybridMetrics:
 
     def get_hit_rate(self) -> float:
         """Calculate overall hit rate (cache + lookup + pattern + ensemble)."""
-        total_hits = (
-            self.cache_hits +
-            self.lookup_hits +
-            self.pattern_hits +
-            self.ensemble_hits
-        )
+        total_hits = self.cache_hits + self.lookup_hits + self.pattern_hits + self.ensemble_hits
         total_requests = total_hits + self.llm_calls + self.heuristic_fallbacks
         return total_hits / total_requests if total_requests > 0 else 0.0
 

@@ -98,8 +98,7 @@ class TypeStatistics:
     def get_heuristic_accuracy(self) -> float:
         """Get accuracy of heuristic-only decisions."""
         heuristic_decisions = [
-            d for d in self.recent_decisions
-            if not d.used_llm and d.was_correct is not None
+            d for d in self.recent_decisions if not d.used_llm and d.was_correct is not None
         ]
 
         if not heuristic_decisions:
@@ -111,8 +110,7 @@ class TypeStatistics:
     def get_llm_accuracy(self) -> float:
         """Get accuracy of LLM decisions."""
         llm_decisions = [
-            d for d in self.recent_decisions
-            if d.used_llm and d.was_correct is not None
+            d for d in self.recent_decisions if d.used_llm and d.was_correct is not None
         ]
 
         if not llm_decisions:
@@ -362,8 +360,7 @@ class ConfidenceCalibrator:
 
         # Also need at least 10 heuristic decisions with known outcomes
         heuristic_decisions = [
-            d for d in stats.recent_decisions
-            if not d.used_llm and d.was_correct is not None
+            d for d in stats.recent_decisions if not d.used_llm and d.was_correct is not None
         ]
 
         if len(heuristic_decisions) < 10:

@@ -116,7 +116,7 @@ def sample_conversation():
         Message(
             role="assistant",
             content="I'll help you fix the authentication bug. Let me start by examining the authentication module.",
-            tool_calls=[{"name": "read_file", "id": "call_1"}]
+            tool_calls=[{"name": "read_file", "id": "call_1"}],
         ),
         Message(
             role="tool",
@@ -129,18 +129,18 @@ def login(username, password):
     if not username or not password:
         return None
     return authenticate(username, password)
-"""
+""",
         ),
         Message(
             role="assistant",
             content="I found the issue. The login function is missing proper input validation. Let me add validation for empty strings and whitespace.",
-            tool_calls=[{"name": "write_file", "id": "call_2"}]
+            tool_calls=[{"name": "write_file", "id": "call_2"}],
         ),
         Message(
             role="tool",
             tool_call_id="call_2",
             tool_name="write_file",
-            content="Successfully updated src/auth/login.py with input validation"
+            content="Successfully updated src/auth/login.py with input validation",
         ),
         Message(
             role="assistant",
@@ -148,9 +148,12 @@ def login(username, password):
             "1. Check for None values\n"
             "2. Strip whitespace from username and password\n"
             "3. Validate that both fields are non-empty after stripping\n\n"
-            "TODO: We should add unit tests for this function later."
+            "TODO: We should add unit tests for this function later.",
         ),
-        Message(role="user", content="Great! Now can you also add error handling for invalid credentials?"),
+        Message(
+            role="user",
+            content="Great! Now can you also add error handling for invalid credentials?",
+        ),
     ]
 
 
@@ -159,29 +162,39 @@ def large_conversation():
     """Create a large conversation for testing compaction."""
     messages = []
     for i in range(50):
-        messages.append(Message(role="user", content=f"Task {i}: Fix bug in src/module{i}/file{i}.py"))
-        messages.append(Message(
-            role="assistant",
-            content=f"I'll fix the bug in file{i}.py",
-            tool_calls=[{"name": "read_file", "id": f"call_{i}"}]
-        ))
-        messages.append(Message(
-            role="tool",
-            tool_call_id=f"call_{i}",
-            tool_name="read_file",
-            content=f"Content of file{i}.py..."
-        ))
-        messages.append(Message(
-            role="assistant",
-            content=f"Fixed the bug. Next, we need to add tests for module{i}.",
-            tool_calls=[{"name": "write_file", "id": f"call_write_{i}"}]
-        ))
-        messages.append(Message(
-            role="tool",
-            tool_call_id=f"call_write_{i}",
-            tool_name="write_file",
-            content=f"Successfully updated file{i}.py"
-        ))
+        messages.append(
+            Message(role="user", content=f"Task {i}: Fix bug in src/module{i}/file{i}.py")
+        )
+        messages.append(
+            Message(
+                role="assistant",
+                content=f"I'll fix the bug in file{i}.py",
+                tool_calls=[{"name": "read_file", "id": f"call_{i}"}],
+            )
+        )
+        messages.append(
+            Message(
+                role="tool",
+                tool_call_id=f"call_{i}",
+                tool_name="read_file",
+                content=f"Content of file{i}.py...",
+            )
+        )
+        messages.append(
+            Message(
+                role="assistant",
+                content=f"Fixed the bug. Next, we need to add tests for module{i}.",
+                tool_calls=[{"name": "write_file", "id": f"call_write_{i}"}],
+            )
+        )
+        messages.append(
+            Message(
+                role="tool",
+                tool_call_id=f"call_write_{i}",
+                tool_name="write_file",
+                content=f"Successfully updated file{i}.py",
+            )
+        )
     return messages
 
 
@@ -214,7 +227,9 @@ class TestHybridCompactionIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_strategy_selection_based_on_complexity(self, router, sample_conversation, large_conversation):
+    async def test_strategy_selection_based_on_complexity(
+        self, router, sample_conversation, large_conversation
+    ):
         """Test that router selects appropriate strategy based on complexity."""
         # Small conversation should use rule-based
         small_result = await router.compact(sample_conversation)
@@ -225,7 +240,9 @@ class TestHybridCompactionIntegration:
         assert large_result.strategy_used == CompactionType.LLM_BASED
 
     @pytest.mark.asyncio
-    async def test_graceful_degradation_on_llm_failure(self, settings, feature_flags, rule_summarizer):
+    async def test_graceful_degradation_on_llm_failure(
+        self, settings, feature_flags, rule_summarizer
+    ):
         """Test graceful degradation when LLM fails."""
         # Create LLM summarizer that fails
         mock_provider = Mock()
@@ -256,10 +273,7 @@ class TestHybridCompactionIntegration:
         import asyncio
 
         # Create multiple concurrent compaction requests
-        tasks = [
-            router.compact(sample_conversation, session_id=f"session-{i}")
-            for i in range(5)
-        ]
+        tasks = [router.compact(sample_conversation, session_id=f"session-{i}") for i in range(5)]
 
         results = await asyncio.gather(*tasks)
 
@@ -344,7 +358,9 @@ class TestSettingsDrivenBehavior:
         assert result.strategy_used == CompactionType.RULE_BASED
 
     @pytest.mark.asyncio
-    async def test_high_complexity_threshold_uses_llm(self, settings, feature_flags, rule_summarizer, mock_provider):
+    async def test_high_complexity_threshold_uses_llm(
+        self, settings, feature_flags, rule_summarizer, mock_provider
+    ):
         """Test that high complexity threshold favors LLM-based."""
         settings.llm_min_complexity = 0.3  # Very low threshold
 
@@ -377,7 +393,7 @@ class TestSettingsDrivenBehavior:
         feature_flags = CompactionFeatureFlags(
             enable_rule_based=True,
             enable_llm_based=False,  # Disable LLM
-            enable_hybrid=False,      # Disable hybrid
+            enable_hybrid=False,  # Disable hybrid
         )
 
         router = CompactionRouter(
@@ -452,11 +468,13 @@ class TestRealWorldScenarios:
 
         for step in debugging_steps:
             messages.append(Message(role="user", content=step))
-            messages.append(Message(
-                role="assistant",
-                content=f"I'll {step.lower()}",
-                tool_calls=[{"name": "read_file", "id": f"call_{len(messages)}"}]
-            ))
+            messages.append(
+                Message(
+                    role="assistant",
+                    content=f"I'll {step.lower()}",
+                    tool_calls=[{"name": "read_file", "id": f"call_{len(messages)}"}],
+                )
+            )
 
         result = await router.compact(messages, current_query="continue debugging")
 
@@ -472,17 +490,21 @@ class TestRealWorldScenarios:
 
         for file_path in files:
             messages.append(Message(role="user", content=f"Refactor {file_path}"))
-            messages.append(Message(
-                role="assistant",
-                content=f"I'll refactor {file_path}",
-                tool_calls=[{"name": "read_file", "id": f"call_{len(messages)}"}]
-            ))
-            messages.append(Message(
-                role="tool",
-                tool_call_id=f"call_{len(messages)}",
-                tool_name="read_file",
-                content=f"Content of {file_path}..."
-            ))
+            messages.append(
+                Message(
+                    role="assistant",
+                    content=f"I'll refactor {file_path}",
+                    tool_calls=[{"name": "read_file", "id": f"call_{len(messages)}"}],
+                )
+            )
+            messages.append(
+                Message(
+                    role="tool",
+                    tool_call_id=f"call_{len(messages)}",
+                    tool_name="read_file",
+                    content=f"Content of {file_path}...",
+                )
+            )
 
         result = await router.compact(messages)
 
@@ -499,6 +521,7 @@ class TestErrorRecovery:
         """Test recovery from LLM timeout."""
         # Mock slow LLM
         import asyncio
+
         async def slow_chat(*args, **kwargs):
             await asyncio.sleep(10)
             return "Slow response"
@@ -526,7 +549,9 @@ class TestErrorRecovery:
         assert result.summary
 
     @pytest.mark.asyncio
-    async def test_partial_llm_failure(self, settings, feature_flags, rule_summarizer, hybrid_summarizer):
+    async def test_partial_llm_failure(
+        self, settings, feature_flags, rule_summarizer, hybrid_summarizer
+    ):
         """Test handling partial LLM failure in hybrid mode."""
         # Mock hybrid that fails on some sections
         original_summarize_async = hybrid_summarizer.summarize_async

@@ -511,7 +511,9 @@ class TestEnsembleVoter:
         """Test ensemble voting with heuristic fallback."""
         voter = EnsembleVoter()
 
-        heuristic_decision = TaskCompletionDecision(is_complete=False, confidence=0.70, phase="working")
+        heuristic_decision = TaskCompletionDecision(
+            is_complete=False, confidence=0.70, phase="working"
+        )
 
         result = voter.vote(
             DecisionType.TASK_COMPLETION,
@@ -544,7 +546,9 @@ class TestEnsembleVoter:
         for i in range(3):
             results.append(
                 LookupResult(
-                    decision=TaskCompletionDecision(is_complete=True, confidence=0.85, phase="done"),
+                    decision=TaskCompletionDecision(
+                        is_complete=True, confidence=0.85, phase="done"
+                    ),
                     confidence=0.85,
                     reason=f"Signal {i}",
                     matched_pattern=f"pattern{i}",

@@ -55,6 +55,7 @@ logger = logging.getLogger(__name__)
 # AgentCallable — the object returned by @victor.agent
 # ---------------------------------------------------------------------------
 
+
 class AgentCallable:
     """Callable wrapper that lazily creates an Agent and forwards calls to it.
 
@@ -87,7 +88,9 @@ class AgentCallable:
         self._tools = tools
         self._temperature = temperature
         self._max_tokens = max_tokens
-        self._system_prompt = system_prompt or (inspect.cleandoc(func.__doc__) if func.__doc__ else None)
+        self._system_prompt = system_prompt or (
+            inspect.cleandoc(func.__doc__) if func.__doc__ else None
+        )
         self._thinking = thinking
         self._airgapped = airgapped
         self._profile = profile
@@ -132,7 +135,9 @@ class AgentCallable:
             )
         return self._agent
 
-    async def __call__(self, prompt: str, *, context: Optional[Dict[str, Any]] = None) -> "TaskResult":
+    async def __call__(
+        self, prompt: str, *, context: Optional[Dict[str, Any]] = None
+    ) -> "TaskResult":
         """Run the agent with the given prompt.
 
         Args:
@@ -168,6 +173,7 @@ class AgentCallable:
 # ---------------------------------------------------------------------------
 # TaskDefinition — the object returned by @victor.task
 # ---------------------------------------------------------------------------
+
 
 class TaskDefinition:
     """Callable wrapper that carries task metadata for agent composition.
@@ -211,15 +217,13 @@ class TaskDefinition:
         return self._func(*args, **kwargs)
 
     def __repr__(self) -> str:
-        return (
-            f"<TaskDefinition '{self.__name__}' "
-            f"description={self.description!r}>"
-        )
+        return f"<TaskDefinition '{self.__name__}' " f"description={self.description!r}>"
 
 
 # ---------------------------------------------------------------------------
 # Public decorator functions
 # ---------------------------------------------------------------------------
+
 
 def agent(
     provider: str = "anthropic",
@@ -267,6 +271,7 @@ def agent(
         result = await dev_agent("Add type hints to utils.py")
         print(result.content)
     """
+
     def decorator(func: Callable) -> AgentCallable:
         return AgentCallable(
             func=func,
@@ -282,6 +287,7 @@ def agent(
             workspace=workspace,
             extra_kwargs=kwargs,
         )
+
     return decorator
 
 
@@ -324,6 +330,7 @@ def task(
         print(write_tests.description)
         print(write_tests.expected_output)
     """
+
     def decorator(func: Callable) -> TaskDefinition:
         return TaskDefinition(
             func=func,
@@ -333,4 +340,5 @@ def task(
             context_vars=context_vars,
             async_execution=async_execution,
         )
+
     return decorator

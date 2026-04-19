@@ -33,7 +33,6 @@ from typing import Any, Dict, List, Optional
 from victor.config.compaction_strategy_settings import CompactionStrategySettings
 from victor.providers.base import Message
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -94,17 +93,61 @@ class RuleBasedCompactionSummarizer:
 
     # File extensions to identify when extracting file paths
     _FILE_EXTENSIONS = {
-        "rs", "ts", "tsx", "js", "jsx", "json", "md", "py", "go", "java",
-        "cpp", "c", "h", "cs", "php", "rb", "swift", "kt", "scala", "sh",
-        "yaml", "yml", "toml", "ini", "cfg", "conf", "xml", "html", "css",
-        "sql", "graphql", "proto", "thrift", "avsc", "wsdl", "xsd", "dtd"
+        "rs",
+        "ts",
+        "tsx",
+        "js",
+        "jsx",
+        "json",
+        "md",
+        "py",
+        "go",
+        "java",
+        "cpp",
+        "c",
+        "h",
+        "cs",
+        "php",
+        "rb",
+        "swift",
+        "kt",
+        "scala",
+        "sh",
+        "yaml",
+        "yml",
+        "toml",
+        "ini",
+        "cfg",
+        "conf",
+        "xml",
+        "html",
+        "css",
+        "sql",
+        "graphql",
+        "proto",
+        "thrift",
+        "avsc",
+        "wsdl",
+        "xsd",
+        "dtd",
     }
 
     # Keywords that indicate pending work
     _PENDING_KEYWORDS = [
-        "todo", "next", "pending", "follow up", "remaining",
-        "not done", "incomplete", "unfinished", "later", "subsequent",
-        "after this", "then", "subsequently", "finally"
+        "todo",
+        "next",
+        "pending",
+        "follow up",
+        "remaining",
+        "not done",
+        "incomplete",
+        "unfinished",
+        "later",
+        "subsequent",
+        "after this",
+        "then",
+        "subsequently",
+        "finally",
     ]
 
     # Patterns for identifying current work
@@ -113,7 +156,7 @@ class RuleBasedCompactionSummarizer:
         r"(now|just)\s+(started|began|working)",
         r"in\s+progress",
         r"wip",
-        r"work\s+in\s+progress"
+        r"work\s+in\s+progress",
     ]
 
     def __init__(self, config: CompactionStrategySettings):
@@ -126,8 +169,7 @@ class RuleBasedCompactionSummarizer:
         self._file_extensions = self._FILE_EXTENSIONS
         self._pending_keywords = [kw.lower() for kw in self._PENDING_KEYWORDS]
         self._current_work_patterns = [
-            re.compile(pattern, re.IGNORECASE)
-            for pattern in self._CURRENT_WORK_PATTERNS
+            re.compile(pattern, re.IGNORECASE) for pattern in self._CURRENT_WORK_PATTERNS
         ]
 
     def summarize(
@@ -170,10 +212,7 @@ class RuleBasedCompactionSummarizer:
 
         # Extract structured information
         tools = self._extract_tool_names(messages)
-        recent_requests = self._extract_recent_user_requests(
-            messages,
-            limit=min(3, user_count)
-        )
+        recent_requests = self._extract_recent_user_requests(messages, limit=min(3, user_count))
         pending = self._infer_pending_work(messages)
         files = self._extract_file_paths(messages)
         current_work = self._infer_current_work(messages)
@@ -266,8 +305,7 @@ class RuleBasedCompactionSummarizer:
             if msg.content:
                 # Pattern: "used X tool" or "X tool returned"
                 tool_mentions = re.findall(
-                    r"used\s+(\w+)\s+tool|(\w+)\s+tool\s+(?:returned|failed)",
-                    msg.content.lower()
+                    r"used\s+(\w+)\s+tool|(\w+)\s+tool\s+(?:returned|failed)", msg.content.lower()
                 )
                 for mention in tool_mentions:
                     tool_name = mention[0] or mention[1]
@@ -355,10 +393,7 @@ class RuleBasedCompactionSummarizer:
         Returns:
             List of recent user request contents (truncated)
         """
-        user_messages = [
-            m.content for m in messages
-            if m.role == "user" and m.content
-        ]
+        user_messages = [m.content for m in messages if m.role == "user" and m.content]
 
         # Get the most recent user messages
         recent = user_messages[-limit:] if len(user_messages) > limit else user_messages
@@ -408,7 +443,7 @@ class RuleBasedCompactionSummarizer:
             Sentence containing pending keywords, or None
         """
         # Split into sentences (rough approximation)
-        sentences = re.split(r'[.!?]+', content)
+        sentences = re.split(r"[.!?]+", content)
 
         for sentence in sentences:
             sentence_lower = sentence.lower()
@@ -439,9 +474,7 @@ class RuleBasedCompactionSummarizer:
                 if match:
                     # Extract the sentence containing the match
                     sentence = self._extract_matching_sentence(
-                        msg.content,
-                        match.start(),
-                        match.end()
+                        msg.content, match.start(), match.end()
                     )
                     if sentence:
                         return self._truncate(sentence, 160)
@@ -502,10 +535,12 @@ class RuleBasedCompactionSummarizer:
             # Truncate content to reasonable length
             content = self._truncate(msg.content, 160) if msg.content else ""
 
-            timeline.append({
-                "role": msg.role,
-                "content": content,
-            })
+            timeline.append(
+                {
+                    "role": msg.role,
+                    "content": content,
+                }
+            )
 
         return timeline
 

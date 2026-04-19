@@ -1319,7 +1319,7 @@ class ToolPipeline:
     ) -> PipelineExecutionResult:
         """[POTENTIALLY OBSOLETE] Execute tool calls with parallelization.
 
-        Note: The main execute_tool_calls() method now handles internal 
+        Note: The main execute_tool_calls() method now handles internal
         parallelization via AsyncToolExecutor. This method may be removed.
 
         Args:

@@ -830,9 +830,7 @@ class ToolExecutor:
             # Issue 3: Session-disable tools that declare themselves permanently unavailable.
             if isinstance(result, dict) and result.get("unavailable"):
                 self._session_disabled_tools.add(tool_name)
-                logger.info(
-                    "Tool '%s' session-disabled: returned unavailable=True", tool_name
-                )
+                logger.info("Tool '%s' session-disabled: returned unavailable=True", tool_name)
         else:
             self._stats[tool_name]["failures"] += 1
             # Track failed signature to avoid retrying same failure

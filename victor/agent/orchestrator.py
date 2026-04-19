@@ -477,10 +477,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             settings=self.settings,
             provider_manager=self._provider_manager,
         )
-        
+
         # [CANONICAL] Initialize state-passed provider service
         self._provider_service = ProviderService(registry=ProviderRegistry)
-        
+
         # [LEGACY] Keep coordinator for compatibility while deferring heavy init.
         self._provider_coordinator = self._provider_runtime.provider_coordinator
         self._provider_switch_coordinator = self._provider_runtime.provider_switch_coordinator
@@ -2448,7 +2448,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         try:
             # [CANONICAL] Use state-passed service
             await self._provider_service.start_health_monitoring()
-            
+
             # Sync legacy coordinator
             await self._provider_coordinator.start_health_monitoring()
             return True
@@ -2465,7 +2465,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         try:
             # [CANONICAL] Use state-passed service
             await self._provider_service.stop_health_monitoring()
-            
+
             # Sync legacy coordinator
             await self._provider_coordinator.stop_health_monitoring()
             return True
@@ -2476,18 +2476,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def get_provider_health(self) -> Dict[str, Any]:
         """[CANONICAL] Get health status via ProviderService.
 
-        Delegates to ProviderService for diagnostics, maintaining backward 
+        Delegates to ProviderService for diagnostics, maintaining backward
         compatibility by returning the expected health information dictionary.
         """
         try:
             is_healthy = await self._provider_service.check_provider_health()
             info = self._provider_service.get_current_provider_info()
-            
+
             return {
                 "healthy": is_healthy,
                 "provider": info.provider_name,
                 "model": info.model_name,
-                "api_key_configured": info.api_key_configured
+                "api_key_configured": info.api_key_configured,
             }
         except Exception as e:
             logger.warning(f"Health check failed: {e}")
@@ -2523,7 +2523,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_current_provider_info(self) -> Dict[str, Any]:
         """[CANONICAL] Get information about the current provider via ProviderService.
 
-        Combines provider metadata from the service with orchestrator-specific 
+        Combines provider metadata from the service with orchestrator-specific
         runtime state (tool budget, usage).
 
         Returns:
@@ -2531,7 +2531,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # [CANONICAL] Get metadata from state-passed service
         info = self._provider_service.get_current_provider_info()
-        
+
         # Format the service info object into the expected dictionary structure
         result = {
             "provider_name": info.provider_name,
@@ -2543,12 +2543,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             "tool_budget": self.tool_budget,
             "tool_calls_used": self.tool_calls_used,
         }
-        
+
         # Add legacy coordinator stats if available
         if self._provider_coordinator:
             stats = self._provider_coordinator.get_rate_limit_stats()
             result.update(stats)
-            
+
         return result
 
     def _parse_tool_calls_with_adapter(
@@ -3834,9 +3834,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """[LEGACY/BRIDGE] Handle tool calls from the model.
 
-        This method is a legacy integration point. Prefer using 
+        This method is a legacy integration point. Prefer using
         IToolCoordinator.execute_tool_calls() in new code.
-        
+
         Delegates execution to ToolPipeline, then post-processes results
         via ToolCoordinator.process_tool_results().
 
@@ -4173,13 +4173,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         try:
             # [CANONICAL] Switch via state-passed service
             await self._provider_service.switch_provider(provider_name, model)
-            
+
             # Synchronize legacy state (manager/coordinator)
             await self._provider_coordinator.switch_provider_async(provider_name, model)
-            
+
             self.model = self._provider_manager.model
             self.provider_name = self._provider_manager.provider_name
-            
+
             if on_switch:
                 on_switch(self.provider_name, self.model)
             return True
@@ -4192,10 +4192,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         try:
             # Update service state
             await self._provider_service.switch_provider(self.provider_name, model)
-            
+
             # Synchronize legacy state
             await self._provider_coordinator.switch_model_async(model)
-            
+
             self.model = self._provider_manager.model
             return True
         except Exception as e:

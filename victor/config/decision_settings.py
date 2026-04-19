@@ -16,7 +16,7 @@ Follows the same pattern as GEPASettings/GEPATierManager.
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any, Dict
 
 from pydantic import BaseModel, Field
 
@@ -98,9 +98,9 @@ class DecisionServiceSettings(BaseModel):
             },
             # xAI Grok models
             "xai": {
-                "edge": "grok-4.1-fast",        # Fast, cost-effective for tool calling
-                "balanced": "grok-4.1-fast",     # High-performance agentic tool calling
-                "performance": "grok-4.20",      # Newest flagship model
+                "edge": "grok-4.1-fast",  # Fast, cost-effective for tool calling
+                "balanced": "grok-4.1-fast",  # High-performance agentic tool calling
+                "performance": "grok-4.20",  # Newest flagship model
             },
             # DeepSeek models
             "deepseek": {
@@ -191,9 +191,7 @@ class DecisionServiceSettings(BaseModel):
 
     # Override capability: explicit provider/model per tier
     # Example: { "edge": {"provider": "ollama", "model": "phi3:mini"} }
-    tier_overrides: Dict[str, Dict[str, str]] = Field(
-        default_factory=dict
-    )
+    tier_overrides: Dict[str, Dict[str, str]] = Field(default_factory=dict)
 
     # Decision type → tier mapping
     tier_routing: Dict[str, str] = Field(
@@ -245,21 +243,15 @@ class DecisionServiceSettings(BaseModel):
         # Validate tier overrides reference valid tiers
         for tier_name, override in self.tier_overrides.items():
             if tier_name not in required_tiers:
-                result["errors"].append(
-                    f"Tier override references unknown tier: '{tier_name}'"
-                )
+                result["errors"].append(f"Tier override references unknown tier: '{tier_name}'")
                 result["valid"] = False
 
             # Check override has provider and model
             if "provider" not in override:
-                result["errors"].append(
-                    f"Tier override for '{tier_name}' missing 'provider' key"
-                )
+                result["errors"].append(f"Tier override for '{tier_name}' missing 'provider' key")
                 result["valid"] = False
             if "model" not in override:
-                result["errors"].append(
-                    f"Tier override for '{tier_name}' missing 'model' key"
-                )
+                result["errors"].append(f"Tier override for '{tier_name}' missing 'model' key")
                 result["valid"] = False
 
         return result

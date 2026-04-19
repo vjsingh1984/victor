@@ -100,8 +100,8 @@ class ToolSelectorLearner(BaseLearner):
 
         # Priority 4 Phase 2: lazy-loaded integration with existing components
         # These are populated on first use to avoid circular imports at init time.
-        self._predictor: Optional[Any] = None   # ToolPredictor from Priority 3
-        self._analytics: Optional[Any] = None   # UsageAnalytics singleton
+        self._predictor: Optional[Any] = None  # ToolPredictor from Priority 3
+        self._analytics: Optional[Any] = None  # UsageAnalytics singleton
 
         # Load state from database
         self._load_state()
@@ -516,6 +516,7 @@ class ToolSelectorLearner(BaseLearner):
         if self._predictor is None:
             try:
                 from victor.agent.planning.tool_predictor import ToolPredictor
+
                 self._predictor = ToolPredictor()
             except Exception as e:
                 logger.debug("tool_selector: ToolPredictor unavailable: %s", e)
@@ -526,6 +527,7 @@ class ToolSelectorLearner(BaseLearner):
         if self._analytics is None:
             try:
                 from victor.agent.usage_analytics import UsageAnalytics
+
                 self._analytics = UsageAnalytics.get_instance()
             except Exception as e:
                 logger.debug("tool_selector: UsageAnalytics unavailable: %s", e)

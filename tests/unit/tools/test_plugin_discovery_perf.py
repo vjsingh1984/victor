@@ -42,7 +42,7 @@ class TestNoDirectEntryPointScans:
         assert not violations, (
             "ToolRegistry must use UnifiedEntryPointRegistry for entry point discovery.\n"
             "Use get_entry_point_objects() instead of importlib.metadata.entry_points().\n"
-            f"Violations:\n" + "\n".join(f"  {v}" for v in violations)
+            "Violations:\n" + "\n".join(f"  {v}" for v in violations)
         )
 
     def test_uses_unified_registry(self):

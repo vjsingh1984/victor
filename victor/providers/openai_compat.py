@@ -251,9 +251,7 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
 
     # Collect all tool_call IDs present in tool responses
     present_response_ids = {
-        m.get("tool_call_id")
-        for m in messages
-        if m.get("role") == "tool" and m.get("tool_call_id")
+        m.get("tool_call_id") for m in messages if m.get("role") == "tool" and m.get("tool_call_id")
     }
 
     # Strip assistant tool_calls whose responses were compacted away
@@ -268,7 +266,8 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     # Remove orphaned tool responses whose assistant tool_calls were
     # compacted away
     messages = [
-        m for m in messages
+        m
+        for m in messages
         if not (
             m.get("role") == "tool"
             and m.get("tool_call_id")

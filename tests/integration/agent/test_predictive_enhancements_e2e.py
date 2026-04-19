@@ -187,9 +187,7 @@ class TestPhaseAwareContextIntegration:
         )
 
         # Simulate transition
-        detector._last_transition_time = (
-            datetime.now(timezone.utc) - timedelta(seconds=3)
-        )
+        detector._last_transition_time = datetime.now(timezone.utc) - timedelta(seconds=3)
 
         # Should allow another transition (cooldown passed)
         assert detector.should_transition(
@@ -299,7 +297,9 @@ class TestFeatureFlagIntegration:
         )
 
         # High threshold should filter more predictions
-        assert flags_high.predictive_confidence_threshold > flags_low.predictive_confidence_threshold
+        assert (
+            flags_high.predictive_confidence_threshold > flags_low.predictive_confidence_threshold
+        )
 
 
 class TestErrorHandlingAndRecovery:

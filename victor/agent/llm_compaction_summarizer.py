@@ -101,22 +101,23 @@ class LLMCompactionSummarizer:
     def _call_provider_sync(self, messages: List[Message]) -> str:
         """Call provider.chat() synchronously with optional model tiering."""
         target_model = self._model
-        
+
         # Heuristic: use performance model for complex summaries (> 8 messages)
         # to ensure intent and decisions are preserved accurately.
         if not target_model:
             try:
                 from victor.agent.model_switcher import get_model_switcher
+
                 switcher = get_model_switcher()
                 if len(messages) > 8:
                     target_model = switcher.get_thorough_model()
-            except:
+            except Exception:
                 pass
 
         kwargs: dict = {
-            "messages": messages, 
+            "messages": messages,
             "max_tokens": self._max_summary_tokens,
-            "temperature": 0.3  # Lower temperature for factual summary
+            "temperature": 0.3,  # Lower temperature for factual summary
         }
         if target_model:
             kwargs["model"] = target_model

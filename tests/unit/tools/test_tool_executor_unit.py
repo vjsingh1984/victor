@@ -1768,6 +1768,7 @@ class TestSessionDisabledTools:
 
     def setup_method(self):
         import victor.agent.safety as safety_module
+
         safety_module._default_checker = None
 
     def _make_executor(self):
@@ -1831,6 +1832,7 @@ class TestFailedPathRedirects:
 
     def setup_method(self):
         import victor.agent.safety as safety_module
+
         safety_module._default_checker = None
 
     def _make_executor(self):
@@ -1852,6 +1854,7 @@ class TestFailedPathRedirects:
 
         # Simulate post-execution path recording logic
         import re
+
         bad_path = "/nonexistent/file.py"
         error = f"File not found: {bad_path}\nDid you mean one of these?\n  - /actual/file.py"
         match = re.search(r"-\s+(\S+)", error)
@@ -1916,6 +1919,7 @@ class TestIntentBasedToolFilter:
         """An unrecognised intent string should not raise, just skip filtering."""
         try:
             from victor.agent.action_authorizer import ActionIntent
+
             ActionIntent("unknown_intent")
             crashed = False
         except ValueError:

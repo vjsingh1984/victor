@@ -106,8 +106,8 @@ class RateLimitInfo:
 class ProviderCoordinator:
     """[DEPRECATED] Coordinates provider initialization, switching, and health monitoring.
 
-    This class is being superseded by ProviderService as part of the 
-    state-passed architectural migration. It remains for backward 
+    This class is being superseded by ProviderService as part of the
+    state-passed architectural migration. It remains for backward
     compatibility with facade-driven components.
 
     1. Provider Management: Switch providers and models with post-switch hooks

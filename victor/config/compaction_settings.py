@@ -33,7 +33,7 @@ class CompactionSettings(BaseModel):
     strategy: Optional[CompactionStrategySettings] = Field(
         default=None,
         description="Hybrid compaction strategy settings for intelligent "
-        "strategy selection between rule-based, LLM-based, and hybrid approaches."
+        "strategy selection between rule-based, LLM-based, and hybrid approaches.",
     )
 
     # Feature flags for compaction (renamed from 'feature_flags' to avoid collision
@@ -41,7 +41,7 @@ class CompactionSettings(BaseModel):
     compaction_feature_flags: Optional[CompactionFeatureFlags] = Field(
         default=None,
         description="Feature flags for compaction enhancements. "
-        "Controls availability of different compaction strategies."
+        "Controls availability of different compaction strategies.",
     )
 
     def get_strategy_settings(self) -> CompactionStrategySettings:

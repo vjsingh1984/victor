@@ -25,10 +25,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from typing import Dict, Any
 
-
 # =============================================================================
 # ToolService Tests (2 methods)
 # =============================================================================
+
 
 class TestToolServiceArgumentNormalization:
     """Test ToolService argument normalization methods."""
@@ -117,6 +117,7 @@ _UNSET = object()
 def _make_chat_service(provider=None, recovery=None, context=None, tools=_UNSET):
     """Helper to build a ChatService with minimal mocks for unit tests."""
     from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+
     tool_service = MagicMock() if tools is _UNSET else tools
     return ChatService(
         config=ChatServiceConfig(),
@@ -132,6 +133,7 @@ def _make_chat_service(provider=None, recovery=None, context=None, tools=_UNSET)
 def _make_tool_service():
     """Helper to build a ToolService with minimal mocks for unit tests."""
     from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+
     return ToolService(
         config=ToolServiceConfig(),
         tool_selector=MagicMock(),
@@ -371,6 +373,7 @@ class TestChatServiceContextMethods:
 # SessionService Tests (3 methods)
 # =============================================================================
 
+
 class TestSessionServiceCheckpointAndTokenMethods:
     """Test SessionService checkpoint and token usage methods."""
 
@@ -527,6 +530,7 @@ class TestSessionServiceCheckpointAndTokenMethods:
 # ProviderService Tests (1 method)
 # =============================================================================
 
+
 class TestProviderServiceTestMethod:
     """Test ProviderService test_provider method."""
 
@@ -628,6 +632,7 @@ class TestProviderServiceTestMethod:
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 class TestLowPriorityGapsIntegration:
     """Integration tests for LOW priority gap implementations."""

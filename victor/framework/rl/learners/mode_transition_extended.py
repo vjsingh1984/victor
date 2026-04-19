@@ -35,7 +35,7 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
         db_connection: Any,
         learning_rate: float = 0.1,
         provider_adapter: Optional[Any] = None,
-        **kwargs
+        **kwargs,
     ):
         """Initialize extended learner with phase detector.
 
@@ -52,7 +52,7 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             db_connection=db_connection,
             learning_rate=learning_rate,
             provider_adapter=provider_adapter,
-            **kwargs
+            **kwargs,
         )
 
         # Integrate PhaseDetector from Priority 2
@@ -85,43 +85,44 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             # Learn from successful transitions
             if detected_phase and transition_successful:
                 # Reinforce successful phase pattern
-                recommendations.append(RLRecommendation(
-                    learner_name="mode_transition",
-                    recommendation_type="phase_transition",
-                    key=f"to_{detected_phase}",
-                    value="allow",
-                    confidence=0.9,
-                    metadata={
-                        "detected_phase": detected_phase,
-                        "from_phase": from_phase,
-                        "to_phase": to_phase,
-                        "transition_successful": transition_successful,
-                    }
-                ))
+                recommendations.append(
+                    RLRecommendation(
+                        learner_name="mode_transition",
+                        recommendation_type="phase_transition",
+                        key=f"to_{detected_phase}",
+                        value="allow",
+                        confidence=0.9,
+                        metadata={
+                            "detected_phase": detected_phase,
+                            "from_phase": from_phase,
+                            "to_phase": to_phase,
+                            "transition_successful": transition_successful,
+                        },
+                    )
+                )
 
             # Learn from failed transitions
             elif detected_phase and not transition_successful:
                 # Discourage problematic transition
-                recommendations.append(RLRecommendation(
-                    learner_name="mode_transition",
-                    recommendation_type="phase_transition",
-                    key=f"to_{detected_phase}",
-                    value="avoid",
-                    confidence=0.7,
-                    metadata={
-                        "reason": "transition_failed",
-                        "detected_phase": detected_phase,
-                        "from_phase": from_phase,
-                    }
-                ))
+                recommendations.append(
+                    RLRecommendation(
+                        learner_name="mode_transition",
+                        recommendation_type="phase_transition",
+                        key=f"to_{detected_phase}",
+                        value="avoid",
+                        confidence=0.7,
+                        metadata={
+                            "reason": "transition_failed",
+                            "detected_phase": detected_phase,
+                            "from_phase": from_phase,
+                        },
+                    )
+                )
 
         return recommendations
 
     def detect_phase(
-        self,
-        current_stage: ConversationStage,
-        recent_tools: List[str],
-        message_content: str
+        self, current_stage: ConversationStage, recent_tools: List[str], message_content: str
     ) -> TaskPhase:
         """Detect current task phase using PhaseDetector.
 
@@ -134,16 +135,10 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             Detected task phase
         """
         return self.phase_detector.detect_phase(
-            current_stage=current_stage,
-            recent_tools=recent_tools,
-            message_content=message_content
+            current_stage=current_stage, recent_tools=recent_tools, message_content=message_content
         )
 
-    def should_transition(
-        self,
-        current_phase: TaskPhase,
-        new_phase: TaskPhase
-    ) -> bool:
+    def should_transition(self, current_phase: TaskPhase, new_phase: TaskPhase) -> bool:
         """Check if phase transition should be allowed.
 
         Uses PhaseTransitionDetector to enforce:
@@ -159,8 +154,7 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             True if transition should be allowed
         """
         return self.transition_detector.should_transition(
-            old_phase=current_phase,
-            new_phase=new_phase
+            old_phase=current_phase, new_phase=new_phase
         )
 
     def get_phase_statistics(self) -> Dict[str, Any]:
@@ -176,5 +170,5 @@ class ExtendedModeTransitionLearner(ModeTransitionLearner):
             },
             "phase_detector": {
                 # Add phase detector stats if available
-            }
+            },
         }

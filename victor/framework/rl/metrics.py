@@ -350,6 +350,7 @@ class RLMetricsExporter:
         # Priority 4: Learning from Execution metrics (gated by feature flag)
         try:
             from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
             if get_feature_flag_manager().is_enabled(FeatureFlag.USE_LEARNING_FROM_EXECUTION):
                 lines.extend(self._export_priority4_metrics())
         except Exception:
@@ -380,7 +381,9 @@ class RLMetricsExporter:
                 avg_rating = stats.get("avg_rating")
                 if avg_rating is not None:
                     lines.append("")
-                    lines.append("# HELP victor_rl_user_feedback_avg_rating Average user rating (0-1)")
+                    lines.append(
+                        "# HELP victor_rl_user_feedback_avg_rating Average user rating (0-1)"
+                    )
                     lines.append("# TYPE victor_rl_user_feedback_avg_rating gauge")
                     lines.append(f"victor_rl_user_feedback_avg_rating {avg_rating:.4f}")
         except Exception as e:

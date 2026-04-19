@@ -239,9 +239,7 @@ class TestEnsembleVoting:
 
     def test_top_k_limiting(self):
         """Test that top_k limits predictions."""
-        predictor = ToolPredictor(
-            config=ToolPredictorConfig(top_k=2)
-        )
+        predictor = ToolPredictor(config=ToolPredictorConfig(top_k=2))
 
         predictions = predictor.predict_tools(
             task_description="find read edit write test run the files",
@@ -252,9 +250,7 @@ class TestEnsembleVoting:
 
     def test_min_confidence_filtering(self):
         """Test that low confidence predictions are filtered."""
-        predictor = ToolPredictor(
-            config=ToolPredictorConfig(min_confidence=0.3)
-        )
+        predictor = ToolPredictor(config=ToolPredictorConfig(min_confidence=0.3))
 
         predictions = predictor.predict_tools(
             task_description="do something",

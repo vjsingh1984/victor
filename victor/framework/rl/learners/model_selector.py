@@ -560,16 +560,18 @@ class ModelSelectorLearner(BaseLearner):
         if decision_type not in self._threshold_observations:
             self._threshold_observations[decision_type] = []
 
-        self._threshold_observations[decision_type].append({
-            "confidence": heuristic_confidence,
-            "used_llm": used_llm,
-            "success": success,
-        })
+        self._threshold_observations[decision_type].append(
+            {
+                "confidence": heuristic_confidence,
+                "used_llm": used_llm,
+                "success": success,
+            }
+        )
 
         # Keep last 200 observations per type to bound memory
-        self._threshold_observations[decision_type] = (
-            self._threshold_observations[decision_type][-200:]
-        )
+        self._threshold_observations[decision_type] = self._threshold_observations[decision_type][
+            -200:
+        ]
 
         self._persist_threshold(decision_type)
 
@@ -614,6 +616,7 @@ class ModelSelectorLearner(BaseLearner):
     def _persist_threshold(self, decision_type: str) -> None:
         """Persist threshold observations to DB for cross-session continuity."""
         import json
+
         observations = getattr(self, "_threshold_observations", {}).get(decision_type, [])
         if not observations:
             return
@@ -641,13 +644,12 @@ class ModelSelectorLearner(BaseLearner):
     def load_threshold_observations(self) -> None:
         """Load persisted threshold observations from DB on startup."""
         import json
+
         if not hasattr(self, "_threshold_observations"):
             self._threshold_observations = {}
         try:
             cursor = self.db.cursor()
-            cursor.execute(
-                "SELECT decision_type, observations FROM rl_model_threshold"
-            )
+            cursor.execute("SELECT decision_type, observations FROM rl_model_threshold")
             for row in cursor.fetchall():
                 row_dict = dict(row)
                 self._threshold_observations[row_dict["decision_type"]] = json.loads(

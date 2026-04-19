@@ -410,10 +410,7 @@ class TestPreloading:
         """Test that max_preload_tools limits preloading."""
         predictor = MagicMock()
         # Return 10 predictions
-        predictions = [
-            MagicMock(tool_name=f"tool_{i}", probability=0.8)
-            for i in range(10)
-        ]
+        predictions = [MagicMock(tool_name=f"tool_{i}", probability=0.8) for i in range(10)]
         predictor.predict_tools = MagicMock(return_value=predictions)
 
         config = PreloaderConfig(max_preload_tools=3)

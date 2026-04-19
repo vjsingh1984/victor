@@ -86,10 +86,12 @@ class TestServiceIntegration:
 
         # Test: Validate tool calls
         tool_service.get_available_tools = Mock(return_value={"code_search", "file_read"})
-        valid, invalid = tool_service.validate_tool_calls([
-            {"name": "code_search", "arguments": {"query": "test"}},
-            {"name": "invalid_tool", "arguments": {}},
-        ])
+        valid, invalid = tool_service.validate_tool_calls(
+            [
+                {"name": "code_search", "arguments": {"query": "test"}},
+                {"name": "invalid_tool", "arguments": {}},
+            ]
+        )
         assert len(valid) == 1
         assert len(invalid) == 1
 
@@ -168,7 +170,9 @@ class TestServiceIntegration:
         provider2.supports_tools = True
         provider2.max_tokens = 8000
 
-        registry.get_provider = Mock(side_effect=lambda p: provider1 if p == "anthropic" else provider2)
+        registry.get_provider = Mock(
+            side_effect=lambda p: provider1 if p == "anthropic" else provider2
+        )
 
         health_checker = Mock()
         health_checker.check = AsyncMock(return_value=True)
@@ -227,8 +231,7 @@ class TestServiceIntegration:
 
         # Test: Configure provider chain
         service.configure_provider_chain(
-            primary_provider="anthropic",
-            fallback_providers=["openai", "google"]
+            primary_provider="anthropic", fallback_providers=["openai", "google"]
         )
 
         assert service.get_primary_provider() == "anthropic"
@@ -236,9 +239,7 @@ class TestServiceIntegration:
 
         # Test: Should switch provider
         should_switch = service.should_switch_provider(
-            current_provider="anthropic",
-            error_type="rate_limit_error",
-            consecutive_failures=3
+            current_provider="anthropic", error_type="rate_limit_error", consecutive_failures=3
         )
         assert should_switch is True
 
@@ -282,18 +283,13 @@ class TestServiceIntegration:
 
         # Test: Add assistant message
         service._add_assistant_message_to_context(
-            "Response",
-            tool_calls=[{"name": "test"}],
-            metadata={"test": "meta"}
+            "Response", tool_calls=[{"name": "test"}], metadata={"test": "meta"}
         )
         assert context.add_message.call_count == 2
 
         # Test: Add tool result
         service._add_tool_result_to_context(
-            "test_tool",
-            "Result",
-            error=None,
-            metadata={"test": "meta"}
+            "test_tool", "Result", error=None, metadata={"test": "meta"}
         )
         assert context.add_message.call_count == 3
 
@@ -305,10 +301,7 @@ class TestServiceIntegration:
         assert "message" in result
 
         # Test: Normalize tool arguments
-        args, method = service.normalize_tool_arguments(
-            {"args": "test"},
-            "test_tool"
-        )
+        args, method = service.normalize_tool_arguments({"args": "test"}, "test_tool")
         assert args == {"args": "normalized"}
         assert method == "normalized"
 
@@ -356,10 +349,12 @@ class TestServiceIntegration:
         assert "file_read" not in enabled
 
         # Test: Validation integration
-        valid, invalid = service.validate_tool_calls([
-            {"name": "code_search", "arguments": {"query": "test"}},
-            {"name": "file_read", "arguments": {"path": "/tmp/test"}},
-        ])
+        valid, invalid = service.validate_tool_calls(
+            [
+                {"name": "code_search", "arguments": {"query": "test"}},
+                {"name": "file_read", "arguments": {"path": "/tmp/test"}},
+            ]
+        )
         assert len(valid) == 2
         assert len(invalid) == 0
 
@@ -407,15 +402,10 @@ class TestServiceIntegration:
 
         # Test: Recovery service suggests provider switch
         recovery_service.configure_provider_chain(
-            primary_provider="anthropic",
-            fallback_providers=["openai"]
+            primary_provider="anthropic", fallback_providers=["openai"]
         )
 
-        should_switch = recovery_service.should_switch_provider(
-            "anthropic",
-            "rate_limit_error",
-            3
-        )
+        should_switch = recovery_service.should_switch_provider("anthropic", "rate_limit_error", 3)
         assert should_switch is True
 
         # Test: Provider service switches
@@ -524,10 +514,7 @@ class TestServiceIntegration:
         )
 
         # Pattern 1: ChatService delegates to ToolService
-        args, method = chat_service.normalize_tool_arguments(
-            {"query": "test"},
-            "code_search"
-        )
+        args, method = chat_service.normalize_tool_arguments({"query": "test"}, "code_search")
         # Should delegate to tool_service
 
         # Pattern 2: Tool execution with budget

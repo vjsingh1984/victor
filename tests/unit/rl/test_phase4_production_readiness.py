@@ -24,19 +24,19 @@ import pytest
 
 from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
 
-
 # ---------------------------------------------------------------------------
 # Part 1: Feature Flag
 # ---------------------------------------------------------------------------
+
 
 class TestFeatureFlag:
     """Feature flag existence and default behaviour."""
 
     def test_flag_exists_in_enum(self):
         """USE_LEARNING_FROM_EXECUTION must be a member of FeatureFlag."""
-        assert hasattr(FeatureFlag, "USE_LEARNING_FROM_EXECUTION"), (
-            "FeatureFlag.USE_LEARNING_FROM_EXECUTION missing — add it to feature_flags.py"
-        )
+        assert hasattr(
+            FeatureFlag, "USE_LEARNING_FROM_EXECUTION"
+        ), "FeatureFlag.USE_LEARNING_FROM_EXECUTION missing — add it to feature_flags.py"
 
     def test_flag_value_string(self):
         """Enum value must be the snake_case string."""
@@ -55,6 +55,7 @@ class TestFeatureFlag:
         with patch.dict("os.environ", {}, clear=False):
             # Remove env var if set
             import os
+
             env_key = "VICTOR_USE_LEARNING_FROM_EXECUTION"
             old = os.environ.pop(env_key, None)
             try:
@@ -80,6 +81,7 @@ class TestFeatureFlag:
 # Part 2: MetaLearningCoordinator Flag Gating
 # ---------------------------------------------------------------------------
 
+
 class TestMetaLearningCoordinatorGating:
     """get_meta_learning_coordinator() must respect the feature flag."""
 
@@ -88,31 +90,35 @@ class TestMetaLearningCoordinatorGating:
         with patch.dict("os.environ", {"VICTOR_USE_LEARNING_FROM_EXECUTION": "true"}):
             # Reset singleton to pick up flag change
             import victor.framework.rl.meta_learning as ml_mod
+
             ml_mod._meta_coordinator = None
 
             from victor.framework.rl.meta_learning import (
                 get_meta_learning_coordinator,
                 MetaLearningCoordinator,
             )
+
             coord = get_meta_learning_coordinator()
-            assert isinstance(coord, MetaLearningCoordinator), (
-                f"Expected MetaLearningCoordinator, got {type(coord)}"
-            )
+            assert isinstance(
+                coord, MetaLearningCoordinator
+            ), f"Expected MetaLearningCoordinator, got {type(coord)}"
             ml_mod._meta_coordinator = None  # cleanup
 
     def test_returns_base_coordinator_when_disabled(self):
         """When flag is disabled, must fall back to base RLCoordinator."""
         with patch.dict("os.environ", {"VICTOR_USE_LEARNING_FROM_EXECUTION": "false"}):
             import victor.framework.rl.meta_learning as ml_mod
+
             ml_mod._meta_coordinator = None
 
             from victor.framework.rl.meta_learning import get_meta_learning_coordinator
             from victor.framework.rl.coordinator import RLCoordinator
             from victor.framework.rl.meta_learning import MetaLearningCoordinator
+
             coord = get_meta_learning_coordinator()
-            assert not isinstance(coord, MetaLearningCoordinator), (
-                "Expected base RLCoordinator when flag disabled, got MetaLearningCoordinator"
-            )
+            assert not isinstance(
+                coord, MetaLearningCoordinator
+            ), "Expected base RLCoordinator when flag disabled, got MetaLearningCoordinator"
             assert isinstance(coord, RLCoordinator)
             ml_mod._meta_coordinator = None  # cleanup
 
@@ -120,6 +126,7 @@ class TestMetaLearningCoordinatorGating:
 # ---------------------------------------------------------------------------
 # Part 3: RecommendationExplainer Flag Gating
 # ---------------------------------------------------------------------------
+
 
 class TestExplainerGating:
     """get_recommendation_explainer() must respect the feature flag."""
@@ -131,6 +138,7 @@ class TestExplainerGating:
                 get_recommendation_explainer,
                 RecommendationExplainer,
             )
+
             explainer = get_recommendation_explainer()
             assert isinstance(explainer, RecommendationExplainer)
 
@@ -138,15 +146,15 @@ class TestExplainerGating:
         """When flag is disabled, must return None."""
         with patch.dict("os.environ", {"VICTOR_USE_LEARNING_FROM_EXECUTION": "false"}):
             from victor.framework.rl.explainability import get_recommendation_explainer
+
             result = get_recommendation_explainer()
-            assert result is None, (
-                f"Expected None when flag disabled, got {type(result)}"
-            )
+            assert result is None, f"Expected None when flag disabled, got {type(result)}"
 
     def test_returns_none_allows_safe_skip(self):
         """None return must allow callers to skip explanation safely (no AttributeError)."""
         with patch.dict("os.environ", {"VICTOR_USE_LEARNING_FROM_EXECUTION": "false"}):
             from victor.framework.rl.explainability import get_recommendation_explainer
+
             explainer = get_recommendation_explainer()
             # Safe usage pattern: if explainer is not None: explainer.explain_...
             if explainer is not None:
@@ -158,12 +166,14 @@ class TestExplainerGating:
 # Part 4: Prometheus Metrics Integration
 # ---------------------------------------------------------------------------
 
+
 class TestPrometheusMetrics:
     """Priority 4 metrics appear in Prometheus output when flag enabled."""
 
     def _make_exporter_with_mock_coord(self):
         """Create RLMetricsExporter with a minimal mock coordinator."""
         from victor.framework.rl.metrics import RLMetricsExporter
+
         exporter = RLMetricsExporter()
 
         mock_coord = MagicMock()
@@ -203,9 +213,9 @@ class TestPrometheusMetrics:
             exporter = self._make_exporter_with_mock_coord()
             output = exporter.export_prometheus()
 
-        assert "victor_rl_user_feedback_total" in output, (
-            "Expected victor_rl_user_feedback_total in Prometheus output when flag enabled"
-        )
+        assert (
+            "victor_rl_user_feedback_total" in output
+        ), "Expected victor_rl_user_feedback_total in Prometheus output when flag enabled"
         assert "victor_rl_user_feedback_avg_rating" in output
 
     def test_priority4_metrics_absent_when_disabled(self):
@@ -214,9 +224,9 @@ class TestPrometheusMetrics:
             exporter = self._make_exporter_with_mock_coord()
             output = exporter.export_prometheus()
 
-        assert "victor_rl_user_feedback_total" not in output, (
-            "Priority 4 metrics must be absent when USE_LEARNING_FROM_EXECUTION=false"
-        )
+        assert (
+            "victor_rl_user_feedback_total" not in output
+        ), "Priority 4 metrics must be absent when USE_LEARNING_FROM_EXECUTION=false"
 
     def test_base_metrics_always_present(self):
         """Core RL metrics must always appear regardless of Priority 4 flag."""
@@ -232,6 +242,7 @@ class TestPrometheusMetrics:
         """_export_priority4_metrics() must not raise even if learner data is missing."""
         with patch.dict("os.environ", {"VICTOR_USE_LEARNING_FROM_EXECUTION": "true"}):
             from victor.framework.rl.metrics import RLMetricsExporter
+
             exporter = RLMetricsExporter()
 
             # Coordinator with learners that raise
@@ -249,6 +260,7 @@ class TestPrometheusMetrics:
 # ---------------------------------------------------------------------------
 # Part 5: No New Tables (schema hygiene)
 # ---------------------------------------------------------------------------
+
 
 class TestSchemaHygiene:
     """Phase 4 must not introduce new database tables."""
@@ -272,12 +284,14 @@ class TestSchemaHygiene:
     def test_no_new_tables_after_flag_check(self, tmp_path):
         """Importing and calling Phase 4 factories must not create unknown tables."""
         import victor.framework.rl.meta_learning as ml_mod
+
         ml_mod._meta_coordinator = None
 
         db_path = str(tmp_path / "test.db")
 
         with patch.dict("os.environ", {"VICTOR_USE_LEARNING_FROM_EXECUTION": "true"}):
             from victor.framework.rl.meta_learning import MetaLearningCoordinator
+
             coord = MetaLearningCoordinator(db_path=db_path)
 
         tables = self._get_tables(db_path)

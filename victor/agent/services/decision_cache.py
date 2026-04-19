@@ -153,10 +153,7 @@ class LRUCache:
         Returns:
             Number of entries removed
         """
-        expired_keys = [
-            key for key, entry in self._cache.items()
-            if entry.is_expired()
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if entry.is_expired()]
 
         for key in expired_keys:
             del self._cache[key]
@@ -374,10 +371,7 @@ class DiskCache:
         Returns:
             Number of entries removed
         """
-        expired_keys = [
-            key for key, entry in self._index.items()
-            if entry.is_expired()
-        ]
+        expired_keys = [key for key, entry in self._index.items() if entry.is_expired()]
 
         for key in expired_keys:
             self.invalidate(key)
@@ -599,7 +593,9 @@ class DecisionCache:
             "l2_hits": self._l2_hits,
             "misses": self._misses,
             "total_requests": total_requests,
-            "hit_rate": (self._l1_hits + self._l2_hits) / total_requests if total_requests > 0 else 0.0,
+            "hit_rate": (
+                (self._l1_hits + self._l2_hits) / total_requests if total_requests > 0 else 0.0
+            ),
             "l1_stats": self.l1.get_stats(),
             "l2_stats": self.l2.get_stats() if self.l2 else None,
         }

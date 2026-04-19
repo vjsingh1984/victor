@@ -30,9 +30,12 @@ import asyncio
 import logging
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
+
+if TYPE_CHECKING:
+    from victor.framework.rl.option_framework import OptionRegistry
 from victor.core.database import get_database
 from victor.core.schema import Tables, Schema
 from victor.core.constants import DEFAULT_VERTICAL
@@ -576,9 +579,7 @@ class RLCoordinator:
             added = []
             for col, typedef in phase1_columns.items():
                 if col not in existing:
-                    cursor.execute(
-                        f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN {col} {typedef}"
-                    )
+                    cursor.execute(f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN {col} {typedef}")
                     added.append(col)
             if added:
                 cursor.execute(
@@ -943,8 +944,10 @@ class RLCoordinator:
                     outcome.to_dict()["metadata"],
                     meta.get("feedback_source"),
                     meta.get("user_feedback"),
-                    1 if meta.get("helpful") is True else (
-                        0 if meta.get("helpful") is False else None
+                    (
+                        1
+                        if meta.get("helpful") is True
+                        else (0 if meta.get("helpful") is False else None)
                     ),
                     meta.get("correction"),
                     meta.get("session_id"),
@@ -1148,9 +1151,7 @@ class RLCoordinator:
         # Check newest candidate timestamp
         try:
             cursor = self.db.cursor()
-            cursor.execute(
-                "SELECT MAX(created_at) FROM agent_prompt_candidate"
-            )
+            cursor.execute("SELECT MAX(created_at) FROM agent_prompt_candidate")
             row = cursor.fetchone()
             if row and row[0]:
                 # Parse ISO timestamp
@@ -1197,7 +1198,9 @@ class RLCoordinator:
                 for section in sections:
                     try:
                         rec = learner.get_recommendation(
-                            provider or "", model or "", "default",
+                            provider or "",
+                            model or "",
+                            "default",
                             section_name=section,
                         )
                         current_text = rec.value if rec else ""

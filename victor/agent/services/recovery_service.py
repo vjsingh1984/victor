@@ -59,7 +59,7 @@ class RecoveryContextImpl:
 class RecoveryService:
     """[CANONICAL] Service for error recovery and resilience.
 
-    The target implementation for recovery operations following the 
+    The target implementation for recovery operations following the
     state-passed architectural pattern. Supersedes RecoveryController.
 
     This service follows SOLID principles:
@@ -410,6 +410,7 @@ class RecoveryService:
                     # Add jitter if enabled
                     if jitter:
                         import random
+
                         delay = delay * (0.5 + random.random() * 0.5)
 
                     self._logger.info(
@@ -418,9 +419,7 @@ class RecoveryService:
                     )
                     await asyncio.sleep(delay)
                 else:
-                    self._logger.error(
-                        f"All {max_attempts} retry attempts failed: {e}"
-                    )
+                    self._logger.error(f"All {max_attempts} retry attempts failed: {e}")
 
         raise last_exception
 
@@ -471,8 +470,7 @@ class RecoveryService:
                     delay = base_delay * random.uniform(min_mult, max_mult)
 
                     self._logger.info(
-                        f"Retry with jitter: attempt {attempt + 1}, "
-                        f"delay {delay:.1f}s"
+                        f"Retry with jitter: attempt {attempt + 1}, " f"delay {delay:.1f}s"
                     )
                     await asyncio.sleep(delay)
 
@@ -516,6 +514,7 @@ class RecoveryService:
                 for _ in range(n):
                     a, b = b, a + b
                 return a
+
             delay = self._base_retry_delay * fib(attempt + 1)
         else:
             # Default to exponential
@@ -561,8 +560,7 @@ class RecoveryService:
         max_consecutive_failures = 5
         if consecutive_failures >= max_consecutive_failures:
             self._logger.warning(
-                f"Circuit breaker open: {consecutive_failures} "
-                f"consecutive failures"
+                f"Circuit breaker open: {consecutive_failures} " f"consecutive failures"
             )
             return False
 
@@ -729,7 +727,7 @@ class RecoveryService:
                 "base_delay": self._base_retry_delay,
                 "use_jitter": True,
                 "fallback_enabled": True,
-            }
+            },
         )
 
     # ==========================================================================
@@ -771,66 +769,64 @@ class RecoveryService:
             # ================================================================
             # Claude Opus 4.6 (latest, most intelligent) → Sonnet 4.6 → Haiku 4.5
             "claude-opus-4-6": [
-                "claude-sonnet-4-6",      # Same provider, next tier
-                "claude-haiku-4-5",       # Same provider, fastest
+                "claude-sonnet-4-6",  # Same provider, next tier
+                "claude-haiku-4-5",  # Same provider, fastest
             ],
             # Claude Sonnet 4.6 → Haiku 4.5
             "claude-sonnet-4-6": [
-                "claude-haiku-4-5",       # Same provider only
+                "claude-haiku-4-5",  # Same provider only
             ],
             # Claude Haiku 4.5 (fastest, no further fallback within Anthropic)
             "claude-haiku-4-5": [
                 # End of Anthropic chain - no fallback
             ],
-
             # ================================================================
             # OPENAI MODELS - Within-Provider Fallback Chain
             # ================================================================
             # GPT 5.4 (latest, most intelligent) → GPT 5.4-mini
             "gpt-5-4": [
-                "gpt-5-4-mini",           # Same provider only
+                "gpt-5-4-mini",  # Same provider only
             ],
             # GPT 5.4-mini (fastest, no further fallback within OpenAI)
             "gpt-5-4-mini": [
                 # End of OpenAI chain - no fallback
             ],
-
             # ================================================================
             # GOOGLE MODELS - Within-Provider Fallback Chain
             # ================================================================
             # Gemini 3.1 (latest) → Gemini 2.5 Flash
             "gemini-3-1": [
-                "gemini-2-5-flash",       # Same provider only
+                "gemini-2-5-flash",  # Same provider only
             ],
             # Gemini 2.5 Flash → Gemini 1.5 Flash
             "gemini-2-5-flash": [
-                "gemini-1-5-flash",       # Same provider only
+                "gemini-1-5-flash",  # Same provider only
             ],
             # Gemini 1.5 Flash (fastest, no further fallback within Google)
             "gemini-1-5-flash": [
                 # End of Google chain - no fallback
             ],
-
             # ================================================================
             # LEGACY MODEL NAMES - Mapped to Latest Within-Provider Chains
             # ================================================================
             # Legacy Anthropic models
-            "claude-3-7-sonnet-20250219": ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
+            "claude-3-7-sonnet-20250219": [
+                "claude-opus-4-6",
+                "claude-sonnet-4-6",
+                "claude-haiku-4-5",
+            ],
             "claude-3-5-sonnet-20241022": ["claude-sonnet-4-6", "claude-haiku-4-5"],
             "claude-3-5-haiku-20241022": ["claude-haiku-4-5"],
             "claude-3-opus-20240229": ["claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5"],
             "claude-3-sonnet-20240229": ["claude-sonnet-4-6", "claude-haiku-4-5"],
             "claude-3-haiku-20240307": ["claude-haiku-4-5"],
-
             # Legacy OpenAI models
             "gpt-4o": ["gpt-5-4", "gpt-5-4-mini"],
             "gpt-4o-mini": ["gpt-5-4-mini"],
             "gpt-4-turbo": ["gpt-5-4-mini"],
-
             # Legacy Google models
             "gemini-2-0-flash-thinking": ["gemini-3-1", "gemini-2-5-flash", "gemini-1-5-flash"],
             "gemini-1-5-pro": ["gemini-3-1", "gemini-2-5-flash"],
-
             # ================================================================
             # OTHER PROVIDERS - Within-Provider Chains (can be extended)
             # ================================================================
@@ -1001,9 +997,7 @@ class RecoveryService:
         # 4. Rate limit errors with many failures
 
         if not health["is_available"]:
-            self._logger.warning(
-                f"Provider {current_provider} is unavailable, should switch"
-            )
+            self._logger.warning(f"Provider {current_provider} is unavailable, should switch")
             return True
 
         if health["consecutive_failures"] >= 5:
@@ -1013,8 +1007,7 @@ class RecoveryService:
             )
             return True
 
-        if (health["total_requests"] >= 10 and
-            health["success_rate"] < 0.5):
+        if health["total_requests"] >= 10 and health["success_rate"] < 0.5:
             self._logger.warning(
                 f"Provider {current_provider} has low success rate "
                 f"({health['success_rate']:.1%}), should switch"
@@ -1120,9 +1113,10 @@ class RecoveryService:
             health["last_failure_time"] = datetime.now().isoformat()
 
             # Check if should mark unavailable
-            if (health["consecutive_failures"] >= 5 or
-                (health["total_requests"] >= 10 and
-                 health["successful_requests"] / health["total_requests"] < 0.5)):
+            if health["consecutive_failures"] >= 5 or (
+                health["total_requests"] >= 10
+                and health["successful_requests"] / health["total_requests"] < 0.5
+            ):
                 health["is_available"] = False
                 self._logger.warning(
                     f"Provider {provider} marked as unavailable: "

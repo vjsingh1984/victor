@@ -74,7 +74,7 @@ class TokenTracker:
             "TokenTracker is deprecated. Use StreamMetrics.record_usage() for token tracking. "
             "This will be removed in version 0.10.0.",
             DeprecationWarning,
-            stacklevel=2
+            stacklevel=2,
         )
         self._usage: Dict[str, int] = dict.fromkeys(self._KEYS, 0)
         self._lock = threading.Lock()

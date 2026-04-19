@@ -337,9 +337,7 @@ class ConversationController:
         if total_chars > 0:
             observed = total_chars / prompt_tokens
             # Rolling average: 80% old, 20% new observation
-            self._observed_chars_per_token = (
-                0.8 * self._observed_chars_per_token + 0.2 * observed
-            )
+            self._observed_chars_per_token = 0.8 * self._observed_chars_per_token + 0.2 * observed
             # Clamp to sane range: 2–8 chars per token
             self._observed_chars_per_token = max(2.0, min(8.0, self._observed_chars_per_token))
             logger.debug(
@@ -495,6 +493,7 @@ class ConversationController:
                 elif isinstance(m, str):
                     normalized.append(Message(role="assistant", content=m))
             from victor.agent.message_history import _TrackedList
+
             self._history._messages = _TrackedList(normalized)
 
         # Score all messages for importance
@@ -525,7 +524,7 @@ class ConversationController:
             # If it's different from root, we might want to keep it
             if recent_system.message.content != system_msgs_to_keep[0].content:
                 system_msgs_to_keep.append(recent_system.message)
-            
+
             # Remove all other system messages from the candidates
             system_indices = {sm.index for sm in other_system_msgs}
             scored_messages = [sm for sm in scored_messages if sm.index not in system_indices]
@@ -537,7 +536,7 @@ class ConversationController:
         # We need at least 1 USER and 1 ASSISTANT (as requested by user fix)
         # but also ensure they don't get buried if target is small.
         kept_roles = {sm.message.role for sm in messages_to_keep}
-        
+
         # 1. Ensure USER message survives (at least one)
         if "user" not in kept_roles:
             for sm in scored_messages[target:]:
@@ -635,11 +634,11 @@ class ConversationController:
             import traceback as _tb
 
             sample_types = [type(m).__name__ for m in msgs_to_score[:5]]
-            history_id = id(self._history) if hasattr(self, '_history') else 'N/A'
+            history_id = id(self._history) if hasattr(self, "_history") else "N/A"
             history_msgs_types = (
                 [type(m).__name__ for m in self._history._messages[:5]]
-                if hasattr(self, '_history') and hasattr(self._history, '_messages')
-                else ['N/A']
+                if hasattr(self, "_history") and hasattr(self._history, "_messages")
+                else ["N/A"]
             )
             logger.info(
                 "SCORE_TRACE: msgs_to_score len=%d types=%s | "
@@ -651,7 +650,7 @@ class ConversationController:
                 history_id,
                 history_msgs_types,
                 id(self.messages),
-                id(self._history.messages) if hasattr(self, '_history') else 'N/A',
+                id(self._history.messages) if hasattr(self, "_history") else "N/A",
             )
 
         # Pre-process: handle system messages and pinned content before canonical scoring
@@ -830,7 +829,7 @@ class ConversationController:
                                 removed_messages,
                                 current_query=current_query,
                                 session_id=self._session_id,
-                            )
+                            ),
                         )
                         result = future.result(timeout=10.0)
                 else:
@@ -847,14 +846,20 @@ class ConversationController:
                 if self._conversation_store and self._session_id:
                     try:
                         # Check if store has the enhanced method
-                        if hasattr(self._conversation_store, 'store_compaction_summary_enhanced'):
+                        if hasattr(self._conversation_store, "store_compaction_summary_enhanced"):
                             # Store with dual formats
                             self._conversation_store.store_compaction_summary_enhanced(
                                 session_id=self._session_id,
-                                summary_xml=result.summary if "<summary>" in result.summary else None,
-                                summary_text=result.summary if "<summary>" not in result.summary else None,
+                                summary_xml=(
+                                    result.summary if "<summary>" in result.summary else None
+                                ),
+                                summary_text=(
+                                    result.summary if "<summary>" not in result.summary else None
+                                ),
                                 summary_json={"strategy": result.strategy_used.value},
-                                messages_summarized=[f"msg_{i}" for i in range(len(removed_messages))],
+                                messages_summarized=[
+                                    f"msg_{i}" for i in range(len(removed_messages))
+                                ],
                                 strategy_used=result.strategy_used.value,
                                 complexity_score=result.complexity_score,
                                 tokens_saved=result.tokens_saved,

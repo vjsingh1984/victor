@@ -48,6 +48,7 @@ class MetaLearningCoordinator(RLCoordinator):
         super().__init__(*args, **kwargs)
         # Import here to avoid circular dependency at module level
         from victor.agent.usage_analytics import UsageAnalytics
+
         self._analytics = UsageAnalytics.get_instance()
 
     def aggregate_session_metrics(self, repo_id: Optional[str] = None) -> Dict[str, Any]:
@@ -193,16 +194,18 @@ class MetaLearningCoordinator(RLCoordinator):
             if learner:
                 stats = learner.get_feedback_stats()  # type: ignore[attr-defined]
                 if stats.get("total_feedback", 0) > 0:
-                    rl_recs.append({
-                        "priority": "medium",
-                        "category": "user_feedback",
-                        "issue": f"User avg rating: {stats['avg_rating']:.2f}",
-                        "action": (
-                            "Investigate low-rated sessions"
-                            if stats["avg_rating"] < 0.7
-                            else "Maintain current approach"
-                        ),
-                    })
+                    rl_recs.append(
+                        {
+                            "priority": "medium",
+                            "category": "user_feedback",
+                            "issue": f"User avg rating: {stats['avg_rating']:.2f}",
+                            "action": (
+                                "Investigate low-rated sessions"
+                                if stats["avg_rating"] < 0.7
+                                else "Maintain current approach"
+                            ),
+                        }
+                    )
         except Exception as e:
             logger.debug("MetaLearning: user_feedback enrichment skipped: %s", e)
 

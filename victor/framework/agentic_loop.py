@@ -539,7 +539,7 @@ class AgenticLoop:
         from victor.core.shared_types import ConversationStage
 
         # Map conversation stage to task phase
-        stage = perception.action_intent.stage if hasattr(perception, 'action_intent') else None
+        stage = perception.action_intent.stage if hasattr(perception, "action_intent") else None
 
         # Simple phase detection based on iteration and stage
         if iteration == 1:

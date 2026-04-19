@@ -121,7 +121,7 @@ class ToolServiceAdapter:
         ctx: "ToolResultContext",
     ) -> List[Dict[str, Any]]:
         """[LEGACY] Process tool execution results via the coordinator.
-        
+
         This method is part of IToolService, which is being superseded by
         IToolCoordinator.
         """

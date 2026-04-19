@@ -19,10 +19,10 @@ from victor.framework.rl.learners.user_feedback import (
     create_outcome_with_user_feedback,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
@@ -37,6 +37,7 @@ def _make_learner() -> UserFeedbackLearner:
 # ---------------------------------------------------------------------------
 # create_outcome_with_user_feedback helper
 # ---------------------------------------------------------------------------
+
 
 class TestCreateOutcomeWithUserFeedback:
     def test_returns_rl_outcome(self):
@@ -72,6 +73,7 @@ class TestCreateOutcomeWithUserFeedback:
     def test_reuses_rl_outcome_quality_score_no_new_field(self):
         """Verify we're NOT adding a separate user_rating field."""
         import dataclasses
+
         fields = {f.name for f in dataclasses.fields(RLOutcome)}
         assert "user_rating" not in fields
         assert "feedback_score" not in fields
@@ -82,9 +84,11 @@ class TestCreateOutcomeWithUserFeedback:
 # UserFeedbackLearner
 # ---------------------------------------------------------------------------
 
+
 class TestUserFeedbackLearner:
     def test_inherits_from_base_learner(self):
         from victor.framework.rl.base import BaseLearner
+
         learner = _make_learner()
         assert isinstance(learner, BaseLearner)
 
@@ -99,8 +103,11 @@ class TestUserFeedbackLearner:
     def test_record_outcome_ignores_non_user_feedback(self):
         learner = _make_learner()
         outcome = RLOutcome(
-            provider="anthropic", model="claude-sonnet-4-6",
-            task_type="tool_call", success=True, quality_score=0.9,
+            provider="anthropic",
+            model="claude-sonnet-4-6",
+            task_type="tool_call",
+            success=True,
+            quality_score=0.9,
             metadata={"feedback_source": "auto"},
         )
         learner.record_outcome(outcome)
@@ -155,9 +162,7 @@ class TestUserFeedbackLearner:
 
     def test_persists_summary_to_db(self):
         learner = _make_learner()
-        learner.record_outcome(
-            create_outcome_with_user_feedback(session_id="s1", rating=0.9)
-        )
+        learner.record_outcome(create_outcome_with_user_feedback(session_id="s1", rating=0.9))
         cursor = learner.db.cursor()
         cursor.execute("SELECT * FROM rl_user_feedback_summary WHERE context_key = 's1'")
         row = cursor.fetchone()
@@ -169,9 +174,11 @@ class TestUserFeedbackLearner:
 # Coordinator integration — user_feedback learner is retrievable
 # ---------------------------------------------------------------------------
 
+
 class TestCoordinatorUserFeedbackIntegration:
     def test_coordinator_can_retrieve_user_feedback_learner(self):
         from victor.framework.rl.coordinator import get_rl_coordinator
+
         coord = get_rl_coordinator()
         learner = coord.get_learner("user_feedback")
         assert learner is not None
@@ -180,6 +187,7 @@ class TestCoordinatorUserFeedbackIntegration:
     def test_record_outcome_writes_feedback_source_column(self):
         from victor.framework.rl.coordinator import get_rl_coordinator
         from victor.core.schema import Tables
+
         coord = get_rl_coordinator()
         outcome = create_outcome_with_user_feedback(session_id="unit-test", rating=0.7)
         coord.record_outcome("user_feedback", outcome)
@@ -199,14 +207,17 @@ class TestCoordinatorUserFeedbackIntegration:
 # UsageAnalytics.persist_to_rl_database
 # ---------------------------------------------------------------------------
 
+
 class TestUsageAnalyticsPersistBridge:
     def setup_method(self):
         from victor.agent.usage_analytics import UsageAnalytics
+
         UsageAnalytics.reset_instance()
         self.ua = UsageAnalytics.get_instance()
 
     def teardown_method(self):
         from victor.agent.usage_analytics import UsageAnalytics
+
         UsageAnalytics.reset_instance()
 
     def test_returns_false_when_no_sessions(self):
@@ -223,28 +234,35 @@ class TestUsageAnalyticsPersistBridge:
     def test_does_not_duplicate_session_aggregation_logic(self):
         """persist_to_rl_database must call get_session_summary(), not reimplement it."""
         import inspect
+
         src = inspect.getsource(self.ua.persist_to_rl_database)
-        assert "get_session_summary" in src, (
-            "persist_to_rl_database must delegate to get_session_summary()"
-        )
+        assert (
+            "get_session_summary" in src
+        ), "persist_to_rl_database must delegate to get_session_summary()"
 
 
 # ---------------------------------------------------------------------------
 # MetaLearningCoordinator
 # ---------------------------------------------------------------------------
 
+
 class TestMetaLearningCoordinator:
     def test_importable(self):
         from victor.framework.rl.meta_learning import MetaLearningCoordinator  # noqa: F401
 
     def test_get_meta_learning_coordinator_returns_instance(self):
-        from victor.framework.rl.meta_learning import get_meta_learning_coordinator, MetaLearningCoordinator
+        from victor.framework.rl.meta_learning import (
+            get_meta_learning_coordinator,
+            MetaLearningCoordinator,
+        )
+
         coord = get_meta_learning_coordinator()
         assert isinstance(coord, MetaLearningCoordinator)
 
     def test_aggregate_session_metrics_returns_dict(self):
         from victor.framework.rl.meta_learning import MetaLearningCoordinator
         from victor.agent.usage_analytics import UsageAnalytics
+
         UsageAnalytics.reset_instance()
         coord = MetaLearningCoordinator()
         result = coord.aggregate_session_metrics()
@@ -254,6 +272,7 @@ class TestMetaLearningCoordinator:
     def test_aggregate_session_metrics_with_data(self):
         from victor.framework.rl.meta_learning import MetaLearningCoordinator
         from victor.agent.usage_analytics import UsageAnalytics
+
         UsageAnalytics.reset_instance()
         ua = UsageAnalytics.get_instance()
         ua.start_session()
@@ -267,6 +286,7 @@ class TestMetaLearningCoordinator:
 
     def test_detect_long_term_trends_no_data(self):
         from victor.framework.rl.meta_learning import MetaLearningCoordinator
+
         coord = MetaLearningCoordinator()
         trends = coord.detect_long_term_trends(repo_id="no-data-repo")
         assert isinstance(trends, dict)
@@ -274,6 +294,7 @@ class TestMetaLearningCoordinator:
 
     def test_get_consolidated_recommendations_returns_list(self):
         from victor.framework.rl.meta_learning import MetaLearningCoordinator
+
         coord = MetaLearningCoordinator()
         recs = coord.get_consolidated_recommendations()
         assert isinstance(recs, list)
@@ -281,4 +302,5 @@ class TestMetaLearningCoordinator:
     def test_extends_rl_coordinator_not_replaces(self):
         from victor.framework.rl.meta_learning import MetaLearningCoordinator
         from victor.framework.rl.coordinator import RLCoordinator
+
         assert issubclass(MetaLearningCoordinator, RLCoordinator)

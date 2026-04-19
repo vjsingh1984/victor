@@ -69,13 +69,10 @@ def sample_messages():
         Message(
             role="assistant",
             content="I'll help fix the bug. TODO: Add tests later",
-            tool_calls=[{"name": "read_file", "id": "call_1"}]
+            tool_calls=[{"name": "read_file", "id": "call_1"}],
         ),
         Message(
-            role="tool",
-            tool_call_id="call_1",
-            tool_name="read_file",
-            content="File content..."
+            role="tool", tool_call_id="call_1", tool_name="read_file", content="File content..."
         ),
     ]
 
@@ -97,6 +94,7 @@ class TestHybridCompactionSummarizer:
     ):
         """Test basic hybrid summarization."""
         import json
+
         summary = await hybrid_summarizer.summarize_async(sample_messages)
 
         # Verify JSON format
@@ -179,6 +177,7 @@ class TestHybridCompactionSummarizer:
     ):
         """Test LLM enhancement of current work section."""
         import json
+
         llm_summarizer.summarize.return_value = "Currently fixing authentication bug in login.py"
 
         hybrid_summarizer = HybridCompactionSummarizer(
@@ -204,6 +203,7 @@ class TestHybridCompactionSummarizer:
         sample_messages,
     ):
         """Test fallback to rule-based on LLM timeout."""
+
         # Mock LLM call to timeout
         async def mock_timeout(*args, **kwargs):
             await asyncio.sleep(10)  # Longer than timeout
@@ -266,6 +266,7 @@ class TestHybridCompactionSummarizer:
     ):
         """Test enhancing multiple sections."""
         import json
+
         settings.hybrid_llm_sections = [
             "pending_work",
             "current_work",
@@ -443,6 +444,7 @@ class TestErrorHandling:
     ):
         """Test handling when rule summary has no content."""
         import json
+
         rule_summarizer = Mock()
         rule_summarizer.summarize = Mock(return_value="")
 
@@ -468,10 +470,7 @@ class TestErrorHandling:
     ):
         """Test concurrent summarization calls."""
         # Run multiple summarizations concurrently
-        tasks = [
-            hybrid_summarizer.summarize_async(sample_messages)
-            for _ in range(5)
-        ]
+        tasks = [hybrid_summarizer.summarize_async(sample_messages) for _ in range(5)]
 
         results = await asyncio.gather(*tasks)
 

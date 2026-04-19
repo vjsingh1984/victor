@@ -191,7 +191,8 @@ class PhaseDetector:
 
         # Strategy 2: Tool patterns (tiebreaker)
         if (
-            self._strategy in (
+            self._strategy
+            in (
                 PhaseDetectionStrategy.TOOL_PATTERNS,
                 PhaseDetectionStrategy.ENSEMBLE,
             )
@@ -204,7 +205,8 @@ class PhaseDetector:
         # Strategy 3: Content analysis (optional)
         if (
             self._enable_content_analysis
-            and self._strategy in (
+            and self._strategy
+            in (
                 PhaseDetectionStrategy.CONTENT_ANALYSIS,
                 PhaseDetectionStrategy.ENSEMBLE,
             )
@@ -231,7 +233,7 @@ class PhaseDetector:
             return None
 
         # Count tool usage per phase
-        phase_counts: Dict[TaskPhase, int] = {phase: 0 for phase in TaskPhase}
+        phase_counts: Dict[TaskPhase, int] = dict.fromkeys(TaskPhase, 0)
 
         for tool in recent_tools:
             for phase, patterns in TOOL_PATTERNS.items():
@@ -259,7 +261,7 @@ class PhaseDetector:
             return None
 
         # Count pattern matches per phase
-        phase_counts: Dict[TaskPhase, int] = {phase: 0 for phase in TaskPhase}
+        phase_counts: Dict[TaskPhase, int] = dict.fromkeys(TaskPhase, 0)
 
         for phase, patterns in self._compiled_patterns.items():
             for pattern in patterns:
@@ -359,10 +361,7 @@ class PhaseTransitionDetector:
             return False
 
         # Check for thrashing (too many transitions in time window)
-        recent_transitions = [
-            t for t in self._transition_history
-            if now - t < self._window_seconds
-        ]
+        recent_transitions = [t for t in self._transition_history if now - t < self._window_seconds]
 
         if len(recent_transitions) >= self._max_transitions:
             logger.debug(
@@ -422,14 +421,13 @@ class PhaseTransitionDetector:
         """
         now = time.monotonic()
 
-        recent_transitions = [
-            t for t in self._transition_history
-            if now - t < self._window_seconds
-        ]
+        recent_transitions = [t for t in self._transition_history if now - t < self._window_seconds]
 
         return {
             "current_phase": self._current_phase.value if self._current_phase else None,
-            "last_transition": now - self._last_transition_time if self._transition_history else None,
+            "last_transition": (
+                now - self._last_transition_time if self._transition_history else None
+            ),
             "total_transitions": len(self._transition_history),
             "recent_transitions": len(recent_transitions),
         }

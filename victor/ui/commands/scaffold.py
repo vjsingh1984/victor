@@ -250,8 +250,7 @@ def scaffold_plugin(
     console.print()
     console.print(
         Panel(
-            f"[bold blue]Creating new {label}: {name}[/]\n"
-            f"[dim]Description: {description}[/]",
+            f"[bold blue]Creating new {label}: {name}[/]\n" f"[dim]Description: {description}[/]",
             title="Victor Scaffold",
             border_style="blue",
         )

@@ -153,8 +153,8 @@ class SessionCostSummary:
 class SessionCoordinator:
     """[DEPRECATED] Coordinates session lifecycle and state management.
 
-    This class is being superseded by SessionService as part of the 
-    state-passed architectural migration. It remains for backward 
+    This class is being superseded by SessionService as part of the
+    state-passed architectural migration. It remains for backward
     compatibility with facade-driven components.
 
     Responsibilities:

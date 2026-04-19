@@ -98,13 +98,19 @@ def complex_messages():
     """Create complex messages (high complexity)."""
     messages = []
     for i in range(30):
-        messages.append(Message(role="user", content=f"Message {i} about fixing bug in src/file{i}.py"))
-        messages.append(Message(
-            role="assistant",
-            content=f"I'll help with that",
-            tool_calls=[{"name": f"tool_{i}", "id": f"call_{i}"}]
-        ))
-        messages.append(Message(role="tool", tool_call_id=f"call_{i}", tool_name=f"tool_{i}", content="Result"))
+        messages.append(
+            Message(role="user", content=f"Message {i} about fixing bug in src/file{i}.py")
+        )
+        messages.append(
+            Message(
+                role="assistant",
+                content="I'll help with that",
+                tool_calls=[{"name": f"tool_{i}", "id": f"call_{i}"}],
+            )
+        )
+        messages.append(
+            Message(role="tool", tool_call_id=f"call_{i}", tool_name=f"tool_{i}", content="Result")
+        )
     return messages
 
 
@@ -154,10 +160,7 @@ class TestCompactionRouter:
     @pytest.mark.asyncio
     async def test_compact_with_current_query(self, router, simple_messages):
         """Test compacting with current query for relevance."""
-        result = await router.compact(
-            simple_messages,
-            current_query="continue with the task"
-        )
+        result = await router.compact(simple_messages, current_query="continue with the task")
 
         assert result.summary
         # Query should affect complexity score
@@ -364,7 +367,7 @@ class TestToolExtraction:
                 tool_calls=[
                     {"name": "read_file", "id": "call_1"},
                     {"name": "write_file", "id": "call_2"},
-                ]
+                ],
             ),
         ]
 
@@ -388,7 +391,7 @@ class TestToolExtraction:
 
         # Extract tools from the mock message
         tools = []
-        if hasattr(msg, 'tool_name') and msg.tool_name:
+        if hasattr(msg, "tool_name") and msg.tool_name:
             tools.append(msg.tool_name)
 
         assert len(tools) == 1
@@ -456,8 +459,8 @@ class TestSettingsIntegration:
         """Test router with custom thresholds."""
         settings = CompactionStrategySettings(
             llm_min_complexity=0.5,  # Lower threshold
-            llm_min_tokens=3000,     # Lower threshold
-            llm_min_messages=10,     # Lower threshold
+            llm_min_tokens=3000,  # Lower threshold
+            llm_min_messages=10,  # Lower threshold
         )
 
         router = CompactionRouter(

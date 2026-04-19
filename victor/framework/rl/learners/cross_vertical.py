@@ -570,16 +570,18 @@ class CrossVerticalLearner(BaseLearner):
                     src_verts = json.loads(rd.get("source_verticals") or "[]")
                 except (json.JSONDecodeError, TypeError):
                     src_verts = []
-                stored.append(SharedPattern(
-                    task_type=rd["task_type"],
-                    pattern_name=rd.get("pattern_name", "stored"),
-                    avg_quality=rd["avg_quality"],
-                    confidence=rd["confidence"],
-                    source_verticals=src_verts,
-                    recommended_mode=rd.get("recommended_mode"),
-                    recommendation=rd.get("recommendation", ""),
-                    sample_count=rd.get("sample_count", 0),
-                ))
+                stored.append(
+                    SharedPattern(
+                        task_type=rd["task_type"],
+                        pattern_name=rd.get("pattern_name", "stored"),
+                        avg_quality=rd["avg_quality"],
+                        confidence=rd["confidence"],
+                        source_verticals=src_verts,
+                        recommended_mode=rd.get("recommended_mode"),
+                        recommendation=rd.get("recommendation", ""),
+                        sample_count=rd.get("sample_count", 0),
+                    )
+                )
         except Exception as e:
             logger.debug("cross_vertical: export_patterns — rl_pattern query failed: %s", e)
 
@@ -594,16 +596,18 @@ class CrossVerticalLearner(BaseLearner):
 
         exported = []
         for p in patterns:
-            exported.append({
-                "task_type": p.task_type,
-                "pattern_name": p.pattern_name,
-                "avg_quality": p.avg_quality,
-                "confidence": p.confidence,
-                "source_verticals": p.source_verticals,
-                "recommended_mode": p.recommended_mode,
-                "recommendation": p.recommendation,
-                "sample_count": p.sample_count,
-            })
+            exported.append(
+                {
+                    "task_type": p.task_type,
+                    "pattern_name": p.pattern_name,
+                    "avg_quality": p.avg_quality,
+                    "confidence": p.confidence,
+                    "source_verticals": p.source_verticals,
+                    "recommended_mode": p.recommended_mode,
+                    "recommendation": p.recommendation,
+                    "sample_count": p.sample_count,
+                }
+            )
 
         return {
             "schema_version": 1,
@@ -646,7 +650,9 @@ class CrossVerticalLearner(BaseLearner):
 
         for p in patterns:
             try:
-                pattern_id = f"imported_{source_repo_id or 'ext'}_{p['task_type']}_{p['pattern_name']}"
+                pattern_id = (
+                    f"imported_{source_repo_id or 'ext'}_{p['task_type']}_{p['pattern_name']}"
+                )
                 decayed_confidence = p["confidence"] * confidence_decay
                 source_verticals = p.get("source_verticals", [])
 
@@ -680,7 +686,9 @@ class CrossVerticalLearner(BaseLearner):
         self.db.commit()
         logger.info(
             "cross_vertical: imported %d/%d patterns from %s",
-            imported, len(patterns), source_repo_id or "external",
+            imported,
+            len(patterns),
+            source_repo_id or "external",
         )
         return imported
 
@@ -736,23 +744,25 @@ class CrossVerticalLearner(BaseLearner):
             # Apply domain-shift penalty
             adapted_confidence = confidence * 0.85
 
-            recommendations.append(RLRecommendation(
-                value=avg_quality,
-                confidence=adapted_confidence,
-                reason=(
-                    f"Adapted from {source_vertical} → {target_vertical}: "
-                    f"avg quality {avg_quality:.2f} on {cnt} outcomes"
-                ),
-                sample_size=cnt,
-                is_baseline=False,
-                metadata={
-                    "transfer_type": "domain_adaptation",
-                    "source_vertical": source_vertical,
-                    "target_vertical": target_vertical,
-                    "task_type": task_type,
-                    "confidence_decay": 0.85,
-                },
-            ))
+            recommendations.append(
+                RLRecommendation(
+                    value=avg_quality,
+                    confidence=adapted_confidence,
+                    reason=(
+                        f"Adapted from {source_vertical} → {target_vertical}: "
+                        f"avg quality {avg_quality:.2f} on {cnt} outcomes"
+                    ),
+                    sample_size=cnt,
+                    is_baseline=False,
+                    metadata={
+                        "transfer_type": "domain_adaptation",
+                        "source_vertical": source_vertical,
+                        "target_vertical": target_vertical,
+                        "task_type": task_type,
+                        "confidence_decay": 0.85,
+                    },
+                )
+            )
 
         return recommendations
 

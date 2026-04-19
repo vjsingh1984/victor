@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional
 
 if TYPE_CHECKING:
     from victor.agent.services.protocols import (
@@ -68,7 +68,7 @@ class ChatServiceConfig:
 class ChatService:
     """[CANONICAL] Service for managing chat operations.
 
-    The target implementation for chat operations following the 
+    The target implementation for chat operations following the
     state-passed architectural pattern. Supersedes ChatCoordinator.
 
     This service follows SOLID principles:
@@ -508,7 +508,7 @@ class ChatService:
         for tool_call in tool_calls:
             tool_name = tool_call.function.name
             arguments = tool_call.function.arguments
-            tool_call_id = getattr(tool_call, 'id', None)
+            tool_call_id = getattr(tool_call, "id", None)
 
             result = await self._tools.execute_tool(tool_name, arguments)
 
@@ -574,7 +574,8 @@ class ChatService:
         msg = {
             "role": "tool",
             "content": content,
-            "tool_call_id": tool_call_id or tool_name,  # Use tool_call_id if provided, fallback to tool_name
+            "tool_call_id": tool_call_id
+            or tool_name,  # Use tool_call_id if provided, fallback to tool_name
             "name": tool_name,  # OpenAI spec requires 'name' for tool messages
         }
         self._context.add_message(msg)
@@ -738,21 +739,18 @@ class ChatService:
         # Track response length
         content_length = len(response.content) if response.content else 0
         quality["average_length"] = (
-            (quality["average_length"] * (quality["total_responses"] - 1) + content_length)
-            / quality["total_responses"]
-        )
+            quality["average_length"] * (quality["total_responses"] - 1) + content_length
+        ) / quality["total_responses"]
 
         # Track completion rate
         if response.stop_reason == "stop":
             quality["completion_rate"] = (
-                (quality["completion_rate"] * (quality["total_responses"] - 1) + 1.0)
-                / quality["total_responses"]
-            )
+                quality["completion_rate"] * (quality["total_responses"] - 1) + 1.0
+            ) / quality["total_responses"]
         else:
             quality["completion_rate"] = (
-                (quality["completion_rate"] * (quality["total_responses"] - 1) + 0.0)
-                / quality["total_responses"]
-            )
+                quality["completion_rate"] * (quality["total_responses"] - 1) + 0.0
+            ) / quality["total_responses"]
 
         # Track user satisfaction
         if user_satisfaction is not None:
@@ -779,9 +777,7 @@ class ChatService:
 
         satisfaction_scores = quality.get("user_satisfaction_scores", [])
         avg_satisfaction = (
-            sum(satisfaction_scores) / len(satisfaction_scores)
-            if satisfaction_scores
-            else 0.0
+            sum(satisfaction_scores) / len(satisfaction_scores) if satisfaction_scores else 0.0
         )
 
         return {
@@ -1099,9 +1095,7 @@ class ChatService:
         message_lower = user_message.lower()
         return any(indicator in message_lower for indicator in multi_step_indicators)
 
-    def _prepare_task(
-        self, user_message: str, task_type: str
-    ) -> tuple[Dict[str, Any], int]:
+    def _prepare_task(self, user_message: str, task_type: str) -> tuple[Dict[str, Any], int]:
         """Prepare task-specific guidance and budget adjustments.
 
         Args:
@@ -1193,14 +1187,14 @@ class ChatService:
         if self._provider:
             try:
                 base_wait = self._provider.get_rate_limit_wait_time(exc)
-                backoff_multiplier = 2 ** attempt
+                backoff_multiplier = 2**attempt
                 wait_time = base_wait * backoff_multiplier
                 return min(wait_time, 300.0)  # Max 5 minutes
             except Exception:
                 pass
 
         # Fallback to exponential backoff
-        return min(60.0 * (2 ** attempt), 300.0)
+        return min(60.0 * (2**attempt), 300.0)
 
     # ==========================================================================
     # Message Persistence

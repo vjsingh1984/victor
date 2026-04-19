@@ -123,10 +123,13 @@ class TestTokenAccountingWiring:
         executor._token_tracker = None
 
         # Bind the real method to our mock instance
-        TurnExecutor._accumulate_token_usage(executor, CompletionResponse(
-            content="response",
-            usage={"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70},
-        ))
+        TurnExecutor._accumulate_token_usage(
+            executor,
+            CompletionResponse(
+                content="response",
+                usage={"prompt_tokens": 50, "completion_tokens": 20, "total_tokens": 70},
+            ),
+        )
 
         mock_ctrl.record_actual_usage.assert_called_once()
         call_args = mock_ctrl.record_actual_usage.call_args
@@ -150,10 +153,13 @@ class TestTokenAccountingWiring:
         executor._token_tracker = None
 
         # Should not raise
-        TurnExecutor._accumulate_token_usage(executor, CompletionResponse(
-            content="ok",
-            usage={"prompt_tokens": 30, "completion_tokens": 10, "total_tokens": 40},
-        ))
+        TurnExecutor._accumulate_token_usage(
+            executor,
+            CompletionResponse(
+                content="ok",
+                usage={"prompt_tokens": 30, "completion_tokens": 10, "total_tokens": 40},
+            ),
+        )
 
     def test_accumulate_skips_record_when_prompt_tokens_zero(self):
         """record_actual_usage is NOT called when prompt_tokens is 0."""
@@ -169,10 +175,13 @@ class TestTokenAccountingWiring:
         executor._chat_context = mock_conversation
         executor._token_tracker = None
 
-        TurnExecutor._accumulate_token_usage(executor, CompletionResponse(
-            content="ok",
-            usage={"prompt_tokens": 0, "completion_tokens": 5, "total_tokens": 5},
-        ))
+        TurnExecutor._accumulate_token_usage(
+            executor,
+            CompletionResponse(
+                content="ok",
+                usage={"prompt_tokens": 0, "completion_tokens": 5, "total_tokens": 5},
+            ),
+        )
 
         mock_ctrl.record_actual_usage.assert_not_called()
 
@@ -192,8 +201,13 @@ class TestConversationStoreTokenSchema:
         cols = {row[1] for row in cursor.fetchall()}
         conn.close()
 
-        for col in ("prompt_tokens", "completion_tokens", "cached_tokens",
-                    "reasoning_tokens", "cost_usd_micros"):
+        for col in (
+            "prompt_tokens",
+            "completion_tokens",
+            "cached_tokens",
+            "reasoning_tokens",
+            "cost_usd_micros",
+        ):
             assert col in cols, f"sessions table missing column: {col}"
 
     def test_update_session_token_usage_accumulates(self, tmp_path):
@@ -246,6 +260,7 @@ class TestConversationStoreTokenSchema:
         # Opening ConversationStore should migrate the table
         from pathlib import Path
         from victor.agent.conversation.store import ConversationStore
+
         ConversationStore(db_path=Path(db_path))
 
         conn = sqlite3.connect(db_path)

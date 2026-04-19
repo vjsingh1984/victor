@@ -579,7 +579,9 @@ class TestConversationMessageSerialization:
 
         assert restored.id == original.id
         # role is normalized to string after roundtrip (enum → str via to_dict)
-        original_role = original.role.value if isinstance(original.role, MessageRole) else original.role
+        original_role = (
+            original.role.value if isinstance(original.role, MessageRole) else original.role
+        )
         assert restored.role == original_role
         assert restored.content == original.content
         assert restored.priority == original.priority

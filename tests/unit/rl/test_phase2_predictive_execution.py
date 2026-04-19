@@ -15,10 +15,10 @@ from victor.framework.rl.base import RLOutcome
 from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
 from victor.framework.rl.learners.model_selector import ModelSelectorLearner
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
@@ -52,6 +52,7 @@ def _tool_outcome(tool_name: str, success: bool = True, tools_used: list = None)
 # ---------------------------------------------------------------------------
 # ToolSelectorLearner Phase 2 extensions
 # ---------------------------------------------------------------------------
+
 
 class TestToolSelectorPredictor:
     def test_predictor_is_none_initially(self):
@@ -113,6 +114,7 @@ class TestToolSelectorPredictor:
     def test_does_not_reimplement_prediction_logic(self):
         """get_next_tool_prediction must delegate to predictor.predict_tools, not reimplement."""
         import inspect
+
         src = inspect.getsource(ToolSelectorLearner.get_next_tool_prediction)
         assert "predict_tools" in src, "Must delegate to existing ToolPredictor.predict_tools()"
         assert "keyword" not in src.lower(), "Must not reimplement keyword matching"
@@ -221,6 +223,7 @@ class TestToolSelectorAnalyticsEnhancedRankings:
 # ModelSelectorLearner Phase 2 — learned confidence thresholds
 # ---------------------------------------------------------------------------
 
+
 class TestModelSelectorConfidenceThresholds:
     def test_learn_confidence_threshold_stores_observation(self):
         learner = _make_model_learner()
@@ -269,9 +272,7 @@ class TestModelSelectorConfidenceThresholds:
             learner.learn_confidence_threshold("tool_necessity", 0.7, False, True)
 
         cursor = learner.db.cursor()
-        cursor.execute(
-            "SELECT * FROM rl_model_threshold WHERE decision_type = 'tool_necessity'"
-        )
+        cursor.execute("SELECT * FROM rl_model_threshold WHERE decision_type = 'tool_necessity'")
         row = cursor.fetchone()
         assert row is not None
 
@@ -307,9 +308,11 @@ class TestModelSelectorConfidenceThresholds:
 # Coordinator integration
 # ---------------------------------------------------------------------------
 
+
 class TestCoordinatorPhase2Integration:
     def test_coordinator_tool_selector_has_predictor_methods(self):
         from victor.framework.rl.coordinator import get_rl_coordinator
+
         coord = get_rl_coordinator()
         learner = coord.get_learner("tool_selector")
         assert hasattr(learner, "get_next_tool_prediction")
@@ -318,6 +321,7 @@ class TestCoordinatorPhase2Integration:
 
     def test_coordinator_model_selector_has_threshold_methods(self):
         from victor.framework.rl.coordinator import get_rl_coordinator
+
         coord = get_rl_coordinator()
         learner = coord.get_learner("model_selector")
         assert hasattr(learner, "learn_confidence_threshold")

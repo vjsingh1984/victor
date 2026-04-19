@@ -234,52 +234,49 @@ class ToolPredictor:
 
         # Source 1: Keyword matching
         if self.config.enable_keyword_matching:
-            keyword_predictions = self._predict_from_keywords(
-                task_description, current_step
-            )
+            keyword_predictions = self._predict_from_keywords(task_description, current_step)
             for tool, score in keyword_predictions.items():
                 predictions[tool] = predictions.get(tool, 0) + score * self.config.keyword_weight
 
         # Source 2: Semantic similarity
         if self.config.enable_semantic_matching and embedding_fn:
-            semantic_predictions = self._predict_from_semantic(
-                task_description, embedding_fn
-            )
+            semantic_predictions = self._predict_from_semantic(task_description, embedding_fn)
             for tool, score in semantic_predictions.items():
                 predictions[tool] = predictions.get(tool, 0) + score * self.config.semantic_weight
 
         # Source 3: Co-occurrence patterns
         if self.config.enable_cooccurrence and self._cooccurrence_tracker:
-            cooccurrence_predictions = self._predict_from_cooccurrence(
-                recent_tools, task_type
-            )
+            cooccurrence_predictions = self._predict_from_cooccurrence(recent_tools, task_type)
             for tool, score in cooccurrence_predictions.items():
-                predictions[tool] = predictions.get(tool, 0) + score * self.config.cooccurrence_weight
+                predictions[tool] = (
+                    predictions.get(tool, 0) + score * self.config.cooccurrence_weight
+                )
 
         # Apply success rate boosting
-        boosted_predictions = self._apply_success_boosting(
-            predictions, task_type
-        )
+        boosted_predictions = self._apply_success_boosting(predictions, task_type)
 
         # Normalize probabilities
         total = sum(boosted_predictions.values())
         if total > 0:
             normalized = {
-                k: v / total for k, v in boosted_predictions.items()
+                k: v / total
+                for k, v in boosted_predictions.items()
                 if v / total >= self.config.min_confidence
             }
         else:
             normalized = {}
 
         # Sort and convert to ToolPrediction objects
-        sorted_predictions = sorted(
-            normalized.items(), key=lambda x: x[1], reverse=True
-        )[: self.config.top_k]
+        sorted_predictions = sorted(normalized.items(), key=lambda x: x[1], reverse=True)[
+            : self.config.top_k
+        ]
 
         result = []
         for tool_name, probability in sorted_predictions:
             success_rate = self._get_tool_success_rate(tool_name, task_type)
-            source = self._determine_prediction_source(tool_name, task_description, recent_tools, task_type)
+            source = self._determine_prediction_source(
+                tool_name, task_description, recent_tools, task_type
+            )
 
             result.append(
                 ToolPrediction(
@@ -450,7 +447,9 @@ class ToolPredictor:
         sources = []
 
         # Check keyword contribution
-        keyword_score = self._predict_from_keywords(task_description, "exploration").get(tool_name, 0)
+        keyword_score = self._predict_from_keywords(task_description, "exploration").get(
+            tool_name, 0
+        )
         if keyword_score > 0:
             sources.append("keyword")
 

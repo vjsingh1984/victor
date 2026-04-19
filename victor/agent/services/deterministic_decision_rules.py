@@ -62,7 +62,6 @@ class LookupTables:
         "ready": (True, 0.92, "done"),
         "good to go": (True, 0.92, "done"),
         "all set": (True, 0.92, "done"),
-
         # Explicit in-progress markers
         "working": (False, 0.90, "working"),
         "working on": (False, 0.90, "working"),
@@ -75,7 +74,6 @@ class LookupTables:
         "let's": (False, 0.85, "working"),
         "i'll": (False, 0.85, "working"),
         "i will": (False, 0.85, "working"),
-
         # Error/stuck markers
         "error": (False, 0.92, "stuck"),
         "failed": (False, 0.92, "stuck"),
@@ -90,7 +88,6 @@ class LookupTables:
         "problem": (False, 0.80, "stuck"),
         "having trouble": (False, 0.90, "stuck"),
         "having issues": (False, 0.90, "stuck"),
-
         # Finalizing markers
         "finalizing": (False, 0.90, "finalizing"),
         "wrapping up": (False, 0.90, "finalizing"),
@@ -120,7 +117,6 @@ class LookupTables:
         "here you are": ("completion", 0.88),
         "ready": ("completion", 0.88),
         "requested": ("completion", 0.85),
-
         # Continuation intent
         "now": ("continuation", 0.85),
         "next": ("continuation", 0.88),
@@ -133,7 +129,6 @@ class LookupTables:
         "first": ("continuation", 0.85),
         "then": ("continuation", 0.85),
         "implement": ("continuation", 0.85),
-
         # Asking input
         "would you like": ("asking_input", 0.92),
         "do you want": ("asking_input", 0.92),
@@ -145,7 +140,6 @@ class LookupTables:
         "shall i": ("asking_input", 0.90),
         "which": ("asking_input", 0.85),
         "prefer": ("asking_input", 0.85),
-
         # Stuck loop
         "i'm stuck": ("stuck_loop", 0.95),
         "i am stuck": ("stuck_loop", 0.95),
@@ -173,22 +167,18 @@ class LookupTables:
         "explore": ("analysis", 0.85),
         "check": ("analysis", 0.82),
         "look at": ("analysis", 0.80),
-
         # Action tasks
         "fix": ("action", 0.92),
         "fix the": ("action", 0.90),
         "implement": ("action", 0.92),
         "add": ("action", 0.88),
         "remove": ("action", 0.88),
-        "update": ("action", 0.88),
-        "change": ("action", 0.85),
         "delete": ("action", 0.88),
         "build": ("action", 0.90),
         "make": ("action", 0.85),
         "set up": ("action", 0.88),
         "configure": ("action", 0.88),
         "install": ("action", 0.90),
-
         # Generation tasks
         "generate": ("generation", 0.92),
         "write": ("generation", 0.88),
@@ -198,7 +188,6 @@ class LookupTables:
         "output": ("generation", 0.85),
         "code": ("generation", 0.82),
         "script": ("generation", 0.85),
-
         # Search tasks
         "find": ("search", 0.90),
         "search": ("search", 0.92),
@@ -208,7 +197,6 @@ class LookupTables:
         "show me": ("search", 0.85),
         "list": ("search", 0.85),
         "what files": ("search", 0.85),
-
         # Edit tasks
         "edit": ("edit", 0.92),
         "modify": ("edit", 0.90),
@@ -235,7 +223,6 @@ class LookupTables:
         "syntax error": ("permanent", 0.88),
         "type error": ("permanent", 0.85),
         "attribute error": ("permanent", 0.85),
-
         # Transient errors
         "connection timeout": ("transient", 0.90),
         "timeout": ("transient", 0.90),
@@ -247,7 +234,6 @@ class LookupTables:
         "temporary": ("transient", 0.85),
         "unavailable": ("transient", 0.82),
         "overloaded": ("transient", 0.85),
-
         # Retryable errors
         "500 internal server error": ("retryable", 0.88),
         "internal server error": ("retryable", 0.88),
@@ -279,7 +265,6 @@ class LookupTables:
         "install": (True, 0.88),
         "in login.py": (True, 0.95),  # File reference
         "file": (True, 0.88),  # File operation
-
         # No tools needed
         "explain": (False, 0.85),
         "what is": (False, 0.85),
@@ -287,7 +272,7 @@ class LookupTables:
         "tell me": (False, 0.85),
         "describe": (False, 0.85),
         "analyze": (False, 0.80),  # Might need tools, but often doesn't
-        "show me": (True, 0.75),   # Often needs tools
+        "show me": (True, 0.75),  # Often needs tools
     }
 
     @classmethod
@@ -339,7 +324,7 @@ class LookupTables:
                 continue
             # Use word boundary matching to avoid partial matches
             # e.g., "unavailable" shouldn't match "503 service unavailable"
-            pattern = r'\b' + re.escape(key) + r'\b'
+            pattern = r"\b" + re.escape(key) + r"\b"
             if re.search(pattern, text_lower):
                 decision_data = table[key]
                 return cls._create_result(decision_type, decision_data, key)
@@ -477,76 +462,195 @@ class PatternMatcher:
     TASK_COMPLETION_PATTERNS: List[Tuple[re.Pattern, bool, float, str]] = [
         # Completion patterns
         (re.compile(r"\b(I'm|I am)\s+done\b", re.IGNORECASE), True, 0.92, "done"),
-        (re.compile(r"\b(I've|I have)\s+(completed|finished)\b", re.IGNORECASE), True, 0.92, "done"),
-        (re.compile(r"\bThe\s+(task|job|work)\s+is\s+(complete|done)\b", re.IGNORECASE), True, 0.95, "done"),
-        (re.compile(r"\b(Successfully|success)\s+(completed|finished|implemented)\b", re.IGNORECASE), True, 0.93, "done"),
+        (
+            re.compile(r"\b(I've|I have)\s+(completed|finished)\b", re.IGNORECASE),
+            True,
+            0.92,
+            "done",
+        ),
+        (
+            re.compile(r"\bThe\s+(task|job|work)\s+is\s+(complete|done)\b", re.IGNORECASE),
+            True,
+            0.95,
+            "done",
+        ),
+        (
+            re.compile(
+                r"\b(Successfully|success)\s+(completed|finished|implemented)\b", re.IGNORECASE
+            ),
+            True,
+            0.93,
+            "done",
+        ),
         (re.compile(r"\bThat('s| is)\s+(everything|all)\b", re.IGNORECASE), True, 0.90, "done"),
         (re.compile(r"\bNothing\s+else\s+to\s+do\b", re.IGNORECASE), True, 0.90, "done"),
-
         # Working patterns
-        (re.compile(r"\b(I'm|I am)\s+(working|proceeding|continuing)\b", re.IGNORECASE), False, 0.88, "working"),
-        (re.compile(r"\bLet('s| us)\s+(proceed|continue|start|begin)\b", re.IGNORECASE), False, 0.88, "working"),
+        (
+            re.compile(r"\b(I'm|I am)\s+(working|proceeding|continuing)\b", re.IGNORECASE),
+            False,
+            0.88,
+            "working",
+        ),
+        (
+            re.compile(r"\bLet('s| us)\s+(proceed|continue|start|begin)\b", re.IGNORECASE),
+            False,
+            0.88,
+            "working",
+        ),
         (re.compile(r"\b(I'll|I will)\s+(now|next)\b", re.IGNORECASE), False, 0.88, "working"),
-        (re.compile(r"\b(Now|Next)\s+(let me|I'll|I will)\b", re.IGNORECASE), False, 0.88, "working"),
-
+        (
+            re.compile(r"\b(Now|Next)\s+(let me|I'll|I will)\b", re.IGNORECASE),
+            False,
+            0.88,
+            "working",
+        ),
         # Error/stuck patterns
-        (re.compile(r"\b(I'm|I am)\s+(stuck|blocked|unable)\b", re.IGNORECASE), False, 0.92, "stuck"),
-        (re.compile(r"\b(Can't|Cannot|Unable)\s+(proceed|continue|do)\b", re.IGNORECASE), False, 0.90, "stuck"),
-        (re.compile(r"\b(Not working|Doesn't work|Failing)\b", re.IGNORECASE), False, 0.90, "stuck"),
-        (re.compile(r"\b(Encountered|Hit|Facing)\s+(an? )?(error|issue|problem)\b", re.IGNORECASE), False, 0.88, "stuck"),
-
+        (
+            re.compile(r"\b(I'm|I am)\s+(stuck|blocked|unable)\b", re.IGNORECASE),
+            False,
+            0.92,
+            "stuck",
+        ),
+        (
+            re.compile(r"\b(Can't|Cannot|Unable)\s+(proceed|continue|do)\b", re.IGNORECASE),
+            False,
+            0.90,
+            "stuck",
+        ),
+        (
+            re.compile(r"\b(Not working|Doesn't work|Failing)\b", re.IGNORECASE),
+            False,
+            0.90,
+            "stuck",
+        ),
+        (
+            re.compile(
+                r"\b(Encountered|Hit|Facing)\s+(an? )?(error|issue|problem)\b", re.IGNORECASE
+            ),
+            False,
+            0.88,
+            "stuck",
+        ),
         # Finalizing patterns
-        (re.compile(r"\b(Finalizing|Wrapping up|Finishing up)\b", re.IGNORECASE), False, 0.90, "finalizing"),
-        (re.compile(r"\b(Almost|Nearly)\s+(done|there|finished)\b", re.IGNORECASE), False, 0.88, "finalizing"),
-        (re.compile(r"\b(One|One more|Last|Final)\s+(step|thing|task)\b", re.IGNORECASE), False, 0.88, "finalizing"),
+        (
+            re.compile(r"\b(Finalizing|Wrapping up|Finishing up)\b", re.IGNORECASE),
+            False,
+            0.90,
+            "finalizing",
+        ),
+        (
+            re.compile(r"\b(Almost|Nearly)\s+(done|there|finished)\b", re.IGNORECASE),
+            False,
+            0.88,
+            "finalizing",
+        ),
+        (
+            re.compile(r"\b(One|One more|Last|Final)\s+(step|thing|task)\b", re.IGNORECASE),
+            False,
+            0.88,
+            "finalizing",
+        ),
     ]
 
     # Intent classification patterns
     INTENT_PATTERNS: List[Tuple[re.Pattern, str, float]] = [
         # Completion intent
-        (re.compile(r"\b(Here('s| is)|I've provided|I have provided)\b", re.IGNORECASE), "completion", 0.88),
-        (re.compile(r"\b(The )?(code|solution|answer|result)\s+is\b", re.IGNORECASE), "completion", 0.90),
+        (
+            re.compile(r"\b(Here('s| is)|I've provided|I have provided)\b", re.IGNORECASE),
+            "completion",
+            0.88,
+        ),
+        (
+            re.compile(r"\b(The )?(code|solution|answer|result)\s+is\b", re.IGNORECASE),
+            "completion",
+            0.90,
+        ),
         (re.compile(r"\b(Completed|Finished|Done|Ready)\b", re.IGNORECASE), "completion", 0.88),
-
         # Continuation intent
         (re.compile(r"\b(Now|Next|Then|After that)\b", re.IGNORECASE), "continuation", 0.85),
-        (re.compile(r"\b(Let('s| me)|I('ll| will))\s+(start|begin|proceed|continue)\b", re.IGNORECASE), "continuation", 0.90),
+        (
+            re.compile(
+                r"\b(Let('s| me)|I('ll| will))\s+(start|begin|proceed|continue)\b", re.IGNORECASE
+            ),
+            "continuation",
+            0.90,
+        ),
         (re.compile(r"\b(First|Second|Third|Next step)\b", re.IGNORECASE), "continuation", 0.88),
-
         # Asking input
-        (re.compile(r"\b(Would|Should|Shall|Do|Can)\s+(you|I)\b", re.IGNORECASE), "asking_input", 0.85),
-        (re.compile(r"\b(Which|What|How)\s+(one|approach|way|method)\b", re.IGNORECASE), "asking_input", 0.88),
-        (re.compile(r"\b(Any|Any particular)\s+(preference|choice)\b", re.IGNORECASE), "asking_input", 0.88),
-
+        (
+            re.compile(r"\b(Would|Should|Shall|Do|Can)\s+(you|I)\b", re.IGNORECASE),
+            "asking_input",
+            0.85,
+        ),
+        (
+            re.compile(r"\b(Which|What|How)\s+(one|approach|way|method)\b", re.IGNORECASE),
+            "asking_input",
+            0.88,
+        ),
+        (
+            re.compile(r"\b(Any|Any particular)\s+(preference|choice)\b", re.IGNORECASE),
+            "asking_input",
+            0.88,
+        ),
         # Stuck loop
-        (re.compile(r"\b(I'm|I am)\s+(stuck|confused|uncertain|unsure)\b", re.IGNORECASE), "stuck_loop", 0.92),
-        (re.compile(r"\b(Not sure|Don't know|Unclear|Confused)\b", re.IGNORECASE), "stuck_loop", 0.88),
-        (re.compile(r"\b(Having|Facing)\s+(trouble|difficulty|issues)\b", re.IGNORECASE), "stuck_loop", 0.88),
+        (
+            re.compile(r"\b(I'm|I am)\s+(stuck|confused|uncertain|unsure)\b", re.IGNORECASE),
+            "stuck_loop",
+            0.92,
+        ),
+        (
+            re.compile(r"\b(Not sure|Don't know|Unclear|Confused)\b", re.IGNORECASE),
+            "stuck_loop",
+            0.88,
+        ),
+        (
+            re.compile(r"\b(Having|Facing)\s+(trouble|difficulty|issues)\b", re.IGNORECASE),
+            "stuck_loop",
+            0.88,
+        ),
     ]
 
     # Task type patterns
     TASK_TYPE_PATTERNS: List[Tuple[re.Pattern, str, float]] = [
         # Analysis tasks
-        (re.compile(r"\b(Analyze|Examine|Review|Investigate|Explore|Study)\b", re.IGNORECASE), "analysis", 0.90),
+        (
+            re.compile(r"\b(Analyze|Examine|Review|Investigate|Explore|Study)\b", re.IGNORECASE),
+            "analysis",
+            0.90,
+        ),
         (re.compile(r"\b(Explain|Understand|Describe|Clarify)\b", re.IGNORECASE), "analysis", 0.88),
-        (re.compile(r"\b(What is|How does|Why does|Tell me about)\b", re.IGNORECASE), "analysis", 0.85),
-
+        (
+            re.compile(r"\b(What is|How does|Why does|Tell me about)\b", re.IGNORECASE),
+            "analysis",
+            0.85,
+        ),
         # Action tasks
-        (re.compile(r"\b(Fix|Implement|Create|Add|Remove|Update|Delete|Write|Build)\b", re.IGNORECASE), "action", 0.90),
+        (
+            re.compile(
+                r"\b(Fix|Implement|Create|Add|Remove|Update|Delete|Write|Build)\b", re.IGNORECASE
+            ),
+            "action",
+            0.90,
+        ),
         (re.compile(r"\b(Set up|Configure|Install|Deploy)\b", re.IGNORECASE), "action", 0.90),
         (re.compile(r"\b(Make|Change|Modify)\b", re.IGNORECASE), "action", 0.85),
-
         # Generation tasks
         (re.compile(r"\b(Generate|Produce|Output|Draft)\b", re.IGNORECASE), "generation", 0.90),
-        (re.compile(r"\bWrite\s+(a|the|code|script|function)\b", re.IGNORECASE), "generation", 0.88),
-
+        (
+            re.compile(r"\bWrite\s+(a|the|code|script|function)\b", re.IGNORECASE),
+            "generation",
+            0.88,
+        ),
         # Search tasks
         (re.compile(r"\b(Find|Search|Locate|Look for)\b", re.IGNORECASE), "search", 0.90),
         (re.compile(r"\b(Where is|Show me|List)\b", re.IGNORECASE), "search", 0.88),
         (re.compile(r"\bWhat files\b", re.IGNORECASE), "search", 0.88),
-
         # Edit tasks
-        (re.compile(r"\b(Edit|Modify|Change|Update|Refactor|Improve|Optimize)\b", re.IGNORECASE), "edit", 0.90),
+        (
+            re.compile(r"\b(Edit|Modify|Change|Update|Refactor|Improve|Optimize)\b", re.IGNORECASE),
+            "edit",
+            0.90,
+        ),
         (re.compile(r"\b(Replace|Rewrite|Refactor)\b", re.IGNORECASE), "edit", 0.88),
     ]
 
@@ -556,19 +660,32 @@ class PatternMatcher:
         (re.compile(r"\b503\s+Service\s+Unavailable\b", re.IGNORECASE), "retryable", 0.90),
         (re.compile(r"\b500\s+Internal\s+Server\s+Error\b", re.IGNORECASE), "retryable", 0.90),
         (re.compile(r"\b[54]\d{2}\b", re.IGNORECASE), "retryable", 0.88),
-
         # Permanent errors
-        (re.compile(r"\b(Not found|Does not exist|File not found)\b", re.IGNORECASE), "permanent", 0.90),
-        (re.compile(r"\b(Permission denied|Unauthorized|Authentication)\b", re.IGNORECASE), "permanent", 0.92),
-        (re.compile(r"\b(Invalid API key|Invalid credentials)\b", re.IGNORECASE), "permanent", 0.95),
+        (
+            re.compile(r"\b(Not found|Does not exist|File not found)\b", re.IGNORECASE),
+            "permanent",
+            0.90,
+        ),
+        (
+            re.compile(r"\b(Permission denied|Unauthorized|Authentication)\b", re.IGNORECASE),
+            "permanent",
+            0.92,
+        ),
+        (
+            re.compile(r"\b(Invalid API key|Invalid credentials)\b", re.IGNORECASE),
+            "permanent",
+            0.95,
+        ),
         (re.compile(r"\b(Syntax|Type|Attribute|Name)Error\b", re.IGNORECASE), "permanent", 0.85),
-
         # Transient errors
         (re.compile(r"\b(Timeout|Timed out)\b", re.IGNORECASE), "transient", 0.90),
         (re.compile(r"\b(Connection|Network)\b", re.IGNORECASE), "transient", 0.88),
         (re.compile(r"\b(Rate limit|Too many requests)\b", re.IGNORECASE), "transient", 0.88),
-        (re.compile(r"\b(Temporarily|Currently)?\s*(unavailable|overloaded)\b", re.IGNORECASE), "transient", 0.85),
-
+        (
+            re.compile(r"\b(Temporarily|Currently)?\s*(unavailable|overloaded)\b", re.IGNORECASE),
+            "transient",
+            0.85,
+        ),
         # Retryable errors
         (re.compile(r"\b(Internal|Server)\s+error\b", re.IGNORECASE), "retryable", 0.85),
     ]
@@ -611,9 +728,6 @@ class PatternMatcher:
                 pattern, is_complete, confidence, phase = pattern_tuple
             else:
                 pattern, decision_value, confidence = pattern_tuple
-                is_complete = None
-                phase = None
-
             match = pattern.search(text)
             if match:
                 matched_text = match.group(0)
@@ -793,7 +907,7 @@ class EnsembleVoter:
 
         # Create a new decision object with boosted confidence if it has a confidence field
         decision = best_result.decision
-        if hasattr(decision, 'confidence') and hasattr(decision, 'model_copy'):
+        if hasattr(decision, "confidence") and hasattr(decision, "model_copy"):
             # Pydantic v2 - use model_copy to create a new instance
             try:
                 decision = decision.model_copy(update={"confidence": boosted_confidence})

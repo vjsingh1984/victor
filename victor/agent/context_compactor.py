@@ -55,6 +55,7 @@ from victor.providers.base import Message
 if TYPE_CHECKING:
     from victor.agent.conversation.controller import ConversationController
     from victor.framework.rl.learners.context_pruning import ContextPruningLearner
+    from victor.providers.base import BaseProvider
 
 logger = logging.getLogger(__name__)
 
@@ -202,12 +203,14 @@ class CompactorConfig:
     enable_phase_aware: bool = True
     # Phase-specific thresholds: EXPLORATION (keep diverse), PLANNING (focus),
     # EXECUTION (balance), REVIEW (comprehensive)
-    phase_thresholds: Dict[TaskPhase, float] = field(default_factory=lambda: {
-        TaskPhase.EXPLORATION: 0.80,  # Keep diverse file coverage
-        TaskPhase.PLANNING: 0.60,     # Focus on task-relevant messages
-        TaskPhase.EXECUTION: 0.70,    # Prioritize recent context
-        TaskPhase.REVIEW: 0.75,       # Full context for review
-    })
+    phase_thresholds: Dict[TaskPhase, float] = field(
+        default_factory=lambda: {
+            TaskPhase.EXPLORATION: 0.80,  # Keep diverse file coverage
+            TaskPhase.PLANNING: 0.60,  # Focus on task-relevant messages
+            TaskPhase.EXECUTION: 0.70,  # Prioritize recent context
+            TaskPhase.REVIEW: 0.75,  # Full context for review
+        }
+    )
 
 
 @dataclass
@@ -426,7 +429,9 @@ class ContextCompactor:
                 "current_query": current_query or "",
                 "recent_failures": recent_failures or [],
                 "compaction_count": self._compaction_count,
-                "utilization": self.controller.get_context_metrics().utilization if self.controller else 0.0,
+                "utilization": (
+                    self.controller.get_context_metrics().utilization if self.controller else 0.0
+                ),
             }
 
             # Use decision service for optimization
@@ -641,9 +646,10 @@ class ContextCompactor:
 
         # Wrap summary in a message
         from victor.providers.base import Message
+
         summary_msg = Message(
             role="assistant",
-            content=f"[Context summary of {len(turns_to_summarize)} earlier messages]\n{summary_text}"
+            content=f"[Context summary of {len(turns_to_summarize)} earlier messages]\n{summary_text}",
         )
 
         # Replace old turns with summary message
@@ -685,12 +691,13 @@ class ContextCompactor:
             tool_name = getattr(msg, "tool_name", None)
             if tool_name:
                 tool_names.add(tool_name)
-            
+
             # Extract file paths
             import re
+
             paths = re.findall(r"[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)", msg.content[:500])
             files_mentioned.update(paths[:5])
-            
+
             # Extract decisions from assistant
             if msg.role == "assistant" and len(msg.content) > 50:
                 first_line = msg.content.split("\n")[0][:150]
@@ -706,7 +713,7 @@ class ContextCompactor:
             summary_parts.append("Key points:")
             for d in key_decisions[:5]:
                 summary_parts.append(f"  - {d}")
-        
+
         return "\n".join(summary_parts) if summary_parts else "Prior history summarized."
 
     def check_and_compact(
@@ -769,9 +776,7 @@ class ContextCompactor:
 
         # Get effective thresholds (RL config overrides phase-aware)
         effective_threshold = (
-            rl_config.get("compaction_threshold", base_threshold)
-            if rl_config
-            else base_threshold
+            rl_config.get("compaction_threshold", base_threshold) if rl_config else base_threshold
         )
         effective_min_messages = (
             rl_config.get("min_messages_keep", self.config.min_messages_after_compact)
@@ -1124,11 +1129,7 @@ class ContextCompactor:
             Compaction threshold (0.0-1.0)
         """
         # Use phase-aware threshold if enabled and phase is provided
-        if (
-            self.config.enable_phase_aware
-            and phase
-            and phase in self.config.phase_thresholds
-        ):
+        if self.config.enable_phase_aware and phase and phase in self.config.phase_thresholds:
             return self.config.phase_thresholds[phase]
 
         # Fall back to default threshold

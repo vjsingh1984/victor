@@ -21,19 +21,29 @@ single and batch validation with a single canonical API.
 import pytest
 from unittest.mock import Mock, MagicMock
 
+
 class TestToolServiceValidationConsolidation:
     """Test consolidated validate_tool_calls method."""
 
     def test_validate_single_tool_call_valid(self):
         """Test validating a single valid tool call."""
-        from victor.agent.services.tool_service import ToolService, ToolServiceConfig, ToolServiceConfig
+        from victor.agent.services.tool_service import (
+            ToolService,
+            ToolServiceConfig,
+            ToolServiceConfig,
+        )
 
         # Create service
         config = ToolServiceConfig()
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
 
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search", "file_read"})
@@ -51,22 +61,29 @@ class TestToolServiceValidationConsolidation:
 
     def test_validate_single_tool_call_invalid(self):
         """Test validating a single invalid tool call."""
-        from victor.agent.services.tool_service import ToolService, ToolServiceConfig, ToolServiceConfig
+        from victor.agent.services.tool_service import (
+            ToolService,
+            ToolServiceConfig,
+            ToolServiceConfig,
+        )
 
         # Create service
         config = ToolServiceConfig()
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
 
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search", "file_read"})
 
         # Validate single invalid tool call
-        valid, invalid = service.validate_tool_calls(
-            {"name": "invalid_tool", "arguments": {}}
-        )
+        valid, invalid = service.validate_tool_calls({"name": "invalid_tool", "arguments": {}})
 
         # Verify results
         assert len(valid) == 0
@@ -84,12 +101,15 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
-        # Validate tool call without name
-        valid, invalid = service.validate_tool_calls(
-            {"arguments": {}}
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
         )
+
+        # Validate tool call without name
+        valid, invalid = service.validate_tool_calls({"arguments": {}})
 
         # Verify results
         assert len(valid) == 0
@@ -106,8 +126,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search"})
 
@@ -131,18 +156,25 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search", "file_read", "grep"})
 
         # Validate multiple tool calls
-        valid, invalid = service.validate_tool_calls([
-            {"name": "code_search", "arguments": {"query": "test"}},
-            {"name": "invalid_tool", "arguments": {}},
-            {"name": "file_read", "arguments": {"path": "/tmp/test"}},
-            {"name": "missing_name_field"},
-        ])
+        valid, invalid = service.validate_tool_calls(
+            [
+                {"name": "code_search", "arguments": {"query": "test"}},
+                {"name": "invalid_tool", "arguments": {}},
+                {"name": "file_read", "arguments": {"path": "/tmp/test"}},
+                {"name": "missing_name_field"},
+            ]
+        )
 
         # Verify results
         assert len(valid) == 2
@@ -150,7 +182,9 @@ class TestToolServiceValidationConsolidation:
         assert valid[0]["name"] == "code_search"
         assert valid[1]["name"] == "file_read"
         assert invalid[0]["name"] == "invalid_tool"
-        assert invalid[1]["name"] == "missing_name_field"  # Tool exists but name field value is "missing_name_field"
+        assert (
+            invalid[1]["name"] == "missing_name_field"
+        )  # Tool exists but name field value is "missing_name_field"
         assert all("_validation_error" in call for call in invalid)
 
     def test_validate_tool_calls_with_list_all_valid(self):
@@ -162,17 +196,24 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search", "file_read", "grep"})
 
         # Validate list of valid tool calls
-        valid, invalid = service.validate_tool_calls([
-            {"name": "code_search", "arguments": {"query": "test"}},
-            {"name": "file_read", "arguments": {"path": "/tmp/test"}},
-            {"name": "grep", "arguments": {"pattern": "foo"}},
-        ])
+        valid, invalid = service.validate_tool_calls(
+            [
+                {"name": "code_search", "arguments": {"query": "test"}},
+                {"name": "file_read", "arguments": {"path": "/tmp/test"}},
+                {"name": "grep", "arguments": {"pattern": "foo"}},
+            ]
+        )
 
         # Verify results
         assert len(valid) == 3
@@ -187,17 +228,24 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search"})
 
         # Validate list of invalid tool calls
-        valid, invalid = service.validate_tool_calls([
-            {"name": "invalid_tool_1", "arguments": {}},
-            {"name": "invalid_tool_2", "arguments": {}},
-            {"arguments": {}},  # Missing name
-        ])
+        valid, invalid = service.validate_tool_calls(
+            [
+                {"name": "invalid_tool_1", "arguments": {}},
+                {"name": "invalid_tool_2", "arguments": {}},
+                {"arguments": {}},  # Missing name
+            ]
+        )
 
         # Verify results
         assert len(valid) == 0
@@ -213,8 +261,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Don't mock get_available_tools - use custom set
         custom_tools = {"code_search", "file_read"}
 
@@ -225,7 +278,7 @@ class TestToolServiceValidationConsolidation:
                 {"name": "file_read", "arguments": {"path": "/tmp/test"}},
                 {"name": "grep", "arguments": {"pattern": "foo"}},  # Not in custom set
             ],
-            available_tools=custom_tools
+            available_tools=custom_tools,
         )
 
         # Verify results
@@ -243,8 +296,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Validate with invalid input type
         valid, invalid = service.validate_tool_calls("invalid")
 
@@ -263,8 +321,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Validate empty list
         valid, invalid = service.validate_tool_calls([])
 
@@ -281,8 +344,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search"})
 
@@ -291,7 +359,7 @@ class TestToolServiceValidationConsolidation:
             "name": "code_search",
             "arguments": {"query": "test", "case_sensitive": True},
             "id": "call_123",
-            "metadata": {"source": "user"}
+            "metadata": {"source": "user"},
         }
 
         # Validate
@@ -314,8 +382,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search"})
 
@@ -329,9 +402,7 @@ class TestToolServiceValidationConsolidation:
         assert error is None
 
         # Test invalid call
-        is_valid, error = service._validate_tool_call(
-            {"name": "invalid_tool", "arguments": {}}
-        )
+        is_valid, error = service._validate_tool_call({"name": "invalid_tool", "arguments": {}})
 
         # Verify result
         assert is_valid is False
@@ -347,8 +418,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search"})
 
@@ -370,8 +446,13 @@ class TestToolServiceValidationConsolidation:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search"})
 
@@ -388,6 +469,7 @@ class TestToolServiceValidationConsolidation:
         _, invalid4 = service.validate_tool_calls({"name": "code_search", "arguments": []})
         assert "must be a dictionary" in invalid4[0]["_validation_error"]
 
+
 class TestToolServiceValidationIntegration:
     """Integration tests for validation with other service methods."""
 
@@ -400,8 +482,13 @@ class TestToolServiceValidationIntegration:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
-        
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
+
         # Mock get_available_tools
         service.get_available_tools = Mock(return_value={"code_search", "file_read"})
 
@@ -433,17 +520,24 @@ class TestToolServiceValidationIntegration:
         tool_selector = Mock()
         tool_executor = Mock()
         tool_registrar = Mock()
-        service = ToolService(config=config, tool_selector=tool_selector, tool_executor=tool_executor, tool_registrar=tool_registrar)
+        service = ToolService(
+            config=config,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+            tool_registrar=tool_registrar,
+        )
 
         # Mock get_available_tools to return a specific set
         service.get_available_tools = Mock(return_value={"code_search", "file_read", "grep"})
 
         # Validate tool calls
-        valid, invalid = service.validate_tool_calls([
-            {"name": "code_search", "arguments": {"query": "test"}},
-            {"name": "file_read", "arguments": {"path": "/tmp/test"}},
-            {"name": "invalid_tool", "arguments": {}},
-        ])
+        valid, invalid = service.validate_tool_calls(
+            [
+                {"name": "code_search", "arguments": {"query": "test"}},
+                {"name": "file_read", "arguments": {"path": "/tmp/test"}},
+                {"name": "invalid_tool", "arguments": {}},
+            ]
+        )
 
         # Verify validation results
         assert len(valid) == 2

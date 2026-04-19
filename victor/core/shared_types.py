@@ -88,13 +88,10 @@ STAGE_TO_PHASE_MAP: Dict[ConversationStage, TaskPhase] = {
     ConversationStage.INITIAL: TaskPhase.EXPLORATION,
     ConversationStage.READING: TaskPhase.EXPLORATION,
     ConversationStage.ANALYSIS: TaskPhase.EXPLORATION,
-
     # PLANNING: PLANNING (10-20% of conversation)
     ConversationStage.PLANNING: TaskPhase.PLANNING,
-
     # EXECUTION: EXECUTION (20-30% of conversation)
     ConversationStage.EXECUTION: TaskPhase.EXECUTION,
-
     # REVIEW: VERIFICATION, COMPLETION (10-15% of conversation)
     ConversationStage.VERIFICATION: TaskPhase.REVIEW,
     ConversationStage.COMPLETION: TaskPhase.REVIEW,

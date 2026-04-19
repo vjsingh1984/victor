@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set, Union
 
 if TYPE_CHECKING:
     from victor.agent.services.protocols.tool_service import ToolSelectionContext
@@ -108,7 +108,7 @@ class BudgetManager:
 class ToolService:
     """[CANONICAL] Service for managing tool operations.
 
-    The target implementation for tool operations following the 
+    The target implementation for tool operations following the
     state-passed architectural pattern. Supersedes ToolCoordinator.
 
     This service follows SOLID principles:
@@ -437,9 +437,8 @@ class ToolService:
         remaining = self.get_remaining_budget()
         if amount > remaining:
             from victor.agent.tools.errors import BudgetExhaustedError
-            raise BudgetExhaustedError(
-                f"Insufficient budget: need {amount}, have {remaining}"
-            )
+
+            raise BudgetExhaustedError(f"Insufficient budget: need {amount}, have {remaining}")
 
         self._budget_manager.record_usage(amount)
 
@@ -588,7 +587,11 @@ class ToolService:
         # Try full shell first
         try:
             shell_canonical = str(ToolNames.SHELL) if hasattr(ToolNames, "SHELL") else "shell"
-            readonly_canonical = str(ToolNames.SHELL_READONLY) if hasattr(ToolNames, "SHELL_READONLY") else "shell_readonly"
+            readonly_canonical = (
+                str(ToolNames.SHELL_READONLY)
+                if hasattr(ToolNames, "SHELL_READONLY")
+                else "shell_readonly"
+            )
         except Exception:
             shell_canonical = "shell"
             readonly_canonical = "shell_readonly"
@@ -604,7 +607,9 @@ class ToolService:
             return readonly_canonical
 
         # Neither enabled - return canonical name (will fail validation later)
-        self._logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
+        self._logger.debug(
+            f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'"
+        )
         return canonical
 
     # ==========================================================================
@@ -963,7 +968,7 @@ class ToolService:
         # Try JSON format: [{"name": "tool", "arguments": {...}}]
         if not tool_calls:
             try:
-                json_match = re.search(r'\[.*\]', response_content, re.DOTALL)
+                json_match = re.search(r"\[.*\]", response_content, re.DOTALL)
                 if json_match:
                     json_data = json.loads(json_match.group(0))
                     if isinstance(json_data, list):
@@ -1011,10 +1016,7 @@ class ToolService:
 
         # Filter to available tools if specified
         if available_tools is not None:
-            tool_calls = [
-                tc for tc in tool_calls
-                if tc.get("name", "") in available_tools
-            ]
+            tool_calls = [tc for tc in tool_calls if tc.get("name", "") in available_tools]
 
         # Validate each tool call
         validated_calls = []
@@ -1027,11 +1029,11 @@ class ToolService:
             schema = self.get_tool_schema(tool_name)
 
             if schema:
-                is_valid, error = self.check_tool_arguments(tool_name, normalized.get("arguments", {}), schema)
+                is_valid, error = self.check_tool_arguments(
+                    tool_name, normalized.get("arguments", {}), schema
+                )
                 if not is_valid:
-                    self._logger.warning(
-                        f"Tool call validation failed for {tool_name}: {error}"
-                    )
+                    self._logger.warning(f"Tool call validation failed for {tool_name}: {error}")
                     continue
 
             validated_calls.append(normalized)
@@ -1073,9 +1075,7 @@ class ToolService:
         arguments = tool_call.get("arguments") or tool_call.get("parameters", {})
         if isinstance(arguments, dict):
             # Remove None values
-            normalized["arguments"] = {
-                k: v for k, v in arguments.items() if v is not None
-            }
+            normalized["arguments"] = {k: v for k, v in arguments.items() if v is not None}
 
         # Preserve any other fields
         for key, value in tool_call.items():
@@ -1221,9 +1221,7 @@ class ToolService:
 
         try:
             # Try to use the normalizer
-            result = self._argument_normalizer.normalize_arguments(
-                tool_args, tool_name
-            )
+            result = self._argument_normalizer.normalize_arguments(tool_args, tool_name)
             if isinstance(result, tuple):
                 return result
             return result, "normalized"
@@ -1311,7 +1309,9 @@ class ToolService:
             selection_context.update(context)
 
         # Call the async select_tools method
-        return await self.select_tools(selection_context, max_tools or self._config.default_max_tools)
+        return await self.select_tools(
+            selection_context, max_tools or self._config.default_max_tools
+        )
 
     def estimate_tools_needed(
         self,
@@ -1545,7 +1545,10 @@ class ToolService:
         if validate:
             valid_calls, invalid_calls = self.validate_tool_calls(tool_calls)
             validation_errors = [
-                {"tool": call.get("name", "unknown"), "error": call.get("_validation_error", "Unknown error")}
+                {
+                    "tool": call.get("name", "unknown"),
+                    "error": call.get("_validation_error", "Unknown error"),
+                }
                 for call in invalid_calls
             ]
         else:
@@ -1565,7 +1568,10 @@ class ToolService:
         if parallel and self._config.enable_parallel_execution:
             # Execute in parallel
             results = await asyncio.gather(
-                *[self.execute_tool_call(call, validate=False, check_budget=False) for call in valid_calls],
+                *[
+                    self.execute_tool_call(call, validate=False, check_budget=False)
+                    for call in valid_calls
+                ],
                 return_exceptions=True,
             )
 
@@ -1573,12 +1579,14 @@ class ToolService:
             processed_results = []
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    processed_results.append({
-                        "tool": valid_calls[i].get("name", "unknown"),
-                        "success": False,
-                        "result": None,
-                        "error": str(result),
-                    })
+                    processed_results.append(
+                        {
+                            "tool": valid_calls[i].get("name", "unknown"),
+                            "success": False,
+                            "result": None,
+                            "error": str(result),
+                        }
+                    )
                 else:
                     processed_results.append(result)
             results = processed_results

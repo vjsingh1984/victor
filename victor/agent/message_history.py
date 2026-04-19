@@ -148,15 +148,19 @@ class MessageHistory:
         import traceback
 
         if not isinstance(value, _TrackedList):
-            has_str = any(isinstance(v, str) for v in value) if hasattr(value, '__iter__') else False
+            has_str = (
+                any(isinstance(v, str) for v in value) if hasattr(value, "__iter__") else False
+            )
             logger.info(
                 "MESSAGES REPLACED with %s (len=%d, has_str=%s) from:\n%s",
                 type(value).__name__,
-                len(value) if hasattr(value, '__len__') else -1,
+                len(value) if hasattr(value, "__len__") else -1,
                 has_str,
                 "".join(traceback.format_stack()[-4:-1]),
             )
-        self.__actual_messages = _TrackedList(value) if not isinstance(value, _TrackedList) else value
+        self.__actual_messages = (
+            _TrackedList(value) if not isinstance(value, _TrackedList) else value
+        )
 
     @property
     def messages(self) -> List[Message]:
@@ -194,7 +198,10 @@ class MessageHistory:
             logger.debug(
                 "NON-MESSAGE DETECTED after add_message(%s): %d non-Message items, types=%s, "
                 "total=%d, caller=%s",
-                role, non_msg, types, len(self._messages),
+                role,
+                non_msg,
+                types,
+                len(self._messages),
                 __import__("traceback").format_stack()[-3].strip(),
             )
         return message
@@ -215,7 +222,8 @@ class MessageHistory:
             self._messages.append(Message(**safe_keys))
             logger.debug(
                 "append_message: converted dict to Message (role=%s, keys=%s)",
-                message.get("role"), list(message.keys()),
+                message.get("role"),
+                list(message.keys()),
             )
         elif isinstance(message, str):
             logger.warning("Converting raw string to Message in history")

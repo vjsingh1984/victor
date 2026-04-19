@@ -40,7 +40,7 @@ Usage:
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
@@ -72,7 +72,6 @@ from victor.agent.ml_metadata import (  # noqa: F401
     get_known_model_params,
     parse_model_metadata,
 )
-
 
 # ConversationMessage is imported from types.py — single canonical definition.
 # Previously duplicated here; consolidated to avoid field drift.
@@ -1052,8 +1051,7 @@ class ConversationStore:
         """
         # Call shared implementation
         message = self._add_message_impl(
-            session_id, role, content, priority,
-            tool_name, tool_call_id, metadata, tool_calls
+            session_id, role, content, priority, tool_name, tool_call_id, metadata, tool_calls
         )
 
         # Persist (sync SQLite I/O)
@@ -1064,8 +1062,7 @@ class ConversationStore:
         # This reduces write overhead and file proliferation
 
         logger.debug(
-            f"Added {role.value} message to {session_id}. "
-            f"Tokens: {message.token_count}"
+            f"Added {role.value} message to {session_id}. " f"Tokens: {message.token_count}"
         )
 
         return message
@@ -1610,7 +1607,9 @@ class ConversationStore:
             elif isinstance(value, type(lambda: None)):  # Functions/lambdas
                 return f"<function: {getattr(value, '__name__', 'lambda')}>"
             # Handle objects with __dict__
-            elif hasattr(value, "__dict__") and not isinstance(value, (str, bytes, dict, list, tuple, int, float, bool)):
+            elif hasattr(value, "__dict__") and not isinstance(
+                value, (str, bytes, dict, list, tuple, int, float, bool)
+            ):
                 return f"<object: {value.__class__.__name__}>"
             # Recursively handle lists and dicts
             elif isinstance(value, dict):
@@ -1623,6 +1622,7 @@ class ConversationStore:
         try:
             # Try to serialize as-is first
             from victor.core.json_utils import json_dumps
+
             json_dumps(metadata)
             return metadata
         except (TypeError, ValueError):
@@ -1763,8 +1763,7 @@ class ConversationStore:
 
         # Call shared implementation
         message = self._add_message_impl(
-            session_id, role, content, priority,
-            tool_name, tool_call_id, metadata, tool_calls
+            session_id, role, content, priority, tool_name, tool_call_id, metadata, tool_calls
         )
 
         # Persist (async SQLite I/O - offloaded to thread pool)
@@ -2355,7 +2354,9 @@ class ConversationStore:
                     strategy_used,
                     len(messages_summarized),  # message_count_before
                     0,  # message_count_after (not tracked here)
-                    tokens_saved + len(summary_xml or summary_text) // self.chars_per_token,  # token_count_before (estimated)
+                    tokens_saved
+                    + len(summary_xml or summary_text)
+                    // self.chars_per_token,  # token_count_before (estimated)
                     len(summary_xml or summary_text) // self.chars_per_token,  # token_count_after
                     duration_ms,
                     llm_provider,
@@ -2477,21 +2478,23 @@ class ConversationStore:
 
             history = []
             for row in cursor.fetchall():
-                history.append({
-                    "id": row[0],
-                    "session_id": row[1],
-                    "strategy_used": row[2],
-                    "message_count_before": row[3],
-                    "message_count_after": row[4],
-                    "token_count_before": row[5],
-                    "token_count_after": row[6],
-                    "duration_ms": row[7],
-                    "llm_provider": row[8],
-                    "llm_model": row[9],
-                    "success": bool(row[10]),
-                    "error_message": row[11],
-                    "created_at": row[12],
-                })
+                history.append(
+                    {
+                        "id": row[0],
+                        "session_id": row[1],
+                        "strategy_used": row[2],
+                        "message_count_before": row[3],
+                        "message_count_after": row[4],
+                        "token_count_before": row[5],
+                        "token_count_after": row[6],
+                        "duration_ms": row[7],
+                        "llm_provider": row[8],
+                        "llm_model": row[9],
+                        "success": bool(row[10]),
+                        "error_message": row[11],
+                        "created_at": row[12],
+                    }
+                )
 
             return history
 
@@ -2666,6 +2669,7 @@ class ConversationStore:
 
             # Calculate cutoff time
             from datetime import timedelta
+
             cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).isoformat()
 
             # Build query with optional session filter
@@ -2689,20 +2693,22 @@ class ConversationStore:
 
             trends = []
             for row in rows:
-                trends.append({
-                    "id": row["id"],
-                    "session_id": row["session_id"],
-                    "strategy_used": row["strategy_used"],
-                    "message_count_before": row["message_count_before"],
-                    "message_count_after": row["message_count_after"],
-                    "token_count_before": row["token_count_before"],
-                    "token_count_after": row["token_count_after"],
-                    "tokens_saved": row["token_count_before"] - row["token_count_after"],
-                    "duration_ms": row["duration_ms"],
-                    "success": bool(row["success"]),
-                    "error_message": row["error_message"],
-                    "created_at": row["created_at"],
-                })
+                trends.append(
+                    {
+                        "id": row["id"],
+                        "session_id": row["session_id"],
+                        "strategy_used": row["strategy_used"],
+                        "message_count_before": row["message_count_before"],
+                        "message_count_after": row["message_count_after"],
+                        "token_count_before": row["token_count_before"],
+                        "token_count_after": row["token_count_after"],
+                        "tokens_saved": row["token_count_before"] - row["token_count_after"],
+                        "duration_ms": row["duration_ms"],
+                        "success": bool(row["success"]),
+                        "error_message": row["error_message"],
+                        "created_at": row["created_at"],
+                    }
+                )
 
             return trends
 

@@ -728,7 +728,6 @@ class ZAIProvider(BaseProvider):
         # Validate message structure before sending
         for i, msg in enumerate(formatted_messages):
             role = msg.get("role", "")
-            content = msg.get("content")
             has_tool_calls = "tool_calls" in msg
             has_tool_call_id = "tool_call_id" in msg
 
@@ -748,7 +747,8 @@ class ZAIProvider(BaseProvider):
                 if missing:
                     self._provider_logger.logger.warning(
                         "Z.AI payload: assistant[%d] tool_calls missing responses: %s",
-                        i, missing,
+                        i,
+                        missing,
                     )
                     # Strip the tool_calls to prevent API error
                     del msg["tool_calls"]

@@ -72,15 +72,20 @@ class UserFeedbackLearner(BaseLearner):
 
     MIN_SAMPLES_FOR_CONFIDENCE = 5
 
-    def __init__(self, name: str, db_connection: Any, learning_rate: float = 0.1,
-                 provider_adapter: Optional[Any] = None):
+    def __init__(
+        self,
+        name: str,
+        db_connection: Any,
+        learning_rate: float = 0.1,
+        provider_adapter: Optional[Any] = None,
+    ):
         super().__init__(name, db_connection, learning_rate, provider_adapter)
         self._feedback_by_context: Dict[str, List[float]] = {}
         self._load_state()
 
     def _ensure_tables(self) -> None:
         cursor = self.db.cursor()
-        cursor.execute(f"""
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS rl_user_feedback_summary (
                 context_key TEXT PRIMARY KEY,
                 avg_rating REAL NOT NULL,

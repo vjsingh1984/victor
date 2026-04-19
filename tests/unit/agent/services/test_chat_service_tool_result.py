@@ -219,6 +219,7 @@ class TestAddToolResultWithContext:
         When: _execute_tool_calls processes the tool_call
         Then: _add_tool_result_to_context is called with tool_call_id='call_test123'
         """
+
         # Arrange
         class MockFunction:
             def __init__(self):
@@ -243,7 +244,9 @@ class TestAddToolResultWithContext:
         call_args = mock_context_service.add_message.call_args
         message = call_args.kwargs if call_args.kwargs else call_args[0][0]
 
-        assert message["tool_call_id"] == "call_test123", "tool_call_id must be propagated from tool_call.id"
+        assert (
+            message["tool_call_id"] == "call_test123"
+        ), "tool_call_id must be propagated from tool_call.id"
         assert message["name"] == "shell"
         assert message["role"] == "tool"
 
@@ -257,6 +260,7 @@ class TestAddToolResultWithContext:
         When: _execute_tool_calls processes the tool_call
         Then: tool_call_id defaults to None, falling back to tool_name
         """
+
         # Arrange
         class MockFunction:
             def __init__(self):

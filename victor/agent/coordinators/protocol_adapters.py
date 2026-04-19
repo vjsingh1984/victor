@@ -159,7 +159,7 @@ class OrchestratorProtocolAdapter:
         tool_calls: List[Any],
     ) -> List[Dict[str, Any]]:
         """[LEGACY] Execute multiple tool calls via orchestrator bridge.
-        
+
         Prefer IToolCoordinator for new implementations.
         """
         orch = self._orchestrator

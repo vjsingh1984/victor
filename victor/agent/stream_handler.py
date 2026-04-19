@@ -226,11 +226,13 @@ class StreamMetrics:
             error: The exception that occurred
             context: Additional context about the error
         """
-        self.errors.append({
-            'type': type(error).__name__,
-            'message': str(error),
-            'context': context,
-        })
+        self.errors.append(
+            {
+                "type": type(error).__name__,
+                "message": str(error),
+                "context": context,
+            }
+        )
 
 
 @dataclass

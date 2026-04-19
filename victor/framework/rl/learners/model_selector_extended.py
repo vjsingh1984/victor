@@ -33,7 +33,7 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
         db_connection: Any,
         learning_rate: float = 0.1,
         provider_adapter: Optional[Any] = None,
-        **kwargs
+        **kwargs,
     ):
         """Initialize extended learner with hybrid decision service.
 
@@ -50,7 +50,7 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
             db_connection=db_connection,
             learning_rate=learning_rate,
             provider_adapter=provider_adapter,
-            **kwargs
+            **kwargs,
         )
 
         # Integrate HybridDecisionService from Priority 1
@@ -82,41 +82,41 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
             # Learn from fast-path decisions
             if not used_llm and success and decision_latency_ms < 100:
                 # Fast path worked well - reinforce
-                recommendations.append(RLRecommendation(
-                    learner_name="model_selector",
-                    recommendation_type="decision_threshold",
-                    key="fast_path_confidence",
-                    value="increase",
-                    confidence=0.8,
-                    metadata={
-                        "decision_latency_ms": decision_latency_ms,
-                        "used_llm": used_llm,
-                        "confidence": confidence,
-                    }
-                ))
+                recommendations.append(
+                    RLRecommendation(
+                        learner_name="model_selector",
+                        recommendation_type="decision_threshold",
+                        key="fast_path_confidence",
+                        value="increase",
+                        confidence=0.8,
+                        metadata={
+                            "decision_latency_ms": decision_latency_ms,
+                            "used_llm": used_llm,
+                            "confidence": confidence,
+                        },
+                    )
+                )
 
             # Learn from LLM fallbacks
             elif used_llm and success:
                 # LLM path was necessary - adjust threshold
-                recommendations.append(RLRecommendation(
-                    learner_name="model_selector",
-                    recommendation_type="decision_threshold",
-                    key="llm_fallback_threshold",
-                    value="decrease",
-                    confidence=0.7,
-                    metadata={
-                        "reason": "llm_was_required",
-                        "confidence": confidence,
-                    }
-                ))
+                recommendations.append(
+                    RLRecommendation(
+                        learner_name="model_selector",
+                        recommendation_type="decision_threshold",
+                        key="llm_fallback_threshold",
+                        value="decrease",
+                        confidence=0.7,
+                        metadata={
+                            "reason": "llm_was_required",
+                            "confidence": confidence,
+                        },
+                    )
+                )
 
         return recommendations
 
-    def select_model(
-        self,
-        task_type: str,
-        context: Dict[str, Any]
-    ) -> str:
+    def select_model(self, task_type: str, context: Dict[str, Any]) -> str:
         """Select model using hybrid decision service.
 
         Uses deterministic rules when confident, falls back to LLM
@@ -133,11 +133,7 @@ class ExtendedModelSelectorLearner(ModelSelectorLearner):
 
         # Use hybrid decision service
         decision = self.decision_service.decide_sync(
-            decision_type=DecisionType.MODEL_SELECTION,
-            context={
-                "task_type": task_type,
-                **context
-            }
+            decision_type=DecisionType.MODEL_SELECTION, context={"task_type": task_type, **context}
         )
 
         return decision.result.model_name

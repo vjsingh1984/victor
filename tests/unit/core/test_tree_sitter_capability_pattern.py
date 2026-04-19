@@ -45,7 +45,7 @@ class TestTreeSitterCapabilityPattern:
         assert not violations, (
             "Core must not import tree_sitter_manager from victor_coding.\n"
             "Use CapabilityRegistry or capability_loader.py instead.\n"
-            f"Violations:\n" + "\n".join(f"  {v}" for v in violations)
+            "Violations:\n" + "\n".join(f"  {v}" for v in violations)
         )
 
     def test_capability_loader_provides_tree_sitter(self):
@@ -93,5 +93,5 @@ class TestTreeSitterCapabilityPattern:
 
         assert not violations, (
             "Core tree-sitter consumers must use CapabilityRegistry, not victor_coding.\n"
-            f"Violations:\n" + "\n".join(f"  {v}" for v in violations)
+            "Violations:\n" + "\n".join(f"  {v}" for v in violations)
         )

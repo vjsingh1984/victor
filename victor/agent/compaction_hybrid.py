@@ -187,10 +187,7 @@ class HybridCompactionSummarizer:
                 import concurrent.futures
 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(
-                        asyncio.run,
-                        self.summarize_async(messages, ledger)
-                    )
+                    future = pool.submit(asyncio.run, self.summarize_async(messages, ledger))
                     return future.result(timeout=self._config.llm_timeout_seconds)
             else:
                 # No async context, run directly
@@ -524,10 +521,14 @@ Provide a 1-2 sentence summary of what changes were made or discussed for these 
         # Build summary dict with enhanced sections
         summary_dict = {
             "scope": rule_summary.scope,
-            "tools_mentioned": enhanced_sections.get("tools_mentioned", rule_summary.tools_mentioned),
+            "tools_mentioned": enhanced_sections.get(
+                "tools_mentioned", rule_summary.tools_mentioned
+            ),
             "recent_user_requests": rule_summary.recent_user_requests,
             "pending_work": enhanced_sections.get("pending_work", rule_summary.pending_work),
-            "key_files_referenced": enhanced_sections.get("key_files_referenced", rule_summary.key_files_referenced),
+            "key_files_referenced": enhanced_sections.get(
+                "key_files_referenced", rule_summary.key_files_referenced
+            ),
             "current_work": enhanced_sections.get("current_work", rule_summary.current_work),
             "key_timeline": rule_summary.key_timeline[-10:],  # Limit to 10 most recent
         }
@@ -590,4 +591,3 @@ Provide a 1-2 sentence summary of what changes were made or discussed for these 
 
         truncated = content[:max_chars]
         return truncated + "…"
-

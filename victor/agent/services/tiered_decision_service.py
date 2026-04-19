@@ -78,6 +78,7 @@ class TieredDecisionService:
         # Try to get from service container
         try:
             from victor.core import get_container
+
             container = get_container()
 
             # Try ProviderService first (new service layer)
@@ -85,6 +86,7 @@ class TieredDecisionService:
                 from victor.agent.services.protocols.provider_service import (
                     ProviderService,
                 )
+
                 provider_service = container.get(ProviderService)
                 if provider_service:
                     provider_name = getattr(provider_service, "provider_name", None)
@@ -100,6 +102,7 @@ class TieredDecisionService:
             # Try ProviderManager (legacy)
             try:
                 from victor.agent.provider_manager import ProviderManager
+
                 provider_mgr = container.get(ProviderManager)
                 if provider_mgr:
                     provider_name = getattr(provider_mgr, "provider_name", None)
@@ -118,12 +121,11 @@ class TieredDecisionService:
         # Try settings
         try:
             from victor.config.settings import Settings
+
             settings = Settings()
             if hasattr(settings, "default_provider") and settings.default_provider:
                 self._detected_provider = settings.default_provider
-                logger.debug(
-                    f"Auto-detected provider from settings: {settings.default_provider}"
-                )
+                logger.debug(f"Auto-detected provider from settings: {settings.default_provider}")
                 return settings.default_provider
         except Exception:
             pass
@@ -310,9 +312,7 @@ class TieredDecisionService:
                 max_tokens_override=spec.max_tokens,
             )
 
-            service = LLMDecisionService(
-                provider=provider_instance, model=model, config=svc_config
-            )
+            service = LLMDecisionService(provider=provider_instance, model=model, config=svc_config)
             self._services[tier] = service
             logger.info(
                 "Created %s decision service: %s/%s (timeout=%dms)",

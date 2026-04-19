@@ -384,7 +384,9 @@ class TestVerticalWorkflowIntegration:
 
         provider = DataAnalysisAssistant.get_workflow_provider()
         if provider is None:
-            pytest.skip("DataAnalysisAssistant workflow provider not implemented (external package)")
+            pytest.skip(
+                "DataAnalysisAssistant workflow provider not implemented (external package)"
+            )
 
         workflows = provider.get_workflows()
         assert len(workflows) > 0

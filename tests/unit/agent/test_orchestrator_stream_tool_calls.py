@@ -110,6 +110,7 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     # Inject a mock _tool_service so is_tool_enabled can be configured.
     # bootstrap_new_services was patched out, so _tool_service is None on fresh orchestrators.
     from unittest.mock import MagicMock
+
     mock_tool_svc = MagicMock()
     orch._tool_service = mock_tool_svc
     enabled_names = {"dummy_tool"} | {t.name for t in orch.tools.list_tools()}

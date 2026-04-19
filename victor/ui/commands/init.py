@@ -311,7 +311,9 @@ def init(
         log_level = log_level.upper()
         valid_levels = ["DEBUG", "INFO", "WARNING", "WARN", "ERROR", "CRITICAL"]
         if log_level not in valid_levels:
-            console.print(f"[red]Invalid log level '{log_level}'. Valid: {', '.join(valid_levels)}[/]")
+            console.print(
+                f"[red]Invalid log level '{log_level}'. Valid: {', '.join(valid_levels)}[/]"
+            )
             raise typer.Exit(1)
         if log_level == "WARN":
             log_level = "WARNING"

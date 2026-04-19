@@ -67,7 +67,7 @@ class RecommendationExplainer:
 
     def __init__(self, coordinator: Any) -> None:
         """Args:
-            coordinator: RLCoordinator (or MetaLearningCoordinator) instance
+        coordinator: RLCoordinator (or MetaLearningCoordinator) instance
         """
         self._coord = coordinator
 
@@ -100,23 +100,27 @@ class RecommendationExplainer:
             success_rate = stats.get("success_rate", 0.0)
             task_q = stats.get("task_q_values", {}).get(task_type)
 
-            signals.append({
-                "source": "rl_q_learning",
-                "value": round(q_value, 3),
-                "weight": 0.8,
-                "description": (
-                    f"Global Q-value {q_value:.3f} from {count} executions "
-                    f"(success rate {success_rate:.0%})"
-                ),
-            })
+            signals.append(
+                {
+                    "source": "rl_q_learning",
+                    "value": round(q_value, 3),
+                    "weight": 0.8,
+                    "description": (
+                        f"Global Q-value {q_value:.3f} from {count} executions "
+                        f"(success rate {success_rate:.0%})"
+                    ),
+                }
+            )
 
             if task_q is not None:
-                signals.append({
-                    "source": "task_specific_q",
-                    "value": round(task_q, 3),
-                    "weight": 0.7,
-                    "description": f"Task-specific Q-value for '{task_type}': {task_q:.3f}",
-                })
+                signals.append(
+                    {
+                        "source": "task_specific_q",
+                        "value": round(task_q, 3),
+                        "weight": 0.7,
+                        "description": f"Task-specific Q-value for '{task_type}': {task_q:.3f}",
+                    }
+                )
 
             # Analytics signal if wired
             analytics = getattr(learner, "_analytics", None)
@@ -125,35 +129,41 @@ class RecommendationExplainer:
                     insights = analytics.get_tool_insights(tool_name)
                     analytics_rate = insights.get("success_rate", None)
                     if analytics_rate is not None:
-                        signals.append({
-                            "source": "usage_analytics",
-                            "value": round(analytics_rate, 3),
-                            "weight": 0.2,
-                            "description": (
-                                f"Current-session success rate from UsageAnalytics: "
-                                f"{analytics_rate:.0%}"
-                            ),
-                        })
+                        signals.append(
+                            {
+                                "source": "usage_analytics",
+                                "value": round(analytics_rate, 3),
+                                "weight": 0.2,
+                                "description": (
+                                    f"Current-session success rate from UsageAnalytics: "
+                                    f"{analytics_rate:.0%}"
+                                ),
+                            }
+                        )
                 except Exception:
                     pass
 
             # Predictor signal if wired
             predictor = getattr(learner, "_predictor", None)
             if predictor is not None:
-                signals.append({
-                    "source": "tool_predictor",
-                    "value": None,
-                    "weight": None,
-                    "description": "Priority 3 ToolPredictor available for sequence prediction",
-                })
+                signals.append(
+                    {
+                        "source": "tool_predictor",
+                        "value": None,
+                        "weight": None,
+                        "description": "Priority 3 ToolPredictor available for sequence prediction",
+                    }
+                )
 
         if not signals:
-            signals.append({
-                "source": "default",
-                "value": 0.5,
-                "weight": 1.0,
-                "description": "No RL data yet — using default Q-value (optimistic init)",
-            })
+            signals.append(
+                {
+                    "source": "default",
+                    "value": 0.5,
+                    "weight": 1.0,
+                    "description": "No RL data yet — using default Q-value (optimistic init)",
+                }
+            )
 
         blended = self._blend_signals(signals)
         return {
@@ -206,33 +216,39 @@ class RecommendationExplainer:
         if learner is not None:
             rec = learner.get_recommendation(provider, "", task_type)
             if rec is not None:
-                signals.append({
-                    "source": "rl_q_learning",
-                    "value": round(rec.value, 3) if isinstance(rec.value, float) else None,
-                    "weight": 0.9,
-                    "description": rec.reason,
-                })
+                signals.append(
+                    {
+                        "source": "rl_q_learning",
+                        "value": round(rec.value, 3) if isinstance(rec.value, float) else None,
+                        "weight": 0.9,
+                        "description": rec.reason,
+                    }
+                )
 
             # Learned threshold signal
             threshold = learner.get_optimal_threshold(task_type)
             if threshold is not None:
-                signals.append({
-                    "source": "learned_threshold",
-                    "value": round(threshold, 3),
-                    "weight": None,
-                    "description": (
-                        f"Learned confidence threshold for '{task_type}': {threshold:.2f} "
-                        f"(heuristic used when confidence ≥ this value)"
-                    ),
-                })
+                signals.append(
+                    {
+                        "source": "learned_threshold",
+                        "value": round(threshold, 3),
+                        "weight": None,
+                        "description": (
+                            f"Learned confidence threshold for '{task_type}': {threshold:.2f} "
+                            f"(heuristic used when confidence ≥ this value)"
+                        ),
+                    }
+                )
 
         if not signals:
-            signals.append({
-                "source": "default",
-                "value": 0.5,
-                "weight": 1.0,
-                "description": "No RL data — using default selection",
-            })
+            signals.append(
+                {
+                    "source": "default",
+                    "value": 0.5,
+                    "weight": 1.0,
+                    "description": "No RL data — using default selection",
+                }
+            )
 
         blended = self._blend_signals(signals)
         return {
@@ -332,6 +348,7 @@ def get_recommendation_explainer(coordinator: Any = None) -> Optional["Recommend
 
     if coordinator is None:
         from victor.framework.rl.coordinator import get_rl_coordinator
+
         coordinator = get_rl_coordinator()
 
     return RecommendationExplainer(coordinator)

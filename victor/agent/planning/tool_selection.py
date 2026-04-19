@@ -52,6 +52,7 @@ try:
     from victor.agent.planning.tool_predictor import ToolPredictor
     from victor.agent.planning.cooccurrence_tracker import CooccurrenceTracker
     from victor.agent.planning.tool_preloader import ToolPreloader
+
     PREDICTIVE_COMPONENTS_AVAILABLE = True
 except ImportError:
     PREDICTIVE_COMPONENTS_AVAILABLE = False
@@ -99,6 +100,7 @@ def create_step_aware_selector(
                 # Check if this request should use predictive features
                 # Use consistent hash based on session or random hash
                 import hashlib
+
                 request_hash = int(hashlib.md5(str(time.time()).encode()).hexdigest(), 16) % 100
 
                 if feature_flags.should_use_predictive_for_request(request_hash):
@@ -114,13 +116,15 @@ def create_step_aware_selector(
 
     if enable_predictive and PREDICTIVE_COMPONENTS_AVAILABLE:
         # Initialize co-occurrence tracker if enabled
-        if settings and settings.feature_flags and settings.feature_flags.enable_cooccurrence_tracking:
+        if (
+            settings
+            and settings.feature_flags
+            and settings.feature_flags.enable_cooccurrence_tracking
+        ):
             cooccurrence_tracker = CooccurrenceTracker()
 
         # Initialize tool predictor
-        tool_predictor = ToolPredictor(
-            cooccurrence_tracker=cooccurrence_tracker
-        )
+        tool_predictor = ToolPredictor(cooccurrence_tracker=cooccurrence_tracker)
 
         # Initialize preloader if enabled
         if settings and settings.feature_flags and settings.feature_flags.enable_tool_preloading:
@@ -225,9 +229,7 @@ class StepAwareToolSelector:
 
         # Initialize predictor if not provided but predictive is enabled
         if self.enable_predictive and self.tool_predictor is None:
-            self.tool_predictor = ToolPredictor(
-                cooccurrence_tracker=self.cooccurrence_tracker
-            )
+            self.tool_predictor = ToolPredictor(cooccurrence_tracker=self.cooccurrence_tracker)
 
         # Initialize tracker if not provided but predictive is enabled
         if self.enable_predictive and self.cooccurrence_tracker is None:
@@ -246,9 +248,7 @@ class StepAwareToolSelector:
         # Track recent tools for co-occurrence prediction
         self._recent_tools: List[str] = []
 
-        logger.info(
-            f"StepAwareToolSelector initialized (predictive={self.enable_predictive})"
-        )
+        logger.info(f"StepAwareToolSelector initialized (predictive={self.enable_predictive})")
 
     def get_tools_for_step(
         self,
@@ -313,9 +313,7 @@ class StepAwareToolSelector:
             )
             # Add high-confidence predictions to tool set
             step_tools.update(predicted_tools)
-            logger.debug(
-                f"Added {len(predicted_tools)} predicted tools for {step_type}"
-            )
+            logger.debug(f"Added {len(predicted_tools)} predicted tools for {step_type}")
 
         # 5. Get complexity limit
         max_tools = COMPLEXITY_TOOL_LIMITS[complexity.value]
@@ -348,10 +346,10 @@ class StepAwareToolSelector:
         if self.enable_predictive and self.tool_preloader:
             # Create background task for preloading (don't await)
             import asyncio
+
             try:
-                # Try to get running event loop
-                loop = asyncio.get_running_loop()
-                # We're in an async context, create a background task
+                # Try to get running event loop — create_task if available
+                asyncio.get_running_loop()
                 asyncio.create_task(
                     self._preload_for_next_step(
                         current_step=step_type,
@@ -535,11 +533,7 @@ class StepAwareToolSelector:
             )
 
             # Filter to high-confidence predictions (>= 0.6)
-            high_confidence = {
-                p.tool_name
-                for p in predictions
-                if p.probability >= 0.6
-            }
+            high_confidence = {p.tool_name for p in predictions if p.probability >= 0.6}
 
             logger.debug(
                 f"Predicted {len(high_confidence)} high-confidence tools "
@@ -577,9 +571,7 @@ class StepAwareToolSelector:
             )
 
             if count > 0:
-                logger.debug(
-                    f"Preloaded {count} tools for next step after {current_step}"
-                )
+                logger.debug(f"Preloaded {count} tools for next step after {current_step}")
 
         except Exception as e:
             logger.warning(f"Preload failed: {e}")
@@ -618,9 +610,7 @@ class StepAwareToolSelector:
                     task_type=task_type,
                     success=success,
                 )
-                logger.debug(
-                    f"Recorded tool sequence for {task_type}: {tools_used}"
-                )
+                logger.debug(f"Recorded tool sequence for {task_type}: {tools_used}")
             except Exception as e:
                 logger.warning(f"Failed to record tool sequence: {e}")
 

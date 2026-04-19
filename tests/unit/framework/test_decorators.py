@@ -17,16 +17,17 @@ from victor.framework.decorators import (
     task,
 )
 
-
 # ---------------------------------------------------------------------------
 # @victor.agent tests
 # ---------------------------------------------------------------------------
+
 
 class TestAgentDecorator:
     """@agent decorator creates AgentCallable instances."""
 
     def test_returns_agent_callable(self):
         """@agent wraps a function in AgentCallable."""
+
         @agent(provider="anthropic")
         async def my_agent(prompt: str) -> str:
             """You are a helpful assistant."""
@@ -36,16 +37,17 @@ class TestAgentDecorator:
 
     def test_preserves_function_name(self):
         """AgentCallable.__name__ matches the decorated function."""
+
         @agent(provider="anthropic")
         async def code_reviewer(prompt: str) -> str:
             """Review code."""
             ...
 
-        assert my_agent.__name__ == "my_agent" if False else True
         assert code_reviewer.__name__ == "code_reviewer"
 
     def test_docstring_becomes_system_prompt(self):
         """Decorated function docstring is used as system prompt."""
+
         @agent(provider="anthropic")
         async def helper(prompt: str) -> str:
             """You are an expert code reviewer."""
@@ -55,6 +57,7 @@ class TestAgentDecorator:
 
     def test_explicit_system_prompt_overrides_docstring(self):
         """Explicit system_prompt kwarg overrides docstring."""
+
         @agent(provider="anthropic", system_prompt="Custom prompt")
         async def helper(prompt: str) -> str:
             """Ignored docstring."""
@@ -64,42 +67,42 @@ class TestAgentDecorator:
 
     def test_no_docstring_system_prompt_is_none(self):
         """No docstring → _system_prompt is None."""
+
         @agent(provider="openai")
-        async def bare(prompt: str) -> str:
-            ...
+        async def bare(prompt: str) -> str: ...
 
         assert bare._system_prompt is None
 
     def test_provider_stored(self):
         """Provider argument is stored on AgentCallable."""
+
         @agent(provider="ollama", model="llama3")
-        async def local_agent(prompt: str) -> str:
-            ...
+        async def local_agent(prompt: str) -> str: ...
 
         assert local_agent._provider == "ollama"
         assert local_agent._model == "llama3"
 
     def test_tools_stored(self):
         """tools argument is stored."""
+
         @agent(provider="anthropic", tools=["filesystem", "git"])
-        async def fs_agent(prompt: str) -> str:
-            ...
+        async def fs_agent(prompt: str) -> str: ...
 
         assert fs_agent._tools == ["filesystem", "git"]
 
     def test_agent_is_none_before_first_call(self):
         """Underlying agent is lazy — None until first __call__."""
+
         @agent(provider="anthropic")
-        async def lazy(prompt: str) -> str:
-            ...
+        async def lazy(prompt: str) -> str: ...
 
         assert lazy.agent is None
 
     def test_reset_clears_agent(self):
         """reset() sets _agent back to None."""
+
         @agent(provider="anthropic")
-        async def resettable(prompt: str) -> str:
-            ...
+        async def resettable(prompt: str) -> str: ...
 
         resettable._agent = MagicMock()  # Simulate a created agent
         resettable.reset()
@@ -107,9 +110,9 @@ class TestAgentDecorator:
 
     def test_repr_contains_provider_and_name(self):
         """repr shows provider and function name."""
+
         @agent(provider="anthropic")
-        async def my_agent(prompt: str) -> str:
-            ...
+        async def my_agent(prompt: str) -> str: ...
 
         r = repr(my_agent)
         assert "my_agent" in r
@@ -143,10 +146,11 @@ class TestAgentDecorator:
         mock_agent.get_orchestrator.return_value = MagicMock()
 
         @agent(provider="anthropic")
-        async def cached(prompt: str) -> str:
-            ...
+        async def cached(prompt: str) -> str: ...
 
-        with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)) as mock_create:
+        with patch(
+            "victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)
+        ) as mock_create:
             await cached("first")
             await cached("second")
 
@@ -161,8 +165,7 @@ class TestAgentDecorator:
         mock_agent.get_orchestrator.return_value = MagicMock()
 
         @agent(provider="anthropic")
-        async def ctx_agent(prompt: str) -> str:
-            ...
+        async def ctx_agent(prompt: str) -> str: ...
 
         ctx = {"file": "auth.py"}
         with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
@@ -190,6 +193,7 @@ class TestAgentDecorator:
     def test_importable_from_victor_namespace(self):
         """@victor.agent must be accessible from the top-level victor namespace."""
         import victor
+
         assert hasattr(victor, "agent"), "victor.agent decorator not exported"
         assert callable(victor.agent)
 
@@ -198,54 +202,55 @@ class TestAgentDecorator:
 # @victor.task tests
 # ---------------------------------------------------------------------------
 
+
 class TestTaskDecorator:
     """@task decorator creates TaskDefinition instances."""
 
     def test_returns_task_definition(self):
         """@task wraps a function in TaskDefinition."""
+
         @task(description="Generate tests", expected_output="pytest file")
-        async def gen_tests(agent, path: str):
-            ...
+        async def gen_tests(agent, path: str): ...
 
         assert isinstance(gen_tests, TaskDefinition)
 
     def test_description_stored(self):
         """description is stored as attribute."""
+
         @task(description="Write docs", expected_output="Markdown file")
-        async def write_docs(agent, module: str):
-            ...
+        async def write_docs(agent, module: str): ...
 
         assert write_docs.description == "Write docs"
 
     def test_expected_output_stored(self):
         """expected_output is stored as attribute."""
+
         @task(description="Analyse", expected_output="JSON report")
-        async def analyse(agent, src: str):
-            ...
+        async def analyse(agent, src: str): ...
 
         assert analyse.expected_output == "JSON report"
 
     def test_tools_default_empty(self):
         """tools defaults to empty list when not provided."""
+
         @task(description="Simple task")
-        async def simple(agent):
-            ...
+        async def simple(agent): ...
 
         assert simple.tools == []
 
     def test_tools_stored(self):
         """tools list is stored on TaskDefinition."""
+
         @task(description="FS task", tools=["filesystem", "git"])
-        async def fs_task(agent):
-            ...
+        async def fs_task(agent): ...
 
         assert fs_task.tools == ["filesystem", "git"]
 
     def test_preserves_function_name(self):
         """__name__ matches the decorated function."""
+
         @task(description="Named task")
-        async def named_fn(agent):
-            ...
+        async def named_fn(agent): ...
 
         assert named_fn.__name__ == "named_fn"
 
@@ -264,23 +269,24 @@ class TestTaskDecorator:
 
     def test_async_execution_flag(self):
         """async_execution flag is stored."""
+
         @task(description="Concurrent task", async_execution=True)
-        async def concurrent(agent):
-            ...
+        async def concurrent(agent): ...
 
         assert concurrent.async_execution is True
 
     def test_importable_from_victor_namespace(self):
         """@victor.task must be accessible from the top-level victor namespace."""
         import victor
+
         assert hasattr(victor, "task"), "victor.task decorator not exported"
         assert callable(victor.task)
 
     def test_repr_contains_description_and_name(self):
         """repr shows function name and description."""
+
         @task(description="My important task")
-        async def my_task(agent):
-            ...
+        async def my_task(agent): ...
 
         r = repr(my_task)
         assert "my_task" in r

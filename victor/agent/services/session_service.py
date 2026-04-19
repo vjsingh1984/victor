@@ -60,7 +60,7 @@ class SessionInfoImpl:
 class SessionService:
     """[CANONICAL] Service for session lifecycle and management.
 
-    The target implementation for session operations following the 
+    The target implementation for session operations following the
     state-passed architectural pattern. Supersedes SessionCoordinator.
     """
 
@@ -114,7 +114,7 @@ class SessionService:
         """Create a new session."""
         if not session_id:
             session_id = f"session-{uuid.uuid4().hex[:16]}"
-            
+
         now = datetime.now()
         self._current_session = SessionInfoImpl(
             session_id=session_id,
@@ -591,13 +591,11 @@ class SessionService:
                 token_usage = state["token_usage"]
                 if hasattr(self._session_state, "update_token_usage"):
                     self._session_state.update_token_usage(
-                        token_usage.get("input", 0),
-                        token_usage.get("output", 0)
+                        token_usage.get("input", 0), token_usage.get("output", 0)
                     )
                 elif hasattr(self._session_state, "set_token_usage"):
                     self._session_state.set_token_usage(
-                        token_usage.get("input", 0),
-                        token_usage.get("output", 0)
+                        token_usage.get("input", 0), token_usage.get("output", 0)
                     )
 
             # Restore observed files if possible
@@ -609,7 +607,9 @@ class SessionService:
                     # Property is read-only or not settable
                     self._logger.debug("observed_files is read-only, skipping restoration")
 
-            self._logger.info(f"Applied checkpoint state for session: {state.get('session_id', 'unknown')}")
+            self._logger.info(
+                f"Applied checkpoint state for session: {state.get('session_id', 'unknown')}"
+            )
             return True
 
         except Exception as e:
@@ -641,9 +641,7 @@ class SessionService:
             self._session_state._token_usage["input"] += input_tokens
             self._session_state._token_usage["output"] += output_tokens
 
-        self._logger.debug(
-            f"Updated token usage: +{input_tokens} input, +{output_tokens} output"
-        )
+        self._logger.debug(f"Updated token usage: +{input_tokens} input, +{output_tokens} output")
 
     def reset_token_usage(self) -> None:
         """Reset token usage statistics.
@@ -905,8 +903,16 @@ class SessionService:
 
             service._current_session = SessionInfoImpl(
                 session_id=data["session_id"],
-                created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
-                last_activity=datetime.fromisoformat(data["last_activity"]) if data.get("last_activity") else datetime.now(),
+                created_at=(
+                    datetime.fromisoformat(data["created_at"])
+                    if data.get("created_at")
+                    else datetime.now()
+                ),
+                last_activity=(
+                    datetime.fromisoformat(data["last_activity"])
+                    if data.get("last_activity")
+                    else datetime.now()
+                ),
                 message_count=data.get("message_count", 0),
                 tool_calls=data.get("tool_calls", 0),
                 metadata=data.get("metadata", {}),
@@ -941,8 +947,16 @@ class SessionService:
             return [
                 {
                     "session_id": s.session_id,
-                    "created_at": s.created_at.isoformat() if hasattr(s, 'created_at') and s.created_at else None,
-                    "last_activity": s.last_activity.isoformat() if hasattr(s, 'last_activity') and s.last_activity else None,
+                    "created_at": (
+                        s.created_at.isoformat()
+                        if hasattr(s, "created_at") and s.created_at
+                        else None
+                    ),
+                    "last_activity": (
+                        s.last_activity.isoformat()
+                        if hasattr(s, "last_activity") and s.last_activity
+                        else None
+                    ),
                     "project_path": getattr(s, "project_path", None),
                     "provider": getattr(s, "provider", None),
                     "model": getattr(s, "model", None),
@@ -958,7 +972,9 @@ class SessionService:
     # ==========================================================================
 
     @staticmethod
-    def init_conversation_embedding_store(memory_manager: Any) -> tuple[Optional[Any], Optional[Any]]:
+    def init_conversation_embedding_store(
+        memory_manager: Any,
+    ) -> tuple[Optional[Any], Optional[Any]]:
         """Initialize LanceDB embedding store for semantic conversation retrieval.
 
         Uses the module-level singleton to prevent duplicate initialization.

@@ -60,7 +60,7 @@ class ProviderInfoImpl:
 class ProviderService:
     """[CANONICAL] Service for provider management.
 
-    The target implementation for provider operations following the 
+    The target implementation for provider operations following the
     state-passed architectural pattern. Supersedes ProviderCoordinator.
 
     This service follows SOLID principles:

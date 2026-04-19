@@ -101,9 +101,7 @@ class TestProcessToolResults:
         assert "/tmp/test.py" in ctx.observed_files
 
         # Conversation injection (role=tool per OpenAI spec with name and tool_call_id)
-        ctx.add_message.assert_called_once_with(
-            "tool", "formatted", name="read", tool_call_id=None
-        )
+        ctx.add_message.assert_called_once_with("tool", "formatted", name="read", tool_call_id=None)
 
     def test_failed_tool_call(self):
         coord = self._make_coordinator()

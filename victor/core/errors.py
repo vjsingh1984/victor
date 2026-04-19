@@ -835,9 +835,7 @@ def _handle_error_impl(
     Raises:
         VictorError: If reraise is True
     """
-    error_info = handler.handle(
-        e, context={"function": func_name, "args_count": args_count}
-    )
+    error_info = handler.handle(e, context={"function": func_name, "args_count": args_count})
     if reraise:
         raise VictorError(
             str(e),
@@ -878,8 +876,14 @@ def handle_errors(
                 raise  # Don't wrap VictorError
             except Exception as e:
                 return _handle_error_impl(
-                    e, handler, func.__name__, len(args),
-                    category, recovery_hint, reraise, default_return
+                    e,
+                    handler,
+                    func.__name__,
+                    len(args),
+                    category,
+                    recovery_hint,
+                    reraise,
+                    default_return,
                 )
 
         return wrapper
@@ -905,8 +909,14 @@ def handle_errors_async(
                 raise
             except Exception as e:
                 return _handle_error_impl(
-                    e, handler, func.__name__, len(args),
-                    category, recovery_hint, reraise, default_return
+                    e,
+                    handler,
+                    func.__name__,
+                    len(args),
+                    category,
+                    recovery_hint,
+                    reraise,
+                    default_return,
                 )
 
         return wrapper  # type: ignore

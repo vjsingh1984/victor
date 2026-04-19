@@ -194,9 +194,7 @@ class TestDecisionServiceSettings:
         from victor.config.decision_settings import DecisionServiceSettings
 
         config = DecisionServiceSettings(
-            tier_overrides={
-                "edge": {"provider": "ollama", "model": "phi3:mini"}
-            }
+            tier_overrides={"edge": {"provider": "ollama", "model": "phi3:mini"}}
         )
         assert config.tier_overrides["edge"]["provider"] == "ollama"
         assert config.tier_overrides["edge"]["model"] == "phi3:mini"
@@ -294,9 +292,7 @@ class TestProviderAgnosticTiers:
         from victor.config.decision_settings import DecisionServiceSettings
 
         config = DecisionServiceSettings(
-            tier_overrides={
-                "edge": {"provider": "ollama", "model": "phi3:mini"}
-            }
+            tier_overrides={"edge": {"provider": "ollama", "model": "phi3:mini"}}
         )
         service = TieredDecisionService(config)
 

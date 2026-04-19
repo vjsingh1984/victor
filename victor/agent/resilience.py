@@ -368,7 +368,9 @@ class RetryHandler:
             max_delay=self.config.max_delay,
             multiplier=self.config.exponential_base,
             jitter=0.5 if self.config.jitter else 0.0,  # 0.5 = 50% jitter to match legacy behavior
-            retryable_exceptions=set(self.config.retryable_exceptions) if self.config.retryable_exceptions else None,
+            retryable_exceptions=(
+                set(self.config.retryable_exceptions) if self.config.retryable_exceptions else None
+            ),
         )
 
         # Create canonical executor
@@ -414,7 +416,9 @@ class RetryHandler:
             return False
 
         # Create context for retry decision
-        ctx = RetryContext(attempt=attempt, max_attempts=self.config.max_retries + 1, last_exception=error)
+        ctx = RetryContext(
+            attempt=attempt, max_attempts=self.config.max_retries + 1, last_exception=error
+        )
 
         # Check exception type
         if error:
@@ -453,8 +457,9 @@ class RetryHandler:
         """
         # Preserve on_retry callback if provided
         if on_retry:
-            original_on_retry = self._strategy.on_retry
-            self._strategy.on_retry = lambda ctx: on_retry(ctx.attempt, ctx.last_exception) if ctx.last_exception else None
+            self._strategy.on_retry = lambda ctx: (
+                on_retry(ctx.attempt, ctx.last_exception) if ctx.last_exception else None
+            )
 
         # Use canonical executor
         result = await self._executor.execute_async(func, *args, **kwargs)

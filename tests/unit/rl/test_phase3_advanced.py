@@ -16,10 +16,10 @@ from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
 from victor.framework.rl.learners.quality_weights import QualityWeightLearner, QualityDimension
 from victor.framework.rl.explainability import RecommendationExplainer
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_db() -> sqlite3.Connection:
     conn = sqlite3.connect(":memory:")
@@ -31,6 +31,7 @@ def _make_cross_vertical() -> CrossVerticalLearner:
     db = _make_db()
     # Create rl_outcome table so cross_vertical queries work in isolation
     from victor.core.schema import Tables, Schema
+
     db.execute(Schema.RL_OUTCOME)
     db.commit()
     return CrossVerticalLearner(name="cross_vertical", db_connection=db)
@@ -43,6 +44,7 @@ def _make_quality_weights() -> QualityWeightLearner:
 # ---------------------------------------------------------------------------
 # Transfer Learning — CrossVerticalLearner
 # ---------------------------------------------------------------------------
+
 
 class TestCrossVerticalExportPatterns:
     def test_export_returns_dict_with_schema_version(self):
@@ -97,14 +99,24 @@ class TestCrossVerticalImportPatterns:
         # Seed a pattern into source via DB directly
         cursor = source.db.cursor()
         from victor.core.schema import Tables
+
         cursor.execute(
             f"""INSERT INTO {Tables.RL_PATTERN}
             (pattern_id, task_type, pattern_name, avg_quality, confidence,
              source_verticals, recommended_mode, recommendation,
              sample_count, created_at, updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))""",
-            ("p1", "analysis", "high_quality", 0.85, 0.75,
-             json.dumps(["coding", "devops"]), "BUILD", "Use structured output", 25),
+            (
+                "p1",
+                "analysis",
+                "high_quality",
+                0.85,
+                0.75,
+                json.dumps(["coding", "devops"]),
+                "BUILD",
+                "Use structured output",
+                25,
+            ),
         )
         source.db.commit()
 
@@ -119,6 +131,7 @@ class TestCrossVerticalImportPatterns:
         target = _make_cross_vertical()
 
         from victor.core.schema import Tables
+
         cursor = source.db.cursor()
         cursor.execute(
             f"""INSERT INTO {Tables.RL_PATTERN}
@@ -126,8 +139,17 @@ class TestCrossVerticalImportPatterns:
              source_verticals, recommended_mode, recommendation,
              sample_count, created_at, updated_at)
             VALUES (?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))""",
-            ("p2", "edit", "edit_pattern", 0.80, 0.90,
-             json.dumps(["coding"]), None, "Verify before edit", 30),
+            (
+                "p2",
+                "edit",
+                "edit_pattern",
+                0.80,
+                0.90,
+                json.dumps(["coding"]),
+                None,
+                "Verify before edit",
+                30,
+            ),
         )
         source.db.commit()
 
@@ -136,10 +158,9 @@ class TestCrossVerticalImportPatterns:
 
         # Verify decay was applied (0.9 * 0.8 = 0.72)
         from victor.core.schema import Tables
+
         cursor2 = target.db.cursor()
-        cursor2.execute(
-            f"SELECT confidence FROM {Tables.RL_PATTERN} WHERE task_type='edit'"
-        )
+        cursor2.execute(f"SELECT confidence FROM {Tables.RL_PATTERN} WHERE task_type='edit'")
         row = cursor2.fetchone()
         assert row is not None
         assert abs(dict(row)["confidence"] - 0.72) < 0.01
@@ -147,18 +168,21 @@ class TestCrossVerticalImportPatterns:
     def test_import_is_idempotent(self):
         source = _make_cross_vertical()
         target = _make_cross_vertical()
-        data = {"schema_version": 1, "patterns": [
-            {
-                "task_type": "analysis",
-                "pattern_name": "p",
-                "avg_quality": 0.8,
-                "confidence": 0.7,
-                "source_verticals": ["coding"],
-                "recommended_mode": None,
-                "recommendation": "test",
-                "sample_count": 10,
-            }
-        ]}
+        data = {
+            "schema_version": 1,
+            "patterns": [
+                {
+                    "task_type": "analysis",
+                    "pattern_name": "p",
+                    "avg_quality": 0.8,
+                    "confidence": 0.7,
+                    "source_verticals": ["coding"],
+                    "recommended_mode": None,
+                    "recommendation": "test",
+                    "sample_count": 10,
+                }
+            ],
+        }
         c1 = target.import_patterns(data, source_repo_id="src")
         c2 = target.import_patterns(data, source_repo_id="src")
         assert c1 == 1
@@ -175,14 +199,14 @@ class TestCrossVerticalAdaptPatterns:
         learner = _make_cross_vertical()
         # Seed some outcomes for source vertical
         from victor.core.schema import Tables
+
         cursor = learner.db.cursor()
         for i in range(12):
             cursor.execute(
                 f"""INSERT INTO {Tables.RL_OUTCOME}
                 (learner_id, provider, model, task_type, vertical, success, quality_score, metadata)
                 VALUES (?,?,?,?,?,?,?,?)""",
-                ("cross_vertical", "anthropic", "claude", "analysis",
-                 "coding", 1, 0.85, "{}"),
+                ("cross_vertical", "anthropic", "claude", "analysis", "coding", 1, 0.85, "{}"),
             )
         learner.db.commit()
 
@@ -197,14 +221,14 @@ class TestCrossVerticalAdaptPatterns:
     def test_adapt_confidence_has_domain_shift_penalty(self):
         learner = _make_cross_vertical()
         from victor.core.schema import Tables
+
         cursor = learner.db.cursor()
         for i in range(50):
             cursor.execute(
                 f"""INSERT INTO {Tables.RL_OUTCOME}
                 (learner_id, provider, model, task_type, vertical, success, quality_score, metadata)
                 VALUES (?,?,?,?,?,?,?,?)""",
-                ("cross_vertical", "anthropic", "claude", "edit",
-                 "coding", 1, 0.95, "{}"),
+                ("cross_vertical", "anthropic", "claude", "edit", "coding", 1, 0.95, "{}"),
             )
         learner.db.commit()
 
@@ -218,6 +242,7 @@ class TestCrossVerticalAdaptPatterns:
 # ---------------------------------------------------------------------------
 # Preference Learning — QualityWeightLearner
 # ---------------------------------------------------------------------------
+
 
 class TestQualityWeightsPreferenceLearning:
     def test_record_user_preference_stores_weight(self):
@@ -246,7 +271,7 @@ class TestQualityWeightsPreferenceLearning:
     def test_get_personalized_weights_blends_preference(self):
         learner = _make_quality_weights()
         # Force a known global weight
-        learner._weights["analysis"] = {dim: 1.0 for dim in QualityDimension.ALL}
+        learner._weights["analysis"] = dict.fromkeys(QualityDimension.ALL, 1.0)
         learner.record_user_preference("u1", QualityDimension.CODE_QUALITY, 3.0, "analysis")
 
         blended = learner.get_personalized_weights("u1", "analysis")
@@ -255,7 +280,7 @@ class TestQualityWeightsPreferenceLearning:
 
     def test_get_personalized_weights_fallback_to_global(self):
         learner = _make_quality_weights()
-        learner._weights["analysis"] = {dim: 1.5 for dim in QualityDimension.ALL}
+        learner._weights["analysis"] = dict.fromkeys(QualityDimension.ALL, 1.5)
         weights = learner.get_personalized_weights("unknown-user", "analysis")
         for dim in QualityDimension.ALL:
             assert weights[dim] == 1.5
@@ -264,9 +289,7 @@ class TestQualityWeightsPreferenceLearning:
         learner = _make_quality_weights()
         learner.record_user_preference("u2", QualityDimension.CONCISENESS, 0.5, "default")
         cursor = learner.db.cursor()
-        cursor.execute(
-            "SELECT weight FROM rl_user_weight_preference WHERE user_id='u2'"
-        )
+        cursor.execute("SELECT weight FROM rl_user_weight_preference WHERE user_id='u2'")
         row = cursor.fetchone()
         assert row is not None
         assert abs(dict(row)["weight"] - 0.5) < 0.01
@@ -301,6 +324,7 @@ class TestQualityWeightsPreferenceLearning:
 # ---------------------------------------------------------------------------
 # Explainability — RecommendationExplainer
 # ---------------------------------------------------------------------------
+
 
 class TestRecommendationExplainer:
     def _make_explainer(self) -> RecommendationExplainer:
@@ -364,8 +388,11 @@ class TestRecommendationExplainer:
         mock_coord = MagicMock()
         mock_learner = MagicMock()
         mock_learner.get_recommendation.return_value = RLRecommendation(
-            value=0.8, confidence=0.75, reason="High Q-value from 50 sessions",
-            sample_size=50, is_baseline=False,
+            value=0.8,
+            confidence=0.75,
+            reason="High Q-value from 50 sessions",
+            sample_size=50,
+            is_baseline=False,
         )
         mock_learner.get_optimal_threshold.return_value = 0.65
         mock_coord.get_learner.return_value = mock_learner
@@ -379,7 +406,10 @@ class TestRecommendationExplainer:
     def test_annotate_recommendation_injects_explanation(self):
         explainer = self._make_explainer()
         rec = RLRecommendation(
-            value=0.8, confidence=0.75, reason="test", sample_size=10,
+            value=0.8,
+            confidence=0.75,
+            reason="test",
+            sample_size=10,
         )
         annotated = explainer.annotate_recommendation(rec, "tool_selector", {"tool": "read"})
         assert "explanation" in annotated.metadata
@@ -389,7 +419,10 @@ class TestRecommendationExplainer:
     def test_annotate_recommendation_does_not_modify_value(self):
         explainer = self._make_explainer()
         rec = RLRecommendation(
-            value=0.88, confidence=0.72, reason="orig", sample_size=15,
+            value=0.88,
+            confidence=0.72,
+            reason="orig",
+            sample_size=15,
         )
         explainer.annotate_recommendation(rec, "tool_selector", {})
         assert rec.value == 0.88
@@ -417,9 +450,11 @@ class TestRecommendationExplainer:
 # End-to-end: coordinator integration
 # ---------------------------------------------------------------------------
 
+
 class TestPhase3CoordinatorIntegration:
     def test_cross_vertical_learner_has_transfer_methods(self):
         from victor.framework.rl.coordinator import get_rl_coordinator
+
         coord = get_rl_coordinator()
         learner = coord.get_learner("cross_vertical")
         assert hasattr(learner, "export_patterns")
@@ -428,6 +463,7 @@ class TestPhase3CoordinatorIntegration:
 
     def test_quality_weights_learner_has_preference_methods(self):
         from victor.framework.rl.coordinator import get_rl_coordinator
+
         coord = get_rl_coordinator()
         learner = coord.get_learner("quality_weights")
         assert hasattr(learner, "record_user_preference")
@@ -439,6 +475,7 @@ class TestPhase3CoordinatorIntegration:
     def test_explainer_works_with_real_coordinator(self):
         from victor.framework.rl.coordinator import get_rl_coordinator
         from victor.framework.rl.explainability import RecommendationExplainer
+
         coord = get_rl_coordinator()
         explainer = RecommendationExplainer(coord)
         result = explainer.explain_tool_recommendation("read", "analysis")

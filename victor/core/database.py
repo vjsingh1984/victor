@@ -122,6 +122,7 @@ class _DatabaseManagerBase:
     def __init__(self):
         """Initialize thread-local storage for database connection."""
         import threading
+
         self._local = threading.local()
 
     def _get_raw_connection(self) -> sqlite3.Connection:
