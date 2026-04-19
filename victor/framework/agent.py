@@ -107,7 +107,25 @@ class Agent:
             model: Model name for reference
             vertical: Optional vertical class used to create this agent
             vertical_config: Optional vertical configuration applied
+
+        Raises:
+            ValueError: If orchestrator is not a valid AgentOrchestrator instance
         """
+        # Validate that orchestrator is a proper AgentOrchestrator instance
+        # This prevents misuse where someone tries to call Agent(...) directly
+        orchestrator_type_name = type(orchestrator).__name__
+        if orchestrator_type_name != "AgentOrchestrator":
+            raise ValueError(
+                f"Agent.__init__() requires an AgentOrchestrator instance, "
+                f"but got {type(orchestrator).__module__}.{orchestrator_type_name}. "
+                f"Use Agent.create() instead of calling Agent() directly.\n\n"
+                f"Correct usage:\n"
+                f"  agent = await Agent.create(provider='anthropic', model='claude-3-5-sonnet-20241022')\n"
+                f"  agent = await Agent.create()  # Uses default provider/model\n"
+                f"  agent = Agent.from_orchestrator(orchestrator)  # If you have an orchestrator\n\n"
+                f"See victor/framework/agent.py for more details."
+            )
+
         self._orchestrator = orchestrator
         self._provider = provider
         self._model = model
@@ -572,6 +590,23 @@ class Agent:
         self._state_observers.append(callback)
 
         def unsubscribe() -> None:
+            """Unsubscribe the previously registered callback from event notifications.
+
+            This function removes the callback from the event notification system.
+            After calling unsubscribe(), the callback will no longer receive events.
+
+            Example:
+                >>> def my_handler(event):
+                ...     print(f"Event: {event.type}")
+                >>>
+                >>> unsubscribe = agent.subscribe_to_events("TOOL", my_handler)
+                >>> # Later, stop receiving events:
+                >>> unsubscribe()
+
+            Note:
+                If the callback is not registered, this function does nothing (no error raised).
+                Safe to call multiple times.
+            """
             if callback in self._state_observers:
                 self._state_observers.remove(callback)
 
