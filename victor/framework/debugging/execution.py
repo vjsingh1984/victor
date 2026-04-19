@@ -130,7 +130,7 @@ class PauseContext:
             "session_id": self.session_id,
             "node_id": self.node_id,
             "position": self.position.value,
-            "state_keys": list(self.state.keys()),
+            "state_keys": list(self.state.to_dict().keys()) if hasattr(self.state, "to_dict") else list(self.state.keys()),
             "breakpoint_ids": self.breakpoint_ids,
             "timestamp": self.timestamp,
             "error": str(self.error) if self.error else None,

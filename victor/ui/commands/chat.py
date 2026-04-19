@@ -1384,10 +1384,12 @@ async def run_workflow_mode(
 
             if result.state:
                 console.print("\n[bold]Final State:[/]")
+                # Convert Pydantic model to dict if needed
+                state_dict = result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
                 # Filter internal keys
                 display_state = {
                     k: v
-                    for k, v in result.state.items()
+                    for k, v in state_dict.items()
                     if not k.startswith("_") and k != "node_results"
                 }
                 if display_state:

@@ -163,8 +163,8 @@ class ExecutionContextWrapper:
         except Exception:
             pass
 
-        # Fall back to direct state access
-        return self.state.get("data", {}).get(key, default)
+        # Fall back to direct state access (Pydantic model)
+        return getattr(self.state, "data", {}).get(key, default)
 
     def set(self, key: str, value: Any) -> None:
         """Set a context value in data.
@@ -180,10 +180,11 @@ class ExecutionContextWrapper:
         except Exception:
             pass
 
-        # Update state dict
-        if "data" not in self.state:
-            self.state["data"] = {}
-        self.state["data"][key] = value
+        # Update state (Pydantic model)
+        if not hasattr(self.state, "data"):
+            # Pydantic models have data as a field
+            object.__setattr__(self.state, "data", {})
+        self.state.data[key] = value
 
     def update(self, values: Dict[str, Any]) -> None:
         """Update multiple context values in data.
@@ -199,24 +200,22 @@ class ExecutionContextWrapper:
         except Exception:
             pass
 
-        # Update state dict
-        if "data" not in self.state:
-            self.state["data"] = {}
-        self.state["data"].update(values)
+        # Update state (Pydantic model)
+        if not hasattr(self.state, "data"):
+            object.__setattr__(self.state, "data", {})
+        self.state.data.update(values)
 
     def get_result(self, node_id: str) -> Optional[Dict[str, Any]]:
         """Get result for a specific node."""
-        return self.state.get("_node_results", {}).get(node_id)
+        return getattr(self.state, "node_results", {}).get(node_id)
 
     def add_result(self, node_id: str, result: Dict[str, Any]) -> None:
         """Add a node result."""
-        if "_node_results" not in self.state:
-            self.state["_node_results"] = {}
-        self.state["_node_results"][node_id] = result
+        self.state.node_results[node_id] = result
 
     def has_failures(self) -> bool:
         """Check if any nodes failed."""
-        results = self.state.get("_node_results", {})
+        results = getattr(self.state, "node_results", {})
         return any(
             r.get("status") == "failed" or not r.get("success", True)
             for r in results.values()
@@ -225,7 +224,7 @@ class ExecutionContextWrapper:
 
     def get_outputs(self) -> Dict[str, Any]:
         """Get all successful node outputs."""
-        results = self.state.get("_node_results", {})
+        results = getattr(self.state, "node_results", {})
         return {
             node_id: result.get("output")
             for node_id, result in results.items()
@@ -237,37 +236,37 @@ class ExecutionContextWrapper:
     @property
     def workflow_id(self) -> str:
         """Get the workflow ID."""
-        return self.state.get("_workflow_id", "")
+        return getattr(self.state, "workflow_id", "")
 
     @property
     def current_node(self) -> str:
         """Get the current node."""
-        return self.state.get("_current_node", "")
+        return getattr(self.state, "current_node", "")
 
     @current_node.setter
     def current_node(self, value: str) -> None:
         """Set the current node."""
-        self.state["_current_node"] = value
+        self.state.current_node = value
 
     @property
     def is_complete(self) -> bool:
         """Check if workflow is complete."""
-        return self.state.get("_is_complete", False)
+        return getattr(self.state, "is_complete", False)
 
     @is_complete.setter
     def is_complete(self, value: bool) -> None:
         """Set completion status."""
-        self.state["_is_complete"] = value
+        self.state.is_complete = value
 
     @property
     def error(self) -> Optional[str]:
         """Get error message."""
-        return self.state.get("_error")
+        return getattr(self.state, "error", None)
 
     @error.setter
     def error(self, value: Optional[str]) -> None:
         """Set error message."""
-        self.state["_error"] = value
+        self.state.error = value
 
 
 # =============================================================================
@@ -275,14 +274,14 @@ class ExecutionContextWrapper:
 # =============================================================================
 
 
-def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
+def from_workflow_context(ctx: "WorkflowContext") -> WorkflowExecutionContextModel:
     """Convert legacy WorkflowContext to ExecutionContext.
 
     Args:
         ctx: Legacy WorkflowContext dataclass
 
     Returns:
-        ExecutionContext with data migrated from WorkflowContext
+        WorkflowExecutionContextModel with data migrated from WorkflowContext
     """
     from victor.workflows.executor import WorkflowContext
 
@@ -310,26 +309,35 @@ def from_workflow_context(ctx: "WorkflowContext") -> ExecutionContext:
         lookback_periods = ctx.temporal.lookback_periods
         include_end_date = ctx.temporal.include_end_date
 
-    return _build_execution_context(
-        initial_data=ctx.data,
-        workflow_id=ctx.metadata.get("workflow_id", str(uuid.uuid4())),
+    # Create Pydantic model
+    model = WorkflowExecutionContextAdapter.create_initial(
+        workflow_id=ctx.metadata.get("workflow_id"),
         workflow_name=ctx.metadata.get("workflow_name", ""),
         current_node=ctx.metadata.get("current_node", ""),
-        node_results=node_results,
-        iteration=ctx.metadata.get("iteration", 0),
-        visited_nodes=list(ctx.node_results.keys()),
-        as_of_date=as_of_date,
-        lookback_periods=lookback_periods,
-        include_end_date=include_end_date,
-        success=not ctx.has_failures(),
+        initial_data=ctx.data,
     )
 
+    # Set additional fields
+    model.node_results = node_results
+    model.iteration = ctx.metadata.get("iteration", 0)
+    model.as_of_date = as_of_date
+    model.lookback_periods = lookback_periods
+    model.include_end_date = include_end_date
+    model.is_complete = True
+    model.success = not ctx.has_failures()
 
-def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
+    # Set visited nodes from node results
+    for node_id in ctx.node_results.keys():
+        model.visit_node(node_id)
+
+    return model
+
+
+def to_workflow_context(ctx: WorkflowExecutionContextModel) -> "WorkflowContext":
     """Convert ExecutionContext to legacy WorkflowContext.
 
     Args:
-        ctx: ExecutionContext TypedDict
+        ctx: WorkflowExecutionContextModel
 
     Returns:
         WorkflowContext dataclass for use with legacy code
@@ -343,7 +351,7 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
 
     # Convert node results from dict to NodeResult
     node_results: Dict[str, NodeResult] = {}
-    for node_id, result in ctx.get("_node_results", {}).items():
+    for node_id, result in ctx.node_results.items():
         if isinstance(result, dict):
             # Map status string to enum
             status_str = result.get("status", "completed")
@@ -367,23 +375,23 @@ def to_workflow_context(ctx: ExecutionContext) -> "WorkflowContext":
 
     # Build temporal context if present
     temporal = None
-    if ctx.get("_as_of_date"):
+    if ctx.as_of_date:
         temporal = TemporalContext(
-            as_of_date=ctx.get("_as_of_date"),
-            lookback_periods=ctx.get("_lookback_periods"),
-            include_end_date=ctx.get("_include_end_date", True),
+            as_of_date=ctx.as_of_date,
+            lookback_periods=ctx.lookback_periods,
+            include_end_date=ctx.include_end_date,
         )
 
     # Build metadata
     metadata = {
-        "workflow_id": ctx.get("_workflow_id", ""),
-        "workflow_name": ctx.get("_workflow_name", ""),
-        "current_node": ctx.get("_current_node", ""),
-        "iteration": ctx.get("_iteration", 0),
+        "workflow_id": ctx.workflow_id,
+        "workflow_name": ctx.workflow_name,
+        "current_node": ctx.current_node,
+        "iteration": ctx.iteration,
     }
 
     return WorkflowContext(
-        data=ctx.get("data", {}).copy(),
+        data=ctx.data.copy(),
         node_results=node_results,
         metadata=metadata,
         temporal=temporal,

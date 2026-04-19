@@ -196,6 +196,68 @@ class WorkflowExecutionContextModel(BaseModel):
         self.is_complete = True
         self.success = success
 
+    # Dict-like methods for compatibility with StateGraph
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value by key (dict-like interface)."""
+        # First check if it's a direct attribute (data, messages)
+        if hasattr(self, key):
+            return getattr(self, key)
+        # Otherwise convert to dict format with underscore prefixes
+        dict_key = f"_{key}" if not key.startswith("_") else key
+        dict_repr = self.to_dict()
+        return dict_repr.get(dict_key, default)
+
+    def keys(self) -> list:
+        """Return list of keys (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        keys = list(dict_repr.keys())
+        if hasattr(self, "data"):
+            # Remove "data" key and add its contents at top level
+            keys.remove("data")
+            keys.extend(self.data.keys())
+        return keys
+
+    def items(self) -> list:
+        """Return list of (key, value) tuples (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        items = list(dict_repr.items())
+        if hasattr(self, "data") and "data" in dict_repr:
+            # Remove "data" entry and add its contents at top level
+            items = [kv for kv in items if kv[0] != "data"]
+            items.extend(self.data.items())
+        return items
+
+    def values(self) -> list:
+        """Return list of values (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        values = list(dict_repr.values())
+        if hasattr(self, "data") and "data" in dict_repr:
+            # Remove "data" value and add its contents at top level
+            values = [v for k, v in dict_repr.items() if k != "data"]
+            values.extend(self.data.values())
+        return values
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item by key (dict-like subscript access)."""
+        return self.get(key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item by key (dict-like subscript access)."""
+        # First check if it's a direct attribute (data, messages)
+        if hasattr(self.__class__, key):
+            setattr(self, key, value)
+        else:
+            # Convert underscore-prefixed keys to attribute names
+            attr_name = key.lstrip("_")
+            if hasattr(self.__class__, attr_name):
+                setattr(self, attr_name, value)
+            else:
+                # For unknown keys, store them in the data field
+                self.data[key] = value
+
 
 class WorkflowStateModel(BaseModel):
     """Generic state for compiled workflow execution (Pydantic v2).
@@ -204,6 +266,7 @@ class WorkflowStateModel(BaseModel):
     workflow execution context fields.
 
     Attributes:
+        data: User data dictionary for workflow state
         workflow_id: Unique workflow execution ID
         workflow_name: Name of the workflow being executed
         current_node: Currently executing node ID
@@ -223,6 +286,7 @@ class WorkflowStateModel(BaseModel):
     )
 
     # Fields
+    data: Dict[str, Any] = Field(default_factory=dict)
     workflow_id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     workflow_name: str = Field(default="")
     current_node: str = Field(default="")
@@ -246,6 +310,7 @@ class WorkflowStateModel(BaseModel):
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dict compatible with TypedDict-based code."""
         return {
+            "data": self.data,
             "_workflow_id": self.workflow_id,
             "_workflow_name": self.workflow_name,
             "_current_node": self.current_node,
@@ -261,6 +326,7 @@ class WorkflowStateModel(BaseModel):
     def from_dict(cls, data: Dict[str, Any]) -> WorkflowStateModel:
         """Create Pydantic model from dict (TypedDict-compatible)."""
         return cls(
+            data=data.get("data", {}),
             workflow_id=data.get("_workflow_id", uuid.uuid4().hex),
             workflow_name=data.get("_workflow_name", ""),
             current_node=data.get("_current_node", ""),
@@ -271,6 +337,118 @@ class WorkflowStateModel(BaseModel):
             hitl_pending=data.get("_hitl_pending", False),
             hitl_response=data.get("_hitl_response"),
         )
+
+    # Dict-like methods for compatibility with StateGraph
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value by key (dict-like interface)."""
+        # First check if it's a direct attribute (data, messages, etc.)
+        if hasattr(self.__class__, key):
+            return getattr(self, key)
+
+        # Check if it's in the data field (user data)
+        if hasattr(self, "data") and key in self.data:
+            return self.data[key]
+
+        # Otherwise convert to dict format with underscore prefixes
+        dict_key = f"_{key}" if not key.startswith("_") else key
+        dict_repr = self.to_dict()
+        return dict_repr.get(dict_key, default)
+
+    def keys(self) -> list:
+        """Return list of keys (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        keys = list(dict_repr.keys())
+        if hasattr(self, "data"):
+            # Remove "data" key and add its contents at top level
+            keys.remove("data")
+            keys.extend(self.data.keys())
+        return keys
+
+    def items(self) -> list:
+        """Return list of (key, value) tuples (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        items = list(dict_repr.items())
+        if hasattr(self, "data") and "data" in dict_repr:
+            # Remove "data" entry and add its contents at top level
+            items = [kv for kv in items if kv[0] != "data"]
+            items.extend(self.data.items())
+        return items
+
+    def values(self) -> list:
+        """Return list of values (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        values = list(dict_repr.values())
+        if hasattr(self, "data") and "data" in dict_repr:
+            # Remove "data" value and add its contents at top level
+            values = [v for k, v in dict_repr.items() if k != "data"]
+            values.extend(self.data.values())
+        return values
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item by key (dict-like subscript access)."""
+        return self.get(key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item by key (dict-like subscript access)."""
+        # Convert underscore-prefixed keys to attribute names
+        attr_name = key.lstrip("_")
+        if hasattr(self, attr_name):
+            setattr(self, attr_name, value)
+        else:
+            # For unknown keys, store them in the data field
+            self.data[key] = value
+
+    # Dict-like methods for compatibility with StateGraph
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value by key (dict-like interface)."""
+        # First check if it's a direct attribute (data, messages, etc.)
+        if hasattr(self.__class__, key):
+            return getattr(self, key)
+
+        # Check if it's in the data field (user data)
+        if hasattr(self, "data") and key in self.data:
+            return self.data[key]
+
+        # Otherwise convert to dict format with underscore prefixes
+        dict_key = f"_{key}" if not key.startswith("_") else key
+        dict_repr = self.to_dict()
+        return dict_repr.get(dict_key, default)
+
+    def keys(self) -> list:
+        """Return list of keys (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        keys = list(dict_repr.keys())
+        if hasattr(self, "data"):
+            # Remove "data" key and add its contents at top level
+            keys.remove("data")
+            keys.extend(self.data.keys())
+        return keys
+
+    def items(self) -> list:
+        """Return list of (key, value) tuples (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        items = list(dict_repr.items())
+        if hasattr(self, "data") and "data" in dict_repr:
+            # Remove "data" entry and add its contents at top level
+            items = [kv for kv in items if kv[0] != "data"]
+            items.extend(self.data.items())
+        return items
+
+    def values(self) -> list:
+        """Return list of values (dict-like interface)."""
+        dict_repr = self.to_dict()
+        # Include data field contents at top level
+        values = list(dict_repr.values())
+        if hasattr(self, "data") and "data" in dict_repr:
+            # Remove "data" value and add its contents at top level
+            values = [v for k, v in dict_repr.items() if k != "data"]
+            values.extend(self.data.values())
+        return values
 
 
 __all__ = [

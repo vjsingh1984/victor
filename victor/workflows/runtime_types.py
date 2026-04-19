@@ -51,6 +51,7 @@ def create_initial_workflow_state(
     kwargs = {
         "workflow_name": workflow_name,
         "current_node": current_node,
+        "data": {},  # Initialize with empty data dict
     }
     if workflow_id is not None:
         kwargs["workflow_id"] = workflow_id
@@ -58,7 +59,24 @@ def create_initial_workflow_state(
     state = WorkflowStateModel(**kwargs)
 
     if initial_state:
-        # Update system fields from initial_state
+        # Separate user data from system fields
+        system_keys = {
+            "_workflow_id",
+            "_workflow_name",
+            "_current_node",
+            "_node_results",
+            "_error",
+            "_iteration",
+            "_parallel_results",
+            "_hitl_pending",
+            "_hitl_response",
+        }
+
+        # User data goes into the data field
+        user_data = {k: v for k, v in initial_state.items() if k not in system_keys}
+        state.data.update(user_data)
+
+        # System fields update the model directly
         if "_node_results" in initial_state:
             state.node_results = initial_state["_node_results"]
         if "_error" in initial_state:

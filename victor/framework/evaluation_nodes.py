@@ -156,7 +156,7 @@ class EvaluationCheckpoint:
             "checkpoint_id": self.checkpoint_id,
             "node_id": self.node_id,
             "timestamp": self.timestamp.isoformat(),
-            "state_keys": list(self.state.keys()),
+            "state_keys": list(self.state.to_dict().keys()) if hasattr(self.state, "to_dict") else list(self.state.keys()),
             "decision": str(self.result.decision),
             "score": self.result.score,
             "reason": self.result.reason,

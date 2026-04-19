@@ -127,7 +127,7 @@ class ExecutorResult:
             "checkpoints_saved": self.checkpoints_saved,
             "interrupted": self.interrupted,
             "interrupt_node": self.interrupt_node,
-            "state_keys": list(self.state.keys()),
+            "state_keys": list(self.state.to_dict().keys()) if hasattr(self.state, "to_dict") else list(self.state.keys()),
         }
 
 
@@ -281,7 +281,9 @@ class StateGraphExecutor:
             result = await compiled.invoke(state, thread_id=thread_id)
 
             # Extract user state (exclude internal fields)
-            user_state = {k: v for k, v in result.state.items() if not k.startswith("_")}
+            # Convert Pydantic model to dict for compatibility
+            state_dict = result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
+            user_state = {k: v for k, v in state_dict.items() if not k.startswith("_")}
 
             return ExecutorResult(
                 success=result.success,

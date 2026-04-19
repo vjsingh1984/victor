@@ -854,7 +854,9 @@ async def _execute_workflow_async(
         logger.debug(f"   Success: {result.success}")
         logger.debug(f"   Duration: {result.duration_seconds:.2f}s")
         logger.debug(f"   Nodes Executed: {len(result.nodes_executed)}")
-        logger.debug(f"   Final State Keys: {list(result.state.keys())}")
+        # Convert Pydantic model to dict if needed for keys()
+        state_dict = result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
+        logger.debug(f"   Final State Keys: {list(state_dict.keys())}")
         logger.debug(f"{'='*80}\n")
 
         console.print("[dim]" + "─" * 50 + "[/]")
@@ -866,9 +868,11 @@ async def _execute_workflow_async(
 
             if result.state:
                 console.print("\n[bold]Final State:[/]")
+                # Convert Pydantic model to dict if needed
+                state_dict = result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
                 display_state = {
                     k: v
-                    for k, v in result.state.items()
+                    for k, v in state_dict.items()
                     if not k.startswith("_") and k not in {"messages", "history"}
                 }
                 console.print(json.dumps(display_state, indent=2, default=str)[:2000])

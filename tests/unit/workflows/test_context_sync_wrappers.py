@@ -67,7 +67,8 @@ class TestExecutionContextWrapperSyncBridge:
 
         wrapper._manager.set.assert_called_once_with("answer", 42)
         mock_run_sync.assert_called_once_with(coro)
-        assert wrapper.state["data"]["answer"] == 42
+        # Pydantic models use attribute access
+        assert wrapper.state.data["answer"] == 42
 
     def test_update_uses_shared_sync_bridge_without_running_loop(self) -> None:
         wrapper = context_module.ExecutionContextWrapper(context_module.create_execution_context())
@@ -84,4 +85,5 @@ class TestExecutionContextWrapperSyncBridge:
 
         wrapper._manager.update.assert_called_once_with(values)
         mock_run_sync.assert_called_once_with(coro)
-        assert wrapper.state["data"] == values
+        # Pydantic models use attribute access
+        assert wrapper.state.data == values
