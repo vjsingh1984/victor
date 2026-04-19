@@ -254,7 +254,15 @@ class ProviderCoordinator:
             return result
 
         except Exception as e:
-            logger.error(f"Failed to switch provider to {provider_name}: {e}")
+            from victor.framework.contextual_errors import ContextualError
+
+            error_msg = f"Failed to switch provider to {provider_name}: {e}"
+            logger.error(error_msg)
+            # Log actionable suggestion for users
+            logger.error(
+                "💡 Suggestion: Verify the provider is available and configured. "
+                "Run 'victor doctor' to check provider status."
+            )
             return False
 
     async def switch_model(self, model: str) -> bool:
@@ -289,7 +297,15 @@ class ProviderCoordinator:
             return result
 
         except Exception as e:
-            logger.error(f"Failed to switch model to {model}: {e}")
+            from victor.framework.contextual_errors import ContextualError
+
+            error_msg = f"Failed to switch model to {model}: {e}"
+            logger.error(error_msg)
+            # Log actionable suggestion for users
+            logger.error(
+                f"💡 Suggestion: Verify the model is supported by the current provider. "
+                f"Run 'victor models --provider {self.provider_name}' to list available models."
+            )
             return False
 
     def get_current_provider_info(self) -> Dict[str, Any]:

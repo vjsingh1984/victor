@@ -417,7 +417,11 @@ class ToolCoordinator:
             List of selected tool definitions
         """
         if not self._selector:
-            logger.warning("No tool selector configured, returning empty list")
+            logger.warning(
+                "No tool selector configured, returning empty list. "
+                "💡 Suggestion: Configure tool selection in settings or use --auto-skill flag. "
+                "Run 'victor doctor' to check configuration."
+            )
             return []
 
         max_count = max_tools or self._config.max_tools_per_selection
@@ -456,7 +460,11 @@ class ToolCoordinator:
             return tools
 
         except Exception as e:
-            logger.warning(f"Tool selection failed: {e}, returning empty list")
+            logger.warning(
+                f"Tool selection failed: {e}, returning empty list. "
+                "💡 Suggestion: Check semantic search configuration. "
+                "Run 'victor doctor' for diagnostics."
+            )
             return []
 
     # =====================================================================
@@ -719,7 +727,11 @@ class ToolCoordinator:
         call_count = len(tool_calls)
 
         if remaining < call_count:
-            logger.warning(f"Insufficient budget: {remaining} remaining, {call_count} requested")
+            logger.warning(
+                f"Insufficient budget: {remaining} remaining, {call_count} requested. "
+                "💡 Suggestion: Increase tool budget with --tool-budget flag or in profiles.yaml. "
+                "Run 'victor doctor' to check current settings."
+            )
 
         # Build execution context
         execution_context = {}
