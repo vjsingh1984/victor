@@ -815,6 +815,12 @@ class ToolExecutor:
                     truncation_info.lines_returned,
                     truncation_info.truncation_reason,
                 )
+                remaining = truncation_info.total_lines - truncation_info.lines_returned
+                result = (
+                    result
+                    + f"\n[OUTPUT TRUNCATED: {remaining} lines omitted to fit context window. "
+                    f"Use offset={truncation_info.lines_returned} to read remaining content.]"
+                )
 
         exec_result = ToolExecutionResult(
             tool_name=tool_name,

@@ -119,14 +119,21 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
             return ToolCallParseResult(remaining_content=content)
 
         tool_calls = []
+        warnings = []
         for tc in raw_tool_calls:
-            if not self.is_valid_tool_name(tc.get("name", "")):
+            name = tc.get("name", "")
+            tc_id = tc.get("id")
+            if not self.is_valid_tool_name(name):
+                warnings.append(f"Skipped invalid tool name: {name}")
+                # Keep with id so pipeline generates error response
+                if tc_id:
+                    tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                 continue
             tool_calls.append(
                 ToolCall(
-                    name=tc.get("name", ""),
+                    name=name,
                     arguments=tc.get("arguments", {}),
-                    id=tc.get("id"),
+                    id=tc_id,
                 )
             )
 
@@ -135,6 +142,7 @@ class AnthropicToolCallingAdapter(BaseToolCallingAdapter):
             remaining_content=content,
             parse_method="native",
             confidence=1.0,
+            warnings=warnings,
         )
 
 
@@ -258,8 +266,13 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
             for tc in raw_tool_calls:
                 name = tc.get("name", "")
+                tc_id = tc.get("id")
                 if not self.is_valid_tool_name(name):
                     native_warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    # (OpenAI spec: every tool_calls[].id needs a role=tool)
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 # Parse arguments (may be string or dict)
@@ -271,7 +284,7 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                         native_warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(
@@ -1344,8 +1357,12 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
             tool_calls = []
             for tc in raw_tool_calls:
                 name = tc.get("name", "")
+                tc_id = tc.get("id")
                 if not self.is_valid_tool_name(name):
                     warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 args = tc.get("arguments", {})
@@ -1356,7 +1373,7 @@ class OpenAICompatToolCallingAdapter(BaseToolCallingAdapter):
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(
@@ -1601,6 +1618,7 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             tool_calls = []
 
             for tc in raw_tool_calls:
+                tc_id = tc.get("id")
                 # Handle OpenAI format with nested function
                 if "function" in tc:
                     func = tc["function"]
@@ -1613,6 +1631,9 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
                 if not self.is_valid_tool_name(name):
                     warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 # Parse arguments (may be string or dict)
@@ -1623,7 +1644,7 @@ class DeepSeekToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(
@@ -1786,9 +1807,13 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
 
         for tc in raw_tool_calls:
             name = tc.get("name", "")
+            tc_id = tc.get("id")
 
             if not self.is_valid_tool_name(name):
                 warnings.append(f"Skipped invalid tool name: {name}")
+                # Keep with id so pipeline generates error response
+                if tc_id:
+                    tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                 continue
 
             # Bedrock returns arguments already parsed as dict
@@ -1804,7 +1829,7 @@ class BedrockToolCallingAdapter(BaseToolCallingAdapter):
                 ToolCall(
                     name=name,
                     arguments=arguments,
-                    id=tc.get("id"),
+                    id=tc_id,
                 )
             )
 
@@ -1934,6 +1959,7 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
             tool_calls = []
 
             for tc in raw_tool_calls:
+                tc_id = tc.get("id")
                 # Handle OpenAI format with nested function
                 if "function" in tc:
                     func = tc["function"]
@@ -1946,6 +1972,9 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
 
                 if not self.is_valid_tool_name(name):
                     warnings.append(f"Skipped invalid tool name: {name}")
+                    # Keep with id so pipeline generates error response
+                    if tc_id:
+                        tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                     continue
 
                 # Parse arguments (may be string or dict)
@@ -1956,7 +1985,7 @@ class AzureOpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter
                         warnings.append(f"Failed to parse arguments for {name}")
                         args = {}
 
-                tool_calls.append(ToolCall(name=name, arguments=args, id=tc.get("id")))
+                tool_calls.append(ToolCall(name=name, arguments=args, id=tc_id))
 
             if tool_calls:
                 return ToolCallParseResult(

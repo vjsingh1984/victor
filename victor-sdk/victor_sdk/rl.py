@@ -20,6 +20,7 @@ class LearnerType(str, Enum):
     MODEL_SELECTOR = "model_selector"
     MODE_TRANSITION = "mode_transition"
     PROMPT_TEMPLATE = "prompt_template"
+    OPTION_FRAMEWORK = "option_framework"
 
 
 DEFAULT_PATIENCE_MAP: Dict[str, int] = {

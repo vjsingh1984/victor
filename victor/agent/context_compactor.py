@@ -290,6 +290,7 @@ class ContextCompactor:
         pruning_learner: Optional["ContextPruningLearner"] = None,
         provider_type: str = "cloud",
         event_bus: Optional[Any] = None,
+        decision_service: Optional[Any] = None,
     ):
         """Initialize the context compactor.
 
@@ -299,12 +300,14 @@ class ContextCompactor:
             pruning_learner: Optional RL learner for adaptive pruning decisions
             provider_type: Provider type for RL state (cloud, local)
             event_bus: Optional event bus for compaction events (ObservabilityBus)
+            decision_service: Optional TieredDecisionService for tier-based compaction routing
         """
         self.controller = controller
         self.config = config or CompactorConfig()
         self.pruning_learner = pruning_learner
         self.provider_type = provider_type
         self._event_bus = event_bus
+        self._decision_service = decision_service
         self._last_compaction_turn: int = 0
         self._total_chars_freed: int = 0
         self._total_tokens_freed: int = 0
@@ -317,8 +320,143 @@ class ContextCompactor:
 
         logger.debug(
             f"ContextCompactor initialized (threshold: {self.config.proactive_threshold:.0%}, "
-            f"rl_enabled: {self._rl_enabled})"
+            f"rl_enabled: {self._rl_enabled}, "
+            f"decision_service: {decision_service is not None})"
         )
+
+    # ========================================================================
+    # Tier-Based Provider Selection
+    # ========================================================================
+
+    def _get_provider_for_tier(self, tier: str) -> Optional["BaseProvider"]:
+        """Get a provider instance for the specified tier.
+
+        Args:
+            tier: One of 'edge', 'balanced', 'performance'
+
+        Returns:
+            Provider instance for the tier, or None if unavailable
+        """
+        try:
+            from victor.config.decision_settings import DecisionServiceSettings
+            from victor.providers.registry import ProviderRegistry
+
+            # Get tier spec from settings
+            settings = DecisionServiceSettings()
+            spec = getattr(settings, tier, None)
+            if spec is None:
+                logger.debug(f"No spec found for tier '{tier}'")
+                return None
+
+            # Build provider kwargs
+            provider_kwargs: Dict[str, Any] = {"timeout": spec.timeout_ms // 1000}
+
+            if spec.provider == "ollama":
+                provider_kwargs["base_url"] = "http://localhost:11434"
+            else:
+                try:
+                    from victor.config.api_keys import get_api_key
+
+                    api_key = get_api_key(spec.provider)
+                    if api_key:
+                        provider_kwargs["api_key"] = api_key
+                except Exception:
+                    pass
+
+            provider = ProviderRegistry.create(spec.provider, **provider_kwargs)
+            logger.debug(f"Created provider for tier '{tier}': {spec.provider}/{spec.model}")
+            return provider
+
+        except Exception as e:
+            logger.warning(f"Failed to create provider for tier '{tier}': {e}")
+            return None
+
+    def _get_default_provider(self) -> Optional["BaseProvider"]:
+        """Get the default provider from the orchestrator.
+
+        Returns:
+            The active provider from ProviderManager, or None if unavailable
+        """
+        try:
+            if self.controller and hasattr(self.controller, "_orchestrator"):
+                provider_manager = self.controller._orchestrator.provider_manager
+                return provider_manager.get_active_provider()
+        except Exception as e:
+            logger.debug(f"Failed to get default provider: {e}")
+        return None
+
+    def get_prompt_optimization_decision(
+        self,
+        current_query: Optional[str] = None,
+        recent_failures: Optional[List[str]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Get a system prompt optimization decision for dynamic prompts.
+
+        When system_prompt_strategy is 'dynamic', this method uses the decision
+        service to determine which prompt sections to include based on current
+        context and recent failures.
+
+        Args:
+            current_query: Current user query for context
+            recent_failures: Optional list of recent error messages for failure hints
+
+        Returns:
+            Dict with optimization decision, or None if decision service unavailable
+        """
+        if not self._decision_service:
+            return None
+
+        try:
+            from victor.agent.decisions.schemas import DecisionType
+
+            # Build context for optimization decision
+            context = {
+                "current_query": current_query or "",
+                "recent_failures": recent_failures or [],
+                "compaction_count": self._compaction_count,
+                "utilization": self.controller.get_context_metrics().utilization if self.controller else 0.0,
+            }
+
+            # Use decision service for optimization
+            # Note: We'll use a simple heuristic for now since we don't have a dedicated
+            # SYSTEM_PROMPT_OPTIMIZATION decision type yet
+            # This can be extended later with a proper decision type
+
+            # Simple heuristic-based optimization
+            all_sections = [
+                "concise_mode",
+                "task_guidance",
+                "tool_constraint",
+                "completion",
+                "tool_guidance",
+                "few_shot_examples",
+            ]
+
+            # Include context reminder if we've compacted recently
+            add_context_reminder = self._compaction_count > 0
+
+            # Add failure hints if there are recent failures
+            add_failure_hints = bool(recent_failures)
+
+            # Adjust for complexity based on utilization
+            adjust_for_complexity = context["utilization"] > 0.7
+
+            # For dynamic mode, include all sections by default
+            # (can be refined later with edge model decision)
+            include_sections = all_sections
+
+            return {
+                "include_sections": include_sections,
+                "add_context_reminder": add_context_reminder,
+                "add_failure_hints": add_failure_hints,
+                "adjust_for_complexity": adjust_for_complexity,
+                "confidence": 0.8,
+                "reason": "Heuristic-based prompt optimization",
+            }
+
+        except Exception as e:
+            logger.debug(f"Prompt optimization decision failed: {e}")
+            return None
 
     # ========================================================================
     # Message Priority Assignment
@@ -391,37 +529,45 @@ class ContextCompactor:
     def _maybe_summarize_turns(self) -> Optional[CompactionAction]:
         """Summarize old turns if conversation exceeds turn threshold.
 
-        Uses LLMCompactionSummarizer (edge model) to produce a compact
-        summary of the oldest turns. Summary replaces the original messages
-        in the active context while originals remain in SQLite.
+        Uses LLMCompactionSummarizer to produce a compact summary of the
+        oldest turns. This preserves intent and decisions better than simple
+        pruning. Summary replaces original messages in the active context.
+
+        Uses decision service for tier-based routing:
+        - Simple compaction (≤8 messages) → Edge tier (fast, free)
+        - Complex compaction (>8 messages) → Performance tier (high quality)
+        - Falls back to main LLM if decision service unavailable
 
         Returns:
             CompactionAction if summarization occurred, None otherwise.
         """
         from victor.config.orchestrator_constants import SUMMARIZATION_CONFIG
+        from victor.agent.llm_compaction_summarizer import LLMCompactionSummarizer
+        from victor.agent.decisions.schemas import DecisionType
 
         if not SUMMARIZATION_CONFIG.enabled or self.controller is None:
             return None
 
         messages = self.controller.messages
+        # Count user messages as turn indicators
         turn_count = sum(1 for m in messages if m.role == "user")
         if turn_count <= SUMMARIZATION_CONFIG.trigger_turn_count:
             return None
 
-        # Already summarized recently? Skip (check by last compaction turn)
+        # Already summarized recently? Skip to avoid excessive LLM calls
         if self._last_compaction_turn > 0:
             turns_since_last = turn_count - self._last_compaction_turn
             if turns_since_last < SUMMARIZATION_CONFIG.max_turns_to_summarize:
                 return None
 
-        # Find the oldest N turns (turn = user msg + subsequent assistant/tool msgs)
+        # Find the oldest turns to summarize
         turn_boundaries = [i for i, m in enumerate(messages) if m.role == "user"]
         if len(turn_boundaries) <= SUMMARIZATION_CONFIG.trigger_turn_count:
             return None
 
-        # Keep system prompt (index 0 if present)
+        # Always preserve the root system prompt (index 0)
         start_idx = 1 if messages and messages[0].role == "system" else 0
-        # Summarize up to max_turns_to_summarize oldest turns
+        # Summarize up to N oldest turns
         end_turn_idx = min(SUMMARIZATION_CONFIG.max_turns_to_summarize, len(turn_boundaries) - 3)
         if end_turn_idx <= 0:
             return None
@@ -432,69 +578,124 @@ class ContextCompactor:
         if not turns_to_summarize:
             return None
 
-        # Build summary text (heuristic — no LLM call for now, can upgrade later)
-        tool_names = set()
-        files_mentioned = set()
-        key_decisions = []
-        for msg in turns_to_summarize:
-            tool_name = getattr(msg, "tool_name", None)
-            if tool_name:
-                tool_names.add(tool_name)
-            # Extract file paths mentioned
-            import re
+        # Determine complexity and select provider
+        provider = None
+        complexity = "complex" if len(turns_to_summarize) > 8 else "simple"
+        estimated_tokens = sum(self.estimate_message_tokens(m) for m in turns_to_summarize)
 
-            paths = re.findall(r"[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)", msg.content[:500])
-            files_mentioned.update(paths[:5])
-            # Extract short decisions from assistant messages
-            if msg.role == "assistant" and len(msg.content) > 50:
-                first_line = msg.content.split("\n")[0][:150]
-                if first_line:
-                    key_decisions.append(first_line)
+        # Try decision service for tier-based routing
+        if self._decision_service:
+            try:
+                decision_result = self._decision_service.decide_sync(
+                    DecisionType.COMPACTION,
+                    context={
+                        "message_count": len(turns_to_summarize),
+                        "estimated_tokens": estimated_tokens,
+                        "complexity": complexity,
+                    },
+                    heuristic_result=None,
+                )
 
-        summary_parts = [f"[Context summary of {len(turns_to_summarize)} earlier messages]"]
-        if tool_names:
-            summary_parts.append(f"Tools used: {', '.join(sorted(tool_names)[:10])}")
-        if files_mentioned:
-            summary_parts.append(f"Files: {', '.join(sorted(files_mentioned)[:8])}")
-        if key_decisions:
-            summary_parts.append("Key points:")
-            for d in key_decisions[:5]:
-                summary_parts.append(f"  - {d}")
+                if decision_result and decision_result.result:
+                    decision = decision_result.result
+                    recommended_tier = getattr(decision, "recommended_tier", None)
+                    if recommended_tier:
+                        provider = self._get_provider_for_tier(recommended_tier)
+                        logger.debug(
+                            f"Compaction decision: tier={recommended_tier}, "
+                            f"complexity={complexity}, messages={len(turns_to_summarize)}"
+                        )
+            except Exception as e:
+                logger.debug(f"Decision service failed, using fallback: {e}")
 
-        summary_text = "\n".join(summary_parts)
+        # Fallback to default provider if decision service didn't return one
+        if provider is None:
+            provider = self._get_default_provider()
+            if provider is None:
+                logger.debug("No provider available for summarization")
+                return None
+
+        # Attempt LLM-based summarization
+        summary_text = ""
+        try:
+            summarizer = LLMCompactionSummarizer(provider=provider)
+            summary_text = summarizer.summarize(turns_to_summarize)
+        except Exception as e:
+            logger.debug(f"LLM summarization failed, falling back to heuristic: {e}")
+            summary_text = self._heuristic_summarize(turns_to_summarize)
+
+        if not summary_text:
+            return None
+
+        # Wrap summary in a message
+        from victor.providers.base import Message
+        summary_msg = Message(
+            role="assistant",
+            content=f"[Context summary of {len(turns_to_summarize)} earlier messages]\n{summary_text}"
+        )
 
         # Replace old turns with summary message
-        from victor.providers.base import Message
-
-        summary_msg = Message(role="assistant", content=summary_text)
-
-        # Remove old turns and insert summary
         chars_before = sum(len(m.content) for m in turns_to_summarize)
         del messages[start_idx:end_msg_idx]
         messages.insert(start_idx, summary_msg)
 
-        chars_after = len(summary_text)
+        chars_after = len(summary_msg.content)
         chars_freed = chars_before - chars_after
         self._last_compaction_turn = sum(1 for m in messages if m.role == "user")
 
         logger.info(
-            "[summarize] Replaced %d messages with summary (%dK → %dK chars, freed %dK)",
+            "Summarized %d messages (%dK -> %dK chars, freed %dK, complexity=%s)",
             len(turns_to_summarize),
             chars_before // 1024,
             chars_after // 1024,
             chars_freed // 1024,
+            complexity,
         )
 
         return CompactionAction(
             trigger=CompactionTrigger.THRESHOLD,
             messages_removed=len(turns_to_summarize) - 1,
             tokens_freed=self._estimate_tokens(chars_freed),
-            new_utilization=0.0,  # Will be recalculated
+            new_utilization=0.0,
             details=[
-                f"Summarized {len(turns_to_summarize)} messages into 1",
+                f"LLM summarized {len(turns_to_summarize)} messages",
                 f"Freed ~{chars_freed // 4} tokens",
+                f"Complexity: {complexity}",
             ],
         )
+
+    def _heuristic_summarize(self, turns: List[Any]) -> str:
+        """Fallback heuristic summarization if LLM call fails."""
+        tool_names = set()
+        files_mentioned = set()
+        key_decisions = []
+        for msg in turns:
+            tool_name = getattr(msg, "tool_name", None)
+            if tool_name:
+                tool_names.add(tool_name)
+            
+            # Extract file paths
+            import re
+            paths = re.findall(r"[\w./]+\.(?:py|js|ts|rs|go|java|yaml|json)", msg.content[:500])
+            files_mentioned.update(paths[:5])
+            
+            # Extract decisions from assistant
+            if msg.role == "assistant" and len(msg.content) > 50:
+                first_line = msg.content.split("\n")[0][:150]
+                if first_line:
+                    key_decisions.append(first_line)
+
+        summary_parts = []
+        if tool_names:
+            summary_parts.append(f"Tools used: {', '.join(sorted(tool_names)[:10])}")
+        if files_mentioned:
+            summary_parts.append(f"Files touched: {', '.join(sorted(files_mentioned)[:8])}")
+        if key_decisions:
+            summary_parts.append("Key points:")
+            for d in key_decisions[:5]:
+                summary_parts.append(f"  - {d}")
+        
+        return "\n".join(summary_parts) if summary_parts else "Prior history summarized."
 
     def check_and_compact(
         self,
@@ -540,7 +741,7 @@ class ContextCompactor:
                     task_complexity=task_complexity,
                     provider_type=self.provider_type,
                 )
-                rl_action = recommendation.action
+                rl_action = recommendation.value
                 rl_config = recommendation.metadata.get("config", {})
                 self._last_rl_action = rl_action
                 logger.debug(

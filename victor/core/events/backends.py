@@ -1254,8 +1254,10 @@ class ObservabilityBus:
         from victor.core.events.emit_helper import emit_event_sync
 
         emit_event_sync(
+            self,
             f"lifecycle.{event_name}",
             data or {},
+            source="observability",
         )
 
     def emit_metric(

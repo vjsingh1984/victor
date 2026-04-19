@@ -177,7 +177,13 @@ class IToolCoordinator(Protocol):
 
 
 class ToolCoordinator:
-    """Coordinates tool selection, budgeting, and execution.
+    """[DEPRECATED] Coordinator for tool selection, budgeting, and execution.
+
+    This class is being superseded by ToolService as part of the
+    state-passed architectural migration. It remains for backward
+    compatibility with legacy facade-driven components.
+
+    **Migration Path**: Use ToolService instead for all new code.
 
     This class consolidates tool-related operations that were spread across
     the orchestrator, providing a unified interface for:
@@ -197,13 +203,25 @@ class ToolCoordinator:
             config=ToolCoordinatorConfig(default_budget=30),
         )
 
-        # In orchestrator:
+        # In orchestrator (legacy):
         context = TaskContext(message=user_query, task_type="edit")
         tools = await coordinator.select_tools(context)
 
         # Check if we can execute more tools
         if coordinator.get_remaining_budget() > 0:
             result = await coordinator.execute_tool_calls(tool_calls)
+
+    **New Code Example** (using ToolService):
+        service = ToolService(
+            config=config,
+            tool_selector=selector,
+            tool_executor=executor,
+            tool_registrar=registrar,
+        )
+
+        # In orchestrator (new):
+        tools = await service.select_tools_sync(message, task_type)
+        results = await service.execute_tool_calls(tool_calls)
     """
 
     def __init__(
@@ -660,15 +678,20 @@ class ToolCoordinator:
 
         return valid, filtered_names
 
+    # =====================================================================
+    # Tool Coordination (Superseded by IToolService)
+    # =====================================================================
+
     async def execute_tool_calls(
         self,
         tool_calls: List[Dict[str, Any]],
         context: Optional[TaskContext] = None,
     ) -> "PipelineExecutionResult":
-        """Execute tool calls through the pipeline.
+        """[DEPRECATED] Execute tool calls through the pipeline.
 
-        Delegates to ToolPipeline for actual execution, handling budget
-        tracking and caching coordination. Pre-filters hallucinated tool names.
+        This method is being superseded by ToolService.execute_tool_calls.
+        It remains here to support legacy components during the state-passed
+        architectural migration.
 
         Args:
             tool_calls: List of tool calls to execute
@@ -827,9 +850,13 @@ class ToolCoordinator:
             tool_calls = normalized_tool_calls or None
             logger.debug(f"After normalization: {len(tool_calls) if tool_calls else 0} tool_calls")
 
-        # Filter out invalid/hallucinated tool names early
+        # Filter invalid/hallucinated tool names but KEEP them as error stubs
+        # so the pipeline generates a tool response with tool_call_id.
+        # Per OpenAI spec, every tool_calls[].id MUST have a matching
+        # role=tool response — silently dropping them causes 400 errors.
         if tool_calls:
             valid_tool_calls = []
+            invalid_count = 0
             for tc in tool_calls:
                 name = tc.get("name", "")
                 # Resolve shell aliases to appropriate enabled variant
@@ -842,11 +869,14 @@ class ToolCoordinator:
                 if is_enabled:
                     valid_tool_calls.append(tc)
                 else:
-                    logger.debug(f"Filtered out disabled tool: {name}")
-            if len(valid_tool_calls) != len(tool_calls):
-                logger.warning(
-                    f"Filtered {len(tool_calls) - len(valid_tool_calls)} invalid tool calls"
-                )
+                    invalid_count += 1
+                    # Mark as pre-failed so pipeline returns error with tool_call_id
+                    tc["_invalid"] = True
+                    tc["_error"] = f"Unknown tool '{name}'. Use one of the available tools."
+                    valid_tool_calls.append(tc)
+                    logger.debug(f"Marked invalid tool for error response: {name}")
+            if invalid_count:
+                logger.warning(f"Marked {invalid_count} invalid tool calls for error responses")
             tool_calls = valid_tool_calls or None
             logger.debug(
                 f"After filtering: {len(tool_calls) if tool_calls else 0} valid tool_calls"
@@ -1118,7 +1148,7 @@ class ToolCoordinator:
         )
 
     # -----------------------------------------------------------------
-    # Post-processing (extracted from AgentOrchestrator._handle_tool_calls)
+    # Post-processing (Superseded by IToolService)
     # -----------------------------------------------------------------
 
     def process_tool_results(
@@ -1126,11 +1156,10 @@ class ToolCoordinator:
         pipeline_result: "PipelineExecutionResult",
         ctx: ToolResultContext,
     ) -> List[Dict[str, Any]]:
-        """Post-process tool pipeline results.
+        """[DEPRECATED] Post-process tool pipeline results.
 
-        Handles state mutations, analytics recording, semantic failure
-        detection, GEPA trace enrichment, conversation injection, and
-        error display.  Previously lived in ``AgentOrchestrator._handle_tool_calls``.
+        This method is being superseded by ToolService.process_tool_results.
+        It handles state mutations, analytics, and conversation injection.
 
         Args:
             pipeline_result: Result from ``ToolPipeline.execute_tool_calls()``.
@@ -1142,7 +1171,9 @@ class ToolCoordinator:
         results: List[Dict[str, Any]] = []
 
         for call_result in pipeline_result.results:
-            if call_result.skipped:
+            # Skip only if genuinely skipped AND has no tool_call_id.
+            # Invalid tools with tool_call_id must produce a response per OpenAI spec.
+            if call_result.skipped and not call_result.tool_call_id:
                 continue
 
             tool_name = call_result.tool_name

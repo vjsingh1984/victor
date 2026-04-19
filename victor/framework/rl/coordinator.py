@@ -504,6 +504,9 @@ class RLCoordinator:
             "mock_",
         )
 
+        # Lazy-initialized OptionRegistry for hierarchical RL options
+        self._option_registry: Optional["OptionRegistry"] = None
+
         # Ensure core tables exist
         self._ensure_core_tables()
 
@@ -564,6 +567,26 @@ class RLCoordinator:
         """
         self._repo_id = repo_id
         logger.debug(f"RL: Repo context set to {repo_id!r}")
+
+    def get_option_registry(self) -> "OptionRegistry":
+        """Get the OptionRegistry, creating it lazily on first access.
+
+        The OptionRegistry manages hierarchical RL options (Explore, Implement,
+        Debug, Review) — temporal abstractions for multi-step agent skills.
+        It is NOT a learner; use this method instead of ``get_learner()``.
+
+        Returns:
+            OptionRegistry instance with default options registered.
+        """
+        if self._option_registry is None:
+            from victor.framework.rl.option_framework import OptionRegistry
+
+            self._option_registry = OptionRegistry()
+            logger.info(
+                "RL: OptionRegistry initialized with %d options",
+                len(self._option_registry._options),
+            )
+        return self._option_registry
 
     def _should_record_tool(self, tool_name: str) -> bool:
         """Check if a tool outcome should be recorded (filters test fixtures)."""
@@ -812,6 +835,10 @@ class RLCoordinator:
                     use_pareto=use_pareto,
                     max_prompt_chars=max_prompt_chars,
                 )
+            elif name == "option_framework":
+                # OptionRegistry is not a learner — access via get_option_registry()
+                logger.debug("RL: option_framework is not a learner — use get_option_registry()")
+                return None
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None
@@ -1044,6 +1071,113 @@ class RLCoordinator:
         except Exception as e:
             logger.debug(f"[evotest] Evolution skipped: {e}")
         return False
+
+    def maybe_background_evolve(self, provider: str = "", model: str = "") -> None:
+        """Check staleness and spawn background evolution if needed.
+
+        Called once at chat startup.  If the newest prompt candidate is older
+        than ``_EVOLUTION_STALE_DAYS``, a daemon thread evolves all evolvable
+        sections from existing trace data.  The thread is fire-and-forget —
+        it never blocks the user.
+
+        A filesystem lock prevents concurrent evolution runs across
+        multiple ``victor chat`` sessions.
+        """
+        import threading
+        from datetime import datetime, timedelta, timezone
+
+        _EVOLUTION_STALE_DAYS = 7
+        lock_path = self.storage_path / ".evolution_lock"
+
+        # Quick check: skip if we already spawned a thread this session
+        if getattr(self, "_bg_evolution_started", False):
+            return
+        self._bg_evolution_started = True
+
+        # Check newest candidate timestamp
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                "SELECT MAX(created_at) FROM agent_prompt_candidate"
+            )
+            row = cursor.fetchone()
+            if row and row[0]:
+                # Parse ISO timestamp
+                last_evolved = datetime.fromisoformat(row[0])
+                if last_evolved.tzinfo is None:
+                    last_evolved = last_evolved.replace(tzinfo=timezone.utc)
+                age = datetime.now(timezone.utc) - last_evolved
+                if age < timedelta(days=_EVOLUTION_STALE_DAYS):
+                    logger.debug(
+                        "RL: Last evolution was %s ago — still fresh, skipping background evolve",
+                        age,
+                    )
+                    return
+                logger.info(
+                    "RL: Last evolution was %s ago (>%dd) — starting background evolve",
+                    age,
+                    _EVOLUTION_STALE_DAYS,
+                )
+            else:
+                logger.info("RL: No prompt candidates found — starting background evolve")
+        except Exception as e:
+            logger.debug("RL: Could not check candidate staleness: %s", e)
+            return
+
+        def _evolve_in_background():
+            """Run evolution for all sections in a daemon thread."""
+            # Filesystem lock to prevent concurrent evolution
+            try:
+                lock_path.touch(exist_ok=True)
+                if lock_path.stat().st_size > 0:
+                    logger.debug("RL: Background evolution lock held, skipping")
+                    return
+                lock_path.write_text(str(datetime.now(timezone.utc).isoformat()))
+            except Exception:
+                return
+
+            try:
+                learner = self.get_learner("prompt_optimizer")
+                if learner is None:
+                    return
+
+                sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+                evolved_count = 0
+                for section in sections:
+                    try:
+                        rec = learner.get_recommendation(
+                            provider or "", model or "", "default",
+                            section_name=section,
+                        )
+                        current_text = rec.value if rec else ""
+                        if not current_text:
+                            continue
+                        result = learner.evolve(section, current_text, provider or "")
+                        if result:
+                            evolved_count += 1
+                    except Exception as e:
+                        logger.debug("RL: Background evolve '%s' failed: %s", section, e)
+
+                if evolved_count:
+                    logger.info(
+                        "RL: Background evolution complete — %d/%d sections evolved",
+                        evolved_count,
+                        len(sections),
+                    )
+            except Exception as e:
+                logger.debug("RL: Background evolution failed: %s", e)
+            finally:
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+        thread = threading.Thread(
+            target=_evolve_in_background,
+            name="rl-background-evolve",
+            daemon=True,
+        )
+        thread.start()
 
     # =========================================================================
     # Async Wrappers - Non-blocking versions for async orchestrator

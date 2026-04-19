@@ -736,8 +736,8 @@ class TestVerticalCommands:
         assert result.exit_code == 1
         assert "not found" in result.stdout
 
-    @patch("victor.ui.commands.scaffold.new_vertical")
-    def test_create_command(self, mock_create):
+    @patch("victor.ui.commands.scaffold.scaffold_plugin")
+    def test_create_command(self, mock_scaffold):
         """Test create command (alias to scaffold)."""
         result = runner.invoke(
             vertical_app,
@@ -745,7 +745,7 @@ class TestVerticalCommands:
         )
 
         assert result.exit_code == 0
-        mock_create.assert_called_once()
+        mock_scaffold.assert_called_once()
 
     def test_audit_command_reports_contract_violations(self, tmp_path):
         """Audit command should flag extracted-vertical contract violations."""

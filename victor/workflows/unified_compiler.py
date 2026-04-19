@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unified Workflow Compiler.
+"""Canonical entry point for all workflow compilation.
 
-Consolidates all workflow compilation paths into a single, consistent pipeline
-with integrated caching. This module unifies:
+This is the single module callers should import for any workflow compilation
+path. ``graph_compiler.py`` and ``yaml_to_graph_compiler.py`` are internal
+implementation modules — not alternatives. This module consolidates:
 
 1. WorkflowGraphCompiler (graph_dsl -> CompiledGraph)
 2. YAMLToStateGraphCompiler (YAML -> StateGraph -> CompiledGraph)

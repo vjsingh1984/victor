@@ -1,4 +1,12 @@
-"""Runtime-free registration helpers for external vertical packages."""
+"""Runtime-free registration helpers for external vertical packages.
+
+CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+The ``@register_vertical`` decorator is the SDK's canonical annotation for an
+external package's assistant class. The corresponding runtime registration at
+the plugin seam is ``PluginContext.register_vertical``. A future SDK minor
+release adds ``@register_plugin`` / ``PluginBase`` aliases (S4 in the plan);
+until then, ``vertical`` is the public noun at the SDK layer.
+"""
 
 from __future__ import annotations
 

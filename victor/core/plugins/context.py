@@ -47,11 +47,32 @@ class HostPluginContext(PluginContext):
         """
         self._container = container
         self._commands: Dict[str, typer.Typer] = {}
+        # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+        # Pending-registration buffers for surfaces that depend on bootstrap order.
+        # Drained by bootstrap phases once their target registries exist.
+        self._pending_rl_configs: Dict[str, Any] = {}
+        self._pending_bootstrap_services: list = []
+        self._pending_mcp_servers: list = []
 
     @property
     def commands(self) -> Dict[str, typer.Typer]:
         """Return registered commands."""
         return self._commands
+
+    @property
+    def pending_rl_configs(self) -> Dict[str, Any]:
+        """Return RL configs registered by plugins via register_rl_config()."""
+        return self._pending_rl_configs
+
+    @property
+    def pending_bootstrap_services(self) -> list:
+        """Return bootstrap-service hooks registered by plugins."""
+        return list(self._pending_bootstrap_services)
+
+    @property
+    def pending_mcp_servers(self) -> list:
+        """Return MCP server specs registered by plugins."""
+        return list(self._pending_mcp_servers)
 
     def register_tool(self, tool_instance: Any) -> None:
         """Register a tool with the framework's ToolRegistry."""
@@ -303,6 +324,124 @@ class HostPluginContext(PluginContext):
         except Exception:
             # Fallback: load default settings
             return Settings()
+
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+    # Gap-fill registrations: let a plugin self-register everything via
+    # register(context) instead of declaring sidecar entry-point groups.
+    # The sidecar groups (victor.safety_rules, victor.tool_dependencies,
+    # victor.escape_hatches, victor.rl_configs, victor.bootstrap_services,
+    # victor.mcp_servers) remain readable for external packages that
+    # haven't migrated.
+    def register_safety_rule(self, rule: Any) -> None:
+        """Register a single safety rule with the framework's SafetyEnforcer."""
+        try:
+            if self._container is None:
+                from victor.core.container import get_container
+
+                self._container = get_container()
+            enforcer = None
+            try:
+                from victor.framework.config import SafetyEnforcer
+
+                if hasattr(self._container, "is_registered") and self._container.is_registered(
+                    SafetyEnforcer
+                ):
+                    enforcer = self._container.get(SafetyEnforcer)
+            except Exception:
+                enforcer = None
+            if enforcer is None:
+                logger.debug(
+                    "SafetyEnforcer not yet registered; deferring rule %s",
+                    getattr(rule, "name", rule),
+                )
+                return
+            # SafetyEnforcer exposes add_rule; coordinators expose register_rule.
+            if hasattr(enforcer, "add_rule"):
+                enforcer.add_rule(rule)
+            elif hasattr(enforcer, "register_rule"):
+                enforcer.register_rule(rule)
+            else:
+                logger.debug("SafetyEnforcer has neither add_rule nor register_rule")
+                return
+            logger.debug("Plugin registered safety rule: %s", getattr(rule, "name", rule))
+        except Exception as exc:
+            logger.error("Plugin failed to register safety rule: %s", exc)
+
+    def register_tool_dependency(self, name: str, provider: Any) -> None:
+        """Register a tool dependency provider for a named vertical / tool group."""
+        try:
+            from victor.core.tool_dependency_loader import (
+                register_vertical_tool_dependency_provider,
+            )
+        except ImportError:
+            logger.debug("tool_dependency_loader does not expose registration helper")
+            return
+        try:
+            register_vertical_tool_dependency_provider(name, provider)
+            logger.debug("Plugin registered tool dependency: %s", name)
+        except Exception as exc:
+            logger.error("Plugin failed to register tool dependency %s: %s", name, exc)
+
+    def register_escape_hatch(self, hatch: Any) -> None:
+        """Register an escape hatch (condition or transform).
+
+        ``hatch`` must expose a ``kind`` attribute (``"condition"`` or
+        ``"transform"``) and ``name`` / ``fn`` attributes. Dicts with those
+        keys also work.
+        """
+        try:
+            from victor.framework.escape_hatch_registry import get_escape_hatch_registry
+        except ImportError:
+            logger.debug("Escape hatch registry unavailable")
+            return
+
+        def _attr(obj: Any, key: str, default: Any = None) -> Any:
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
+
+        kind = _attr(hatch, "kind")
+        name = _attr(hatch, "name")
+        fn = _attr(hatch, "fn")
+        if not kind or not name or fn is None:
+            logger.debug("register_escape_hatch missing kind/name/fn: %s", hatch)
+            return
+        try:
+            registry = get_escape_hatch_registry()
+            if kind == "condition":
+                registry.register_condition(name, fn, **(_attr(hatch, "options", {}) or {}))
+            elif kind == "transform":
+                registry.register_transform(name, fn, **(_attr(hatch, "options", {}) or {}))
+            else:
+                logger.debug("register_escape_hatch unknown kind: %s", kind)
+                return
+            logger.debug("Plugin registered escape hatch: %s (%s)", name, kind)
+        except Exception as exc:
+            logger.error("Plugin failed to register escape hatch %s: %s", name, exc)
+
+    def register_rl_config(self, key: str, config: Any) -> None:
+        """Buffer an RL config fragment; bootstrap drains it once RL services exist."""
+        self._pending_rl_configs[key] = config
+        logger.debug("Plugin buffered RL config: %s", key)
+
+    def register_bootstrap_service(
+        self,
+        factory: Any,
+        *,
+        phase: str = "vertical_services",
+    ) -> None:
+        """Buffer a bootstrap-service hook for the named phase."""
+        self._pending_bootstrap_services.append((phase, factory))
+        logger.debug(
+            "Plugin buffered bootstrap service for phase '%s': %s",
+            phase,
+            getattr(factory, "__name__", factory),
+        )
+
+    def register_mcp_server(self, spec: Any) -> None:
+        """Buffer an MCP server spec for the MCP vertical to pick up."""
+        self._pending_mcp_servers.append(spec)
+        logger.debug("Plugin buffered MCP server spec: %s", getattr(spec, "name", spec))
 
 
 class _LazyCapabilityProxy:

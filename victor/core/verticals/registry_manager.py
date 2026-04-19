@@ -84,6 +84,24 @@ from victor.core.verticals.cache_invalidation import (
 
 logger = logging.getLogger(__name__)
 
+_LEGACY_VERTICALS_WARNED = False
+
+
+def _warn_legacy_verticals_group_once() -> None:
+    """Emit a one-shot DeprecationWarning for the legacy ``victor.verticals`` group."""
+    global _LEGACY_VERTICALS_WARNED
+    if _LEGACY_VERTICALS_WARNED:
+        return
+    _LEGACY_VERTICALS_WARNED = True
+    import warnings
+
+    warnings.warn(
+        "Entry-point group 'victor.verticals' is deprecated; declare plugins "
+        "under 'victor.plugins' instead.",
+        DeprecationWarning,
+        stacklevel=3,
+    )
+
 
 class PackageSourceType(Enum):
     """Type of package source."""
@@ -382,12 +400,14 @@ class VerticalRegistryManager:
         """Return True when the name belongs to a core-owned builtin vertical."""
         return name in self._discover_builtin_vertical_locations()
 
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
     def _list_installed_verticals(self) -> List[InstalledVertical]:
         """List installed external verticals.
 
         Uses importlib.metadata to discover packages that register
-        verticals via either the canonical ``victor.plugins`` group or the
-        legacy ``victor.verticals`` compatibility group.
+        verticals via the canonical ``victor.plugins`` group. The legacy
+        ``victor.verticals`` group is still read for backward compatibility
+        but triggers a single-shot DeprecationWarning per process.
         """
         verticals = []
         seen_names = set()
@@ -400,6 +420,8 @@ class VerticalRegistryManager:
 
                 for group in ("victor.plugins", "victor.verticals"):
                     entry_points = list(dist.entry_points.select(group=group))
+                    if entry_points and group == "victor.verticals":
+                        _warn_legacy_verticals_group_once()
                     for ep in entry_points:
                         if ep.name in seen_names:
                             continue

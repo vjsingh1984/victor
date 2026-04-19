@@ -528,6 +528,33 @@ async def _get_or_build_index(
 
     _index_factory = registry.get(CodebaseIndexFactoryProtocol)
     if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
+        # Recovery 1: force plugin capability re-discovery (plugin chain may have
+        # been bootstrapped before victor-coding was installed, or an exception
+        # was silently swallowed during _auto_register_vertical_capabilities)
+        from victor.core.bootstrap import _discover_plugin_capabilities
+
+        _discover_plugin_capabilities(None)
+        _index_factory = registry.get(CodebaseIndexFactoryProtocol)
+
+    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
+        # Recovery 2: direct import — bypasses plugin→vertical→capability chain entirely.
+        # This handles cases where the plugin chain fails silently (DEBUG-level exception
+        # swallowing in _auto_register_vertical_capabilities) but the package IS installed.
+        try:
+            from victor.core.capability_registry import CapabilityStatus
+            from victor.core.search.indexer import EnhancedCodebaseIndexFactory
+
+            factory = EnhancedCodebaseIndexFactory()
+            registry.register(CodebaseIndexFactoryProtocol, factory, CapabilityStatus.ENHANCED)
+            _index_factory = factory
+            logger.info(
+                "[code_search] Recovered CodebaseIndex factory via direct import "
+                "(victor-coding is installed, plugin chain failed)"
+            )
+        except ImportError:
+            pass  # victor-coding genuinely not installed
+
+    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
         raise ImportError(
             "CodebaseIndex requires a codebase indexing provider "
             "(e.g., pip install victor-coding). The provider registers "

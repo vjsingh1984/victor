@@ -466,23 +466,29 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return calculate_max_context_chars(settings, provider, model)
 
     def _initialize_provider_runtime(self) -> None:
-        """Initialize provider runtime boundaries with lazy coordinator loading."""
+        """Initialize provider runtime boundaries with canonical service and legacy coordinator."""
         from victor.agent.runtime.provider_runtime import (
             create_provider_runtime_components,
         )
+        from victor.agent.services.provider_service import ProviderService
 
         self._provider_runtime = create_provider_runtime_components(
             factory=self._factory,
             settings=self.settings,
             provider_manager=self._provider_manager,
         )
-        # Keep legacy attributes for compatibility while deferring heavy coordinator init.
+        
+        # [CANONICAL] Initialize state-passed provider service
+        self._provider_service = ProviderService(registry=ProviderRegistry)
+        
+        # [LEGACY] Keep coordinator for compatibility while deferring heavy init.
         self._provider_coordinator = self._provider_runtime.provider_coordinator
         self._provider_switch_coordinator = self._provider_runtime.provider_switch_coordinator
 
     def _initialize_memory_runtime(self) -> None:
-        """Initialize memory/session runtime boundaries."""
+        """Initialize memory/session runtime boundaries with canonical service."""
         from victor.agent.runtime.memory_runtime import create_memory_runtime_components
+        from victor.agent.services.session_service import SessionService
 
         self._memory_runtime = create_memory_runtime_components(
             factory=self._factory,
@@ -491,6 +497,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         self.memory_manager = self._memory_runtime.memory_manager
         self._memory_session_id = self._memory_runtime.memory_session_id
+
+        # [CANONICAL] Initialize state-passed session service
+        # Note: lifecycle_manager is None initially - will be set by component_assembler
+        self._session_service = SessionService(
+            session_state_manager=self._session_state,
+            lifecycle_manager=None,  # Will be set later by component_assembler
+            memory_manager=self.memory_manager,
+            checkpoint_manager=getattr(self, "_checkpoint_manager", None),
+            cost_tracker=getattr(self, "_cost_tracker", None),
+        )
 
         # Initialize LanceDB embedding store for efficient semantic retrieval if memory enabled.
         if self.memory_manager and getattr(self.settings, "conversation_embeddings_enabled", True):
@@ -2424,14 +2440,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
 
     async def start_health_monitoring(self) -> bool:
-        """Start background provider health monitoring.
-
-        Delegates to ProviderCoordinator (TD-002).
+        """[CANONICAL] Start background health monitoring via ProviderService.
 
         Returns:
             True if monitoring started, False if already running or unavailable
         """
         try:
+            # [CANONICAL] Use state-passed service
+            await self._provider_service.start_health_monitoring()
+            
+            # Sync legacy coordinator
             await self._provider_coordinator.start_health_monitoring()
             return True
         except Exception as e:
@@ -2439,14 +2457,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return False
 
     async def stop_health_monitoring(self) -> bool:
-        """Stop background provider health monitoring.
-
-        Delegates to ProviderCoordinator (TD-002).
+        """[CANONICAL] Stop background health monitoring via ProviderService.
 
         Returns:
             True if monitoring stopped, False if not running or error
         """
         try:
+            # [CANONICAL] Use state-passed service
+            await self._provider_service.stop_health_monitoring()
+            
+            # Sync legacy coordinator
             await self._provider_coordinator.stop_health_monitoring()
             return True
         except Exception as e:
@@ -2454,14 +2474,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return False
 
     async def get_provider_health(self) -> Dict[str, Any]:
-        """Get health status of all registered providers.
+        """[CANONICAL] Get health status via ProviderService.
 
-        Delegates to ProviderCoordinator (TD-002).
-
-        Returns:
-            Dictionary with provider health information
+        Delegates to ProviderService for diagnostics, maintaining backward 
+        compatibility by returning the expected health information dictionary.
         """
-        return await self._provider_coordinator.get_health()
+        try:
+            is_healthy = await self._provider_service.check_provider_health()
+            info = self._provider_service.get_current_provider_info()
+            
+            return {
+                "healthy": is_healthy,
+                "provider": info.provider_name,
+                "model": info.model_name,
+                "api_key_configured": info.api_key_configured
+            }
+        except Exception as e:
+            logger.warning(f"Health check failed: {e}")
+            return {"healthy": False, "error": str(e)}
 
     async def graceful_shutdown(self) -> Dict[str, bool]:
         """Perform graceful shutdown of all orchestrator components.
@@ -2491,28 +2521,35 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     # =========================================================================
 
     def get_current_provider_info(self) -> Dict[str, Any]:
-        """Get information about the current provider and model.
+        """[CANONICAL] Get information about the current provider via ProviderService.
 
-        Combines provider info with orchestrator-specific runtime state.
+        Combines provider metadata from the service with orchestrator-specific 
+        runtime state (tool budget, usage).
 
         Returns:
-            Dictionary with provider/model info and capabilities
+            Dictionary with provider/model info and capabilities.
         """
+        # [CANONICAL] Get metadata from state-passed service
         info = self._provider_service.get_current_provider_info()
-        if hasattr(info, "__dict__"):
-            info = {
-                "provider_name": getattr(info, "provider_name", ""),
-                "model_name": getattr(info, "model_name", ""),
-            }
-        elif not isinstance(info, dict):
-            info = {}
-        info.update(
-            {
-                "tool_budget": self.tool_budget,
-                "tool_calls_used": self.tool_calls_used,
-            }
-        )
-        return info
+        
+        # Format the service info object into the expected dictionary structure
+        result = {
+            "provider_name": info.provider_name,
+            "model_name": info.model_name,
+            "api_key_configured": info.api_key_configured,
+            "supports_streaming": info.supports_streaming,
+            "supports_tool_calling": info.supports_tool_calling,
+            "max_tokens": info.max_tokens,
+            "tool_budget": self.tool_budget,
+            "tool_calls_used": self.tool_calls_used,
+        }
+        
+        # Add legacy coordinator stats if available
+        if self._provider_coordinator:
+            stats = self._provider_coordinator.get_rate_limit_stats()
+            result.update(stats)
+            
+        return result
 
     def _parse_tool_calls_with_adapter(
         self, content: str, raw_tool_calls: Optional[List[Dict[str, Any]]] = None
@@ -3086,6 +3123,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             memory_manager=self.memory_manager,
             memory_session_id=self._memory_session_id,
             usage_logger=self.usage_logger,
+            tool_name=kwargs.get("name"),
+            tool_call_id=kwargs.get("tool_call_id"),
+            tool_calls=kwargs.get("tool_calls"),
         )
 
     async def chat(
@@ -3792,8 +3832,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return await self._tool_service.execute_tool_with_retry(tool_name, tool_args, context)
 
     async def _handle_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Handle tool calls from the model.
+        """[LEGACY/BRIDGE] Handle tool calls from the model.
 
+        This method is a legacy integration point. Prefer using 
+        IToolCoordinator.execute_tool_calls() in new code.
+        
         Delegates execution to ToolPipeline, then post-processes results
         via ToolCoordinator.process_tool_results().
 
@@ -4117,46 +4160,47 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         model: Optional[str] = None,
         on_switch: Optional[Any] = None,
     ) -> bool:
-        """Switch to a different provider/model (protocol method).
+        """[CANONICAL] Switch provider via ProviderService.
 
-        Delegates to ProviderManager's async switch_provider directly
-        for proper exception handling in async context (Phase 2 refactoring fix).
+        Delegates to ProviderService for orchestration, maintaining the
+        legacy coordinator in sync for backward compatibility.
 
         Args:
             provider_name: Target provider name
             model: Optional specific model
-            on_switch: Optional callback(provider_name, model) after switch
-
-        Returns:
-            True if switch was successful, False otherwise
-
-        Raises:
-            ProviderNotFoundError: If provider not found
+            on_switch: Optional callback after switch
         """
-        await self._provider_service.switch_provider(provider_name, model)
-        self.model = self._provider_manager.model
-        self.provider_name = self._provider_manager.provider_name
-        if on_switch:
-            on_switch(self.provider_name, self.model)
-        return True
+        try:
+            # [CANONICAL] Switch via state-passed service
+            await self._provider_service.switch_provider(provider_name, model)
+            
+            # Synchronize legacy state (manager/coordinator)
+            await self._provider_coordinator.switch_provider_async(provider_name, model)
+            
+            self.model = self._provider_manager.model
+            self.provider_name = self._provider_manager.provider_name
+            
+            if on_switch:
+                on_switch(self.provider_name, self.model)
+            return True
+        except Exception as e:
+            logger.error(f"Provider switch failed: {e}")
+            return False
 
     async def switch_model(self, model: str) -> bool:
-        """Switch to a different model on the current provider (protocol method).
-
-        Delegates to ProviderManager's async switch_model directly
-        for proper exception handling in async context (Phase 2 refactoring fix).
-
-        Args:
-            model: Target model name
-
-        Returns:
-            True if switch was successful, False otherwise
-        """
-        result = await self._provider_coordinator.switch_model_async(model)
-        if result:
-            # Sync orchestrator's model attribute with provider manager state
+        """[CANONICAL] Switch model via ProviderService."""
+        try:
+            # Update service state
+            await self._provider_service.switch_provider(self.provider_name, model)
+            
+            # Synchronize legacy state
+            await self._provider_coordinator.switch_model_async(model)
+            
             self.model = self._provider_manager.model
-        return result
+            return True
+        except Exception as e:
+            logger.error(f"Model switch failed: {e}")
+            return False
 
     # --- ToolsProtocol ---
 

@@ -20,6 +20,13 @@ This registry provides a single point of entry for:
 - Capability negotiation
 - Version compatibility checking
 - Lifecycle management
+
+CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+This registry is a *metadata / compatibility* view over the plugin system;
+plugin instantiation and vertical class capture are owned by
+``victor.core.plugins.registry.PluginRegistry.get_vertical_classes()``. Keep
+version checks and compatibility logic here, but do not re-scan entry points
+for discovery.
 """
 
 from __future__ import annotations

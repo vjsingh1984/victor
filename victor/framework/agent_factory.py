@@ -182,6 +182,10 @@ class AgentFactory:
         # Step 7: Initialize skill matcher
         await self._initialize_skill_matcher()
 
+        # Step 8: Background RL warm-up — evolve stale prompt candidates
+        # Non-blocking: spawns a daemon thread if candidates are >7 days old.
+        self._trigger_background_evolution()
+
         logger.info(
             "AgentFactory created orchestrator: profile=%s, vertical=%s, session=%s",
             self._profile,
@@ -287,3 +291,20 @@ class AgentFactory:
             self._orchestrator._skill_matcher = matcher
         except Exception as e:
             logger.debug(f"Skill matcher initialization skipped: {e}")
+
+    def _trigger_background_evolution(self) -> None:
+        """Kick off background GEPA evolution if candidates are stale.
+
+        Non-blocking: the coordinator spawns a daemon thread internally.
+        Resolves provider/model from current settings for evolution context.
+        """
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            provider = getattr(self._settings, "provider", None)
+            provider_name = getattr(provider, "default_provider", "") if provider else ""
+            model_name = getattr(provider, "default_model", "") if provider else ""
+            coordinator.maybe_background_evolve(provider_name, model_name)
+        except Exception as e:
+            logger.debug(f"Background RL evolution skipped: {e}")

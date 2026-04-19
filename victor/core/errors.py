@@ -141,7 +141,29 @@ class VictorError(Exception):
         return result
 
 
-class ProviderError(VictorError):
+class AgentError(VictorError):
+    """Base for errors surfaced through the Agent public API.
+
+    Adds the recoverable attribute so framework callers can distinguish
+    transient failures (retry) from permanent ones (abort).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        recoverable: bool = True,
+        details: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(message, details=details, **kwargs)
+        self.recoverable = recoverable
+
+    def __str__(self) -> str:
+        return self.message
+
+
+class ProviderError(AgentError):
     """Errors related to LLM providers."""
 
     def __init__(
@@ -299,7 +321,7 @@ class ProviderInvalidResponseError(ProviderError):
             self.details["response_keys"] = list(response_data.keys())[:10]
 
 
-class ToolError(VictorError):
+class ToolError(AgentError):
     """Errors related to tool execution."""
 
     def __init__(
@@ -389,7 +411,7 @@ class ToolTimeoutError(ToolError):
         self.details["timeout"] = timeout
 
 
-class ConfigurationError(VictorError):
+class ConfigurationError(AgentError):
     """Configuration-related errors."""
 
     def __init__(

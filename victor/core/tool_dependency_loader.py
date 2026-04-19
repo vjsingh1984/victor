@@ -764,6 +764,28 @@ def clear_vertical_tool_dependency_provider_cache() -> int:
     return count
 
 
+# CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+def register_vertical_tool_dependency_provider(
+    vertical: str,
+    provider: "BaseToolDependencyProvider",
+) -> None:
+    """Register a tool dependency provider programmatically.
+
+    Used by :class:`HostPluginContext.register_tool_dependency` so a plugin's
+    ``register(context)`` call can wire a dependency provider without the
+    sidecar ``victor.tool_dependencies`` entry-point group.
+
+    Args:
+        vertical: Vertical name (normalized internally).
+        provider: Provider instance implementing ``BaseToolDependencyProvider``.
+    """
+    vertical_name = normalize_vertical_name(vertical)
+    with _vertical_provider_cache_lock:
+        # Seed both canonicalization variants so downstream callers hit cache.
+        for canonicalize in (True, False):
+            _vertical_provider_cache[(vertical_name, canonicalize)] = provider
+
+
 def create_vertical_tool_dependency_provider(
     vertical: str,
     canonicalize: Optional[bool] = None,

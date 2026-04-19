@@ -170,3 +170,53 @@ class CapabilityRegistry:
 
 # Module-level shortcut for convenient access
 capabilities = CapabilityRegistry.get_instance()
+
+
+# ---------------------------------------------------------------------------
+# Capability → method name mappings (consolidated from framework/capability_registry.py)
+# ---------------------------------------------------------------------------
+
+from typing import Dict  # noqa: E402  (re-import after class defs for clarity)
+
+CAPABILITY_METHOD_MAPPINGS: Dict[str, str] = {
+    # Tool capabilities
+    "enabled_tools": "set_enabled_tools",
+    "tool_dependencies": "set_tool_dependencies",
+    "tool_sequences": "set_tool_sequences",
+    "tiered_tool_config": "set_tiered_tool_config",
+    # Vertical capabilities
+    "vertical_middleware": "apply_vertical_middleware",
+    "vertical_safety_patterns": "apply_vertical_safety_patterns",
+    "vertical_context": "set_vertical_context",
+    # RL capabilities
+    "rl_hooks": "set_rl_hooks",
+    # Team capabilities
+    "team_specs": "set_team_specs",
+    # Mode capabilities
+    "mode_configs": "set_mode_configs",
+    "default_budget": "set_default_budget",
+    # Prompt capabilities
+    "custom_prompt": "set_custom_prompt",
+    "prompt_builder": "prompt_builder",
+    "prompt_section": "add_prompt_section",
+    "task_type_hints": "set_task_type_hints",
+    # Safety capabilities
+    "safety_patterns": "add_safety_patterns",
+    # Enrichment capabilities
+    "enrichment_strategy": "set_enrichment_strategy",
+    "enrichment_service": "enrichment_service",
+    # LSP capabilities
+    "lsp": "set_lsp",
+}
+
+
+def get_method_for_capability(capability_name: str) -> str:
+    """Get the method name for a capability.
+
+    Args:
+        capability_name: Name of the capability
+
+    Returns:
+        Method name to call for this capability
+    """
+    return CAPABILITY_METHOD_MAPPINGS.get(capability_name, f"set_{capability_name}")

@@ -147,7 +147,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from victor.framework.capability_registry import get_method_for_capability
+from victor.core.capability_registry import get_method_for_capability
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator

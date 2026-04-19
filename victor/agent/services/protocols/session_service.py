@@ -79,14 +79,11 @@ class SessionState(Protocol):
 
 @runtime_checkable
 class SessionServiceProtocol(Protocol):
-    """Protocol for session lifecycle and management service.
+    """[CANONICAL] Protocol for session lifecycle and management service.
 
-    Handles:
-    - Session creation and initialization
-    - Session state management
-    - Session persistence and restoration
-    - Session cleanup and disposal
-    - Session metrics and analytics
+    This protocol represents the target architecture for session operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on session-related operations.

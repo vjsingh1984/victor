@@ -345,12 +345,15 @@ class LLMDecisionService:
 
         max_tokens = self._config.max_tokens_override or prompt_config.max_tokens
 
+        # Disable thinking/reasoning for edge decisions — we need raw JSON,
+        # not reasoning text. Ollama's "think" is a top-level parameter.
         response = await self._provider.chat(
             messages=messages,
             model=self._model,
             temperature=self._config.temperature,
             max_tokens=max_tokens,
             tools=None,
+            think=False,
         )
 
         # Extract text content from response
@@ -404,22 +407,42 @@ class LLMDecisionService:
         return 0
 
     def _parse_response(self, raw_text: str, schema: type) -> Any:
-        """Parse raw LLM text into a Pydantic model."""
-        # Strip markdown code fences if present
+        """Parse raw LLM text into a Pydantic model.
+
+        Handles common edge model output patterns:
+        - Markdown code fences (```json ... ```)
+        - Embedded JSON within reasoning text (e.g., qwen3 thinking prefix)
+        """
         text = raw_text.strip()
+
+        # Strip markdown code fences if present
         if text.startswith("```"):
             lines = text.split("\n")
-            # Remove first and last lines (code fence markers)
             lines = [line for line in lines[1:] if not line.startswith("```")]
             text = "\n".join(lines).strip()
 
+        # First try: direct parse
         try:
             data = json.loads(text)
             return schema.model_validate(data)
-        except (json.JSONDecodeError, Exception) as e:
-            self._metrics.parse_failures += 1
-            logger.debug("Failed to parse LLM decision response: %s (raw: %s)", e, raw_text[:200])
-            raise
+        except json.JSONDecodeError:
+            pass
+
+        # Second try: extract embedded JSON object from mixed text
+        # (handles models that prepend reasoning before the JSON)
+        brace_pos = text.find("{")
+        if brace_pos > 0:
+            last_brace = text.rfind("}")
+            if last_brace > brace_pos:
+                try:
+                    data = json.loads(text[brace_pos : last_brace + 1])
+                    return schema.model_validate(data)
+                except (json.JSONDecodeError, Exception):
+                    pass
+
+        self._metrics.parse_failures += 1
+        logger.debug("Failed to parse LLM decision response (raw: %s)", raw_text[:200])
+        raise ValueError(f"Could not extract JSON from response: {raw_text[:100]}")
 
     def _cache_key(self, decision_type: DecisionType, context: Dict[str, Any]) -> str:
         """Generate a cache key from decision type and context."""

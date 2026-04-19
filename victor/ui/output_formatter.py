@@ -125,6 +125,22 @@ class OutputFormatter:
             self.config.stderr.flush()
         # JSON modes: skip status messages
 
+    def info(self, message: str) -> None:
+        """Output an informational message.
+
+        Info messages are displayed in all non-JSON modes and not suppressed in quiet mode.
+
+        Args:
+            message: Info message to display
+        """
+        if self.config.mode == OutputMode.RICH:
+            self._console.print(f"[cyan]{message}[/]")
+        elif self.config.mode == OutputMode.PLAIN:
+            print(message, file=self.config.stderr)
+            # Flush stderr immediately to ensure info appears before next content
+            self.config.stderr.flush()
+        # JSON modes: skip info messages
+
     def error(self, message: str, details: Optional[str] = None) -> None:
         """Output an error message.
 

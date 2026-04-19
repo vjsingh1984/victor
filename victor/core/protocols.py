@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Protocol definitions for breaking circular import chains.
+"""Minimal protocol interface for breaking circular imports.
 
-This module provides Protocol classes (structural typing) that define
-interfaces for components involved in circular import chains. By depending
-on Protocols rather than concrete implementations, modules can be decoupled
-without runtime overhead.
+This module provides a small OrchestratorProtocol (7 methods) specifically
+to decouple evaluation/adapter modules from the main orchestrator without
+creating circular import chains. It is intentionally minimal.
+
+For the full Agent public-API contract (6 composite protocols), use
+``victor.framework.protocols``. Domain-specific protocols live in
+``victor.protocols.*``. The three layers serve distinct purposes and
+are not duplicates.
 
 Design Pattern: Dependency Inversion Principle (SOLID)
     - High-level modules should not depend on low-level modules

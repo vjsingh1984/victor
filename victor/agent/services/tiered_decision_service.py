@@ -1,5 +1,11 @@
 """Tiered decision service — routes DecisionTypes to different model tiers.
 
+Provider-Agnostic Design:
+- Auto-detects active provider from orchestrator
+- Resolves model from provider_model_tiers mapping
+- Ensures decision service uses same provider as main LLM
+- Supports explicit overrides via tier_overrides
+
 Follows the GEPATierManager pattern: edge (fast local), balanced (mid-tier cloud),
 performance (frontier). Each decision type is mapped to a tier via settings.
 Fallback chain: performance → balanced → edge → heuristic.
@@ -16,6 +22,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any, Dict, Optional, Set
 
@@ -35,6 +42,12 @@ FALLBACK_CHAIN = {
 class TieredDecisionService:
     """Decision service with per-DecisionType tier routing.
 
+    Provider-Agnostic Behavior:
+    - Auto-detects active provider from orchestrator/container
+    - Resolves model from provider_model_tiers mapping
+    - Falls back gracefully when provider or model unavailable
+    - Supports tier_overrides for explicit provider/model selection
+
     Maintains a pool of LLMDecisionService instances (one per tier).
     Routes each decision type to the appropriate tier via settings.
     Falls back through the chain when a tier is unavailable.
@@ -45,6 +58,88 @@ class TieredDecisionService:
         self._services: Dict[str, Any] = {}  # tier name → LLMDecisionService
         self._tier_routing = dict(config.tier_routing)
         self._failed_tiers: Set[str] = set()
+        self._detected_provider: Optional[str] = None  # Cached provider detection
+
+    def _detect_active_provider(self) -> Optional[str]:
+        """Detect the active provider from the orchestrator.
+
+        Checks multiple sources in order:
+        1. Service container (ProviderManager/ProviderService)
+        2. Settings.default_provider
+        3. Environment variables (VICTOR_PROVIDER)
+
+        Returns:
+            Provider name (e.g., "anthropic", "openai") or None
+        """
+        # Return cached provider if available
+        if self._detected_provider:
+            return self._detected_provider
+
+        # Try to get from service container
+        try:
+            from victor.core import get_container
+            container = get_container()
+
+            # Try ProviderService first (new service layer)
+            try:
+                from victor.agent.services.protocols.provider_service import (
+                    ProviderService,
+                )
+                provider_service = container.get(ProviderService)
+                if provider_service:
+                    provider_name = getattr(provider_service, "provider_name", None)
+                    if provider_name:
+                        self._detected_provider = provider_name
+                        logger.debug(
+                            f"Auto-detected provider from ProviderService: {provider_name}"
+                        )
+                        return provider_name
+            except Exception:
+                pass
+
+            # Try ProviderManager (legacy)
+            try:
+                from victor.agent.provider_manager import ProviderManager
+                provider_mgr = container.get(ProviderManager)
+                if provider_mgr:
+                    provider_name = getattr(provider_mgr, "provider_name", None)
+                    if provider_name:
+                        self._detected_provider = provider_name
+                        logger.debug(
+                            f"Auto-detected provider from ProviderManager: {provider_name}"
+                        )
+                        return provider_name
+            except Exception:
+                pass
+
+        except Exception:
+            pass
+
+        # Try settings
+        try:
+            from victor.config.settings import Settings
+            settings = Settings()
+            if hasattr(settings, "default_provider") and settings.default_provider:
+                self._detected_provider = settings.default_provider
+                logger.debug(
+                    f"Auto-detected provider from settings: {settings.default_provider}"
+                )
+                return settings.default_provider
+        except Exception:
+            pass
+
+        # Try environment variable
+        try:
+            provider = os.getenv("VICTOR_PROVIDER")
+            if provider:
+                self._detected_provider = provider.lower()
+                logger.debug(f"Auto-detected provider from env var: {provider}")
+                return self._detected_provider
+        except Exception:
+            pass
+
+        logger.warning("Could not auto-detect active provider")
+        return None
 
     def decide_sync(
         self,
@@ -63,6 +158,21 @@ class TieredDecisionService:
             heuristic_confidence: Confidence of the heuristic result
         """
         tier = self._tier_routing.get(decision_type.value, "edge")
+
+        # Handle "auto" routing for COMPACTION decision type
+        # Auto-route based on complexity: simple→edge, complex→performance
+        if tier == "auto" and decision_type == DecisionType.COMPACTION:
+            complexity = context.get("complexity", "simple")
+            if complexity == "complex":
+                tier = "performance"
+            else:
+                tier = "edge"
+            logger.debug(
+                "Decision %s: auto-routed to '%s' tier (complexity=%s)",
+                decision_type.value,
+                tier,
+                complexity,
+            )
 
         # Try primary tier
         service = self._get_service(tier)
@@ -111,11 +221,60 @@ class TieredDecisionService:
         return self._create_service(tier)
 
     def _create_service(self, tier: str) -> Optional[Any]:
-        """Create an LLMDecisionService for the given tier."""
-        spec = getattr(self._config, tier, None)
+        """Create an LLMDecisionService for the given tier.
+
+        Auto-detects provider from active orchestrator if provider="auto".
+        Resolves model from provider_model_tiers mapping if model="auto".
+        """
+        # Check for tier overrides first
+        if tier in self._config.tier_overrides:
+            override = self._config.tier_overrides[tier]
+            override_provider = override.get("provider", "auto")
+            override_model = override.get("model", "auto")
+
+            # Use override values to create a temporary spec
+            from victor.config.decision_settings import DecisionModelSpec
+
+            spec = DecisionModelSpec(
+                provider=override_provider,
+                model=override_model,
+                timeout_ms=getattr(self._config, tier).timeout_ms,
+                max_tokens=getattr(self._config, tier).max_tokens,
+            )
+
+            logger.debug(f"Using override for tier '{tier}': {override_provider}/{override_model}")
+        else:
+            spec = getattr(self._config, tier, None)
+
         if spec is None:
             self._failed_tiers.add(tier)
             return None
+
+        # Resolve provider="auto" to actual provider
+        provider = spec.provider
+        model = spec.model
+
+        if provider == "auto" or model == "auto":
+            # Detect active provider from orchestrator
+            active_provider = self._detect_active_provider()
+            if active_provider is None:
+                logger.warning(f"Could not detect active provider for tier '{tier}'")
+                self._failed_tiers.add(tier)
+                return None
+
+            provider = active_provider
+
+        # Resolve model="auto" from provider's tier mapping
+        if model == "auto":
+            provider_tiers = self._config.provider_model_tiers.get(provider, {})
+            model = provider_tiers.get(tier)
+            if model is None:
+                logger.warning(
+                    f"No {tier} model defined for provider '{provider}'. "
+                    f"Available tiers: {list(provider_tiers.keys())}"
+                )
+                self._failed_tiers.add(tier)
+                return None
 
         try:
             from victor.agent.services.decision_service import (
@@ -128,19 +287,19 @@ class TieredDecisionService:
                 "timeout": spec.timeout_ms // 1000,
             }
 
-            if spec.provider == "ollama":
+            if provider == "ollama":
                 provider_kwargs["base_url"] = "http://localhost:11434"
             else:
                 try:
                     from victor.config.api_keys import get_api_key
 
-                    api_key = get_api_key(spec.provider)
+                    api_key = get_api_key(provider)
                     if api_key:
                         provider_kwargs["api_key"] = api_key
                 except Exception:
                     pass
 
-            provider = ProviderRegistry.create(spec.provider, **provider_kwargs)
+            provider_instance = ProviderRegistry.create(provider, **provider_kwargs)
 
             svc_config = LLMDecisionServiceConfig(
                 confidence_threshold=0.7,
@@ -151,13 +310,15 @@ class TieredDecisionService:
                 max_tokens_override=spec.max_tokens,
             )
 
-            service = LLMDecisionService(provider=provider, model=spec.model, config=svc_config)
+            service = LLMDecisionService(
+                provider=provider_instance, model=model, config=svc_config
+            )
             self._services[tier] = service
             logger.info(
                 "Created %s decision service: %s/%s (timeout=%dms)",
                 tier,
-                spec.provider,
-                spec.model,
+                provider,
+                model,
                 spec.timeout_ms,
             )
             return service
@@ -166,8 +327,8 @@ class TieredDecisionService:
             logger.warning(
                 "Failed to create %s decision service (%s/%s): %s",
                 tier,
-                spec.provider,
-                spec.model,
+                provider,
+                model,
                 e,
             )
             self._failed_tiers.add(tier)

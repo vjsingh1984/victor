@@ -399,14 +399,15 @@ def create_vertical(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
 ) -> None:
     """Create (scaffold) a new vertical package."""
-    from victor.ui.commands.scaffold import new_vertical
+    from victor.ui.commands.scaffold import scaffold_plugin
 
-    new_vertical(
+    scaffold_plugin(
         name=name,
         description=description,
         service_provider=service_provider,
         force=force,
         dry_run=dry_run,
+        label="vertical",
     )
 
 
@@ -421,14 +422,15 @@ def scaffold_vertical(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
 ) -> None:
     """Scaffold a new vertical package."""
-    from victor.ui.commands.scaffold import new_vertical
+    from victor.ui.commands.scaffold import scaffold_plugin
 
-    new_vertical(
+    scaffold_plugin(
         name=name,
         description=description,
         service_provider=service_provider,
         force=force,
         dry_run=dry_run,
+        label="vertical",
     )
 
 

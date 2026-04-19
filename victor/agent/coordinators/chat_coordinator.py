@@ -67,10 +67,11 @@ logger = logging.getLogger(__name__)
 
 
 class ChatCoordinator:
-    """Coordinator for chat and streaming chat operations.
+    """[DEPRECATED] Coordinator for chat and streaming chat operations.
 
-    This class extracts chat-related logic from the orchestrator,
-    providing a clean interface for managing conversations.
+    This class is being superseded by ChatService as part of the 
+    state-passed architectural migration. It remains for backward 
+    compatibility with facade-driven components.
 
     The coordinator depends on ``ChatOrchestratorProtocol`` (defined in
     ``chat_protocols.py``) rather than the concrete ``AgentOrchestrator``.
@@ -406,7 +407,7 @@ class ChatCoordinator:
             await orch._context_manager.start_background_compaction(interval_seconds=15.0)
 
         # Local aliases for frequently-used values
-        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 50)
+        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 100)
         total_iterations = 0
         force_completion = False
 
@@ -775,20 +776,28 @@ class ChatCoordinator:
                     sanitized = orch.sanitizer.sanitize(response.content)
                     if sanitized:
                         orch.add_message("assistant", sanitized)
-                        chunk = StreamChunk(content=sanitized)
+                        chunk = StreamChunk(content=sanitized, is_final=True)
+                        orch._record_intelligent_outcome(
+                            success=True,
+                            quality_score=last_quality_score,
+                            user_satisfied=True,
+                            completed=True,
+                        )
+                        return True, chunk
             except (ProviderRateLimitError, ProviderTimeoutError) as e:
                 logger.error(f"Rate limit/timeout during final response: {e}")
-                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n")
+                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n", is_final=True)
             except ProviderAuthError as e:
                 logger.error(f"Auth error during final response: {e}")
-                chunk = StreamChunk(content="Authentication error. Check API credentials.\n")
+                chunk = StreamChunk(content="Authentication error. Check API credentials.\n", is_final=True)
             except (ConnectionError, TimeoutError) as e:
                 logger.error(f"Network error during final response: {e}")
-                chunk = StreamChunk(content="Network error. Check connection.\n")
+                chunk = StreamChunk(content="Network error. Check connection.\n", is_final=True)
             except Exception:
                 logger.exception("Unexpected error during final response generation")
                 chunk = StreamChunk(
-                    content="Unable to generate final summary due to iteration limit.\n"
+                    content="Unable to generate final summary due to iteration limit.\n",
+                    is_final=True
                 )
 
             orch._record_intelligent_outcome(
@@ -797,7 +806,7 @@ class ChatCoordinator:
                 user_satisfied=True,
                 completed=True,
             )
-            return True, StreamChunk(content="", is_final=True)
+            return True, chunk if chunk else StreamChunk(content="", is_final=True)
 
         return False, None
 
@@ -834,7 +843,9 @@ class ChatCoordinator:
             Number of seconds to wait before retrying
         """
         orch = self._orchestrator
-        base_wait = orch._provider_coordinator.get_rate_limit_wait_time(exc)
+        # [CANONICAL] Use state-passed service for rate limit calculation
+        base_wait = orch._provider_service.get_rate_limit_wait_time(exc)
+        
         backoff_multiplier = 2**attempt
         wait_time = base_wait * backoff_multiplier
         return min(wait_time, 300.0)
@@ -1124,6 +1135,9 @@ class ChatCoordinator:
         memory_manager: Any,
         memory_session_id: Optional[str],
         usage_logger: Any,
+        tool_name: Optional[str] = None,
+        tool_call_id: Optional[str] = None,
+        tool_calls: Optional[list] = None,
     ) -> None:
         """Persist a message to memory and log the event.
 
@@ -1131,11 +1145,14 @@ class ChatCoordinator:
         loop is running, preventing async caller blocking.
 
         Args:
-            role: Message role (user, assistant, system).
+            role: Message role (user, assistant, system, tool).
             content: Message content text.
             memory_manager: MemoryManager instance (or None).
             memory_session_id: Active memory session ID (or None).
             usage_logger: UsageLogger for event logging.
+            tool_name: Tool name for tool role messages.
+            tool_call_id: Tool call ID for correlation.
+            tool_calls: Tool calls list for assistant messages (OpenAI spec).
         """
         # Persist to memory manager if available
         if memory_manager and memory_session_id:
@@ -1152,6 +1169,19 @@ class ChatCoordinator:
                 }
                 msg_role = role_map.get(role, MessageRole.USER)
 
+                # Build kwargs for add_message
+                add_kwargs: dict = {
+                    "session_id": memory_session_id,
+                    "role": msg_role,
+                    "content": content,
+                }
+                if tool_name:
+                    add_kwargs["tool_name"] = tool_name
+                if tool_call_id:
+                    add_kwargs["tool_call_id"] = tool_call_id
+                if tool_calls:
+                    add_kwargs["tool_calls"] = tool_calls
+
                 try:
                     loop = asyncio.get_running_loop()
                 except RuntimeError:
@@ -1160,17 +1190,10 @@ class ChatCoordinator:
                 if loop is not None and loop.is_running():
                     loop.run_in_executor(
                         None,
-                        memory_manager.add_message,
-                        memory_session_id,
-                        msg_role,
-                        content,
+                        lambda: memory_manager.add_message(**add_kwargs),
                     )
                 else:
-                    memory_manager.add_message(
-                        session_id=memory_session_id,
-                        role=msg_role,
-                        content=content,
-                    )
+                    memory_manager.add_message(**add_kwargs)
             except Exception as e:
                 logging.getLogger(__name__).debug("Failed to persist message: %s", e)
 

@@ -930,25 +930,39 @@ async def graph(
             "rebuilt": loaded.rebuilt,
             "result": result,
         }
-    except ImportError as exc:
-        # CodebaseIndex provider not installed — return helpful guidance
-        # instead of a confusing error that the LLM will retry.
+    except (ImportError, RuntimeError) as exc:
+        # CodebaseIndex provider not installed or not bootstrapped —
+        # return helpful guidance instead of a confusing error the LLM retries.
         return {
             "success": False,
             "mode": mode,
             "error": str(exc),
             "suggestion": (
                 "The graph tool requires a codebase indexing provider. "
-                "Use the 'search' or 'read' tools for code exploration instead. "
+                "Use code_search, overview, ls, or read tools for code exploration instead. "
                 "To enable graph analysis: pip install victor-coding"
             ),
             "unavailable": True,
         }
     except Exception as exc:
+        error_msg = str(exc)
+        # Detect CodebaseIndex-related errors even if not ImportError
+        if "CodebaseIndex" in error_msg or "codebase indexing" in error_msg:
+            return {
+                "success": False,
+                "mode": mode,
+                "error": error_msg,
+                "suggestion": (
+                    "The graph tool requires a codebase indexing provider. "
+                    "Use code_search, overview, ls, or read tools instead. "
+                    "To enable graph analysis: pip install victor-coding"
+                ),
+                "unavailable": True,
+            }
         return {
             "success": False,
             "mode": mode,
-            "error": str(exc),
+            "error": error_msg,
         }
 
 

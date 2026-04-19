@@ -65,7 +65,7 @@ class TestConversationConfig:
     def test_default_config(self):
         """Test default configuration values."""
         config = ConversationConfig()
-        assert config.max_context_chars == 200000
+        assert config.max_context_chars == 800000
         assert config.chars_per_token_estimate == 4
         assert config.enable_stage_tracking is True
         assert config.enable_context_monitoring is True

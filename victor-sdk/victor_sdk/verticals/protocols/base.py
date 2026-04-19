@@ -34,6 +34,12 @@ from victor_sdk.verticals.mixins import (
 )
 
 
+# CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+# External packages subclass VerticalBase and expose it via a VictorPlugin's
+# register(context): context.register_vertical(MyVertical). "Plugin" is the
+# canonical runtime integration seam; "Vertical" is the role the plugin
+# provides. A future SDK minor release (S4) introduces PluginBase as an alias
+# so new packages can standardize on plugin nomenclature.
 class VerticalBase(
     RLMixin,
     TeamMixin,

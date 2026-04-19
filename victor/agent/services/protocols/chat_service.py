@@ -36,12 +36,11 @@ if TYPE_CHECKING:
 
 @runtime_checkable
 class ChatServiceProtocol(Protocol):
-    """Protocol for chat operations service.
+    """[CANONICAL] Protocol for chat operations service.
 
-    Handles the core chat flow including:
-    - Processing user messages through the agentic loop
-    - Streaming responses for real-time feedback
-    - Managing conversation state and resets
+    This protocol represents the target architecture for chat operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on chat-related operations.

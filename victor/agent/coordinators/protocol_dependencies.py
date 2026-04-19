@@ -132,13 +132,13 @@ class OrchestratorProtocolAdapter:
         """Get current session ID."""
         return self._orchestrator.session_id
 
-    # IToolExecutor implementation
+    # IToolExecutor implementation (LEGACY)
     async def execute_tool_call(
         self,
         tool_call: Any,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """Execute tool call via orchestrator."""
+        """[LEGACY] Execute tool call via orchestrator."""
         return await self._orchestrator.execute_tool(
             tool_call.name,
             tool_call.arguments,
@@ -150,7 +150,7 @@ class OrchestratorProtocolAdapter:
         tool_calls: List[Any],
         **kwargs: Any,
     ) -> List[Dict[str, Any]]:
-        """Execute multiple tool calls."""
+        """[LEGACY] Execute multiple tool calls."""
         results = []
         for tool_call in tool_calls:
             result = await self.execute_tool_call(tool_call, **kwargs)

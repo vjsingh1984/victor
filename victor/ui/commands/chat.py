@@ -687,6 +687,13 @@ async def run_oneshot(
         )
         try:
             agent = await factory.create()
+
+            # Set planning model override if provided (for planning coordinator)
+            if planning_model:
+                agent._planning_model_override = planning_model
+
+            # Note: Observability (shim) is handled by AgentFactory internally
+            # The factory creates the agent with framework features already wired
         except InitializationError as e:
             formatter.error(f"{e.stage}: {e.message}")
             for s in e.suggestions:
@@ -694,20 +701,6 @@ async def run_oneshot(
             if e.run_command:
                 formatter.info(f"Run: {e.run_command}")
             raise typer.Exit(1)
-
-            # Set planning model override if provided (for planning coordinator)
-            if planning_model:
-                agent._planning_model_override = planning_model
-
-            # Emit session start event if observability is enabled
-            shim.emit_session_start(
-                {
-                    "mode": "oneshot",
-                    "task_type": task_type,
-                    "vertical": vertical,
-                    "thinking": thinking,
-                }
-            )
 
         if tool_budget is not None:
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
@@ -857,13 +850,6 @@ async def run_interactive(
         )
         try:
             agent = await factory.create()
-        except InitializationError as e:
-            console.print(f"[red]Error ({e.stage}):[/] {e.message}")
-            for s in e.suggestions:
-                console.print(f"  → {s}")
-            if e.run_command:
-                console.print(f"\nRun: [bold]{e.run_command}[/]")
-            raise typer.Exit(1)
 
             # Set planning model override if provided (for planning coordinator)
             if planning_model:
@@ -908,16 +894,15 @@ async def run_interactive(
                     f"({metadata.get('message_count', 0)} messages)\n"
                 )
 
-            # Emit session start event if observability is enabled
-            shim.emit_session_start(
-                {
-                    "mode": "interactive",
-                    "vertical": vertical,
-                    "thinking": thinking,
-                    "provider": profile_config.provider,
-                    "model": profile_config.model,
-                }
-            )
+            # Note: Observability (shim) is handled by AgentFactory internally
+            # The factory creates the agent with framework features already wired
+        except InitializationError as e:
+            console.print(f"[red]Error ({e.stage}):[/] {e.message}")
+            for s in e.suggestions:
+                console.print(f"  → {s}")
+            if e.run_command:
+                console.print(f"\nRun: [bold]{e.run_command}[/]")
+            raise typer.Exit(1)
 
         if tool_budget is not None:
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)

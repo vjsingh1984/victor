@@ -38,6 +38,11 @@ class StreamMetrics:
     - Optional cost calculation based on provider pricing config
     - Supports cache token costs (Anthropic)
     - cost_calculated flag indicates whether costs are available
+
+    Observability features (consolidated from victor.observability.analytics.streaming_metrics):
+    - chunk_intervals: List of time intervals between chunks for P50/P95/P99 analysis
+    - metadata: Dict for arbitrary metadata (request_id, model, provider, etc.)
+    - errors: List of errors encountered during streaming
     """
 
     start_time: float = 0.0
@@ -63,6 +68,11 @@ class StreamMetrics:
     cache_cost: float = 0.0
     total_cost: float = 0.0
     cost_calculated: bool = False
+
+    # Observability features (consolidated)
+    chunk_intervals: List[float] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    errors: List[Dict[str, Any]] = field(default_factory=list)
 
     def record_usage(self, usage: Optional[Dict[str, Any]]) -> None:
         """Record token usage from provider API response.
@@ -148,6 +158,79 @@ class StreamMetrics:
         if self.cost_calculated:
             return f"${self.total_cost:.4f}"
         return "cost n/a"
+
+    # Observability methods (consolidated from victor.observability.analytics.streaming_metrics)
+
+    def avg_chunk_interval_ms(self) -> float:
+        """Calculate average chunk interval in milliseconds.
+
+        Returns:
+            Average interval between chunks, or 0.0 if no intervals recorded
+        """
+        if not self.chunk_intervals:
+            return 0.0
+        return (sum(self.chunk_intervals) / len(self.chunk_intervals)) * 1000
+
+    def p50_chunk_interval_ms(self) -> float:
+        """Calculate median (P50) chunk interval in milliseconds.
+
+        Returns:
+            Median interval between chunks, or 0.0 if no intervals recorded
+        """
+        if not self.chunk_intervals:
+            return 0.0
+        sorted_intervals = sorted(self.chunk_intervals)
+        mid = len(sorted_intervals) // 2
+        if len(sorted_intervals) % 2 == 0:
+            median = (sorted_intervals[mid - 1] + sorted_intervals[mid]) / 2
+        else:
+            median = sorted_intervals[mid]
+        return median * 1000
+
+    def p95_chunk_interval_ms(self) -> float:
+        """Calculate P95 chunk interval in milliseconds.
+
+        Returns:
+            95th percentile interval between chunks, or 0.0 if no intervals recorded
+        """
+        if len(self.chunk_intervals) < 20:
+            return 0.0
+        sorted_intervals = sorted(self.chunk_intervals)
+        idx = int(len(sorted_intervals) * 0.95)
+        return sorted_intervals[idx] * 1000
+
+    def p99_chunk_interval_ms(self) -> float:
+        """Calculate P99 chunk interval in milliseconds.
+
+        Returns:
+            99th percentile interval between chunks, or 0.0 if no intervals recorded
+        """
+        if len(self.chunk_intervals) < 100:
+            return 0.0
+        sorted_intervals = sorted(self.chunk_intervals)
+        idx = int(len(sorted_intervals) * 0.99)
+        return sorted_intervals[idx] * 1000
+
+    def record_chunk_interval(self, interval_seconds: float) -> None:
+        """Record a chunk interval for percentile analysis.
+
+        Args:
+            interval_seconds: Time interval since last chunk in seconds
+        """
+        self.chunk_intervals.append(interval_seconds)
+
+    def record_error(self, error: Exception, context: Dict[str, Any]) -> None:
+        """Record an error encountered during streaming.
+
+        Args:
+            error: The exception that occurred
+            context: Additional context about the error
+        """
+        self.errors.append({
+            'type': type(error).__name__,
+            'message': str(error),
+            'context': context,
+        })
 
 
 @dataclass

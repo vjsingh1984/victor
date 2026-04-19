@@ -128,15 +128,32 @@ def _generate_init_content(
 
 
 async def _create_init_agent(provider: str, model: Optional[str] = None) -> Any:
-    """Create an Agent configured for init analysis with the given provider.
+    """Create an AgentOrchestrator for init synthesis using the profile path.
+
+    Uses AgentFactory(profile=provider) — same path as `victor chat -p <provider>` —
+    so profile credentials (keyring, API keys) are resolved correctly.
+    Falls back to Agent.create(provider=provider) for bare provider names that
+    aren't registered profiles (e.g., "ollama", "anthropic").
 
     Args:
-        provider: LLM provider name (e.g., "anthropic", "openai", "ollama")
-        model: Optional model override. If None, uses provider's default.
+        provider: Profile name (e.g., "zai-coding") or bare provider name.
+        model: Optional model override.
 
     Returns:
-        Agent instance ready for codebase analysis.
+        AgentOrchestrator instance with an initialized provider.
     """
+    from victor.config.settings import load_settings
+    from victor.framework.agent_factory import AgentFactory
+
+    settings = load_settings()
+    profiles = settings.load_profiles() if hasattr(settings, "load_profiles") else {}
+
+    if provider in profiles:
+        # Profile path: same as `victor chat -p <provider>` — keyring works
+        factory = AgentFactory(settings=settings, profile=provider)
+        return await factory.create()
+
+    # Bare provider name: fall back to Agent.create (no profile, no keyring for ZAI)
     from victor.framework.agent import Agent
 
     kwargs: dict = {"provider": provider, "temperature": 0.3}
@@ -280,12 +297,26 @@ def init(
         "-m",
         help="Override LLM model for deep analysis (e.g., claude-sonnet-4-20250514).",
     ),
+    log_level: Optional[str] = typer.Option(
+        None,
+        "--log-level",
+        help="Log level: DEBUG, INFO, WARNING, ERROR (default: WARNING).",
+        case_sensitive=False,
+    ),
 ) -> None:
     """Initialize project context and configuration."""
-    # Configure logging so init operations (LLM calls, graph analysis) go to victor.log
     from victor.ui.commands.utils import setup_logging
 
-    setup_logging(command="init")
+    if log_level is not None:
+        log_level = log_level.upper()
+        valid_levels = ["DEBUG", "INFO", "WARNING", "WARN", "ERROR", "CRITICAL"]
+        if log_level not in valid_levels:
+            console.print(f"[red]Invalid log level '{log_level}'. Valid: {', '.join(valid_levels)}[/]")
+            raise typer.Exit(1)
+        if log_level == "WARN":
+            log_level = "WARNING"
+
+    setup_logging(command="init", cli_log_level=log_level)
 
     # If wizard mode is requested, run the onboarding wizard instead
     if wizard:

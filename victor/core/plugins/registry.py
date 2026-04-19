@@ -136,6 +136,10 @@ class _ExternalPluginAdapter:
         }
 
 
+# CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+# PluginRegistry is the single authority for "installed Victor plugins + their verticals".
+# VerticalLoader, VerticalRegistryManager, UnifiedVerticalRegistry, and bootstrap
+# capability discovery all read from it via get_vertical_classes() / list_plugins().
 class PluginRegistry(SingletonRegistry["PluginRegistry"]):
     """Registry for discovering and managing Victor plugins.
 
@@ -152,6 +156,7 @@ class PluginRegistry(SingletonRegistry["PluginRegistry"]):
         self._plugins: Dict[str, VictorPlugin] = {}
         self._context: Optional[HostPluginContext] = None
         self._discovered = False
+        self._vertical_classes: Optional[Dict[str, Type[Any]]] = None
 
     def discover(self, force: bool = False) -> List[VictorPlugin]:
         """Discover and load plugins from entry points.
@@ -169,6 +174,10 @@ class PluginRegistry(SingletonRegistry["PluginRegistry"]):
         """
         if self._discovered and not force:
             return list(self._plugins.values())
+
+        # Invalidate derived caches on forced refresh.
+        if force:
+            self._vertical_classes = None
 
         # Try AOT manifest fast-path (skip when forcing refresh)
         aot_entries = None
@@ -391,3 +400,58 @@ class PluginRegistry(SingletonRegistry["PluginRegistry"]):
             )
 
         return sorted(entries, key=lambda e: e["name"])
+
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+    def get_vertical_classes(self) -> Dict[str, Type[Any]]:
+        """Return the vertical classes each discovered plugin registers.
+
+        The single authority for "which plugin provides which vertical". Uses a
+        capture-only PluginContext (no side effects) so VerticalLoader,
+        VerticalRegistryManager, and bootstrap capability discovery can read
+        the same materialized result without repeating entry-point scans or
+        re-instantiating plugins.
+
+        Returns:
+            Mapping from vertical name to the SDK ``VerticalBase`` subclass
+            the plugin registered.
+        """
+        if self._vertical_classes is not None:
+            return dict(self._vertical_classes)
+
+        # Ensure plugins are instantiated; avoid forcing a re-scan.
+        if not self._discovered:
+            self.discover()
+
+        try:
+            from victor_sdk.discovery import collect_verticals_from_candidate
+        except ImportError:
+            logger.debug("victor_sdk.discovery not importable; skipping vertical capture")
+            self._vertical_classes = {}
+            return {}
+
+        result: Dict[str, Type[Any]] = {}
+        for plugin_name, plugin in self._plugins.items():
+            if isinstance(plugin, _ExternalPluginAdapter):
+                # External subprocess plugins don't provide SDK verticals.
+                continue
+            try:
+                for vertical_name, vertical_cls in collect_verticals_from_candidate(plugin).items():
+                    # First plugin to register wins; emit a warning on collision.
+                    if vertical_name in result and result[vertical_name] is not vertical_cls:
+                        logger.warning(
+                            "Vertical name collision on '%s': keeping %s, ignoring %s",
+                            vertical_name,
+                            result[vertical_name].__name__,
+                            vertical_cls.__name__,
+                        )
+                        continue
+                    result[vertical_name] = vertical_cls
+            except Exception as exc:
+                logger.debug(
+                    "Failed to collect verticals from plugin '%s': %s",
+                    plugin_name,
+                    exc,
+                )
+
+        self._vertical_classes = result
+        return dict(result)

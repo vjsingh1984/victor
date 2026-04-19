@@ -39,44 +39,63 @@ DEAD_LETTER_DIR.mkdir(parents=True, exist_ok=True)
 NOTIF_QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 
-# Simple circuit breaker
+# Circuit breaker wrapper using canonical implementation
+# Replaces local implementation with victor.providers.circuit_breaker.CircuitBreaker
+from victor.providers.circuit_breaker import CircuitBreaker as CanonicalCircuitBreaker, CircuitBreakerConfig
+
+
 class CircuitBreaker:
+    """Adapter wrapper around canonical CircuitBreaker for data pipeline compatibility.
+
+    This adapter provides the same API as the previous simple CircuitBreaker
+    implementation while delegating to the canonical CircuitBreaker from
+    victor.providers.circuit_breaker.
+
+    The canonical implementation provides:
+    - More robust state management (CLOSED, OPEN, HALF_OPEN states)
+    - Better observability with metrics and callbacks
+    - Decorator and context manager support
+    - Thread-safe operations with async locks
+    """
+
     def __init__(self, max_failures: int = 5, reset_timeout: int = 60):
-        self.max_failures = max_failures
-        self.reset_timeout = reset_timeout
-        self.failure_count = 0
-        self.open_until = None
+        # Map legacy parameters to canonical config
+        config = CircuitBreakerConfig(
+            failure_threshold=max_failures,
+            timeout_seconds=float(reset_timeout),
+        )
+        self._breaker = CanonicalCircuitBreaker.from_config("data_pipeline", config)
 
     def call(self, func: Callable, *args, **kwargs):
+        """Execute function through circuit breaker with legacy API compatibility.
+
+        This method adapts the canonical CircuitBreaker's record_success/record_failure
+        API to match the legacy call() interface that automatically tracks success/failure.
+        """
         if self.is_open():
             raise Exception("Circuit breaker open")
+
         try:
             result = func(*args, **kwargs)
+            self._breaker.record_success()
+            return result
         except Exception as exc:
-            self.failure_count += 1
+            self._breaker.record_failure(exc)
             LOG.warning(
-                "Circuit breaker failure %s/%s: %s",
-                self.failure_count,
-                self.max_failures,
+                "Circuit breaker failure: %s",
                 exc,
             )
-            if self.failure_count >= self.max_failures:
-                self.open_until = time.time() + self.reset_timeout
-                LOG.error("Circuit breaker opened for %s seconds", self.reset_timeout)
+            if self._breaker.is_open:
+                LOG.error("Circuit breaker opened")
             raise
-        else:
-            self.failure_count = 0
-            return result
 
     def is_open(self) -> bool:
-        if self.open_until is None:
-            return False
-        if time.time() >= self.open_until:
-            self.open_until = None
-            self.failure_count = 0
-            LOG.info("Circuit breaker closed")
-            return False
-        return True
+        """Check if circuit is open (failing fast).
+
+        The canonical CircuitBreaker automatically transitions from OPEN to HALF_OPEN
+        after the timeout, so this check may trigger state transitions.
+        """
+        return not self._breaker.can_execute()
 
 
 # Pipeline implementation

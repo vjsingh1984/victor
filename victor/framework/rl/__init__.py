@@ -90,6 +90,7 @@ from typing import (
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import RLCoordinator, get_rl_coordinator
+from victor.framework.rl.option_framework import OptionRegistry
 from victor.framework.rl.config import (
     BaseRLConfig,
     DEFAULT_ACTIVE_LEARNERS,
@@ -635,6 +636,8 @@ __all__ = [
     "Transition",
     "ExecutionTrace",
     "create_credit_aware_workflow",
+    # Option Framework (hierarchical RL)
+    "OptionRegistry",
     # Visualization & Export
     "CreditVisualizationBuilder",
     "ExportConfig",

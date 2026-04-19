@@ -43,6 +43,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from victor.core.health import HealthStatus
 from victor.providers.registry import ProviderRegistry
 from victor.providers.resolution import (
     UnifiedApiKeyResolver,
@@ -51,15 +52,6 @@ from victor.providers.resolution import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class HealthStatus:
-    """Health status enumeration for providers."""
-
-    HEALTHY = "healthy"
-    DEGRADED = "degraded"
-    UNHEALTHY = "unhealthy"
-    UNKNOWN = "unknown"
 
 
 @dataclass

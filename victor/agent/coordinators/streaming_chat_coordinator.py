@@ -288,10 +288,15 @@ class StreamingChatCoordinator:
         # Execute tool calls
         tool_results = await self._tool_context._handle_tool_calls(tool_calls)
 
-        # Add tool results to conversation
+        # Add tool results to conversation with tool_call_id for OpenAI spec compliance
         for result in tool_results:
             if result.get("content"):
-                self._chat_context.add_message("tool", result["content"])
+                self._chat_context.add_message(
+                    "tool",
+                    result["content"],
+                    name=result.get("name"),
+                    tool_call_id=result.get("tool_call_id"),
+                )
 
 
 __all__ = [

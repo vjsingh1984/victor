@@ -2182,9 +2182,14 @@ async def ls(
             except NotADirectoryError:
                 raise NotADirectoryError(
                     f"Path is not a directory: {path}\n"
-                    f"Suggestion: Use read_file(path='{path}') to read this file instead."
+                    f"Suggestion: Use read(path='{path}') to read this file instead."
                 )
         if not dir_path.is_dir():
+            if dir_path.is_file():
+                raise NotADirectoryError(
+                    f"Path is not a directory: {path}\n"
+                    f"Suggestion: Use read(path='{path}') to read this file instead."
+                )
             raise NotADirectoryError(f"Path is not a directory: {path}")
 
         # Normalize limit (handle non-int input from model)

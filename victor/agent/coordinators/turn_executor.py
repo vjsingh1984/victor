@@ -750,7 +750,7 @@ class TurnExecutor:
                 logger.info(
                     "Parallel exploration: %d files, %d tool calls, %.1fs",
                     len(findings.file_paths),
-                    findings.tool_calls_total,
+                    findings.tool_calls,
                     findings.duration_seconds,
                 )
 

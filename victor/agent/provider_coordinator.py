@@ -381,6 +381,13 @@ class ProviderCoordinator:
 
         return self.config.default_rate_limit_wait
 
+    def get_rate_limit_stats(self) -> dict:
+        """Get rate limit statistics."""
+        return {
+            "rate_limit_count": self._rate_limit_count,
+            "last_rate_limit_time": self._last_rate_limit_time,
+        }
+
     async def stream_with_rate_limit_retry(
         self,
         stream_func: Callable[..., AsyncIterator[T]],

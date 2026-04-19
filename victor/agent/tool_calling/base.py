@@ -276,9 +276,14 @@ class FallbackParsingMixin:
                 args = tc.get("arguments", {})
                 tc_id = tc.get("id")
 
-            # Validate tool name if validator provided
+            # Validate tool name if validator provided.
+            # Invalid names are still included so the pipeline can generate
+            # a proper error tool response with tool_call_id — OpenAI spec
+            # requires every tool_calls[].id to have a matching role=tool.
             if validate_name_fn and not validate_name_fn(name):
                 warnings.append(f"Skipped invalid tool name: {name}")
+                # Include with empty args — pipeline will produce error response
+                tool_calls.append(ToolCall(name=name, arguments={}, id=tc_id))
                 continue
             elif not name:
                 warnings.append("Skipped tool call with empty name")

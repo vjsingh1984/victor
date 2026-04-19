@@ -223,6 +223,7 @@ class TestGetRateLimitWaitTime:
     def test_calculates_wait_time_with_backoff(self, chat_coordinator, mock_orchestrator):
         """Calculate wait time with exponential backoff."""
         mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 2.0
+        mock_orchestrator._provider_service.get_rate_limit_wait_time.return_value = 2.0
         exc = Exception("Rate limited")
 
         # First attempt
@@ -240,6 +241,7 @@ class TestGetRateLimitWaitTime:
     def test_caps_wait_at_max(self, chat_coordinator, mock_orchestrator):
         """Cap wait time at 300 seconds."""
         mock_orchestrator._provider_coordinator.get_rate_limit_wait_time.return_value = 100.0
+        mock_orchestrator._provider_service.get_rate_limit_wait_time.return_value = 100.0
         exc = Exception("Rate limited")
 
         # Would be 100 * 2^4 = 1600, but capped at 300

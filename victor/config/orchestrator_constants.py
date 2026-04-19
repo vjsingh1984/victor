@@ -62,17 +62,24 @@ class ContextLimits:
         chars_per_token_estimate: Approximate characters per token for estimation
 
     **Design Notes:**
-    - overflow_threshold (0.75) provides headroom before hitting model limits
-    - proactive_compaction_threshold (0.70) triggers compaction early for token efficiency
-    - compaction_target (0.45) reduces to 45% to allow for conversation growth
+    - max_context_chars reflects modern 200K-token models (200K tokens × 4 chars = 800K chars).
+      Previous value (200K chars = 50K tokens) was calibrated for 64K-token-era models and
+      triggered compaction at ~35K tokens on 200K-token models — far too conservative.
+    - overflow_threshold (0.85) triggers at ~170K tokens on a 200K model, leaving 30K headroom.
+    - proactive_compaction_threshold (0.75) triggers at ~150K tokens — allows long conversations
+      before compaction but still leaves buffer. Restored from 0.70 which was overly aggressive.
+    - warning_threshold (0.65) warns at ~130K tokens, giving user advance notice.
+    - compaction_target (0.45) compacts down to ~90K tokens — room for continued growth.
     """
 
-    overflow_threshold: float = 0.75  # Reduced from 0.8
-    warning_threshold: float = 0.65  # Reduced from 0.7
-    proactive_compaction_threshold: float = 0.70  # Reduced from 0.90 - trigger earlier
-    critical_threshold: float = 0.90  # Reduced from 0.95
-    compaction_target: float = 0.45  # Reduced from 0.5 - compact more aggressively
-    max_context_chars: int = 200000
+    overflow_threshold: float = 0.85
+    warning_threshold: float = 0.65
+    proactive_compaction_threshold: float = 0.75
+    critical_threshold: float = 0.95
+    compaction_target: float = 0.45
+    # 200K tokens × 4 chars/token. Modern models (ZAI, Claude, GPT-4o) support 128K–200K tokens.
+    # Override via VICTOR_MAX_CONTEXT_CHARS env var or profiles.yaml if using a smaller model.
+    max_context_chars: int = 800000
     chars_per_token_estimate: int = 4
 
 

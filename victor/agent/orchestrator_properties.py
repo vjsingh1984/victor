@@ -471,6 +471,85 @@ def _cumulative_token_usage_set(self: "AgentOrchestrator", value: dict) -> None:
 # Property installation registry
 # =====================================================================
 
+# =====================================================================
+# Group 5: ToolService convenience methods (delegates to canonical service)
+# =====================================================================
+
+
+def _is_tool_enabled_get(self: "AgentOrchestrator") -> Any:
+    """Check if a tool is enabled via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Args:
+        tool_name: Name of the tool to check
+
+    Returns:
+        True if tool is enabled, False otherwise
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.is_tool_enabled
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.is_tool_enabled
+    raise AttributeError("ToolService not available")
+
+
+def _get_enabled_tools_get(self: "AgentOrchestrator") -> Any:
+    """Get enabled tools via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Returns:
+        Set of enabled tool names
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.get_enabled_tools
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.get_enabled_tools
+    raise AttributeError("ToolService not available")
+
+
+def _set_enabled_tools_get(self: "AgentOrchestrator") -> Any:
+    """Set enabled tools via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Args:
+        tools: Set of tool names to enable
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.set_enabled_tools
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.set_enabled_tools
+    raise AttributeError("ToolService not available")
+
+
+def _resolve_tool_alias_get(self: "AgentOrchestrator") -> Any:
+    """Resolve tool alias via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Args:
+        tool_name: Tool name or alias to resolve
+
+    Returns:
+        Canonical tool name
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.resolve_tool_alias
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.resolve_tool_alias
+    raise AttributeError("ToolService not available")
+
+
 # Map of public property name -> (getter, setter_or_None)
 _PROPERTY_REGISTRY: dict[str, Any] = {
     # Group 1: Simple accessors (getter only)
@@ -528,6 +607,11 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
         _cumulative_token_usage_get,
         _cumulative_token_usage_set,
     ),
+    # Group 5: ToolService convenience methods (delegates to canonical service)
+    "is_tool_enabled": (_is_tool_enabled_get, None),
+    "get_enabled_tools": (_get_enabled_tools_get, None),
+    "set_enabled_tools": (_set_enabled_tools_get, None),
+    "resolve_tool_alias": (_resolve_tool_alias_get, None),
 }
 
 

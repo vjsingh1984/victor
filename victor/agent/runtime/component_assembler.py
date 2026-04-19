@@ -167,6 +167,10 @@ class ComponentAssembler:
             ),
         )
 
+        # [CANONICAL] Update SessionService with lifecycle_manager after it's created
+        if hasattr(orchestrator, "_session_service") and orchestrator._session_service:
+            orchestrator._session_service.set_lifecycle_manager(orchestrator._lifecycle_manager)
+
         # Tool deduplication and pipeline
         orchestrator._deduplication_tracker = factory.create_tool_deduplication_tracker()
         orchestrator._tool_pipeline = factory.create_tool_pipeline(

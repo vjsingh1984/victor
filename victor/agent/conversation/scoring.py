@@ -54,12 +54,14 @@ CONTROLLER_WEIGHTS = ScoringWeights(priority=0.0, recency=0.3, role=0.3, length=
 DEFAULT_WEIGHTS = ScoringWeights()
 
 # Role importance scores (from ConversationController's scoring)
+# Adjusted to prevent system message hoarding (was 1.0 for system)
+# 'tool' matches MessageRole.TOOL (OpenAI spec for tool results)
 _ROLE_SCORES: Dict[str, float] = {
-    "system": 1.0,
-    "tool_result": 0.9,
-    "tool_call": 0.8,
-    "assistant": 0.5,
-    "user": 0.6,
+    "system": 0.7,        # High but not absolute
+    "user": 0.8,          # Higher than system to ensure user intent survives
+    "assistant": 0.6,
+    "tool": 0.9,          # Tool results (role=tool) are critical for task state
+    "tool_call": 0.7,     # Internal role for assistant tool requests
 }
 
 

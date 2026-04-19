@@ -30,7 +30,7 @@ import logging
 from typing import TYPE_CHECKING, Optional, Set
 
 from victor.agent.protocols import IToolSelector
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
     from victor.agent.conversation.state_machine import ConversationStateMachine

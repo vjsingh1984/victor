@@ -45,7 +45,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Awaitable, Callable, ClassVar, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -586,6 +586,7 @@ class ResilientProvider:
     - Fallback to alternative providers
     - Request timeout handling
     - Comprehensive error logging
+    - ObservabilityBus integration for fallback notifications
 
     Usage:
         resilient = ResilientProvider(
@@ -595,6 +596,21 @@ class ResilientProvider:
 
         response = await resilient.chat(messages, model=model)
     """
+
+    _observability_bus: ClassVar[Optional[Any]] = None
+
+    @classmethod
+    def wire_observability(cls, bus: Any) -> None:
+        """Wire an ObservabilityBus for provider fallback notifications.
+
+        Follows the same pattern as ``CircuitBreakerRegistry.wire_observability``.
+        When wired, lifecycle events are emitted on fallback activation and
+        exhaustion so the dashboard and other subscribers gain visibility.
+
+        Args:
+            bus: ObservabilityBus instance with ``emit_lifecycle_event()`` method.
+        """
+        cls._observability_bus = bus
 
     def __init__(
         self,
@@ -736,6 +752,16 @@ class ResilientProvider:
 
                 self._stats["fallback_successes"] += 1
                 logger.info(f"Fallback provider '{fb_name}' succeeded")
+                if self.__class__._observability_bus is not None:
+                    self.__class__._observability_bus.emit_lifecycle_event(
+                        "provider.fallback.activated",
+                        {
+                            "primary": self._provider_name,
+                            "fallback": fb_name,
+                            "error": str(primary_error),
+                            "model": model,
+                        },
+                    )
                 return result
 
             except CircuitOpenError as e:
@@ -748,6 +774,16 @@ class ResilientProvider:
 
         # All providers failed
         self._stats["total_failures"] += 1
+        if self.__class__._observability_bus is not None:
+            self.__class__._observability_bus.emit_lifecycle_event(
+                "provider.fallback.exhausted",
+                {
+                    "primary": self._provider_name,
+                    "fallback_count": len(self.fallback_providers),
+                    "error": str(primary_error),
+                    "model": model,
+                },
+            )
         raise ProviderUnavailableError(primary_error, fallback_errors)
 
     async def stream(
@@ -815,12 +851,34 @@ class ResilientProvider:
                     async for chunk in stream:
                         yield chunk
                     self._stats["fallback_successes"] += 1
+                    if self.__class__._observability_bus is not None:
+                        self.__class__._observability_bus.emit_lifecycle_event(
+                            "provider.fallback.activated",
+                            {
+                                "primary": self._provider_name,
+                                "fallback": fb_name,
+                                "error": str(primary_err),
+                                "model": model,
+                                "streaming": True,
+                            },
+                        )
                     return
                 except Exception as e:
                     logger.warning(f"Fallback stream '{fb_name}' failed: {e}")
                     continue
 
             self._stats["total_failures"] += 1
+            if self.__class__._observability_bus is not None:
+                self.__class__._observability_bus.emit_lifecycle_event(
+                    "provider.fallback.exhausted",
+                    {
+                        "primary": self._provider_name,
+                        "fallback_count": len(self.fallback_providers),
+                        "error": str(primary_err),
+                        "model": model,
+                        "streaming": True,
+                    },
+                )
             raise primary_err
 
     def get_stats(self) -> Dict[str, Any]:

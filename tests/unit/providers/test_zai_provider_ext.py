@@ -87,7 +87,7 @@ async def test_supports_streaming(zai_provider):
 @pytest.mark.asyncio
 async def test_get_context_window(zai_provider):
     """Test context window retrieval."""
-    assert zai_provider.get_context_window("glm-4.7") == 128000
+    assert zai_provider.get_context_window("glm-4.7") == 200000
     assert zai_provider.get_context_window("glm-4.6") == 128000
     assert zai_provider.get_context_window("glm-4.5") == 128000
     assert zai_provider.get_context_window("glm-4.5-air") == 128000

@@ -766,6 +766,10 @@ def bootstrap_capabilities() -> None:
     _auto_detect_enhanced_capabilities(registry)
 
 
+# CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+# Capability registration ultimately runs inside plugin.register(HostPluginContext),
+# so this entry-point is the *single* side-effecting registration path. Do not
+# add a parallel entry-point scan here — PluginRegistry owns discovery.
 def _discover_plugin_capabilities(registry: Any) -> None:
     """Discover enhanced capabilities from installed plugin verticals.
 
@@ -774,21 +778,37 @@ def _discover_plugin_capabilities(registry: Any) -> None:
     → _auto_register_vertical_capabilities() → CapabilityRegistry.register(ENHANCED)
 
     This replaces the hardcoded _PLUGIN_VERTICAL_MAP with dynamic discovery.
-    The guard (context is None) prevents double-registration when
-    _phase_plugins already ran during phase-based bootstrap.
+
+    The check uses CapabilityRegistry state (not PluginRegistry.context) to
+    decide whether to re-run discovery.  This handles the case where the
+    CapabilityRegistry singleton was reset (e.g., by test fixtures) while
+    the ServiceContainer singleton still has Settings registered, causing
+    ensure_bootstrapped() to take the early-return path.
     """
     try:
+        from victor.core.capability_registry import CapabilityRegistry as CapReg
+        from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+
+        cap_registry = CapReg.get_instance()
+
+        # If enhanced capabilities already registered, nothing to do.
+        if cap_registry.is_enhanced(CodebaseIndexFactoryProtocol):
+            return
+
         from victor.core.plugins.registry import PluginRegistry
 
         plugin_registry = PluginRegistry.get_instance()
-        if plugin_registry.context is None:
-            # Plugins haven't been registered yet — run registration now.
-            # This triggers the full chain: plugin.register(context) →
-            # context.register_vertical() → _auto_register_vertical_capabilities()
-            # → CapabilityRegistry.register(..., ENHANCED)
-            plugin_registry.register_all()
+        # Force full registration — capabilities are missing even if
+        # the plugin context was set by a previous (now stale) bootstrap.
+        plugin_registry.register_all()
+        # Verify registration succeeded
+        if not cap_registry.is_enhanced(CodebaseIndexFactoryProtocol):
+            logger.warning(
+                "Plugin capability discovery completed but CodebaseIndex "
+                "still not enhanced — check victor-coding plugin registration"
+            )
     except Exception as e:
-        logger.debug("Plugin capability discovery failed: %s", e)
+        logger.warning("Plugin capability discovery failed: %s", e, exc_info=True)
 
 
 # ---------------------------------------------------------------------------

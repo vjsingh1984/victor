@@ -42,6 +42,11 @@ class PluginContext(Protocol):
         """
         ...
 
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+    # This is the bridge between the plugin seam and the vertical role. No
+    # ``register_plugin`` method exists today — ``register_vertical`` IS the
+    # canonical way to expose a plugin's extension surface. S4 will add a
+    # ``register_plugin`` alias (behaviour identical) for naming consistency.
     def register_vertical(self, vertical_class: Type[Any]) -> None:
         """Register a vertical class with the framework.
 
@@ -126,6 +131,72 @@ class PluginContext(Protocol):
         """
         ...
 
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+    # These methods let a plugin self-register everything via register(context)
+    # without needing sidecar entry-point groups (victor.safety_rules,
+    # victor.tool_dependencies, victor.escape_hatches, victor.rl_configs,
+    # victor.bootstrap_services, victor.mcp_servers). Hosts running older
+    # frameworks may not implement some of these; plugins should probe with
+    # hasattr() before calling. Added in SDK minor bump for PluginContext.
+    def register_safety_rule(self, rule: Any) -> None:
+        """Register a single safety rule with the framework's SafetyEnforcer.
+
+        Args:
+            rule: A SafetyRule instance (see ``victor_sdk.safety``).
+        """
+        ...
+
+    def register_tool_dependency(self, name: str, provider: Any) -> None:
+        """Register a tool dependency provider for a named tool group.
+
+        Args:
+            name: Tool or tool-group identifier (e.g., ``"devops"``).
+            provider: Provider instance implementing the
+                ``BaseToolDependencyProvider`` contract.
+        """
+        ...
+
+    def register_escape_hatch(self, hatch: Any) -> None:
+        """Register an escape-hatch (condition or transform) with the framework.
+
+        Args:
+            hatch: An escape-hatch descriptor. The host inspects ``kind``
+                (``"condition"`` or ``"transform"``) and ``name`` / ``fn``
+                attributes to route to the appropriate registry method.
+        """
+        ...
+
+    def register_rl_config(self, key: str, config: Any) -> None:
+        """Register an RL config fragment the framework merges at bootstrap.
+
+        Args:
+            key: Config namespace (typically the vertical name).
+            config: Dict-like config payload.
+        """
+        ...
+
+    def register_bootstrap_service(
+        self,
+        factory: Any,
+        *,
+        phase: str = "vertical_services",
+    ) -> None:
+        """Register a bootstrap-service hook that runs during the given phase.
+
+        Args:
+            factory: Callable with signature ``(container, settings, context)``.
+            phase: Bootstrap phase name (default ``"vertical_services"``).
+        """
+        ...
+
+    def register_mcp_server(self, spec: Any) -> None:
+        """Register an MCP server spec for discovery by the MCP vertical.
+
+        Args:
+            spec: MCP server specification object or dict.
+        """
+        ...
+
 
 @runtime_checkable
 class VictorPlugin(Protocol):
@@ -155,6 +226,10 @@ class VictorPlugin(Protocol):
         """
         ...
 
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
+    # "this plugin's vertical" == the VerticalBase subclass registered via
+    # context.register_vertical. Plugin and vertical describe the same
+    # extension instance from two angles (runtime seam vs. configuration role).
     def on_activate(self) -> None:
         """Called when this plugin's vertical is activated.
 

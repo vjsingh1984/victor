@@ -190,8 +190,9 @@ class ZAIProvider(BaseProvider):
         )
     """
 
-    # Reasonable timeout for cloud API
-    DEFAULT_TIMEOUT = 120
+    # Z.AI GLM models can take 200-400s for complex analysis tasks with
+    # many tools.  At ~20 tok/s output, generating 4K tokens needs ~215s.
+    DEFAULT_TIMEOUT = 300
 
     def __init__(
         self,
@@ -364,7 +365,7 @@ class ZAIProvider(BaseProvider):
             ProviderError: For other errors
         """
         # Strip endpoint suffix from model name (e.g., "glm-5.1:coding" -> "glm-5.1")
-        if ":" in model:
+        if model and ":" in model:
             parts = model.rsplit(":", 1)
             if parts[1] in ZAI_BASE_URLS:
                 model = parts[0]
@@ -471,7 +472,7 @@ class ZAIProvider(BaseProvider):
         """
         # Strip Z.AI endpoint suffix from model name (e.g., "glm-5.1:coding" -> "glm-5.1")
         # Only strips known endpoint suffixes, not Ollama-style tags like "gemma4:31b"
-        if ":" in model:
+        if model and ":" in model:
             parts = model.rsplit(":", 1)
             if parts[1] in ZAI_BASE_URLS:
                 model = parts[0]
@@ -486,6 +487,26 @@ class ZAIProvider(BaseProvider):
                 stream=True,
                 thinking=thinking,
                 **kwargs,
+            )
+
+            # Diagnostic: log message structure for debugging 400 errors
+            msg_summary = []
+            for i, m in enumerate(payload.get("messages", [])):
+                role = m.get("role", "?")
+                has_tc = "tool_calls" in m
+                tc_id = m.get("tool_call_id", "")
+                content_len = len(m.get("content", "") or "")
+                parts = [f"{i}:{role}({content_len})"]
+                if has_tc:
+                    tc_ids = [tc.get("id", "?")[:12] for tc in m["tool_calls"]]
+                    parts.append(f"tc={tc_ids}")
+                if tc_id:
+                    parts.append(f"tcid={tc_id[:12]}")
+                msg_summary.append(" ".join(parts))
+            self._provider_logger.logger.info(
+                "Z.AI stream payload: %d messages: %s",
+                len(payload.get("messages", [])),
+                " | ".join(msg_summary),
             )
 
             async with self.client.stream("POST", "/chat/completions", json=payload) as response:
@@ -698,23 +719,50 @@ class ZAIProvider(BaseProvider):
 
             formatted_messages.append(formatted_msg)
 
-        # Second pass: strip orphaned tool_calls from assistant messages.
-        # After compaction, an assistant message may have tool_calls but its
-        # tool responses were removed. Z.AI rejects this — tool_calls must
-        # have matching tool responses in the conversation.
-        present_tool_response_ids = {
-            m.get("tool_call_id")
-            for m in formatted_messages
-            if m.get("role") == "tool" and m.get("tool_call_id")
-        }
-        for msg in formatted_messages:
-            if msg.get("role") == "assistant" and "tool_calls" in msg:
-                tc_ids = {tc["id"] for tc in msg["tool_calls"] if "id" in tc}
-                if not tc_ids.issubset(present_tool_response_ids):
-                    # Remove tool_calls — responses were compacted away
+        # Second pass: fix orphaned tool_calls/responses after compaction.
+        # Shared across all OpenAI-compatible providers.
+        from victor.providers.openai_compat import fix_orphaned_tool_messages
+
+        formatted_messages = fix_orphaned_tool_messages(formatted_messages)
+
+        # Validate message structure before sending
+        for i, msg in enumerate(formatted_messages):
+            role = msg.get("role", "")
+            content = msg.get("content")
+            has_tool_calls = "tool_calls" in msg
+            has_tool_call_id = "tool_call_id" in msg
+
+            # Assistant messages with tool_calls must be followed by tool responses
+            if role == "assistant" and has_tool_calls:
+                expected_ids = {tc["id"] for tc in msg["tool_calls"] if "id" in tc}
+                next_ids = set()
+                for j in range(i + 1, len(formatted_messages)):
+                    nxt = formatted_messages[j]
+                    if nxt.get("role") == "tool":
+                        nxt_id = nxt.get("tool_call_id")
+                        if nxt_id:
+                            next_ids.add(nxt_id)
+                    else:
+                        break
+                missing = expected_ids - next_ids
+                if missing:
+                    self._provider_logger.logger.warning(
+                        "Z.AI payload: assistant[%d] tool_calls missing responses: %s",
+                        i, missing,
+                    )
+                    # Strip the tool_calls to prevent API error
                     del msg["tool_calls"]
                     if msg.get("content") is None:
                         msg["content"] = ""
+
+            # Tool messages must have tool_call_id
+            if role == "tool" and not has_tool_call_id:
+                self._provider_logger.logger.warning(
+                    "Z.AI payload: tool[%d] missing tool_call_id, converting to user",
+                    i,
+                )
+                msg["role"] = "user"
+                msg["content"] = f"[Tool result] {msg.get('content', '')}"
 
         payload: Dict[str, Any] = {
             "model": model,

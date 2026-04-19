@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import logging
+import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
@@ -40,16 +41,35 @@ logger = logging.getLogger(__name__)
 
 
 class SQLiteSessionPersistence:
-    """SQLite-based session persistence.
+    """SQLite-based session persistence (DEPRECATED).
 
     .. deprecated:: 0.7.0
         Use ``ConversationStore`` from
-        ``victor.agent.conversation_memory`` instead. It provides
-        normalized schema, ML/RL-friendly aggregation, token-aware
-        pruning, and FTS search. This class will be removed in 0.9.0.
+        ``victor.agent.conversation.store`` instead. This class
+        will be removed in version 0.10.0.
 
     Stores conversation sessions and messages in the project database,
     providing fast queries and eliminating JSON file duplication.
+
+    Migration guide:
+        # Old API:
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        persistence = get_sqlite_session_persistence()
+        sessions = persistence.list_sessions()
+        session = persistence.load_session(session_id)
+
+        # New API:
+        from victor.agent.conversation.store import ConversationStore
+        store = ConversationStore()
+        sessions = store.list_sessions()
+        session = store.get_session(session_id)
+
+    The ConversationStore provides:
+    - Token-aware context window management
+    - Priority-based message pruning
+    - Semantic relevance scoring
+    - ML/RL-friendly aggregation
+    - Full-text search support
 
     Tables Used:
     - sessions: id, name, provider, model, profile, data, created_at, updated_at
@@ -62,6 +82,12 @@ class SQLiteSessionPersistence:
         Args:
             db_path: Path to project database (default: .victor/project.db)
         """
+        warnings.warn(
+            "SQLiteSessionPersistence is deprecated. Use ConversationStore from "
+            "victor.agent.conversation.store instead. This will be removed in version 0.10.0.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         from victor.config.settings import get_project_paths
         from victor.core.database import get_project_database
 
@@ -452,7 +478,11 @@ class SQLiteSessionPersistence:
 def get_sqlite_session_persistence(
     db_path: Optional[Path] = None,
 ) -> SQLiteSessionPersistence:
-    """Get the SQLite session persistence instance.
+    """Get the SQLite session persistence instance (DEPRECATED).
+
+    .. deprecated:: 0.7.0
+        Use ``ConversationStore`` from ``victor.agent.conversation.store`` instead.
+        This function will be removed in version 0.10.0.
 
     Args:
         db_path: Optional database path (for testing). If not provided,
@@ -460,8 +490,26 @@ def get_sqlite_session_persistence(
 
     Returns:
         SQLiteSessionPersistence instance
+
+    Migration example:
+        # Old:
+        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        persistence = get_sqlite_session_persistence()
+        sessions = persistence.list_sessions()
+
+        # New:
+        from victor.agent.conversation.store import ConversationStore
+        store = ConversationStore()
+        sessions = store.list_sessions()
     """
     import os
+
+    warnings.warn(
+        "get_sqlite_session_persistence() is deprecated. Use ConversationStore from "
+        "victor.agent.conversation.store instead. This will be removed in version 0.10.0.",
+        DeprecationWarning,
+        stacklevel=2
+    )
 
     # Support test database override via environment variable
     if db_path is None:

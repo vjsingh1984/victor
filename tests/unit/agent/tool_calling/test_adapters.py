@@ -215,9 +215,15 @@ class TestAnthropicAdapterParseToolCalls:
             raw_tool_calls=raw_calls,
         )
 
-        # Only read_file should pass validation
-        assert len(result.tool_calls) == 1
+        # read_file passes validation; invalid names kept with ids for error responses
+        # (OpenAI spec: every tool_calls[].id needs a role=tool response)
+        assert len(result.tool_calls) == 4  # 1 valid + 3 invalid (all have ids)
         assert result.tool_calls[0].name == "read_file"
+        assert result.tool_calls[0].arguments == {"path": "/test/file.txt"}
+        # Invalid tools have empty args
+        assert result.tool_calls[1].name == "example_tool"
+        assert result.tool_calls[1].arguments == {}
+        assert result.tool_calls[1].id == "call-2"
 
     def test_parse_tool_calls_empty_raw_calls(self):
         """Empty raw_tool_calls returns result with no tool calls."""

@@ -1196,8 +1196,8 @@ class Settings(BaseSettings):
     continuation_prompt_overrides: dict = {}
 
     # Enable RL-based learning of optimal continuation prompts per provider/model
-    # Tracks success rates and adjusts limits automatically (future feature)
-    enable_continuation_rl_learning: bool = False
+    # Tracks success rates and adjusts limits automatically
+    enable_continuation_rl_learning: bool = True
 
     # Session idle timeout: Maximum seconds of inactivity before forcing completion
     # Timer resets on each provider response or tool execution
@@ -1215,7 +1215,7 @@ class Settings(BaseSettings):
     conversation_embeddings_enabled: bool = True  # Enable LanceDB embeddings for semantic retrieval
     # Note: conversation_db now uses get_project_paths().conversation_db (project-local)
     # Embeddings stored at get_project_paths().embeddings_dir / "conversations"
-    max_context_tokens: int = 100000  # Maximum tokens in context window
+    max_context_tokens: int = 200000  # Maximum tokens in context window (modern models: 128K–200K)
     response_token_reserve: int = 4096  # Tokens reserved for model response
 
     # ==========================================================================
@@ -1674,6 +1674,7 @@ class Settings(BaseSettings):
         flat fields. A deprecation warning is emitted once to guide migration
         to the nested access pattern (e.g. settings.provider.xxx).
         """
+        nested_group_names = set(_NESTED_GROUPS.keys())
         for group_name, model_cls in _NESTED_GROUPS.items():
             # Get current value of the nested field
             nested_obj = getattr(self, group_name)
@@ -1683,7 +1684,11 @@ class Settings(BaseSettings):
                 data = {}
                 settings_fields = type(self).model_fields
                 for field_name in model_cls.model_fields:
-                    if field_name in settings_fields:
+                    # Only copy flat Settings fields — skip other nested group names to
+                    # prevent type-mismatch when two models share a field name (e.g.
+                    # Settings.feature_flags: FeatureFlagSettings vs
+                    # CompactionSettings.feature_flags: CompactionFeatureFlags).
+                    if field_name in settings_fields and field_name not in nested_group_names:
                         data[field_name] = getattr(self, field_name)
                 object.__setattr__(self, group_name, model_cls(**data))
 

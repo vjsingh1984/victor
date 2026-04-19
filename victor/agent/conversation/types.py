@@ -76,8 +76,8 @@ class ConversationMessage:
     metadata: Dict[str, Any] = field(default_factory=dict)
     tool_name: Optional[str] = None
     tool_call_id: Optional[str] = None
-    name: Optional[str] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None
+    name: Optional[str] = None
 
     @property
     def role_enum(self) -> MessageRole:
@@ -120,11 +120,24 @@ class ConversationMessage:
             metadata=metadata or {},
         )
 
+    def to_provider_format(self) -> Dict[str, Any]:
+        """Convert to OpenAI-compatible message dict for provider API calls."""
+        role_str = self.role.value if isinstance(self.role, MessageRole) else self.role
+        if role_str not in ("system", "user", "assistant", "tool"):
+            role_str = "assistant"
+        base: Dict[str, Any] = {"role": role_str, "content": self.content}
+        if role_str == "tool" and self.tool_call_id:
+            base["tool_call_id"] = self.tool_call_id
+        if self.tool_calls:
+            base["tool_calls"] = self.tool_calls
+        return base
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
-        return {
+        role_str = self.role.value if isinstance(self.role, MessageRole) else self.role
+        d: Dict[str, Any] = {
             "id": self.id,
-            "role": self.role,
+            "role": role_str,
             "content": self.content,
             "timestamp": self.timestamp.isoformat(),
             "token_count": self.token_count,
@@ -134,6 +147,9 @@ class ConversationMessage:
             "name": self.name,
             "metadata": self.metadata,
         }
+        if self.tool_calls:
+            d["tool_calls"] = self.tool_calls
+        return d
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ConversationMessage:
@@ -157,6 +173,7 @@ class ConversationMessage:
             priority=priority,
             tool_name=data.get("tool_name"),
             tool_call_id=data.get("tool_call_id"),
+            tool_calls=data.get("tool_calls"),
             name=data.get("name"),
             metadata=data.get("metadata", {}),
         )

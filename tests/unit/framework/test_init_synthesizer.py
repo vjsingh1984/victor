@@ -22,16 +22,27 @@ class TestInitSynthesizer:
     """Core synthesize() method tests."""
 
     @pytest.mark.asyncio
-    async def test_synthesize_with_agent_reuses_orchestrator(self):
-        """When agent is provided, synthesize() uses agent.chat() — no new Agent created."""
-        mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(content="# init.md\n\nProject overview.")
+    async def test_synthesize_with_agent_uses_provider_directly(self):
+        """When agent is provided, synthesize() calls agent.provider.chat() directly.
+
+        Bypasses AgenticLoop — single LLM call: prompt → markdown.
+        Uses the already-initialized provider (same credential path as victor chat).
+        """
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.return_value = MagicMock(content="# init.md\n\nProject overview.")
+
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = "test-model"
 
         synthesizer = InitSynthesizer()
         result = await synthesizer.synthesize("raw data here", agent=mock_agent)
 
-        mock_agent.chat.assert_called_once()
-        assert "init.md" in mock_agent.chat.call_args[0][0]  # Prompt contains template
+        mock_provider.chat.assert_called_once()
+        call_kwargs = mock_provider.chat.call_args
+        messages = call_kwargs[1].get("messages") or call_kwargs[0][0]
+        assert any("raw data here" in str(m) for m in messages)
         assert result == "# init.md\n\nProject overview."
 
     @pytest.mark.asyncio
@@ -51,8 +62,14 @@ class TestInitSynthesizer:
     @pytest.mark.asyncio
     async def test_synthesize_cleans_code_fences(self):
         """Output wrapped in ``` gets cleaned."""
-        mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(content="```markdown\n# Project\n\nOverview.\n```")
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.return_value = MagicMock(
+            content="```markdown\n# Project\n\nOverview.\n```"
+        )
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
 
         synthesizer = InitSynthesizer()
         result = await synthesizer.synthesize("raw data", agent=mock_agent)
@@ -63,20 +80,29 @@ class TestInitSynthesizer:
     @pytest.mark.asyncio
     async def test_synthesize_prompt_contains_base_content(self):
         """The synthesis prompt includes the base_content."""
-        mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(content="# Result")
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.return_value = MagicMock(content="# Result")
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
 
         synthesizer = InitSynthesizer()
         await synthesizer.synthesize("UNIQUE_BASE_DATA_12345", agent=mock_agent)
 
-        prompt = mock_agent.chat.call_args[0][0]
-        assert "UNIQUE_BASE_DATA_12345" in prompt
+        call_kwargs = mock_provider.chat.call_args
+        messages = call_kwargs[1].get("messages") or call_kwargs[0][0]
+        assert any("UNIQUE_BASE_DATA_12345" in str(m) for m in messages)
 
     @pytest.mark.asyncio
     async def test_synthesize_handles_failure_gracefully(self):
-        """If agent.chat() raises, return empty string."""
-        mock_agent = AsyncMock()
-        mock_agent.chat.side_effect = RuntimeError("LLM failed")
+        """If provider.chat() raises, return empty string."""
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.side_effect = RuntimeError("LLM failed")
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
 
         synthesizer = InitSynthesizer()
         result = await synthesizer.synthesize("data", agent=mock_agent)
@@ -169,14 +195,20 @@ class TestInitSynthesizerGEPAWiring:
         """When GEPA has evolved rules, synthesize() injects them into frame."""
         evolved_rules = "RULES:\n- Improved rule 1\n- Improved rule 2"
 
-        mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(content="# Evolved result")
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.return_value = MagicMock(content="# Evolved result")
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
 
         synthesizer = InitSynthesizer()
         with patch.object(InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules):
             result = await synthesizer.synthesize("raw data", agent=mock_agent)
 
-        prompt_sent = mock_agent.chat.call_args[0][0]
+        call_kwargs = mock_provider.chat.call_args
+        messages = call_kwargs[1].get("messages") or call_kwargs[0][0]
+        prompt_sent = str(messages)
         assert "Improved rule 1" in prompt_sent
         assert "raw data" in prompt_sent  # base_content always present (frame)
         assert result == "# Evolved result"
@@ -184,15 +216,21 @@ class TestInitSynthesizerGEPAWiring:
     @pytest.mark.asyncio
     async def test_falls_back_to_static_when_no_evolution(self):
         """When GEPA has no evolved rules, uses static SYNTHESIS_RULES."""
-        mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(content="# Static result")
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.return_value = MagicMock(content="# Static result")
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
 
         synthesizer = InitSynthesizer()
         with patch.object(InitSynthesizer, "_get_evolved_rules", return_value=None):
             result = await synthesizer.synthesize("raw data", agent=mock_agent)
 
-        prompt_sent = mock_agent.chat.call_args[0][0]
-        assert "SYNTHESIZE" in prompt_sent
+        call_kwargs = mock_provider.chat.call_args
+        messages = call_kwargs[1].get("messages") or call_kwargs[0][0]
+        prompt_sent = str(messages)
+        assert "RULES:" in prompt_sent
         assert "raw data" in prompt_sent
         assert result == "# Static result"
 
@@ -201,14 +239,20 @@ class TestInitSynthesizerGEPAWiring:
         """Even with evolved rules, {base_content} is always in the prompt."""
         evolved_rules = "RULES:\n- Any content here"
 
-        mock_agent = AsyncMock()
-        mock_agent.chat.return_value = MagicMock(content="# Result")
+        mock_provider = AsyncMock()
+        mock_provider.name = "test-provider"
+        mock_provider.chat.return_value = MagicMock(content="# Result")
+        mock_agent = MagicMock()
+        mock_agent.provider = mock_provider
+        mock_agent.model = None
 
         synthesizer = InitSynthesizer()
         with patch.object(InitSynthesizer, "_get_evolved_rules", return_value=evolved_rules):
             await synthesizer.synthesize("UNIQUE_DATA_XYZ", agent=mock_agent)
 
-        prompt_sent = mock_agent.chat.call_args[0][0]
+        call_kwargs = mock_provider.chat.call_args
+        messages = call_kwargs[1].get("messages") or call_kwargs[0][0]
+        prompt_sent = str(messages)
         assert "UNIQUE_DATA_XYZ" in prompt_sent  # Frame always includes data
 
     def test_get_evolved_rules_gates_on_settings(self):
@@ -244,12 +288,13 @@ class TestInitQualityScoring:
         mock_usage = MagicMock()
         result = (
             "# Project Overview\nA project.\n"
+            "# System Flow\nUser → Core → Output.\n"
             "# Package Layout\n| Path | Description |\n"
             "# Key Entry Points\n| Component | Path |\n"
+            "# Architecture Patterns\n- Pattern A.\n"
             "# Development Commands\n```bash\nmake test\n```\n"
             "# Dependencies\nCore: pydantic.\n"
             "# Configuration\nSettings via .env.\n"
-            "# Architecture Notes\n- Pattern A.\n"
             "# Codebase Scale\n100K lines.\n"
         )
         # Pad to ~80 lines
@@ -258,8 +303,8 @@ class TestInitQualityScoring:
         InitSynthesizer._log_init_quality(mock_usage, result)
 
         call_data = mock_usage.log_event.call_args[0][1]
-        assert call_data["sections_found"] == 8
-        assert call_data["sections_total"] == 8
+        assert call_data["sections_found"] == 9
+        assert call_data["sections_total"] == 9
         assert call_data["section_score"] == 1.0
         assert 60 <= call_data["line_count"] <= 100
         assert call_data["length_score"] == 1.0
@@ -268,14 +313,14 @@ class TestInitQualityScoring:
     def test_quality_score_missing_sections(self):
         """Output missing sections scores lower."""
         mock_usage = MagicMock()
-        # Only 2 of 8 sections
+        # Only 2 of 9 sections
         result = "# Project Overview\nA project.\n# Dependencies\nCore: pydantic.\n"
 
         InitSynthesizer._log_init_quality(mock_usage, result)
 
         call_data = mock_usage.log_event.call_args[0][1]
         assert call_data["sections_found"] == 2
-        assert call_data["section_score"] == 0.25
+        assert call_data["section_score"] == pytest.approx(2 / 9, abs=0.01)
         assert call_data["quality_score"] < 0.5
 
     def test_quality_score_empty_output(self):

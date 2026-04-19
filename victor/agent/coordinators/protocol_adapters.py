@@ -153,19 +153,14 @@ class OrchestratorProtocolAdapter:
             "error": exec_result.error if not exec_result.success else None,
         }
 
+    # [LEGACY WRAPPER] Bridges to AgentOrchestrator._handle_tool_calls
     async def execute_tool_calls(
         self,
         tool_calls: List[Any],
     ) -> List[Dict[str, Any]]:
-        """Execute multiple tool calls.
-
-        Delegates to the orchestrator's _handle_tool_calls method.
-
-        Args:
-            tool_calls: List of tool call objects
-
-        Returns:
-            List of tool execution results
+        """[LEGACY] Execute multiple tool calls via orchestrator bridge.
+        
+        Prefer IToolCoordinator for new implementations.
         """
         orch = self._orchestrator
         return await orch._handle_tool_calls(tool_calls)
@@ -364,7 +359,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.observed_files
 
     async def _handle_tool_calls(self, tool_calls: List[Any]) -> List[Dict[str, Any]]:
-        """Handle tool calls."""
+        """[LEGACY] Handle tool calls via orchestrator bridge."""
         return await self._orchestrator._handle_tool_calls(tool_calls)
 
     def _model_supports_tool_calls(self) -> bool:

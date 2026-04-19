@@ -91,9 +91,14 @@ def orchestrator(mock_provider, orchestrator_settings):
 
     mock_provider_svc = MagicMock()
     from victor.core.errors import ProviderNotFoundError
+    from victor.agent.services.provider_service import ProviderService
 
     mock_provider_svc.switch_provider = AsyncMock(
         side_effect=ProviderNotFoundError("not configured")
+    )
+    # Wire rate-limit parsing to real logic so TestRateLimitRetry assertions hold.
+    mock_provider_svc.get_rate_limit_wait_time.side_effect = (
+        lambda exc: ProviderService.get_rate_limit_wait_time(None, exc)
     )
     orch._provider_service = mock_provider_svc
 
@@ -2091,22 +2096,16 @@ class TestSwitchProvider:
 
     @pytest.mark.asyncio
     async def test_switch_returns_bool_or_none(self, orchestrator):
-        """switch_provider returns boolean or None."""
-        import pytest
-        from victor.core.errors import ProviderNotFoundError
-
-        # Raises ProviderNotFoundError when provider not found
-        with pytest.raises(ProviderNotFoundError):
-            await orchestrator.switch_provider("mock", "test-model")
+        """switch_provider returns False when provider not found (errors are swallowed)."""
+        # New contract: switch_provider catches exceptions and returns False on failure.
+        result = await orchestrator.switch_provider("mock", "test-model")
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_switch_to_invalid_provider_returns_none(self, orchestrator):
-        """Switching to invalid provider raises ProviderNotFoundError."""
-        import pytest
-        from victor.core.errors import ProviderNotFoundError
-
-        with pytest.raises(ProviderNotFoundError):
-            await orchestrator.switch_provider("nonexistent_provider_xyz", "model")
+        """Switching to invalid provider returns falsy (False)."""
+        result = await orchestrator.switch_provider("nonexistent_provider_xyz", "model")
+        assert not result
 
     @pytest.mark.asyncio
     async def test_switch_updates_provider_name(self, mock_provider, orchestrator_settings):
@@ -2125,6 +2124,11 @@ class TestSwitchProvider:
             mock_provider_svc = MagicMock()
             mock_provider_svc.switch_provider = AsyncMock()
             orchestrator._provider_service = mock_provider_svc
+
+            # Mock provider_coordinator so the sync step also succeeds
+            mock_provider_coordinator = MagicMock()
+            mock_provider_coordinator.switch_provider_async = AsyncMock()
+            orchestrator._provider_coordinator = mock_provider_coordinator
 
             # Mock provider_manager so post-switch reads succeed
             orchestrator._provider_manager = MagicMock()
@@ -4087,10 +4091,11 @@ class TestSetEnabledTools:
     """Tests for set_enabled_tools method."""
 
     def test_sets_enabled_tools(self, orchestrator):
-        """Test set_enabled_tools sets the tool set."""
+        """Test set_enabled_tools delegates to ToolService."""
         tools = {"read_file", "write_file"}
         orchestrator.set_enabled_tools(tools)
-        assert orchestrator._enabled_tools == tools
+        # _enabled_tools moved to service layer; verify via service mock
+        orchestrator._tool_service.set_enabled_tools.assert_called_once_with(tools)
 
 
 class TestClassifyTaskKeywords:
@@ -4458,12 +4463,9 @@ class TestSwitchProviderMethod:
 
     @pytest.mark.asyncio
     async def test_switch_provider_to_invalid_returns_falsy(self, orchestrator):
-        """Test switch_provider raises ProviderNotFoundError for invalid provider."""
-        import pytest
-        from victor.core.errors import ProviderNotFoundError
-
-        with pytest.raises(ProviderNotFoundError):
-            await orchestrator.switch_provider("nonexistent_provider_xyz")
+        """Test switch_provider returns falsy for invalid provider (errors swallowed)."""
+        result = await orchestrator.switch_provider("nonexistent_provider_xyz")
+        assert not result
 
 
 class TestContextMetrics:

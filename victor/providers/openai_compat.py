@@ -215,3 +215,65 @@ def parse_openai_stream_chunk(chunk_data: Dict[str, Any]) -> Dict[str, Any]:
         result["finish_reason"] = choice["finish_reason"]
 
     return result
+
+
+def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Fix orphaned tool_calls/responses after compaction.
+
+    OpenAI-compatible APIs require strict pairing:
+    - Every ``tool_calls[].id`` in an assistant message must have a matching
+      ``role=tool`` response with the same ``tool_call_id``.
+    - Every ``role=tool`` message must have a corresponding assistant
+      ``tool_calls`` entry.
+
+    After context compaction, either side may be missing. This function:
+    1. Strips ``tool_calls`` from assistant messages whose responses are gone.
+    2. Removes ``role=tool`` messages whose assistant ``tool_calls`` are gone.
+
+    Shared utility for all OpenAI-compatible providers (Z.AI, DeepSeek,
+    OpenAI, xAI, Groq, LMStudio, etc.).
+
+    Args:
+        messages: List of formatted message dicts (already converted to
+                  OpenAI format with ``role``, ``content``, ``tool_calls``,
+                  ``tool_call_id`` keys).
+
+    Returns:
+        Cleaned message list with consistent tool_calls/response pairing.
+    """
+    # Collect all tool_call IDs declared by assistant messages
+    declared_tool_call_ids: set = set()
+    for msg in messages:
+        if msg.get("role") == "assistant" and "tool_calls" in msg:
+            for tc in msg["tool_calls"]:
+                if "id" in tc:
+                    declared_tool_call_ids.add(tc["id"])
+
+    # Collect all tool_call IDs present in tool responses
+    present_response_ids = {
+        m.get("tool_call_id")
+        for m in messages
+        if m.get("role") == "tool" and m.get("tool_call_id")
+    }
+
+    # Strip assistant tool_calls whose responses were compacted away
+    for msg in messages:
+        if msg.get("role") == "assistant" and "tool_calls" in msg:
+            tc_ids = {tc["id"] for tc in msg["tool_calls"] if "id" in tc}
+            if not tc_ids.issubset(present_response_ids):
+                del msg["tool_calls"]
+                if msg.get("content") is None:
+                    msg["content"] = ""
+
+    # Remove orphaned tool responses whose assistant tool_calls were
+    # compacted away
+    messages = [
+        m for m in messages
+        if not (
+            m.get("role") == "tool"
+            and m.get("tool_call_id")
+            and m["tool_call_id"] not in declared_tool_call_ids
+        )
+    ]
+
+    return messages

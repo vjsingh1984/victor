@@ -728,7 +728,7 @@ class TestCheckAndCompactWithRL:
         # Create mock RL learner
         mock_learner = MagicMock()
         mock_recommendation = MagicMock()
-        mock_recommendation.action = "aggressive_compact"
+        mock_recommendation.value = "aggressive_compact"
         mock_recommendation.confidence = 0.9
         mock_recommendation.metadata = {
             "config": {

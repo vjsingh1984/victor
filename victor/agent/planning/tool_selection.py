@@ -42,7 +42,7 @@ from victor.agent.task_tool_config_loader import TaskToolConfigLoader
 
 if TYPE_CHECKING:
     from victor.providers.base import ToolDefinition
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

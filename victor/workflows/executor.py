@@ -12,10 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Workflow executor for running workflow definitions.
+"""Workflow executor for running workflow definitions (LEGACY DAG EXECUTOR).
 
-Provides the execution engine that traverses workflow DAGs and
-executes agent nodes using the SubAgent infrastructure.
+.. deprecated::
+    For new code, prefer StateGraphExecutor from victor.workflows.unified_executor.
+    This DAG-based executor is retained for backward compatibility.
+
+This module provides the legacy DAG-based execution engine that traverses
+workflow DAGs and executes agent nodes using the SubAgent infrastructure.
+
+Differences from StateGraphExecutor:
+- Execution Model: Custom DAG traversal vs StateGraph-based execution
+- State Management: dataclass-based state vs TypedDict state
+- Checkpointing: RL CheckpointStore vs StateGraph checkpointing
+- Feature Parity: Legacy features vs modern StateGraph patterns
+
+For new workflows, use StateGraphExecutor for better LangGraph compatibility
+and modern state management patterns.
 """
 
 from __future__ import annotations
@@ -343,7 +356,11 @@ class WorkflowResult:
 
 
 class WorkflowExecutor:
-    """Executes workflow definitions with optional checkpointing and caching.
+    """Executes workflow definitions with optional checkpointing and caching (LEGACY).
+
+    .. deprecated::
+        For new code, prefer StateGraphExecutor from victor.workflows.unified_executor.
+        This DAG-based executor is retained for backward compatibility.
 
     Traverses the workflow DAG and executes nodes using the
     SubAgent infrastructure. Supports checkpointing for workflow
@@ -352,6 +369,15 @@ class WorkflowExecutor:
     Supports optional node-level caching for deterministic nodes
     (TransformNode, ConditionNode) to improve performance on
     repeated workflow executions.
+
+    Differences from StateGraphExecutor:
+    - Execution Model: Custom DAG traversal vs StateGraph-based execution
+    - State Management: dataclass-based state vs TypedDict state
+    - Checkpointing: RL CheckpointStore vs StateGraph checkpointing
+    - Feature Parity: Legacy features vs modern StateGraph patterns
+
+    For new workflows, use StateGraphExecutor for better LangGraph compatibility
+    and modern state management patterns.
 
     Attributes:
         orchestrator: Agent orchestrator for spawning agents
@@ -383,6 +409,17 @@ class WorkflowExecutor:
             orchestrator,
             cache=WorkflowCache(cache_config),
         )
+
+    Migration to StateGraphExecutor:
+        # Old (DAG-based):
+        from victor.workflows.executor import WorkflowExecutor
+        executor = WorkflowExecutor(orchestrator)
+        result = await executor.execute(workflow, {"files": ["main.py"]})
+
+        # New (StateGraph-based):
+        from victor.workflows.unified_executor import StateGraphExecutor
+        executor = StateGraphExecutor(orchestrator)
+        result = await executor.execute(workflow, {"files": ["main.py"]})
     """
 
     def __init__(

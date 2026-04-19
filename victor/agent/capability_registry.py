@@ -55,12 +55,13 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Capability Method Mappings — re-exported from framework layer
+# Capability Method Mappings — re-exported from core layer
 # =============================================================================
 
-# The canonical definitions live in victor.framework.capability_registry
-# to avoid framework → agent layering violations.
-from victor.framework.capability_registry import (  # noqa: F401
+# The canonical definitions live in victor.core.capability_registry.
+# Previously imported from framework to avoid layering violations, but
+# core is the correct location for this infrastructure.
+from victor.core.capability_registry import (  # noqa: F401
     CAPABILITY_METHOD_MAPPINGS,
     get_method_for_capability,
 )

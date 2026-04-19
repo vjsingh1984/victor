@@ -23,9 +23,16 @@ logger = logging.getLogger(__name__)
 # GEPA evolves SYNTHESIS_RULES only; the frame is never mutated.
 _SYNTHESIS_FRAME_BEFORE = """You are writing an init.md file — a compact system-prompt context
 file that an AI coding assistant reads at the start of every conversation about this codebase.
+Think of it like a CLAUDE.md or Cursor rules file: the goal is to give an AI assistant
+enough context to navigate the codebase confidently without reading every file.
 
-Below is raw auto-generated data about the project. Your job is to SYNTHESIZE it into a
-compact, high-signal init.md (target: 80–120 lines, under 2000 tokens).
+Below is raw auto-generated data about the project (symbol graph + project docs).
+Your job is to SYNTHESIZE it into a compact, high-signal init.md (100–150 lines, <2500 tokens).
+
+First: detect the primary language(s) and project type from the raw data. Then apply
+language-appropriate patterns. An AI reading this file should immediately understand
+the architecture, key design patterns, where to find important code, and how pieces fit
+together. Do NOT re-list the raw data — INTERPRET and SYNTHESIZE it.
 
 {rules}
 
@@ -40,26 +47,97 @@ Return ONLY the final init.md markdown. No preamble, no explanation."""
 # The evolvable rules section — this is what GEPA v2 optimizes.
 SYNTHESIS_RULES = """RULES:
 - Write project-specific content only. No generic advice.
-- Use these sections in order: Project Overview, Package Layout, Key Entry Points,
-  Development Commands, Dependencies, Configuration, Architecture Notes, Codebase Scale.
-- Project Overview: 2–3 sentences covering what the project is, its primary language,
-  and its key capabilities.
-- Package Layout: table with Path, Description. Only include directories that exist.
-- Key Entry Points: table with Component, Path, Description. Pick the 8–12 most
-  architecturally important classes/functions — entry points, facades, registries,
-  core abstractions. NOT alphabetically sorted Manager classes.
-- Development Commands: the essential build/test/run commands in a code block.
-- Dependencies: one line listing core deps count and top 5–8 packages.
-- Configuration: 1–2 lines on how config works.
-- Architecture Notes: 3–5 bullet points on the system's key architectural patterns,
-  data flow, or design decisions. INCLUDE graph insights if present: inheritance backbone
-  (most-subclassed base classes), hub classes (high connectivity), coupling hotspots,
-  and key modules by role.
-- Codebase Scale: one line with total symbols, files, and graph edges if available.
-- OMIT these sections entirely (they waste tokens): Analyzer Coverage, Performance Hints,
-  Embeddings & Chunking, raw PageRank numbers, graph node IDs.
-- Do NOT include sections about the indexer or analysis tooling.
-- End with a one-line note: "Run `/init --update` to refresh after code changes.\""""
+- Sections in order: Project Overview, System Flow, Package Layout, Key Entry Points,
+  Architecture Patterns, Development Commands, Dependencies, Configuration, Codebase Scale.
+
+- Project Overview: 3–4 sentences: what the project does, primary language/framework,
+  key capabilities, intended users. Include version/release info if present.
+
+- System Flow: one arrow-chain line showing end-to-end data/control flow. Examples:
+  - Web service:    "Request → Router → Handler → Service → Repository → DB"
+  - CLI tool:       "User → CLI Parser → Command → Core Logic → Output"
+  - Library/SDK:    "User Code → Public API → Core Engine → Backends/Adapters"
+  - Agent/AI:       "User → Orchestrator → Provider → Tools → Storage"
+  - Compiler/tool:  "Source → Lexer → Parser → AST → Codegen → Output"
+
+- Package Layout: table (Path | Type | Description). Language conventions:
+  - Go:        cmd/ (binaries), pkg/ (libraries), internal/ (private), api/ (protos)
+  - Rust:      src/ (lib root), each workspace crate, bin/ for binaries
+  - Node/TS:   src/, packages/ (monorepo), lib/; omit dist/ and node_modules/
+  - Python:    top-level package dir, scripts/, config files
+  - Java/Kotlin: src/main/java, modules/ (multi-module), resources/
+  Only include directories that actually exist. Omit build artifacts and test subfolders.
+
+- Key Entry Points: table (Component | Type | Path:line | Description).
+  Pick 10–15 most architecturally important: entry points, core abstractions, base
+  classes/interfaces/traits, registries, facades, public API surfaces.
+  Use real line numbers from raw data. Exclude alphabetically sorted utility classes.
+
+- Architecture Patterns: MOST IMPORTANT SECTION. 5–8 bullet points. Cite concrete names.
+  Detect and report patterns appropriate to the language:
+
+  Python patterns to look for:
+  * Inheritance backbone — most-subclassed base classes with subclass count
+  * Hub classes — highest-connectivity types (many imports/references)
+  * Facade/Orchestrator — large coordinator classes delegating to sub-components
+  * Plugin/Extension system — how plugins register (entry_points, subclassing, decorators)
+  * Async-first design — asyncio coroutine boundaries, sync/async adapter layers
+  * Feature flag / settings gating — config-driven behavior variants
+
+  Go patterns to look for:
+  * Interface segregation — key interfaces and their main implementors
+  * Constructor injection — how dependencies are wired (wire/dig/fx or manual)
+  * Package cohesion — cmd/ vs internal/ vs pkg/ boundary discipline
+  * Error handling — sentinel errors, wrapped errors (%w), custom error types
+  * Concurrency — goroutine/channel patterns, sync.Mutex, errgroup usage
+
+  TypeScript/Node patterns to look for:
+  * Module system — ESM vs CJS, barrel exports (index.ts), path aliases
+  * DI framework — NestJS decorators, inversify, tsyringe, or manual factories
+  * Type hierarchy — discriminated unions, branded types, generic constraints
+  * Async patterns — Promise, async/await, RxJS observables, event emitters
+  * Monorepo structure — workspaces (nx/turborepo/pnpm), shared packages
+
+  Rust patterns to look for:
+  * Trait system — key traits and their main implementors (analogous to interfaces)
+  * Ownership strategy — Arc<Mutex<>>, RwLock, channels for shared state
+  * Error handling — thiserror/anyhow, custom Error enums, Result propagation
+  * Crate architecture — workspace layout, public API surface via lib.rs pub use
+  * Async runtime — tokio/async-std task spawning, Pin/Future patterns
+
+  Java/Kotlin patterns to look for:
+  * DI framework — Spring beans, Guice modules, Dagger components
+  * Layered architecture — Controller → Service → Repository boundary
+  * Domain model — key entities, value objects, aggregates (DDD markers)
+  * Exception hierarchy — checked vs unchecked, custom exception classes
+
+  Universal patterns (apply to any language):
+  * Coupling hotspots — files/modules with highest fan-in (note as "many callers")
+  * Extensibility mechanism — the primary way the system is extended by users/plugins
+  * Configuration pattern — how config is loaded and propagated through the system
+
+- Development Commands: essential commands in a code block (build, test, run, lint).
+  Language defaults if not found in raw data:
+  - Python:  pip install -e ".[dev]", pytest, ruff/black/mypy
+  - Go:      go build ./..., go test ./..., go vet ./..., golangci-lint run
+  - Node/TS: npm install, npm run build, npm test, npm run lint
+  - Rust:    cargo build, cargo test, cargo clippy, cargo fmt
+  - Java:    ./mvnw package, ./mvnw test  OR  ./gradlew build, ./gradlew test
+  Include environment setup (venv activate, nvm use, etc.) if present in raw data.
+
+- Dependencies: one line — package manager, total count, top 6–8 package names.
+  Source from whichever manifest is present: pyproject.toml, package.json, go.mod,
+  Cargo.toml, pom.xml, build.gradle.
+
+- Configuration: 2–3 lines on how config works: sources, override order, key classes/files.
+
+- Codebase Scale: one line — LOC, file count, symbol/node count and graph edges if
+  available, test coverage if known.
+
+- OMIT: Analyzer Coverage, Performance Hints, Embeddings & Chunking, raw PageRank
+  numbers, graph node IDs, Learned from Conversations, Common Topics, FAQ, indexer
+  internals, sections about the analysis tooling itself.
+- End with: "Run `/init --update` to refresh after code changes.\""""
 
 
 def _build_synthesis_prompt(base_content: str, rules: str = SYNTHESIS_RULES) -> str:
@@ -76,6 +154,22 @@ SYNTHESIS_PROMPT = _build_synthesis_prompt("{base_content}")
 SYNTHESIS_PROMPT = _SYNTHESIS_FRAME_BEFORE.format(
     rules=SYNTHESIS_RULES, base_content="{base_content}"
 )
+
+def _parse_makefile_targets(path: Any) -> str:
+    """Extract phony/documented make targets (up to 1000 chars)."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    targets = [
+        l for l in lines
+        if l and not l.startswith("\t") and ":" in l
+        and not l.startswith("#") and len(l) < 100
+    ][:25]
+    return "\n".join(targets)[:1000]
+
+
+def _read_task_file(path: Any) -> str:
+    """Read justfile/Taskfile, trimmed to 1000 chars."""
+    return path.read_text(encoding="utf-8")[:1000]
+
 
 TOOLS_FALLBACK_PROMPT = """Analyze this codebase and generate a comprehensive init.md file.
 
@@ -119,6 +213,11 @@ class InitSynthesizer:
         Returns:
             Synthesized init.md markdown content.
         """
+        # Enrich base_content with CLAUDE.md / existing project docs before synthesis.
+        # This gives the LLM the architectural ground truth (patterns, service layer,
+        # feature flags, dev commands) that static graph analysis alone can't surface.
+        base_content = self._enrich_with_project_docs(base_content)
+
         # Check for GEPA-evolved RULES section (not the full prompt)
         evolved_rules = self._get_evolved_rules(provider)
         if evolved_rules:
@@ -151,21 +250,120 @@ class InitSynthesizer:
         Unlike synthesize(), this DOES use the agentic loop (needs tool calling).
         """
         if agent:
-            return await self._run_with_orchestrator(agent, TOOLS_FALLBACK_PROMPT)
+            # synthesize_with_tools intentionally uses the agentic loop — the agent
+            # needs to call tools (overview, ls, read) to explore the codebase.
+            # Use agent.chat() directly, NOT _run_with_orchestrator (which bypasses the loop).
+            try:
+                response = await agent.chat(TOOLS_FALLBACK_PROMPT)
+                content = response.content if response else ""
+                return self._clean(content)
+            except Exception as e:
+                logger.warning("Init synthesis with tools failed: %s", e)
+                return ""
         else:
             return await self._run_agent_with_tools(
                 TOOLS_FALLBACK_PROMPT, provider, model, vertical="coding"
             )
 
     async def _run_with_orchestrator(self, agent: "AgentOrchestrator", prompt: str) -> str:
-        """Run synthesis using an existing orchestrator (slash command path)."""
+        """Run synthesis using an existing orchestrator or framework Agent.
+
+        Handles two agent types:
+        - AgentOrchestrator: async chat() → CompletionResponse (slash command path)
+        - victor.framework.agent.Agent: async run() → TaskResult (CLI path via _create_init_agent)
+        """
+        import inspect
+
         try:
-            response = await agent.chat(prompt)
-            content = response.content if response else ""
-            return self._clean(content)
+            # Always prefer a direct provider call for init synthesis — bypass AgenticLoop.
+            # AgentOrchestrator.chat() routes through USE_AGENTIC_LOOP → edge model (Ollama)
+            # calls for task classification + tool selection even when we just need one LLM
+            # call: prompt → markdown. Use the already-initialized provider directly instead.
+
+            # 1. AgentOrchestrator (from _create_init_agent profile path or slash command)
+            provider_instance = getattr(agent, "provider", None)
+            model = getattr(agent, "model", None)
+
+            # 2. Framework Agent (wraps orchestrator via _orchestrator)
+            if provider_instance is None:
+                inner = getattr(agent, "_orchestrator", None)
+                if inner is not None:
+                    provider_instance = getattr(inner, "provider", None)
+                    model = getattr(inner, "model", None)
+
+            if provider_instance is not None:
+                logger.debug(
+                    "[init] Using initialized provider %s (bypassing AgenticLoop)",
+                    type(provider_instance).__name__,
+                )
+                return await self._call_initialized_provider(prompt, provider_instance, model)
+
+            # 3. Last resort: fall back to agent.chat() for slash command contexts where
+            #    the orchestrator's provider attribute may not be directly accessible.
+            if inspect.iscoroutinefunction(getattr(agent, "chat", None)):
+                logger.debug("[init] No direct provider found, falling back to agent.chat()")
+                response = await agent.chat(prompt)
+                content = response.content if response else ""
+                return self._clean(content)
+
+            # 4. Bare framework Agent with no accessible orchestrator
+            provider_name = getattr(agent, "_provider", None)
+            model = getattr(agent, "_model", None)
+            logger.debug("[init] Falling back to fresh provider: %s", provider_name)
+            return await self._run_with_fresh_agent(prompt, provider_name, model)
         except Exception as e:
             logger.warning("Init synthesis via orchestrator failed: %s", e)
             return ""
+
+    async def _call_initialized_provider(
+        self,
+        prompt: str,
+        provider_instance: Any,
+        model: Optional[str],
+    ) -> str:
+        """Single direct call using an already-initialized provider instance.
+
+        Used when a framework Agent is passed: reuses the provider that was
+        initialized by AgentFactory (with keyring access) rather than creating a
+        new instance via ProviderRegistry.create() which skips keyring in
+        non-interactive mode.  This is the same mechanism `victor chat` uses.
+        """
+        import time as _time
+
+        from victor.providers.base import Message
+
+        provider_name = getattr(provider_instance, "name", type(provider_instance).__name__)
+        messages = [Message(role="user", content=prompt)]
+
+        logger.info(
+            "[init→LLM] provider=%s model=%s prompt_chars=%d prompt_lines=%d (reused)",
+            provider_name,
+            model,
+            len(prompt),
+            prompt.count("\n"),
+        )
+        _start = _time.monotonic()
+
+        chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
+        if model:
+            chat_kwargs["model"] = model
+        response = await provider_instance.chat(messages=messages, **chat_kwargs)
+
+        _elapsed_ms = (_time.monotonic() - _start) * 1000
+        content = response.content if response else ""
+        result = self._clean(content)
+
+        logger.info(
+            "[init←LLM] provider=%s model=%s duration=%.1fs "
+            "response_chars=%d response_lines=%d usage=%s",
+            provider_name,
+            model,
+            _elapsed_ms / 1000,
+            len(result),
+            result.count("\n"),
+            getattr(response, "usage", None),
+        )
+        return result
 
     async def _run_with_fresh_agent(
         self,
@@ -210,12 +408,12 @@ class InitSynthesizer:
             )
             _start = _time.monotonic()
 
-            response = await provider_instance.chat(
-                messages=messages,
-                model=model,
-                temperature=0.7,
-                max_tokens=4096,
-            )
+            # Only pass model when explicitly set — lets provider use its own default
+            # when model=None (passing None overrides the method's default parameter)
+            chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
+            if model:
+                chat_kwargs["model"] = model
+            response = await provider_instance.chat(messages=messages, **chat_kwargs)
             _elapsed_ms = (_time.monotonic() - _start) * 1000
             content = response.content if response else ""
             result = self._clean(content)
@@ -332,12 +530,13 @@ class InitSynthesizer:
         """
         expected_sections = [
             "Project Overview",
+            "System Flow",
             "Package Layout",
             "Key Entry Points",
+            "Architecture Patterns",
             "Development Commands",
             "Dependencies",
             "Configuration",
-            "Architecture Notes",
             "Codebase Scale",
         ]
         sections_found = sum(1 for s in expected_sections if s in result)
@@ -367,6 +566,131 @@ class InitSynthesizer:
                 "char_count": len(result),
             },
         )
+
+    @staticmethod
+    def _enrich_with_project_docs(base_content: str) -> str:
+        """Prepend high-signal project docs to base_content before synthesis.
+
+        Static graph analysis surfaces connectivity metrics but misses: project
+        narrative, declared dependencies, dev commands, and architectural decisions.
+        This enrichment step reads 4 targeted file categories to fill those gaps —
+        deterministic and fast (~milliseconds), works for any language/framework.
+
+        Reading budget (to avoid crowding out graph data):
+          CLAUDE.md / AI rules: 5000 chars
+          README:               1500 chars
+          Build manifest:       1500 chars
+          Task runner:          1000 chars
+        """
+        from pathlib import Path
+
+        cwd = Path.cwd()
+        enrichments: list[str] = []
+
+        # 1. AI assistant rules files — highest signal: architecture, patterns, dev commands
+        for name in ("CLAUDE.md", ".claude/CLAUDE.md", ".cursor/rules", ".github/copilot-instructions.md"):
+            path = cwd / name
+            if path.exists():
+                try:
+                    text = path.read_text(encoding="utf-8")
+                    trimmed = text[:5000]
+                    if len(text) > 5000:
+                        trimmed += "\n... (truncated)"
+                    label = Path(name).name
+                    enrichments.append(f"## Project AI Rules ({label})\n\n{trimmed}")
+                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
+                    break
+                except Exception:
+                    pass
+
+        # 2. README — project narrative, purpose, quick-start (language-agnostic)
+        for name in ("README.md", "README.rst", "README.txt", "README"):
+            path = cwd / name
+            if path.exists():
+                try:
+                    text = path.read_text(encoding="utf-8")
+                    trimmed = text[:1500]
+                    if len(text) > 1500:
+                        trimmed += "\n... (truncated)"
+                    enrichments.append(f"## README (first 1500 chars)\n\n{trimmed}")
+                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
+                    break
+                except Exception:
+                    pass
+
+        # 3. Build manifest — declared dependencies, project metadata, scripts
+        #    Priority: language-specific manifest wins over generic
+        build_manifests = [
+            # Python
+            ("pyproject.toml", "pyproject.toml"),
+            ("setup.cfg", "setup.cfg"),
+            # Node/TS/Deno
+            ("package.json", "package.json"),
+            ("deno.json", "deno.json"),
+            # Go
+            ("go.mod", "go.mod"),
+            # Rust
+            ("Cargo.toml", "Cargo.toml"),
+            # JVM
+            ("pom.xml", "pom.xml"),
+            ("build.gradle.kts", "build.gradle.kts"),
+            ("build.gradle", "build.gradle"),
+            # .NET
+            ("*.csproj", None),  # glob — handled below
+            # Ruby
+            ("Gemfile", "Gemfile"),
+            # PHP
+            ("composer.json", "composer.json"),
+            # Swift
+            ("Package.swift", "Package.swift"),
+        ]
+        for name, _ in build_manifests:
+            if name == "*.csproj":
+                import glob as _glob
+                matches = _glob.glob(str(cwd / "**" / "*.csproj"), recursive=True)
+                if matches:
+                    path = Path(matches[0])
+                    name = path.name
+                else:
+                    continue
+            else:
+                path = cwd / name
+            if path.exists():
+                try:
+                    text = path.read_text(encoding="utf-8")
+                    trimmed = text[:1500]
+                    if len(text) > 1500:
+                        trimmed += "\n... (truncated)"
+                    enrichments.append(f"## Build Manifest ({name})\n\n```\n{trimmed}\n```")
+                    logger.info("[init] Enriched with %s (%d chars)", name, len(trimmed))
+                    break
+                except Exception:
+                    pass
+
+        # 4. Task runner — dev commands, build targets (always read, complements manifest)
+        task_runners = [
+            ("Makefile", _parse_makefile_targets),
+            ("justfile", _read_task_file),
+            ("Taskfile.yml", _read_task_file),
+            ("Taskfile.yaml", _read_task_file),
+        ]
+        for name, reader in task_runners:
+            path = cwd / name
+            if path.exists():
+                try:
+                    snippet = reader(path)
+                    if snippet:
+                        enrichments.append(f"## Task Runner ({name})\n\n```\n{snippet}\n```")
+                        logger.info("[init] Enriched with %s", name)
+                    break
+                except Exception:
+                    pass
+
+        if not enrichments:
+            return base_content
+
+        prefix = "\n\n".join(enrichments)
+        return f"{prefix}\n\n---\n\n{base_content}"
 
     @staticmethod
     def _get_evolved_rules(provider: Optional[str] = None) -> Optional[str]:

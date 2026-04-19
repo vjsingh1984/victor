@@ -76,7 +76,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
@@ -1182,7 +1182,19 @@ class ToolPipeline:
         for tool_call in unique_calls:
             # Capture tool_call_id BEFORE execution so it's set even if the call fails
             tc_id = tool_call.get("id") if isinstance(tool_call, dict) else None
-            call_result = await self._execute_single_call(tool_call, context)
+
+            # Handle pre-invalidated tool calls (hallucinated names marked by coordinator)
+            if isinstance(tool_call, dict) and tool_call.get("_invalid"):
+                call_result = ToolCallResult(
+                    tool_name=tool_call.get("name", "unknown"),
+                    arguments={},
+                    success=False,
+                    error=tool_call.get("_error", "Unknown tool"),
+                    skipped=True,
+                    skip_reason=tool_call.get("_error"),
+                )
+            else:
+                call_result = await self._execute_single_call(tool_call, context)
             # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec
             call_result.tool_call_id = tc_id
             result.results.append(call_result)
@@ -1305,12 +1317,10 @@ class ToolPipeline:
         context: Optional[Dict[str, Any]] = None,
         force_parallel: bool = False,
     ) -> PipelineExecutionResult:
-        """Execute tool calls with parallelization when beneficial.
+        """[POTENTIALLY OBSOLETE] Execute tool calls with parallelization.
 
-        Automatically decides whether to use parallel execution based on:
-        - Number of tool calls (>1 for parallel)
-        - Tool categories (read-only tools can parallelize)
-        - Configuration settings
+        Note: The main execute_tool_calls() method now handles internal 
+        parallelization via AsyncToolExecutor. This method may be removed.
 
         Args:
             tool_calls: List of tool call requests

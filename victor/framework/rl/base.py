@@ -106,6 +106,7 @@ class RLRecommendation:
     reason: str
     sample_size: int
     is_baseline: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
         """Human-readable representation."""

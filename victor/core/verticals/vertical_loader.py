@@ -454,15 +454,18 @@ class VerticalLoader:
         self._log_discovery_telemetry(event="VERTICAL_DISCOVERY", kind="vertical", payload=payload)
         return discovered
 
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
     def _discover_verticals_internal(
         self,
         force_refresh: bool = False,
     ) -> Tuple[Dict[str, Type[VerticalBase]], bool, float]:
         """Discover verticals and return result with cache/duration metadata.
 
-        Delegates to PluginRegistry when it has already run, avoiding
-        a redundant entry point scan.  Falls back to direct scan if
-        the registry hasn't been initialized yet.
+        Prefers PluginRegistry.get_vertical_classes() as the single source of
+        truth — one capture per process shared with bootstrap capability
+        discovery and registry_manager. Falls back to a direct entry-point
+        scan if PluginRegistry has not initialized yet (e.g., in isolated
+        tests).
         """
         with self._lock:
             self._vertical_discovery_calls += 1
@@ -474,8 +477,15 @@ class VerticalLoader:
             self._vertical_discovery_scans += 1
             self._discovered_verticals = {}
 
+            if self._try_populate_from_plugin_registry(force_refresh=force_refresh):
+                self._vertical_last_discovery_ms = max(
+                    0.0,
+                    (time.perf_counter() - start) * 1000.0,
+                )
+                return self._discovered_verticals, False, self._vertical_last_discovery_ms
+
             try:
-                # Discover verticals via entry point scan
+                # Fallback: direct entry-point scan.
                 ep_entries = self._get_vertical_entry_points(force_refresh=force_refresh)
                 self._load_vertical_entries(ep_entries)
             except Exception as e:
@@ -487,6 +497,67 @@ class VerticalLoader:
             )
 
             return self._discovered_verticals, False, self._vertical_last_discovery_ms
+
+    def _try_populate_from_plugin_registry(self, *, force_refresh: bool) -> bool:
+        """Populate ``self._discovered_verticals`` from PluginRegistry if possible.
+
+        Returns True when the population succeeded (caller should not fall
+        back to an independent entry-point scan). Returns False when the
+        PluginRegistry has not discovered yet, when it is unavailable, or
+        when a forced refresh is requested — in which case callers perform
+        their own scan.
+        """
+        if force_refresh:
+            return False
+
+        try:
+            from victor.core.plugins.registry import PluginRegistry
+        except ImportError:
+            return False
+
+        try:
+            plugin_registry = PluginRegistry.get_instance()
+        except Exception:
+            return False
+
+        if not plugin_registry.is_discovered:
+            return False
+
+        try:
+            vertical_classes = plugin_registry.get_vertical_classes()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("PluginRegistry.get_vertical_classes failed: %s", exc)
+            return False
+
+        if not vertical_classes:
+            # Plugin registry ran but captured no verticals; signal fallback.
+            return False
+
+        for vertical_name, vertical_cls in vertical_classes.items():
+            if not VerticalRegistry._validate_external_vertical(vertical_cls, vertical_name):
+                continue
+            existing = VerticalRegistry.get(vertical_cls.name)
+            if existing is not None and existing is not vertical_cls:
+                existing_module = getattr(existing, "__module__", "")
+                new_module = getattr(vertical_cls, "__module__", "")
+                existing_is_contrib = "verticals.contrib" in existing_module
+                new_is_contrib = "verticals.contrib" in new_module
+                if not existing_is_contrib and new_is_contrib:
+                    continue
+                if existing_is_contrib == new_is_contrib:
+                    logger.warning(
+                        "Vertical '%s' has name '%s' which conflicts with "
+                        "registered vertical %s (from %s). Skipping.",
+                        vertical_name,
+                        vertical_cls.name,
+                        existing.__name__,
+                        existing_module,
+                    )
+                    continue
+            self._discovered_verticals[vertical_name] = vertical_cls
+            VerticalRegistry.register(vertical_cls)
+
+        return True
 
     async def discover_verticals_async(
         self,

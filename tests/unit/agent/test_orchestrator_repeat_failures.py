@@ -83,13 +83,14 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch,
     orch.tool_executor.tools = orch.tools
     orch._tool_pipeline.tools = orch.tools  # Pipeline's registry
     orch._tool_pipeline.executor.tools = orch.tools  # Pipeline's executor registry
-    # Also update tool coordinator's registry so is_tool_enabled works
-    if hasattr(orch._tool_coordinator, "_tools"):
-        orch._tool_coordinator._tools = orch.tools
-    # Ensure is_tool_enabled returns True for our test tool
-    orch.is_tool_enabled = lambda name: name == "always_fail" or name in {
-        t.name for t in orch.tools.list_tools()
-    }
+
+    # Inject a mock _tool_service so is_tool_enabled can be configured.
+    # bootstrap_new_services was patched out, so _tool_service is None on fresh orchestrators.
+    from unittest.mock import MagicMock
+    mock_tool_svc = MagicMock()
+    orch._tool_service = mock_tool_svc
+    enabled_names = {"always_fail"} | {t.name for t in orch.tools.list_tools()}
+    mock_tool_svc.is_tool_enabled = lambda name: name in enabled_names
 
     # Simulate a single tool call repeated twice
     tool_calls = [

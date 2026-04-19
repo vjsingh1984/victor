@@ -174,6 +174,17 @@ class ContextPruningLearner(BaseLearner):
 
         self.db.commit()
 
+    def _compute_reward(self, outcome: Any) -> float:
+        """Compute reward from a standard RLOutcome.
+
+        ContextPruningLearner primarily uses its own ``record_outcome()``
+        with domain-specific arguments.  This method provides the
+        ``BaseLearner`` abstract contract for the generic path.
+        """
+        success = getattr(outcome, "success", False)
+        quality = getattr(outcome, "quality_score", 0.5)
+        return (0.6 * (1.0 if success else -0.5)) + (0.4 * quality)
+
     def _discretize_state(
         self,
         context_utilization: float,
@@ -295,8 +306,10 @@ class ContextPruningLearner(BaseLearner):
         confidence = min(1.0, total_visits / (self.MIN_SAMPLES_FOR_CONFIDENCE * len(self.ACTIONS)))
 
         return RLRecommendation(
-            action=best_action.value,
+            value=best_action.value,
             confidence=confidence,
+            reason=f"Thompson Sampling selected {best_action.value} (sample={best_sample:.3f})",
+            sample_size=total_visits,
             metadata={
                 "state_key": state_key,
                 "config": {

@@ -47,3 +47,9 @@ class ContextSettings(BaseModel):
     #   'dangerous'  — MEDIUM+ danger level tools require approval
     #   'all'        — Every tool call requires approval
     tool_approval_mode: str = "auto"
+
+    # System prompt strategy: controls whether system prompt can vary during session
+    #   'static'   — Freeze at session start for cache optimization (default, 50-90% discount)
+    #   'dynamic'  — Rebuild per-turn based on context/tool calls (no cache benefit)
+    #   'hybrid'   — Static for API providers (cache), dynamic for local providers (no cache benefit)
+    system_prompt_strategy: str = "static"

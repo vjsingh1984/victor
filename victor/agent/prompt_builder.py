@@ -264,6 +264,7 @@ class SystemPromptBuilder:
         query_classification: Optional["QueryClassification"] = None,
         provider_caches: bool = False,
         provider_has_kv_cache: bool = False,
+        system_prompt_strategy: str = "static",
     ):
         """Initialize the prompt builder.
 
@@ -285,6 +286,10 @@ class SystemPromptBuilder:
             provider_has_kv_cache: If True, provider supports KV prefix caching (Ollama,
                 LMStudio, etc.). Sections are reduced AND frozen at session start so the
                 system prompt prefix stays byte-identical across turns.
+            system_prompt_strategy: Strategy for system prompt management.
+                - 'static': Freeze at session start for cache optimization (default)
+                - 'dynamic': Rebuild per-turn based on context/tool calls
+                - 'hybrid': Static for API providers, dynamic for local providers
         """
         # Handle both string and ProviderSettings object for provider_name
         # (backward compatibility with settings refactor)
@@ -309,6 +314,7 @@ class SystemPromptBuilder:
         self.query_classification = query_classification
         self.provider_caches = provider_caches
         self.provider_has_kv_cache = provider_has_kv_cache
+        self.system_prompt_strategy = system_prompt_strategy
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -319,6 +325,10 @@ class SystemPromptBuilder:
 
         # Cache merged task hints from vertical contributors
         self._merged_task_hints = None
+
+        # Prompt caching for static mode
+        self._cached_prompt: Optional[str] = None
+        self._cache_key: Optional[str] = None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
@@ -591,6 +601,67 @@ class SystemPromptBuilder:
         5. Completion guidance (always included for deterministic task completion)
         6. Provider-specific tool guidance (GAP-5)
 
+        System Prompt Strategy:
+        - 'static': Cache prompt after first build, reuse for all turns (default)
+        - 'dynamic': Rebuild every turn based on current context
+        - 'hybrid': Static for API providers (cache benefit), dynamic for local providers
+
+        Returns:
+            System prompt string tailored to the provider/model
+        """
+        # Determine if we should use cached prompt or rebuild
+        strategy = self._get_effective_strategy()
+
+        if strategy == "static":
+            # Return cached prompt if available
+            if self._cached_prompt is not None:
+                logger.debug(
+                    "[SystemPrompt→Cache] Using cached prompt (strategy=static, len=%d)",
+                    len(self._cached_prompt),
+                )
+                return self._cached_prompt
+
+        # Build the prompt
+        prompt = self._build_prompt_internal()
+
+        # Cache for static mode
+        if strategy == "static":
+            self._cached_prompt = prompt
+            logger.debug(
+                "[SystemPrompt→Cache] Cached prompt (strategy=static, len=%d)",
+                len(prompt),
+            )
+        elif strategy == "dynamic":
+            # Clear cache to ensure rebuild next time
+            self._cached_prompt = None
+            logger.debug(
+                "[SystemPrompt→Dynamic] Rebuilt prompt (strategy=dynamic, len=%d)",
+                len(prompt),
+            )
+        # hybrid: cache for API providers, no cache for local
+
+        return prompt
+
+    def _get_effective_strategy(self) -> str:
+        """Get the effective strategy based on configuration and provider type.
+
+        Returns:
+            'static', 'dynamic', or 'hybrid'
+        """
+        strategy = self.system_prompt_strategy
+
+        if strategy == "hybrid":
+            # Static for API providers (cache benefit), dynamic for local
+            if self.provider_caches or self.provider_has_kv_cache:
+                return "static"
+            else:
+                return "dynamic"
+
+        return strategy
+
+    def _build_prompt_internal(self) -> str:
+        """Internal method to build the prompt without caching logic.
+
         Returns:
             System prompt string tailored to the provider/model
         """
@@ -638,12 +709,13 @@ class SystemPromptBuilder:
         # Log system prompt composition sent to LLM
         logger.debug(
             "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
-            "tool_guidance_len=%d prompt_total_len=%d",
+            "tool_guidance_len=%d prompt_total_len=%d strategy=%s",
             self.provider_name,
             sorted(sections_to_include),
             self._get_tool_constraint_section()[:300] if self.available_tools else "(none)",
             len(self.get_provider_tool_guidance()),
             len(base_prompt),
+            self.system_prompt_strategy,
         )
 
         return base_prompt

@@ -72,13 +72,11 @@ class ToolSelectionContext(Protocol):
 
 @runtime_checkable
 class ToolServiceProtocol(Protocol):
-    """Protocol for tool operations service.
+    """[CANONICAL] Protocol for tool operations service.
 
-    Handles:
-    - Intelligent tool selection based on context
-    - Tool execution with validation and error handling
-    - Tool budget management and tracking
-    - Tool usage analytics
+    This protocol represents the target architecture for tool operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on tool-related operations.

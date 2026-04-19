@@ -611,22 +611,6 @@ class ToolService:
     # Tool Statistics and Budget Queries
     # ==========================================================================
 
-    def get_tool_usage_stats(self) -> Dict[str, int]:
-        """Get comprehensive tool usage statistics.
-
-        Returns a dictionary mapping tool names to usage counts.
-        Includes both successful executions and errors (prefixed with "error:").
-
-        Returns:
-            Dictionary with tool usage statistics
-
-        Example:
-            stats = service.get_tool_usage_stats()
-            # {"read": 10, "write": 5, "error:shell": 2}
-        """
-        # Return a copy to prevent external modification
-        return dict(self._usage_stats)
-
     def get_tool_call_count(self, tool_name: str) -> int:
         """Get the number of times a specific tool was called.
 

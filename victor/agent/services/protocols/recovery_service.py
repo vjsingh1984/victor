@@ -96,14 +96,11 @@ class RecoveryContext(Protocol):
 
 @runtime_checkable
 class RecoveryServiceProtocol(Protocol):
-    """Protocol for error recovery and resilience service.
+    """[CANONICAL] Protocol for error recovery and resilience service.
 
-    Handles:
-    - Error classification and analysis
-    - Recovery action selection
-    - Automatic retry with exponential backoff
-    - Circuit breaker management
-    - Recovery metrics and tracking
+    This protocol represents the target architecture for recovery operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on recovery-related operations.

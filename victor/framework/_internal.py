@@ -218,6 +218,16 @@ def setup_observability_integration(
     # Wire into orchestrator
     integration.wire_orchestrator(orchestrator)
 
+    # Wire provider resilience notifications to the same bus so dashboard
+    # and other subscribers see fallback events.  Follows the same pattern
+    # as CircuitBreakerRegistry.wire_observability().
+    try:
+        from victor.providers.resilience import ResilientProvider
+
+        ResilientProvider.wire_observability(integration.event_bus)
+    except Exception:
+        pass  # Non-critical — resilience works without observability
+
     # Ensure reference is stored through public observability ports.
     if isinstance(orchestrator, ObservabilityPortProtocol):
         orchestrator.set_observability(integration)

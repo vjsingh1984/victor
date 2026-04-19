@@ -151,10 +151,11 @@ class SessionCostSummary:
 
 
 class SessionCoordinator:
-    """Coordinates session lifecycle and state management.
+    """[DEPRECATED] Coordinates session lifecycle and state management.
 
-    This coordinator provides a unified interface for session management,
-    delegating to specialized components for specific operations.
+    This class is being superseded by SessionService as part of the 
+    state-passed architectural migration. It remains for backward 
+    compatibility with facade-driven components.
 
     Responsibilities:
     - Session ID creation and tracking

@@ -51,7 +51,7 @@ from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
     from victor.agent.conversation.state_machine import ConversationStage
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

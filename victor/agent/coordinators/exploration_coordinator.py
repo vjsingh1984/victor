@@ -159,22 +159,43 @@ class ExplorationCoordinator:
 
     def _extract_search_terms(self, task: str) -> List[str]:
         """Extract meaningful search terms from task description."""
-        # Remove common stop words and extract code-relevant terms
-        # Look for function names, class names, module references
         terms = []
 
-        # Extract quoted strings
+        # Extract quoted strings (backtick or double-quote)
         quoted = re.findall(r'`([^`]+)`|"([^"]+)"', task)
         for q in quoted:
             term = q[0] or q[1]
             if len(term) > 2:
                 terms.append(term)
 
-        # Extract CamelCase or snake_case identifiers
+        # Extract CamelCase or snake_case code identifiers
         identifiers = re.findall(r"\b[A-Z][a-zA-Z]+\b|\b[a-z]+_[a-z_]+\b", task)
         for ident in identifiers:
             if len(ident) > 3 and ident not in terms:
                 terms.append(ident)
+
+        # Fallback for conceptual/English queries (e.g. "review the codebase for UX issues"):
+        # extract meaningful content words when no code identifiers were found.
+        if not terms:
+            stop_words = {
+                "a", "an", "the", "and", "or", "but", "in", "on", "at", "to",
+                "for", "of", "with", "by", "from", "is", "are", "was", "be",
+                "it", "its", "this", "that", "all", "any", "how", "what",
+                "why", "when", "where", "who", "can", "do", "not", "if",
+                "as", "up", "out", "so", "i", "we", "you", "he", "she",
+                "they", "then", "than", "into", "over", "also", "should",
+                "could", "would", "will", "may", "must", "have", "has",
+                "had", "been", "being", "let", "get", "find", "identify",
+                "review", "analyze", "check", "look", "list", "show",
+            }
+            words = re.findall(r"\b[a-zA-Z]{4,}\b", task.lower())
+            seen: set = set()
+            for word in words:
+                if word not in stop_words and word not in seen:
+                    seen.add(word)
+                    terms.append(word)
+                    if len(terms) >= 5:
+                        break
 
         return terms[:5]
 

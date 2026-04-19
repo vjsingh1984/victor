@@ -78,7 +78,7 @@ class ToolBuildersMixin:
         Returns:
             ToolRegistry instance for tool storage and management
         """
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         logger.debug("ToolRegistry created")

@@ -27,7 +27,7 @@ from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

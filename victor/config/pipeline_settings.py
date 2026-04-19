@@ -76,5 +76,5 @@ class PipelineSettings(BaseModel):
     max_continuation_prompts_action: int = 5
     max_continuation_prompts_default: int = 3
     continuation_prompt_overrides: dict = Field(default_factory=dict)
-    enable_continuation_rl_learning: bool = False
+    enable_continuation_rl_learning: bool = True
     session_idle_timeout: int = 180

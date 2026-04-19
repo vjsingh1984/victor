@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     from victor.agent.content_registry import ContentCategory, ContentItem, ContentRegistry
     from victor.agent.optimization_injector import OptimizationInjector
     from victor.agent.task_analyzer import TaskAnalyzer
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

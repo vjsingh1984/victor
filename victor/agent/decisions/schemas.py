@@ -29,6 +29,7 @@ class DecisionType(str, Enum):
     SKILL_SELECTION = "skill_selection"
     MULTI_SKILL_DECOMPOSITION = "multi_skill_decomposition"
     TOOL_NECESSITY = "tool_necessity"
+    COMPACTION = "compaction"
 
 
 class TaskCompletionDecision(BaseModel):
@@ -150,3 +151,61 @@ class MultiSkillDecision(BaseModel):
 
     skills: list[str] = Field(description="Ordered list of skill names to execute")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in decomposition")
+
+
+class CompactionDecision(BaseModel):
+    """Decision for context compaction routing.
+
+    Determines which tier should handle compaction based on complexity
+    and estimated token count. Simple compaction (≤8 messages) can use
+    edge tier for speed, while complex compaction (>8 messages) should
+    use performance tier for quality.
+
+    Attributes:
+        complexity: simple (≤8 messages) or complex (>8 messages)
+        recommended_tier: Which tier should handle compaction (edge, balanced, performance)
+        estimated_tokens: Estimated size of content to compact
+        confidence: Decision confidence (0.0-1.0)
+        reason: Brief explanation of the decision
+    """
+
+    complexity: Literal["simple", "complex"] = Field(
+        description="simple (≤8 messages) or complex (>8 messages)"
+    )
+    recommended_tier: Literal["edge", "balanced", "performance"] = Field(
+        description="Recommended tier for compaction"
+    )
+    estimated_tokens: int = Field(description="Estimated token count of content to compact")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the decision")
+    reason: str = Field(max_length=200, description="Brief explanation of the decision")
+
+
+class SystemPromptOptimizationDecision(BaseModel):
+    """Decision for system prompt optimization during compaction.
+
+    When system_prompt_strategy is 'dynamic', this decision determines
+    which prompt sections to include based on current context and task state.
+
+    Attributes:
+        include_sections: Which prompt sections to include (subset of all sections)
+        add_context_reminder: Whether to add compaction summary reminder
+        add_failure_hints: Whether to include recent failure patterns
+        adjust_for_complexity: Tailor prompt for task complexity
+        confidence: Decision confidence (0.0-1.0)
+        reason: Brief explanation of the decision
+    """
+
+    include_sections: list[str] = Field(
+        description="List of section names to include in the prompt"
+    )
+    add_context_reminder: bool = Field(
+        description="Whether to add a reminder about recent compaction"
+    )
+    add_failure_hints: bool = Field(
+        description="Whether to include hints based on recent failures"
+    )
+    adjust_for_complexity: bool = Field(
+        description="Whether to tailor prompt based on task complexity"
+    )
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the decision")
+    reason: str = Field(max_length=200, description="Brief explanation of the decision")

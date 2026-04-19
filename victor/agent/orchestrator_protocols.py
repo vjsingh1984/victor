@@ -146,8 +146,9 @@ class IAgentOrchestrator(Protocol):
 
 @runtime_checkable
 class IToolExecutor(Protocol):
-    """Protocol for tool execution operations.
-
+    """[LEGACY PROTOCOL] Interface for tool execution.
+    
+    Superseded by IToolCoordinator for high-level operations.
     Defines interface for executing tools with retry, caching,
     and error handling.
     """

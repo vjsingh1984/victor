@@ -554,7 +554,7 @@ class TestConversationMessageSerialization:
 
         provider_format = msg.to_provider_format()
 
-        assert provider_format["role"] == "assistant"  # Tool results map to assistant
+        assert provider_format["role"] == "tool"  # Per OpenAI spec, tool results keep role=tool
         assert provider_format["tool_call_id"] == "call-123"
 
     def test_to_dict_roundtrip(self):
@@ -578,7 +578,9 @@ class TestConversationMessageSerialization:
         restored = ConversationMessage.from_dict(msg_dict)
 
         assert restored.id == original.id
-        assert restored.role == original.role
+        # role is normalized to string after roundtrip (enum → str via to_dict)
+        original_role = original.role.value if isinstance(original.role, MessageRole) else original.role
+        assert restored.role == original_role
         assert restored.content == original.content
         assert restored.priority == original.priority
         assert restored.tool_name == original.tool_name

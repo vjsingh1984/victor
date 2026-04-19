@@ -2384,6 +2384,269 @@ class ConversationStore:
 
             return history
 
+    def store_compaction_history(
+        self,
+        session_id: str,
+        strategy_used: str,
+        message_count_before: int,
+        message_count_after: int,
+        token_count_before: int,
+        token_count_after: int,
+        duration_ms: int,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
+        success: bool = True,
+        error_message: Optional[str] = None,
+    ) -> str:
+        """Store compaction event to history table for analytics.
+
+        Args:
+            session_id: Session ID
+            strategy_used: Compaction strategy used (rule_based, llm_based, hybrid)
+            message_count_before: Message count before compaction
+            message_count_after: Message count after compaction
+            token_count_before: Estimated token count before compaction
+            token_count_after: Token count after compaction
+            duration_ms: Duration of compaction in milliseconds
+            llm_provider: LLM provider used (if applicable)
+            llm_model: LLM model used (if applicable)
+            success: Whether compaction succeeded
+            error_message: Error message if failed
+
+        Returns:
+            History event ID
+        """
+        history_id = f"hist_{uuid.uuid4().hex[:12]}"
+
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT INTO compaction_history (
+                    id, session_id, strategy_used, message_count_before,
+                    message_count_after, token_count_before, token_count_after,
+                    duration_ms, llm_provider, llm_model, success, error_message,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    history_id,
+                    session_id,
+                    strategy_used,
+                    message_count_before,
+                    message_count_after,
+                    token_count_before,
+                    token_count_after,
+                    duration_ms,
+                    llm_provider,
+                    llm_model,
+                    success,
+                    error_message,
+                    datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+
+        logger.debug(
+            f"Stored compaction history event {history_id} for session {session_id} "
+            f"(strategy={strategy_used}, duration_ms={duration_ms}, success={success})"
+        )
+
+        return history_id
+
+    def get_compaction_statistics(
+        self,
+        session_id: Optional[str] = None,
+        limit: int = 1000,
+    ) -> Dict[str, Any]:
+        """Get aggregate compaction statistics.
+
+        Args:
+            session_id: Optional session ID to filter by (None = all sessions)
+            limit: Maximum number of events to analyze
+
+        Returns:
+            Dictionary with aggregate statistics:
+            - total_compactions: Total number of compaction events
+            - success_rate: Overall success rate (0.0-1.0)
+            - avg_duration_ms: Average duration in milliseconds
+            - avg_tokens_saved: Average tokens saved
+            - strategy_counts: Count per strategy
+            - strategy_success_rates: Success rate per strategy
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # Build query with optional session filter
+            session_filter = "WHERE session_id = ?" if session_id else ""
+            session_params = (session_id,) if session_id else ()
+
+            # Get total statistics
+            row = conn.execute(
+                f"""
+                SELECT
+                    COUNT(*) as total_compactions,
+                    AVG(CASE WHEN success = 1 THEN 1.0 ELSE 0.0 END) as success_rate,
+                    AVG(duration_ms) as avg_duration_ms,
+                    AVG(token_count_before - token_count_after) as avg_tokens_saved
+                FROM compaction_history
+                {session_filter}
+                LIMIT ?
+                """,
+                session_params + (limit,),
+            ).fetchone()
+
+            # Get counts per strategy
+            strategy_rows = conn.execute(
+                f"""
+                SELECT
+                    strategy_used,
+                    COUNT(*) as count,
+                    AVG(CASE WHEN success = 1 THEN 1.0 ELSE 0.0 END) as success_rate,
+                    AVG(duration_ms) as avg_duration_ms,
+                    AVG(token_count_before - token_count_after) as avg_tokens_saved
+                FROM compaction_history
+                {session_filter}
+                GROUP BY strategy_used
+                LIMIT ?
+                """,
+                session_params + (limit,),
+            ).fetchall()
+
+            strategy_counts = {}
+            strategy_success_rates = {}
+            strategy_durations = {}
+            strategy_savings = {}
+
+            for row in strategy_rows:
+                strategy = row["strategy_used"]
+                strategy_counts[strategy] = row["count"]
+                strategy_success_rates[strategy] = row["success_rate"]
+                strategy_durations[strategy] = row["avg_duration_ms"]
+                strategy_savings[strategy] = row["avg_tokens_saved"]
+
+            return {
+                "total_compactions": row["total_compactions"] if row else 0,
+                "success_rate": row["success_rate"] if row else 0.0,
+                "avg_duration_ms": row["avg_duration_ms"] if row else 0.0,
+                "avg_tokens_saved": row["avg_tokens_saved"] if row else 0.0,
+                "strategy_counts": strategy_counts,
+                "strategy_success_rates": strategy_success_rates,
+                "strategy_durations": strategy_durations,
+                "strategy_savings": strategy_savings,
+            }
+
+    def get_compaction_performance_trends(
+        self,
+        session_id: Optional[str] = None,
+        hours_back: int = 24,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Get time-series performance trends for compaction.
+
+        Args:
+            session_id: Optional session ID to filter by (None = all sessions)
+            hours_back: Number of hours to look back (default: 24)
+            limit: Maximum number of events to return
+
+        Returns:
+            List of compaction events with timestamp, ordered by time
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            # Calculate cutoff time
+            from datetime import timedelta
+            cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=hours_back)).isoformat()
+
+            # Build query with optional session filter
+            session_filter = "AND session_id = ?" if session_id else ""
+            session_params = (session_id,) if session_id else ()
+
+            rows = conn.execute(
+                f"""
+                SELECT
+                    id, session_id, strategy_used, message_count_before,
+                    message_count_after, token_count_before, token_count_after,
+                    duration_ms, success, error_message, created_at
+                FROM compaction_history
+                WHERE created_at >= ?
+                {session_filter}
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (cutoff_time,) + session_params + (limit,),
+            ).fetchall()
+
+            trends = []
+            for row in rows:
+                trends.append({
+                    "id": row["id"],
+                    "session_id": row["session_id"],
+                    "strategy_used": row["strategy_used"],
+                    "message_count_before": row["message_count_before"],
+                    "message_count_after": row["message_count_after"],
+                    "token_count_before": row["token_count_before"],
+                    "token_count_after": row["token_count_after"],
+                    "tokens_saved": row["token_count_before"] - row["token_count_after"],
+                    "duration_ms": row["duration_ms"],
+                    "success": bool(row["success"]),
+                    "error_message": row["error_message"],
+                    "created_at": row["created_at"],
+                })
+
+            return trends
+
+    def get_strategy_comparison(
+        self,
+        limit: int = 1000,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Compare performance across compaction strategies.
+
+        Args:
+            limit: Maximum number of events to analyze per strategy
+
+        Returns:
+            Dictionary mapping strategy names to their performance metrics
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+
+            rows = conn.execute(
+                """
+                SELECT
+                    strategy_used,
+                    COUNT(*) as total_compactions,
+                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_compactions,
+                    AVG(CASE WHEN success = 1 THEN 1.0 ELSE 0.0 END) as success_rate,
+                    AVG(duration_ms) as avg_duration_ms,
+                    MIN(duration_ms) as min_duration_ms,
+                    MAX(duration_ms) as max_duration_ms,
+                    AVG(token_count_before - token_count_after) as avg_tokens_saved,
+                    MIN(token_count_before - token_count_after) as min_tokens_saved,
+                    MAX(token_count_before - token_count_after) as max_tokens_saved
+                FROM compaction_history
+                GROUP BY strategy_used
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+            comparison = {}
+            for row in rows:
+                strategy = row["strategy_used"]
+                comparison[strategy] = {
+                    "total_compactions": row["total_compactions"],
+                    "successful_compactions": row["successful_compactions"],
+                    "success_rate": row["success_rate"],
+                    "avg_duration_ms": row["avg_duration_ms"],
+                    "min_duration_ms": row["min_duration_ms"],
+                    "max_duration_ms": row["max_duration_ms"],
+                    "avg_tokens_saved": row["avg_tokens_saved"],
+                    "min_tokens_saved": row["min_tokens_saved"],
+                    "max_tokens_saved": row["max_tokens_saved"],
+                }
+
+            return comparison
+
     def get_historical_tool_results(
         self,
         session_id: str,
