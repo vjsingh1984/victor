@@ -159,6 +159,8 @@ class DebugLogger:
         max_preview: int = 80,
         enabled: bool = True,
         presentation: Optional["PresentationProtocol"] = None,
+        max_context_chars: int = 800_000,
+        max_context_tokens: int = 200_000,
     ):
         """Initialize debug logger.
 
@@ -167,12 +169,22 @@ class DebugLogger:
             max_preview: Max characters for inline previews
             enabled: Whether logging is enabled
             presentation: Optional presentation adapter for icons (creates default if None)
+            max_context_chars: Maximum context window in characters (for warning thresholds)
+            max_context_tokens: Maximum context window in tokens (for warning thresholds)
         """
         self.logger = logging.getLogger(name)
         self.max_preview = max_preview
         self.enabled = enabled
         self._last_iteration = 0
         self.stats = ConversationStats()
+        self.max_context_chars = max_context_chars
+        self.max_context_tokens = max_context_tokens
+
+        # Calculate warning thresholds as percentages of actual capacity
+        # Warning at 75% of capacity, info at 50% of capacity
+        self.warn_threshold_chars = int(max_context_chars * 0.75)
+        self.info_threshold_chars = int(max_context_chars * 0.50)
+
         # Lazy init for backward compatibility
         if presentation is None:
             from victor.agent.presentation import create_presentation_adapter
@@ -320,33 +332,32 @@ class DebugLogger:
     def log_context_size(self, char_count: int, estimated_tokens: int) -> None:
         """Log context size warning if large.
 
-        Thresholds are conservative for older models:
-        - Warning at 150K chars (~37K tokens) - was 100K
-        - Info at 75K chars (~19K tokens) - was 50K
+        Warning thresholds are dynamically calculated based on actual model capacity:
+        - Warning at 75% of max_context_chars (default: 600K chars for 200K token models)
+        - Info at 50% of max_context_chars (default: 400K chars for 200K token models)
 
-        Modern models (DeepSeek, Claude 3.5+, GPT-4) support much larger contexts,
-        so these thresholds are informational rather than critical.
+        This ensures warnings are appropriate for the actual model being used,
+        rather than hardcoded conservative values from older models.
         """
         if not self.enabled:
             return
 
-        # Dynamic threshold based on model context window (default 128K tokens)
-        # Warning at 70% utilization, info at 40%
-        max_context_chars = getattr(self, "_max_context_chars", 358_400)  # 128K * 3.5 * 0.8
-        warn_threshold = int(max_context_chars * 0.70)
-        info_threshold = int(max_context_chars * 0.40)
+        # Calculate percentage of capacity used
+        chars_pct = char_count / self.max_context_chars if self.max_context_chars > 0 else 0
+        tokens_pct = estimated_tokens / self.max_context_tokens if self.max_context_tokens > 0 else 0
 
-        if char_count > warn_threshold:
+        if char_count >= self.warn_threshold_chars:
             warning_icon = self._presentation.icon("warning", with_color=False)
-            pct = int(100 * char_count / max_context_chars)
             self.logger.warning(
                 f"   {warning_icon} Large context: {char_count:,} chars "
-                f"(~{estimated_tokens:,} tokens, {pct}% of budget)"
+                f"(~{estimated_tokens:,} est. tokens, {chars_pct:.1%} of capacity, "
+                f"chars/{char_count // max(estimated_tokens, 1)})"
             )
-        elif char_count > info_threshold:
+        elif char_count >= self.info_threshold_chars:
             chart_icon = self._presentation.icon("chart", with_color=False)
             self.logger.info(
-                f"   {chart_icon} Context: {char_count:,} chars (~{estimated_tokens:,} tokens)"
+                f"   {chart_icon} Context: {char_count:,} chars "
+                f"(~{estimated_tokens:,} est. tokens, {chars_pct:.1%} of capacity)"
             )
 
     def log_conversation_summary(self, messages: List[Message]) -> None:
@@ -384,6 +395,8 @@ def configure_debug_logging(
     enabled: bool = True,
     max_preview: int = 80,
     log_level: str = "INFO",
+    max_context_chars: int = 800_000,
+    max_context_tokens: int = 200_000,
 ) -> DebugLogger:
     """Configure debug logging with clean output.
 
@@ -391,6 +404,8 @@ def configure_debug_logging(
         enabled: Whether debug logging is enabled
         max_preview: Max chars for previews
         log_level: Log level (INFO recommended for readable output)
+        max_context_chars: Maximum context window in characters (for warning thresholds)
+        max_context_tokens: Maximum context window in tokens (for warning thresholds)
 
     Returns:
         Configured DebugLogger instance
@@ -403,6 +418,8 @@ def configure_debug_logging(
     _debug_logger = DebugLogger(
         enabled=enabled,
         max_preview=max_preview,
+        max_context_chars=max_context_chars,
+        max_context_tokens=max_context_tokens,
     )
 
     return _debug_logger

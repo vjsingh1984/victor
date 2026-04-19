@@ -492,23 +492,43 @@ class TestLogContextSize:
 
     def test_warns_very_large_context(self, debug_logger):
         """Test warning for very large context."""
+        # Set explicit context limits for predictable test behavior
+        debug_logger.max_context_chars = 200_000
+        debug_logger.max_context_tokens = 50_000
+        debug_logger.warn_threshold_chars = 150_000  # 75%
+        debug_logger.info_threshold_chars = 100_000  # 50%
+
         with patch.object(debug_logger.logger, "warning") as mock_warn:
-            debug_logger.log_context_size(150001, 40000)
+            debug_logger.log_context_size(150_001, 37_500)
             mock_warn.assert_called_once()
             assert "Large context" in mock_warn.call_args[0][0]
+            assert "75.0% of capacity" in mock_warn.call_args[0][0]
 
     def test_info_medium_context(self, debug_logger):
         """Test info for medium context."""
+        # Set explicit context limits for predictable test behavior
+        debug_logger.max_context_chars = 200_000
+        debug_logger.max_context_tokens = 50_000
+        debug_logger.warn_threshold_chars = 150_000  # 75%
+        debug_logger.info_threshold_chars = 100_000  # 50%
+
         with patch.object(debug_logger.logger, "info") as mock_info:
-            debug_logger.log_context_size(75001, 20000)
+            debug_logger.log_context_size(100_001, 25_000)
             mock_info.assert_called_once()
             assert "Context" in mock_info.call_args[0][0]
+            assert "50.0% of capacity" in mock_info.call_args[0][0]
 
     def test_no_log_small_context(self, debug_logger):
         """Test no log for small context."""
+        # Set explicit context limits for predictable test behavior
+        debug_logger.max_context_chars = 200_000
+        debug_logger.max_context_tokens = 50_000
+        debug_logger.warn_threshold_chars = 150_000  # 75%
+        debug_logger.info_threshold_chars = 100_000  # 50%
+
         with patch.object(debug_logger.logger, "warning") as mock_warn:
             with patch.object(debug_logger.logger, "info") as mock_info:
-                debug_logger.log_context_size(10000, 2500)
+                debug_logger.log_context_size(10_000, 2_500)
                 mock_warn.assert_not_called()
                 mock_info.assert_not_called()
 
@@ -560,11 +580,17 @@ class TestGlobalFunctions:
             enabled=True,
             max_preview=100,
             log_level="DEBUG",
+            max_context_chars=500_000,
+            max_context_tokens=125_000,
         )
 
         assert isinstance(logger, DebugLogger)
         assert logger.enabled is True
         assert logger.max_preview == 100
+        assert logger.max_context_chars == 500_000
+        assert logger.max_context_tokens == 125_000
+        assert logger.warn_threshold_chars == 375_000  # 75% of 500K
+        assert logger.info_threshold_chars == 250_000  # 50% of 500K
 
     def test_configure_debug_logging_disabled(self):
         """Test configure_debug_logging with disabled."""
