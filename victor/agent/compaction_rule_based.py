@@ -15,7 +15,8 @@
 """Rule-based compaction summarizer (Claudecode-style).
 
 Implements fast, deterministic, reproducible compaction without LLM calls.
-Generates machine-readable XML format for structured parsing.
+Generates machine-readable JSON format for seamless integration with
+LLM-based and hybrid approaches.
 
 Performance: <100ms for 100 messages (vs 2-5s for LLM-based).
 Use case: 80% of compactions - simple cases with clear patterns.
@@ -23,6 +24,7 @@ Use case: 80% of compactions - simple cases with clear patterns.
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -69,7 +71,8 @@ class RuleBasedCompactionSummarizer:
     """Claudecode-style deterministic rule-based summarization.
 
     Fast, cheap, reproducible compaction without LLM calls.
-    Generates machine-readable XML format for parsing.
+    Generates machine-readable JSON format for seamless integration
+    with LLM-based and hybrid approaches.
 
     Performance characteristics:
     - Speed: <100ms for 100 messages
@@ -132,21 +135,21 @@ class RuleBasedCompactionSummarizer:
         messages: List[Message],
         ledger: Optional[Any] = None,
     ) -> str:
-        """Generate rule-based summary in XML format.
+        """Generate rule-based summary in JSON format.
 
         Args:
             messages: Messages to summarize
             ledger: Optional ledger (currently unused, for API compatibility)
 
         Returns:
-            XML-formatted summary string
+            JSON-formatted summary string
         """
         if not messages:
             return ""
 
         try:
             summary = self._generate_summary(messages)
-            return self._format_xml(summary)
+            return self._format_json(summary)
         except Exception as e:
             logger.warning(f"Rule-based summarization failed: {e}")
             return self._format_fallback_summary(len(messages))
@@ -192,63 +195,47 @@ class RuleBasedCompactionSummarizer:
             key_timeline=timeline,
         )
 
-    def _format_xml(self, summary: RuleBasedSummary) -> str:
-        """Format summary as XML (claudecode-compatible).
+    def _format_json(self, summary: RuleBasedSummary) -> str:
+        """Format summary as JSON (compatible with LLM-based format).
 
         Args:
             summary: Structured summary data
 
         Returns:
-            XML-formatted string
+            JSON-formatted string
         """
-        lines = ["<summary>", "Conversation summary:"]
-        lines.append(f"- Scope: {summary.scope}.")
+        summary_dict = {
+            "scope": summary.scope,
+            "tools_mentioned": summary.tools_mentioned,
+            "recent_user_requests": summary.recent_user_requests,
+            "pending_work": summary.pending_work,
+            "key_files_referenced": summary.key_files_referenced,
+            "current_work": summary.current_work,
+            "key_timeline": summary.key_timeline[-10:],  # Limit to 10 most recent
+        }
 
-        if summary.tools_mentioned:
-            lines.append(
-                f"- Tools mentioned: {', '.join(summary.tools_mentioned)}."
-            )
-
-        if summary.recent_user_requests:
-            lines.append("- Recent user requests:")
-            lines.extend(f"  - {self._escape_xml(req)}" for req in summary.recent_user_requests)
-
-        if summary.pending_work:
-            lines.append("- Pending work:")
-            lines.extend(f"  - {self._escape_xml(item)}" for item in summary.pending_work)
-
-        if summary.key_files_referenced:
-            lines.append(
-                f"- Key files referenced: {', '.join(summary.key_files_referenced)}."
-            )
-
-        if summary.current_work:
-            lines.append(f"- Current work: {self._escape_xml(summary.current_work)}")
-
-        if summary.key_timeline:
-            lines.append("- Key timeline:")
-            for entry in summary.key_timeline[-10:]:  # Limit to 10 most recent
-                role = entry["role"]
-                content = self._truncate(entry["content"], 160)
-                lines.append(f"  - {role}: {self._escape_xml(content)}")
-
-        lines.append("</summary>")
-        return "\n".join(lines)
+        # Return as compact JSON (no extra whitespace)
+        return json.dumps(summary_dict, separators=(",", ":"))
 
     def _format_fallback_summary(self, message_count: int) -> str:
-        """Format a minimal fallback summary.
+        """Format a minimal fallback summary in JSON format.
 
         Args:
             message_count: Number of messages that were compacted
 
         Returns:
-            Minimal XML summary
+            Minimal JSON summary
         """
-        return (
-            "<summary>\n"
-            f"Conversation summary: {message_count} earlier messages compacted.\n"
-            "</summary>"
-        )
+        fallback_dict = {
+            "scope": f"{message_count} earlier messages compacted.",
+            "tools_mentioned": [],
+            "recent_user_requests": [],
+            "pending_work": [],
+            "key_files_referenced": [],
+            "current_work": "",
+            "key_timeline": [],
+        }
+        return json.dumps(fallback_dict, separators=(",", ":"))
 
     def _extract_tool_names(self, messages: List[Message]) -> List[str]:
         """Extract unique tool names from messages.
@@ -512,9 +499,12 @@ class RuleBasedCompactionSummarizer:
             if msg.role == "system":
                 continue
 
+            # Truncate content to reasonable length
+            content = self._truncate(msg.content, 160) if msg.content else ""
+
             timeline.append({
                 "role": msg.role,
-                "content": msg.content,
+                "content": content,
             })
 
         return timeline
@@ -535,20 +525,3 @@ class RuleBasedCompactionSummarizer:
 
         truncated = content[:max_chars]
         return truncated + "…"
-
-    @staticmethod
-    def _escape_xml(text: str) -> str:
-        """Escape special XML characters.
-
-        Args:
-            text: Text to escape
-
-        Returns:
-            XML-escaped text
-        """
-        text = text.replace("&", "&amp;")
-        text = text.replace("<", "&lt;")
-        text = text.replace(">", "&gt;")
-        text = text.replace('"', "&quot;")
-        text = text.replace("'", "&apos;")
-        return text

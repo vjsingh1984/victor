@@ -78,7 +78,7 @@ class HybridCompactionSummarizer:
     1. Generate rule-based summary (sub-100ms)
     2. Identify sections to enhance (configurable)
     3. Use LLM to enhance specific sections (200-400ms per section)
-    4. Merge enhanced sections back into XML format
+    4. Merge enhanced sections back into JSON format
 
     Fallback behavior:
     - If LLM is unavailable → use rule-based summary only
@@ -123,25 +123,25 @@ class HybridCompactionSummarizer:
             ledger: Optional ledger for context
 
         Returns:
-            XML-formatted hybrid summary
+            JSON-formatted hybrid summary
         """
         if not messages:
             return ""
 
         try:
             # Step 1: Generate rule-based summary (fast)
-            rule_summary_xml = self._rule_summarizer.summarize(messages, ledger)
-            rule_summary = self._parse_xml_summary(rule_summary_xml)
+            rule_summary_json = self._rule_summarizer.summarize(messages, ledger)
+            rule_summary = self._parse_json_summary(rule_summary_json)
 
             # Step 2: If LLM enhancement disabled, return rules only
             if not self._config.hybrid_llm_enhancement:
                 logger.debug("LLM enhancement disabled, using rule-based summary")
-                return rule_summary_xml
+                return rule_summary_json
 
             # Step 3: If LLM summarizer not available, return rules only
             if not self._llm_summarizer:
                 logger.debug("LLM summarizer not available, using rule-based summary")
-                return rule_summary_xml
+                return rule_summary_json
 
             # Step 4: Enhance specific sections with LLM
             enhanced_sections = await self._enhance_with_llm(
@@ -150,7 +150,7 @@ class HybridCompactionSummarizer:
                 self._enhancement_sections,
             )
 
-            # Step 5: Merge enhanced sections back into XML
+            # Step 5: Merge enhanced sections back into JSON
             return self._merge_enhanced_summary(rule_summary, enhanced_sections)
 
         except Exception as e:
@@ -170,7 +170,7 @@ class HybridCompactionSummarizer:
             ledger: Optional ledger for context
 
         Returns:
-            XML-formatted hybrid summary
+            JSON-formatted hybrid summary
         """
         if not messages:
             return ""
@@ -510,115 +510,68 @@ Provide a 1-2 sentence summary of what changes were made or discussed for these 
         rule_summary: "RuleBasedSummary",
         enhanced_sections: Dict[str, str],
     ) -> str:
-        """Merge LLM-enhanced sections into XML format.
+        """Merge LLM-enhanced sections into JSON format.
 
         Args:
             rule_summary: Base rule-based summary
             enhanced_sections: LLM-enhanced sections
 
         Returns:
-            Merged XML summary
+            Merged JSON summary
         """
-        lines = ["<summary>", "Conversation summary:"]
-        lines.append(f"- Scope: {rule_summary.scope}.")
+        import json
 
-        # Tools mentioned
-        if "tools_mentioned" in enhanced_sections:
-            lines.append(f"- Tools: {enhanced_sections['tools_mentioned']}")
-        elif rule_summary.tools_mentioned:
-            lines.append(
-                f"- Tools mentioned: {', '.join(rule_summary.tools_mentioned)}."
-            )
+        # Build summary dict with enhanced sections
+        summary_dict = {
+            "scope": rule_summary.scope,
+            "tools_mentioned": enhanced_sections.get("tools_mentioned", rule_summary.tools_mentioned),
+            "recent_user_requests": rule_summary.recent_user_requests,
+            "pending_work": enhanced_sections.get("pending_work", rule_summary.pending_work),
+            "key_files_referenced": enhanced_sections.get("key_files_referenced", rule_summary.key_files_referenced),
+            "current_work": enhanced_sections.get("current_work", rule_summary.current_work),
+            "key_timeline": rule_summary.key_timeline[-10:],  # Limit to 10 most recent
+        }
 
-        # Recent user requests
-        if rule_summary.recent_user_requests:
-            lines.append("- Recent user requests:")
-            lines.extend(
-                f"  - {self._escape_xml(req)}"
-                for req in rule_summary.recent_user_requests
-            )
+        # Return as compact JSON
+        return json.dumps(summary_dict, separators=(",", ":"))
 
-        # Pending work (enhanced if available)
-        if "pending_work" in enhanced_sections:
-            lines.append("- Pending work:")
-            lines.append(f"  {enhanced_sections['pending_work']}")
-        elif rule_summary.pending_work:
-            lines.append("- Pending work:")
-            lines.extend(
-                f"  - {self._escape_xml(item)}"
-                for item in rule_summary.pending_work
-            )
-
-        # Current work (enhanced if available)
-        if "current_work" in enhanced_sections:
-            lines.append(f"- Current work: {enhanced_sections['current_work']}")
-        elif rule_summary.current_work:
-            lines.append(f"- Current work: {self._escape_xml(rule_summary.current_work)}")
-
-        # Key files referenced (enhanced if available)
-        if "key_files_referenced" in enhanced_sections:
-            lines.append(f"- Key files: {enhanced_sections['key_files_referenced']}")
-        elif rule_summary.key_files_referenced:
-            lines.append(
-                f"- Key files referenced: {', '.join(rule_summary.key_files_referenced)}."
-            )
-
-        # Key timeline
-        if rule_summary.key_timeline:
-            lines.append("- Key timeline:")
-            for entry in rule_summary.key_timeline[-10:]:  # Limit to 10 most recent
-                role = entry["role"]
-                content = self._truncate(entry["content"], 160)
-                lines.append(f"  - {role}: {self._escape_xml(content)}")
-
-        lines.append("</summary>")
-        return "\n".join(lines)
-
-    def _parse_xml_summary(self, xml_summary: str) -> "RuleBasedSummary":
-        """Parse XML summary back into RuleBasedSummary object.
-
-        This is a simplified parser that extracts key information.
-        For production, you might want to use proper XML parsing.
+    def _parse_json_summary(self, json_summary: str) -> "RuleBasedSummary":
+        """Parse JSON summary back into RuleBasedSummary object.
 
         Args:
-            xml_summary: XML-formatted summary
+            json_summary: JSON-formatted summary
 
         Returns:
             RuleBasedSummary object
         """
+        import json
+
         # Import here to avoid circular dependency
         from victor.agent.compaction_rule_based import RuleBasedSummary
 
-        # Simple extraction (in production, use proper XML parser)
-        lines = xml_summary.split("\n")
+        # Handle empty summary
+        if not json_summary or not json_summary.strip():
+            return RuleBasedSummary(
+                scope="",
+                tools_mentioned=[],
+                recent_user_requests=[],
+                pending_work=[],
+                key_files_referenced=[],
+                current_work="",
+                key_timeline=[],
+            )
 
-        scope = ""
-        tools = []
-        pending_work = []
-        current_work = ""
-        files = []
-        timeline = []
-
-        for line in lines:
-            if "Scope:" in line:
-                scope = line.split("Scope:")[1].strip().rstrip(".")
-            elif "Tools mentioned:" in line:
-                tools_str = line.split("Tools mentioned:")[1].strip().rstrip(".")
-                tools = [t.strip() for t in tools_str.split(",") if t.strip()]
-            elif "- Current work:" in line:
-                current_work = line.split("- Current work:")[1].strip()
-            elif "Key files referenced:" in line:
-                files_str = line.split("Key files referenced:")[1].strip().rstrip(".")
-                files = [f.strip() for f in files_str.split(",") if f.strip()]
+        # Parse JSON
+        summary_dict = json.loads(json_summary)
 
         return RuleBasedSummary(
-            scope=scope,
-            tools_mentioned=tools,
-            recent_user_requests=[],  # Not extracted for simplicity
-            pending_work=pending_work,
-            key_files_referenced=files,
-            current_work=current_work,
-            key_timeline=timeline,
+            scope=summary_dict.get("scope", ""),
+            tools_mentioned=summary_dict.get("tools_mentioned", []),
+            recent_user_requests=summary_dict.get("recent_user_requests", []),
+            pending_work=summary_dict.get("pending_work", []),
+            key_files_referenced=summary_dict.get("key_files_referenced", []),
+            current_work=summary_dict.get("current_work", ""),
+            key_timeline=summary_dict.get("key_timeline", []),
         )
 
     @staticmethod
@@ -638,19 +591,3 @@ Provide a 1-2 sentence summary of what changes were made or discussed for these 
         truncated = content[:max_chars]
         return truncated + "…"
 
-    @staticmethod
-    def _escape_xml(text: str) -> str:
-        """Escape special XML characters.
-
-        Args:
-            text: Text to escape
-
-        Returns:
-            XML-escaped text
-        """
-        text = text.replace("&", "&amp;")
-        text = text.replace("<", "&lt;")
-        text = text.replace(">", "&gt;")
-        text = text.replace('"', "&quot;")
-        text = text.replace("'", "&apos;")
-        return text
