@@ -289,18 +289,19 @@ class BatchRegistrar:
         """
         registered_names = []
 
-        # Phase 1: Register all tools (build up internal state)
-        for tool_name, tool in context.tools.items():
-            try:
-                self._registry.register(tool)
-                registered_names.append(tool_name)
-            except Exception as e:
-                logger.warning(f"Failed to register {tool_name}: {e}")
-                # Continue with other tools even if one fails
+        # Use batch_update context manager for single cache invalidation
+        # This ensures that all registrations invalidate cache only once at the end
+        with self._registry.batch_update():
+            # Phase 1: Register all tools (build up internal state)
+            for tool_name, tool in context.tools.items():
+                try:
+                    self._registry.register(tool)
+                    registered_names.append(tool_name)
+                except Exception as e:
+                    logger.warning(f"Failed to register {tool_name}: {e}")
+                    # Continue with other tools even if one fails
 
-        # Phase 2: Single cache invalidation for entire batch
-        self._registry._invalidate_all_caches()
-
+        # Phase 2: Cache automatically invalidated once on context exit
         return registered_names
 
 
