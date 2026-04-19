@@ -144,7 +144,9 @@ def profile_list(
 
     # Show recommended
     recommended = get_recommended_profile()
-    console.print(f"\n💡 [yellow]Recommended for you:[/] {recommended.display_name}")
+    from victor.ui.emoji import get_icon
+
+    console.print(f"\n{get_icon('info')} [yellow]Recommended for you:[/] {recommended.display_name}")
     console.print("   Use: [bold]victor profile apply {recommended.name}[/]")
 
 
@@ -159,7 +161,9 @@ def profile_show(
     profile = get_profile(name)
 
     if not profile:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         console.print("\nAvailable profiles: " + ", ".join(PROFILES.keys()))
         raise typer.Exit(1)
 
@@ -212,7 +216,9 @@ def profile_apply(
     profile = get_profile(name)
 
     if not profile:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         console.print("\nAvailable profiles: " + ", ".join(PROFILES.keys()))
         raise typer.Exit(1)
 
@@ -240,7 +246,9 @@ def profile_apply(
             model_override=model,
         )
 
-        console.print(f"\n[green]✓[/] Applied [bold cyan]{profile.display_name}[/] profile")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"\n{get_icon('success')} Applied [bold cyan]{profile.display_name}[/] profile")
         console.print(f"[dim]Config written to: {profiles_path}[/]")
 
         # Show summary
@@ -267,10 +275,10 @@ def profile_apply(
 
         console.print(table)
 
-        console.print("\n[yellow]💡 Next steps:[/]")
+        console.print(f"\n{get_icon('info')} Next steps:[/]")
         console.print("  1. [bold]victor doctor[/] - Verify your configuration")
         console.print("  2. [bold]victor chat[/] - Start using Victor")
-        console.print(f"\n[dim]To change profiles, run: victor profile apply <name>[/]")
+        console.print("\n[dim]To change profiles, run: victor profile apply <name>[/]")
 
     except Exception as e:
         console.print(f"\n[red]✗[/] Failed to apply profile: {e}")
@@ -295,7 +303,7 @@ def profile_current(
 
     profile = get_profile(profile_name)
     if profile:
-        console.print(f"\n[bold]Current Profile:[/]")
+        console.print("\n[bold]Current Profile:[/]")
         console.print(f"  Name: [cyan]{profile.display_name}[/] ([dim]{profile.name}[/])")
         console.print(f"  Level: [yellow]{profile.level.value.upper()}[/]")
         console.print(f"  Description: {profile.description}")
@@ -338,7 +346,9 @@ def profile_create(
     data["profiles"] = profiles
     _save_profiles_yaml(profiles_file, data)
 
-    console.print(f"[green]✓[/] Created profile '{name}'")
+    from victor.ui.emoji import get_icon
+
+    console.print(f"\n{get_icon('success')} Created profile '{name}'")
 
 
 @profiles_app.command("edit")
@@ -359,7 +369,9 @@ def profile_edit(
     profiles = data.get("profiles", {})
 
     if name not in profiles:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         return
 
     updates: Dict[str, Any] = {}
@@ -399,7 +411,9 @@ def profile_delete(
     profiles = data.get("profiles", {})
 
     if name not in profiles:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         return
 
     if not force:
@@ -428,7 +442,9 @@ def profile_set_default(
     profiles = data.get("profiles", {})
 
     if name not in profiles:
-        console.print(f"[red]✗[/] Profile '{name}' not found")
+        from victor.ui.emoji import get_icon
+
+        console.print(f"{get_icon('error')} Profile '{name}' not found")
         return
 
     current_default = data.get("default_profile")

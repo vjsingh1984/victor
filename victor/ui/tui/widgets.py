@@ -98,6 +98,18 @@ class StatusBar(Static):
         self._last_unread_count: int = 0
 
     def compose(self) -> ComposeResult:
+        """Compose the status bar widget.
+
+        Returns:
+            ComposeResult: The child widgets for the status bar.
+
+        Layout:
+            - Provider info (e.g., "Victor | anthropic / claude-3-5-sonnet-20241022")
+            - Status indicator (idle, streaming, error)
+            - Follow indicator (shows when auto-following is active)
+            - Unread indicator (shows unread message count)
+            - Keyboard shortcuts (Ctrl+C exit, Enter send)
+        """
         with Horizontal(classes="status-content"):
             yield Label(
                 Text.assemble(
@@ -657,6 +669,18 @@ class ToolCallWidget(Static):
         return label
 
     def compose(self) -> ComposeResult:
+        """Compose the tool call widget.
+
+        Displays:
+            - Status icon (pending: ..., success: ✓, error: ✗)
+            - Tool name
+            - Arguments preview (first argument, truncated if too long)
+            - Elapsed time
+            - Follow-up suggestions (if available)
+
+        Returns:
+            ComposeResult: The child widgets for the tool call display.
+        """
         status_icon = {
             "pending": "...",
             "success": "✓",
