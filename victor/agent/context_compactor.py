@@ -49,6 +49,7 @@ from victor.config.orchestrator_constants import (
     CONTEXT_LIMITS,
     RL_LEARNER_CONFIG,
 )
+from victor.core.shared_types import TaskPhase
 from victor.providers.base import Message
 
 if TYPE_CHECKING:
@@ -182,6 +183,8 @@ class CompactorConfig:
         preserve_json_structure: Try to preserve JSON structure when truncating
         enable_proactive: Enable proactive (pre-overflow) compaction
         enable_tool_truncation: Enable automatic tool result truncation
+        enable_phase_aware: Enable phase-aware compaction thresholds
+        phase_thresholds: Phase-specific compaction thresholds (overrides proactive_threshold)
     """
 
     proactive_threshold: float = CONTEXT_LIMITS.proactive_compaction_threshold
@@ -196,6 +199,15 @@ class CompactorConfig:
     preserve_json_structure: bool = True
     enable_proactive: bool = True
     enable_tool_truncation: bool = True
+    enable_phase_aware: bool = True
+    # Phase-specific thresholds: EXPLORATION (keep diverse), PLANNING (focus),
+    # EXECUTION (balance), REVIEW (comprehensive)
+    phase_thresholds: Dict[TaskPhase, float] = field(default_factory=lambda: {
+        TaskPhase.EXPLORATION: 0.80,  # Keep diverse file coverage
+        TaskPhase.PLANNING: 0.60,     # Focus on task-relevant messages
+        TaskPhase.EXECUTION: 0.70,    # Prioritize recent context
+        TaskPhase.REVIEW: 0.75,       # Full context for review
+    })
 
 
 @dataclass
@@ -703,12 +715,13 @@ class ContextCompactor:
         force: bool = False,
         tool_call_count: int = 0,
         task_complexity: str = "medium",
+        phase: Optional[TaskPhase] = None,
     ) -> CompactionAction:
         """Check context utilization and compact if needed.
 
         Two-phase compaction:
         1. Turn-based summarization (early, at turn threshold)
-        2. Utilization-based compaction (late, at 70% threshold)
+        2. Utilization-based compaction (late, at phase-aware threshold)
 
         Uses RL learner for adaptive pruning when available.
 
@@ -717,6 +730,7 @@ class ContextCompactor:
             force: Force compaction regardless of utilization
             tool_call_count: Number of tool calls made (for RL state)
             task_complexity: Task complexity level (for RL state)
+            phase: Current task phase for phase-aware thresholds
 
         Returns:
             CompactionAction describing what was done
@@ -750,17 +764,26 @@ class ContextCompactor:
             except Exception as e:
                 logger.warning(f"RL recommendation failed: {e}")
 
-        # Get effective thresholds (RL config or defaults)
+        # Get base threshold (phase-aware or default)
+        base_threshold = self._get_compaction_threshold(phase)
+
+        # Get effective thresholds (RL config overrides phase-aware)
         effective_threshold = (
-            rl_config.get("compaction_threshold", self.config.proactive_threshold)
+            rl_config.get("compaction_threshold", base_threshold)
             if rl_config
-            else self.config.proactive_threshold
+            else base_threshold
         )
         effective_min_messages = (
             rl_config.get("min_messages_keep", self.config.min_messages_after_compact)
             if rl_config
             else self.config.min_messages_after_compact
         )
+
+        # Log phase-aware threshold
+        if phase and self.config.enable_phase_aware:
+            logger.debug(
+                f"Phase-aware compaction: phase={phase.value}, threshold={effective_threshold:.0%}"
+            )
 
         # Determine trigger
         if force:
@@ -1088,6 +1111,30 @@ class ContextCompactor:
         return f"{head}\n\n... [{truncated} lines truncated] ...\n\n{tail}"
 
     # ========================================================================
+    # Phase-Aware Compaction
+    # ========================================================================
+
+    def _get_compaction_threshold(self, phase: Optional[TaskPhase]) -> float:
+        """Get the compaction threshold for the current phase.
+
+        Args:
+            phase: Current task phase
+
+        Returns:
+            Compaction threshold (0.0-1.0)
+        """
+        # Use phase-aware threshold if enabled and phase is provided
+        if (
+            self.config.enable_phase_aware
+            and phase
+            and phase in self.config.phase_thresholds
+        ):
+            return self.config.phase_thresholds[phase]
+
+        # Fall back to default threshold
+        return self.config.proactive_threshold
+
+    # ========================================================================
     # Token Estimation
     # ========================================================================
 
@@ -1199,6 +1246,9 @@ class ContextCompactor:
         self,
         current_query: Optional[str] = None,
         force: bool = False,
+        tool_call_count: int = 0,
+        task_complexity: str = "medium",
+        phase: Optional[TaskPhase] = None,
     ) -> CompactionAction:
         """Check and compact asynchronously.
 
@@ -1207,6 +1257,9 @@ class ContextCompactor:
         Args:
             current_query: Current user query for relevance
             force: Force compaction
+            tool_call_count: Number of tool calls made (for RL state)
+            task_complexity: Task complexity level (for RL state)
+            phase: Current task phase for phase-aware thresholds
 
         Returns:
             CompactionAction describing what was done
@@ -1214,7 +1267,14 @@ class ContextCompactor:
         import asyncio
 
         self._ensure_async_state()
-        action = await asyncio.to_thread(self.check_and_compact, current_query, force)
+        action = await asyncio.to_thread(
+            self.check_and_compact,
+            current_query,
+            force,
+            tool_call_count,
+            task_complexity,
+            phase,
+        )
 
         if action.action_taken:
             self._async_compactions += 1

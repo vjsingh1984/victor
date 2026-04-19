@@ -68,6 +68,7 @@ from victor.agent.turn_policy import (
     SpinDetector,
     SpinState,
 )
+from victor.core.shared_types import TaskPhase
 from victor.framework.evaluation_nodes import (
     EvaluationDecision,
     EvaluationResult,
@@ -305,6 +306,11 @@ class AgenticLoop:
                 iteration.perception = perception
                 state["perception"] = perception.to_dict()
 
+                # DETECT PHASE (for phase-aware context management)
+                current_phase = self._detect_phase(i, state, perception)
+                state["task_phase"] = current_phase
+                logger.debug(f"[Iteration {i}/{effective_max}] Phase: {current_phase.value}")
+
                 # PLAN (use existing PlanningCoordinator if available)
                 logger.info(f"[Iteration {i}/{effective_max}] PLAN")
                 plan = await self._plan(perception, state)
@@ -514,6 +520,41 @@ class AgenticLoop:
         # EVALUATE (post-hoc — decisions need full response context)
         logger.debug("[stream] Streaming complete, post-hoc evaluation done")
 
+    def _detect_phase(
+        self,
+        iteration: int,
+        state: Dict[str, Any],
+        perception: Perception,
+    ) -> TaskPhase:
+        """Detect the current task phase based on iteration and state.
+
+        Args:
+            iteration: Current iteration number
+            state: Current loop state
+            perception: Current perception result
+
+        Returns:
+            Detected task phase
+        """
+        from victor.core.shared_types import ConversationStage
+
+        # Map conversation stage to task phase
+        stage = perception.action_intent.stage if hasattr(perception, 'action_intent') else None
+
+        # Simple phase detection based on iteration and stage
+        if iteration == 1:
+            # First iteration is always exploration
+            return TaskPhase.EXPLORATION
+        elif stage in (ConversationStage.PLANNING,):
+            return TaskPhase.PLANNING
+        elif stage in (ConversationStage.EXECUTION,):
+            return TaskPhase.EXECUTION
+        elif stage in (ConversationStage.VERIFICATION, ConversationStage.COMPLETION):
+            return TaskPhase.REVIEW
+        else:
+            # Default to EXECUTION for middle iterations
+            return TaskPhase.EXECUTION if iteration > 1 else TaskPhase.EXPLORATION
+
     async def _plan(
         self,
         perception: Perception,
@@ -569,6 +610,7 @@ class AgenticLoop:
                 user_message=query,
                 task_classification=task_classification,
                 is_qa_task=is_qa,
+                intent=state.get("perception", {}).get("intent"),
             )
 
             # Update shared spin detector

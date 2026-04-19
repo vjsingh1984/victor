@@ -160,7 +160,7 @@ class AgentError(VictorError):
         self.recoverable = recoverable
 
     def __str__(self) -> str:
-        return self.message
+        return super().__str__()
 
 
 class ProviderError(AgentError):

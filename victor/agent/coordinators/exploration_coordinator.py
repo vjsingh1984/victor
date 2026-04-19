@@ -168,9 +168,12 @@ class ExplorationCoordinator:
             if len(term) > 2:
                 terms.append(term)
 
-        # Extract CamelCase or snake_case code identifiers
-        identifiers = re.findall(r"\b[A-Z][a-zA-Z]+\b|\b[a-z]+_[a-z_]+\b", task)
-        for ident in identifiers:
+        # Extract true CamelCase identifiers (require internal uppercase, e.g. ActionIntent)
+        # or snake_case identifiers (e.g. task_analyzer). Single-capitalized words like
+        # "Review" or "Analyze" are NOT code identifiers and are excluded.
+        camel = re.findall(r"\b[A-Z][a-z]+(?:[A-Z][a-zA-Z]*)+\b", task)  # ≥2 words joined
+        snake = re.findall(r"\b[a-z]+_[a-z_]+\b", task)
+        for ident in camel + snake:
             if len(ident) > 3 and ident not in terms:
                 terms.append(ident)
 

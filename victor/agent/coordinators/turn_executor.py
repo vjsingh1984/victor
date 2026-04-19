@@ -409,6 +409,7 @@ class TurnExecutor:
         task_classification: Optional[Any] = None,
         is_qa_task: bool = False,
         enable_thinking: bool = False,
+        intent: Optional[str] = None,
     ) -> TurnResult:
         """Execute a single complete turn: LLM call + tool execution.
 
@@ -435,7 +436,7 @@ class TurnExecutor:
             and self._provider_context.provider.supports_tools()
             and self._tool_context.tool_calls_used < self._tool_context.tool_budget
         ):
-            tools = await self._select_tools_for_turn(user_message)
+            tools = await self._select_tools_for_turn(user_message, intent=intent)
 
         # Prepare thinking parameter
         provider_kwargs: Dict[str, Any] = {}
@@ -766,11 +767,14 @@ class TurnExecutor:
     async def _select_tools_for_turn(
         self,
         user_message: str,
+        intent: Optional[str] = None,
     ) -> Optional[List[Any]]:
         """Select tools for the current iteration.
 
         Args:
             user_message: Original user message
+            intent: Serialized ActionIntent value from perception (e.g. "read_only").
+                    When provided, tools blocked for that intent are removed.
 
         Returns:
             List of tool definitions or None
@@ -791,6 +795,32 @@ class TurnExecutor:
 
         # Prioritize by stage
         tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
+
+        # Issue 4: Filter write/generation tools when intent is read-only or display-only.
+        if tools and intent:
+            try:
+                from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+
+                action_intent = ActionIntent(intent)
+                blocked = INTENT_BLOCKED_TOOLS.get(action_intent, frozenset())
+                if blocked:
+                    before = len(tools)
+                    tools = [
+                        t for t in tools
+                        if (
+                            t.get("name") if isinstance(t, dict)
+                            else getattr(t, "name", None)
+                        ) not in blocked
+                    ]
+                    removed = before - len(tools)
+                    if removed:
+                        logger.debug(
+                            "Intent filter (%s): removed %d blocked tools",
+                            intent,
+                            removed,
+                        )
+            except (ValueError, ImportError, AttributeError):
+                pass
 
         return tools
 
