@@ -22,6 +22,7 @@ Architecture Decision Records (ADRs) document significant architectural decision
 | [ADR-005](005-event-system.md) | Event System Architecture | Accepted | 2025-02-26 |
 | [ADR-006](006-provider-integration-improvements.md) | Provider Integration Improvements for Non-Interactive Environments | Proposed | 2026-02-28 |
 | [ADR-007](007-vertical-distribution-and-sdk-boundary.md) | Vertical Distribution Model and SDK Boundary | Proposed | 2026-03-10 |
+| [ADR-008](008-registry-performance-optimization.md) | Tool Registry Performance Optimization | Accepted | 2025-04-19 |
 
 ## ADR Summaries
 
@@ -69,6 +70,17 @@ Architecture Decision Records (ADRs) document significant architectural decision
 - Type-safe events
 - Middleware processing
 - Pub/Sub event distribution
+
+### ADR-008: Tool Registry Performance Optimization
+
+**Decision**: Multi-layered caching and batch operations for 6-11× performance improvement.
+
+**Key Points**:
+- Batch registration API with single cache invalidation
+- Feature flag caching with TTL expiration
+- Query result caching with LRU eviction
+- Performance regression tests with CI gates
+- 3-5× faster for 100+ items, 6-11× overall improvement
 
 ## Creating New ADRs
 
