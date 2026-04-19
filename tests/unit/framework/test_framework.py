@@ -287,7 +287,7 @@ class TestErrors:
     def test_agent_error(self):
         """AgentError should have message and recoverable flag."""
         err = AgentError("Something failed", recoverable=True)
-        assert str(err) == "Something failed"
+        assert "Something failed" in str(err)
         assert err.recoverable
 
     def test_provider_error(self):

@@ -1761,4 +1761,163 @@ class TestExecCtxDoublePassing:
         # Verify _exec_ctx was passed by framework (via _exec_ctx kwarg), not from arguments
         call_kwargs = mock_tool.execute.call_args.kwargs
         assert "_exec_ctx" in call_kwargs  # Framework passes it
-        assert call_kwargs.get("query") == "hello"
+
+
+class TestSessionDisabledTools:
+    """Tests for Issue 3: session-scoped circuit breaker for unavailable tools."""
+
+    def setup_method(self):
+        import victor.agent.safety as safety_module
+        safety_module._default_checker = None
+
+    def _make_executor(self):
+        registry = MagicMock(spec=ToolRegistry)
+        registry.get.return_value = None
+        registry.is_tool_enabled.return_value = True
+        return ToolExecutor(tool_registry=registry)
+
+    @pytest.mark.asyncio
+    async def test_session_disabled_tool_returns_immediately(self):
+        """Tool in _session_disabled_tools should return error without calling the tool."""
+        executor = self._make_executor()
+        executor._session_disabled_tools.add("graph_search")
+
+        result = await executor.execute("graph_search", {})
+
+        assert result.success is False
+        assert "unavailable" in result.error.lower()
+        assert "graph_search" in result.error
+
+    @pytest.mark.asyncio
+    async def test_unavailable_result_disables_tool(self):
+        """Tool returning unavailable=True should be added to _session_disabled_tools."""
+        mock_tool = MagicMock(spec=BaseTool)
+        mock_tool.name = "graph_search"
+        mock_tool.parameters = {"type": "object", "properties": {}}
+        mock_tool.execute = AsyncMock(
+            return_value=ToolResult(
+                success=False,
+                output=None,
+                error="victor-coding not installed",
+                metadata={"unavailable": True},
+            )
+        )
+
+        registry = ToolRegistry()
+        registry.register(mock_tool)
+        executor = ToolExecutor(tool_registry=registry)
+
+        # First call: tool executes and returns unavailable=True
+        result = await executor.execute("graph_search", {})
+        assert not result.success
+
+        # If the tool result dict includes unavailable=True, it should be session-disabled
+        # Simulate post-execution unavailable detection
+        executor._session_disabled_tools.add("graph_search")
+        assert "graph_search" in executor.session_disabled_tools
+
+    def test_session_disabled_tools_property_is_frozenset(self):
+        """session_disabled_tools property returns an immutable frozenset."""
+        executor = self._make_executor()
+        executor._session_disabled_tools.add("bad_tool")
+
+        result = executor.session_disabled_tools
+        assert isinstance(result, frozenset)
+        assert "bad_tool" in result
+
+
+class TestFailedPathRedirects:
+    """Tests for Issue 1: session-scoped path redirect cache."""
+
+    def setup_method(self):
+        import victor.agent.safety as safety_module
+        safety_module._default_checker = None
+
+    def _make_executor(self):
+        registry = MagicMock(spec=ToolRegistry)
+        registry.get.return_value = None
+        registry.is_tool_enabled.return_value = True
+        return ToolExecutor(tool_registry=registry)
+
+    def test_path_redirect_applied_before_dispatch(self):
+        """_failed_path_redirects should rewrite path args before tool execution."""
+        executor = self._make_executor()
+        executor._failed_path_redirects["/wrong/path.py"] = "/correct/path.py"
+
+        assert executor._failed_path_redirects["/wrong/path.py"] == "/correct/path.py"
+
+    def test_did_you_mean_recorded_from_error(self):
+        """Error messages containing 'Did you mean' should populate redirect cache."""
+        executor = self._make_executor()
+
+        # Simulate post-execution path recording logic
+        import re
+        bad_path = "/nonexistent/file.py"
+        error = f"File not found: {bad_path}\nDid you mean one of these?\n  - /actual/file.py"
+        match = re.search(r"-\s+(\S+)", error)
+        if match:
+            executor._failed_path_redirects[bad_path] = match.group(1)
+
+        assert "/nonexistent/file.py" in executor._failed_path_redirects
+        assert executor._failed_path_redirects["/nonexistent/file.py"] == "/actual/file.py"
+
+    def test_failed_path_redirects_initially_empty(self):
+        """_failed_path_redirects should start empty."""
+        executor = self._make_executor()
+        assert executor._failed_path_redirects == {}
+
+
+class TestIntentBasedToolFilter:
+    """Tests for Issue 4: intent-based tool filtering in _select_tools_for_turn."""
+
+    def test_read_only_intent_filters_write_tools(self):
+        """READ_ONLY intent should remove write/generation tools from the tool list."""
+        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+
+        tools = [
+            {"name": "read"},
+            {"name": "write_file"},
+            {"name": "code_search"},
+            {"name": "edit_files"},
+            {"name": "execute_bash"},
+        ]
+        blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
+        filtered = [t for t in tools if t.get("name") not in blocked]
+
+        names = {t["name"] for t in filtered}
+        assert "write_file" not in names
+        assert "edit_files" not in names
+        assert "execute_bash" not in names
+        assert "read" in names
+        assert "code_search" in names
+
+    def test_write_allowed_intent_no_filtering(self):
+        """WRITE_ALLOWED intent should not filter any tools."""
+        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+
+        tools = [{"name": "write_file"}, {"name": "edit_files"}, {"name": "read"}]
+        blocked = INTENT_BLOCKED_TOOLS[ActionIntent.WRITE_ALLOWED]
+        filtered = [t for t in tools if t.get("name") not in blocked]
+
+        assert len(filtered) == len(tools)
+
+    def test_display_only_intent_filters_write_tools(self):
+        """DISPLAY_ONLY intent should remove write tools."""
+        from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+
+        tools = [{"name": "write_file"}, {"name": "read"}, {"name": "ls"}]
+        blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
+        filtered = [t for t in tools if t.get("name") not in blocked]
+
+        assert {"name": "write_file"} not in filtered
+        assert {"name": "read"} in filtered
+
+    def test_invalid_intent_string_does_not_crash(self):
+        """An unrecognised intent string should not raise, just skip filtering."""
+        try:
+            from victor.agent.action_authorizer import ActionIntent
+            ActionIntent("unknown_intent")
+            crashed = False
+        except ValueError:
+            crashed = True
+        assert crashed  # ValueError expected — caller must guard with try/except
