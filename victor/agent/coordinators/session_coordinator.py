@@ -691,7 +691,11 @@ class SessionCoordinator:
             from victor.agent.conversation_embedding_store import (
                 ConversationEmbeddingStore,
             )
-            import victor.agent.conversation_embedding_store as ces_module
+            # Note: Can't use 'import victor.agent.conversation_embedding_store as ces_module'
+            # because victor.agent is shadowed by the @victor.agent decorator function.
+            # Access the module via sys.modules instead.
+            import sys
+            ces_module = sys.modules.get('victor.agent.conversation_embedding_store')
 
             # Prefer an already-wired memory-manager service to avoid splitting
             # runtime state. Otherwise use the canonical singleton directly.
