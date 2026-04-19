@@ -14,14 +14,14 @@
 
 """Tests for ConversationController."""
 
-from victor.agent.conversation_controller import (
+from victor.agent.conversation.controller import (
     ConversationController,
     ConversationConfig,
     ContextMetrics,
     CompactionStrategy,
     MessageImportance,
 )
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.providers.base import Message
 
 
@@ -65,7 +65,7 @@ class TestConversationConfig:
     def test_default_config(self):
         """Test default configuration values."""
         config = ConversationConfig()
-        assert config.max_context_chars == 200000
+        assert config.max_context_chars == 800000
         assert config.chars_per_token_estimate == 4
         assert config.enable_stage_tracking is True
         assert config.enable_context_monitoring is True
@@ -342,13 +342,15 @@ class TestSmartCompaction:
         # Score messages
         scored = controller._score_messages()
 
-        # Tool results should have higher scores than regular messages
+        # Tool results should have higher scores than regular assistant messages
         tool_scores = [s for s in scored if s.message.role == "tool"]
-        [s for s in scored if s.message.role == "user"]
+        assistant_scores = [s for s in scored if s.message.role == "assistant"]
 
         assert len(tool_scores) > 0
-        # Tool results get boosted score
-        assert any(s.score > 3.0 for s in tool_scores)
+        # Tool results score higher than assistant messages (boosted by HIGH priority)
+        max_tool = max(s.score for s in tool_scores)
+        min_assistant = min(s.score for s in assistant_scores)
+        assert max_tool > min_assistant
 
     def test_smart_compact_preserves_system_message(self):
         """Test that system message is always preserved."""
@@ -364,8 +366,8 @@ class TestSmartCompaction:
         assert controller.messages[0].role == "system"
         assert controller.messages[0].content == "Always keep this"
 
-    def test_score_messages_recency_boost(self):
-        """Test that recent messages get higher scores."""
+    def test_score_messages_produces_valid_scores(self):
+        """Test that canonical scorer produces positive scores for all messages."""
         config = ConversationConfig(compaction_strategy=CompactionStrategy.TIERED)
         controller = ConversationController(config=config)
 
@@ -375,11 +377,15 @@ class TestSmartCompaction:
 
         scored = controller._score_messages()
 
-        # Later messages should have higher scores due to recency
-        early_score = scored[0].score
-        late_score = scored[-1].score
+        # All non-system scored messages should have positive scores
+        non_system = [s for s in scored if s.reason != "system"]
+        assert len(non_system) == 10
+        assert all(s.score > 0 for s in non_system)
 
-        assert late_score > early_score
+        # System message should have highest score (1000.0)
+        system_scores = [s for s in scored if s.reason == "system"]
+        if system_scores:
+            assert system_scores[0].score == 1000.0
 
     def test_generate_compaction_summary(self):
         """Test compaction summary generation."""

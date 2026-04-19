@@ -7,7 +7,7 @@ vertical metadata and capabilities.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from victor_sdk.core.types import (
     CapabilityRequirement,
@@ -65,7 +65,9 @@ class VerticalMetadata:
             evaluation_criteria=self.evaluation_criteria.copy(),
         )
 
-    def with_requirement(self, requirement: CapabilityRequirementLike) -> VerticalMetadata:
+    def with_requirement(
+        self, requirement: CapabilityRequirementLike
+    ) -> VerticalMetadata:
         """Return metadata with an additional capability requirement."""
 
         normalized = normalize_capability_requirement(requirement)
@@ -87,7 +89,10 @@ class VerticalMetadata:
         """Return required capability identifiers in legacy string form."""
 
         if self.capability_requirements:
-            return [requirement.capability_id for requirement in self.capability_requirements]
+            return [
+                requirement.capability_id
+                for requirement in self.capability_requirements
+            ]
         return self.requirements.copy()
 
     def with_tag(self, tag: str) -> VerticalMetadata:

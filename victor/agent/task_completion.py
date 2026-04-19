@@ -26,7 +26,16 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Set, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -443,6 +452,11 @@ class TaskCompletionDetector:
         # Priority 1: LLM classification via decision service
         if self._decision_service is not None:
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("task_type_classification"):
+                    return
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 decision = self._decision_service.decide_sync(
@@ -577,13 +591,18 @@ class TaskCompletionDetector:
                 break
 
         # LLM augmentation: if no active signal found and service available,
-        # consult LLM for completion detection
+        # consult LLM for completion detection (gated by decision chain)
         if (
             not self._state.active_signal_detected
             and not self._state.completion_signals
             and self._decision_service is not None
         ):
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("task_completion"):
+                    return
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 decision = self._decision_service.decide_sync(
@@ -603,7 +622,10 @@ class TaskCompletionDetector:
                         self._state.continuation_requests += 1
                         logger.debug("LLM detected stuck phase")
             except Exception:
-                logger.debug("LLM decision augmentation failed in analyze_response", exc_info=True)
+                logger.debug(
+                    "LLM decision augmentation failed in analyze_response",
+                    exc_info=True,
+                )
 
         # Infer deliverables from response content
         # Check both when no expected deliverables AND when expected ones aren't yet met
@@ -891,6 +913,14 @@ class TaskCompletionDetector:
         if self._has_file_modifications() and self._state.completion_signals:
             return CompletionConfidence.MEDIUM
 
+        # Diagnostic: signals present but no file mods — waiting for edits
+        if self._state.completion_signals and not self._has_file_modifications():
+            logger.debug(
+                "Completion signals detected (%d) but no file modifications — "
+                "waiting for edits before marking complete",
+                len(self._state.completion_signals),
+            )
+
         # Priority 3: Only passive completion signals (LOW confidence)
         if self._state.completion_signals:
             # Check if signals are only passive phrases (not active)
@@ -909,6 +939,11 @@ class TaskCompletionDetector:
             and self._decision_service is not None
         ):
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("task_completion"):
+                    return heuristic_confidence
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 conf_value = 0.3 if heuristic_confidence == CompletionConfidence.LOW else 0.0

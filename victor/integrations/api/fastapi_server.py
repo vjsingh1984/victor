@@ -427,7 +427,12 @@ class VictorFastAPIServer:
                 allow_origin_regex=r"^(http://localhost:\d+|http://127\.0\.0\.1:\d+|vscode-webview://[a-z0-9-]+)$",
                 allow_credentials=True,
                 allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                allow_headers=["Content-Type", "Accept", "Authorization", "X-Requested-With"],
+                allow_headers=[
+                    "Content-Type",
+                    "Accept",
+                    "Authorization",
+                    "X-Requested-With",
+                ],
             )
 
         # Setup routes
@@ -723,7 +728,8 @@ class VictorFastAPIServer:
             api_key = data.get("api_key", "")
             if api_key and self.api_keys:
                 matched = next(
-                    (k for k in self.api_keys if secrets.compare_digest(k, api_key)), None
+                    (k for k in self.api_keys if secrets.compare_digest(k, api_key)),
+                    None,
                 )
                 if matched:
                     if not hasattr(ws, "state"):

@@ -1,6 +1,5 @@
 """Unit tests for protocol discovery."""
 
-import pytest
 
 from victor_sdk.discovery import (
     ProtocolRegistry,

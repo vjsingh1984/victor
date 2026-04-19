@@ -205,7 +205,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
                         }
                     )
                     remaining = re.sub(
-                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining
+                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>",
+                        "",
+                        remaining,
                     )
         except json.JSONDecodeError:
             pass
@@ -269,7 +271,11 @@ class VLLMProvider(BaseProvider):
         self._provider_logger = ProviderLogger("vllm", __name__)
 
         super().__init__(
-            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.base_url = base_url or DEFAULT_VLLM_URLS[0]
         self.timeout = timeout
@@ -352,6 +358,14 @@ class VLLMProvider(BaseProvider):
 
     def supports_streaming(self) -> bool:
         """vLLM supports streaming."""
+        return True
+
+    def supports_prompt_caching(self) -> bool:
+        """vLLM has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """vLLM supports Automatic Prefix Caching (APC) for KV cache reuse."""
         return True
 
     async def list_models(self) -> List[Dict[str, Any]]:
@@ -458,7 +472,10 @@ class VLLMProvider(BaseProvider):
                     raise ProviderError(
                         message=f"vLLM API error: {error_msg}",
                         provider="vllm",
-                        details={"status_code": response.status_code, "response": error_data},
+                        details={
+                            "status_code": response.status_code,
+                            "response": error_data,
+                        },
                     )
 
                 result = response.json()

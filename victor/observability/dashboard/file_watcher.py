@@ -308,7 +308,9 @@ class EventFileWatcher(Static):
                 data=data.get("data", {}),
                 source=data.get("source"),
                 correlation_id=data.get("trace_id"),
-                headers={"session_id": data.get("session_id")} if data.get("session_id") else None,
+                headers=(
+                    {"session_id": data.get("session_id")} if data.get("session_id") else None
+                ),
             )
 
             logger.debug(

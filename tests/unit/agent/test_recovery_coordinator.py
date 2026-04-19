@@ -23,7 +23,10 @@ import pytest
 from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from typing import Any, Dict, List, Optional
 
-from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator, StreamingRecoveryContext
+from victor.agent.recovery_coordinator import (
+    StreamingRecoveryCoordinator,
+    StreamingRecoveryContext,
+)
 from victor.providers.base import StreamChunk
 
 
@@ -360,7 +363,11 @@ class TestActionHandling:
         assert should_force is False
 
     def test_handle_empty_response_threshold_exceeded(
-        self, recovery_coordinator, recovery_context, mock_streaming_handler, mock_streaming_context
+        self,
+        recovery_coordinator,
+        recovery_context,
+        mock_streaming_handler,
+        mock_streaming_context,
     ):
         """Test handle_empty_response when threshold exceeded."""
         mock_result = Mock()
@@ -543,8 +550,15 @@ class TestFilteringAndTruncation:
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):
         """Test filter_blocked_tool_calls when none blocked."""
-        tool_calls = [{"name": "tool1", "arguments": {}}, {"name": "tool2", "arguments": {}}]
-        mock_streaming_handler.filter_blocked_tool_calls.return_value = (tool_calls, [], 0)
+        tool_calls = [
+            {"name": "tool1", "arguments": {}},
+            {"name": "tool2", "arguments": {}},
+        ]
+        mock_streaming_handler.filter_blocked_tool_calls.return_value = (
+            tool_calls,
+            [],
+            0,
+        )
 
         filtered, chunks, count = recovery_coordinator.filter_blocked_tool_calls(
             recovery_context, tool_calls
@@ -558,7 +572,10 @@ class TestFilteringAndTruncation:
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):
         """Test filter_blocked_tool_calls when some blocked."""
-        tool_calls = [{"name": "tool1", "arguments": {}}, {"name": "blocked_tool", "arguments": {}}]
+        tool_calls = [
+            {"name": "tool1", "arguments": {}},
+            {"name": "blocked_tool", "arguments": {}},
+        ]
         mock_streaming_handler.filter_blocked_tool_calls.return_value = (
             [tool_calls[0]],
             [StreamChunk(content="blocked", is_final=False)],

@@ -27,11 +27,21 @@ from fastapi import APIRouter
 if TYPE_CHECKING:
     from victor.integrations.api.fastapi_server import VictorFastAPIServer
 
-from victor.integrations.api.routes.system_routes import create_router as create_system_router
-from victor.integrations.api.routes.chat_routes import create_router as create_chat_router
-from victor.integrations.api.routes.search_routes import create_router as create_search_router
-from victor.integrations.api.routes.config_routes import create_router as create_config_router
-from victor.integrations.api.routes.tool_routes import create_router as create_tool_router
+from victor.integrations.api.routes.system_routes import (
+    create_router as create_system_router,
+)
+from victor.integrations.api.routes.chat_routes import (
+    create_router as create_chat_router,
+)
+from victor.integrations.api.routes.search_routes import (
+    create_router as create_search_router,
+)
+from victor.integrations.api.routes.config_routes import (
+    create_router as create_config_router,
+)
+from victor.integrations.api.routes.tool_routes import (
+    create_router as create_tool_router,
+)
 from victor.integrations.api.routes.conversation_routes import (
     create_router as create_conversation_router,
 )
@@ -46,9 +56,15 @@ from victor.integrations.api.routes.workflow_routes import (
     create_router as create_workflow_router,
 )
 from victor.integrations.api.routes.rl_routes import create_router as create_rl_router
-from victor.integrations.api.routes.agent_routes import create_router as create_agent_router
-from victor.integrations.api.routes.plan_routes import create_router as create_plan_router
-from victor.integrations.api.routes.team_routes import create_router as create_team_router
+from victor.integrations.api.routes.agent_routes import (
+    create_router as create_agent_router,
+)
+from victor.integrations.api.routes.plan_routes import (
+    create_router as create_plan_router,
+)
+from victor.integrations.api.routes.team_routes import (
+    create_router as create_team_router,
+)
 from victor.integrations.api.routes.mcp_routes import create_router as create_mcp_router
 from victor.integrations.api.routes.websocket_routes import (
     create_router as create_websocket_router,

@@ -306,7 +306,13 @@ class TestConvenienceFunctions:
 
     def test_get_safe_tools(self):
         """Test the get_safe_tools convenience function."""
-        all_tools = {"read_file", "write_file", "list_directory", "execute_bash", "code_search"}
+        all_tools = {
+            "read_file",
+            "write_file",
+            "list_directory",
+            "execute_bash",
+            "code_search",
+        }
 
         # Display only should filter out write
         safe = get_safe_tools("show me a function", all_tools)

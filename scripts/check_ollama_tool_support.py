@@ -62,7 +62,9 @@ class ModelToolSupport:
             "template_has_tool_calls": self.template_has_tool_calls,
             "tool_response_format": self.tool_response_format,
             "detection_method": self.detection_method,
-            "template_snippet": self.template_snippet[:200] if self.template_snippet else "",
+            "template_snippet": (
+                self.template_snippet[:200] if self.template_snippet else ""
+            ),
             "error": self.error,
         }
 
@@ -143,7 +145,9 @@ def detect_tool_support(template: str) -> ModelToolSupport:
     # Extract relevant snippet
     if result.supports_tools:
         match = re.search(
-            r"\{\{-?\s*if\s+\.?Tools[^}]*\}\}.*?\{\{-?\s*end\s*\}\}", template, re.DOTALL
+            r"\{\{-?\s*if\s+\.?Tools[^}]*\}\}.*?\{\{-?\s*end\s*\}\}",
+            template,
+            re.DOTALL,
         )
         if match:
             result.template_snippet = match.group(0)[:300]
@@ -183,7 +187,9 @@ def check_all_models(host: str) -> List[ModelToolSupport]:
     return results
 
 
-def update_model_capabilities(results: List[ModelToolSupport], config_path: Path) -> None:
+def update_model_capabilities(
+    results: List[ModelToolSupport], config_path: Path
+) -> None:
     """Update model_capabilities.yaml with detected tool support."""
     if not config_path.exists():
         print(f"Config file not found: {config_path}", file=sys.stderr)
@@ -251,7 +257,11 @@ def print_report(results: List[ModelToolSupport], json_output: bool = False) -> 
     print("MODELS WITH NATIVE TOOL SUPPORT (Template has {{ if .Tools }})")
     print("-" * 70)
     for r in sorted(supported, key=lambda x: x.name):
-        format_str = f" [{r.tool_response_format}]" if r.tool_response_format != "unknown" else ""
+        format_str = (
+            f" [{r.tool_response_format}]"
+            if r.tool_response_format != "unknown"
+            else ""
+        )
         print(f"  ✓ {r.name}{format_str}")
     print()
 
@@ -273,8 +283,7 @@ def print_report(results: List[ModelToolSupport], json_output: bool = False) -> 
     print("=" * 70)
     print("DIAGNOSIS GUIDE")
     print("=" * 70)
-    print(
-        """
+    print("""
 To check if a model supports tools:
 
 1. Run: ollama show <model_name>
@@ -296,8 +305,7 @@ To check if a model supports tools:
    - Create a custom Modelfile with tool template
    - Use: ollama create <new_name> -f Modelfile
    - See: https://ollama.com/blog/tool-support
-"""
-    )
+""")
 
 
 def main():
@@ -328,7 +336,10 @@ def main():
     parser.add_argument(
         "--config-path",
         type=Path,
-        default=Path(__file__).parent.parent / "victor" / "config" / "model_capabilities.yaml",
+        default=Path(__file__).parent.parent
+        / "victor"
+        / "config"
+        / "model_capabilities.yaml",
         help="Path to model_capabilities.yaml",
     )
 

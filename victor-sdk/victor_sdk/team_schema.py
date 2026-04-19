@@ -1,0 +1,342 @@
+"""SDK-owned declarative team schema contracts.
+
+This module provides the vertical-authoring team schema without requiring
+extracted verticals to import ``victor.framework`` runtime modules.
+The runtime bridge remains available through lazy adapter methods so host
+applications can execute these definitions without forcing a hard dependency
+during import time.
+"""
+
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
+
+from victor_sdk.constants import get_canonical_name
+
+if TYPE_CHECKING:
+    from victor.teams.types import TeamMember
+
+
+class TeamFormation(str, Enum):
+    """Declarative team organization patterns."""
+
+    SEQUENTIAL = "sequential"
+    PARALLEL = "parallel"
+    HIERARCHICAL = "hierarchical"
+    PIPELINE = "pipeline"
+    CONSENSUS = "consensus"
+
+
+@dataclass
+class MemoryConfig:
+    """Configuration for per-agent memory behavior."""
+
+    enabled: bool = True
+    persist_across_sessions: bool = False
+    search_own_memories_only: bool = False
+    memory_types: Set[str] = field(default_factory=lambda: {"entity", "episodic", "semantic"})
+    max_memories_per_query: int = 10
+    relevance_threshold: float = 0.5
+    auto_summarize: bool = True
+    ttl_seconds: Optional[int] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to a dictionary representation."""
+        return {
+            "enabled": self.enabled,
+            "persist_across_sessions": self.persist_across_sessions,
+            "search_own_memories_only": self.search_own_memories_only,
+            "memory_types": list(self.memory_types),
+            "max_memories_per_query": self.max_memories_per_query,
+            "relevance_threshold": self.relevance_threshold,
+            "auto_summarize": self.auto_summarize,
+            "ttl_seconds": self.ttl_seconds,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MemoryConfig":
+        """Construct from a dictionary representation."""
+        return cls(
+            enabled=data.get("enabled", True),
+            persist_across_sessions=data.get("persist_across_sessions", False),
+            search_own_memories_only=data.get("search_own_memories_only", False),
+            memory_types=set(data.get("memory_types", ["entity", "episodic", "semantic"])),
+            max_memories_per_query=data.get("max_memories_per_query", 10),
+            relevance_threshold=data.get("relevance_threshold", 0.5),
+            auto_summarize=data.get("auto_summarize", True),
+            ttl_seconds=data.get("ttl_seconds"),
+        )
+
+
+ROLE_MAPPING: Dict[str, str] = {
+    "researcher": "RESEARCHER",
+    "research": "RESEARCHER",
+    "planner": "PLANNER",
+    "plan": "PLANNER",
+    "executor": "EXECUTOR",
+    "execute": "EXECUTOR",
+    "impl": "EXECUTOR",
+    "implementer": "EXECUTOR",
+    "reviewer": "REVIEWER",
+    "review": "REVIEWER",
+    "critic": "REVIEWER",
+    "writer": "EXECUTOR",
+    "analyzer": "RESEARCHER",
+    "verifier": "REVIEWER",
+}
+
+
+@dataclass
+class TeamMemberSpec:
+    """Declarative specification for a team member."""
+
+    role: str
+    goal: str
+    name: Optional[str] = None
+    tool_budget: Optional[int] = None
+    allowed_tools: Optional[List[str]] = None
+    is_manager: bool = False
+    priority: int = 0
+    backstory: str = ""
+    expertise: List[str] = field(default_factory=list)
+    personality: str = ""
+    max_delegation_depth: int = 0
+    memory: bool = False
+    memory_config: Optional[MemoryConfig] = None
+    cache: bool = True
+    verbose: bool = False
+    max_iterations: Optional[int] = None
+
+    def __post_init__(self) -> None:
+        """Normalize canonical tool names at definition time."""
+        if self.allowed_tools:
+            self.allowed_tools = [get_canonical_name(tool) for tool in self.allowed_tools]
+
+    def to_team_member(self, index: int = 0) -> "TeamMember":
+        """Convert this SDK definition into the host runtime TeamMember model."""
+        try:
+            from victor.core.shared_types import SubAgentRole
+            from victor.teams.types import TeamMember
+        except ImportError as exc:  # pragma: no cover - only exercised outside host runtime
+            raise RuntimeError(
+                "TeamMemberSpec.to_team_member() requires the Victor runtime host package."
+            ) from exc
+
+        role_lower = self.role.lower()
+        role_name = ROLE_MAPPING.get(role_lower, "EXECUTOR")
+        sub_role = getattr(SubAgentRole, role_name, SubAgentRole.EXECUTOR)
+
+        name = self.name or f"{self.role.title()} Agent"
+        member_id = f"{role_lower}_{uuid.uuid4().hex[:8]}"
+
+        default_budgets = {
+            SubAgentRole.RESEARCHER: 20,
+            SubAgentRole.PLANNER: 15,
+            SubAgentRole.EXECUTOR: 25,
+            SubAgentRole.REVIEWER: 15,
+        }
+        tool_budget = self.tool_budget or default_budgets.get(sub_role, 15)
+
+        member = TeamMember(
+            id=member_id,
+            role=sub_role,
+            name=name,
+            goal=self.goal,
+            tool_budget=tool_budget,
+            allowed_tools=self.allowed_tools,
+            is_manager=self.is_manager,
+            priority=self.priority if self.priority else index,
+            backstory=self.backstory,
+            expertise=list(self.expertise),
+            personality=self.personality,
+            max_delegation_depth=self.max_delegation_depth,
+            memory=self.memory,
+            memory_config=self.memory_config,
+            cache=self.cache,
+            verbose=self.verbose,
+            max_iterations=self.max_iterations,
+        )
+
+        if member.memory_enabled:
+            try:
+                from victor.storage.memory import get_memory_coordinator
+
+                member.attach_memory_coordinator(get_memory_coordinator())
+            except ImportError:
+                pass
+
+        return member
+
+
+@dataclass
+class RoleConfig:
+    """Configuration for a reusable role definition."""
+
+    base_role: str
+    tools: List[str]
+    tool_budget: int
+    description: str = ""
+
+    def __post_init__(self) -> None:
+        """Canonicalize tool names on creation."""
+        if self.tools:
+            self.tools = [get_canonical_name(tool) for tool in self.tools]
+
+
+@dataclass
+class TeamSpec:
+    """Declarative team specification used by extracted verticals."""
+
+    name: str
+    description: str
+    vertical: str
+    formation: TeamFormation
+    members: List[TeamMemberSpec]
+    total_tool_budget: int = 100
+    max_iterations: int = 50
+    tags: List[str] = field(default_factory=list)
+    task_types: List[str] = field(default_factory=list)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Normalize member tool names if present."""
+        for member in self.members:
+            if member.allowed_tools:
+                member.allowed_tools = [get_canonical_name(tool) for tool in member.allowed_tools]
+
+    @property
+    def member_count(self) -> int:
+        """Get the number of team members."""
+        return len(self.members)
+
+    @property
+    def roles(self) -> Set[str]:
+        """Get the set of roles in this team."""
+        return {member.role for member in self.members}
+
+    def get_member_by_role(self, role: str) -> Optional[TeamMemberSpec]:
+        """Get the first member with the given role."""
+        for member in self.members:
+            if member.role == role:
+                return member
+        return None
+
+    def get_members_by_role(self, role: str) -> List[TeamMemberSpec]:
+        """Get all members matching the given role."""
+        return [member for member in self.members if member.role == role]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize to a dictionary representation."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "vertical": self.vertical,
+            "formation": (
+                self.formation.value if hasattr(self.formation, "value") else str(self.formation)
+            ),
+            "members": [
+                {
+                    "role": member.role,
+                    "goal": member.goal,
+                    "name": member.name,
+                    "tool_budget": member.tool_budget,
+                    "allowed_tools": list(member.allowed_tools or []),
+                    "backstory": member.backstory,
+                    "expertise": list(member.expertise),
+                    "personality": member.personality,
+                    "memory": member.memory,
+                    "memory_config": (
+                        member.memory_config.to_dict() if member.memory_config else None
+                    ),
+                    "is_manager": member.is_manager,
+                    "priority": member.priority,
+                    "cache": member.cache,
+                    "verbose": member.verbose,
+                    "max_iterations": member.max_iterations,
+                    "max_delegation_depth": member.max_delegation_depth,
+                }
+                for member in self.members
+            ],
+            "total_tool_budget": self.total_tool_budget,
+            "max_iterations": self.max_iterations,
+            "tags": list(self.tags),
+            "task_types": list(self.task_types),
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TeamSpec":
+        """Construct from a dictionary representation."""
+        members: List[TeamMemberSpec] = []
+        for member_data in data.get("members", []):
+            memory_config_data = member_data.get("memory_config")
+            member = TeamMemberSpec(
+                role=member_data["role"],
+                goal=member_data["goal"],
+                name=member_data.get("name"),
+                tool_budget=member_data.get("tool_budget"),
+                allowed_tools=member_data.get("allowed_tools"),
+                backstory=member_data.get("backstory", ""),
+                expertise=list(member_data.get("expertise", [])),
+                personality=member_data.get("personality", ""),
+                memory=member_data.get("memory", False),
+                memory_config=(
+                    MemoryConfig.from_dict(memory_config_data) if memory_config_data else None
+                ),
+                is_manager=member_data.get("is_manager", False),
+                priority=member_data.get("priority", 0),
+                cache=member_data.get("cache", True),
+                verbose=member_data.get("verbose", False),
+                max_iterations=member_data.get("max_iterations"),
+                max_delegation_depth=member_data.get("max_delegation_depth", 0),
+            )
+            members.append(member)
+
+        formation_value = data.get("formation", TeamFormation.SEQUENTIAL.value)
+        formation = TeamFormation(getattr(formation_value, "value", formation_value))
+
+        return cls(
+            name=data["name"],
+            description=data.get("description", ""),
+            vertical=data["vertical"],
+            formation=formation,
+            members=members,
+            total_tool_budget=data.get("total_tool_budget", 100),
+            max_iterations=data.get("max_iterations", 50),
+            tags=list(data.get("tags", [])),
+            task_types=list(data.get("task_types", [])),
+            metadata=dict(data.get("metadata", {})),
+        )
+
+
+def create_team_spec(
+    name: str,
+    description: str,
+    vertical: str,
+    formation: TeamFormation,
+    members: List[TeamMemberSpec],
+    **kwargs: Any,
+) -> TeamSpec:
+    """Factory function for building a team spec."""
+    return TeamSpec(
+        name=name,
+        description=description,
+        vertical=vertical,
+        formation=formation,
+        members=members,
+        **kwargs,
+    )
+
+
+__all__ = [
+    "MemoryConfig",
+    "ROLE_MAPPING",
+    "RoleConfig",
+    "TeamFormation",
+    "TeamMemberSpec",
+    "TeamSpec",
+    "create_team_spec",
+]

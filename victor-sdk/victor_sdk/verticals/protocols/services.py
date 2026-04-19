@@ -5,7 +5,7 @@ These protocols define how verticals provide service configurations.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Type
+from typing import Callable, Protocol, runtime_checkable, Dict, Any, Optional, Type
 
 
 @runtime_checkable
@@ -48,7 +48,9 @@ class ServiceLocator(Protocol):
     Service locators provide access to registered services.
     """
 
-    def get_service(self, service_name: str, default: Optional[Any] = None) -> Optional[Any]:
+    def get_service(
+        self, service_name: str, default: Optional[Any] = None
+    ) -> Optional[Any]:
         """Get a service by name.
 
         Args:

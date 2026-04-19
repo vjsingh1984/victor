@@ -57,10 +57,18 @@ logger = logging.getLogger(__name__)
 # Consolidated pattern definitions for classification
 PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
     TaskComplexity.SIMPLE: [
-        (r"\b(list|show|display)\s+.*?(files?|directories?|folders?)\b", 1.0, "list_files"),
+        (
+            r"\b(list|show|display)\s+.*?(files?|directories?|folders?)\b",
+            1.0,
+            "list_files",
+        ),
         (r"\bwhat\s+files\s+(are\s+)?(in|at)\b", 1.0, "what_files"),
         (r"\bgit\s+(status|log|branch)\b", 1.0, "git_status"),
-        (r"\b(show|what|get)\s+(the\s+)?(current\s+)?(git\s+)?status\b", 0.9, "status_query"),
+        (
+            r"\b(show|what|get)\s+(the\s+)?(current\s+)?(git\s+)?status\b",
+            0.9,
+            "status_query",
+        ),
         (r"\bpwd\b|\bcurrent\s+(directory|dir|folder)\b", 1.0, "pwd"),
         # ls command - exclude ls= (Python kwarg like linestyle) and ls| (pipe)
         (r"(?:^|\s)ls\s+(?![\=\'])", 0.9, "ls_command"),
@@ -73,7 +81,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             "explain_code",
         ),
         (r"\bread\s+(and\s+)?(explain|summarize)\b", 0.9, "read_explain"),
-        (r"\bfind\s+(all\s+)?(classes?|functions?|methods?)\b", 0.8, "find_definitions"),
+        (
+            r"\bfind\s+(all\s+)?(classes?|functions?|methods?)\b",
+            0.8,
+            "find_definitions",
+        ),
         (r"\bwhere\s+(is|are|does)\b", 0.8, "where_query"),
         (r"\bhow\s+(does|do|is)\s+.+\s+(work|implemented)\b", 0.9, "how_works"),
     ],
@@ -104,13 +116,29 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
         (r"\b(bug|issue)\s*(report|#\d+)?\s*:", 0.9, "bug_report"),
         # SWE-bench narrative patterns (GitHub issue style)
         (r"\bthe\s+issue\s+is\s+(that\s+)?", 1.0, "swe_issue_narrative"),
-        (r"\bwhen\s+\w+.+\s+(fails?|breaks?|raises?|throws?)\b", 0.95, "swe_when_fails"),
+        (
+            r"\bwhen\s+\w+.+\s+(fails?|breaks?|raises?|throws?)\b",
+            0.95,
+            "swe_when_fails",
+        ),
         (r"\b(test|tests?)\s+(fails?|failing|broken)\b", 1.0, "swe_test_fails"),
-        (r"\bTraceback\b|\bAttributeError\b|\bTypeError\b|\bValueError\b", 1.0, "swe_traceback"),
-        (r"\bexpected\s+.+\s+but\s+(got|received|returns?)\b", 0.95, "swe_expected_but"),
+        (
+            r"\bTraceback\b|\bAttributeError\b|\bTypeError\b|\bValueError\b",
+            1.0,
+            "swe_traceback",
+        ),
+        (
+            r"\bexpected\s+.+\s+but\s+(got|received|returns?)\b",
+            0.95,
+            "swe_expected_but",
+        ),
         (r"\bdoes\s+not\s+(work|function|import|load|return)\b", 0.95, "swe_does_not"),
         (r"\b(import|importing)\s+.+\s+(fails?|error)\b", 0.95, "swe_import_fails"),
-        (r"\bmodule\s+.+\s+(not\s+found|missing|unavailable)\b", 0.95, "swe_module_missing"),
+        (
+            r"\bmodule\s+.+\s+(not\s+found|missing|unavailable)\b",
+            0.95,
+            "swe_module_missing",
+        ),
     ],
     TaskComplexity.GENERATION: [
         (
@@ -123,8 +151,16 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             1.0,
             "write_lang_script",
         ),
-        (r"\bcomplete\s+(this|the)\s+(function|code|implementation)\b", 1.0, "complete_function"),
-        (r"\bshow\s+(me\s+)?(a\s+)?code\s+(example|sample)\b", 0.95, "show_code_example"),
+        (
+            r"\bcomplete\s+(this|the)\s+(function|code|implementation)\b",
+            1.0,
+            "complete_function",
+        ),
+        (
+            r"\bshow\s+(me\s+)?(a\s+)?code\s+(example|sample)\b",
+            0.95,
+            "show_code_example",
+        ),
         (r"\bshow\s+me\s+code\s+for\b", 0.95, "show_code_for"),
         (r"\bimplement\s+(the\s+)?function\s+to\s+pass\b", 0.95, "implement_function"),
         # Lower weight - often appears in issue reports as code examples
@@ -133,10 +169,22 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
     ],
     TaskComplexity.ACTION: [
         (r"\bgit\s+(add|commit|push|pull|merge|rebase|stash)\b", 1.0, "git_command"),
-        (r"\b(run|execute)\s+(the\s+)?(tests?|pytest|unittest|jest|mocha)\b", 1.0, "run_tests"),
+        (
+            r"\b(run|execute)\s+(the\s+)?(tests?|pytest|unittest|jest|mocha)\b",
+            1.0,
+            "run_tests",
+        ),
         (r"\bpytest\b|\bnpm\s+test\b|\bcargo\s+test\b", 1.0, "test_command"),
-        (r"\b(build|compile|deploy)\s+(the\s+)?(project|app|code)\b", 0.9, "build_deploy"),
-        (r"\b(perform|do|run)\s+(a\s+)?(web\s*search|websearch)\b", 1.0, "web_search_action"),
+        (
+            r"\b(build|compile|deploy)\s+(the\s+)?(project|app|code)\b",
+            0.9,
+            "build_deploy",
+        ),
+        (
+            r"\b(perform|do|run)\s+(a\s+)?(web\s*search|websearch)\b",
+            1.0,
+            "web_search_action",
+        ),
         # SWE-bench / GitHub issue format (multi-step issue resolution)
         (
             r"###\s*(Description|Expected\s+behavior|Actual\s+behavior|Steps)",
@@ -144,7 +192,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             "github_issue_format",
         ),
         (r"\bSteps\s+to\s+Reproduce\b", 1.0, "steps_to_reproduce"),
-        (r"\bPlease\s+(fix|resolve|address)\s+(this|the)\s+(issue|bug)\b", 0.95, "issue_request"),
+        (
+            r"\bPlease\s+(fix|resolve|address)\s+(this|the)\s+(issue|bug)\b",
+            0.95,
+            "issue_request",
+        ),
     ],
     TaskComplexity.ANALYSIS: [
         (
@@ -152,7 +204,11 @@ PATTERNS: Dict[TaskComplexity, List[Tuple[str, float, str]]] = {
             1.0,
             "detailed_analysis",
         ),
-        (r"\barchitecture\s+(review|analysis|overview)\b", 1.0, "architecture_analysis"),
+        (
+            r"\barchitecture\s+(review|analysis|overview)\b",
+            1.0,
+            "architecture_analysis",
+        ),
         (
             r"\b(analyze|review|audit)\s+(the\s+)?(entire\s+)?(codebase|project|code)\b",
             1.0,
@@ -502,6 +558,11 @@ class TaskComplexityService:
 
             service = container.get(LLMDecisionServiceProtocol)
             if service is None:
+                return None
+
+            from victor.agent.decisions.chain import should_use_llm
+
+            if not should_use_llm("task_type_classification"):
                 return None
 
             from victor.agent.decisions.schemas import DecisionType

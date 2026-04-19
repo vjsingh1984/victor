@@ -202,7 +202,9 @@ class TestLanceDBProvider:
             await provider.initialize()
 
             await provider.index_document(
-                doc_id="test_id", content="test content", metadata={"file_path": "test.py"}
+                doc_id="test_id",
+                content="test content",
+                metadata={"file_path": "test.py"},
             )
 
             # Should create table since it didn't exist
@@ -238,7 +240,9 @@ class TestLanceDBProvider:
             assert provider.table == mock_table
 
             await provider.index_document(
-                doc_id="test_id", content="test content", metadata={"file_path": "test.py"}
+                doc_id="test_id",
+                content="test content",
+                metadata={"file_path": "test.py"},
             )
 
             # Should add to existing table
@@ -265,8 +269,16 @@ class TestLanceDBProvider:
             await provider.initialize()
 
             documents = [
-                {"id": "doc1", "content": "content1", "metadata": {"file_path": "test1.py"}},
-                {"id": "doc2", "content": "content2", "metadata": {"file_path": "test2.py"}},
+                {
+                    "id": "doc1",
+                    "content": "content1",
+                    "metadata": {"file_path": "test1.py"},
+                },
+                {
+                    "id": "doc2",
+                    "content": "content2",
+                    "metadata": {"file_path": "test2.py"},
+                },
             ]
 
             await provider.index_documents(documents)

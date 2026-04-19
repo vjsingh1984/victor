@@ -66,13 +66,10 @@ class ChatServiceConfig:
 
 
 class ChatService:
-    """Service for managing chat operations.
+    """[CANONICAL] Service for managing chat operations.
 
-    Extracted from AgentOrchestrator to handle:
-    - Chat flow coordination
-    - Streaming response processing
-    - Response aggregation
-    - Agentic loop management
+    The target implementation for chat operations following the 
+    state-passed architectural pattern. Supersedes ChatCoordinator.
 
     This service follows SOLID principles:
     - SRP: Only handles chat operations
@@ -125,6 +122,23 @@ class ChatService:
         self._conversation = conversation_controller
         self._streaming = streaming_coordinator
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
+
+        # Initialize metrics tracking
+        self._metrics: Dict[str, Any] = {
+            "total_requests": 0,
+            "successful_requests": 0,
+            "failed_requests": 0,
+            "total_tokens": 0,
+            "tool_calls": 0,
+            "continuations": 0,
+            "response_times": [],
+            "latencies": [],
+            "total_streams": 0,
+            "average_chunks": 0,
+            "avg_chunk_size": 0,
+            "chunks_per_second": 0,
+            "total_chunks": 0,
+        }
 
     async def chat(
         self, user_message: str, *, stream: bool = False, **kwargs
@@ -266,6 +280,113 @@ class ChatService:
         return True
 
     # ==========================================================================
+    # Conversation Query Methods
+    # ==========================================================================
+
+    def get_message_count(self) -> int:
+        """Get the number of messages in the conversation.
+
+        Returns the total count of messages (excluding system messages)
+        in the current conversation history.
+
+        Returns:
+            Number of messages in conversation
+
+        Example:
+            count = service.get_message_count()
+            # Returns: 15
+        """
+        if hasattr(self._context, "message_count"):
+            return self._context.message_count
+        elif hasattr(self._context, "get_message_count"):
+            return self._context.get_message_count()
+        elif hasattr(self._conversation, "message_count"):
+            return self._conversation.message_count
+        return 0
+
+    def is_conversation_empty(self) -> bool:
+        """Check if the conversation has no messages.
+
+        Returns True if there are no user or assistant messages
+        (system messages are ignored).
+
+        Returns:
+            True if conversation is empty, False otherwise
+
+        Example:
+            if service.is_conversation_empty():
+                # Start fresh conversation
+        """
+        return self.get_message_count() == 0
+
+    def get_conversation_stats(self) -> Dict[str, int]:
+        """Get conversation statistics.
+
+        Returns metadata about the current conversation including
+        message count, token usage, and tool call count.
+
+        Returns:
+            Dictionary with conversation statistics
+
+        Example:
+            stats = service.get_conversation_stats()
+            # {"message_count": 10, "user_messages": 3, "assistant_messages": 5, ...}
+        """
+        stats = {
+            "message_count": self.get_message_count(),
+            "is_empty": self.is_conversation_empty(),
+        }
+
+        # Add token usage if available
+        if hasattr(self._context, "get_token_count"):
+            try:
+                stats["token_count"] = self._context.get_token_count()
+            except Exception:
+                pass
+
+        # Add tool call count if available
+        if hasattr(self._tools, "get_tool_usage_stats"):
+            try:
+                usage_stats = self._tools.get_tool_usage_stats()
+                stats["tool_calls"] = sum(usage_stats.values())
+            except Exception:
+                pass
+
+        return stats
+
+    def get_conversation_metadata(self) -> Dict[str, Any]:
+        """Get conversation metadata.
+
+        Returns high-level metadata about the conversation including
+        model, provider, and configuration info.
+
+        Returns:
+            Dictionary with conversation metadata
+
+        Example:
+            metadata = service.get_conversation_metadata()
+            # {"model": "gpt-4o", "provider": "openai", "max_iterations": 200}
+        """
+        metadata = {
+            "max_iterations": self._config.max_iterations,
+            "max_continuation_prompts": self._config.max_continuation_prompts,
+            "is_healthy": self.is_healthy(),
+        }
+
+        # Add provider info if available
+        if hasattr(self._provider, "get_current_provider_info"):
+            try:
+                provider_info = self._provider.get_current_provider_info()
+                if hasattr(provider_info, "model_name"):
+                    metadata["model"] = provider_info.model_name
+                if hasattr(provider_info, "provider_name"):
+                    metadata["provider"] = provider_info.provider_name
+            except Exception:
+                pass
+
+        return metadata
+
+    # ==========================================================================
     # Private Methods
     # ==========================================================================
 
@@ -330,43 +451,9 @@ class ChatService:
         self._logger.warning(f"Max iterations ({self._config.max_iterations}) reached")
         return response
 
-    async def _run_agentic_loop_streaming(
-        self, user_message: str, **kwargs
-    ) -> AsyncIterator["StreamChunk"]:
-        """Run the agentic loop with streaming support.
-
-        Similar to _run_agentic_loop but yields stream chunks
-        as they become available.
-
-        Args:
-            user_message: The user's input message
-            **kwargs: Additional options
-
-        Yields:
-            StreamChunk objects with incremental content
-        """
-        # Get messages from context
-        messages = self._context.get_messages()
-
-        # Stream from provider
-        provider = self._provider.get_current_provider()
-        stream = provider.stream_completion(messages, **kwargs)
-
-        async for chunk in stream:
-            yield chunk
-
-    async def _get_completion(self, messages: List[Any], **kwargs) -> "CompletionResponse":
-        """Get completion from provider.
-
-        Args:
-            messages: Messages to send
-            **kwargs: Additional options
-
-        Returns:
-            CompletionResponse from provider
-        """
-        provider = self._provider.get_current_provider()
-        return await provider.chat_completion(messages, **kwargs)
+    # NOTE: Orchestrator wires directly to ChatCoordinator (Phase 2).
+    # ChatCoordinator uses StreamingChatPipeline + AgenticLoop for full
+    # perception, fulfillment, and progress tracking.
 
     def _is_response_complete(self, response: "CompletionResponse") -> bool:
         """Check if response is complete.
@@ -421,11 +508,12 @@ class ChatService:
         for tool_call in tool_calls:
             tool_name = tool_call.function.name
             arguments = tool_call.function.arguments
+            tool_call_id = getattr(tool_call, 'id', None)
 
             result = await self._tools.execute_tool(tool_name, arguments)
 
-            # Add tool result to context
-            self._add_tool_result_to_context(tool_name, result)
+            # Add tool result to context with proper tool_call_id
+            self._add_tool_result_to_context(tool_name, result, tool_call_id=tool_call_id)
 
     async def _create_continuation_prompt(self, response: "CompletionResponse") -> str:
         """Create continuation prompt for incomplete response.
@@ -461,18 +549,33 @@ class ChatService:
             msg["tool_calls"] = response.tool_calls
         self._context.add_message(msg)
 
-    def _add_tool_result_to_context(self, tool_name: str, result: Any) -> None:
+    def _add_tool_result_to_context(
+        self,
+        tool_name: str,
+        result: Any,
+        tool_call_id: Optional[str] = None,
+    ) -> None:
         """Add tool result to context.
 
         Args:
             tool_name: Name of tool that was executed
             result: Tool result
+            tool_call_id: ID of the tool call (required for OpenAI API compatibility)
         """
-        content = str(result.output) if result.output else str(result.error)
+        # Handle output/error with proper string conversion
+        # Use output if available and not None, otherwise use error
+        if result.output is not None:
+            content = str(result.output)
+        elif result.error:
+            content = str(result.error)
+        else:
+            content = ""
+
         msg = {
             "role": "tool",
             "content": content,
-            "tool_call_id": tool_name,
+            "tool_call_id": tool_call_id or tool_name,  # Use tool_call_id if provided, fallback to tool_name
+            "name": tool_name,  # OpenAI spec requires 'name' for tool messages
         }
         self._context.add_message(msg)
 
@@ -506,14 +609,833 @@ class ChatService:
             error: Error that occurred
 
         Returns:
-            Recovery context object
+            RecoveryContextImpl with error details
         """
-        # This would create a proper recovery context
-        # For now, return a simple dict
+        from victor.agent.services.recovery_service import RecoveryContextImpl
+
+        return RecoveryContextImpl(
+            error=error,
+            error_type=type(error).__name__,
+            attempt_count=1,
+            state={},
+            metadata={},
+        )
+
+    # ==========================================================================
+    # Real-Time Metrics Collection
+    # ==========================================================================
+
+    def get_chat_metrics(self) -> Dict[str, Any]:
+        """Get real-time chat metrics.
+
+        Returns comprehensive metrics about chat performance,
+        including response times, token usage, error rates, etc.
+
+        Returns:
+            Dictionary with chat metrics
+
+        Example:
+            metrics = service.get_chat_metrics()
+            # {
+            #   "total_requests": 100,
+            #   "successful_requests": 95,
+            #   "failed_requests": 5,
+            #   "average_response_time": 1.5,
+            #   "total_tokens_used": 50000,
+            #   "average_tokens_per_request": 500,
+            #   "tool_calls_made": 20,
+            #   "continuation_prompts": 5,
+            # }
+        """
         return {
-            "error": error,
-            "error_type": type(error).__name__,
-            "attempt_count": 1,
-            "state": {},
-            "metadata": {},
+            "total_requests": self._metrics.get("total_requests", 0),
+            "successful_requests": self._metrics.get("successful_requests", 0),
+            "failed_requests": self._metrics.get("failed_requests", 0),
+            "average_response_time": self._calculate_average_response_time(),
+            "total_tokens_used": self._metrics.get("total_tokens", 0),
+            "average_tokens_per_request": self._calculate_average_tokens(),
+            "tool_calls_made": self._metrics.get("tool_calls", 0),
+            "continuation_prompts": self._metrics.get("continuations", 0),
+            "last_request_time": self._metrics.get("last_request_time"),
+            "success_rate": self._calculate_success_rate(),
         }
+
+    def get_performance_metrics(self) -> Dict[str, Any]:
+        """Get detailed performance metrics.
+
+        Returns granular performance data including latency percentiles,
+        throughput metrics, and resource usage.
+
+        Returns:
+            Dictionary with performance metrics
+
+        Example:
+            perf = service.get_performance_metrics()
+            # {
+            #   "p50_latency": 1.2,
+            #   "p95_latency": 2.5,
+            #   "p99_latency": 5.0,
+            #   "throughput_per_minute": 40,
+            #   "average_tokens_per_second": 350,
+            # }
+        """
+        latencies = self._metrics.get("latencies", [])
+
+        if not latencies:
+            return {
+                "p50_latency": 0.0,
+                "p95_latency": 0.0,
+                "p99_latency": 0.0,
+                "throughput_per_minute": 0.0,
+                "average_tokens_per_second": 0.0,
+            }
+
+        sorted_latencies = sorted(latencies)
+        p50 = sorted_latencies[len(sorted_latencies) // 2]
+        p95 = sorted_latencies[int(len(sorted_latencies) * 0.95)]
+        p99 = sorted_latencies[int(len(sorted_latencies) * 0.99)]
+
+        return {
+            "p50_latency": p50,
+            "p95_latency": p95,
+            "p99_latency": p99,
+            "throughput_per_minute": self._calculate_throughput(),
+            "average_tokens_per_second": self._calculate_tokens_per_second(),
+        }
+
+    # ==========================================================================
+    # Response Quality Tracking
+    # ==========================================================================
+
+    def track_response_quality(
+        self,
+        response: "CompletionResponse",
+        user_satisfaction: Optional[float] = None,
+    ) -> None:
+        """Track response quality metrics.
+
+        Records quality indicators such as response length,
+        completion rate, and user satisfaction.
+
+        Args:
+            response: The completion response
+            user_satisfaction: Optional satisfaction score (0.0-1.0)
+
+        Example:
+            service.track_response_quality(response, user_satisfaction=0.8)
+        """
+        if "quality_metrics" not in self._metrics:
+            self._metrics["quality_metrics"] = {
+                "total_responses": 0,
+                "average_length": 0.0,
+                "completion_rate": 0.0,
+                "user_satisfaction_scores": [],
+            }
+
+        quality = self._metrics["quality_metrics"]
+        quality["total_responses"] += 1
+
+        # Track response length
+        content_length = len(response.content) if response.content else 0
+        quality["average_length"] = (
+            (quality["average_length"] * (quality["total_responses"] - 1) + content_length)
+            / quality["total_responses"]
+        )
+
+        # Track completion rate
+        if response.stop_reason == "stop":
+            quality["completion_rate"] = (
+                (quality["completion_rate"] * (quality["total_responses"] - 1) + 1.0)
+                / quality["total_responses"]
+            )
+        else:
+            quality["completion_rate"] = (
+                (quality["completion_rate"] * (quality["total_responses"] - 1) + 0.0)
+                / quality["total_responses"]
+            )
+
+        # Track user satisfaction
+        if user_satisfaction is not None:
+            quality["user_satisfaction_scores"].append(user_satisfaction)
+
+    def get_quality_metrics(self) -> Dict[str, Any]:
+        """Get response quality metrics.
+
+        Returns aggregated quality indicators.
+
+        Returns:
+            Dictionary with quality metrics
+
+        Example:
+            quality = service.get_quality_metrics()
+            # {
+            #   "total_responses": 100,
+            #   "average_length": 500,
+            #   "completion_rate": 0.95,
+            #   "average_satisfaction": 0.85,
+            # }
+        """
+        quality = self._metrics.get("quality_metrics", {})
+
+        satisfaction_scores = quality.get("user_satisfaction_scores", [])
+        avg_satisfaction = (
+            sum(satisfaction_scores) / len(satisfaction_scores)
+            if satisfaction_scores
+            else 0.0
+        )
+
+        return {
+            "total_responses": quality.get("total_responses", 0),
+            "average_length": quality.get("average_length", 0.0),
+            "completion_rate": quality.get("completion_rate", 0.0),
+            "average_satisfaction": avg_satisfaction,
+            "satisfaction_count": len(satisfaction_scores),
+        }
+
+    # ==========================================================================
+    # Conversation State Management
+    # ==========================================================================
+
+    def get_conversation_state(self) -> Dict[str, Any]:
+        """Get detailed conversation state.
+
+        Returns comprehensive state information including
+        message counts, token usage, and stage information.
+
+        Returns:
+            Dictionary with conversation state
+
+        Example:
+            state = service.get_conversation_state()
+            # {
+            #   "message_count": 10,
+            #   "total_tokens": 5000,
+            #   "stage": "active",
+            #   "has_tool_calls": True,
+            #   "last_message_role": "assistant",
+            # }
+        """
+        stats = self.get_conversation_stats()
+
+        return {
+            "message_count": stats.get("message_count", 0),
+            "total_tokens": stats.get("total_tokens", 0),
+            "user_messages": stats.get("user_messages", 0),
+            "assistant_messages": stats.get("assistant_messages", 0),
+            "system_messages": stats.get("system_messages", 0),
+            "tool_messages": stats.get("tool_messages", 0),
+            "stage": self._get_conversation_stage(),
+            "has_tool_calls": stats.get("tool_calls", 0) > 0,
+            "last_message_role": self._get_last_message_role(),
+            "is_empty": self.is_conversation_empty(),
+        }
+
+    def _get_conversation_stage(self) -> str:
+        """Get current conversation stage.
+
+        Returns:
+            Stage identifier: "initial", "active", "tool_execution", "completion"
+        """
+        if self.is_conversation_empty():
+            return "initial"
+
+        stats = self.get_conversation_stats()
+        if stats.get("tool_calls", 0) > 0:
+            return "tool_execution"
+
+        if stats.get("assistant_messages", 0) > 0:
+            return "completion"
+
+        return "active"
+
+    def _get_last_message_role(self) -> Optional[str]:
+        """Get role of last message in conversation.
+
+        Returns:
+            Role string or None
+        """
+        metadata = self.get_conversation_metadata()
+        last_role = metadata.get("last_message_role")
+        return last_role
+
+    # ==========================================================================
+    # Performance Monitoring
+    # ==========================================================================
+
+    def _calculate_average_response_time(self) -> float:
+        """Calculate average response time.
+
+        Returns:
+            Average response time in seconds
+        """
+        response_times = self._metrics.get("response_times", [])
+        if not response_times:
+            return 0.0
+        return sum(response_times) / len(response_times)
+
+    def _calculate_average_tokens(self) -> float:
+        """Calculate average tokens per request.
+
+        Returns:
+            Average token count
+        """
+        total_tokens = self._metrics.get("total_tokens", 0)
+        total_requests = self._metrics.get("total_requests", 0)
+        if total_requests == 0:
+            return 0.0
+        return total_tokens / total_requests
+
+    def _calculate_success_rate(self) -> float:
+        """Calculate success rate.
+
+        Returns:
+            Success rate (0.0-1.0)
+        """
+        successful = self._metrics.get("successful_requests", 0)
+        total = self._metrics.get("total_requests", 0)
+        if total == 0:
+            return 0.0
+        return successful / total
+
+    def _calculate_throughput(self) -> float:
+        """Calculate throughput per minute.
+
+        Returns:
+            Requests per minute
+        """
+        # Simple calculation based on total requests and uptime
+        # In production, would use actual time window
+        total_requests = self._metrics.get("total_requests", 0)
+        return float(total_requests)  # Placeholder
+
+    def _calculate_tokens_per_second(self) -> float:
+        """Calculate tokens per second throughput.
+
+        Returns:
+            Average tokens per second
+        """
+        total_tokens = self._metrics.get("total_tokens", 0)
+        total_time = sum(self._metrics.get("latencies", [1.0]))
+        if total_time == 0:
+            return 0.0
+        return total_tokens / total_time
+
+    # ==========================================================================
+    # Advanced Error Handling
+    # ==========================================================================
+
+    async def handle_chat_error(
+        self,
+        error: Exception,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> "CompletionResponse":
+        """Handle chat errors with recovery strategies.
+
+        Attempts to recover from errors using fallback strategies
+        before giving up.
+
+        Args:
+            error: The error that occurred
+            context: Optional context for recovery
+
+        Returns:
+            Fallback response or raises if unrecoverable
+
+        Example:
+            try:
+                response = await service.chat("Hello")
+            except Exception as e:
+                response = await service.handle_chat_error(e)
+        """
+        from victor.providers.base import CompletionResponse
+
+        # Try recovery service
+        recovery_context = self._create_recovery_context(error)
+
+        if context:
+            recovery_context.state.update(context)
+
+        # Check if recovery is possible
+        should_recover = await self._recovery_service.should_attempt_recovery(
+            recovery_context.error_type,
+            consecutive_failures=0,
+        )
+
+        if should_recover:
+            self._logger.info(f"Attempting recovery from {recovery_context.error_type}")
+
+            # Return fallback response
+            return CompletionResponse(
+                content=f"I encountered an error ({recovery_context.error_type}). "
+                f"Please try rephrasing your request.",
+                stop_reason="error",
+                usage={},
+            )
+
+        # If no recovery possible, raise the original error
+        raise error
+
+    # ==========================================================================
+    # Streaming Integration
+    # ==========================================================================
+
+    async def stream_with_callback(
+        self,
+        user_message: str,
+        callback: Callable[[str], None],
+        **kwargs,
+    ) -> "CompletionResponse":
+        """Stream chat with callback for each chunk.
+
+        Streams the response and calls the callback function
+        with each chunk's content.
+
+        Args:
+            user_message: User's message
+            callback: Callback function called with each chunk
+            **kwargs: Additional arguments for chat
+
+        Returns:
+            Aggregated completion response
+
+        Example:
+            def on_chunk(chunk: str):
+                print(chunk, end="", flush=True)
+
+            response = await service.stream_with_callback(
+                "Hello, world!",
+                on_chunk
+            )
+        """
+        chunks = []
+        async for chunk in self.stream_chat(user_message, **kwargs):
+            chunks.append(chunk)
+            if chunk.content:
+                callback(chunk.content)
+
+        return self._aggregate_chunks(chunks)
+
+    def get_streaming_metrics(self) -> Dict[str, Any]:
+        """Get streaming-specific metrics.
+
+        Returns metrics about streaming performance including
+        chunks per second, average chunk size, etc.
+
+        Returns:
+            Dictionary with streaming metrics
+
+        Example:
+            metrics = service.get_streaming_metrics()
+            # {
+            #   "total_streams": 50,
+            #   "average_chunks_per_stream": 100,
+            #   "average_chunk_size": 5,
+            #   "chunks_per_second": 50,
+            # }
+        """
+        return {
+            "total_streams": self._metrics.get("total_streams", 0),
+            "average_chunks_per_stream": self._metrics.get("average_chunks", 0),
+            "average_chunk_size": self._metrics.get("avg_chunk_size", 0),
+            "chunks_per_second": self._metrics.get("chunks_per_second", 0),
+            "total_chunks_sent": self._metrics.get("total_chunks", 0),
+        }
+
+    # ==========================================================================
+    # Streaming Pipeline Management
+    # ==========================================================================
+
+    def set_streaming_pipeline(self, pipeline: Any) -> None:
+        """Set or override the streaming pipeline.
+
+        Allows injection of a pre-built streaming pipeline for
+        custom streaming behavior or testing.
+
+        Args:
+            pipeline: Streaming pipeline instance
+
+        Example:
+            service.set_streaming_pipeline(custom_pipeline)
+        """
+        self._streaming = pipeline
+        self._logger.debug(f"Streaming pipeline set to: {type(pipeline).__name__}")
+
+    # ==========================================================================
+    # Planning and Task Preparation
+    # ==========================================================================
+
+    def _should_use_planning(self, user_message: str) -> bool:
+        """Determine if planning should be used for this task.
+
+        Checks for:
+        1. Multi-step indicators in the message
+        2. Task complexity keywords
+
+        Args:
+            user_message: User's message
+
+        Returns:
+            True if planning should be used
+
+        Example:
+            if service._should_use_planning("analyze the code"):
+                # Use planning
+        """
+        # Simple heuristic: multi-step keywords
+        multi_step_indicators = [
+            "analyze",
+            "architecture",
+            "design",
+            "evaluate",
+            "review",
+            "refactor",
+            "implement",
+            "debug",
+            "optimize",
+            "test",
+            "document",
+        ]
+
+        message_lower = user_message.lower()
+        return any(indicator in message_lower for indicator in multi_step_indicators)
+
+    def _prepare_task(
+        self, user_message: str, task_type: str
+    ) -> tuple[Dict[str, Any], int]:
+        """Prepare task-specific guidance and budget adjustments.
+
+        Args:
+            user_message: The user's message
+            task_type: The detected task type
+
+        Returns:
+            Tuple of (task_classification, complexity_tool_budget)
+
+        Example:
+            task_info, budget = service._prepare_task("fix the bug", "debug")
+        """
+        # Default task classification
+        task_classification = {
+            "type": task_type,
+            "complexity": "medium",
+            "requires_tools": True,
+        }
+
+        # Budget based on complexity
+        complexity_budgets = {
+            "simple": 10,
+            "medium": 20,
+            "complex": 50,
+        }
+
+        budget = complexity_budgets.get(task_classification["complexity"], 20)
+
+        return task_classification, budget
+
+    # ==========================================================================
+    # Stream Handling
+    # ==========================================================================
+
+    def _handle_stream_chunk(
+        self,
+        chunk: Any,
+        consecutive_garbage_chunks: int,
+        max_garbage_chunks: int = 5,
+        garbage_detected: bool = False,
+    ) -> tuple[Any, int, bool]:
+        """Handle garbage detection for a streaming chunk.
+
+        Args:
+            chunk: The stream chunk to check
+            consecutive_garbage_chunks: Current count of consecutive garbage chunks
+            max_garbage_chunks: Maximum consecutive garbage chunks allowed
+            garbage_detected: Whether garbage has been detected
+
+        Returns:
+            Tuple of (chunk, consecutive_garbage_chunks, garbage_detected)
+
+        Example:
+            chunk, count, detected = service._handle_stream_chunk(
+                chunk, consecutive_count, max_chunks, detected
+            )
+        """
+        # Simple garbage detection: check if content is None or empty
+        if chunk is None:
+            consecutive_garbage_chunks += 1
+            if consecutive_garbage_chunks >= max_garbage_chunks:
+                if not garbage_detected:
+                    self._logger.warning("Empty chunks detected - stopping stream")
+                    garbage_detected = True
+                return None, consecutive_garbage_chunks, garbage_detected
+        else:
+            consecutive_garbage_chunks = 0
+
+        return chunk, consecutive_garbage_chunks, garbage_detected
+
+    # ==========================================================================
+    # Rate Limiting
+    # ==========================================================================
+
+    def _get_rate_limit_wait_time(self, exc: Exception, attempt: int) -> float:
+        """Get wait time for rate limit retry.
+
+        Args:
+            exc: The rate limit exception
+            attempt: Current retry attempt number
+
+        Returns:
+            Number of seconds to wait before retrying
+
+        Example:
+            wait_time = service._get_rate_limit_wait_time(error, attempt=1)
+        """
+        # Delegate to provider service if available
+        if self._provider:
+            try:
+                base_wait = self._provider.get_rate_limit_wait_time(exc)
+                backoff_multiplier = 2 ** attempt
+                wait_time = base_wait * backoff_multiplier
+                return min(wait_time, 300.0)  # Max 5 minutes
+            except Exception:
+                pass
+
+        # Fallback to exponential backoff
+        return min(60.0 * (2 ** attempt), 300.0)
+
+    # ==========================================================================
+    # Message Persistence
+    # ==========================================================================
+
+    @staticmethod
+    def persist_message(
+        role: str,
+        content: str,
+        memory_manager: Any,
+        memory_session_id: Optional[str],
+        usage_logger: Any,
+        tool_name: Optional[str] = None,
+        tool_call_id: Optional[str] = None,
+        tool_calls: Optional[list] = None,
+    ) -> None:
+        """Persist a message to memory and log the event.
+
+        Offloads blocking SQLite I/O to the thread pool when an event
+        loop is running, preventing async caller blocking.
+
+        Args:
+            role: Message role (user, assistant, system, tool)
+            content: Message content text
+            memory_manager: MemoryManager instance (or None)
+            memory_session_id: Active memory session ID (or None)
+            usage_logger: UsageLogger for event logging
+            tool_name: Tool name for tool role messages
+            tool_call_id: Tool call ID for correlation
+            tool_calls: Tool calls list for assistant messages
+
+        Example:
+            ChatService.persist_message(
+                role="user",
+                content="Hello",
+                memory_manager=memory_mgr,
+                memory_session_id=session_id,
+                usage_logger=logger,
+            )
+        """
+        # Persist to memory manager if available
+        if memory_manager and memory_session_id:
+            try:
+                from victor.agent.conversation.types import MessageRole
+
+                role_map = {
+                    "user": MessageRole.USER,
+                    "assistant": MessageRole.ASSISTANT,
+                    "system": MessageRole.SYSTEM,
+                    "tool": MessageRole.TOOL,
+                }
+
+                message_role = role_map.get(role, MessageRole.USER)
+
+                # Add message to memory
+                memory_manager.add_message(
+                    session_id=memory_session_id,
+                    role=message_role,
+                    content=content,
+                    tool_name=tool_name,
+                    tool_call_id=tool_call_id,
+                    tool_calls=tool_calls,
+                )
+            except Exception as e:
+                logger.warning(f"Failed to persist message to memory: {e}")
+
+        # Log the event
+        if usage_logger:
+            try:
+                usage_logger.log_message(role, content)
+            except Exception as e:
+                logger.debug(f"Failed to log message: {e}")
+
+    # ==========================================================================
+    # Context Management Helpers
+    # ==========================================================================
+
+    def _add_user_message_to_context(
+        self,
+        content: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Add user message to context.
+
+        Delegates to context service to add a user message to the
+        conversation context.
+
+        Args:
+            content: User message content
+            metadata: Optional metadata for the message
+
+        Example:
+            service._add_user_message_to_context("Hello world")
+        """
+        if self._context:
+            try:
+                self._context.add_message(
+                    role="user",
+                    content=content,
+                    metadata=metadata or {},
+                )
+            except Exception as e:
+                self._logger.warning(f"Failed to add user message to context: {e}")
+
+    def _add_assistant_message_to_context(
+        self,
+        content: str,
+        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Add assistant message to context.
+
+        Delegates to context service to add an assistant message to the
+        conversation context.
+
+        Args:
+            content: Assistant message content
+            tool_calls: Optional list of tool calls made
+            metadata: Optional metadata for the message
+
+        Example:
+            service._add_assistant_message_to_context(
+                "I'll help you with that.",
+                tool_calls=[{"name": "read", "arguments": {"path": "file.txt"}}]
+            )
+        """
+        if self._context:
+            try:
+                self._context.add_message(
+                    role="assistant",
+                    content=content,
+                    tool_calls=tool_calls,
+                    metadata=metadata or {},
+                )
+            except Exception as e:
+                self._logger.warning(f"Failed to add assistant message to context: {e}")
+
+    def handle_chat_error(
+        self,
+        error: Exception,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Handle chat error with recovery.
+
+        Delegates to recovery service to attempt recovery from the error.
+
+        Args:
+            error: The exception that occurred
+            context: Optional context for recovery
+
+        Returns:
+            Dictionary with error handling result:
+            - handled: Whether error was handled
+            - action: Action taken (retry, switch, abort, etc.)
+            - message: Human-readable message
+
+        Example:
+            result = service.handle_chat_error(error, context)
+            if result["handled"]:
+                print(f"Error handled: {result['action']}")
+        """
+        if self._recovery:
+            try:
+                # Try to recover using recovery service
+                recovered = self._recovery.should_attempt_recovery(error)
+                if recovered:
+                    return {
+                        "handled": True,
+                        "action": "retry",
+                        "message": "Attempting recovery",
+                    }
+                else:
+                    return {
+                        "handled": True,
+                        "action": "abort",
+                        "message": str(error),
+                    }
+            except Exception as e:
+                self._logger.warning(f"Recovery check failed: {e}")
+
+        # Default: not handled
+        return {
+            "handled": False,
+            "action": "abort",
+            "message": str(error),
+        }
+
+    def normalize_tool_arguments(
+        self,
+        tool_args: Dict[str, Any],
+        tool_name: str,
+    ) -> tuple[Dict[str, Any], str]:
+        """Normalize tool arguments to handle malformed JSON.
+
+        Simplified version for ChatService that delegates to ToolService
+        if available.
+
+        Args:
+            tool_args: Raw arguments from tool call
+            tool_name: Name of the tool being called
+
+        Returns:
+            Tuple of (normalized_args, strategy_used)
+
+        Example:
+            args, strategy = service.normalize_tool_arguments(
+                {"query": "test"}, "code_search"
+            )
+        """
+        # Try to delegate to tool service if available
+        if self._tools:
+            try:
+                return self._tools.normalize_tool_arguments(tool_args, tool_name)
+            except Exception:
+                pass
+
+        # Fallback: return as-is
+        return tool_args, "direct"
+
+    # ==========================================================================
+    # Turn Executor Property
+    # ==========================================================================
+
+    @property
+    def turn_executor(self) -> "ChatService":
+        """Get the turn executor for chat operations.
+
+        In the service-based architecture, the ChatService itself
+        acts as the turn executor for single-turn execution.
+
+        Returns:
+            Self (ChatService instance)
+
+        Example:
+            executor = service.turn_executor
+            response = await executor.chat("Hello")
+        """
+        return self

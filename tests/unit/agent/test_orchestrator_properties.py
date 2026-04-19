@@ -48,7 +48,7 @@ class TestOrchestratorPropertyInstallation:
 
         lazy_props = [
             "protocol_adapter",
-            "execution_coordinator",
+            "turn_executor",
             "sync_chat_coordinator",
             "streaming_chat_coordinator",
             "unified_chat_coordinator",

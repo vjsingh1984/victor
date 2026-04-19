@@ -38,7 +38,11 @@ from typing import TYPE_CHECKING, Any, Dict, List
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import (
+        NodeResult,
+        ExecutorNodeStatus,
+        WorkflowContext,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +337,7 @@ def merge_tool_results(ctx: Dict[str, Any]) -> Dict[str, Any]:
         "combined_output": combined_output,
         "success": all_success and not errors,
         "errors": errors,
-        "execution_order": execution_order if preserve_order else sorted(execution_order),
+        "execution_order": (execution_order if preserve_order else sorted(execution_order)),
         "tool_count": len(tool_results),
     }
 

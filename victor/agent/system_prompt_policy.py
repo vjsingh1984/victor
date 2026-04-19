@@ -161,7 +161,8 @@ def create_policy_from_settings(settings: Optional[Any]) -> SystemPromptPolicy:
         enforce_identity=_get("prompt_policy_enforce_identity", base_config.enforce_identity),
         enforce_guidelines=_get("prompt_policy_enforce_guidelines", base_config.enforce_guidelines),
         enforce_operating_preamble=_get(
-            "prompt_policy_enforce_operating_preamble", base_config.enforce_operating_preamble
+            "prompt_policy_enforce_operating_preamble",
+            base_config.enforce_operating_preamble,
         ),
         enforce_unique_sections=_get(
             "prompt_policy_enforce_unique_sections", base_config.enforce_unique_sections

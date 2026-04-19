@@ -28,12 +28,20 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
-from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority, ToolConfig
+from victor.tools.base import (
+    AccessMode,
+    DangerLevel,
+    ExecutionCategory,
+    Priority,
+    ToolConfig,
+)
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async
 
 
-def _get_provider_and_model(context: Optional[Dict[str, Any]] = None) -> Tuple[Any, Optional[str]]:
+def _get_provider_and_model(
+    context: Optional[Dict[str, Any]] = None,
+) -> Tuple[Any, Optional[str]]:
     """Get provider and model from ToolConfig in execution context.
 
     Args:
@@ -100,7 +108,11 @@ async def _run_git_async(
     ],
     task_types=["action", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.MIXED,  # Can both read and write
-    progress_params=["operation", "files", "branch"],  # Params indicating different operations
+    progress_params=[
+        "operation",
+        "files",
+        "branch",
+    ],  # Params indicating different operations
     keywords=[
         "git",
         "commit",
@@ -169,7 +181,7 @@ async def git(
     author_email: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Unified git operations: status, diff, stage, commit, log, branch.
+    """Run git operations: status, diff, stash, log, branch, checkout.
 
     Operations: status, diff (staged=True for staged), stage (files or all),
     commit (message required), log (limit), branch (list/create/switch).
@@ -261,7 +273,10 @@ async def git(
 
         # Commit with message and optional author override
         success, stdout, stderr = await _run_git_async(
-            "commit", "-m", message, env_overrides=env_overrides if env_overrides else None
+            "commit",
+            "-m",
+            message,
+            env_overrides=env_overrides if env_overrides else None,
         )
 
         if not success:
@@ -326,7 +341,7 @@ async def git(
     examples=["suggest a commit message", "generate commit message for staged changes"],
 )
 async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Generate an AI-powered commit message from staged changes.
+    """Generate a commit message from staged git changes.
 
     Analyzes the staged diff and generates a conventional commit message
     using the configured LLM provider. The generated message follows the
@@ -405,7 +420,11 @@ Generate ONLY the commit message, nothing else."""
         return {"success": True, "output": message, "error": ""}
 
     except Exception as e:
-        return {"success": False, "output": "", "error": f"AI generation failed: {str(e)}"}
+        return {
+            "success": False,
+            "output": "",
+            "error": f"AI generation failed: {str(e)}",
+        }
 
 
 @tool(
@@ -540,7 +559,11 @@ DESCRIPTION:
     )
 
     if not success:
-        return {"success": False, "output": "", "error": f"Failed to push branch: {stderr}"}
+        return {
+            "success": False,
+            "output": "",
+            "error": f"Failed to push branch: {stderr}",
+        }
 
     # Create PR with gh CLI
     pr_command = (
@@ -580,11 +603,15 @@ DESCRIPTION:
     access_mode=AccessMode.READONLY,  # Only analyzes, doesn't modify
     danger_level=DangerLevel.SAFE,  # No side effects
     keywords=["merge conflict", "conflict", "resolve", "rebase", "merge"],
-    use_cases=["analyzing merge conflicts", "resolving git conflicts", "conflict resolution help"],
+    use_cases=[
+        "analyzing merge conflicts",
+        "resolving git conflicts",
+        "conflict resolution help",
+    ],
     examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
 )
 async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Analyze merge conflicts and provide resolution guidance.
+    """Analyze and resolve merge conflicts in the current branch.
 
     Detects files with merge conflicts (marked as UU in git status) and provides
     detailed information about each conflict, including previews of conflict

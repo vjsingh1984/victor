@@ -218,7 +218,9 @@ class TestGitTool:
         with patch("victor.tools.git_tool._run_git_async", new_callable=AsyncMock) as mock:
             mock.return_value = (True, "committed", "")
             result = await git(
-                operation="commit", message="test commit", author_email="custom@example.com"
+                operation="commit",
+                message="test commit",
+                author_email="custom@example.com",
             )
             assert result["success"] is True
             call_kwargs = mock.call_args.kwargs

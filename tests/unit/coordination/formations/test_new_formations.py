@@ -30,7 +30,10 @@ from victor.coordination.formations.multi_level_hierarchy import (
     MultiLevelHierarchyFormation,
     HierarchyNode,
 )
-from victor.coordination.formations.adaptive import AdaptiveFormation, AdaptationStrategy
+from victor.coordination.formations.adaptive import (
+    AdaptiveFormation,
+    AdaptationStrategy,
+)
 from victor.coordination.formations.base import TeamContext
 from victor.teams.types import AgentMessage, MessageType
 
@@ -273,7 +276,9 @@ class TestDynamicRouterFormation:
 
         # Task with 'analyze' keyword
         task = AgentMessage(
-            sender_id="test", content="Analyze the data trends", message_type=MessageType.TASK
+            sender_id="test",
+            content="Analyze the data trends",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -295,7 +300,9 @@ class TestDynamicRouterFormation:
 
         # Task with custom keyword
         task = AgentMessage(
-            sender_id="test", content="Use custom_keyword to process", message_type=MessageType.TASK
+            sender_id="test",
+            content="Use custom_keyword to process",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -312,7 +319,9 @@ class TestDynamicRouterFormation:
 
         # Task without clear routing signals
         task = AgentMessage(
-            sender_id="test", content="Do something generic", message_type=MessageType.TASK
+            sender_id="test",
+            content="Do something generic",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -331,7 +340,9 @@ class TestDynamicRouterFormation:
         mock_coder.execute.side_effect = Exception("Execution failed")
 
         task = AgentMessage(
-            sender_id="test", content="Implement a function", message_type=MessageType.TASK
+            sender_id="test",
+            content="Implement a function",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -368,7 +379,9 @@ class TestMultiLevelHierarchyFormation:
         formation = MultiLevelHierarchyFormation(hierarchy=leaf)
 
         task = AgentMessage(
-            sender_id="test", content="Complete this task", message_type=MessageType.TASK
+            sender_id="test",
+            content="Complete this task",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -402,7 +415,9 @@ class TestMultiLevelHierarchyFormation:
         formation = MultiLevelHierarchyFormation(hierarchy=lead)
 
         task = AgentMessage(
-            sender_id="test", content="Complete this task", message_type=MessageType.TASK
+            sender_id="test",
+            content="Complete this task",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)
@@ -442,7 +457,9 @@ class TestMultiLevelHierarchyFormation:
         formation = MultiLevelHierarchyFormation(hierarchy=coordinator_node)
 
         task = AgentMessage(
-            sender_id="test", content="Complete complex task", message_type=MessageType.TASK
+            sender_id="test",
+            content="Complete complex task",
+            message_type=MessageType.TASK,
         )
 
         results = await formation.execute([], team_context, task)

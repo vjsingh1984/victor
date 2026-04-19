@@ -296,7 +296,9 @@ def is_tool_capable(base_name: str) -> Optional[Dict]:
     return None
 
 
-def analyze_models(host: str, specific_models: Optional[List[str]] = None) -> List[ModelInfo]:
+def analyze_models(
+    host: str, specific_models: Optional[List[str]] = None
+) -> List[ModelInfo]:
     """Analyze models and identify which need tool-enabled variants."""
     if specific_models:
         models = specific_models

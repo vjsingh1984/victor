@@ -810,7 +810,10 @@ class TestPrepareRequest:
         """Test prepare_request when components fail to init."""
         with (
             patch.object(
-                pipeline, "_get_prompt_builder", new_callable=AsyncMock, return_value=None
+                pipeline,
+                "_get_prompt_builder",
+                new_callable=AsyncMock,
+                return_value=None,
             ),
             patch.object(pipeline, "_get_mode_controller", return_value=None),
         ):
@@ -1035,7 +1038,10 @@ class TestExecuteWithResilience:
         mock_provider.chat = AsyncMock(return_value={"content": "response"})
 
         with patch.object(
-            pipeline, "_get_resilient_executor", new_callable=AsyncMock, return_value=None
+            pipeline,
+            "_get_resilient_executor",
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             result = await pipeline.execute_with_resilience(
                 provider=mock_provider,

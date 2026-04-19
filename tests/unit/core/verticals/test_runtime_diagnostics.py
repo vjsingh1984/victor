@@ -56,7 +56,9 @@ def test_runtime_diagnostics_is_resilient_to_loader_failure(monkeypatch) -> None
     assert snapshot["framework_entry_point_loader"] == {"cache_hits": 4}
 
 
-def test_runtime_diagnostics_is_resilient_to_component_stat_failures(monkeypatch) -> None:
+def test_runtime_diagnostics_is_resilient_to_component_stat_failures(
+    monkeypatch,
+) -> None:
     """Snapshot should report per-section errors when telemetry providers fail."""
     fake_loader = SimpleNamespace(
         active_vertical_name="research",

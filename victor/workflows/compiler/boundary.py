@@ -280,7 +280,8 @@ class NativeWorkflowGraphCompiler:
             ]
 
         logger.debug(
-            "Compiling parsed workflow '%s' via native StateGraph backend", parsed.workflow_name
+            "Compiling parsed workflow '%s' via native StateGraph backend",
+            parsed.workflow_name,
         )
         return graph.compile(
             checkpointer=self._build_checkpointer(),
@@ -376,7 +377,8 @@ class LegacyWorkflowGraphCompiler:
         """Compile a parsed workflow definition into an executable graph."""
         compiler = self._compiler_factory()
         logger.debug(
-            "Compiling parsed workflow '%s' via legacy graph backend", parsed.workflow_name
+            "Compiling parsed workflow '%s' via legacy graph backend",
+            parsed.workflow_name,
         )
         return compiler.compile(parsed.workflow)
 

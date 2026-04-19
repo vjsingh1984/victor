@@ -51,9 +51,12 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from victor.core.context import bind_active_vertical
 from victor.core.events.emit_helper import emit_event_sync
+from victor.framework.entry_point_registry import get_entry_point_registry, get_entry_point_values
 from victor.framework.module_loader import get_entry_point_cache
 from victor.core.verticals.adapters import ensure_runtime_vertical
 from victor.core.verticals.base import VerticalBase, VerticalRegistry
+from victor.core.verticals.compatibility_gate import VerticalCompatibilityGate
+from victor.core.verticals.framework_version import get_framework_version
 from victor.core.verticals.manifest_contract import (
     get_or_create_vertical_manifest,
     get_vertical_runtime_metadata,
@@ -261,8 +264,18 @@ class VerticalLoader:
             if self._discovered_vertical_entry_points is not None and not force_refresh:
                 return self._discovered_vertical_entry_points
 
-            cache = get_entry_point_cache()
-            entries = dict(cache.get_entry_points("victor.plugins", force_refresh=force_refresh))
+            registry = get_entry_point_registry()
+            if force_refresh:
+                registry.invalidate()
+            group = registry.get_group("victor.plugins")
+            entries = (
+                {
+                    name: entry_point_tuple[0].value
+                    for name, entry_point_tuple in group.entry_points.items()
+                }
+                if group is not None
+                else {}
+            )
             self._discovered_vertical_entry_points = entries
             return entries
 
@@ -441,15 +454,18 @@ class VerticalLoader:
         self._log_discovery_telemetry(event="VERTICAL_DISCOVERY", kind="vertical", payload=payload)
         return discovered
 
+    # CONSOLIDATION: plugin-vertical unification — see memory plugin_vertical_consolidation.md
     def _discover_verticals_internal(
         self,
         force_refresh: bool = False,
     ) -> Tuple[Dict[str, Type[VerticalBase]], bool, float]:
         """Discover verticals and return result with cache/duration metadata.
 
-        Delegates to PluginRegistry when it has already run, avoiding
-        a redundant entry point scan.  Falls back to direct scan if
-        the registry hasn't been initialized yet.
+        Prefers PluginRegistry.get_vertical_classes() as the single source of
+        truth — one capture per process shared with bootstrap capability
+        discovery and registry_manager. Falls back to a direct entry-point
+        scan if PluginRegistry has not initialized yet (e.g., in isolated
+        tests).
         """
         with self._lock:
             self._vertical_discovery_calls += 1
@@ -461,8 +477,15 @@ class VerticalLoader:
             self._vertical_discovery_scans += 1
             self._discovered_verticals = {}
 
+            if self._try_populate_from_plugin_registry(force_refresh=force_refresh):
+                self._vertical_last_discovery_ms = max(
+                    0.0,
+                    (time.perf_counter() - start) * 1000.0,
+                )
+                return self._discovered_verticals, False, self._vertical_last_discovery_ms
+
             try:
-                # Discover verticals via entry point scan
+                # Fallback: direct entry-point scan.
                 ep_entries = self._get_vertical_entry_points(force_refresh=force_refresh)
                 self._load_vertical_entries(ep_entries)
             except Exception as e:
@@ -474,6 +497,67 @@ class VerticalLoader:
             )
 
             return self._discovered_verticals, False, self._vertical_last_discovery_ms
+
+    def _try_populate_from_plugin_registry(self, *, force_refresh: bool) -> bool:
+        """Populate ``self._discovered_verticals`` from PluginRegistry if possible.
+
+        Returns True when the population succeeded (caller should not fall
+        back to an independent entry-point scan). Returns False when the
+        PluginRegistry has not discovered yet, when it is unavailable, or
+        when a forced refresh is requested — in which case callers perform
+        their own scan.
+        """
+        if force_refresh:
+            return False
+
+        try:
+            from victor.core.plugins.registry import PluginRegistry
+        except ImportError:
+            return False
+
+        try:
+            plugin_registry = PluginRegistry.get_instance()
+        except Exception:
+            return False
+
+        if not plugin_registry.is_discovered:
+            return False
+
+        try:
+            vertical_classes = plugin_registry.get_vertical_classes()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("PluginRegistry.get_vertical_classes failed: %s", exc)
+            return False
+
+        if not vertical_classes:
+            # Plugin registry ran but captured no verticals; signal fallback.
+            return False
+
+        for vertical_name, vertical_cls in vertical_classes.items():
+            if not VerticalRegistry._validate_external_vertical(vertical_cls, vertical_name):
+                continue
+            existing = VerticalRegistry.get(vertical_cls.name)
+            if existing is not None and existing is not vertical_cls:
+                existing_module = getattr(existing, "__module__", "")
+                new_module = getattr(vertical_cls, "__module__", "")
+                existing_is_contrib = "verticals.contrib" in existing_module
+                new_is_contrib = "verticals.contrib" in new_module
+                if not existing_is_contrib and new_is_contrib:
+                    continue
+                if existing_is_contrib == new_is_contrib:
+                    logger.warning(
+                        "Vertical '%s' has name '%s' which conflicts with "
+                        "registered vertical %s (from %s). Skipping.",
+                        vertical_name,
+                        vertical_cls.name,
+                        existing.__name__,
+                        existing_module,
+                    )
+                    continue
+            self._discovered_verticals[vertical_name] = vertical_cls
+            VerticalRegistry.register(vertical_cls)
+
+        return True
 
     async def discover_verticals_async(
         self,
@@ -645,13 +729,7 @@ class VerticalLoader:
             self._discovered_tools = {}
 
             try:
-                # Use cached entry points for fast startup
-                cache = get_entry_point_cache()
-                ep_entries = cache.get_entry_points(
-                    "victor.tools",
-                    force_refresh=force_refresh,
-                )
-
+                ep_entries = get_entry_point_values("victor.tools", force=force_refresh)
                 self._load_tool_entries(ep_entries)
             except Exception as e:
                 logger.warning("Failed to discover tool entry points: %s", e)
@@ -731,8 +809,11 @@ class VerticalLoader:
             # Also invalidate the entry point cache
             cache = get_entry_point_cache()
             cache.invalidate("victor.plugins")
-            cache.invalidate("victor.verticals")
             cache.invalidate("victor.tools")
+            try:
+                get_entry_point_registry().invalidate()
+            except Exception as e:
+                logger.debug("Failed invalidating unified entry-point registry: %s", e)
 
             # Clear extension cache for consistency (Phase 3.3 fix)
             from victor.core.verticals.extension_loader import VerticalExtensionLoader
@@ -750,7 +831,9 @@ class VerticalLoader:
                 logger.debug("Failed clearing framework vertical integration cache: %s", e)
 
             try:
-                from victor.framework.entry_point_loader import clear_entry_point_loader_cache
+                from victor.framework.entry_point_loader import (
+                    clear_entry_point_loader_cache,
+                )
 
                 clear_entry_point_loader_cache()
             except Exception as e:
@@ -885,101 +968,10 @@ class VerticalLoader:
             logger.debug("Vertical manifest not available: %s", exc)
             return
 
-        # 1. Version Negotiation (Core Framework v. Vertical Requirement)
-        try:
-            from packaging import version
-            from victor.version import VERSION as FRAMEWORK_VERSION
-
-            required = getattr(manifest, "framework_version_requirement", ">=1.0.0")
-
-            from packaging.specifiers import SpecifierSet
-
-            spec = SpecifierSet(required)
-            if version.parse(FRAMEWORK_VERSION) not in spec:
-                raise ValueError(
-                    f"Incompatible framework version: {FRAMEWORK_VERSION} "
-                    f"does not meet requirement {required} for vertical {manifest.name}"
-                )
-        except (ImportError, AttributeError) as exc:
-            logger.debug("Core version negotiation skipped: %s", exc)
-
-        # 2. Capability/Protocol Negotiation
-        try:
-            from victor.core.verticals.capability_negotiator import (
-                CapabilityNegotiator,
-            )
-            from victor.framework.capability_negotiation import (
-                NegotiationResult,
-            )
-
-            negotiator = CapabilityNegotiator()
-            result: NegotiationResult = negotiator.negotiate(manifest)
-
-            for warning in result.warnings:
-                logger.warning("Manifest negotiation warning for '%s': %s", manifest.name, warning)
-
-            if not result.compatible:
-                errors = "; ".join(result.errors)
-                raise ValueError(
-                    f"Vertical '{manifest.name}' manifest negotiation failed: {errors}"
-                )
-        except (ImportError, AttributeError) as exc:
-            # Graceful degradation if manifest/negotiator not available
-            logger.debug("Manifest negotiation skipped: %s", exc)
-
-        # 3. Version Compatibility Matrix Check
-        try:
-            from victor.core.verticals.version_matrix import (
-                VersionCompatibilityMatrix,
-                get_compatibility_matrix,
-            )
-            from victor.version import VERSION as FRAMEWORK_VERSION
-            from packaging.version import parse as parse_version
-
-            vertical_version = getattr(manifest, "version", "1.0.0")
-            vertical_name = manifest.name
-
-            # Get compatibility matrix
-            matrix = get_compatibility_matrix()
-
-            # Load default rules if not loaded
-            if not matrix.is_loaded():
-                matrix.load_default_rules()
-
-            # Check compatibility
-            result = matrix.check_compatibility(
-                vertical_name=vertical_name,
-                vertical_version=vertical_version,
-                framework_version=FRAMEWORK_VERSION,
-            )
-
-            if result.is_incompatible:
-                raise ValueError(
-                    f"Vertical '{vertical_name}' is incompatible with framework {FRAMEWORK_VERSION}: "
-                    f"{result.message}"
-                )
-
-            if result.status.value == "degraded":
-                logger.warning(
-                    "Vertical '%s' is running in degraded mode: %s",
-                    vertical_name,
-                    result.message,
-                )
-
-            if result.required_features:
-                logger.warning(
-                    "Vertical '%s' requires features that are not available: %s",
-                    vertical_name,
-                    ", ".join(sorted(result.required_features)),
-                )
-
-        except (ImportError, AttributeError) as exc:
-            logger.debug("Version compatibility check skipped: %s", exc)
-        except ValueError:
-            # Re-raise ValueError as it indicates incompatibility
-            raise
-        except Exception as exc:
-            logger.debug("Version compatibility check failed: %s", exc)
+        report = VerticalCompatibilityGate().assess_manifest(manifest)
+        for warning in report.warnings:
+            logger.warning("Manifest negotiation warning for '%s': %s", manifest.name, warning)
+        report.raise_if_incompatible()
 
     def _validate_dependencies(self, vertical: Type[VerticalBase]) -> None:
         """Validate vertical dependencies before activation.
@@ -1215,7 +1207,9 @@ class VerticalLoader:
         framework_entry_point_stats: Dict[str, Any] = {}
         entry_point_cache_stats: Dict[str, Any] = {}
         try:
-            from victor.core.tool_dependency_loader import get_tool_dependency_resolution_stats
+            from victor.core.tool_dependency_loader import (
+                get_tool_dependency_resolution_stats,
+            )
 
             tool_dependency_stats = get_tool_dependency_resolution_stats()
         except Exception as e:

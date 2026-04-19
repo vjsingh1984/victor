@@ -254,7 +254,8 @@ class TestRunOnboarding:
         mock_run.assert_called_once()
 
     @patch(
-        "victor.ui.commands.onboarding.OnboardingWizard.run", side_effect=Exception("Test error")
+        "victor.ui.commands.onboarding.OnboardingWizard.run",
+        side_effect=Exception("Test error"),
     )
     def test_run_onboarding_handles_exception(self, mock_run):
         """run_onboarding handles exceptions."""
@@ -265,7 +266,10 @@ class TestRunOnboarding:
         assert exit_code == 1
         mock_run.assert_called_once()
 
-    @patch("victor.ui.commands.onboarding.OnboardingWizard", side_effect=Exception("Init error"))
+    @patch(
+        "victor.ui.commands.onboarding.OnboardingWizard",
+        side_effect=Exception("Init error"),
+    )
     def test_run_onboarding_handles_wizard_init_exception(self, mock_wizard):
         """run_onboarding handles wizard initialization exceptions."""
         from victor.ui.commands.onboarding import run_onboarding

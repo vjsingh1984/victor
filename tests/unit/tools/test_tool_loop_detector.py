@@ -339,7 +339,10 @@ class TestToolLoopDetectorDeepSeekScenario:
             # Symbol lookup (different resource)
             detector.record_tool_call(
                 "symbol",
-                {"file_path": "utils/web_search_client.py", "symbol": "WebSearchClient"},
+                {
+                    "file_path": "utils/web_search_client.py",
+                    "symbol": "WebSearchClient",
+                },
             )
 
         # Should still detect resource contention on the file

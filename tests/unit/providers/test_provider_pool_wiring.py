@@ -90,7 +90,9 @@ class TestProviderPoolBasic:
 class TestProviderRuntimePoolWiring:
     def test_feature_flag_creates_pool(self):
         """When use_provider_pooling flag is set, pool should be created."""
-        from victor.agent.runtime.provider_runtime import create_provider_runtime_components
+        from victor.agent.runtime.provider_runtime import (
+            create_provider_runtime_components,
+        )
 
         mock_settings = MagicMock()
         mock_settings.feature_flags = MagicMock()
@@ -110,7 +112,9 @@ class TestProviderRuntimePoolWiring:
 
     def test_no_pool_by_default(self):
         """Without feature flag, pool should be None."""
-        from victor.agent.runtime.provider_runtime import create_provider_runtime_components
+        from victor.agent.runtime.provider_runtime import (
+            create_provider_runtime_components,
+        )
 
         mock_settings = MagicMock()
         mock_settings.feature_flags = MagicMock()

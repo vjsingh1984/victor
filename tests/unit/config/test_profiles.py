@@ -82,7 +82,7 @@ class TestProfiles:
     def test_list_profiles(self):
         """Listing profiles returns all profiles."""
         profiles = list_profiles()
-        assert len(profiles) == 5
+        assert len(profiles) == 6
         assert all(isinstance(p, ProfileTemplate) for p in profiles)
 
     def test_get_profile_by_name(self):

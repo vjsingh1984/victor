@@ -178,7 +178,9 @@ class ModuleAnalyzer:
 
     # === Internal methods ===
 
-    def _load_module_graph(self) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
+    def _load_module_graph(
+        self,
+    ) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
         """Load module-level adjacency from graph_edge/graph_node tables."""
         db = self._get_db()
         conn = db.connection if hasattr(db, "connection") else db._get_raw_connection()

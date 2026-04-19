@@ -19,7 +19,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # Shell-related aliases that should resolve intelligently
-SHELL_ALIASES = {"run", "bash", "execute", "cmd", "execute_bash", "shell_readonly", "shell"}
+SHELL_ALIASES = {
+    "run",
+    "bash",
+    "execute",
+    "cmd",
+    "execute_bash",
+    "shell_readonly",
+    "shell",
+}
 
 
 def resolve_shell_variant(

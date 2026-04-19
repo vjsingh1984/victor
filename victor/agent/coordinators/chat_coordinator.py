@@ -40,13 +40,11 @@ This design enables:
 
 import asyncio
 import logging
-from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, Optional, TYPE_CHECKING
 
 from victor.framework.task import TaskComplexity
 from victor.agent.unified_task_tracker import TrackerTaskType
-from victor.agent.response_completer import ToolFailureContext
 from victor.agent.prompt_requirement_extractor import extract_prompt_requirements
-from victor.agent.task_analyzer import TaskAnalysis
 from victor.providers.base import CompletionResponse, Message, StreamChunk
 from victor.core.errors import (
     ProviderAuthError,
@@ -69,10 +67,11 @@ logger = logging.getLogger(__name__)
 
 
 class ChatCoordinator:
-    """Coordinator for chat and streaming chat operations.
+    """[DEPRECATED] Coordinator for chat and streaming chat operations.
 
-    This class extracts chat-related logic from the orchestrator,
-    providing a clean interface for managing conversations.
+    This class is being superseded by ChatService as part of the 
+    state-passed architectural migration. It remains for backward 
+    compatibility with facade-driven components.
 
     The coordinator depends on ``ChatOrchestratorProtocol`` (defined in
     ``chat_protocols.py``) rather than the concrete ``AgentOrchestrator``.
@@ -110,41 +109,45 @@ class ChatCoordinator:
         self._streaming_pipeline = pipeline
 
         # NEW: Execution coordinator for agentic loop (Phase 1)
-        self._execution_coordinator: Optional[Any] = None
+        self._turn_executor: Optional[Any] = None
 
     # =====================================================================
     # Public API
     # =====================================================================
 
     @property
-    def execution_coordinator(self) -> Any:
+    def turn_executor(self) -> Any:
         """Get the execution coordinator for agentic loop.
 
         Returns:
-            ExecutionCoordinator instance (lazy initialized)
+            TurnExecutor instance (lazy initialized)
         """
-        if self._execution_coordinator is None:
-            from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+        if self._turn_executor is None:
+            from victor.agent.coordinators.turn_executor import (
+                TurnExecutor,
+            )
 
             # Create protocol adapter for orchestrator
-            from victor.agent.coordinators.protocol_adapters import OrchestratorProtocolAdapter
+            from victor.agent.coordinators.protocol_adapters import (
+                OrchestratorProtocolAdapter,
+            )
 
             adapter = OrchestratorProtocolAdapter(self._orchestrator)
 
             # Initialize execution coordinator with protocol-based dependencies
-            self._execution_coordinator = ExecutionCoordinator(
+            self._turn_executor = TurnExecutor(
                 chat_context=adapter,
                 tool_context=adapter,
                 provider_context=adapter,
                 execution_provider=adapter,
                 token_tracker=self._token_tracker,
             )
-        return self._execution_coordinator
+        return self._turn_executor
 
     async def chat(
         self,
         user_message: str,
-        use_planning: bool = False,
+        use_planning: Optional[bool] = False,
     ) -> CompletionResponse:
         """Send a chat message and get response with full agentic loop.
 
@@ -155,17 +158,26 @@ class ChatCoordinator:
 
         Args:
             user_message: User's message
-            use_planning: Whether to use structured planning for complex tasks
+            use_planning: Whether to use structured planning for complex tasks.
+                None = auto-detect based on task complexity.
+                True = use planning if task qualifies.
+                False = skip planning entirely.
 
         Returns:
             CompletionResponse from the model with complete response
         """
-        # Check if we should use planning for this task
-        if use_planning and self._should_use_planning(user_message):
+        # If planning is explicitly disabled, skip planning check
+        if use_planning is False:
+            return await self.turn_executor.execute_agentic_loop(user_message)
+
+        # Check if we should use planning for this task (explicit or auto-detected)
+        if (use_planning is True or use_planning is None) and self._should_use_planning(
+            user_message
+        ):
             return await self._chat_with_planning(user_message)
 
-        # NEW: Delegate to execution coordinator for agentic loop
-        return await self.execution_coordinator.execute_agentic_loop(user_message)
+        # Default: delegate to execution coordinator for agentic loop
+        return await self.turn_executor.execute_agentic_loop(user_message)
 
     def _should_use_planning(self, user_message: str) -> bool:
         """Determine if planning should be used for this task.
@@ -287,7 +299,23 @@ class ChatCoordinator:
         if self._streaming_pipeline is None:
             from victor.agent.streaming import create_streaming_chat_pipeline
 
-            self._streaming_pipeline = create_streaming_chat_pipeline(self)
+            # Wire AgenticLoop components into streaming pipeline for parity:
+            # - PerceptionIntegration: structured task understanding before iteration
+            # - FulfillmentDetector: task completion validation after tool execution
+            # Access via public attributes or capability protocol
+            perception = (
+                orch.get_capability_value("perception_integration")
+                if orch.has_capability("perception_integration")
+                else None
+            )
+            fulfillment = (
+                orch.get_capability_value("fulfillment_detector")
+                if orch.has_capability("fulfillment_detector")
+                else None
+            )
+            self._streaming_pipeline = create_streaming_chat_pipeline(
+                self, perception=perception, fulfillment=fulfillment
+            )
 
         pipeline = self._streaming_pipeline
         try:
@@ -296,8 +324,10 @@ class ChatCoordinator:
         finally:
             # Update cumulative token usage after stream completes
             # This enables accurate token tracking for evaluations/benchmarks
-            if hasattr(orch, "_current_stream_context") and orch._current_stream_context:
-                ctx = orch._current_stream_context
+            if orch.has_capability("current_stream_context") and orch.get_capability_value(
+                "current_stream_context"
+            ):
+                ctx = orch.get_capability_value("current_stream_context")
                 if hasattr(ctx, "cumulative_usage"):
                     if self._token_tracker is not None:
                         self._token_tracker.accumulate(ctx.cumulative_usage)
@@ -363,19 +393,21 @@ class ChatCoordinator:
         orch.reminder_manager.reset()
 
         # Start UsageAnalytics session for this conversation
-        if hasattr(orch, "_usage_analytics") and orch._usage_analytics:
-            orch._usage_analytics.start_session()
+        if orch.has_capability("usage_analytics") and orch.get_capability_value("usage_analytics"):
+            orch.get_capability_value("usage_analytics").start_session()
 
         # Clear ToolSequenceTracker history for new conversation
-        if hasattr(orch, "_sequence_tracker") and orch._sequence_tracker:
-            orch._sequence_tracker.clear_history()
+        if orch.has_capability("tool_sequence_tracker") and orch.get_capability_value(
+            "tool_sequence_tracker"
+        ):
+            orch.get_capability_value("tool_sequence_tracker").clear_history()
 
         # PERF: Start background compaction for async context management
         if orch._context_manager and hasattr(orch._context_manager, "start_background_compaction"):
             await orch._context_manager.start_background_compaction(interval_seconds=15.0)
 
         # Local aliases for frequently-used values
-        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 50)
+        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 100)
         total_iterations = 0
         force_completion = False
 
@@ -383,8 +415,8 @@ class ChatCoordinator:
         orch.add_message("user", user_message)
 
         # Record this turn in UsageAnalytics
-        if hasattr(orch, "_usage_analytics") and orch._usage_analytics:
-            orch._usage_analytics.record_turn()
+        if orch.has_capability("usage_analytics") and orch.get_capability_value("usage_analytics"):
+            orch.get_capability_value("usage_analytics").record_turn()
 
         # Detect task type using unified tracker
         unified_task_type = orch.unified_tracker.detect_task_type(user_message)
@@ -481,7 +513,7 @@ class ChatCoordinator:
         ) = await self._prepare_stream(user_message)
 
         # Classify task type based on keywords
-        task_keywords = self._classify_task_keywords(user_message)
+        task_keywords = orch._classify_task_keywords(user_message)
 
         # Create and populate context
         ctx = create_stream_context(
@@ -502,14 +534,21 @@ class ChatCoordinator:
         ctx.task_classification = task_classification
         ctx.complexity_tool_budget = complexity_tool_budget
 
-        # Add task keyword results
-        ctx.is_analysis_task = task_keywords["is_analysis_task"] or unified_task_type.value in (
-            "analyze",
-            "analysis",
+        # Add task keyword results (compat with both old and new format)
+        task_type_val = task_keywords.get("task_type", "default")
+        ctx.is_analysis_task = task_keywords.get(
+            "is_analysis_task",
+            task_type_val in ("analysis", "analyze"),
+        ) or unified_task_type.value in ("analyze", "analysis")
+        ctx.is_action_task = task_keywords.get(
+            "is_action_task",
+            task_type_val in ("action", "create_simple", "create_complex"),
         )
-        ctx.is_action_task = task_keywords["is_action_task"]
-        ctx.needs_execution = task_keywords["needs_execution"]
-        ctx.coarse_task_type = task_keywords["coarse_task_type"]
+        ctx.needs_execution = task_keywords.get(
+            "needs_execution",
+            task_type_val in ("execution", "action"),
+        )
+        ctx.coarse_task_type = task_keywords.get("coarse_task_type", task_type_val)
 
         # Set is_complex_task from ComplexityClassifier for lenient progress checking
         if task_classification and hasattr(task_classification, "complexity"):
@@ -517,6 +556,11 @@ class ChatCoordinator:
                 TaskComplexity.COMPLEX,
                 TaskComplexity.ANALYSIS,
             )
+
+        # Q&A detection: skip tools for pure question/display-only tasks
+        from victor.agent.coordinators.turn_executor import TurnExecutor
+
+        ctx.is_qa_task = TurnExecutor._is_question_only(user_message)
 
         # Set goals for tool selection
         ctx.goals = orch._tool_planner.infer_goals_from_message(user_message)
@@ -556,182 +600,6 @@ class ChatCoordinator:
         return orch.task_coordinator.prepare_task(
             user_message, unified_task_type, orch.conversation_controller
         )
-
-    def _classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
-        """Classify task based on keywords in the user message.
-
-        Delegates to TaskAnalyzer.classify_task_keywords() for consistency
-        with orchestrator behavior.
-
-        Args:
-            user_message: The user's message
-
-        Returns:
-            Dictionary with classification results including is_analysis_task,
-            is_action_task, needs_execution, and coarse_task_type
-        """
-        orch = self._orchestrator
-        return orch._task_analyzer.classify_task_keywords(user_message)
-
-    def _apply_intent_guard(self, user_message: str) -> None:
-        """Detect intent and inject prompt guards for read-only tasks.
-
-        Args:
-            user_message: The user's message
-        """
-        orch = self._orchestrator
-
-        # Delegate to TaskCoordinator
-        orch.task_coordinator.apply_intent_guard(user_message, orch.conversation_controller)
-
-        # Sync current_intent back to orchestrator
-        orch._current_intent = orch.task_coordinator.current_intent
-
-    def _apply_task_guidance(
-        self,
-        user_message: str,
-        unified_task_type: TrackerTaskType,
-        is_analysis_task: bool,
-        is_action_task: bool,
-        needs_execution: bool,
-        max_exploration_iterations: int,
-    ) -> None:
-        """Apply guidance and budget tweaks for analysis/action tasks.
-
-        Args:
-            user_message: The user's message
-            unified_task_type: The detected task type
-            is_analysis_task: Whether this is an analysis task
-            is_action_task: Whether this is an action task
-            needs_execution: Whether execution is needed
-            max_exploration_iterations: Maximum exploration iterations
-        """
-        orch = self._orchestrator
-
-        # Set initial temperature and tool_budget in TaskCoordinator
-        orch.task_coordinator.temperature = orch.temperature
-        orch.task_coordinator.tool_budget = orch.tool_budget
-
-        # Delegate to TaskCoordinator
-        orch.task_coordinator.apply_task_guidance(
-            user_message=user_message,
-            unified_task_type=unified_task_type,
-            is_analysis_task=is_analysis_task,
-            is_action_task=is_action_task,
-            needs_execution=needs_execution,
-            max_exploration_iterations=max_exploration_iterations,
-            conversation_controller=orch.conversation_controller,
-        )
-
-        # Sync temperature and tool_budget back to orchestrator
-        orch.temperature = orch.task_coordinator.temperature
-        orch.tool_budget = orch.task_coordinator.tool_budget
-
-    async def _select_tools_for_turn(self, context_msg: str, goals: Any) -> Any:
-        """Select and prioritize tools for the current turn.
-
-        Args:
-            context_msg: The context message for tool selection
-            goals: Inferred goals from the user message
-
-        Returns:
-            Selected and prioritized tools, or None if tooling not allowed
-        """
-        orch = self._orchestrator
-
-        provider_supports_tools = orch.provider.supports_tools()
-        tooling_allowed = provider_supports_tools and orch._model_supports_tool_calls()
-
-        if not tooling_allowed:
-            return None
-
-        planned_tools = None
-        if goals:
-            available_inputs = ["query"]
-            if orch.observed_files:
-                available_inputs.append("file_contents")
-            planned_tools = orch._tool_planner.plan_tools(goals, available_inputs)
-            logger.info(f"available_inputs={available_inputs}")
-
-        conversation_depth = orch.conversation.message_count()
-        conversation_history = (
-            [msg.model_dump() for msg in orch.messages] if orch.messages else None
-        )
-        tools = await orch.tool_selector.select_tools(
-            context_msg,
-            use_semantic=orch.use_semantic_selection,
-            conversation_history=conversation_history,
-            conversation_depth=conversation_depth,
-            planned_tools=planned_tools,
-        )
-        logger.info(
-            f"context_msg={context_msg}\nuse_semantic={orch.use_semantic_selection}\nconversation_depth={conversation_depth}"
-        )
-        tools = orch.tool_selector.prioritize_by_stage(context_msg, tools)
-        current_intent = getattr(orch, "_current_intent", None)
-        tools = orch._tool_planner.filter_tools_by_intent(tools, current_intent)
-        return tools
-
-    def _get_decision_service(self) -> Optional[Any]:
-        """Get the LLM decision service from the container if available.
-
-        Returns:
-            LLMDecisionService instance or None if not configured.
-        """
-        try:
-            from victor.core.feature_flags import FeatureFlag, is_feature_enabled
-
-            if not is_feature_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
-                return None
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
-
-            container = getattr(self._orchestrator, "_container", None)
-            if container is not None:
-                return container.get(LLMDecisionServiceProtocol)
-        except Exception as e:
-            logger.debug("Failed to resolve LLM decision service: %s", e)
-        return None
-
-    def _extract_required_files_from_prompt(self, user_message: str) -> List[str]:
-        """Extract required file paths from the user message.
-
-        Args:
-            user_message: The user's message
-
-        Returns:
-            List of required file paths mentioned in the message
-        """
-        import re
-
-        # Extract file paths from the message (e.g., /path/to/file.py, ./relative/path)
-        pattern = r'(?:^|[\s"\'`])(/[\w./\-]+\.\w+|\.{1,2}/[\w./\-]+\.\w+)'
-        matches = re.findall(pattern, user_message)
-        return list(set(matches))
-
-    def _extract_required_outputs_from_prompt(self, user_message: str) -> List[str]:
-        """Extract required outputs from the user message.
-
-        Args:
-            user_message: The user's message
-
-        Returns:
-            List of required outputs mentioned in the message
-        """
-        # Required outputs are not easily extractable from raw text;
-        # return empty list as these are advisory hints for the streaming loop
-        return []
-
-    def _get_max_context_chars(self) -> int:
-        """Get the maximum context length in characters.
-
-        Delegates to orchestrator's _get_max_context_chars which uses ContextManager.
-
-        Returns:
-            Maximum context length for the current provider/model
-        """
-        return self._orchestrator._get_max_context_chars()
 
     # =====================================================================
     # Iteration Pre-Checks
@@ -801,39 +669,6 @@ class ChatCoordinator:
             logger.info("Injecting pending grounding feedback as system message")
             orch.add_message("system", stream_ctx.pending_grounding_feedback)
             stream_ctx.pending_grounding_feedback = ""
-
-    def _log_iteration_debug(
-        self,
-        stream_ctx: "StreamingChatContext",
-        max_total_iterations: int,
-    ) -> None:
-        """Log iteration debug information.
-
-        Args:
-            stream_ctx: The streaming context
-            max_total_iterations: Maximum iterations allowed
-        """
-        orch = self._orchestrator
-        unique_resources = orch.unified_tracker.unique_resources
-        logger.debug(
-            f"Iteration {stream_ctx.total_iterations}/{max_total_iterations}: "
-            f"tool_calls_used={orch.tool_calls_used}/{orch.tool_budget}, "
-            f"unique_resources={len(unique_resources)}, "
-            f"force_completion={stream_ctx.force_completion}"
-        )
-
-        orch.debug_logger.log_iteration_start(
-            stream_ctx.total_iterations,
-            tool_calls=orch.tool_calls_used,
-            files_read=len(unique_resources),
-        )
-        orch.debug_logger.log_limits(
-            tool_budget=orch.tool_budget,
-            tool_calls_used=orch.tool_calls_used,
-            max_iterations=max_total_iterations,
-            current_iteration=stream_ctx.total_iterations,
-            is_analysis_task=stream_ctx.is_analysis_task,
-        )
 
     # =====================================================================
     # Context and Iteration Limits
@@ -941,20 +776,28 @@ class ChatCoordinator:
                     sanitized = orch.sanitizer.sanitize(response.content)
                     if sanitized:
                         orch.add_message("assistant", sanitized)
-                        chunk = StreamChunk(content=sanitized)
+                        chunk = StreamChunk(content=sanitized, is_final=True)
+                        orch._record_intelligent_outcome(
+                            success=True,
+                            quality_score=last_quality_score,
+                            user_satisfied=True,
+                            completed=True,
+                        )
+                        return True, chunk
             except (ProviderRateLimitError, ProviderTimeoutError) as e:
                 logger.error(f"Rate limit/timeout during final response: {e}")
-                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n")
+                chunk = StreamChunk(content="Rate limited or timeout. Please retry in a moment.\n", is_final=True)
             except ProviderAuthError as e:
                 logger.error(f"Auth error during final response: {e}")
-                chunk = StreamChunk(content="Authentication error. Check API credentials.\n")
+                chunk = StreamChunk(content="Authentication error. Check API credentials.\n", is_final=True)
             except (ConnectionError, TimeoutError) as e:
                 logger.error(f"Network error during final response: {e}")
-                chunk = StreamChunk(content="Network error. Check connection.\n")
+                chunk = StreamChunk(content="Network error. Check connection.\n", is_final=True)
             except Exception:
                 logger.exception("Unexpected error during final response generation")
                 chunk = StreamChunk(
-                    content="Unable to generate final summary due to iteration limit.\n"
+                    content="Unable to generate final summary due to iteration limit.\n",
+                    is_final=True
                 )
 
             orch._record_intelligent_outcome(
@@ -963,7 +806,7 @@ class ChatCoordinator:
                 user_satisfied=True,
                 completed=True,
             )
-            return True, StreamChunk(content="", is_final=True)
+            return True, chunk if chunk else StreamChunk(content="", is_final=True)
 
         return False, None
 
@@ -1000,7 +843,9 @@ class ChatCoordinator:
             Number of seconds to wait before retrying
         """
         orch = self._orchestrator
-        base_wait = orch._provider_coordinator.get_rate_limit_wait_time(exc)
+        # [CANONICAL] Use state-passed service for rate limit calculation
+        base_wait = orch._provider_service.get_rate_limit_wait_time(exc)
+        
         backoff_multiplier = 2**attempt
         wait_time = base_wait * backoff_multiplier
         return min(wait_time, 300.0)
@@ -1038,6 +883,7 @@ class ChatCoordinator:
                         f"Rate limit hit (attempt {attempt + 1}/{max_retries + 1}). "
                         f"Waiting {wait_time:.1f}s before retry..."
                     )
+                    logger.debug(f"Rate limit detail: {str(e)[:300]}")
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
@@ -1051,6 +897,7 @@ class ChatCoordinator:
                             f"Rate limit hit (attempt {attempt + 1}/{max_retries + 1}). "
                             f"Waiting {wait_time:.1f}s before retry..."
                         )
+                        logger.debug(f"Rate limit detail: {type(e).__name__}: {str(e)[:200]}")
                         await asyncio.sleep(wait_time)
                     else:
                         logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
@@ -1086,8 +933,11 @@ class ChatCoordinator:
         max_garbage_chunks = 3
         total_tokens: float = 0
 
+        assembled = orch.get_assembled_messages(
+            current_query=stream_ctx.user_message if stream_ctx else None
+        )
         async for chunk in orch.provider.stream(
-            messages=orch.messages,
+            messages=assembled,
             model=orch.model,
             temperature=orch.temperature,
             max_tokens=orch.max_tokens,
@@ -1095,7 +945,10 @@ class ChatCoordinator:
             **provider_kwargs,
         ):
             chunk, consecutive_garbage_chunks, garbage_detected = self._handle_stream_chunk(
-                chunk, consecutive_garbage_chunks, max_garbage_chunks, garbage_detected
+                chunk,
+                consecutive_garbage_chunks,
+                max_garbage_chunks,
+                garbage_detected,
             )
             if chunk is None:
                 continue
@@ -1163,69 +1016,8 @@ class ChatCoordinator:
         return chunk, consecutive_garbage_chunks, garbage_detected
 
     # =====================================================================
-    # Tool Call Processing
-    # =====================================================================
-
-    def _parse_and_validate_tool_calls(self, tool_calls: Any, full_content: str) -> tuple[Any, str]:
-        """Parse, validate, and normalize tool calls.
-
-        Delegates to ToolCoordinator which consolidates all tool-call processing.
-
-        Args:
-            tool_calls: Raw tool calls from the provider
-            full_content: The full content from the response
-
-        Returns:
-            Tuple of (validated_tool_calls, full_content)
-        """
-        orch = self._orchestrator
-        return orch._tool_coordinator.parse_and_validate_tool_calls(
-            tool_calls, full_content, orch.tool_adapter
-        )
-
-    # =====================================================================
     # Recovery Integration
     # =====================================================================
-
-    def _create_recovery_context(
-        self,
-        stream_ctx: "StreamingChatContext",
-    ) -> Any:
-        """Create RecoveryContext from current orchestrator state.
-
-        Delegates to orchestrator for consistency (includes model, temperature,
-        unified_task_type, is_analysis_task, is_action_task fields).
-        """
-        return self._orchestrator._create_recovery_context(stream_ctx)
-
-    async def _handle_recovery_with_integration(
-        self,
-        stream_ctx: "StreamingChatContext",
-        full_content: str,
-        tool_calls: Any,
-        mentioned_tools: Optional[List[str]] = None,
-    ) -> Any:
-        """Handle recovery using the recovery integration system.
-
-        Delegates to orchestrator which uses _recovery_coordinator for
-        consistent recovery handling.
-        """
-        return await self._orchestrator._handle_recovery_with_integration(
-            stream_ctx=stream_ctx,
-            full_content=full_content,
-            tool_calls=tool_calls,
-            mentioned_tools=mentioned_tools,
-        )
-
-    def _apply_recovery_action(
-        self, recovery_action: Any, stream_ctx: "StreamingChatContext"
-    ) -> Optional[StreamChunk]:
-        """Apply a recovery action and return any chunk to yield.
-
-        Delegates to orchestrator which uses _recovery_coordinator for
-        consistent recovery action application.
-        """
-        return self._orchestrator._apply_recovery_action(recovery_action, stream_ctx)
 
     async def _handle_empty_response_recovery(
         self,
@@ -1261,13 +1053,19 @@ class ChatCoordinator:
 
                 provider_kwargs: Dict[str, Any] = {}
                 if orch.thinking:
-                    provider_kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
+                    provider_kwargs["thinking"] = {
+                        "type": "enabled",
+                        "budget_tokens": 10000,
+                    }
 
                 full_content = ""
                 recovered_tool_calls = None
 
+                retry_assembled = orch.get_assembled_messages(
+                    current_query=stream_ctx.user_message if stream_ctx else None
+                )
                 async for chunk in orch.provider.stream(
-                    messages=orch.messages,
+                    messages=retry_assembled,
                     model=orch.model,
                     temperature=temp,
                     max_tokens=orch.max_tokens,
@@ -1305,44 +1103,8 @@ class ChatCoordinator:
         return False, None, None
 
     # =====================================================================
-    # Intelligent Response Validation
-    # =====================================================================
-
-    async def _validate_intelligent_response(
-        self,
-        response: str,
-        query: str,
-        tool_calls: int,
-        task_type: str,
-    ) -> Optional[Dict[str, Any]]:
-        """Validate response quality using the intelligent pipeline.
-
-        Delegates to orchestrator's implementation which uses the correct
-        intelligent_integration property.
-        """
-        return await self._orchestrator._validate_intelligent_response(
-            response=response,
-            query=query,
-            tool_calls=tool_calls,
-            task_type=task_type,
-        )
-
-    # =====================================================================
     # Planning Integration
     # =====================================================================
-
-    def _get_planning_coordinator(self) -> "PlanningCoordinator":
-        """Get or create the planning coordinator.
-
-        Returns:
-            PlanningCoordinator instance
-        """
-        if self._planning_coordinator is None:
-            from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
-
-            self._planning_coordinator = PlanningCoordinator(self._orchestrator)
-
-        return self._planning_coordinator
 
     async def chat_with_planning(
         self,
@@ -1351,8 +1113,7 @@ class ChatCoordinator:
     ) -> CompletionResponse:
         """Chat with automatic planning for complex multi-step tasks.
 
-        Delegates to _chat_with_planning when planning is enabled or auto-detected.
-        For simple tasks or when planning is disabled, uses regular chat.
+        Convenience method that delegates to chat() with planning support.
 
         Args:
             user_message: User's message
@@ -1360,26 +1121,86 @@ class ChatCoordinator:
 
         Returns:
             CompletionResponse from the model
-
-        Example:
-            # Auto-detect if planning is needed
-            response = await coordinator.chat_with_planning(
-                "Analyze the codebase architecture and provide SOLID evaluation"
-            )
-
-            # Force planning mode
-            response = await coordinator.chat_with_planning(
-                "Implement user auth",
-                use_planning=True
-            )
         """
-        # If planning is explicitly disabled, use regular chat
-        if use_planning is False:
-            return await self.chat(user_message)
+        return await self.chat(user_message, use_planning=use_planning)
 
-        # If planning is explicitly enabled or auto-detected, delegate
-        if use_planning is True or self._should_use_planning(user_message):
-            return await self._chat_with_planning(user_message)
+    # =====================================================================
+    # Message Persistence (extracted from AgentOrchestrator.add_message)
+    # =====================================================================
 
-        # Default to regular chat for simple tasks
-        return await self.chat(user_message)
+    @staticmethod
+    def persist_message(
+        role: str,
+        content: str,
+        memory_manager: Any,
+        memory_session_id: Optional[str],
+        usage_logger: Any,
+        tool_name: Optional[str] = None,
+        tool_call_id: Optional[str] = None,
+        tool_calls: Optional[list] = None,
+    ) -> None:
+        """Persist a message to memory and log the event.
+
+        Offloads blocking SQLite I/O to the thread pool when an event
+        loop is running, preventing async caller blocking.
+
+        Args:
+            role: Message role (user, assistant, system, tool).
+            content: Message content text.
+            memory_manager: MemoryManager instance (or None).
+            memory_session_id: Active memory session ID (or None).
+            usage_logger: UsageLogger for event logging.
+            tool_name: Tool name for tool role messages.
+            tool_call_id: Tool call ID for correlation.
+            tool_calls: Tool calls list for assistant messages (OpenAI spec).
+        """
+        # Persist to memory manager if available
+        if memory_manager and memory_session_id:
+            try:
+                from victor.agent.conversation.types import MessageRole
+
+                role_map = {
+                    "user": MessageRole.USER,
+                    "assistant": MessageRole.ASSISTANT,
+                    "system": MessageRole.SYSTEM,
+                    "tool": MessageRole.TOOL,
+                    "tool_result": MessageRole.TOOL,  # Legacy compat
+                    "tool_call": MessageRole.TOOL_CALL,
+                }
+                msg_role = role_map.get(role, MessageRole.USER)
+
+                # Build kwargs for add_message
+                add_kwargs: dict = {
+                    "session_id": memory_session_id,
+                    "role": msg_role,
+                    "content": content,
+                }
+                if tool_name:
+                    add_kwargs["tool_name"] = tool_name
+                if tool_call_id:
+                    add_kwargs["tool_call_id"] = tool_call_id
+                if tool_calls:
+                    add_kwargs["tool_calls"] = tool_calls
+
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop is not None and loop.is_running():
+                    loop.run_in_executor(
+                        None,
+                        lambda: memory_manager.add_message(**add_kwargs),
+                    )
+                else:
+                    memory_manager.add_message(**add_kwargs)
+            except Exception as e:
+                logging.getLogger(__name__).debug("Failed to persist message: %s", e)
+
+        # Log usage event
+        if role == "user":
+            usage_logger.log_event("user_prompt", {"content": content})
+        elif role == "assistant":
+            usage_logger.log_event("assistant_response", {"content": content})
+            if hasattr(usage_logger, "set_reasoning_context") and content:
+                usage_logger.set_reasoning_context(content)

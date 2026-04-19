@@ -280,7 +280,10 @@ def _extract_content(html: str, max_length: int = 5000) -> str:
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["query"],  # Different queries indicate progress, not loops
     stages=["planning", "initial"],  # Conversation stages where relevant
-    task_types=["research", "analysis"],  # Task types for classification-aware selection
+    task_types=[
+        "research",
+        "analysis",
+    ],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
     keywords=[
         "search",
@@ -406,14 +409,22 @@ async def web_search(
             logger.info(f"[web_search] top URLs: {sample_urls}")
 
         if not results:
-            result_payload = {"success": True, "results": "No results found", "result_count": 0}
+            result_payload = {
+                "success": True,
+                "results": "No results found",
+                "result_count": 0,
+            }
             if cache is not None:
                 cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
             return result_payload
 
         # Format results
         output = _format_results(query, results)
-        result_payload = {"success": True, "results": output, "result_count": len(results)}
+        result_payload = {
+            "success": True,
+            "results": output,
+            "result_count": len(results),
+        }
         if cache is not None:
             cache.set(ResultType.SEARCH, query, dict(result_payload), params=cache_params)
         return result_payload
@@ -433,7 +444,10 @@ async def web_search(
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["url"],  # Different URLs indicate progress, not loops
     stages=["planning", "initial"],  # Conversation stages where relevant
-    task_types=["research", "analysis"],  # Task types for classification-aware selection
+    task_types=[
+        "research",
+        "analysis",
+    ],  # Task types for classification-aware selection
     execution_category="network",  # Can run in parallel with read-only ops
     keywords=["fetch", "url", "webpage", "download", "http", "content", "web fetch"],
     aliases=["fetch"],  # Backward compatibility alias
@@ -666,7 +680,11 @@ Format the response clearly with sections."""
                 f"[web_summarize] summarization model='{model}', summary_len={len(summary)}"
             )
 
-            return {"success": True, "summary": summary, "original_results": results_text}
+            return {
+                "success": True,
+                "summary": summary,
+                "original_results": results_text,
+            }
 
         except Exception as e:
             # Fallback to just search results

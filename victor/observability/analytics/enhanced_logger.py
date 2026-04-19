@@ -42,13 +42,21 @@ class PIIScrubber:
     # Patterns for common PII
     PATTERNS: List[tuple[str, Pattern, str]] = [
         # Email addresses
-        ("email", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"), "[EMAIL]"),
+        (
+            "email",
+            re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
+            "[EMAIL]",
+        ),
         # API keys (common formats)
         ("api_key", re.compile(r"\b(sk-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(xai-[a-zA-Z0-9]{20,})\b"), "[API_KEY]"),
         ("api_key", re.compile(r"\b(AIza[a-zA-Z0-9_-]{35})\b"), "[API_KEY]"),
         # Bearer tokens
-        ("token", re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I), "[BEARER_TOKEN]"),
+        (
+            "token",
+            re.compile(r"\b(Bearer\s+[a-zA-Z0-9._-]+)\b", re.I),
+            "[BEARER_TOKEN]",
+        ),
         # Home directory paths
         ("path", re.compile(r"/Users/[a-zA-Z0-9_-]+"), "/Users/[USER]"),
         ("path", re.compile(r"/home/[a-zA-Z0-9_-]+"), "/home/[USER]"),
@@ -311,6 +319,7 @@ class EnhancedUsageLogger:
         max_log_size: int = 10 * 1024 * 1024,  # 10 MB
         backup_count: int = 5,
         compress_rotated: bool = True,
+        sampling_filter: Optional[Any] = None,
     ):
         """Initialize enhanced usage logger.
 
@@ -323,11 +332,15 @@ class EnhancedUsageLogger:
             max_log_size: Maximum log file size before rotation
             backup_count: Number of backup files to keep
             compress_rotated: Whether to compress rotated files
+            sampling_filter: Optional SemanticSamplingFilter for noise reduction.
         """
         self._enabled = enabled
         self._log_file = Path(log_file).expanduser()
         self.session_id = str(uuid.uuid4())
         self._lock = threading.Lock()
+        self._sampling_filter = sampling_filter
+        # Backward compat: UsageLogger used self._logger
+        self._logger = logger
 
         # Initialize components
         self._scrubber = PIIScrubber() if scrub_pii else None
@@ -368,6 +381,10 @@ class EnhancedUsageLogger:
             data: Event-specific data dictionary
         """
         if not self._enabled:
+            return
+
+        # Semantic sampling: drop noise events before disk I/O
+        if self._sampling_filter and not self._sampling_filter.should_emit(event_type, data):
             return
 
         # Check for rotation
@@ -490,10 +507,5 @@ def create_usage_logger(
     Returns:
         Logger instance
     """
-    if enhanced:
-        return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)
-
-    # Fall back to basic logger
-    from victor.observability.analytics.logger import UsageLogger
-
-    return UsageLogger(log_file=log_file, enabled=enabled)
+    # EnhancedUsageLogger is the canonical implementation (UsageLogger is now an alias)
+    return EnhancedUsageLogger(log_file=log_file, enabled=enabled, **kwargs)

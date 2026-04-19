@@ -31,7 +31,7 @@ from victor.core.events.emit_helper import emit_event_sync
 if TYPE_CHECKING:
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.prompt_builder import SystemPromptBuilder
     from victor.config.settings import Settings
     from victor.agent.task_analyzer import TaskType

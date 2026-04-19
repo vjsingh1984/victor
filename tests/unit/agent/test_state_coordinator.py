@@ -23,7 +23,7 @@ Tests the state coordination functionality including:
 import pytest
 from unittest.mock import MagicMock, PropertyMock
 
-from victor.agent.conversation_state import ConversationStage
+from victor.agent.conversation.state_machine import ConversationStage
 from victor.agent.state_coordinator import (
     StateCoordinator,
     StateCoordinatorConfig,
@@ -273,7 +273,10 @@ class TestStateCoordinator:
         coordinator.transition_to(ConversationStage.PLANNING)
 
         assert len(callback_calls) == 1
-        assert callback_calls[0] == (ConversationStage.INITIAL, ConversationStage.PLANNING)
+        assert callback_calls[0] == (
+            ConversationStage.INITIAL,
+            ConversationStage.PLANNING,
+        )
 
 
 class TestCreateStateCoordinator:

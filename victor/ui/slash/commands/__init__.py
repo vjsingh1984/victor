@@ -41,7 +41,9 @@ from victor.ui.slash.commands import (
     mode,
     model,
     navigation,
+    prompt_optimize,
     session,
+    skills,
     system,
     tools,
 )
@@ -55,7 +57,9 @@ __all__ = [
     "mode",
     "model",
     "navigation",
+    "prompt_optimize",
     "session",
+    "skills",
     "system",
     "tools",
 ]

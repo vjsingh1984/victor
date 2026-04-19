@@ -108,7 +108,9 @@ class NodeExecutorFactory:
 
     def _register_extension_executor_types(self) -> None:
         """Register plugin- or application-provided workflow node executors."""
-        from victor.workflows.executors.registry import get_workflow_node_executor_registry
+        from victor.workflows.executors.registry import (
+            get_workflow_node_executor_registry,
+        )
 
         registry = get_workflow_node_executor_registry()
         for registration in registry.get_registrations().values():

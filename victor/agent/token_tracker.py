@@ -12,24 +12,49 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Thread-safe token usage tracker.
+"""Thread-safe token usage tracker (COMPATIBILITY LAYER).
 
-Centralizes all token usage accumulation to prevent divergence
-between ExecutionCoordinator and SessionStateManager.
+.. deprecated::
+    For new code, use StreamMetrics.record_usage() for token tracking.
+    This class is retained for backward compatibility and will be deprecated in version 0.10.0.
+
+    This class provides session-wide token accumulation across multiple turns.
+    For per-stream token tracking, use victor.agent.stream_handler.StreamMetrics instead.
+
+    Use cases:
+    - Session-wide token accumulation across multiple turns (use this)
+    - Per-stream token tracking during execution (use StreamMetrics)
 """
 
 from __future__ import annotations
 
+import warnings
 import threading
 from typing import Dict
 
 
 class TokenTracker:
-    """Thread-safe token usage tracker.
+    """Thread-safe token usage tracker (COMPATIBILITY LAYER).
 
-    Centralizes token accumulation from ExecutionCoordinator,
-    ChatCoordinator, and MetricsCoordinator into a single
-    source of truth.
+    .. deprecated::
+        For new code, use StreamMetrics.record_usage() for token tracking.
+        This class is retained for backward compatibility and will be deprecated in version 0.10.0.
+
+    This class provides session-wide token accumulation across multiple turns.
+    For per-stream token tracking, use victor.agent.stream_handler.StreamMetrics instead.
+
+    Thread-safe accumulation from TurnExecutor, ChatCoordinator, and MetricsCoordinator.
+
+    Migration guide:
+        # Old (deprecated):
+        from victor.agent.token_tracker import TokenTracker
+        tracker = TokenTracker()
+        trackeraccumulate(usage)
+
+        # New (recommended):
+        from victor.agent.stream_handler import StreamMetrics
+        metrics = StreamMetrics()
+        metrics.record_usage(usage)
     """
 
     _KEYS = (
@@ -41,6 +66,16 @@ class TokenTracker:
     )
 
     def __init__(self) -> None:
+        """Initialize token tracker.
+
+        Deprecated: Use StreamMetrics.record_usage() for new code.
+        """
+        warnings.warn(
+            "TokenTracker is deprecated. Use StreamMetrics.record_usage() for token tracking. "
+            "This will be removed in version 0.10.0.",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._usage: Dict[str, int] = dict.fromkeys(self._KEYS, 0)
         self._lock = threading.Lock()
 

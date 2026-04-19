@@ -286,10 +286,18 @@ class TestToolSelectorLearner:
         """Test blended Q-value calculation (70% task-specific + 30% global)."""
         # Record outcomes for same tool with different task types
         _record_tool_outcome(
-            learner, tool_name="edit", task_type="action", success=True, quality_score=1.0
+            learner,
+            tool_name="edit",
+            task_type="action",
+            success=True,
+            quality_score=1.0,
         )
         _record_tool_outcome(
-            learner, tool_name="edit", task_type="analysis", success=False, quality_score=0.0
+            learner,
+            tool_name="edit",
+            task_type="analysis",
+            success=False,
+            quality_score=0.0,
         )
 
         # Blended value should be weighted mix

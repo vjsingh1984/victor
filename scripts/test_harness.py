@@ -593,7 +593,11 @@ def print_results(console: Console, suites: List[TestSuite]):
             details = (
                 result.error
                 if result.error
-                else (result.output[:60] + "..." if len(result.output) > 60 else result.output)
+                else (
+                    result.output[:60] + "..."
+                    if len(result.output) > 60
+                    else result.output
+                )
             )
             # Clean up ANSI codes for display
             details = details.replace("\n", " ").strip()
@@ -692,7 +696,9 @@ async def run_tests(args):
             suite.results.append(result)
 
             # Code-related prompt
-            result = await tester.test_simple_chat("What programming languages do you know?")
+            result = await tester.test_simple_chat(
+                "What programming languages do you know?"
+            )
             suite.results.append(result)
 
             suites.append(suite)
@@ -729,7 +735,9 @@ Examples:
     parser.add_argument("--commands", action="store_true", help="Test slash commands")
     parser.add_argument("--verticals", action="store_true", help="Test verticals")
     parser.add_argument("--modes", action="store_true", help="Test agent modes")
-    parser.add_argument("--chat", action="store_true", help="Test live chat (requires provider)")
+    parser.add_argument(
+        "--chat", action="store_true", help="Test live chat (requires provider)"
+    )
 
     parser.add_argument("--vertical", type=str, help="Test specific vertical")
     parser.add_argument(
@@ -737,9 +745,14 @@ Examples:
     )
 
     parser.add_argument(
-        "--provider", type=str, default="ollama", help="Provider to use (default: ollama)"
+        "--provider",
+        type=str,
+        default="ollama",
+        help="Provider to use (default: ollama)",
     )
-    parser.add_argument("--model", type=str, default="qwen3-coder:30b", help="Model to use")
+    parser.add_argument(
+        "--model", type=str, default="qwen3-coder:30b", help="Model to use"
+    )
 
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
 

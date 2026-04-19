@@ -135,6 +135,8 @@ class Tables:
     AGENT_PROMPT_STYLE = "agent_prompt_style"  # Prompt style definitions
     AGENT_PROMPT_ELEMENT = "agent_prompt_element"  # Prompt components
     AGENT_PROMPT_HISTORY = "agent_prompt_history"  # Prompt history
+    AGENT_PROMPT_CANDIDATE = "agent_prompt_candidate"  # GEPA-evolved prompt candidates
+    AGENT_PROMPT_PARETO_INSTANCE = "agent_prompt_pareto_instance"  # GEPA v2 Pareto instances
 
     # Curriculum & Policy
     AGENT_CURRICULUM_STAGE = "agent_curriculum_stage"  # Learning curriculum
@@ -217,6 +219,7 @@ class LearnerID:
     CROSS_VERTICAL = "cross_vertical"
     WORKFLOW_EXECUTION = "workflow_execution"
     TEAM_COMPOSITION = "team_composition"
+    PROMPT_OPTIMIZER = "prompt_optimizer"
 
     @classmethod
     def all(cls) -> List[str]:
@@ -235,6 +238,7 @@ class LearnerID:
             cls.CROSS_VERTICAL,
             cls.WORKFLOW_EXECUTION,
             cls.TEAM_COMPOSITION,
+            cls.PROMPT_OPTIMIZER,
         ]
 
 
@@ -285,7 +289,8 @@ class Schema:
             provider TEXT,
             model TEXT,
             task_type TEXT,
-            vertical TEXT DEFAULT 'coding',
+            vertical TEXT DEFAULT '',
+            repo_id TEXT DEFAULT NULL,
             success INTEGER,
             quality_score REAL,
             metadata TEXT,
@@ -460,6 +465,41 @@ class Schema:
             success_rate REAL DEFAULT 0.5,
             usage_count INTEGER DEFAULT 0,
             updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    AGENT_PROMPT_CANDIDATE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_CANDIDATE} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            section_name TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'default',
+            text_hash TEXT NOT NULL,
+            text TEXT NOT NULL,
+            generation INTEGER DEFAULT 0,
+            parent_hash TEXT,
+            completion_score REAL DEFAULT 0.0,
+            token_efficiency REAL DEFAULT 0.0,
+            tool_effectiveness REAL DEFAULT 0.0,
+            alpha REAL DEFAULT 1.0,
+            beta REAL DEFAULT 1.0,
+            sample_count INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(section_name, provider, text_hash)
+        )
+    """
+
+    AGENT_PROMPT_PARETO_INSTANCE = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.AGENT_PROMPT_PARETO_INSTANCE} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            section_name TEXT NOT NULL,
+            provider TEXT NOT NULL DEFAULT 'default',
+            instance_id TEXT NOT NULL,
+            best_candidate_hash TEXT,
+            best_score REAL DEFAULT 0.0,
+            sample_count INTEGER DEFAULT 0,
+            updated_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(section_name, provider, instance_id)
         )
     """
 
@@ -907,6 +947,8 @@ class Schema:
             cls.AGENT_WORKFLOW_RUN,
             cls.AGENT_PROMPT_STYLE,
             cls.AGENT_PROMPT_ELEMENT,
+            cls.AGENT_PROMPT_CANDIDATE,
+            cls.AGENT_PROMPT_PARETO_INSTANCE,
             cls.AGENT_CURRICULUM_STAGE,
             cls.AGENT_CURRICULUM_METRIC,
             cls.AGENT_POLICY_SNAPSHOT,

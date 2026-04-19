@@ -57,7 +57,9 @@ class TestEmbeddingsCommand:
         selector.close.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_rebuild_conversation_embeddings_async_closes_store_on_error(self) -> None:
+    async def test_rebuild_conversation_embeddings_async_closes_store_on_error(
+        self,
+    ) -> None:
         store = MagicMock()
         store.initialize = AsyncMock(side_effect=RuntimeError("boom"))
         store.rebuild = AsyncMock()

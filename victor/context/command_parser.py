@@ -137,7 +137,9 @@ class URLResolver(ContextResolver):
             async with aiohttp.ClientSession() as session:
                 headers = {"User-Agent": self.user_agent}
                 async with session.get(
-                    url, timeout=aiohttp.ClientTimeout(total=self.timeout), headers=headers
+                    url,
+                    timeout=aiohttp.ClientTimeout(total=self.timeout),
+                    headers=headers,
                 ) as response:
                     if response.status != 200:
                         return ContextItem(
@@ -403,7 +405,12 @@ class FolderResolver(ContextResolver):
             # Add key file previews if enabled
             previews = ""
             if self.include_file_previews:
-                key_files = ["README.md", "README.rst", "pyproject.toml", "package.json"]
+                key_files = [
+                    "README.md",
+                    "README.rst",
+                    "pyproject.toml",
+                    "package.json",
+                ]
                 for key_file in key_files:
                     key_path = folder_path / key_file
                     if key_path.exists() and key_path.is_file():

@@ -57,7 +57,9 @@ def register_vertical(*args, **kwargs) -> Callable[[Type], Type]:
 
             VerticalRegistry.register(decorated)
             logger.debug(
-                "Registered vertical '%s' (%s)", getattr(decorated, "name", None), decorated
+                "Registered vertical '%s' (%s)",
+                getattr(decorated, "name", None),
+                decorated,
             )
         except ImportError:
             logger.debug(
@@ -67,7 +69,9 @@ def register_vertical(*args, **kwargs) -> Callable[[Type], Type]:
 
         if manifest is not None:
             try:
-                from victor.core.verticals.config_registry import VerticalBehaviorConfigRegistry
+                from victor.core.verticals.config_registry import (
+                    VerticalBehaviorConfigRegistry,
+                )
 
                 behavior_config = VerticalBehaviorConfigRegistry.from_manifest(manifest)
                 VerticalBehaviorConfigRegistry.register(manifest.name, behavior_config)

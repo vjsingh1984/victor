@@ -25,7 +25,10 @@ import logging
 from typing import Any, Optional
 
 from victor.agent.protocols import IToolAdapterCoordinator, IProviderSwitcher
-from victor.agent.tool_calling import ToolCallingAdapterRegistry, ToolCallingCapabilities
+from victor.agent.tool_calling import (
+    ToolCallingAdapterRegistry,
+    ToolCallingCapabilities,
+)
 
 logger = logging.getLogger(__name__)
 

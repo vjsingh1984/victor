@@ -88,7 +88,7 @@ class TestCorrelation:
             "expected_status": self.expected_status.value,
             "actual_status": self.actual_status.value,
             "matches_expectation": self.matches_expectation,
-            "failure_category": self.failure_category.value if self.failure_category else None,
+            "failure_category": (self.failure_category.value if self.failure_category else None),
             "error_message": self.error_message,
             "is_flaky": self.is_flaky,
             "context": self.context,

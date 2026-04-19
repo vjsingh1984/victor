@@ -24,7 +24,10 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from victor.config.orchestrator_constants import DeduplicationConfig, DEDUPLICATION_CONFIG
+from victor.config.orchestrator_constants import (
+    DeduplicationConfig,
+    DEDUPLICATION_CONFIG,
+)
 from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)
@@ -58,7 +61,11 @@ class ToolResultDeduplicator:
     def deduplicate_in_place(
         self, messages: List[Message], new_tool_name: str, new_args: Dict[str, Any]
     ) -> int:
-        """Replace older duplicate file read contents with stubs.
+        """Replace older duplicate tool outputs with compact stubs.
+
+        Two dedup strategies:
+        1. Path-based: exact path match for read-like tools (existing)
+        2. Content-hash: identical content from any tool (new)
 
         Args:
             messages: Conversation message list (modified in place)
@@ -71,12 +78,19 @@ class ToolResultDeduplicator:
         if not self._config.enabled:
             return 0
 
+        stubbed = self._dedup_by_path(messages, new_tool_name, new_args)
+        stubbed += self._dedup_by_content_hash(messages)
+        return stubbed
+
+    def _dedup_by_path(
+        self, messages: List[Message], new_tool_name: str, new_args: Dict[str, Any]
+    ) -> int:
+        """Stub older tool outputs with matching path."""
         target_path = new_args.get("path", new_args.get("file_path", ""))
         if not target_path:
             return 0
 
         stubbed = 0
-        # Scan messages except the last one (which is the new result)
         for i in range(len(messages) - 1):
             msg = messages[i]
             if msg.role != "user":
@@ -84,7 +98,6 @@ class ToolResultDeduplicator:
             if len(msg.content) < self._config.min_content_chars_to_dedup:
                 continue
 
-            # Check for TOOL_OUTPUT marker with matching path
             match = _TOOL_OUTPUT_PATH_RE.search(msg.content)
             if not match:
                 continue
@@ -97,13 +110,45 @@ class ToolResultDeduplicator:
             if matched_path != target_path:
                 continue
 
-            # Build stub
             lines = msg.content.count("\n") + 1
             stub = self._config.stub_template.format(path=target_path, lines=lines)
-
-            # Replace content
             messages[i] = Message(role=msg.role, content=stub)
             stubbed += 1
-            logger.debug(f"Deduplicated file read for {target_path} at message {i}")
+            logger.debug("Deduplicated path match for %s at message %d", target_path, i)
+
+        return stubbed
+
+    def _dedup_by_content_hash(self, messages: List[Message]) -> int:
+        """Stub older messages with identical content (regardless of path).
+
+        Uses a hash of first 2000 + last 500 chars as a fingerprint.
+        When duplicates found, the OLDER message is replaced with a stub,
+        keeping the most recent version in the conversation.
+        """
+        seen: Dict[int, int] = {}  # content fingerprint → index of newest occurrence
+        stubbed = 0
+        min_chars = self._config.min_content_chars_to_dedup
+
+        for i, msg in enumerate(messages):
+            if msg.role != "user" or len(msg.content) < min_chars:
+                continue
+            # Already a stub? Skip
+            if msg.content.startswith("[Previously") or msg.content.startswith("[Duplicate"):
+                continue
+
+            fingerprint = hash(msg.content[:2000] + msg.content[-500:])
+            if fingerprint in seen:
+                prev_idx = seen[fingerprint]
+                # Only stub if the previous message is still full content
+                prev = messages[prev_idx]
+                if not prev.content.startswith("["):
+                    lines = prev.content.count("\n") + 1
+                    messages[prev_idx] = Message(
+                        role=prev.role,
+                        content=f"[Duplicate tool output — {lines} lines, see later message]",
+                    )
+                    stubbed += 1
+                    logger.debug("Content-hash dedup: stubbed message %d (dup of %d)", prev_idx, i)
+            seen[fingerprint] = i
 
         return stubbed

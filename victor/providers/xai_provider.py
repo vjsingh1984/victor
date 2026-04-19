@@ -158,7 +158,12 @@ class XAIProvider(BaseProvider):
             model="grok",  # Will be set on chat()
             key_source=key_result.source_detail,
             non_interactive=key_result.non_interactive,
-            config={"base_url": base_url, "timeout": timeout, "max_retries": max_retries, **kwargs},
+            config={
+                "base_url": base_url,
+                "timeout": timeout,
+                "max_retries": max_retries,
+                **kwargs,
+            },
         )
 
         super().__init__(
@@ -188,6 +193,14 @@ class XAIProvider(BaseProvider):
 
     def supports_streaming(self) -> bool:
         """xAI supports streaming."""
+        return True
+
+    def supports_prompt_caching(self) -> bool:
+        """xAI/Grok auto-caches prompts (50-75% discount on cached tokens)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """xAI reuses KV cache for matching prompt prefixes."""
         return True
 
     def get_context_window(self, model: str) -> int:

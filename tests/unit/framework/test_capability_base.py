@@ -75,10 +75,18 @@ class TestCapabilityMetadata:
     def test_metadata_equality(self):
         """Two CapabilityMetadata with same values should be equal."""
         metadata1 = CapabilityMetadata(
-            name="test", description="Test", version="1.0", dependencies=["dep1"], tags=["tag1"]
+            name="test",
+            description="Test",
+            version="1.0",
+            dependencies=["dep1"],
+            tags=["tag1"],
         )
         metadata2 = CapabilityMetadata(
-            name="test", description="Test", version="1.0", dependencies=["dep1"], tags=["tag1"]
+            name="test",
+            description="Test",
+            version="1.0",
+            dependencies=["dep1"],
+            tags=["tag1"],
         )
         assert metadata1 == metadata2
 
@@ -129,7 +137,10 @@ class TestCapabilityProvider(BaseCapabilityProvider[MockCapability]):
         }
         self._metadata: Dict[str, CapabilityMetadata] = {
             "read": CapabilityMetadata(
-                name="read", description="Read files and data", version="1.0", tags=["io", "safe"]
+                name="read",
+                description="Read files and data",
+                version="1.0",
+                tags=["io", "safe"],
             ),
             "write": CapabilityMetadata(
                 name="write",
@@ -359,32 +370,32 @@ class TestCapabilityProviderWithDifferentTypes:
 
 
 class TestCapabilityProviderAbstractMethods:
-    """Test that abstract methods must be implemented."""
+    """Test that base methods raise NotImplementedError when not overridden."""
 
-    def test_cannot_instantiate_base_class(self):
-        """BaseCapabilityProvider should not be instantiable directly."""
-        with pytest.raises(TypeError) as exc_info:
-            BaseCapabilityProvider()  # type: ignore
-        assert "abstract" in str(exc_info.value).lower()
+    def test_base_class_get_capabilities_raises(self):
+        """BaseCapabilityProvider.get_capabilities() raises NotImplementedError."""
+        provider = BaseCapabilityProvider()  # type: ignore
+        with pytest.raises(NotImplementedError):
+            provider.get_capabilities()
 
     def test_must_implement_get_capabilities(self):
-        """Subclass must implement get_capabilities."""
+        """Subclass without get_capabilities raises NotImplementedError on call."""
 
         class IncompleteProvider(BaseCapabilityProvider[str]):
             def get_capability_metadata(self) -> Dict[str, CapabilityMetadata]:
                 return {}
 
-        with pytest.raises(TypeError) as exc_info:
-            IncompleteProvider()  # type: ignore
-        assert "get_capabilities" in str(exc_info.value)
+        provider = IncompleteProvider()
+        with pytest.raises(NotImplementedError):
+            provider.get_capabilities()
 
     def test_must_implement_get_capability_metadata(self):
-        """Subclass must implement get_capability_metadata."""
+        """Subclass without get_capability_metadata raises NotImplementedError on call."""
 
         class IncompleteProvider(BaseCapabilityProvider[str]):
             def get_capabilities(self) -> Dict[str, str]:
                 return {}
 
-        with pytest.raises(TypeError) as exc_info:
-            IncompleteProvider()  # type: ignore
-        assert "get_capability_metadata" in str(exc_info.value)
+        provider = IncompleteProvider()
+        with pytest.raises(NotImplementedError):
+            provider.get_capability_metadata()

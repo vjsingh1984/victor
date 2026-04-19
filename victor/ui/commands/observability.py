@@ -97,7 +97,10 @@ def dashboard_command(
         5.0, "--interval", "-i", help="Update interval in seconds (for --watch)"
     ),
     rich: bool = typer.Option(
-        False, "--rich", "-r", help="Use rich terminal dashboard (requires rich library)"
+        False,
+        "--rich",
+        "-r",
+        help="Use rich terminal dashboard (requires rich library)",
     ),
 ) -> None:
     """Display observability dashboard data.

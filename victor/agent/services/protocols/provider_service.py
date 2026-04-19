@@ -83,13 +83,11 @@ class ProviderInfo(Protocol):
 
 @runtime_checkable
 class ProviderServiceProtocol(Protocol):
-    """Protocol for provider management service.
+    """[CANONICAL] Protocol for provider management service.
 
-    Handles:
-    - Provider initialization and configuration
-    - Provider switching with validation
-    - Provider health checks
-    - Provider capability discovery
+    This protocol represents the target architecture for provider operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on provider-related operations.

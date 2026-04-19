@@ -75,3 +75,16 @@ def test_is_healthy(tool_adapter):
 def test_is_healthy_with_none():
     adapter = ToolServiceAdapter(None)
     assert adapter.is_healthy() is False
+
+
+def test_process_tool_results_delegates(tool_adapter, mock_tool_coordinator):
+    mock_tool_coordinator.process_tool_results.return_value = [{"name": "read", "success": True}]
+    mock_pipeline_result = MagicMock()
+    mock_ctx = MagicMock()
+
+    result = tool_adapter.process_tool_results(mock_pipeline_result, mock_ctx)
+
+    mock_tool_coordinator.process_tool_results.assert_called_once_with(
+        mock_pipeline_result, mock_ctx
+    )
+    assert result == [{"name": "read", "success": True}]

@@ -297,7 +297,14 @@ class OnboardingWizard:
         self.console.print("\n[bold cyan]Step 3/5: Provider Configuration[/]")
         self.console.print("─" * 50)
 
-        provider_options = ["ollama", "anthropic", "openai", "google", "lmstudio", "auto"]
+        provider_options = [
+            "ollama",
+            "anthropic",
+            "openai",
+            "google",
+            "lmstudio",
+            "auto",
+        ]
 
         # Default to auto or based on environment
         if self.state["has_cloud_keys"]:
@@ -388,7 +395,10 @@ class OnboardingWizard:
         models = {
             "ollama": [
                 {"id": "qwen2.5-coder:7b", "description": "Coding-focused, 7B params"},
-                {"id": "qwen2.5-coder:14b", "description": "Coding-focused, 14B params"},
+                {
+                    "id": "qwen2.5-coder:14b",
+                    "description": "Coding-focused, 14B params",
+                },
                 {"id": "qwen2.5:7b", "description": "General purpose, 7B params"},
                 {"id": "llama3.2:3b", "description": "Fast, efficient, 3B params"},
             ],
@@ -401,7 +411,10 @@ class OnboardingWizard:
                 {"id": "gpt-4o-mini", "description": "Very fast, efficient"},
             ],
             "google": [
-                {"id": "gemini-2.0-flash-exp", "description": "Very fast, experimental"},
+                {
+                    "id": "gemini-2.0-flash-exp",
+                    "description": "Very fast, experimental",
+                },
                 {"id": "gemini-1.5-pro", "description": "Balanced"},
             ],
             "lmstudio": [

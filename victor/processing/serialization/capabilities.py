@@ -33,7 +33,10 @@ from typing import Any, Dict, List, Optional, Set
 
 import yaml
 
-from victor.processing.serialization.strategy import SerializationFormat, SerializationConfig
+from victor.processing.serialization.strategy import (
+    SerializationFormat,
+    SerializationConfig,
+)
 
 logger = logging.getLogger(__name__)
 

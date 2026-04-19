@@ -16,7 +16,17 @@
 
 import threading
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generator, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
@@ -156,7 +166,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         if isinstance(hook, Hook):
             return hook
         return Hook(
-            callback=hook, name=name or getattr(hook, "__name__", "hook"), critical=critical
+            callback=hook,
+            name=name or getattr(hook, "__name__", "hook"),
+            critical=critical,
         )
 
     def register_before_hook(
@@ -219,9 +231,19 @@ class ToolRegistry(BaseRegistry[str, Any]):
             # Single argument: register(tool) - extract name automatically
             tool = args[0]
 
+            # LazyToolProxy — register directly (bypass strategy pattern)
+            if hasattr(tool, "is_loaded") and hasattr(tool, "execute"):
+                super().register(tool.name, tool)
+                self._tool_enabled[tool.name] = enabled
+                self._invalidate_schema_cache()
+                return
+
             # Check feature flag for strategy-based registration
             try:
-                from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+                from victor.core.feature_flags import (
+                    get_feature_flag_manager,
+                    FeatureFlag,
+                )
 
                 if get_feature_flag_manager().is_enabled(
                     FeatureFlag.USE_STRATEGY_BASED_TOOL_REGISTRATION
@@ -238,9 +260,13 @@ class ToolRegistry(BaseRegistry[str, Any]):
             elif isinstance(tool, self._BaseTool):  # It's a BaseTool instance
                 super().register(tool.name, tool)
                 self._tool_enabled[tool.name] = enabled
+            elif hasattr(tool, "name") and hasattr(tool, "execute"):
+                # LazyToolProxy or duck-typed tool with name + execute
+                super().register(tool.name, tool)
+                self._tool_enabled[tool.name] = enabled
             else:
                 raise TypeError(
-                    "Can only register BaseTool instances or functions decorated with @tool"
+                    "Can only register BaseTool instances, @tool functions, or LazyToolProxy"
                 )
         elif len(args) == 2:
             # Two arguments: register(key, value) - LSP-compatible
@@ -262,7 +288,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
             tool: Tool to register
             enabled: Whether tool is enabled
         """
-        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+        from victor.tools.registration.registry import (
+            get_tool_registration_strategy_registry,
+        )
 
         if self._strategy_registry is None:
             self._strategy_registry = get_tool_registration_strategy_registry()
@@ -317,7 +345,9 @@ class ToolRegistry(BaseRegistry[str, Any]):
         Args:
             strategy: Strategy to add
         """
-        from victor.tools.registration.registry import get_tool_registration_strategy_registry
+        from victor.tools.registration.registry import (
+            get_tool_registration_strategy_registry,
+        )
 
         if self._strategy_registry is None:
             self._strategy_registry = get_tool_registration_strategy_registry()
@@ -649,3 +679,146 @@ class ToolRegistry(BaseRegistry[str, Any]):
             hook(result)
 
         return result
+
+    # ========================================================================
+    # Plugin-Based Tool Registration
+    # ========================================================================
+
+    def register_plugin(self, plugin: Any) -> None:
+        """Register a tool plugin with the registry.
+
+        Tool plugins enable external verticals to dynamically register
+        tools at runtime. The plugin's register() method is called to perform
+        the actual registration.
+
+        This method accepts any object with a register() method, including:
+        - VictorPlugin from victor_sdk.core.plugins
+        - ToolFactoryAdapter from victor_sdk.verticals.protocols.tool_plugins
+        - Any class with a register(registry) method
+
+        Args:
+            plugin: Object with register() method (VictorPlugin protocol)
+
+        Raises:
+            AttributeError: If plugin doesn't have a register() method
+            Exception: If plugin.register() raises an exception
+
+        Example:
+            from victor_sdk.verticals.protocols import ToolPluginHelper
+
+            # Using helper
+            tools = {"code_search": CodeSearchTool(), "refactor": RefactoringTool()}
+            plugin = ToolPluginHelper.from_instances(tools)
+            registry.register_plugin(plugin)
+
+        Example:
+            # Custom plugin class
+            class MyVerticalPlugin:
+                def register(self, registry: ToolRegistry) -> None:
+                    registry.register(CodeSearchTool())
+                    registry.register(RefactoringTool())
+
+            plugin = MyVerticalPlugin()
+            registry.register_plugin(plugin)
+        """
+        if not hasattr(plugin, "register"):
+            raise AttributeError(f"Tool plugin must have a 'register' method. Got: {type(plugin)}")
+
+        # Call plugin's register method
+        plugin.register(self)
+
+    def discover_plugins(self) -> int:
+        """Discover and register tool plugins from entry points.
+
+        Scans the 'victor.plugins' entry point group for tool plugins
+        and automatically registers them.
+
+        Returns:
+            Number of plugins discovered and registered
+
+        Example:
+            # In setup.py:
+            # setup_entry_points={
+            #     "victor.plugins": [
+            #         "my_vertical = my_vertical.plugin:MyVerticalPlugin"
+            #     ]
+            # }
+
+            # At runtime:
+            count = registry.discover_plugins()
+            print(f"Registered {count} tool plugins")
+        """
+        from victor.framework.entry_point_registry import get_entry_point_objects
+
+        count = 0
+
+        try:
+            plugin_eps = get_entry_point_objects("victor.plugins")
+
+            for ep in plugin_eps:
+                try:
+                    plugin = ep.load()
+                    self.register_plugin(plugin)
+                    count += 1
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    ep_name = getattr(ep, "name", "unknown")
+                    logger.warning(f"Failed to load tool plugin '{ep_name}': {e}")
+
+        except Exception:
+            pass
+
+        return count
+
+    def register_from_entry_points(
+        self,
+        entry_point_group: str = "victor.plugins",
+        enabled: bool = True,
+    ) -> int:
+        """Discover and register tools from entry points.
+
+        Uses UnifiedEntryPointRegistry for efficient single-pass discovery
+        instead of redundant importlib.metadata.entry_points() calls.
+
+        Args:
+            entry_point_group: Entry point group to scan (default: victor.plugins)
+            enabled: Whether discovered tools are enabled by default (unused, for backward compatibility)
+
+        Returns:
+            Number of entry points discovered and registered
+        """
+        from victor.framework.entry_point_registry import get_entry_point_objects
+
+        count = 0
+
+        try:
+            group_eps = get_entry_point_objects(entry_point_group)
+
+            for ep in group_eps:
+                try:
+                    plugin = ep.load()
+
+                    if hasattr(plugin, "register"):
+                        self.register_plugin(plugin)
+                        count += 1
+                    elif isinstance(plugin, (list, tuple)):
+                        from victor_sdk.verticals.protocols import ToolPluginHelper
+
+                        tools = {f"tool_{i}": tool for i, tool in enumerate(plugin)}
+                        adapter = ToolPluginHelper.from_instances(tools)
+                        self.register_plugin(adapter)
+                        count += 1
+
+                except Exception as e:
+                    import logging
+
+                    logger = logging.getLogger(__name__)
+                    ep_name = getattr(ep, "name", "unknown")
+                    logger.warning(f"Failed to load tool plugin from '{ep_name}': {e}")
+
+        except Exception:
+            pass
+
+        return count

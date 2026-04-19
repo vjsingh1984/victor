@@ -307,7 +307,10 @@ async def notebook_edit(input_data: NotebookEditInput) -> NotebookEditResult:
         _write_notebook(path, notebook)
         new_count = len(cells)
         logger.info(
-            "Inserted %s cell at index %d in %s", input_data.cell_type.value, insert_idx, path
+            "Inserted %s cell at index %d in %s",
+            input_data.cell_type.value,
+            insert_idx,
+            path,
         )
         return NotebookEditResult(
             success=True,

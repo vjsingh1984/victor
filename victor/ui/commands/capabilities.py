@@ -24,7 +24,7 @@ from rich.table import Table
 from rich.tree import Tree
 
 capabilities_app = typer.Typer(
-    name="capabilities",
+    name="capability",
     help="Discover Victor's capabilities: tools, verticals, personas, teams, and more.",
 )
 

@@ -34,9 +34,10 @@ import json
 import logging
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,163 @@ benchmark_app = typer.Typer(
 console = Console()
 
 
-def _configure_log_level(log_level: Optional[str], command: str = "benchmark") -> None:
+@dataclass(frozen=True)
+class CodeIntelligencePrewarmResult:
+    """Outcome of benchmark code-intelligence prewarm for a repo."""
+
+    status: str
+    message: str
+    cached_hit: bool = False
+    graph_nodes: int = 0
+    graph_edges: int = 0
+
+
+def _ensure_benchmark_runtime_tools(adapter) -> object:
+    """Fail fast when the benchmark session is missing required core tools."""
+    readiness = adapter.get_benchmark_tool_readiness()
+    if readiness.ready:
+        return readiness
+
+    issues = []
+    if readiness.missing_tools:
+        issues.append(f"missing tools: {', '.join(readiness.missing_tools)}")
+    if readiness.disabled_tools:
+        issues.append(f"disabled tools: {', '.join(readiness.disabled_tools)}")
+
+    raise RuntimeError(
+        "Benchmark runtime is not ready for code-intelligence execution: "
+        + "; ".join(issues)
+        + ". Check tool discovery and tool configuration before running benchmarks."
+    )
+
+
+def _summarize_code_intelligence_diagnostics(
+    result: Any,
+    *,
+    sample_limit: int = 5,
+) -> dict[str, Any]:
+    """Summarize which benchmark tasks skipped the code-intelligence path."""
+    tasks = list(getattr(result, "task_results", []) or [])
+    missing_code_intel = [
+        task for task in tasks if not getattr(task, "used_code_intelligence", False)
+    ]
+    failed_missing = [
+        task
+        for task in missing_code_intel
+        if getattr(getattr(task, "status", None), "value", None) in {"failed", "error", "timeout"}
+    ]
+    missing_graph = [task for task in tasks if not getattr(task, "used_graph", False)]
+
+    def _task_ids(items: list[Any]) -> list[str]:
+        return [str(getattr(item, "task_id", "")) for item in items if getattr(item, "task_id", "")]
+
+    total_tasks = len(tasks)
+    missing_ids = _task_ids(missing_code_intel)
+    failed_missing_ids = _task_ids(failed_missing)
+    missing_graph_ids = _task_ids(missing_graph)
+    coverage = ((total_tasks - len(missing_ids)) / total_tasks) if total_tasks else 0.0
+
+    return {
+        "total_tasks": total_tasks,
+        "code_intelligence_coverage": coverage,
+        "tasks_without_code_intelligence": len(missing_ids),
+        "task_ids_without_code_intelligence": missing_ids,
+        "sample_task_ids_without_code_intelligence": missing_ids[:sample_limit],
+        "failed_tasks_without_code_intelligence": len(failed_missing_ids),
+        "failed_task_ids_without_code_intelligence": failed_missing_ids,
+        "sample_failed_task_ids_without_code_intelligence": failed_missing_ids[:sample_limit],
+        "tasks_without_graph": len(missing_graph_ids),
+        "task_ids_without_graph": missing_graph_ids,
+        "sample_task_ids_without_graph": missing_graph_ids[:sample_limit],
+    }
+
+
+async def _prewarm_code_intelligence_index(
+    work_dir: Optional[Path],
+    warmed_repos: Dict[str, CodeIntelligencePrewarmResult],
+    *,
+    timeout: float = 300.0,
+) -> CodeIntelligencePrewarmResult:
+    """Prewarm the shared code-search/graph index for a benchmark workspace."""
+    if work_dir is None:
+        return CodeIntelligencePrewarmResult(
+            status="skipped",
+            message="  [yellow]Code intelligence pre-warm skipped: workspace unavailable[/]",
+        )
+
+    repo_key = str(work_dir.resolve())
+    cached = warmed_repos.get(repo_key)
+    if cached is not None:
+        if cached.status == "ready":
+            message = "  Code search index pre-warmed (cached)"
+        elif cached.status == "timeout":
+            message = "  [yellow]Skipping index pre-warm after previous timeout[/]"
+        else:
+            message = "  [yellow]Skipping index pre-warm after previous failure[/]"
+        return CodeIntelligencePrewarmResult(
+            status=cached.status,
+            message=message,
+            cached_hit=True,
+            graph_nodes=cached.graph_nodes,
+            graph_edges=cached.graph_edges,
+        )
+
+    try:
+        from victor.config.settings import load_settings
+        from victor.tools.code_search_tool import _get_or_build_index
+
+        prewarm_settings = load_settings()
+        index, _rebuilt = await asyncio.wait_for(
+            _get_or_build_index(work_dir, prewarm_settings, force_reindex=False),
+            timeout=timeout,
+        )
+
+        graph_nodes = 0
+        graph_edges = 0
+        graph_store = getattr(index, "graph_store", None)
+        if graph_store is not None:
+            try:
+                stats = await graph_store.stats()
+                graph_nodes = int(stats.get("nodes", 0) or 0)
+                graph_edges = int(stats.get("edges", 0) or 0)
+            except Exception as exc:
+                logger.debug("Graph stats unavailable during prewarm: %s", exc)
+
+        message = "  Code search index pre-warmed"
+        if graph_nodes or graph_edges:
+            message += f" ({graph_nodes} graph nodes, {graph_edges} graph edges)"
+
+        result = CodeIntelligencePrewarmResult(
+            status="ready",
+            message=message,
+            graph_nodes=graph_nodes,
+            graph_edges=graph_edges,
+        )
+        warmed_repos[repo_key] = result
+        return result
+    except asyncio.TimeoutError:
+        logger.warning("Index pre-warm timed out after %.0fs, code_search may be slow", timeout)
+        result = CodeIntelligencePrewarmResult(
+            status="timeout",
+            message="  [yellow]Code search index pre-warm timed out[/]",
+        )
+        warmed_repos[repo_key] = result
+        return result
+    except Exception as exc:
+        logger.debug("Index pre-warm failed: %s", exc)
+        result = CodeIntelligencePrewarmResult(
+            status="failed",
+            message=f"  [yellow]Code search index pre-warm skipped: {exc}[/]",
+        )
+        warmed_repos[repo_key] = result
+        return result
+
+
+def _configure_log_level(
+    log_level: Optional[str],
+    command: str = "benchmark",
+    debug_modules: Optional[str] = None,
+) -> None:
     """Configure logging for benchmark commands using centralized config.
 
     Uses the centralized logging config system with proper priority chain:
@@ -85,7 +242,12 @@ def _configure_log_level(log_level: Optional[str], command: str = "benchmark") -
             log_level = "WARNING"
 
     # Use centralized logging config
-    setup_logging(command=command, cli_log_level=log_level, stream=sys.stderr)
+    setup_logging(
+        command=command,
+        cli_log_level=log_level,
+        stream=sys.stderr,
+        cli_debug_modules=debug_modules,
+    )
 
 
 @benchmark_app.command("list")
@@ -154,11 +316,36 @@ def setup_benchmark(
     )
 
 
+async def _run_git_with_timeout(cmd, cwd, timeout=60):
+    """Run a git command with timeout protection.
+
+    Kills the process if it doesn't complete within timeout seconds.
+    Prevents silent hangs from blocking the benchmark pipeline.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=cwd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return proc.returncode, stdout, stderr
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        logger.warning("Git command timed out after %ds: %s", timeout, " ".join(cmd))
+        raise
+
+
 @benchmark_app.command("run")
 def run_benchmark(
     benchmark: str = typer.Argument(..., help="Benchmark to run: swe-bench, humaneval, mbpp"),
     max_tasks: Optional[int] = typer.Option(
         None, "--max-tasks", "-n", help="Maximum number of tasks to run"
+    ),
+    start_task: int = typer.Option(
+        0, "--start-task", help="Skip first N tasks (0-indexed, for targeting specific tasks)"
     ),
     model: Optional[str] = typer.Option(
         None, "--model", "-m", help="Model to use (default: from profile)"
@@ -167,11 +354,14 @@ def run_benchmark(
     output: Optional[Path] = typer.Option(
         None, "--output", "-o", help="Output file for results (JSON)"
     ),
-    timeout: int = typer.Option(300, "--timeout", "-t", help="Timeout per task in seconds"),
+    timeout: int = typer.Option(420, "--timeout", "-t", help="Timeout per task in seconds"),
     max_turns: int = typer.Option(10, "--max-turns", help="Maximum conversation turns per task"),
     parallel: int = typer.Option(1, "--parallel", help="Number of parallel tasks"),
     resume: bool = typer.Option(
-        False, "--resume", "-r", help="Resume from checkpoint if previous run was interrupted"
+        False,
+        "--resume",
+        "-r",
+        help="Resume from checkpoint if previous run was interrupted",
     ),
     provider: Optional[str] = typer.Option(
         None, "--provider", help="Override provider (e.g., deepseek, openai, xai)"
@@ -179,9 +369,31 @@ def run_benchmark(
     log_level: Optional[str] = typer.Option(
         None, "--log-level", help="Logging level (DEBUG, INFO, WARNING, ERROR)"
     ),
+    debug_modules: Optional[str] = typer.Option(
+        None,
+        "--debug-modules",
+        help="Comma-separated modules for DEBUG logging (e.g. code_search,agent_adapter)",
+    ),
+    no_edge_model: bool = typer.Option(
+        False,
+        "--no-edge-model",
+        help="Disable edge model micro-decisions during benchmark",
+    ),
+    account: Optional[str] = typer.Option(
+        None,
+        "--account",
+        "-a",
+        help="Use a configured account (e.g., openai-oauth). Overrides --profile/--provider.",
+    ),
 ) -> None:
     """Run a benchmark evaluation."""
-    _configure_log_level(log_level)
+    _configure_log_level(log_level, debug_modules=debug_modules)
+
+    # Disable edge model if requested
+    if no_edge_model:
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        get_feature_flag_manager().disable(FeatureFlag.USE_EDGE_MODEL)
 
     from victor.config.settings import Settings
     from victor.evaluation.protocol import BenchmarkType, EvaluationConfig
@@ -194,7 +406,10 @@ def run_benchmark(
     # Map benchmark name to type and runner
     benchmark_map = {
         "swe-bench": (BenchmarkType.SWE_BENCH, SWEBenchRunner),
-        "swe-bench-lite": (BenchmarkType.SWE_BENCH, lambda: SWEBenchRunner(split="lite")),
+        "swe-bench-lite": (
+            BenchmarkType.SWE_BENCH,
+            lambda: SWEBenchRunner(split="lite"),
+        ),
         "humaneval": (BenchmarkType.HUMAN_EVAL, HumanEvalRunner),
         "mbpp": (BenchmarkType.MBPP, MBPPRunner),
         "mbpp-test": (BenchmarkType.MBPP, lambda: MBPPRunner(split="test")),
@@ -209,9 +424,25 @@ def run_benchmark(
     bench_type, runner_factory = benchmark_map[benchmark_lower]
     runner = runner_factory() if callable(runner_factory) else runner_factory
 
+    # Resolve account if specified (overrides --profile and --provider)
+    resolved_account = None
+    if account:
+        from victor.config.accounts import get_account_manager
+
+        mgr = get_account_manager()
+        resolved_account = mgr.get_account(account)
+        if not resolved_account:
+            console.print(f"[bold red]Error:[/] Account '{account}' not found")
+            console.print("[dim]Run 'victor auth list' to see available accounts[/]")
+            raise typer.Exit(1)
+        # Account overrides provider and model (unless --model explicitly given)
+        provider = resolved_account.provider
+        if not model:
+            model = resolved_account.model
+        console.print(f"[cyan]Using account '{account}' ({resolved_account.provider}/{model})[/]")
+
     # Load profile to get model if not specified
     effective_model = model
-    effective_provider = None
     if not effective_model:
         settings = Settings()
         try:
@@ -220,7 +451,6 @@ def run_benchmark(
             if profile_config:
                 # ProfileConfig is a Pydantic model with .model attribute
                 effective_model = profile_config.model
-                effective_provider = profile_config.provider
             else:
                 console.print(
                     f"[yellow]Warning:[/] Profile '{profile}' not found, using default model"
@@ -230,11 +460,19 @@ def run_benchmark(
             console.print(f"[yellow]Warning:[/] Could not load profile: {e}")
             effective_model = "claude-3-sonnet"
 
-    # Build config
+    # Build config — account for start_task offset in max_tasks
+    effective_max_tasks = max_tasks
+    # Resolve start_task — when called programmatically (not via Typer CLI),
+    # the default may be a typer.OptionInfo rather than int.
+    if not isinstance(start_task, int):
+        start_task = 0
+    if start_task > 0 and max_tasks is not None:
+        effective_max_tasks = max_tasks + start_task
+
     config = EvaluationConfig(
         benchmark=bench_type,
         model=effective_model,
-        max_tasks=max_tasks,
+        max_tasks=effective_max_tasks,
         timeout_per_task=timeout,
         max_turns=max_turns,
         parallel_tasks=parallel,
@@ -256,6 +494,8 @@ def run_benchmark(
             max_turns=max_turns,
             resume=resume,
             provider_override=provider,
+            start_task=start_task,
+            resolved_account=resolved_account,
         )
     )
 
@@ -277,8 +517,86 @@ def run_benchmark(
     results_table.add_row("Pass Rate", f"[bold]{metrics['pass_rate']:.1%}[/]")
     results_table.add_row("Duration", f"{metrics['duration_seconds']:.1f}s")
     results_table.add_row("Total Tokens", f"{metrics['total_tokens']:,}")
+    results_table.add_row("Tool Calls", f"{metrics['total_tool_calls']:,}")
+    results_table.add_row("Code Search Calls", f"{metrics['total_code_search_calls']:,}")
+    results_table.add_row("Graph Calls", f"{metrics['total_graph_calls']:,}")
+    results_table.add_row(
+        "Code Intel Coverage",
+        f"{metrics['tasks_using_code_intelligence']}/{metrics['total_tasks']}"
+        f" ({metrics['code_intelligence_task_coverage']:.1%})",
+    )
+
+    # Extended token metrics (if available)
+    cached = metrics.get("cached_tokens", 0)
+    reasoning = metrics.get("reasoning_tokens", 0)
+    cost_micros = metrics.get("cost_usd_micros", 0)
+    if cached > 0:
+        results_table.add_row("Cached Tokens", f"[dim]{cached:,}[/]")
+    if reasoning > 0:
+        results_table.add_row("Reasoning Tokens", f"[dim]{reasoning:,}[/]")
+    if cost_micros > 0:
+        cost_usd = cost_micros / 1_000_000
+        results_table.add_row("API Cost", f"[dim]${cost_usd:.4f}[/]")
 
     console.print(results_table)
+
+    code_intel_diagnostics = _summarize_code_intelligence_diagnostics(result)
+    failed_without_code_intel = code_intel_diagnostics["failed_task_ids_without_code_intelligence"]
+    missing_code_intel = code_intel_diagnostics["task_ids_without_code_intelligence"]
+    if failed_without_code_intel:
+        console.print(
+            "[yellow]Code intelligence missed on failed tasks:[/] "
+            + ", ".join(failed_without_code_intel[:5])
+        )
+    elif missing_code_intel:
+        console.print(
+            "[dim]Tasks without code intelligence:[/] " + ", ".join(missing_code_intel[:5])
+        )
+
+    # Auto-evolve: run GEPA evolution after benchmark completes
+    # This is the "post-session hook" from Memory Scaling — the agent
+    # improves its prompts automatically after each benchmark run.
+    if metrics["total_tasks"] >= 5:  # Only evolve with enough data
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+
+            coordinator = get_rl_coordinator()
+            learner = coordinator.get_learner("prompt_optimizer")
+            if learner:
+                from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
+
+                # Determine provider from model name
+                model_lower = (config.model or "").lower()
+                provider = "default"
+                for prefix, prov in [
+                    ("gpt", "openai"),
+                    ("grok", "xai"),
+                    ("deepseek", "deepseek"),
+                    ("haiku", "anthropic"),
+                    ("claude", "anthropic"),
+                ]:
+                    if prefix in model_lower:
+                        provider = prov
+                        break
+
+                candidate = learner.evolve(
+                    "ASI_TOOL_EFFECTIVENESS_GUIDANCE",
+                    ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                    provider=provider,
+                )
+                if candidate:
+                    # Seed from this run's results
+                    for _ in range(metrics["passed"]):
+                        candidate.update(True)
+                    for _ in range(metrics["failed"] + metrics.get("errors", 0)):
+                        candidate.update(False)
+                    learner._save_candidate(candidate)
+                    console.print(
+                        f"\n[dim]Auto-evolved prompt gen-{candidate.generation} "
+                        f"for {provider} (mean={candidate.mean:.2f})[/]"
+                    )
+        except Exception as e:
+            logger.debug("Auto-evolve skipped: %s", e)
 
     # Save results if output specified
     if output:
@@ -287,6 +605,7 @@ def run_benchmark(
             "model": config.model,
             "timestamp": datetime.now().isoformat(),
             "metrics": metrics,
+            "diagnostics": code_intel_diagnostics,
             "task_results": [
                 {
                     "task_id": r.task_id,
@@ -294,6 +613,9 @@ def run_benchmark(
                     "tests_passed": r.tests_passed,
                     "tests_total": r.tests_total,
                     "duration": r.duration_seconds,
+                    "tool_calls": r.tool_calls,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                 }
                 for r in result.task_results
             ],
@@ -376,6 +698,8 @@ async def _run_benchmark_async(
     max_turns: int = 10,
     resume: bool,
     provider_override: Optional[str] = None,
+    start_task: int = 0,
+    resolved_account=None,
 ):
     from victor.evaluation.harness import EvaluationHarness
     from victor.evaluation.agent_adapter import VictorAgentAdapter
@@ -393,6 +717,20 @@ async def _run_benchmark_async(
         harness.register_runner(runner)
 
         tasks = await runner.load_tasks(config)
+
+        # Skip tasks for targeted execution (--start-task)
+        if start_task > 0 and start_task < len(tasks):
+            tasks = tasks[start_task:]
+            console.print(f"[dim]Skipped {start_task} tasks (starting from index {start_task})[/]")
+            # Override runner.load_tasks to return filtered set
+            # (harness calls load_tasks internally)
+            _original_load = runner.load_tasks
+
+            async def _filtered_load(cfg):
+                return tasks
+
+            runner.load_tasks = _filtered_load
+
         progress.update(task, description=f"Loaded {len(tasks)} tasks")
 
         if not tasks:
@@ -410,28 +748,34 @@ async def _run_benchmark_async(
             )
             # Bootstrap edge model decision service into the container
             # so tool selection, prompt focus, and stage detection can use it.
-            try:
-                from victor.agent.edge_model import (
-                    EdgeModelConfig,
-                    create_edge_decision_service,
-                )
-                from victor.core import get_container
-                from victor.agent.services.protocols.decision_service import (
-                    LLMDecisionServiceProtocol,
-                )
-                from victor.core.container import ServiceLifetime
+            from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
 
-                edge_service = create_edge_decision_service(EdgeModelConfig())
-                if edge_service:
-                    container = get_container()
-                    container.register(
-                        LLMDecisionServiceProtocol,
-                        lambda c: edge_service,
-                        ServiceLifetime.SINGLETON,
+            _edge_enabled = get_feature_flag_manager().is_enabled(FeatureFlag.USE_EDGE_MODEL)
+            if _edge_enabled:
+                try:
+                    from victor.agent.edge_model import (
+                        EdgeModelConfig,
+                        create_edge_decision_service,
                     )
-                    console.print("[dim]Edge model enabled for micro-decisions[/]")
-            except Exception as e:
-                console.print(f"[dim]Edge model unavailable: {e}[/]")
+                    from victor.core import get_container
+                    from victor.agent.services.protocols.decision_service import (
+                        LLMDecisionServiceProtocol,
+                    )
+                    from victor.core.container import ServiceLifetime
+
+                    edge_service = create_edge_decision_service(EdgeModelConfig())
+                    if edge_service:
+                        container = get_container()
+                        container.register(
+                            LLMDecisionServiceProtocol,
+                            lambda c: edge_service,
+                            ServiceLifetime.SINGLETON,
+                        )
+                        console.print("[dim]Edge model enabled for micro-decisions[/]")
+                except Exception as e:
+                    console.print(f"[dim]Edge model unavailable: {e}[/]")
+            else:
+                console.print("[dim]Edge model disabled (--no-edge-model)[/]")
 
             if provider_override:
                 # Direct provider creation bypassing profile's provider
@@ -443,20 +787,50 @@ async def _run_benchmark_async(
                 settings = load_settings()
                 profiles = settings.load_profiles()
                 profile_config = profiles.get(profile, profiles.get("default"))
-                effective_model = model or (
-                    profile_config.model if profile_config else "deepseek-chat"
+                # Use explicit --model, else provider's default model
+                _PROVIDER_DEFAULT_MODELS = {
+                    "deepseek": "deepseek-chat",
+                    "anthropic": "claude-sonnet-4-20250514",
+                    "openai": "gpt-4o",
+                    "google": "gemini-2.0-flash",
+                    "xai": "grok-3",
+                    "ollama": "gemma4:31b",
+                }
+                if model:
+                    effective_model = model
+                else:
+                    effective_model = _PROVIDER_DEFAULT_MODELS.get(provider_override)
+                    if not effective_model and profile_config:
+                        effective_model = profile_config.model
+                    if not effective_model:
+                        effective_model = "deepseek-chat"
+
+                # Build provider kwargs — use OAuth if account requires it
+                provider_kwargs: dict = {
+                    "settings": settings,
+                    "timeout": timeout,
+                }
+                if resolved_account and resolved_account.auth.method == "oauth":
+                    provider_kwargs["auth_mode"] = "oauth"
+                else:
+                    provider_kwargs["api_key"] = get_api_key(provider_override)
+
+                provider = ProviderRegistry.create(
+                    provider_override,
+                    **provider_kwargs,
                 )
 
-                api_key = get_api_key(provider_override)
-                provider = ProviderRegistry.create(
-                    provider_override, api_key=api_key, settings=settings, timeout=timeout
+                # Only enable thinking for providers that support it
+                use_thinking = (
+                    hasattr(provider, "supports_thinking") and provider.supports_thinking()
                 )
+
                 orchestrator = AgentOrchestrator(
                     settings=settings,
                     provider=provider,
                     model=effective_model,
                     provider_name=provider_override,
-                    thinking=True,
+                    thinking=use_thinking,
                 )
                 adapter = VictorAgentAdapter(orchestrator, adapter_config)
             else:
@@ -466,7 +840,13 @@ async def _run_benchmark_async(
                     timeout=timeout,
                     config=adapter_config,
                 )
+            readiness = _ensure_benchmark_runtime_tools(adapter)
+            console.print(
+                "  [dim]Benchmark tools ready: " + ", ".join(readiness.enabled_tools) + "[/]"
+            )
             workspace_manager = SWEBenchWorkspaceManager()
+
+            _warmed_repos: Dict[str, CodeIntelligencePrewarmResult] = {}
 
             async def agent_callback(benchmark_task: BenchmarkTask) -> dict:
                 """Run agent on task and return generated code with metrics."""
@@ -485,17 +865,31 @@ async def _run_benchmark_async(
                     # Reset workspace to base_commit with clean working tree.
                     # Fetch the specific commit first (may be outside shallow depth).
                     for git_cmd in [
-                        ["git", "fetch", "--depth", "1", "origin", benchmark_task.base_commit],
+                        [
+                            "git",
+                            "fetch",
+                            "--depth",
+                            "1",
+                            "origin",
+                            benchmark_task.base_commit,
+                        ],
                         ["git", "checkout", "--force", benchmark_task.base_commit],
-                        ["git", "clean", "-fd"],
+                        ["git", "clean", "-fd", "-e", ".victor"],
                     ]:
-                        proc = await asyncio.create_subprocess_exec(
-                            *git_cmd,
-                            cwd=work_dir,
-                            stdout=asyncio.subprocess.PIPE,
-                            stderr=asyncio.subprocess.PIPE,
-                        )
-                        await proc.communicate()
+                        try:
+                            await _run_git_with_timeout(git_cmd, work_dir, timeout=60)
+                        except asyncio.TimeoutError:
+                            console.print(f"  [yellow]Git command timed out: {git_cmd[1]}[/]")
+
+                # Pre-warm code_search/graph index BEFORE task timer starts.
+                # This is a fixed cost — NOT deducted from the per-task timeout.
+                prewarm_result = await _prewarm_code_intelligence_index(
+                    work_dir,
+                    _warmed_repos,
+                    timeout=300.0,
+                )
+                if prewarm_result.message:
+                    console.print(prewarm_result.message)
 
                 original_cwd = os.getcwd()
                 os.chdir(work_dir)
@@ -552,6 +946,8 @@ async def _run_benchmark_async(
                     "tokens_used": trace.token_usage.total_tokens,
                     "tool_calls": len(trace.tool_calls),
                     "turns": trace.turns,
+                    "code_search_calls": trace.code_search_calls,
+                    "graph_calls": trace.graph_calls,
                 }
 
         except Exception as e:
@@ -568,7 +964,8 @@ async def _run_benchmark_async(
             )
 
         progress.update(
-            task, description="Resuming evaluation..." if resume else "Running evaluation..."
+            task,
+            description="Resuming evaluation..." if resume else "Running evaluation...",
         )
         return await harness.run_evaluation(
             config=config,
@@ -732,7 +1129,12 @@ def show_capabilities() -> None:
     table.add_column("Capability", style="cyan")
 
     # Add framework columns
-    frameworks = [Framework.VICTOR, Framework.AIDER, Framework.CLAUDE_CODE, Framework.CURSOR]
+    frameworks = [
+        Framework.VICTOR,
+        Framework.AIDER,
+        Framework.CLAUDE_CODE,
+        Framework.CURSOR,
+    ]
     for f in frameworks:
         table.add_column(f.value, justify="center")
 
@@ -761,3 +1163,305 @@ def show_capabilities() -> None:
         table.add_row(*row)
 
     console.print(table)
+
+
+@benchmark_app.command("evolve")
+def evolve_prompts(
+    provider: str = typer.Option("all", "--provider", "-p", help="Provider to evolve (or 'all')"),
+    section: str = typer.Option("all", "--section", "-s", help="Section to evolve (or 'all')"),
+    compliance: bool = typer.Option(False, "--compliance", help="Show GEPA compliance scorecard"),
+) -> None:
+    """Evolve prompts using GEPA + benchmark trace data.
+
+    Reads execution traces from usage.jsonl and evaluation results,
+    then evolves prompt sections using the configured strategy
+    (GEPA, MIPROv2, CoT distillation).
+
+    Examples:
+        victor benchmark evolve                 # Evolve all
+        victor benchmark evolve -p openai       # Evolve for OpenAI
+        victor benchmark evolve --compliance    # Show compliance
+    """
+    from rich.table import Table
+
+    try:
+        from victor.framework.rl.coordinator import get_rl_coordinator
+
+        coordinator = get_rl_coordinator()
+        learner = coordinator.get_learner("prompt_optimizer")
+        if learner is None:
+            console.print("[yellow]Prompt optimizer not available[/]")
+            return
+
+        from victor.framework.rl.learners.prompt_optimizer import PromptOptimizerLearner
+        from victor.agent.prompt_builder import ASI_TOOL_EFFECTIVENESS_GUIDANCE
+
+        sections = PromptOptimizerLearner.EVOLVABLE_SECTIONS
+        if section != "all":
+            matched = [s for s in sections if section.upper() in s]
+            sections = matched if matched else sections
+
+        providers = ["openai", "xai", "deepseek", "anthropic"]
+        if provider != "all":
+            providers = [provider]
+
+        section_text = {
+            "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+            "GROUNDING_RULES": "",
+            "COMPLETION_GUIDANCE": "",
+            "FEW_SHOT_EXAMPLES": "",
+        }
+
+        results = Table(title="GEPA Evolution Results")
+        results.add_column("Provider", style="cyan")
+        results.add_column("Section", style="dim")
+        results.add_column("Gen", style="green")
+        results.add_column("Mean", style="bold")
+        results.add_column("Chars", style="dim")
+
+        # Load ALL evaluation results (not just latest) to compute
+        # aggregate pass rates per provider across all benchmark runs.
+        import glob as _glob
+        import json as _json
+        from pathlib import Path as _Path
+
+        eval_dir = _Path.home() / ".victor" / "evaluations"
+        provider_agg = {}  # provider → {"pass": N, "fail": N}
+        model_to_provider = {
+            "gpt": "openai",
+            "grok": "xai",
+            "deepseek": "deepseek",
+            "haiku": "anthropic",
+            "claude": "anthropic",
+        }
+        for ef in sorted(_glob.glob(str(eval_dir / "eval_swe_bench_*.json"))):
+            try:
+                with open(ef) as _f:
+                    edata = _json.load(_f)
+                emodel = edata.get("config", {}).get("model", "")
+                etasks = edata.get("tasks", [])
+                # Map model to provider
+                p_name = None
+                for prefix, prov in model_to_provider.items():
+                    if prefix in emodel.lower():
+                        p_name = prov
+                        break
+                if not p_name or len(etasks) < 1:
+                    continue
+                if p_name not in provider_agg:
+                    provider_agg[p_name] = {"pass": 0, "fail": 0}
+                for t in etasks:
+                    if t.get("status") == "passed":
+                        provider_agg[p_name]["pass"] += 1
+                    else:
+                        provider_agg[p_name]["fail"] += 1
+            except Exception:
+                pass
+
+        # Also collect trace-based success from usage.jsonl
+        traces = learner._collect_traces(limit=200)
+        trace_pass = sum(1 for t in traces if t.success)
+        trace_fail = len(traces) - trace_pass
+        console.print(
+            f"[dim]Seeding from {len(list(_glob.glob(str(eval_dir / 'eval_*.json'))))} "
+            f"eval files + {len(traces)} traces[/]"
+        )
+
+        # Default seed for providers without benchmark data
+        default_seed = (max(trace_pass, 5), max(trace_fail, 3))
+
+        for p in providers:
+            for s in sections:
+                current = section_text.get(s, "")
+                candidate = learner.evolve(s, current, provider=p)
+                if candidate:
+                    # Seed from aggregate benchmark data or defaults
+                    agg = provider_agg.get(p)
+                    if agg and (agg["pass"] + agg["fail"]) > 0:
+                        # Scale to max 15 to avoid overwhelming priors
+                        total = agg["pass"] + agg["fail"]
+                        scale = min(15 / max(total, 1), 1.0)
+                        passes = max(1, int(agg["pass"] * scale))
+                        fails = max(1, int(agg["fail"] * scale))
+                    else:
+                        # No benchmark data — use trace-based defaults
+                        passes, fails = default_seed
+                    for _ in range(passes):
+                        candidate.update(True)
+                    for _ in range(fails):
+                        candidate.update(False)
+                    learner._save_candidate(candidate)
+                    results.add_row(
+                        p,
+                        s[:20],
+                        str(candidate.generation),
+                        f"{candidate.mean:.2f}",
+                        str(len(candidate.text)),
+                    )
+                else:
+                    results.add_row(p, s[:20], "-", "-", "[dim]no change[/]")
+
+        console.print(results)
+        metrics = learner.export_metrics()
+        console.print(f"\n[dim]Total candidates: {metrics['total_candidates']}[/]")
+
+    except Exception as e:
+        console.print(f"[red]Evolution failed:[/] {e}")
+        import traceback
+
+        console.print(traceback.format_exc())
+
+    if compliance:
+        _show_compliance_scorecard()
+
+
+def _show_compliance_scorecard() -> None:
+    """Show GEPA prompt compliance analysis from usage.jsonl traces."""
+    import gzip
+    import json
+    from collections import defaultdict
+    from pathlib import Path
+    from rich.table import Table
+
+    events = []
+    logs_dir = Path.home() / ".victor" / "logs"
+    for path in sorted(logs_dir.glob("usage.*.jsonl.gz")) + [logs_dir / "usage.jsonl"]:
+        if not path.exists():
+            continue
+        try:
+            opener = gzip.open if path.suffix == ".gz" else open
+            mode = "rt" if path.suffix == ".gz" else "r"
+            with opener(str(path), mode) as f:
+                for line in f:
+                    try:
+                        events.append(json.loads(line))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    sessions = defaultdict(list)
+    for e in events:
+        if e.get("event_type") in ("tool_call", "tool_result"):
+            sessions[e.get("session_id", "?")].append(e)
+
+    # Rule checks
+    total_sessions = len(sessions)
+    search_first = sum(
+        1
+        for evts in sessions.values()
+        if any(
+            e.get("data", {}).get("tool_name") == "code_search"
+            for e in evts
+            if e.get("event_type") == "tool_call"
+        )
+        and next(
+            (
+                e.get("data", {}).get("tool_name")
+                for e in evts
+                if e.get("event_type") == "tool_call"
+            ),
+            None,
+        )
+        == "code_search"
+    )
+
+    shell_total = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call" and e.get("data", {}).get("tool_name") == "shell"
+    )
+    shell_search = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "shell"
+        and any(
+            s in str(e.get("data", {}).get("tool_args", {}).get("cmd", "")).lower()
+            for s in ["grep ", "rg ", " ag "]
+        )
+    )
+
+    total_reads = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call" and e.get("data", {}).get("tool_name") == "read"
+    )
+    victor_reads = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "read"
+        and "victor" in str(e.get("data", {}).get("tool_args", {}).get("path", "")).lower()
+        and "swe_bench" not in str(e.get("data", {}).get("tool_args", {}))
+    )
+
+    cs_total = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "code_search"
+    )
+    cs_semantic = sum(
+        1
+        for e in events
+        if e.get("event_type") == "tool_call"
+        and e.get("data", {}).get("tool_name") == "code_search"
+        and e.get("data", {}).get("tool_args", {}).get("mode", "semantic") == "semantic"
+    )
+
+    table = Table(title="GEPA Compliance Scorecard")
+    table.add_column("Rule", style="cyan")
+    table.add_column("Compliance", style="bold")
+    table.add_column("Target", style="dim")
+
+    rules = [
+        ("Search first", search_first * 100 // max(total_sessions, 1), 50),
+        (
+            "No shell search",
+            (shell_total - shell_search) * 100 // max(shell_total, 1) if shell_total else 100,
+            80,
+        ),
+        (
+            "No workspace contamination",
+            (total_reads - victor_reads) * 100 // max(total_reads, 1),
+            95,
+        ),
+        (
+            "Semantic search preferred",
+            cs_semantic * 100 // max(cs_total, 1) if cs_total else 100,
+            80,
+        ),
+    ]
+
+    for name, pct, target in rules:
+        status = (
+            "[green]✓[/]"
+            if pct >= target
+            else "[yellow]⚠[/]" if pct >= target * 0.6 else "[red]✗[/]"
+        )
+        table.add_row(f"{status} {name}", f"{pct}%", f"{target}%")
+
+    console.print("\n")
+    console.print(table)
+
+    # Efficiency scaling: tool calls per session over time
+    session_tools = []
+    for sid, evts in sessions.items():
+        tc = sum(1 for e in evts if e.get("event_type") == "tool_call")
+        if tc > 0:
+            session_tools.append(tc)
+
+    if len(session_tools) >= 4:
+        first_half = session_tools[: len(session_tools) // 2]
+        second_half = session_tools[len(session_tools) // 2 :]
+        avg_first = sum(first_half) / len(first_half)
+        avg_second = sum(second_half) / len(second_half)
+        delta = avg_second - avg_first
+        direction = "↓" if delta < 0 else "↑" if delta > 0 else "="
+        console.print(
+            f"[dim]Efficiency: {avg_first:.0f} → {avg_second:.0f} tools/session "
+            f"({direction}{abs(delta):.0f}) across {len(session_tools)} sessions[/]"
+        )
+
+    console.print(f"[dim]Based on {len(events):,} events across {total_sessions} sessions[/]")

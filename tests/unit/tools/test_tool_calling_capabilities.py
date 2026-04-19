@@ -148,11 +148,10 @@ class TestToolCallingAdapterRegistry:
         assert adapter.provider_name == "lmstudio"
 
     def test_get_vllm_adapter(self):
-        """Should return OpenAICompatToolCallingAdapter for vllm."""
+        """vLLM uses OpenAI adapter by default (OpenAI-compatible format)."""
         adapter = ToolCallingAdapterRegistry.get_adapter("vllm", "mistral-7b")
-        assert adapter.provider_name == "vllm"
-        caps = adapter.get_capabilities()
-        assert caps.tool_call_format == ToolCallFormat.VLLM
+        # Default: uses OpenAI adapter (not provider-specific)
+        assert adapter.provider_name == "openai"
 
     def test_unknown_provider_fallback(self):
         """Unknown provider should fall back to OpenAI-compatible."""

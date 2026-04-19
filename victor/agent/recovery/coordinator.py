@@ -470,8 +470,14 @@ class RecoveryCoordinator:
         """Get fallback model using circuit breaker status if available."""
         # Default fallback chains
         fallback_chains = {
-            "anthropic": [("openai", "gpt-4o"), ("anthropic", "claude-3-5-haiku-latest")],
-            "openai": [("anthropic", "claude-3-5-sonnet-latest"), ("openai", "gpt-4o-mini")],
+            "anthropic": [
+                ("openai", "gpt-4o"),
+                ("anthropic", "claude-3-5-haiku-latest"),
+            ],
+            "openai": [
+                ("anthropic", "claude-3-5-sonnet-latest"),
+                ("openai", "gpt-4o-mini"),
+            ],
             "ollama": [("ollama", "qwen2.5-coder:14b"), ("ollama", "llama3.1:8b")],
             "lmstudio": [("ollama", "qwen2.5-coder:14b")],
         }

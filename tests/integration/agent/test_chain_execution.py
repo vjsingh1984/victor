@@ -413,7 +413,10 @@ class TestYAMLWorkflowChainReferences:
         @chain("dataanalysis:analyze")
         def analyze_factory():
             return RunnableLambda(
-                lambda x: {"analyzed": True, "result": f"Analyzed {x.get('rows', 0)} rows"}
+                lambda x: {
+                    "analyzed": True,
+                    "result": f"Analyzed {x.get('rows', 0)} rows",
+                }
             )
 
         # Simulate what the workflow executor does when resolving chain handlers

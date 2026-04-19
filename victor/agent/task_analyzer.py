@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from victor.storage.embeddings.intent_classifier import IntentType
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
     from victor.protocols.coordination import CoordinationSuggestion
+    from victor.framework.task.complexity import ComplexityBudget
 
 # Import protocols for type hints (available at runtime since protocols.py has no heavy deps)
 from victor.core.protocols import TaskClassifierProtocol, IntentClassifierProtocol
@@ -102,6 +103,9 @@ class TaskAnalysis:
             return None
         rec = self.coordination_suggestion.primary_team
         return rec.team_name if rec else None
+
+    # Framework-driven resource allocation from ComplexityBudget
+    budget: Optional["ComplexityBudget"] = None
 
     def should_force_completion(self, tool_calls: int) -> bool:
         return tool_calls >= self.tool_budget
@@ -199,10 +203,16 @@ class TaskAnalyzer:
             else self.unified_classifier.classify(message)
         )
 
+        # Get framework-driven resource allocation
+        from victor.framework.task.complexity import ComplexityBudget as _CB
+
+        _budget = _CB.for_complexity(complexity_result.complexity)
+
         analysis = TaskAnalysis(
             complexity=complexity_result.complexity,
             tool_budget=complexity_result.tool_budget,
             complexity_confidence=complexity_result.confidence,
+            budget=_budget,
             unified_task_type=unified_result.task_type,
             unified_confidence=unified_result.confidence,
             is_action_task=unified_result.is_action_task,

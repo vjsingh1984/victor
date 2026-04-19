@@ -360,7 +360,10 @@ class TestVerticalRegistration:
         registry.register_for_vertical(
             "devops",
             TaskTypeDefinition(
-                name="test1", category=TaskCategory.MODIFICATION, hint="", tool_budget=10
+                name="test1",
+                category=TaskCategory.MODIFICATION,
+                hint="",
+                tool_budget=10,
             ),
         )
         registry.register_for_vertical(

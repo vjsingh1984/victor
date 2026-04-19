@@ -14,6 +14,8 @@
 
 """Vertical management commands."""
 
+import json
+from pathlib import Path
 from typing import Optional
 
 import typer
@@ -156,7 +158,7 @@ def list_verticals(
             v.name,
             v.version,
             "Builtin" if v.is_builtin else "External",
-            v.metadata.description if v.metadata else "[dim]No description available[/]",
+            (v.metadata.description if v.metadata else "[dim]No description available[/]"),
         ]
 
         if verbose:
@@ -305,6 +307,87 @@ def search_verticals(
     console.print(f"\n[dim]Found {len(results)} result(s)[/]")
 
 
+@vertical_app.command("audit")
+def audit_verticals(
+    paths: list[str] = typer.Argument(
+        None,
+        help="One or more extracted vertical repository paths",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    workspace: bool = typer.Option(
+        False,
+        "--workspace",
+        help="Audit the default extracted sibling repos next to the core checkout",
+    ),
+) -> None:
+    """Audit extracted vertical repositories against the supported plugin contract."""
+    _deprecation_notice()
+
+    from victor.core.verticals.contract_audit import VerticalContractAuditor
+    from victor.core.verticals.extracted_repo_paths import (
+        discover_default_extracted_repo_paths,
+        normalize_extracted_repo_paths,
+    )
+
+    if workspace:
+        repo_root = Path(__file__).resolve().parents[3]
+        resolved_paths = discover_default_extracted_repo_paths(repo_root=repo_root)
+        if not resolved_paths:
+            console.print("[yellow]No extracted vertical repositories found to audit.[/]")
+            raise typer.Exit(0)
+    elif paths:
+        resolved_paths = normalize_extracted_repo_paths(paths, cwd=Path.cwd())
+    else:
+        _handle_error("Provide at least one path or pass --workspace")
+        return
+
+    reports = VerticalContractAuditor().audit_paths(resolved_paths)
+
+    if json_output:
+        console.print_json(json.dumps([report.to_dict() for report in reports], indent=2))
+    else:
+        table = Table(title="Vertical Contract Audit")
+        table.add_column("Repo", style="cyan")
+        table.add_column("Result")
+        table.add_column("Errors", justify="right")
+        table.add_column("Warnings", justify="right")
+        table.add_column("Plugin Entry Points")
+
+        for report in reports:
+            status = "[green]PASSED[/]" if report.passed else "[red]FAILED[/]"
+            plugin_entries = (
+                ", ".join(report.plugin_entry_points) if report.plugin_entry_points else "-"
+            )
+            table.add_row(
+                str(report.root_path),
+                status,
+                str(report.error_count),
+                str(report.warning_count),
+                plugin_entries,
+            )
+
+        console.print(table)
+
+        for report in reports:
+            if not report.issues:
+                continue
+            console.print(f"\n[bold]{report.project_name or report.root_path.name}[/]")
+            for issue in report.issues:
+                location = ""
+                if issue.path:
+                    location = f" ({issue.path}"
+                    if issue.line is not None:
+                        location += f":{issue.line}"
+                    location += ")"
+                style = "red" if issue.level == "error" else "yellow"
+                console.print(
+                    f"[{style}]{issue.level.upper()} {issue.code}[/]{location}: {issue.message}"
+                )
+
+    if any(not report.passed for report in reports):
+        raise typer.Exit(1)
+
+
 @vertical_app.command("create")
 def create_vertical(
     name: str = typer.Argument(..., help="Name of the new vertical"),
@@ -316,14 +399,15 @@ def create_vertical(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
 ) -> None:
     """Create (scaffold) a new vertical package."""
-    from victor.ui.commands.scaffold import new_vertical
+    from victor.ui.commands.scaffold import scaffold_plugin
 
-    new_vertical(
+    scaffold_plugin(
         name=name,
         description=description,
         service_provider=service_provider,
         force=force,
         dry_run=dry_run,
+        label="vertical",
     )
 
 
@@ -338,14 +422,15 @@ def scaffold_vertical(
     dry_run: bool = typer.Option(False, "--dry-run", help="Show files that would be created"),
 ) -> None:
     """Scaffold a new vertical package."""
-    from victor.ui.commands.scaffold import new_vertical
+    from victor.ui.commands.scaffold import scaffold_plugin
 
-    new_vertical(
+    scaffold_plugin(
         name=name,
         description=description,
         service_provider=service_provider,
         force=force,
         dry_run=dry_run,
+        label="vertical",
     )
 
 

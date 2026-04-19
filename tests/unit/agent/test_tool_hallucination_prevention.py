@@ -88,7 +88,11 @@ class TestToolPreFilter:
             tool_pipeline=mock_pipeline,
             tool_registry=mock_registry,
         )
-        coordinator._known_tool_names = known_tools or {"read_file", "write_file", "shell"}
+        coordinator._known_tool_names = known_tools or {
+            "read_file",
+            "write_file",
+            "shell",
+        }
         return coordinator
 
     def test_pre_filter_removes_hallucinated_tools(self):

@@ -141,7 +141,8 @@ class CodeChunkingStrategy(ChunkingStrategy):
 
             # Extract symbol name from match
             symbol_match = re.search(
-                r"(?:def|function|fn|func|class|struct|enum|interface|impl)\s+(\w+)", match_text
+                r"(?:def|function|fn|func|class|struct|enum|interface|impl)\s+(\w+)",
+                match_text,
             )
             symbol_name = symbol_match.group(1) if symbol_match else None
 

@@ -246,7 +246,10 @@ class WorkflowDefinitionSchema(BaseModel):
     """
 
     name: str = Field(
-        ..., min_length=1, max_length=100, description="Workflow name (unique identifier)"
+        ...,
+        min_length=1,
+        max_length=100,
+        description="Workflow name (unique identifier)",
     )
     description: Optional[str] = Field(None, max_length=500, description="Workflow description")
     entry_point: str = Field(

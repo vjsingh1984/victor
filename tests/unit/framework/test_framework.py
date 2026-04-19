@@ -323,7 +323,7 @@ class TestState:
         Phase 7.2: Updated to use protocol methods instead of direct attribute access.
         """
         from unittest.mock import MagicMock, PropertyMock
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         mock_orchestrator = MagicMock()
         # Configure protocol methods
@@ -351,7 +351,7 @@ class TestState:
         Phase 7.2: Updated to use protocol methods instead of direct attribute access.
         """
         from unittest.mock import MagicMock, PropertyMock
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         mock_orchestrator = MagicMock()
         # Configure protocol methods

@@ -74,7 +74,9 @@ def keys(
         False, "--services", help="List configured services (finnhub, fred, etc.)"
     ),
     set_oauth_client_id: Optional[str] = typer.Option(
-        None, "--set-oauth-client-id", help="Set OAuth client_id for a provider (openai, qwen)"
+        None,
+        "--set-oauth-client-id",
+        help="Set OAuth client_id for a provider (openai, qwen)",
     ),
     delete_oauth_client_id: Optional[str] = typer.Option(
         None, "--delete-oauth-client-id", help="Delete OAuth client_id from keyring"

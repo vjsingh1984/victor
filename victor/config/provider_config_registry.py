@@ -109,7 +109,6 @@ DEFAULT_PROVIDER_ENDPOINTS = {
     "xai": "https://api.x.ai/v1",
     "moonshot": "https://api.moonshot.cn/v1",
     "deepseek": "https://api.deepseek.com/v1",
-    "zai": "https://api.z.ai/api/paas/v4/",
     "groqcloud": "https://api.groq.com/openai/v1",
     "cerebras": "https://api.cerebras.ai/v1",
     "mistral": "https://api.mistral.ai/v1",
@@ -239,7 +238,7 @@ class OllamaConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         result = dict(base_settings)
-        result.setdefault("base_url", settings.ollama_base_url)
+        result.setdefault("base_url", settings.provider.ollama_base_url)
         return result
 
 
@@ -300,7 +299,7 @@ class VLLMConfig(ProviderConfigStrategy):
         base_settings: Dict[str, Any],
     ) -> Dict[str, Any]:
         result = dict(base_settings)
-        result.setdefault("base_url", settings.vllm_base_url)
+        result.setdefault("base_url", settings.provider.vllm_base_url)
         return result
 
 
@@ -332,6 +331,46 @@ class QwenConfig(ProviderConfigStrategy):
             if api_key:
                 result["api_key"] = api_key
             result.setdefault("base_url", "https://dashscope.aliyuncs.com/compatible-mode/v1/")
+        return result
+
+
+class ZAIConfig(ProviderConfigStrategy):
+    """Configuration strategy for Z.AI (Zhipu GLM).
+
+    Handles coding plan endpoint switching: the Coding Plan requires
+    a different base URL (/api/coding/paas/v4/) than the standard API.
+    """
+
+    @property
+    def provider_name(self) -> str:
+        return "zai"
+
+    @property
+    def aliases(self) -> List[str]:
+        return ["zhipu"]
+
+    def get_settings(
+        self,
+        settings: "Settings",
+        base_settings: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        from victor.config.api_keys import get_api_key
+
+        result = dict(base_settings)
+
+        # Resolve API key
+        api_key = get_api_key("zai")
+        if api_key:
+            result["api_key"] = api_key
+
+        # Coding plan uses a dedicated endpoint
+        coding_plan = result.pop("coding_plan", False)
+        if coding_plan:
+            result.setdefault("base_url", "https://api.z.ai/api/coding/paas/v4/")
+            result["coding_plan"] = True
+        else:
+            result.setdefault("base_url", "https://api.z.ai/api/paas/v4/")
+
         return result
 
 
@@ -373,13 +412,21 @@ class ProviderConfigRegistry:
         provider: str,
         settings: "Settings",
         profile_overrides: Optional[Dict[str, Any]] = None,
+        account_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Get settings for a provider.
+
+        Merge precedence (lowest to highest):
+        1. profiles.yaml providers section (base_settings)
+        2. account_data from AccountManager config.yaml (credentials)
+        3. profile_overrides from CLI flags (--coding-plan, --auth-mode)
+        4. Strategy logic (provider-specific endpoint switching, URL probing)
 
         Args:
             provider: Provider name (or alias)
             settings: Settings instance
-            profile_overrides: Optional profile-level overrides (e.g., auth_mode from ProfileConfig.__pydantic_extra__)
+            profile_overrides: Runtime overrides (e.g., coding_plan, auth_mode from CLI)
+            account_data: Credential data from AccountManager (api_key, auth_mode, base_url)
 
         Returns:
             Provider settings dictionary
@@ -388,14 +435,23 @@ class ProviderConfigRegistry:
             # Resolve alias
             resolved = self._aliases.get(provider, provider)
 
-            # Load base settings from profiles.yaml
+            # 1. Load base settings from profiles.yaml providers section
             base_settings = {}
             provider_config = settings.load_provider_config(resolved)
             if provider_config:
                 base_settings.update(unwrap_secrets(provider_config.model_dump(exclude_none=True)))
 
-            # Apply profile overrides BEFORE calling strategy
-            # This allows the strategy to see auth_mode and make decisions
+            # 2. Merge account data (credentials from config.yaml)
+            if account_data:
+                # API key from AccountManager always wins (it's the credential source)
+                if "api_key" in account_data:
+                    base_settings["api_key"] = account_data["api_key"]
+                # Other account data fills gaps (don't override existing settings)
+                for key in ("auth_mode", "base_url"):
+                    if key in account_data and key not in base_settings:
+                        base_settings[key] = account_data[key]
+
+            # 3. Apply profile overrides (CLI flags like --coding-plan, --auth-mode)
             if profile_overrides:
                 base_settings.update(profile_overrides)
 
@@ -457,7 +513,7 @@ def _register_builtin_providers(registry: ProviderConfigRegistry) -> None:
         DefaultProviderConfig("moonshot", aliases=["kimi"]),
         DefaultProviderConfig("deepseek"),
         DefaultProviderConfig("groqcloud", aliases=["groq"]),
-        DefaultProviderConfig("zai", aliases=["zhipuai", "zhipu"]),
+        ZAIConfig(),
         QwenConfig(),
     ]
 

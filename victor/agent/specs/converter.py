@@ -140,7 +140,9 @@ class EnsembleConverter:
                 role=self._get_role_for_agent(agent),
                 goal=agent.system_prompt or agent.description,
                 tool_budget=agent.constraints.max_tool_calls or self.default_tool_budget,
-                allowed_tools=list(agent.capabilities.tools) if agent.capabilities.tools else None,
+                allowed_tools=(
+                    list(agent.capabilities.tools) if agent.capabilities.tools else None
+                ),
                 output_key=f"{agent.name}_output",
             )
 
@@ -178,7 +180,9 @@ class EnsembleConverter:
                 role=self._get_role_for_agent(agent),
                 goal=agent.system_prompt or agent.description,
                 tool_budget=agent.constraints.max_tool_calls or self.default_tool_budget,
-                allowed_tools=list(agent.capabilities.tools) if agent.capabilities.tools else None,
+                allowed_tools=(
+                    list(agent.capabilities.tools) if agent.capabilities.tools else None
+                ),
                 output_key=f"{agent.name}_output",
                 next_nodes=[],  # No explicit next nodes, parallel node handles flow
             )
@@ -222,7 +226,9 @@ class EnsembleConverter:
             goal=manager.system_prompt or manager.description,
             name=f"Manager: {manager.name}",
             tool_budget=manager.constraints.max_tool_calls or self.default_tool_budget * 2,
-            allowed_tools=list(manager.capabilities.tools) if manager.capabilities.tools else None,
+            allowed_tools=(
+                list(manager.capabilities.tools) if manager.capabilities.tools else None
+            ),
             output_key="manager_plan",
         )
 

@@ -855,8 +855,8 @@ class VictorTUI(App):
                     elif chunk_type == "tool_end":
                         try:
                             self._finish_tool_call(
-                                success=chunk.success if hasattr(chunk, "success") else True,
-                                elapsed=chunk.elapsed if hasattr(chunk, "elapsed") else None,
+                                success=(chunk.success if hasattr(chunk, "success") else True),
+                                elapsed=(chunk.elapsed if hasattr(chunk, "elapsed") else None),
                             )
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
@@ -1099,7 +1099,9 @@ class VictorTUI(App):
 
     def action_resume_project_session(self) -> None:
         """Resume a project session from the project SQLite database."""
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         persistence = get_sqlite_session_persistence()
         sessions = persistence.list_sessions(limit=20)
@@ -1126,7 +1128,9 @@ class VictorTUI(App):
 
     def action_resume_any_session(self) -> None:
         """Resume a session from either TUI or project history."""
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
         from victor.ui.tui.session import SessionManager
 
         manager = SessionManager()
@@ -1226,9 +1230,11 @@ class VictorTUI(App):
 
     def _load_project_session(self, session_id: str) -> None:
         """Load a project session with progress indication."""
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         persistence = get_sqlite_session_persistence()
         session = persistence.load_session(session_id)
@@ -1397,7 +1403,9 @@ class VictorTUI(App):
     async def _load_project_session_async(self, session_id: str) -> None:
         """Async project session loader using chunked replay."""
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         persistence = get_sqlite_session_persistence()
         session = await asyncio.to_thread(persistence.load_session, session_id)

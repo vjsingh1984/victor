@@ -234,7 +234,11 @@ def plugin_info(
             "root_path": str(plugin.root_path),
             "permissions": manifest.permissions,
             "tools": [
-                {"name": t.name, "description": t.description, "permission": t.required_permission}
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "permission": t.required_permission,
+                }
                 for t in manifest.tools
             ],
             "commands": [{"name": c.name, "description": c.description} for c in manifest.commands],
@@ -304,3 +308,61 @@ def search_plugins(
         )
 
     console.print(table)
+
+
+@plugin_app.command("init")
+def init_plugin(
+    name: str = typer.Argument(
+        ...,
+        help="Name of the new plugin (e.g., 'security', 'analytics')",
+    ),
+    description: str = typer.Option(
+        None,
+        "--description",
+        "-d",
+        help="Description of the plugin's purpose",
+    ),
+    service_provider: bool = typer.Option(
+        False,
+        "--service-provider",
+        "-s",
+        help="Include service_provider.py for DI container registration",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Overwrite existing files if plugin already exists",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        "-n",
+        help="Show what would be created without actually creating files",
+    ),
+) -> None:
+    """Scaffold a new plugin from templates.
+
+    Creates a plugin directory with an SDK-first definition layer:
+    - __init__.py - Package initialization and assistant export
+    - assistant.py - Main plugin definition authored against victor-sdk
+    - safety.py - Optional runtime-side safety notes placeholder
+    - prompts.py - Optional serializable prompt metadata helper
+    - mode_config.py - Optional runtime-side mode metadata placeholder
+    - service_provider.py - DI container registration (optional)
+
+    Examples:
+        victor plugin init security --description "Security analysis assistant"
+        victor plugin init analytics -d "Data analytics" --service-provider
+        victor plugin init ml --dry-run
+    """
+    from victor.ui.commands.scaffold import scaffold_plugin
+
+    scaffold_plugin(
+        name=name,
+        description=description,
+        service_provider=service_provider,
+        force=force,
+        dry_run=dry_run,
+        label="plugin",
+    )

@@ -439,7 +439,9 @@ class TestCompilation:
         mock_run_sync.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_compile_with_async_transform_node_uses_thread_bridge_in_async_context(self):
+    async def test_compile_with_async_transform_node_uses_thread_bridge_in_async_context(
+        self,
+    ):
         """Compiled async function nodes should avoid nested loops in async contexts."""
         graph = WorkflowGraph(SimpleState)
         graph.add_node("process", async_increment)

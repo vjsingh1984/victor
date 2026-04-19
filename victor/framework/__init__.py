@@ -451,6 +451,41 @@ _LAZY_IMPORTS: dict[str, list[str]] = {
         "wrap_error",
         "format_exception_for_user",
     ],
+    "victor.framework.perception_integration": [
+        "Perception",
+        "PerceptionIntegration",
+        "Requirement",
+        "RequirementType",
+        "SimilarExperience",
+        "perceive",
+    ],
+    "victor.framework.evaluation_nodes": [
+        "EvaluationCheckpoint",
+        "EvaluationDecision",
+        "EvaluationNode",
+        "EvaluationResult",
+        "add_evaluation",
+        "composite_evaluator",
+        "convergence_evaluator",
+        "create_agentic_loop_graph",
+        "error_count_evaluator",
+        "progress_tracking_evaluator",
+        "simple_score_evaluator",
+    ],
+    "victor.framework.fulfillment": [
+        "FulfillmentConfig",
+        "FulfillmentDetector",
+        "FulfillmentResult",
+        "FulfillmentStatus",
+        "FulfillmentStrategy",
+        "TaskType",
+    ],
+    "victor.framework.agentic_loop": [
+        "AgenticLoop",
+        "LoopIteration",
+        "LoopResult",
+        "LoopStage",
+    ],
 }
 
 # Phase 9 export counts for testing

@@ -72,7 +72,14 @@ try:
 except ImportError:
     # Fallback if framework module is not available
     class ContextualError(RuntimeError):  # type: ignore
-        def __init__(self, message, operation=None, suggestion=None, error_code=None, details=None):
+        def __init__(
+            self,
+            message,
+            operation=None,
+            suggestion=None,
+            error_code=None,
+            details=None,
+        ):
             full_message = message
             if operation:
                 full_message = f"[{operation}] {message}"

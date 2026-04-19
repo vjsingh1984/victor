@@ -46,7 +46,9 @@ class SaveCommand(BaseSlashCommand):
             return
 
         from victor.agent.session import get_session_manager
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         # Check for --new flag
         force_new = self._has_flag(ctx, "--new", "-n")
@@ -150,7 +152,7 @@ class LoadCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
         from victor.agent.session import get_session_manager
 
@@ -211,7 +213,9 @@ class SessionsCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         limit = self._parse_int_arg(ctx, 0, default=10)
 
@@ -283,9 +287,11 @@ class ResumeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         # If session_id provided as argument, load it directly
         if ctx.args:
@@ -350,9 +356,11 @@ class ResumeCommand(BaseSlashCommand):
             ctx: Command context
             session_id: Session ID to load
         """
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
         from victor.agent.message_history import MessageHistory
-        from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+        from victor.agent.sqlite_session_persistence import (
+            get_sqlite_session_persistence,
+        )
 
         try:
             persistence = get_sqlite_session_persistence()
@@ -521,7 +529,10 @@ class CompactCommand(BaseSlashCommand):
                 from victor.agent.message_types import Message
 
                 new_messages = [
-                    Message(role="system", content=f"[Previous conversation summary]\n{summary}"),
+                    Message(
+                        role="system",
+                        content=f"[Previous conversation summary]\n{summary}",
+                    ),
                     *messages[-keep_recent:],
                 ]
                 ctx.agent.conversation.messages = new_messages

@@ -86,7 +86,74 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
-class DatabaseManager:
+def _normalize_project_database_paths(project_path: Optional[Path]) -> tuple[Path, Path, Path]:
+    """Normalize project DB input to project root, state dir, and db file."""
+    if project_path is None:
+        resolved = Path.cwd().resolve()
+    else:
+        resolved = Path(project_path).resolve()
+
+    if resolved.suffix == ".db":
+        project_dir = resolved.parent
+        db_path = resolved
+    elif resolved.name == ".victor":
+        project_dir = resolved
+        db_path = project_dir / "project.db"
+    else:
+        project_dir = resolved / ".victor"
+        db_path = project_dir / "project.db"
+
+    project_root = project_dir.parent
+    return project_root, project_dir, db_path
+
+
+class _DatabaseManagerBase:
+    """Base class for database managers with shared connection logic.
+
+    Provides common functionality for managing SQLite database connections:
+    - Thread-local connection storage
+    - Raw connection retrieval with lazy initialization
+    - Connection cleanup
+
+    This base class is inherited by both DatabaseManager and ProjectDatabaseManager
+    to avoid code duplication.
+    """
+
+    def __init__(self):
+        """Initialize thread-local storage for database connection."""
+        import threading
+        self._local = threading.local()
+
+    def _get_raw_connection(self) -> sqlite3.Connection:
+        """Get raw SQLite connection (thread-local).
+
+        Creates a new connection if one doesn't exist for the current thread.
+        All connections use Row factory for convenient column access.
+
+        Returns:
+            Thread-local SQLite connection with Row factory
+        """
+        if not hasattr(self._local, "conn") or self._local.conn is None:
+            self._local.conn = sqlite3.connect(
+                str(self.db_path),
+                check_same_thread=False,
+                timeout=30.0,
+            )
+            self._local.conn.row_factory = sqlite3.Row
+        return self._local.conn
+
+    def close(self) -> None:
+        """Close the database connection.
+
+        Closes the thread-local connection if it exists and clears the reference.
+        Safe to call multiple times.
+        """
+        if hasattr(self._local, "conn") and self._local.conn:
+            self._local.conn.close()
+            self._local.conn = None
+
+
+class DatabaseManager(_DatabaseManagerBase):
     """Unified database manager for Victor.
 
     Provides a single SQLite database for all components, with:
@@ -132,6 +199,9 @@ class DatabaseManager:
         if self._initialized:
             return
 
+        # Initialize base class (sets up self._local)
+        super().__init__()
+
         self._victor_dir = Path.home() / ".victor"
         self._victor_dir.mkdir(parents=True, exist_ok=True)
 
@@ -139,7 +209,6 @@ class DatabaseManager:
             db_path = self._victor_dir / "victor.db"
 
         self.db_path = db_path
-        self._local = threading.local()
         self._migration_lock = threading.Lock()
         self._migrated = False
 
@@ -167,17 +236,6 @@ class DatabaseManager:
 
         # Run migrations if needed
         self._run_migrations(conn)
-
-    def _get_raw_connection(self) -> sqlite3.Connection:
-        """Get raw SQLite connection (thread-local)."""
-        if not hasattr(self._local, "conn") or self._local.conn is None:
-            self._local.conn = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-                timeout=30.0,
-            )
-            self._local.conn.row_factory = sqlite3.Row
-        return self._local.conn
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection.
@@ -490,17 +548,191 @@ class DatabaseManager:
 
         return stats
 
+    # Table groups for bulk operations
+    TABLE_GROUPS = {
+        "rl": ["rl_outcome", "rl_metric"],
+        "agent": ["agent_prompt_history", "agent_workflow_run", "agent_team_run"],
+    }
+
+    # Column name mapping: table → date column used for time-based pruning
+    # Tables use different names: created_at, timestamp, executed_at
+    _DATE_COLUMNS = {
+        "rl_outcome": "created_at",
+        "rl_metric": "created_at",
+        "agent_prompt_history": "timestamp",
+        "agent_workflow_run": "executed_at",
+        "agent_team_run": "created_at",
+        "rl_cache_history": "created_at",
+        "rl_grounding_history": "created_at",
+        "rl_tool_outcome": "created_at",
+    }
+
+    def _get_date_column(self, table: str) -> str:
+        """Get the date column name for a table, with auto-detection fallback."""
+        if table in self._DATE_COLUMNS:
+            return self._DATE_COLUMNS[table]
+        # Auto-detect
+        conn = self.get_connection()
+        cols = {r[1] for r in conn.execute(f"PRAGMA table_info([{table}])").fetchall()}
+        for candidate in ("created_at", "timestamp", "executed_at", "updated_at"):
+            if candidate in cols:
+                return candidate
+        raise ValueError(f"No date column found in '{table}' (columns: {cols})")
+
+    def get_tables_for_group(self, group: str) -> list:
+        """Get table names for a logical group. 'all' returns all prunable tables."""
+        if group == "all":
+            tables = []
+            for g in self.TABLE_GROUPS.values():
+                tables.extend(g)
+            return tables
+        return list(self.TABLE_GROUPS.get(group, []))
+
+    def prune_table(
+        self,
+        table: str,
+        *,
+        older_than_days: int | None = None,
+        keep_last: int | None = None,
+    ) -> int:
+        """Delete old rows from a table.
+
+        Args:
+            table: Table name (must be in a known group for safety)
+            older_than_days: Delete rows older than N days (uses created_at)
+            keep_last: Keep only the most recent N rows
+
+        Returns:
+            Number of rows deleted
+        """
+        # Safety: only allow pruning known tables
+        all_prunable = self.get_tables_for_group("all")
+        if table not in all_prunable:
+            raise ValueError(f"Table '{table}' not in prunable tables: {all_prunable}")
+
+        conn = self.get_connection()
+
+        if older_than_days is not None:
+            from datetime import datetime, timedelta, timezone
+
+            date_col = self._get_date_column(table)
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=older_than_days)).isoformat()
+            cursor = conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (cutoff,))
+            conn.commit()
+            deleted = cursor.rowcount
+            logger.info(
+                "Pruned %d rows from %s (older than %d days)", deleted, table, older_than_days
+            )
+            return deleted
+
+        if keep_last is not None:
+            cursor = conn.execute(
+                f"DELETE FROM [{table}] WHERE id NOT IN "
+                f"(SELECT id FROM [{table}] ORDER BY id DESC LIMIT ?)",
+                (keep_last,),
+            )
+            conn.commit()
+            deleted = cursor.rowcount
+            logger.info("Pruned %d rows from %s (kept last %d)", deleted, table, keep_last)
+            return deleted
+
+        return 0
+
+    def archive_table(self, table: str, before_date: str, output_path: "Path") -> int:
+        """Export rows before a date to gzip JSONL, then delete them.
+
+        Args:
+            table: Table name
+            before_date: ISO date string (YYYY-MM-DD)
+            output_path: Path for the .jsonl.gz archive file
+
+        Returns:
+            Number of rows archived
+        """
+        import gzip
+        import json
+
+        all_prunable = self.get_tables_for_group("all")
+        if table not in all_prunable:
+            raise ValueError(f"Table '{table}' not prunable")
+
+        conn = self.get_connection()
+        date_col = self._get_date_column(table)
+        cursor = conn.execute(f"SELECT * FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
+        columns = [desc[0] for desc in cursor.description]
+        rows = cursor.fetchall()
+
+        if not rows:
+            return 0
+
+        # Write to gzip JSONL
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with gzip.open(output_path, "wt", encoding="utf-8") as f:
+            for row in rows:
+                record = dict(zip(columns, row))
+                f.write(json.dumps(record, default=str) + "\n")
+
+        # Delete archived rows
+        conn.execute(f"DELETE FROM [{table}] WHERE [{date_col}] < ?", (before_date,))
+        conn.commit()
+
+        logger.info("Archived %d rows from %s to %s", len(rows), table, output_path)
+        return len(rows)
+
+    def get_table_stats(self) -> list:
+        """Get per-table statistics for all tables with data.
+
+        Returns:
+            List of dicts with table, rows, min_date, max_date, est_size_kb
+        """
+        conn = self.get_connection()
+        tables = [
+            r[0]
+            for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        ]
+
+        stats = []
+        for table in sorted(tables):
+            try:
+                count = conn.execute(f"SELECT count(*) FROM [{table}]").fetchone()[0]
+                if count == 0:
+                    continue
+
+                # Try to get date range (check multiple column names)
+                min_date = max_date = None
+                try:
+                    date_col = self._get_date_column(table)
+                    row = conn.execute(
+                        f"SELECT MIN([{date_col}]), MAX([{date_col}]) FROM [{table}]"
+                    ).fetchone()
+                    min_date, max_date = row[0], row[1]
+                except Exception:
+                    pass
+
+                # Estimate size from sample
+                sample = conn.execute(f"SELECT * FROM [{table}] LIMIT 5").fetchall()
+                avg_row = sum(len(str(r)) for r in sample) / max(len(sample), 1)
+                est_kb = int(count * avg_row / 1024)
+
+                stats.append(
+                    {
+                        "table": table,
+                        "rows": count,
+                        "min_date": str(min_date)[:10] if min_date else None,
+                        "max_date": str(max_date)[:10] if max_date else None,
+                        "est_size_kb": est_kb,
+                    }
+                )
+            except Exception:
+                continue
+
+        return stats
+
     def vacuum(self) -> None:
         """Vacuum the database to reclaim space."""
         conn = self.get_connection()
         conn.execute("VACUUM")
         logger.info("Database vacuumed")
-
-    def close(self) -> None:
-        """Close the database connection."""
-        if hasattr(self._local, "conn") and self._local.conn:
-            self._local.conn.close()
-            self._local.conn = None
 
     # =========================================================================
     # Async API (wraps sync methods via thread pool)
@@ -704,7 +936,7 @@ class DatabaseManager:
         await self.flush_writes_async()
 
 
-class ProjectDatabaseManager:
+class ProjectDatabaseManager(_DatabaseManagerBase):
     """Project-level database manager for repo-specific data.
 
     Manages project-scoped data in .victor/project.db:
@@ -763,14 +995,15 @@ class ProjectDatabaseManager:
         Args:
             project_path: Path to project root. If None, uses current directory.
         """
-        if project_path is None:
-            project_path = Path.cwd()
+        project_root, project_dir, db_path = _normalize_project_database_paths(project_path)
 
-        self.project_dir = project_path / ".victor"
+        # Initialize base class (sets up self._local)
+        super().__init__()
+
+        self.project_root = project_root
+        self.project_dir = project_dir
         self.project_dir.mkdir(parents=True, exist_ok=True)
-
-        self.db_path = self.project_dir / "project.db"
-        self._local = threading.local()
+        self.db_path = db_path
         self._migration_lock = threading.Lock()
         self._migrated = False
 
@@ -811,17 +1044,6 @@ class ProjectDatabaseManager:
 
         # Run migrations if needed
         self._run_migrations(conn)
-
-    def _get_raw_connection(self) -> sqlite3.Connection:
-        """Get raw SQLite connection (thread-local)."""
-        if not hasattr(self._local, "conn") or self._local.conn is None:
-            self._local.conn = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-                timeout=30.0,
-            )
-            self._local.conn.row_factory = sqlite3.Row
-        return self._local.conn
 
     def get_connection(self) -> sqlite3.Connection:
         """Get database connection."""
@@ -999,12 +1221,6 @@ class ProjectDatabaseManager:
 
         return stats
 
-    def close(self) -> None:
-        """Close the database connection."""
-        if hasattr(self._local, "conn") and self._local.conn:
-            self._local.conn.close()
-            self._local.conn = None
-
 
 # Module-level singleton accessors
 _database: Optional[DatabaseManager] = None
@@ -1036,10 +1252,8 @@ def get_project_database(project_path: Optional[Path] = None) -> ProjectDatabase
         ProjectDatabaseManager instance for the project
     """
     global _project_databases
-    if project_path is None:
-        project_path = Path.cwd()
-
-    project_key = str(project_path.resolve())
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
+    project_key = str(db_path)
     if project_key not in _project_databases:
         _project_databases[project_key] = ProjectDatabaseManager(project_path)
     return _project_databases[project_key]
@@ -1057,10 +1271,8 @@ def reset_database() -> None:
 def reset_project_database(project_path: Optional[Path] = None) -> None:
     """Reset project database instance (for testing)."""
     global _project_databases
-    if project_path is None:
-        project_path = Path.cwd()
-
-    project_key = str(project_path.resolve())
+    _project_root, _project_dir, db_path = _normalize_project_database_paths(project_path)
+    project_key = str(db_path)
     if project_key in _project_databases:
         _project_databases[project_key].close()
         del _project_databases[project_key]

@@ -28,7 +28,10 @@ import re
 from typing import Any, Dict, List, Optional
 
 from victor.core.events import ObservabilityBus
-from victor.agent.tool_call_extractor import extract_tool_call_from_text, ExtractedToolCall
+from victor.agent.tool_call_extractor import (
+    extract_tool_call_from_text,
+    ExtractedToolCall,
+)
 
 # Patterns for detecting output requirements in response content
 # PRE-COMPILED at module load for performance (avoid re.compile in hot path)
@@ -203,7 +206,10 @@ class ContinuationStrategy:
                     loop.create_task(
                         self._event_bus.emit(
                             topic=topic,
-                            data={**data, "category": "state"},  # Preserve for observability
+                            data={
+                                **data,
+                                "category": "state",
+                            },  # Preserve for observability
                             source=source,
                         )
                     )
@@ -652,7 +658,9 @@ class ContinuationStrategy:
         # CRITICAL FIX: Handle tool mention without execution (hallucinated tool calls)
         # If model says "let me call search()" but didn't actually call it, try to extract
         # the intended tool call from the text and execute it automatically.
-        if mentioned_tools and len(mentioned_tools) > 0:
+        # BUT: If the model indicated COMPLETION, don't override it — the model may
+        # mention tool names in its summary text without intending to call them.
+        if mentioned_tools and len(mentioned_tools) > 0 and not is_completion:
             logger.info(
                 f"Model mentioned tools but didn't call them: {mentioned_tools}. "
                 "Attempting to extract tool call from text."
@@ -929,6 +937,11 @@ class ContinuationStrategy:
         # running for 3+ turns without clear resolution
         if self._decision_service is not None and continuation_prompts >= 3:
             try:
+                from victor.agent.decisions.chain import should_use_llm
+
+                if not should_use_llm("continuation_action"):
+                    return "finish"
+
                 from victor.agent.decisions.schemas import DecisionType
 
                 response_excerpt = (full_content or "")[-500:]

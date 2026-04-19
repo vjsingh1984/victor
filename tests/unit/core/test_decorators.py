@@ -394,7 +394,7 @@ class TestToolNameResolution:
         assert resolve_tool_name("execute_bash") == "shell"
         assert resolve_tool_name("read_file") == "read"
         assert resolve_tool_name("write_file") == "write"
-        assert resolve_tool_name("code_search") == "grep"
+        assert resolve_tool_name("code_search") == "code_search"
         assert resolve_tool_name("list_directory") == "ls"
 
     def test_resolve_tool_name_canonical_unchanged(self):

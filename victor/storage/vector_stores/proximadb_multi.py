@@ -45,23 +45,24 @@ from victor.storage.vector_stores.base import (
     EmbeddingConfig,
     EmbeddingSearchResult,
 )
-from victor.core.utils.coding_support import load_tree_sitter_get_parser
+from victor.core.utils.capability_loader import load_tree_sitter_get_parser
+from victor.storage.vector_stores.code_chunking import (
+    CodeChunk,
+    CodeChunkingContext,
+    TreeSitterParseContext,
+    create_code_chunker,
+)
+from victor.storage.vector_stores.change_impact import ChangeImpactAccumulator
+from victor.storage.vector_stores.issue_localization import IssueLocalizationAccumulator
 from victor.storage.vector_stores.models import (
     BaseEmbeddingModel,
     EmbeddingModelConfig,
     create_embedding_model,
 )
 
-try:
-    from victor_coding.languages.base import TreeSitterQueries
-    from victor_coding.languages.registry import (
-        LanguageRegistry,
-        get_language_registry,
-    )
-except ImportError:
-    TreeSitterQueries = None  # type: ignore[misc, assignment]
-    LanguageRegistry = None  # type: ignore[misc, assignment]
-    get_language_registry = None  # type: ignore[assignment]
+# Language registry and tree-sitter queries are provided by external vertical
+# packages (e.g., victor-coding) via CapabilityRegistry. We use Any for type
+# annotations and _NullLanguageRegistry as fallback when no provider is installed.
 
 try:
     from tree_sitter import Query, QueryCursor
@@ -136,18 +137,6 @@ _IMPORT_QUERIES: Dict[str, str] = {
 
 
 @dataclass
-class _CodeChunk:
-    """Chunk of code prepared for vector indexing."""
-
-    content: str
-    start_line: int
-    end_line: int
-    chunk_type: str
-    symbol_name: Optional[str] = None
-    parent_symbol: Optional[str] = None
-
-
-@dataclass
 class _FallbackVectorRecord:
     """Minimal record shape used when the SDK model import is unavailable."""
 
@@ -200,6 +189,16 @@ class _GraphSnapshot:
     imports: List[str]
 
 
+@dataclass
+class _TreeSitterAnalysis:
+    """Parse-once tree-sitter artifacts reused by graph extraction and chunking."""
+
+    parser: Any
+    tree: Any
+    queries: Any
+    chunking_context: TreeSitterParseContext
+
+
 class _NullLanguageRegistry:
     """Fallback registry used when victor-coding is not installed."""
 
@@ -229,7 +228,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self,
         config: EmbeddingConfig,
         client: Optional[Any] = None,
-        language_registry: Optional[LanguageRegistry] = None,
+        language_registry: Optional[Any] = None,
     ) -> None:
         super().__init__(config)
 
@@ -243,10 +242,13 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self._graph_api: Optional[Any] = None
         if language_registry is not None:
             self._language_registry = language_registry
-        elif callable(get_language_registry):
-            self._language_registry = get_language_registry()
         else:
-            self._language_registry = _NullLanguageRegistry()
+            # Discover language registry via CapabilityRegistry (provided by
+            # external verticals like victor-coding at bootstrap time)
+            discovered = self._discover_language_registry()
+            self._language_registry = (
+                discovered if discovered is not None else _NullLanguageRegistry()
+            )
 
         if not getattr(self._language_registry, "_plugins", {}):
             self._language_registry.discover_plugins()
@@ -255,6 +257,14 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self._batch_size = int(config.extra_config.get("batch_size", 16))
         self._chunk_size = int(config.extra_config.get("chunk_size", 500))
         self._chunk_overlap = int(config.extra_config.get("chunk_overlap", 50))
+        self._code_chunking_strategy = str(
+            config.extra_config.get("code_chunking_strategy", "symbol_span")
+        )
+        self._code_chunker = create_code_chunker(
+            self._code_chunking_strategy,
+            chunk_size=self._chunk_size,
+            chunk_overlap=self._chunk_overlap,
+        )
         self._graph_enabled = bool(config.extra_config.get("graph_enabled", True))
         self._document_enabled = bool(config.extra_config.get("document_enabled", True))
         self._metrics_enabled = bool(config.extra_config.get("metrics_enabled", True))
@@ -268,6 +278,26 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self._document_collection = self._collection_name("document_collection", "documents")
         self._metrics_collection = self._collection_name("metrics_collection", "metrics")
         self._graph_collection = self._collection_name("graph_collection", "graph")
+
+    @staticmethod
+    def _discover_language_registry() -> Optional[Any]:
+        """Discover a language registry from CapabilityRegistry.
+
+        External vertical packages (e.g., victor-coding) register their
+        language registry as a capability at bootstrap. Returns None if
+        no provider is installed.
+        """
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+
+            registry = CapabilityRegistry.get_instance()
+            # Look for any registered provider with a get/detect_language interface
+            for proto_type, (provider, _status) in registry._providers.items():
+                if hasattr(provider, "get") and hasattr(provider, "detect_language"):
+                    return provider
+        except Exception:
+            pass
+        return None
 
     async def initialize(self) -> None:
         """Initialize the embedding model and required ProximaDB collections."""
@@ -432,7 +462,10 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             try:
                 self._client.delete_graph(self._graph_collection)
             except Exception:
-                logger.debug("Failed to delete graph %s during clear_index", self._graph_collection)
+                logger.debug(
+                    "Failed to delete graph %s during clear_index",
+                    self._graph_collection,
+                )
             self._ensure_graph()
             self._graph_api = self._build_graph_api()
 
@@ -501,14 +534,26 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             "language": language_name,
             "file_hash": file_hash,
             "indexed_at": indexed_at.isoformat(),
+            "chunking_strategy": self._code_chunking_strategy,
         }
         if metadata:
             base_metadata.update(metadata)
 
         await self.delete_by_file(file_path)
-        graph_snapshot = self._extract_graph_snapshot(file_path, content, language_name)
+        tree_analysis = self._build_tree_sitter_analysis(file_path, content, language_name)
+        graph_snapshot = self._extract_graph_snapshot(
+            file_path,
+            content,
+            language_name,
+            tree_analysis=tree_analysis,
+        )
 
-        chunks = self._chunk_code(file_path, content, graph_snapshot.symbols)
+        chunks = self._chunk_code(
+            file_path,
+            content,
+            graph_snapshot.symbols,
+            tree_analysis=tree_analysis,
+        )
         if chunks:
             documents = []
             for index, chunk in enumerate(chunks):
@@ -565,6 +610,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         return {
             "workspace": self._workspace,
             "language": language_name,
+            "chunking_strategy": self._code_chunking_strategy,
             "vectors": len(chunks),
             "document": self._document_enabled,
             "graph": graph_counts,
@@ -883,7 +929,10 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                     "related_files": sorted(
                         {
                             candidate.get("file_path")
-                            for candidate in [*callers[:context_limit], *callees[:context_limit]]
+                            for candidate in [
+                                *callers[:context_limit],
+                                *callees[:context_limit],
+                            ]
                             if candidate.get("file_path")
                         }
                     ),
@@ -897,6 +946,140 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             enriched.append(result)
 
         return enriched
+
+    async def localize_issue(
+        self,
+        issue_description: str,
+        language: Optional[str] = None,
+        top_k: int = 10,
+        include_graph_context: bool = True,
+        context_limit: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Return file-level candidates for an issue using semantic seeds plus graph expansion."""
+        if not self._initialized:
+            await self.initialize()
+
+        document_filter = {"language": language} if language else None
+        ranked = await self.hybrid_search(
+            query=issue_description,
+            document_filter=document_filter,
+            top_k=max(top_k * 2, top_k),
+        )
+
+        accumulator = IssueLocalizationAccumulator(
+            issue_description,
+            context_limit=context_limit,
+        )
+        for row in ranked:
+            accumulator.add_seed(row)
+            metadata = dict(row.get("metadata", {}) or {})
+            symbol_name = (
+                row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+            )
+            file_path = row.get("file_path") or metadata.get("file_path")
+            score = float(row.get("score", 0.0) or 0.0)
+
+            if not include_graph_context or not symbol_name or not file_path:
+                continue
+
+            callers = await self.find_callers(
+                symbol_name,
+                file_path=file_path,
+                max_depth=1,
+            )
+            callees = await self.find_callees(
+                symbol_name,
+                file_path=file_path,
+                max_depth=1,
+            )
+            accumulator.attach_graph_context(
+                file_path,
+                callers=callers[:context_limit],
+                callees=callees[:context_limit],
+            )
+            accumulator.add_graph_neighbors(
+                seed_file_path=file_path,
+                seed_symbol=symbol_name,
+                seed_score=score,
+                relation="callers",
+                neighbors=callers[:context_limit],
+            )
+            accumulator.add_graph_neighbors(
+                seed_file_path=file_path,
+                seed_symbol=symbol_name,
+                seed_score=score,
+                relation="callees",
+                neighbors=callees[:context_limit],
+            )
+
+        return accumulator.finalize(top_k=top_k)
+
+    async def analyze_change_impact(
+        self,
+        change_description: str,
+        language: Optional[str] = None,
+        top_k: int = 10,
+        include_graph_context: bool = True,
+        context_limit: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Return ranked blast-radius candidates for a proposed change."""
+        if not self._initialized:
+            await self.initialize()
+
+        document_filter = {"language": language} if language else None
+        ranked = await self.hybrid_search(
+            query=change_description,
+            document_filter=document_filter,
+            top_k=max(top_k * 2, top_k),
+        )
+
+        accumulator = ChangeImpactAccumulator(
+            change_description,
+            context_limit=context_limit,
+        )
+        for row in ranked:
+            accumulator.add_seed(row)
+            metadata = dict(row.get("metadata", {}) or {})
+            symbol_name = (
+                row.get("symbol_name") or metadata.get("qualified_name") or metadata.get("name")
+            )
+            file_path = row.get("file_path") or metadata.get("file_path")
+            score = float(row.get("score", 0.0) or 0.0)
+
+            if not include_graph_context or not symbol_name or not file_path:
+                continue
+
+            callers = await self.find_callers(
+                symbol_name,
+                file_path=file_path,
+                max_depth=2,
+            )
+            callees = await self.find_callees(
+                symbol_name,
+                file_path=file_path,
+                max_depth=1,
+            )
+            accumulator.attach_graph_context(
+                file_path,
+                callers=callers[:context_limit],
+                callees=callees[:context_limit],
+            )
+            accumulator.add_graph_neighbors(
+                seed_file_path=file_path,
+                seed_symbol=symbol_name,
+                seed_score=score,
+                relation="callers",
+                neighbors=callers[:context_limit],
+            )
+            accumulator.add_graph_neighbors(
+                seed_file_path=file_path,
+                seed_symbol=symbol_name,
+                seed_score=score,
+                relation="callees",
+                neighbors=callees[:context_limit],
+            )
+
+        return accumulator.finalize(top_k=top_k)
 
     def _ensure_collection(self, collection_name: str) -> None:
         """Create a collection if it does not already exist."""
@@ -927,7 +1110,10 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 description=f"Victor code graph for workspace {self._workspace}",
             )
         except Exception:
-            logger.debug("Graph %s already exists or could not be created", self._graph_collection)
+            logger.debug(
+                "Graph %s already exists or could not be created",
+                self._graph_collection,
+            )
 
     def _build_graph_api(self) -> Optional[Any]:
         """Create the optional SDK graph helper when available."""
@@ -953,7 +1139,11 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         except TypeError:
             result = self._client.query_nodes(labels=labels, properties=properties)
         except Exception:
-            logger.debug("Graph node lookup failed for labels=%s properties=%s", labels, properties)
+            logger.debug(
+                "Graph node lookup failed for labels=%s properties=%s",
+                labels,
+                properties,
+            )
             return []
 
         if isinstance(result, dict):
@@ -1201,130 +1391,47 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         file_path: str,
         content: str,
         symbols: List[_GraphSymbol],
-    ) -> List[_CodeChunk]:
-        lines = content.splitlines()
-        if not lines:
-            return []
-
-        chunks: List[_CodeChunk] = []
-        used_ranges = set()
-
-        for symbol in sorted(symbols, key=lambda item: (item.line_start, item.line_end, item.name)):
-            start = max(symbol.line_start, 1)
-            end = min(symbol.line_end, len(lines))
-            if end < start:
-                continue
-            span = tuple(range(start, end + 1))
-            if span in used_ranges:
-                continue
-            used_ranges.add(span)
-            chunks.extend(
-                self._split_line_span(
-                    lines=lines,
-                    start_line=start,
-                    end_line=end,
-                    chunk_type=symbol.symbol_type,
-                    symbol_name=symbol.qualified_name,
-                    parent_symbol=symbol.parent_symbol,
-                )
-            )
-
-        if not chunks:
-            chunks.extend(
-                self._split_line_span(
-                    lines=lines,
-                    start_line=1,
-                    end_line=len(lines),
-                    chunk_type="module",
-                    symbol_name=None,
-                    parent_symbol=None,
-                )
-            )
-
-        return chunks
-
-    def _split_line_span(
-        self,
-        lines: List[str],
-        start_line: int,
-        end_line: int,
-        chunk_type: str,
-        symbol_name: Optional[str],
-        parent_symbol: Optional[str],
-    ) -> List[_CodeChunk]:
-        span_lines = lines[start_line - 1 : end_line]
-        if not span_lines:
-            return []
-
-        chunks: List[_CodeChunk] = []
-        current: List[str] = []
-        current_tokens = 0
-        current_start = start_line
-        overlap = max(self._chunk_overlap, 0)
-
-        for index, line in enumerate(span_lines, start=start_line):
-            current.append(line)
-            current_tokens += max(len(line.split()), 1)
-            if current_tokens < self._chunk_size:
-                continue
-
-            chunk_lines = list(current)
-            chunks.append(
-                _CodeChunk(
-                    content="\n".join(chunk_lines),
-                    start_line=current_start,
-                    end_line=index,
-                    chunk_type=chunk_type,
-                    symbol_name=symbol_name,
-                    parent_symbol=parent_symbol,
-                )
-            )
-
-            overlap_lines = chunk_lines[-overlap:] if overlap else []
-            current = overlap_lines
-            current_tokens = sum(max(len(item.split()), 1) for item in overlap_lines)
-            current_start = max(index - len(overlap_lines) + 1, current_start)
-
-        if current:
-            chunks.append(
-                _CodeChunk(
-                    content="\n".join(current),
-                    start_line=current_start,
-                    end_line=end_line,
-                    chunk_type=chunk_type,
-                    symbol_name=symbol_name,
-                    parent_symbol=parent_symbol,
-                )
-            )
-
-        return chunks
+        tree_analysis: Optional[_TreeSitterAnalysis] = None,
+    ) -> List[CodeChunk]:
+        chunking_context = CodeChunkingContext(
+            symbols=symbols,
+            parse_context=tree_analysis.chunking_context if tree_analysis else None,
+        )
+        return self._code_chunker.chunk(file_path, content, chunking_context)
 
     def _extract_graph_snapshot(
         self,
         file_path: str,
         content: str,
         language: str,
+        tree_analysis: Optional[_TreeSitterAnalysis] = None,
     ) -> _GraphSnapshot:
+        if tree_analysis is not None:
+            return self._extract_tree_sitter_snapshot(file_path, content, language, tree_analysis)
+
         if TREE_SITTER_AVAILABLE:
-            snapshot = self._extract_tree_sitter_snapshot(file_path, content, language)
-            if snapshot is not None:
-                return snapshot
+            parsed = self._build_tree_sitter_analysis(file_path, content, language)
+            if parsed is not None:
+                return self._extract_tree_sitter_snapshot(file_path, content, language, parsed)
 
         if language == "python":
             return self._extract_python_ast_snapshot(file_path, content)
 
         return _GraphSnapshot([], [], [], [], [], [])
 
-    def _extract_tree_sitter_snapshot(
+    def _build_tree_sitter_analysis(
         self,
         file_path: str,
         content: str,
         language: str,
-    ) -> Optional[_GraphSnapshot]:
+    ) -> Optional[_TreeSitterAnalysis]:
+        if not TREE_SITTER_AVAILABLE:
+            return None
+
         try:
             plugin = self._language_registry.get(language)
             queries = plugin.tree_sitter_queries
-            if not queries.symbols:
+            if not queries or not queries.symbols:
                 return None
             get_parser = load_tree_sitter_get_parser()
             parser = get_parser(language)
@@ -1333,20 +1440,63 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             logger.debug("Tree-sitter parse failed for %s: %s", file_path, exc)
             return None
 
-        symbols = self._extract_symbols_from_tree(tree, parser, queries, content)
-        calls = self._extract_call_edges_from_tree(tree, parser, queries)
+        return _TreeSitterAnalysis(
+            parser=parser,
+            tree=tree,
+            queries=queries,
+            chunking_context=TreeSitterParseContext.from_content(content, tree.root_node),
+        )
+
+    def _extract_tree_sitter_snapshot(
+        self,
+        file_path: str,
+        content: str,
+        language: str,
+        analysis: _TreeSitterAnalysis,
+    ) -> _GraphSnapshot:
+        symbols = self._extract_symbols_from_tree(
+            analysis.tree,
+            analysis.parser,
+            analysis.queries,
+            content,
+        )
+        calls = self._extract_call_edges_from_tree(
+            analysis.tree,
+            analysis.parser,
+            analysis.queries,
+        )
         inheritance = self._extract_pair_edges_from_tree(
-            tree, parser, queries.inheritance, "child", "base", "INHERITS"
+            analysis.tree,
+            analysis.parser,
+            analysis.queries.inheritance,
+            "child",
+            "base",
+            "INHERITS",
         )
         implements = self._extract_pair_edges_from_tree(
-            tree, parser, queries.implements, "child", "interface", "IMPLEMENTS"
+            analysis.tree,
+            analysis.parser,
+            analysis.queries.implements,
+            "child",
+            "interface",
+            "IMPLEMENTS",
         )
-        if queries.implements and not implements:
+        if analysis.queries.implements and not implements:
             implements = self._extract_pair_edges_from_tree(
-                tree, parser, queries.implements, "child", "base", "IMPLEMENTS"
+                analysis.tree,
+                analysis.parser,
+                analysis.queries.implements,
+                "child",
+                "base",
+                "IMPLEMENTS",
             )
         composition = self._extract_pair_edges_from_tree(
-            tree, parser, queries.composition, "owner", "type", "COMPOSITION"
+            analysis.tree,
+            analysis.parser,
+            analysis.queries.composition,
+            "owner",
+            "type",
+            "COMPOSITION",
         )
         imports = self._extract_imports(content, language)
         self._enrich_python_symbols(symbols, content)
@@ -1356,7 +1506,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self,
         tree: Any,
         parser: Any,
-        queries: TreeSitterQueries,
+        queries: Any,
         content: str,
     ) -> List[_GraphSymbol]:
         symbols: List[_GraphSymbol] = []
@@ -1393,7 +1543,7 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
         self,
         tree: Any,
         parser: Any,
-        queries: TreeSitterQueries,
+        queries: Any,
     ) -> List[_GraphEdge]:
         if not queries.calls:
             return []
@@ -1686,7 +1836,12 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
     def _dedupe_symbols(self, symbols: List[_GraphSymbol]) -> List[_GraphSymbol]:
         deduped: Dict[tuple[str, str, int, Optional[str]], _GraphSymbol] = {}
         for symbol in symbols:
-            key = (symbol.name, symbol.symbol_type, symbol.line_start, symbol.parent_symbol)
+            key = (
+                symbol.name,
+                symbol.symbol_type,
+                symbol.line_start,
+                symbol.parent_symbol,
+            )
             deduped[key] = symbol
         return list(deduped.values())
 
@@ -1757,7 +1912,10 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 self._queue_graph_edge(
                     queued_edges,
                     edge_id=self._edge_id(
-                        "defines", symbol.parent_symbol, symbol.qualified_name, file_path
+                        "defines",
+                        symbol.parent_symbol,
+                        symbol.qualified_name,
+                        file_path,
                     ),
                     from_node_id=symbol_nodes[symbol.parent_symbol],
                     to_node_id=node_id,
@@ -1846,7 +2004,11 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
                 queued_nodes,
                 node_id=import_id,
                 labels=["Module", "Imported"],
-                properties={"workspace": self._workspace, "name": imported, "file_path": imported},
+                properties={
+                    "workspace": self._workspace,
+                    "name": imported,
+                    "file_path": imported,
+                },
             )
             self._queue_graph_edge(
                 queued_edges,
@@ -1907,7 +2069,11 @@ class ProximaDBMultiModelProvider(BaseEmbeddingProvider):
             from_node_id=source_id,
             to_node_id=target_id,
             edge_type=edge.edge_type,
-            properties={"file_path": file_path, "line_number": edge.line_number, **edge.metadata},
+            properties={
+                "file_path": file_path,
+                "line_number": edge.line_number,
+                **edge.metadata,
+            },
         )
 
     def _queue_graph_node(

@@ -100,6 +100,7 @@ class TestToolCoordinator:
         """Create mock tool pipeline."""
         pipeline = MagicMock()
         pipeline.execute_tool_calls = AsyncMock()
+        pipeline.credit_tracking_service = MagicMock(pending_signals=0)
         return pipeline
 
     @pytest.fixture
@@ -234,8 +235,8 @@ class TestToolCoordinator:
         assert coordinator.execution_count == 2
 
     def test_get_selection_stats(self, coordinator):
-        """Test selection statistics."""
-        stats = coordinator.get_selection_stats()
+        """Test selection statistics via observability handler."""
+        stats = coordinator._observability.get_selection_stats()
 
         assert "total_selections" in stats
         assert "total_tools_selected" in stats
@@ -243,10 +244,10 @@ class TestToolCoordinator:
         assert stats["total_selections"] == 0
 
     def test_get_execution_stats(self, coordinator):
-        """Test execution statistics."""
+        """Test execution statistics via observability handler."""
         coordinator.consume_budget(5)
 
-        stats = coordinator.get_execution_stats()
+        stats = coordinator._observability.get_execution_stats()
 
         assert stats["total_executions"] == 0
         assert stats["budget_used"] == 5

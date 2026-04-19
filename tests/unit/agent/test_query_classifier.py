@@ -4,7 +4,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.query_classifier import QueryClassification, QueryClassifier, QueryType
+from victor.agent.query_classifier import (
+    QueryClassification,
+    QueryClassifier,
+    QueryType,
+)
 from victor.framework.task.protocols import TaskClassification, TaskComplexity
 
 

@@ -3,6 +3,9 @@
 import logging
 
 from typing import List
+from unittest.mock import Mock
+
+import pytest
 
 from victor.core import tool_dependency_loader
 from victor.core.verticals.adapters import ensure_runtime_vertical
@@ -209,19 +212,34 @@ def test_loader_validation_does_not_invoke_runtime_prompt_or_tool_methods(monkey
     VerticalRegistry.unregister(_RuntimeSensitiveVertical.name)
 
 
-def test_loader_resolves_requested_entry_point_without_importing_all_verticals(monkeypatch):
+def test_loader_resolves_requested_entry_point_without_importing_all_verticals(
+    monkeypatch,
+):
     """Single-vertical resolution should only import the requested entry point."""
 
     loader = VerticalLoader()
     requested = _make_sdk_vertical("requested_vertical", api_version=1)
 
-    class _Cache:
-        def get_entry_points(self, group: str, force_refresh: bool = False):
+    class _EntryPoint:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+    class _Registry:
+        def invalidate(self) -> None:
+            return None
+
+        def get_group(self, group: str):
             assert group == "victor.plugins"
-            return {
-                "requested_vertical": "pkg.requested:Vertical",
-                "unused_vertical": "pkg.unused:Vertical",
-            }
+            return type(
+                "_Group",
+                (),
+                {
+                    "entry_points": {
+                        "requested_vertical": (_EntryPoint("pkg.requested:Vertical"), False),
+                        "unused_vertical": (_EntryPoint("pkg.unused:Vertical"), False),
+                    }
+                },
+            )()
 
     def _load_entry_point(name: str, value: str):
         if name != "requested_vertical":
@@ -230,8 +248,8 @@ def test_loader_resolves_requested_entry_point_without_importing_all_verticals(m
 
     VerticalRegistry.unregister("requested_vertical")
     monkeypatch.setattr(
-        "victor.core.verticals.vertical_loader.get_entry_point_cache",
-        lambda: _Cache(),
+        "victor.core.verticals.vertical_loader.get_entry_point_registry",
+        lambda: _Registry(),
     )
     monkeypatch.setattr(loader, "_load_entry_point", _load_entry_point)
 
@@ -257,22 +275,123 @@ def test_ensure_runtime_vertical_reuses_cached_adapter_for_sdk_vertical():
     assert first is not requested
 
 
+def test_manifest_negotiation_enforces_min_framework_version(monkeypatch):
+    """Manifest negotiation should honor min_framework_version on normalized manifests."""
+
+    loader = VerticalLoader()
+    vertical = _make_sdk_vertical("future_framework_vertical", api_version=2)
+    vertical._victor_manifest = ExtensionManifest(
+        api_version=2,
+        name="future_framework_vertical",
+        version="1.0.0",
+        min_framework_version=">=9.9.9",
+    )
+
+    monkeypatch.setattr(
+        "victor.core.verticals.compatibility_gate.get_framework_version",
+        lambda: "1.2.3",
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.compatibility_gate.CapabilityNegotiator.negotiate",
+        lambda self, manifest: Mock(compatible=True, warnings=[], errors=[]),
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.compatibility_gate.get_compatibility_matrix",
+        lambda: Mock(
+            is_loaded=lambda: True,
+            load_default_rules=lambda: None,
+            check_compatibility=lambda **kwargs: Mock(
+                is_incompatible=False,
+                message="",
+                required_features=[],
+                status=Mock(value="compatible"),
+            ),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="does not meet requirement >=9.9.9"):
+        loader._negotiate_manifest(vertical)
+
+
+def test_manifest_negotiation_uses_runtime_framework_version_for_matrix(monkeypatch):
+    """Version-matrix compatibility should use the normalized framework version helper."""
+
+    loader = VerticalLoader()
+    vertical = _make_sdk_vertical("matrix_version_vertical", api_version=2)
+    vertical._victor_manifest = ExtensionManifest(
+        api_version=2,
+        name="matrix_version_vertical",
+        version="1.0.0",
+        min_framework_version=">=0.0.1",
+    )
+    observed: dict[str, str] = {}
+
+    def _check_compatibility(*, vertical_name: str, vertical_version: str, framework_version: str):
+        observed["vertical_name"] = vertical_name
+        observed["vertical_version"] = vertical_version
+        observed["framework_version"] = framework_version
+        return Mock(
+            is_incompatible=False,
+            message="",
+            required_features=[],
+            status=Mock(value="compatible"),
+        )
+
+    monkeypatch.setattr(
+        "victor.core.verticals.compatibility_gate.get_framework_version",
+        lambda: "2.4.6",
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.compatibility_gate.CapabilityNegotiator.negotiate",
+        lambda self, manifest: Mock(compatible=True, warnings=[], errors=[]),
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.compatibility_gate.get_compatibility_matrix",
+        lambda: Mock(
+            is_loaded=lambda: True,
+            load_default_rules=lambda: None,
+            check_compatibility=_check_compatibility,
+        ),
+    )
+
+    loader._negotiate_manifest(vertical)
+
+    assert observed == {
+        "vertical_name": "matrix_version_vertical",
+        "vertical_version": "1.0.0",
+        "framework_version": "2.4.6",
+    }
+
+
 def test_discover_vertical_names_uses_entry_point_metadata_only(monkeypatch):
     """Fast name discovery should not import entry-point modules."""
 
     loader = VerticalLoader()
 
-    class _Cache:
-        def get_entry_points(self, group: str, force_refresh: bool = False):
+    class _EntryPoint:
+        def __init__(self, value: str) -> None:
+            self.value = value
+
+    class _Registry:
+        def invalidate(self) -> None:
+            return None
+
+        def get_group(self, group: str):
             assert group == "victor.plugins"
-            return {
-                "coding": "victor_coding:Assistant",
-                "research": "victor_research:Assistant",
-            }
+            return type(
+                "_Group",
+                (),
+                {
+                    "entry_points": {
+                        "coding": (_EntryPoint("victor_coding:Assistant"), False),
+                        "research": (_EntryPoint("victor_research:Assistant"), False),
+                    }
+                },
+            )()
 
     monkeypatch.setattr(
-        "victor.core.verticals.vertical_loader.get_entry_point_cache",
-        lambda: _Cache(),
+        "victor.core.verticals.vertical_loader.get_entry_point_registry",
+        lambda: _Registry(),
     )
     monkeypatch.setattr(
         loader,
@@ -335,25 +454,38 @@ def test_discover_verticals_force_refresh_bypasses_loader_cache(monkeypatch):
     refreshed_vertical = _make_vertical("refresh_two", api_version=1)
     call_flags: list[bool] = []
 
-    class _Cache:
-        def get_entry_points(self, group: str, force_refresh: bool = False):
-            assert group == "victor.plugins"
-            call_flags.append(force_refresh)
-            if force_refresh:
-                return {"refresh_two": "fake.module:RefreshTwo"}
-            return {"refresh_one": "fake.module:RefreshOne"}
+    class _EntryPoint:
+        def __init__(self, value: str) -> None:
+            self.value = value
 
-        def invalidate(self, group: str):
-            return 1
+    class _Registry:
+        def __init__(self) -> None:
+            self.invalidations = 0
+
+        def get_group(self, group: str):
+            assert group == "victor.plugins"
+            force_refresh = self.invalidations > 0
+            call_flags.append(force_refresh)
+            entries = (
+                {"refresh_two": (_EntryPoint("fake.module:RefreshTwo"), False)}
+                if force_refresh
+                else {"refresh_one": (_EntryPoint("fake.module:RefreshOne"), False)}
+            )
+            return type("_Group", (), {"entry_points": entries})()
+
+        def invalidate(self) -> None:
+            self.invalidations += 1
+
+    registry = _Registry()
 
     monkeypatch.setattr(
-        "victor.core.verticals.vertical_loader.get_entry_point_cache",
-        lambda: _Cache(),
+        "victor.core.verticals.vertical_loader.get_entry_point_registry",
+        lambda: registry,
     )
     monkeypatch.setattr(
         loader,
         "_load_entry_point",
-        lambda name, value: refreshed_vertical if name == "refresh_two" else first_vertical,
+        lambda name, value: (refreshed_vertical if name == "refresh_two" else first_vertical),
     )
 
     first_result = loader.discover_verticals()
@@ -364,6 +496,35 @@ def test_discover_verticals_force_refresh_bypasses_loader_cache(monkeypatch):
     assert list(first_result.keys()) == ["refresh_one"]
     assert cached_result is first_result
     assert list(refreshed_result.keys()) == ["refresh_two"]
+
+
+def test_discover_tools_uses_shared_entry_point_values(monkeypatch):
+    """Tool discovery should use the shared entry-point discovery helper."""
+    loader = VerticalLoader()
+    loader._emit_observability_event = lambda *args, **kwargs: None
+    loader._emit_observability_event_async = lambda *args, **kwargs: None
+
+    call_flags: list[tuple[str, bool]] = []
+    tool_cls = type("SharedDiscoveredTool", (), {})
+
+    def _get_values(group: str, *, force: bool = False):
+        call_flags.append((group, force))
+        return {"tool_a": "fake.module:ToolA"}
+
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.get_entry_point_values",
+        _get_values,
+    )
+    monkeypatch.setattr(loader, "_load_entry_point", lambda *_: tool_cls)
+
+    first_result = loader.discover_tools()
+    cached_result = loader.discover_tools()
+    refreshed_result = loader.discover_tools(force_refresh=True)
+
+    assert call_flags == [("victor.tools", False), ("victor.tools", True)]
+    assert first_result["tool_a"] is tool_cls
+    assert cached_result is first_result
+    assert refreshed_result["tool_a"] is tool_cls
 
 
 def test_loader_skips_name_conflict_with_existing_vertical(monkeypatch):
@@ -433,7 +594,12 @@ def test_discover_verticals_logs_structured_telemetry(monkeypatch, caplog):
     loader._emit_observability_event_async = lambda *args, **kwargs: None
 
     telemetry_stats = {
-        "vertical": {"calls": 1, "cache_hits": 0, "scans": 1, "last_discovery_ms": 12.5},
+        "vertical": {
+            "calls": 1,
+            "cache_hits": 0,
+            "scans": 1,
+            "last_discovery_ms": 12.5,
+        },
         "entry_point_cache": {
             "groups_cached": 1,
             "groups": {"victor.plugins": {"entries": 2}},
@@ -482,9 +648,22 @@ def test_refresh_plugins_logs_structured_telemetry(monkeypatch, caplog):
         def invalidate(self, group: str) -> int:
             return 1
 
+    class _Registry:
+        def __init__(self) -> None:
+            self.invalidated = 0
+
+        def invalidate(self) -> None:
+            self.invalidated += 1
+
+    registry = _Registry()
+
     monkeypatch.setattr(
         "victor.core.verticals.vertical_loader.get_entry_point_cache",
         lambda: _Cache(),
+    )
+    monkeypatch.setattr(
+        "victor.core.verticals.vertical_loader.get_entry_point_registry",
+        lambda: registry,
     )
     monkeypatch.setattr(
         "victor.core.verticals.extension_loader.VerticalExtensionLoader.clear_extension_cache",
@@ -517,6 +696,8 @@ def test_refresh_plugins_logs_structured_telemetry(monkeypatch, caplog):
 
     with caplog.at_level(logging.INFO, logger="victor.core.verticals.vertical_loader"):
         loader.refresh_plugins()
+
+    assert registry.invalidated == 1
 
     records = [
         record

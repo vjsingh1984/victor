@@ -308,7 +308,10 @@ class OrchestratorServiceProvider:
             ToolRegistrar instance
         """
         from victor.agent.tool_registrar import ToolRegistrar, ToolRegistrarConfig
-        from victor.agent.protocols import ToolRegistryProtocol, ToolDependencyGraphProtocol
+        from victor.agent.protocols import (
+            ToolRegistryProtocol,
+            ToolDependencyGraphProtocol,
+        )
 
         # Get ToolRegistry from container
         tool_registry = container.get(ToolRegistryProtocol)
@@ -470,7 +473,7 @@ class OrchestratorServiceProvider:
 
     def _create_conversation_state_machine(self) -> "ConversationStateMachineProtocol":
         """Create ConversationStateMachine instance."""
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
 
         return ConversationStateMachine()
 
@@ -512,7 +515,9 @@ class OrchestratorServiceProvider:
         """
         from victor.agent.protocols import UnifiedMemoryCoordinatorProtocol
 
-        def create_memory_coordinator(_: ServiceContainer) -> "UnifiedMemoryCoordinatorProtocol":
+        def create_memory_coordinator(
+            _: ServiceContainer,
+        ) -> "UnifiedMemoryCoordinatorProtocol":
             try:
                 from victor.storage.memory.unified import get_memory_coordinator
 
@@ -819,7 +824,9 @@ class OrchestratorServiceProvider:
     # Analytics & observability service factory methods
     # =========================================================================
 
-    def _create_conversation_embedding_store(self) -> "ConversationEmbeddingStoreProtocol":
+    def _create_conversation_embedding_store(
+        self,
+    ) -> "ConversationEmbeddingStoreProtocol":
         """Create ConversationEmbeddingStore instance."""
         from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
         from victor.storage.embeddings.service import EmbeddingService
@@ -841,7 +848,10 @@ class OrchestratorServiceProvider:
 
     def _create_metrics_collector(self) -> "MetricsCollectorProtocol":
         """Create MetricsCollector instance."""
-        from victor.agent.metrics_collector import MetricsCollector, MetricsCollectorConfig
+        from victor.agent.metrics_collector import (
+            MetricsCollector,
+            MetricsCollectorConfig,
+        )
         from victor.analytics.logger import UsageLogger
         from pathlib import Path
 
@@ -901,7 +911,9 @@ class OrchestratorServiceProvider:
 
         return UsageLogger(log_file=log_file, enabled=enabled)
 
-    def _create_streaming_metrics_collector(self) -> "StreamingMetricsCollectorProtocol":
+    def _create_streaming_metrics_collector(
+        self,
+    ) -> "StreamingMetricsCollectorProtocol":
         """Create StreamingMetricsCollector instance."""
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
         from pathlib import Path

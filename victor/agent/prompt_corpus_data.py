@@ -65,8 +65,14 @@ FUNCTION_COMPLETION_PROMPTS: List[Tuple[str, str]] = [
         "Write a function that inserts a delimiter between every two consecutive elements of a list",
         "humaneval",
     ),
-    ("Write a function that returns the maximum nesting depth of parentheses", "humaneval"),
-    ("Write a function that finds the longest common subsequence of two strings", "humaneval"),
+    (
+        "Write a function that returns the maximum nesting depth of parentheses",
+        "humaneval",
+    ),
+    (
+        "Write a function that finds the longest common subsequence of two strings",
+        "humaneval",
+    ),
     (
         "Write a function that filters strings to only include those containing a specific substring",
         "humaneval",
@@ -75,13 +81,22 @@ FUNCTION_COMPLETION_PROMPTS: List[Tuple[str, str]] = [
         "Write a function that returns a tuple of the sum and product of all integers in a list",
         "humaneval",
     ),
-    ("Write a function that returns a list of running maximum elements from a list", "humaneval"),
+    (
+        "Write a function that returns a list of running maximum elements from a list",
+        "humaneval",
+    ),
     (
         "Write a function that finds the shortest palindrome that begins with a given string",
         "humaneval",
     ),
-    ("Write a function that performs string XOR operation on two binary strings", "humaneval"),
-    ("Write a function that returns the longest common prefix of a list of strings", "humaneval"),
+    (
+        "Write a function that performs string XOR operation on two binary strings",
+        "humaneval",
+    ),
+    (
+        "Write a function that returns the longest common prefix of a list of strings",
+        "humaneval",
+    ),
     (
         "Write a function that returns the greatest common divisor of two positive integers",
         "humaneval",
@@ -90,45 +105,90 @@ FUNCTION_COMPLETION_PROMPTS: List[Tuple[str, str]] = [
         "Write a function that returns all prefixes of a string from shortest to longest",
         "humaneval",
     ),
-    ("Write a function that returns a space-separated string of numbers from 0 to n", "humaneval"),
-    ("Write a function that counts the number of distinct elements in a list", "humaneval"),
-    ("Write a function that parses a string of music notes into their beat durations", "humaneval"),
-    ("Write a function that counts substring appearances including overlaps", "humaneval"),
+    (
+        "Write a function that returns a space-separated string of numbers from 0 to n",
+        "humaneval",
+    ),
+    (
+        "Write a function that counts the number of distinct elements in a list",
+        "humaneval",
+    ),
+    (
+        "Write a function that parses a string of music notes into their beat durations",
+        "humaneval",
+    ),
+    (
+        "Write a function that counts substring appearances including overlaps",
+        "humaneval",
+    ),
     (
         "Write a function that sorts integers and returns them as a space-separated string",
         "humaneval",
     ),
     ("Write a function that finds the two closest numbers in a list", "humaneval"),
-    ("Write a function that rescales a list of numbers to the range [0, 1]", "humaneval"),
-    ("Write a function that filters a list to keep only the integer values", "humaneval"),
+    (
+        "Write a function that rescales a list of numbers to the range [0, 1]",
+        "humaneval",
+    ),
+    (
+        "Write a function that filters a list to keep only the integer values",
+        "humaneval",
+    ),
     ("Write a function that returns the length of a string", "humaneval"),
-    ("Write a function that returns the largest divisor of n smaller than n", "humaneval"),
-    ("Write a function that returns the prime factorization of an integer", "humaneval"),
-    ("Write a function that removes duplicate elements while preserving order", "humaneval"),
+    (
+        "Write a function that returns the largest divisor of n smaller than n",
+        "humaneval",
+    ),
+    (
+        "Write a function that returns the prime factorization of an integer",
+        "humaneval",
+    ),
+    (
+        "Write a function that removes duplicate elements while preserving order",
+        "humaneval",
+    ),
     ("Write a function that flips the case of each character in a string", "humaneval"),
-    ("Write a function that concatenates a list of strings into a single string", "humaneval"),
+    (
+        "Write a function that concatenates a list of strings into a single string",
+        "humaneval",
+    ),
     (
         "Write a function that filters strings to keep only those starting with a prefix",
         "humaneval",
     ),
-    ("Write a function that returns only the positive numbers from a list", "humaneval"),
+    (
+        "Write a function that returns only the positive numbers from a list",
+        "humaneval",
+    ),
     ("Write a function that checks if a number is a power of 2", "humaneval"),
     ("Write a function that finds the kth smallest element in a list", "humaneval"),
     ("Write a function that rotates a matrix 90 degrees clockwise", "humaneval"),
-    ("Write a function that validates if a string is a valid IPv4 address", "humaneval"),
+    (
+        "Write a function that validates if a string is a valid IPv4 address",
+        "humaneval",
+    ),
     ("Write a function that finds all pairs that sum to a target value", "humaneval"),
     ("Write a function that implements a basic calculator for +, -, *, /", "humaneval"),
-    ("Write a function that converts a number to its Roman numeral representation", "humaneval"),
+    (
+        "Write a function that converts a number to its Roman numeral representation",
+        "humaneval",
+    ),
     ("Write a function that finds the longest palindromic substring", "humaneval"),
     ("Write a function that merges overlapping intervals", "humaneval"),
     ("Write a function that finds the median of two sorted arrays", "humaneval"),
     ("Write a function that generates all valid parentheses combinations", "humaneval"),
     ("Write a function that implements binary search on a sorted list", "humaneval"),
-    ("Write a function that finds the longest substring without repeating characters", "humaneval"),
+    (
+        "Write a function that finds the longest substring without repeating characters",
+        "humaneval",
+    ),
     ("Write a function that reverses words in a sentence", "humaneval"),
     ("Write a function that finds the missing number in a sequence", "humaneval"),
     ("Write a function that implements quicksort algorithm", "humaneval"),
-    ("Write a function that checks if two strings are rotations of each other", "humaneval"),
+    (
+        "Write a function that checks if two strings are rotations of each other",
+        "humaneval",
+    ),
     ("Write a function that finds the first non-repeating character", "humaneval"),
     ("Write a function that implements a stack using two queues", "humaneval"),
     # MBPP-style function completion

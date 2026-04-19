@@ -85,6 +85,8 @@ class DeepSeekProvider(BaseProvider):
 
     # Cloud provider timeout
     DEFAULT_TIMEOUT = 120
+    # Retry attempts for transport errors (RemoteProtocolError under sustained load)
+    RETRY_ATTEMPTS = 5
 
     def __init__(
         self,
@@ -131,12 +133,16 @@ class DeepSeekProvider(BaseProvider):
             config={"base_url": base_url, "timeout": timeout, **kwargs},
         )
 
-        super().__init__(base_url=base_url, timeout=timeout, **kwargs)
+        # Cap per-call timeout to prevent a single API call from consuming
+        # the entire task budget (e.g., benchmark passes timeout=420 but a
+        # single call should not hang for more than 120s)
+        api_timeout = min(timeout, self.DEFAULT_TIMEOUT)
+        super().__init__(base_url=base_url, timeout=api_timeout, **kwargs)
 
         # Use httpx for consistent behavior with other providers
         self.client = httpx.AsyncClient(
             base_url=base_url,
-            timeout=httpx.Timeout(timeout),
+            timeout=httpx.Timeout(api_timeout),
             headers={
                 "Authorization": f"Bearer {self._api_key}",
                 "Content-Type": "application/json",
@@ -154,6 +160,14 @@ class DeepSeekProvider(BaseProvider):
 
     def supports_streaming(self) -> bool:
         """DeepSeek supports streaming."""
+        return True
+
+    def supports_prompt_caching(self) -> bool:
+        """DeepSeek automatic disk cache (90% discount, $0 write, 1h+ TTL, cheapest)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """DeepSeek reuses KV cache for matching prompt prefixes."""
         return True
 
     def _model_supports_tools(self, model: str) -> bool:
@@ -220,10 +234,39 @@ class DeepSeekProvider(BaseProvider):
                 **kwargs,
             )
 
-            response = await self._execute_with_circuit_breaker(
-                self.client.post, "/chat/completions", json=payload
-            )
-            response.raise_for_status()
+            # Retry on transient transport errors (RemoteProtocolError,
+            # ConnectionReset, etc.) — DeepSeek API drops connections under
+            # sustained load (observed: 22 errors across 8 consecutive tasks).
+            # 5 retries with exponential backoff: 2s, 5s, 10s, 17s, 34s
+            import httpx as _httpx
+
+            last_err = None
+            for _attempt in range(self.RETRY_ATTEMPTS):
+                try:
+                    response = await self._execute_with_circuit_breaker(
+                        self.client.post, "/chat/completions", json=payload
+                    )
+                    response.raise_for_status()
+                    last_err = None
+                    break
+                except (_httpx.RemoteProtocolError, _httpx.ReadError, _httpx.ConnectError) as e:
+                    last_err = e
+                    if _attempt < self.RETRY_ATTEMPTS - 1:
+                        import asyncio as _aio
+
+                        delay = (2**_attempt) + 1  # 2s, 5s, 10s, 17s
+                        logger.warning(
+                            "DeepSeek transport error (attempt %d/%d), retrying in %ds: %s",
+                            _attempt + 1,
+                            self.RETRY_ATTEMPTS,
+                            delay,
+                            e,
+                        )
+                        await _aio.sleep(delay)
+            if last_err:
+                raise ProviderError(
+                    f"DeepSeek transport error after {self.RETRY_ATTEMPTS} retries: {last_err}"
+                ) from last_err
 
             result = response.json()
             parsed = self._parse_response(result, model)
@@ -314,7 +357,9 @@ class DeepSeekProvider(BaseProvider):
                         try:
                             chunk_data = json.loads(data_str)
                             chunk = self._parse_stream_chunk(
-                                chunk_data, accumulated_tool_calls, accumulated_reasoning
+                                chunk_data,
+                                accumulated_tool_calls,
+                                accumulated_reasoning,
                             )
                             if chunk.content:
                                 accumulated_content += chunk.content

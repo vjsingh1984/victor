@@ -29,7 +29,10 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional
 
-from victor.config.orchestrator_constants import SessionLedgerConfig, SESSION_LEDGER_CONFIG
+from victor.config.orchestrator_constants import (
+    SessionLedgerConfig,
+    SESSION_LEDGER_CONFIG,
+)
 
 logger = logging.getLogger(__name__)
 

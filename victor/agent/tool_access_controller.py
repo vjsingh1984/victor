@@ -50,8 +50,8 @@ from victor.agent.protocols import (
 from victor.protocols.mode_aware import ModeAwareMixin
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage
-    from victor.tools.base import ToolRegistry
+    from victor.agent.conversation.state_machine import ConversationStage
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -383,7 +383,15 @@ class StageLayer(AccessLayer, ModeAwareMixin):
 
     # Core tools never filtered (basic operation)
     CORE_TOOLS: Set[str] = frozenset(
-        {"read", "read_file", "ls", "list_directory", "search", "code_search", "shell_readonly"}
+        {
+            "read",
+            "read_file",
+            "ls",
+            "list_directory",
+            "search",
+            "code_search",
+            "shell_readonly",
+        }
     )
 
     def __init__(self, preserved_tools: Optional[Set[str]] = None):
@@ -482,7 +490,10 @@ class IntentLayer(AccessLayer):
         # Check if read-only intent
         if intent_name in self.READ_ONLY_INTENTS:
             if tool_name in self.WRITE_TOOLS:
-                return False, f"Write tool '{tool_name}' blocked for {intent_name} intent"
+                return (
+                    False,
+                    f"Write tool '{tool_name}' blocked for {intent_name} intent",
+                )
 
         return True, f"Tool allowed for {intent_name} intent"
 
@@ -536,8 +547,16 @@ class ToolAccessController(IToolAccessController):
             (
                 context.current_mode,
                 context.conversation_stage.name if context.conversation_stage else None,
-                context.intent.name if context.intent and hasattr(context.intent, "name") else None,
-                frozenset(context.session_enabled_tools) if context.session_enabled_tools else None,
+                (
+                    context.intent.name
+                    if context.intent and hasattr(context.intent, "name")
+                    else None
+                ),
+                (
+                    frozenset(context.session_enabled_tools)
+                    if context.session_enabled_tools
+                    else None
+                ),
             )
         )
 

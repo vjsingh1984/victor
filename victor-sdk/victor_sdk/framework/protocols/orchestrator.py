@@ -5,7 +5,16 @@ These protocols define how verticals interact with the agent orchestrator.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, Dict, Any, List, Optional, Callable, Awaitable
+from typing import (
+    Protocol,
+    runtime_checkable,
+    Dict,
+    Any,
+    List,
+    Optional,
+    Callable,
+    Awaitable,
+)
 
 
 @runtime_checkable
@@ -16,7 +25,9 @@ class Orchestrator(Protocol):
     tool calls, LLM interactions, and result processing.
     """
 
-    async def run(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def run(
+        self, prompt: str, context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Run a single-turn agent interaction.
 
         Args:

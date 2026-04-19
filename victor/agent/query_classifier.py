@@ -63,7 +63,8 @@ _QUERY_PATTERNS: List[Tuple[re.Pattern, QueryType]] = [
     ),
     (
         re.compile(
-            r"\b(implement|create|add|build|write|generate|make|develop|refactor)\b", re.IGNORECASE
+            r"\b(implement|create|add|build|write|generate|make|develop|refactor)\b",
+            re.IGNORECASE,
         ),
         QueryType.IMPLEMENTATION,
     ),

@@ -63,11 +63,17 @@ def main():
     print("\n\n3️⃣ Simulating conversation...")
     conversation = [
         ("user", "Explain how the provider system works"),
-        ("assistant", "The provider system uses an abstract base class called BaseProvider..."),
+        (
+            "assistant",
+            "The provider system uses an abstract base class called BaseProvider...",
+        ),
         ("user", "Show me an example"),
         ("assistant", "Here's an example of implementing a custom provider..."),
         ("user", "How do I add tool support?"),
-        ("assistant", "To add tool support, you need to implement the tools parameter..."),
+        (
+            "assistant",
+            "To add tool support, you need to implement the tools parameter...",
+        ),
     ]
 
     for i, (role, content) in enumerate(conversation):
@@ -110,7 +116,11 @@ def main():
     print("\n\n6️⃣ Pruning strategies comparison:")
     print("-" * 70)
 
-    for strategy in [PruningStrategy.FIFO, PruningStrategy.PRIORITY, PruningStrategy.SMART]:
+    for strategy in [
+        PruningStrategy.FIFO,
+        PruningStrategy.PRIORITY,
+        PruningStrategy.SMART,
+    ]:
         test_ctx = ProjectContextLoader(
             model="gpt-4",
             max_tokens=1000,  # Small window for demo

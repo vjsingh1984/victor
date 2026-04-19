@@ -50,7 +50,11 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import (
+        NodeResult,
+        ExecutorNodeStatus,
+        WorkflowContext,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +351,11 @@ class ParallelToolsHandler:
                 try:
                     # Check constraints before execution
                     if not node.constraints.allows_tool(tool_name):
-                        return tool_name, None, f"Tool '{tool_name}' blocked by constraints"
+                        return (
+                            tool_name,
+                            None,
+                            f"Tool '{tool_name}' blocked by constraints",
+                        )
 
                     result = await asyncio.wait_for(
                         tool_registry.execute(
@@ -368,7 +376,11 @@ class ParallelToolsHandler:
                         return tool_name, None, result.error
 
                 except asyncio.TimeoutError:
-                    return tool_name, None, f"Timed out after {node.constraints.timeout}s"
+                    return (
+                        tool_name,
+                        None,
+                        f"Timed out after {node.constraints.timeout}s",
+                    )
                 except Exception as e:
                     return tool_name, None, str(e)
 

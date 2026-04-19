@@ -387,7 +387,7 @@ class LanceDBProvider(BaseEmbeddingProvider):
             "total_documents": count,
             "embedding_model_type": self.config.embedding_model_type,
             "embedding_model_name": self.config.embedding_model_name,
-            "dimension": self.embedding_model.get_dimension() if self.embedding_model else 4096,
+            "dimension": (self.embedding_model.get_dimension() if self.embedding_model else 4096),
             "distance_metric": self.config.distance_metric,
             "table_name": self.config.extra_config.get("table_name", "embeddings"),
             "persist_directory": self.config.persist_directory,

@@ -1241,6 +1241,25 @@ class ObservabilityBus:
             )
         )
 
+    def emit_lifecycle_event(
+        self,
+        event_name: str,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Emit a lifecycle event (fire-and-forget).
+
+        Convenience method for graph/workflow lifecycle events
+        (graph_started, node_start, node_end, graph_completed).
+        """
+        from victor.core.events.emit_helper import emit_event_sync
+
+        emit_event_sync(
+            self,
+            f"lifecycle.{event_name}",
+            data or {},
+            source="observability",
+        )
+
     def emit_metric(
         self,
         metric_name: str,
@@ -1508,7 +1527,9 @@ def get_observability_bus() -> ObservabilityBus:
                     settings, "event_emit_sync_metrics_interval_seconds", 60.0
                 ),
                 topic=getattr(
-                    settings, "event_emit_sync_metrics_topic", "core.events.emit_sync.metrics"
+                    settings,
+                    "event_emit_sync_metrics_topic",
+                    "core.events.emit_sync.metrics",
                 ),
                 reset_after_emit=getattr(
                     settings, "event_emit_sync_metrics_reset_after_emit", False

@@ -56,7 +56,8 @@ class TestArgumentNormalizerInit:
         normalizer = ArgumentNormalizer()
         assert normalizer.provider_name == "unknown"
         assert normalizer.config == {}
-        assert normalizer.parameter_aliases == {}
+        # parameter_aliases may be loaded from YAML config at init
+        assert isinstance(normalizer.parameter_aliases, dict)
 
     def test_init_with_provider_name(self):
         """Test initialization with provider name."""
@@ -70,10 +71,12 @@ class TestArgumentNormalizerInit:
         assert normalizer.config == config
 
     def test_init_with_parameter_aliases(self):
-        """Test initialization with parameter aliases."""
+        """Test initialization with parameter aliases merges with defaults."""
         config = {"parameter_aliases": {"read": {"line_start": "offset"}}}
         normalizer = ArgumentNormalizer(config=config)
-        assert normalizer.parameter_aliases == {"read": {"line_start": "offset"}}
+        # Custom aliases should be present (may also include YAML defaults)
+        assert "read" in normalizer.parameter_aliases
+        assert normalizer.parameter_aliases["read"]["line_start"] == "offset"
 
     def test_initial_stats(self):
         """Test initial stats are zeroed."""
@@ -238,7 +241,10 @@ class TestNormalizeArgumentsManualRepair:
         args = {"operations": "[{'type': 'modify'}]"}
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
         # Should be normalized via AST or manual repair
-        assert strategy in (NormalizationStrategy.PYTHON_AST, NormalizationStrategy.MANUAL_REPAIR)
+        assert strategy in (
+            NormalizationStrategy.PYTHON_AST,
+            NormalizationStrategy.MANUAL_REPAIR,
+        )
 
 
 class TestNormalizeArgumentsFailure:

@@ -30,6 +30,7 @@ import asyncio
 import logging
 import os
 import time
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
@@ -56,6 +57,18 @@ from victor.evaluation.protocol import BenchmarkTask
 from victor.providers.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
+
+BENCHMARK_TOOL_ALLOWLIST = frozenset(
+    {
+        "read",
+        "edit",
+        "write",
+        "code_search",
+        "graph",
+        "ls",
+        "shell",
+    }
+)
 
 
 @dataclass
@@ -92,6 +105,30 @@ class AdapterConfig:
 
         policy = SafeTimeoutPolicy(min_turn_timeout=self.min_turn_timeout)
         return policy.calculate(self.total_timeout, self.max_turns)
+
+
+@dataclass(frozen=True)
+class BenchmarkToolReadiness:
+    """Live benchmark tool readiness for a session-scoped tool registry."""
+
+    required_tools: tuple[str, ...]
+    enabled_tools: tuple[str, ...]
+    missing_tools: tuple[str, ...] = ()
+    disabled_tools: tuple[str, ...] = ()
+
+    @property
+    def ready(self) -> bool:
+        """Whether all required tools are present and enabled."""
+        return not self.missing_tools and not self.disabled_tools
+
+
+def _summarize_eval_tool_calls(tool_calls: List[EvalToolCall]) -> Dict[str, int]:
+    """Summarize tool usage counts for benchmark telemetry."""
+    counts = Counter(call.name for call in tool_calls)
+    return {
+        "code_search_calls": int(counts.get("code_search", 0)),
+        "graph_calls": int(counts.get("graph", 0)),
+    }
 
 
 class VictorAgentAdapter:
@@ -140,7 +177,9 @@ class VictorAgentAdapter:
                 self._on_tool_start_hook, critical=False, name="AgentAdapter.tool_start"
             )
             orchestrator.tools.register_after_hook(
-                self._on_tool_complete_hook, critical=False, name="AgentAdapter.tool_complete"
+                self._on_tool_complete_hook,
+                critical=False,
+                name="AgentAdapter.tool_complete",
             )
             logger.info("[AgentAdapter] Registered ToolRegistry hooks for tool call tracking")
         else:
@@ -274,6 +313,63 @@ class VictorAgentAdapter:
             )
         )
 
+    @classmethod
+    def benchmark_tool_allowlist(cls) -> frozenset[str]:
+        """Return the canonical benchmark tool allowlist."""
+        return BENCHMARK_TOOL_ALLOWLIST
+
+    def get_benchmark_tool_readiness(
+        self,
+        required_tools: Optional[set[str]] = None,
+    ) -> BenchmarkToolReadiness:
+        """Inspect the live session tool registry for benchmark-critical tools."""
+        required = set(required_tools or self.benchmark_tool_allowlist())
+        registry = getattr(self.orchestrator, "tools", None)
+        required_sorted = tuple(sorted(required))
+
+        if registry is None or not hasattr(registry, "list_tools"):
+            return BenchmarkToolReadiness(
+                required_tools=required_sorted,
+                enabled_tools=(),
+                missing_tools=required_sorted,
+            )
+
+        try:
+            tools = registry.list_tools(only_enabled=False)
+        except TypeError:
+            tools = registry.list_tools(False)
+        except Exception:
+            tools = []
+
+        registered = {
+            name
+            for tool in tools or []
+            for name in [getattr(tool, "name", None)]
+            if isinstance(name, str) and name
+        }
+        missing = sorted(required - registered)
+
+        enabled = []
+        disabled = []
+        for tool_name in sorted(required & registered):
+            is_enabled = True
+            if hasattr(registry, "is_tool_enabled"):
+                try:
+                    is_enabled = bool(registry.is_tool_enabled(tool_name))
+                except Exception:
+                    is_enabled = False
+            if is_enabled:
+                enabled.append(tool_name)
+            else:
+                disabled.append(tool_name)
+
+        return BenchmarkToolReadiness(
+            required_tools=required_sorted,
+            enabled_tools=tuple(enabled),
+            missing_tools=tuple(missing),
+            disabled_tools=tuple(disabled),
+        )
+
     def get_partial_trace(self) -> Dict[str, Any]:
         """Get partial trace data for timeout scenarios.
 
@@ -288,14 +384,32 @@ class VictorAgentAdapter:
                 "output_tokens": usage.output_tokens,
                 "total_tokens": usage.total_tokens,
             }
+        # Fallback: read from _cumulative_token_usage directly if metrics returns 0
+        if token_usage["total_tokens"] == 0:
+            cum = getattr(self.orchestrator, "_cumulative_token_usage", {})
+            if cum.get("total_tokens", 0) > 0:
+                token_usage = {
+                    "input_tokens": cum.get("prompt_tokens", 0),
+                    "output_tokens": cum.get("completion_tokens", 0),
+                    "total_tokens": cum.get("total_tokens", 0),
+                }
+
+        # Get extended token fields from cumulative dict
+        cum = getattr(self.orchestrator, "_cumulative_token_usage", {})
 
         return {
             "code": "",  # No code generated on timeout
             "tokens_input": token_usage["input_tokens"],
             "tokens_output": token_usage["output_tokens"],
             "tokens_used": token_usage["total_tokens"],
+            "cached_tokens": cum.get("cached_tokens", 0),
+            "reasoning_tokens": cum.get("reasoning_tokens", 0),
+            "cost_usd_micros": cum.get("cost_usd_micros", 0),
             "tool_calls": len(self._tool_calls),
             "turns": self._turns,
+            "file_edits": len(self._file_edits),
+            "files_modified": [e.get("path", "") for e in self._file_edits[:10]],
+            **_summarize_eval_tool_calls(self._tool_calls),
         }
 
     def reset(self) -> None:
@@ -306,6 +420,14 @@ class VictorAgentAdapter:
         self._turns = 0
         self._file_snapshots = {}
         self.orchestrator.reset_conversation()
+
+        # Clear code_search index cache for task isolation
+        try:
+            from victor.tools.code_search_tool import clear_index_cache
+
+            clear_index_cache()
+        except ImportError:
+            pass
 
         # Reset token usage for fresh tracking per task
         if hasattr(self.orchestrator, "reset_token_usage"):
@@ -319,6 +441,39 @@ class VictorAgentAdapter:
 
         # Reset completion detector for new task
         self._completion_detector.reset()
+
+        # Clear RL repo context between tasks
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+
+            get_rl_coordinator().set_repo_context(None)
+        except Exception:
+            pass
+
+        # Reset conversation state machine (clear transition history)
+        state_mgr = getattr(
+            self.orchestrator,
+            "_conversation_state",
+            getattr(self.orchestrator, "conversation_state", None),
+        )
+        if state_mgr and hasattr(state_mgr, "reset"):
+            state_mgr.reset()
+
+        # Reset embedding service to prevent stale connections
+        try:
+            from victor.storage.embeddings.service import EmbeddingService
+
+            if EmbeddingService._instance is not None and hasattr(
+                EmbeddingService._instance, "_shutdown"
+            ):
+                EmbeddingService._instance._shutdown = False
+        except Exception:
+            pass
+
+        # Force GC to release held resources
+        import gc
+
+        gc.collect()
 
     async def execute_task(
         self,
@@ -355,9 +510,9 @@ class VictorAgentAdapter:
 
         os.chdir(workspace_dir)
 
-        # Force EXECUTION stage so tool selector doesn't gate edit/write behind
-        # READING stage. The stage detector will try to override this based on
-        # tool history, but for benchmarks we want edit available from turn 1.
+        # Start benchmarks in READING stage — agent must explore before editing.
+        # The stage machine will naturally progress to EXECUTION after the agent
+        # reads enough files (MAX_READS_WITHOUT_EDIT) or uses edit/write tools.
         try:
             from victor.core.shared_types import ConversationStage
 
@@ -367,10 +522,8 @@ class VictorAgentAdapter:
                 getattr(self.orchestrator, "conversation_state", None),
             )
             if state_mgr and hasattr(state_mgr, "_transition_to"):
-                state_mgr._transition_to(ConversationStage.EXECUTION, confidence=1.0)
-                # Prevent stage regression — don't let the detector push back
-                # to READING/ANALYSIS after grep/read tool calls.
-                state_mgr.MIN_TOOLS_FOR_TRANSITION = 999
+                state_mgr._transition_to(ConversationStage.READING, confidence=0.8)
+                # Allow natural stage progression — do NOT lock MIN_TOOLS
         except Exception:
             pass
 
@@ -378,17 +531,13 @@ class VictorAgentAdapter:
         # The default semantic selector broadcasts 15+ tools which causes model
         # decision fatigue — models default to text responses instead of tool use.
         # A minimal set forces decisive tool use at each stage.
-        BENCHMARK_TOOLS = {"read", "edit", "write", "grep", "ls", "shell"}
         try:
-            if hasattr(self.orchestrator, "tools"):
-                all_tools = set(self.orchestrator.tools.list_tools())
-                disable = all_tools - BENCHMARK_TOOLS
-                for tool_name in disable:
-                    self.orchestrator.tools.disable_tool(tool_name)
-                logger.info(
-                    f"Benchmark tool restriction: {len(BENCHMARK_TOOLS)} tools enabled "
-                    f"({', '.join(sorted(BENCHMARK_TOOLS))})"
-                )
+            benchmark_tools = set(self.benchmark_tool_allowlist())
+            self.orchestrator.set_enabled_tools(benchmark_tools)
+            logger.info(
+                f"Benchmark tool restriction: {len(benchmark_tools)} tools enabled "
+                f"({', '.join(sorted(benchmark_tools))})"
+            )
         except Exception as e:
             logger.debug(f"Could not restrict tools for benchmark: {e}")
 
@@ -443,14 +592,46 @@ class VictorAgentAdapter:
 
         # Wrap task description with explicit instructions for benchmark tasks.
         # Raw issue text alone causes models to analyze instead of fix.
+        # GEPA failure analysis (edit_mismatch category): the #1 failure mode is
+        # old_str not matching file content exactly. Explicit guidance here reduces
+        # edit rollbacks by ensuring the agent copies text verbatim from read output.
         prompt = (
-            "Fix the following issue by editing the source code in this repository. "
-            "Use the read tool to find the relevant files, then use the edit tool "
-            "to apply your fix. Do not just describe the fix — apply it.\n\n"
+            "Fix the following issue by editing the source code in this repository.\n\n"
+            "WORKFLOW:\n"
+            "1. Use code_search to find relevant files\n"
+            "2. Use graph to inspect callers, callees, dependencies, and impact when "
+            "the fix crosses symbol or file boundaries\n"
+            "3. Use read to examine the code (use offset/limit for large files)\n"
+            "4. Use edit to apply your fix — COPY the old_str EXACTLY from the "
+            "read output, character-by-character. Do NOT type it from memory.\n"
+            "5. If an edit fails (transaction rolled back), re-read the file at "
+            "that location and try again with the exact text.\n\n"
+            "CRITICAL: The edit tool's old_str must match the file content exactly "
+            "including whitespace, quotes, and line breaks. Even one wrong character "
+            "causes a rollback. Always copy from the most recent read output.\n\n"
             f"ISSUE:\n{task_description}"
         )
 
         try:
+            # Start heartbeat for silent hang detection
+            import time as _time
+
+            _heartbeat_start = _time.time()
+
+            async def _heartbeat():
+                while True:
+                    await asyncio.sleep(30)
+                    logger.info(
+                        "[AgentAdapter] Heartbeat: turn=%d, tool_calls=%d, "
+                        "files_modified=%s, elapsed=%.0fs",
+                        self._turns,
+                        len(self._tool_calls),
+                        bool(self._file_edits),
+                        _time.time() - _heartbeat_start,
+                    )
+
+            _heartbeat_task = asyncio.create_task(_heartbeat())
+
             # Execute agent loop
             complete = False
             while not complete and self._turns < self.config.max_turns:
@@ -463,8 +644,8 @@ class VictorAgentAdapter:
                 elif not self._completion_detector._has_file_modifications():
                     current_message = (
                         "You have not edited any files yet. "
-                        "Use the edit or write tool to fix the issue in the source code. "
-                        "Do not just describe the fix — apply it."
+                        "When you have enough context, use the edit tool "
+                        "to fix the issue in the source code."
                     )
                 else:
                     current_message = "Continue."
@@ -558,6 +739,13 @@ class VictorAgentAdapter:
         except Exception as e:
             logger.error(f"Task execution error: {e}")
             trace.validation_errors["execution"] = str(e)
+        finally:
+            # Cancel heartbeat
+            _heartbeat_task.cancel()
+            try:
+                await _heartbeat_task
+            except asyncio.CancelledError:
+                pass
 
         # Populate trace
         trace.end_time = time.time()
@@ -579,6 +767,17 @@ class VictorAgentAdapter:
         # Capture token usage from orchestrator (P1: Token Tracking Fix)
         if hasattr(self.orchestrator, "get_token_usage"):
             trace.token_usage = self.orchestrator.get_token_usage()
+            # Fallback: read cumulative dict directly if metrics reports 0
+            if trace.token_usage and trace.token_usage.total_tokens == 0:
+                cum = getattr(self.orchestrator, "_cumulative_token_usage", {})
+                if cum.get("total_tokens", 0) > 0:
+                    from victor.evaluation.protocol import TokenUsage
+
+                    trace.token_usage = TokenUsage(
+                        input_tokens=cum.get("prompt_tokens", 0),
+                        output_tokens=cum.get("completion_tokens", 0),
+                        total_tokens=cum.get("total_tokens", 0),
+                    )
 
         return trace
 
@@ -645,6 +844,18 @@ class VictorAgentAdapter:
             workspace_dir: Working directory for the task
         """
         context_sections = []
+
+        # PIN the task description at the TOP of system context
+        # This ensures the model always knows what it's supposed to fix,
+        # even as the conversation grows and the user message fades.
+        task_desc = getattr(task, "issue_text", None) or task.prompt or task.description
+        if task_desc:
+            context_sections.append(
+                f"## YOUR TASK (focus ONLY on this issue)\n"
+                f"{task_desc[:2000]}\n\n"
+                f"IMPORTANT: Fix ONLY the issue described above. "
+                f"Do NOT fix other issues you notice in the code."
+            )
 
         # Add working directory context
         context_sections.append(f"## Working Directory\nYou are working in: {workspace_dir}")

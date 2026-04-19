@@ -292,7 +292,8 @@ class TestConnectionValidationIntegration:
                 validator,
                 "_validate_auth",
                 return_value=ValidationResult(
-                    status=ValidationStatus.SUCCESS, message="OAuth client_id configured"
+                    status=ValidationStatus.SUCCESS,
+                    message="OAuth client_id configured",
                 ),
             ):
                 result = await validator.test_account(account)
@@ -541,7 +542,9 @@ class TestAccountResolutionIntegration:
 
         # Mock keyring retrieval
         with patch.object(
-            clean_account_manager, "_get_api_key_from_keyring", return_value="sk-ant-keyring-key"
+            clean_account_manager,
+            "_get_api_key_from_keyring",
+            return_value="sk-ant-keyring-key",
         ):
             config = clean_account_manager.resolve_provider_config(account)
 

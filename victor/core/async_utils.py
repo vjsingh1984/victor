@@ -219,6 +219,37 @@ class SyncAsyncBridge:
         return wrapper
 
 
+async def run_blocking(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
+    """Run a blocking sync function from async context without blocking the event loop.
+
+    Uses asyncio.to_thread() to offload blocking I/O (file reads, subprocess,
+    database queries, etc.) to a thread pool, keeping the event loop responsive.
+
+    This is the inverse of run_sync(): while run_sync() lets sync code call async,
+    run_blocking() lets async code call sync blocking functions safely.
+
+    Args:
+        func: The blocking synchronous function to run
+        *args: Positional arguments to pass to func
+        **kwargs: Keyword arguments to pass to func
+
+    Returns:
+        The result of the blocking function
+
+    Example:
+        async def async_handler():
+            # Don't block the event loop with file I/O
+            content = await run_blocking(Path("large.txt").read_text)
+
+            # Or with any blocking library call
+            result = await run_blocking(blocking_api_call, param1, param2)
+    """
+    if kwargs:
+        func_with_kwargs = functools.partial(func, **kwargs)
+        return await asyncio.to_thread(func_with_kwargs, *args)
+    return await asyncio.to_thread(func, *args)
+
+
 def ensure_async(func: Callable[..., Any]) -> Callable[..., Awaitable[Any]]:
     """Ensure a function is async-compatible.
 
@@ -248,6 +279,7 @@ def ensure_async(func: Callable[..., Any]) -> Callable[..., Awaitable[Any]]:
 __all__ = [
     "run_sync",
     "run_sync_in_thread",
+    "run_blocking",
     "async_to_sync",
     "SyncAsyncBridge",
     "ensure_async",

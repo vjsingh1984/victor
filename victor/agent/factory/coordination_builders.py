@@ -28,20 +28,23 @@ from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.recovery import RecoveryHandler
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
     from victor.agent.middleware_chain import MiddlewareChain
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.task_completion import TaskCompletionDetector
     from victor.agent.read_cache import ReadResultCache
     from victor.agent.time_aware_executor import TimeAwareExecutor
     from victor.agent.thinking_detector import ThinkingPatternDetector
     from victor.agent.resource_manager import ResourceManager
     from victor.agent.budget_manager import ModeCompletionCriteria
-    from victor.agent.context_assembler import TurnBoundaryContextAssembler
+    from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
     from victor.agent.referential_intent_resolver import ReferentialIntentResolver
     from victor.agent.session_ledger import SessionLedger
     from victor.agent.mode_workflow_team_coordinator import ModeWorkflowTeamCoordinator
@@ -157,7 +160,7 @@ class CoordinationBuildersMixin:
             truncation_strategy_str, TruncationStrategy.SMART
         )
 
-        provider_name = getattr(self.settings, "provider", "").lower()
+        provider_name = str(getattr(self.settings, "provider", "")).lower()
         local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
         provider_type = "local" if any(p in provider_name for p in local_providers) else "cloud"
 
@@ -184,7 +187,9 @@ class CoordinationBuildersMixin:
         )
         return compactor
 
-    def create_middleware_chain(self) -> Tuple[Optional["MiddlewareChain"], Optional[Any]]:
+    def create_middleware_chain(
+        self,
+    ) -> Tuple[Optional["MiddlewareChain"], Optional[Any]]:
         """Create middleware chain with vertical extensions.
 
         Returns:
@@ -560,17 +565,23 @@ class CoordinationBuildersMixin:
 
         Args:
             ledger: SessionLedger instance
-            controller: ConversationController (used for score_fn extraction)
+            controller: ConversationController (for semantic retrieval)
         """
-        from victor.agent.context_assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
+        from victor.agent.conversation.scoring import score_messages, CONTROLLER_WEIGHTS
+        from victor.agent.conversation.types import ConversationMessage
 
-        score_fn = None
-        if controller is not None:
-            score_fn = getattr(controller, "_score_messages", None)
+        def _canonical_score_fn(messages, current_query=None):
+            """Bridge provider Messages to canonical scorer."""
+            conv_msgs = [ConversationMessage.from_provider_message(m) for m in messages]
+            scored = score_messages(conv_msgs, current_query, weights=CONTROLLER_WEIGHTS)
+            # Map back to original Message objects
+            conv_to_orig = {id(cm): msg for cm, msg in zip(conv_msgs, messages)}
+            return [(conv_to_orig[id(cm)], s) for cm, s in scored]
 
         assembler = TurnBoundaryContextAssembler(
             session_ledger=ledger,
-            score_fn=score_fn,
+            score_fn=_canonical_score_fn,
             conversation_controller=controller,
         )
         logger.debug("TurnBoundaryContextAssembler created")

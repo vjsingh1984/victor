@@ -53,8 +53,8 @@ from victor.core.mode_config import (
     RegistryBasedModeConfigProvider,
 )
 
-# Stage definition type (re-export from existing)
-from victor.framework.stage_manager import StageDefinition
+# Stage definition type for external/default contracts
+from victor_sdk import StageDefinition
 
 # Mode configs (defaults)
 from victor.framework.defaults.mode_configs import (

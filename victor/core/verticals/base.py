@@ -55,9 +55,22 @@ if TYPE_CHECKING:
     from victor.core.verticals.composition import CapabilityComposer
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Set, Type, TYPE_CHECKING
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Type,
+    TYPE_CHECKING,
+)
 
-from victor.framework.tools import ToolSet
+from victor_sdk.core.api_version import (
+    CURRENT_API_VERSION as SDK_CURRENT_API_VERSION,
+    MIN_SUPPORTED_API_VERSION as SDK_MIN_SUPPORTED_API_VERSION,
+)
 from victor_sdk.core.types import Tier
 
 # Import SDK base class for dependency inversion
@@ -76,11 +89,8 @@ from victor.core.vertical_types import (
     StageBuilder,
 )
 
-# Import framework capabilities (Phase 1: Promote Generic Capabilities)
-from victor.framework.capabilities import (
-    StageBuilderCapability,
-    GroundingRulesCapability,
-)
+# Framework capabilities loaded lazily in _get_stage_capability() and
+# _get_grounding_capability() to avoid Core→Framework import at module level.
 
 # Import stage contract for LSP compliance (Phase 2)
 from victor.core.verticals.protocols.stages import (
@@ -92,9 +102,23 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Framework capability instances (class-level for sharing)
-_stage_capability: Optional[StageBuilderCapability] = None
-_grounding_capability: Optional[GroundingRulesCapability] = None
+# Framework capability instances (class-level for sharing, lazy-loaded)
+_stage_capability: Optional[Any] = None
+_grounding_capability: Optional[Any] = None
+
+
+def _lazy_toolset() -> Any:
+    """Lazy factory for ToolSet default — avoids eager framework import."""
+    from victor.framework.tools import ToolSet
+
+    return ToolSet()
+
+
+def _lazy_toolset_from_tools(tool_names: List[str]) -> Any:
+    """Lazy ToolSet.from_tools() — avoids eager framework import."""
+    from victor.framework.tools import ToolSet
+
+    return ToolSet.from_tools(tool_names)
 
 
 @dataclass
@@ -114,7 +138,7 @@ class VerticalConfig:
 
     name: str = ""
     description: str = ""
-    tools: ToolSet = field(default_factory=ToolSet)
+    tools: Any = field(default_factory=lambda: _lazy_toolset())
     system_prompt: str = ""
     stages: Dict[str, StageDefinition] = field(default_factory=dict)
     provider_hints: Dict[str, Any] = field(default_factory=dict)
@@ -415,7 +439,7 @@ class VerticalBase(
         return cls.description
 
     @classmethod
-    def _get_toolset(cls) -> ToolSet:
+    def _get_toolset(cls) -> Any:
         """Convert tool names to ToolSet (SDK protocol implementation).
 
         This implements the SDK's abstract method by creating a ToolSet
@@ -425,33 +449,29 @@ class VerticalBase(
             ToolSet object with tools from get_tools().
         """
         tool_names = cls.get_tools()
-        return ToolSet.from_tools(tool_names)
+        return _lazy_toolset_from_tools(tool_names)
 
     # =========================================================================
     # Framework Capability Helpers (Phase 1)
     # =========================================================================
 
     @classmethod
-    def _get_stage_capability(cls) -> StageBuilderCapability:
-        """Get or create the stage builder capability.
-
-        Returns:
-            StageBuilderCapability instance
-        """
+    def _get_stage_capability(cls) -> Any:
+        """Get or create the stage builder capability (lazy-loaded)."""
         global _stage_capability
         if _stage_capability is None:
+            from victor.framework.capabilities import StageBuilderCapability
+
             _stage_capability = StageBuilderCapability()
         return _stage_capability
 
     @classmethod
-    def _get_grounding_capability(cls) -> GroundingRulesCapability:
-        """Get or create the grounding rules capability.
-
-        Returns:
-            GroundingRulesCapability instance
-        """
+    def _get_grounding_capability(cls) -> Any:
+        """Get or create the grounding rules capability (lazy-loaded)."""
         global _grounding_capability
         if _grounding_capability is None:
+            from victor.framework.capabilities import GroundingRulesCapability
+
             _grounding_capability = GroundingRulesCapability()
         return _grounding_capability
 
@@ -528,16 +548,11 @@ class VerticalBase(
 
         # Convert framework stage dicts to StageDefinition objects
         # This maintains backward compatibility while using framework capabilities
-        from victor.core.vertical_types import StageDefinition
+        from victor.core.vertical_types import normalize_stage_definition
 
         stages = {}
         for stage_name, stage_def in framework_stages.items():
-            stages[stage_name] = StageDefinition(
-                name=stage_def["name"],
-                description=stage_def["description"],
-                keywords=stage_def.get("keywords", []),
-                next_stages=stage_def.get("next_stages", set()),
-            )
+            stages[stage_name] = normalize_stage_definition(stage_name, stage_def)
 
         # Validate stages against contract (Phase 2: LSP compliance)
         # Use validator directly since VerticalBase is abstract
@@ -561,6 +576,18 @@ class VerticalBase(
             logger.warning(f"[{cls.name}] Stage validation skipped: {e}")
 
         return stages
+
+    @classmethod
+    def get_skills(cls) -> List[Any]:
+        """Return skill definitions for this vertical.
+
+        Subclasses override this to declare composable skills. Each skill
+        binds a prompt fragment with a tool subset and constraints.
+
+        Returns:
+            List of SkillDefinition objects (empty by default)
+        """
+        return []
 
     @classmethod
     def customize_config(cls, config: VerticalConfig) -> VerticalConfig:
@@ -608,19 +635,47 @@ class VerticalBase(
                     cls._config_cache.pop(cache_key, None)
                     cls._config_cache_timestamps.pop(cache_key, None)
 
-        # Build tool set
-        tool_names = cls.get_tools()
-        tools = ToolSet.from_tools(tool_names)
+        # Build tool set — with crash containment for each hook
+        try:
+            tool_names = cls.get_tools()
+            tools = _lazy_toolset_from_tools(tool_names)
+        except Exception as e:
+            logger.warning("Vertical %s: get_tools() failed: %s", cls.name, e)
+            tools = _lazy_toolset()
+
+        try:
+            system_prompt = cls.get_system_prompt()
+        except Exception as e:
+            logger.warning("Vertical %s: get_system_prompt() failed: %s", cls.name, e)
+            system_prompt = ""
+
+        try:
+            stages = cls.get_stages()
+        except Exception as e:
+            logger.warning("Vertical %s: get_stages() failed: %s", cls.name, e)
+            stages = {}
+
+        try:
+            provider_hints = cls.get_provider_hints()
+        except Exception as e:
+            logger.warning("Vertical %s: get_provider_hints() failed: %s", cls.name, e)
+            provider_hints = {}
+
+        try:
+            evaluation_criteria = cls.get_evaluation_criteria()
+        except Exception as e:
+            logger.warning("Vertical %s: get_evaluation_criteria() failed: %s", cls.name, e)
+            evaluation_criteria = []
 
         # Build config
         config = VerticalConfig(
             name=cls.name,
             description=cls.description,
             tools=tools,
-            system_prompt=cls.get_system_prompt(),
-            stages=cls.get_stages(),
-            provider_hints=cls.get_provider_hints(),
-            evaluation_criteria=cls.get_evaluation_criteria(),
+            system_prompt=system_prompt,
+            stages=stages,
+            provider_hints=provider_hints,
+            evaluation_criteria=evaluation_criteria,
             metadata={
                 "vertical_name": cls.name,
                 "vertical_version": cls.version,
@@ -699,7 +754,7 @@ class VerticalBase(
         pass
 
     @classmethod
-    def get_tool_set(cls) -> ToolSet:
+    def get_tool_set(cls) -> Any:
         """Get the ToolSet for this vertical.
 
         Convenience method that returns just the tool configuration.
@@ -707,7 +762,7 @@ class VerticalBase(
         Returns:
             Configured ToolSet.
         """
-        return ToolSet.from_tools(cls.get_tools())
+        return _lazy_toolset_from_tools(cls.get_tools())
 
     @classmethod
     async def create_agent(
@@ -767,9 +822,9 @@ class VerticalRegistry:
     _provenance: Dict[str, str] = {}
     _external_discovered: bool = False
     _legacy_entry_point_warning_emitted: bool = False
-    ENTRY_POINT_GROUP: str = "victor.verticals"
-    MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = 1
-    CURRENT_API_VERSION: ClassVar[int] = 1
+    ENTRY_POINT_GROUP: str = "victor.plugins"  # Consolidated from legacy "victor.verticals"
+    MINIMUM_SUPPORTED_API_VERSION: ClassVar[int] = SDK_MIN_SUPPORTED_API_VERSION
+    CURRENT_API_VERSION: ClassVar[int] = SDK_CURRENT_API_VERSION
 
     @classmethod
     def _is_contrib_module(cls, module_path: str) -> bool:
@@ -1011,7 +1066,6 @@ class VerticalRegistry:
             "Publish VictorPlugin objects via 'victor.plugins' instead. "
             f"Observed legacy entries: {names}"
         )
-        warnings.warn(message, DeprecationWarning, stacklevel=2)
         logger.warning(message)
         cls._legacy_entry_point_warning_emitted = True
 
@@ -1052,7 +1106,12 @@ class VerticalRegistry:
             return False
 
         # Validate the minimal callable contract without executing runtime-heavy hooks.
-        required_methods = ("get_name", "get_description", "get_tools", "get_system_prompt")
+        required_methods = (
+            "get_name",
+            "get_description",
+            "get_tools",
+            "get_system_prompt",
+        )
         for method_name in required_methods:
             method = getattr(vertical_class, method_name, None)
             if method is None or not callable(method):
@@ -1099,11 +1158,12 @@ class VerticalRegistry:
             )
             return False
         if api_version > cls.CURRENT_API_VERSION:
-            logger.warning(
+            logger.error(
                 f"External vertical '{entry_point_name}' ({vertical_class.__name__}) "
                 f"API version {api_version} is newer than current "
-                f"version {cls.CURRENT_API_VERSION}. It may use unsupported features."
+                f"version {cls.CURRENT_API_VERSION}. Skipping."
             )
+            return False
 
         return True
 
@@ -1133,7 +1193,9 @@ class VerticalRegistry:
             pass
 
         try:
-            from victor.framework.entry_point_loader import clear_entry_point_loader_cache
+            from victor.framework.entry_point_loader import (
+                clear_entry_point_loader_cache,
+            )
 
             clear_entry_point_loader_cache()
         except Exception:

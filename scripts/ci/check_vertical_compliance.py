@@ -28,8 +28,13 @@ COMPLIANCE_LEVELS = {
     "Basic": {"tool_dependencies", "safety"},
     "Standard": {"tool_dependencies", "safety", "mode_config", "middleware"},
     "Full": {
-        "tool_dependencies", "safety", "mode_config", "middleware",
-        "workflows", "teams", "service_provider",
+        "tool_dependencies",
+        "safety",
+        "mode_config",
+        "middleware",
+        "workflows",
+        "teams",
+        "service_provider",
     },
 }
 
@@ -80,20 +85,24 @@ def main() -> int:
             level = determine_compliance_level(provides_values)
             version = manifest.version
             api_ver = manifest.api_version
-            provides_str = ", ".join(sorted(provides_values)) if provides_values else "(none)"
+            provides_str = (
+                ", ".join(sorted(provides_values)) if provides_values else "(none)"
+            )
         except (AttributeError, NotImplementedError, ImportError) as exc:
             level = "N/A"
             version = "?"
             api_ver = "?"
             provides_str = f"(manifest unavailable: {exc})"
 
-        rows.append({
-            "name": name,
-            "version": version,
-            "api_version": api_ver,
-            "level": level,
-            "provides": provides_str,
-        })
+        rows.append(
+            {
+                "name": name,
+                "version": version,
+                "api_version": api_ver,
+                "level": level,
+                "provides": provides_str,
+            }
+        )
 
     # Output markdown table
     print("## Vertical Compliance Report")
@@ -113,7 +122,9 @@ def main() -> int:
     none_verticals = [r for r in rows if r["level"] == "None"]
     if none_verticals:
         names = ", ".join(r["name"] for r in none_verticals)
-        print(f"\n**Warning**: {len(none_verticals)} vertical(s) at 'None' compliance: {names}")
+        print(
+            f"\n**Warning**: {len(none_verticals)} vertical(s) at 'None' compliance: {names}"
+        )
 
     return 0
 

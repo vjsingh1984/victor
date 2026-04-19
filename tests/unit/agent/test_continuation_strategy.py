@@ -19,7 +19,10 @@ from unittest.mock import MagicMock, patch
 
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.storage.embeddings.intent_classifier import IntentType
-from victor.storage.embeddings.question_classifier import QuestionType, QuestionClassificationResult
+from victor.storage.embeddings.question_classifier import (
+    QuestionType,
+    QuestionClassificationResult,
+)
 
 # =============================================================================
 # DETECT MENTIONED TOOLS TESTS
@@ -322,7 +325,8 @@ class TestDetermineContinuationAction:
             matched_pattern="Should I proceed?",
         )
         with patch(
-            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+            "victor.agent.continuation_strategy.classify_question",
+            return_value=mock_result,
         ):
             result = strategy.determine_continuation_action(
                 intent_result=mock_intent, **base_kwargs
@@ -347,7 +351,8 @@ class TestDetermineContinuationAction:
             matched_pattern="Should I proceed?",
         )
         with patch(
-            "victor.agent.continuation_strategy.classify_question", return_value=mock_result
+            "victor.agent.continuation_strategy.classify_question",
+            return_value=mock_result,
         ):
             result = strategy.determine_continuation_action(
                 intent_result=mock_intent, **base_kwargs

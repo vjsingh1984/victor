@@ -74,6 +74,7 @@ class LLMDecisionService:
 
         # Metrics
         self._metrics = DecisionMetrics()
+        self._auto_disable_warned = False
 
     async def decide(
         self,
@@ -217,6 +218,27 @@ class LLMDecisionService:
                 confidence=heuristic_confidence,
             )
 
+        # Auto-disable if timeout rate is too high (>60% after 10+ calls)
+        if (
+            self._metrics.total_calls >= 10
+            and self._metrics.timeouts / max(self._metrics.total_calls, 1) > 0.6
+        ):
+            if not self._auto_disable_warned:
+                logger.warning(
+                    "Edge model auto-disabled: %.0f%% timeout rate (%d/%d calls)",
+                    100 * self._metrics.timeouts / self._metrics.total_calls,
+                    self._metrics.timeouts,
+                    self._metrics.total_calls,
+                )
+                self._auto_disable_warned = True
+            self._metrics.total_calls += 1
+            return DecisionResult(
+                decision_type=decision_type,
+                result=heuristic_result,
+                source="auto_disabled",
+                confidence=heuristic_confidence,
+            )
+
         # Use run_sync_in_thread to handle both cases:
         # 1. No running loop — runs in a thread with its own loop
         # 2. Inside async context — also runs in a thread (avoids blocking)
@@ -225,7 +247,7 @@ class LLMDecisionService:
         try:
             from victor.core.async_utils import run_sync_in_thread
 
-            return run_sync_in_thread(
+            result = run_sync_in_thread(
                 self.decide(
                     decision_type,
                     context,
@@ -234,13 +256,31 @@ class LLMDecisionService:
                 ),
                 timeout=self._config.timeout_ms / 1000.0,
             )
+
+            # Log decision for fine-tuning data collection
+            try:
+                from victor.agent.decisions.chain import log_decision
+
+                log_decision(
+                    decision_type=decision_type.value,
+                    context=context,
+                    result=str(getattr(result.result, "__dict__", result.result)),
+                    source=result.source,
+                    confidence=result.confidence,
+                )
+            except Exception:
+                pass
+
+            return result
         except (TimeoutError, Exception) as e:
             logger.debug("decide_sync thread execution failed: %s", e)
             self._metrics.total_calls += 1
+            if isinstance(e, TimeoutError):
+                self._metrics.timeouts += 1
             return DecisionResult(
                 decision_type=decision_type,
                 result=heuristic_result,
-                source="heuristic",
+                source="timeout_fallback" if isinstance(e, TimeoutError) else "heuristic",
                 confidence=heuristic_confidence,
             )
 
@@ -305,12 +345,15 @@ class LLMDecisionService:
 
         max_tokens = self._config.max_tokens_override or prompt_config.max_tokens
 
+        # Disable thinking/reasoning for edge decisions — we need raw JSON,
+        # not reasoning text. Ollama's "think" is a top-level parameter.
         response = await self._provider.chat(
             messages=messages,
             model=self._model,
             temperature=self._config.temperature,
             max_tokens=max_tokens,
             tools=None,
+            think=False,
         )
 
         # Extract text content from response
@@ -364,22 +407,42 @@ class LLMDecisionService:
         return 0
 
     def _parse_response(self, raw_text: str, schema: type) -> Any:
-        """Parse raw LLM text into a Pydantic model."""
-        # Strip markdown code fences if present
+        """Parse raw LLM text into a Pydantic model.
+
+        Handles common edge model output patterns:
+        - Markdown code fences (```json ... ```)
+        - Embedded JSON within reasoning text (e.g., qwen3 thinking prefix)
+        """
         text = raw_text.strip()
+
+        # Strip markdown code fences if present
         if text.startswith("```"):
             lines = text.split("\n")
-            # Remove first and last lines (code fence markers)
             lines = [line for line in lines[1:] if not line.startswith("```")]
             text = "\n".join(lines).strip()
 
+        # First try: direct parse
         try:
             data = json.loads(text)
             return schema.model_validate(data)
-        except (json.JSONDecodeError, Exception) as e:
-            self._metrics.parse_failures += 1
-            logger.debug("Failed to parse LLM decision response: %s (raw: %s)", e, raw_text[:200])
-            raise
+        except json.JSONDecodeError:
+            pass
+
+        # Second try: extract embedded JSON object from mixed text
+        # (handles models that prepend reasoning before the JSON)
+        brace_pos = text.find("{")
+        if brace_pos > 0:
+            last_brace = text.rfind("}")
+            if last_brace > brace_pos:
+                try:
+                    data = json.loads(text[brace_pos : last_brace + 1])
+                    return schema.model_validate(data)
+                except (json.JSONDecodeError, Exception):
+                    pass
+
+        self._metrics.parse_failures += 1
+        logger.debug("Failed to parse LLM decision response (raw: %s)", raw_text[:200])
+        raise ValueError(f"Could not extract JSON from response: {raw_text[:100]}")
 
     def _cache_key(self, decision_type: DecisionType, context: Dict[str, Any]) -> str:
         """Generate a cache key from decision type and context."""

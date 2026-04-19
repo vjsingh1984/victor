@@ -24,7 +24,9 @@ from victor.workflows.executors.registry import (
 )
 from victor.workflows.runtime_types import GraphNodeResult, WorkflowState
 from victor.workflows.runtime_types import create_initial_workflow_state
-from victor.workflows.unified_compiler import NodeExecutionResult as UnifiedNodeExecutionResult
+from victor.workflows.unified_compiler import (
+    NodeExecutionResult as UnifiedNodeExecutionResult,
+)
 from victor.workflows.yaml_to_graph_compiler import (
     GraphNodeResult as YAMLGraphNodeResult,
     WorkflowState as YAMLWorkflowState,

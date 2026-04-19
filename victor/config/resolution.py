@@ -214,7 +214,9 @@ class ProviderResolver:
     ) -> Dict[str, Any]:
         """Quick resolution with common parameters.
 
-        This is a convenience method for simple use cases.
+        .. deprecated::
+            Use Settings.get_provider_settings() instead, which routes through
+            ProviderConfigRegistry for correct provider-specific logic.
 
         Args:
             provider: Provider name

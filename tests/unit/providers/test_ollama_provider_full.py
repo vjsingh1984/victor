@@ -7,7 +7,12 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from typing import List, Dict, Any, AsyncIterator
 
 from victor.providers.ollama_provider import OllamaProvider
-from victor.providers.base import Message, ProviderError, ProviderTimeoutError, ToolDefinition
+from victor.providers.base import (
+    Message,
+    ProviderError,
+    ProviderTimeoutError,
+    ToolDefinition,
+)
 
 
 # Helper for async generator
@@ -234,7 +239,8 @@ class TestOllamaProviderCapabilities:
         template = "This model does not support tools."
         # Temporarily patch TOOL_SUPPORT_PATTERNS to something that won't match
         with patch(
-            "victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS", ["non_matching_pattern"]
+            "victor.providers.ollama_provider.TOOL_SUPPORT_PATTERNS",
+            ["non_matching_pattern"],
         ):
             assert provider._detect_tool_support(template) is False
 
@@ -277,7 +283,9 @@ class TestOllamaProviderChat:
         provider = OllamaProvider()
         # Mock _execute_with_circuit_breaker to raise the specific error
         with patch.object(
-            provider, "_execute_with_circuit_breaker", side_effect=httpx.TimeoutException("Timeout")
+            provider,
+            "_execute_with_circuit_breaker",
+            side_effect=httpx.TimeoutException("Timeout"),
         ) as mock_breaker:
             with pytest.raises(ProviderTimeoutError):
                 await provider.chat([Message(role="user", content="Hi")], model="test-model")

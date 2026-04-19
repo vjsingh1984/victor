@@ -26,7 +26,7 @@ domain (SRP compliance).
 Architecture:
     WorkflowEngine (Facade)
     ├── YAMLWorkflowCoordinator     # execute_yaml(), stream_yaml()
-    ├── GraphExecutionCoordinator   # execute_graph(), stream_graph()
+    ├── GraphTurnExecutor   # execute_graph(), stream_graph()
     ├── HITLCoordinator             # execute_with_hitl()
     └── CacheCoordinator            # enable_caching(), clear_cache()
 
@@ -83,7 +83,7 @@ if TYPE_CHECKING:
     from victor.framework.graph import CompiledGraph, StateGraph
     from victor.framework.coordinators import (
         YAMLWorkflowCoordinator,
-        GraphExecutionCoordinator,
+        GraphTurnExecutor,
         HITLCoordinator,
         CacheCoordinator,
     )
@@ -270,7 +270,7 @@ class WorkflowEngine:
 
         # Lazy-loaded coordinators (SRP split)
         self._yaml_coordinator: Optional["YAMLWorkflowCoordinator"] = None
-        self._graph_coordinator: Optional["GraphExecutionCoordinator"] = None
+        self._graph_coordinator: Optional["GraphTurnExecutor"] = None
         self._hitl_coordinator: Optional["HITLCoordinator"] = None
         self._cache_coordinator: Optional["CacheCoordinator"] = None
 
@@ -438,7 +438,7 @@ class WorkflowEngine:
     ) -> WorkflowExecutionResult:
         """Execute a compiled StateGraph.
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant execution
+        Delegates to GraphTurnExecutor for SRP-compliant execution
         with LSP-compliant polymorphic result handling.
 
         Args:
@@ -545,7 +545,7 @@ class WorkflowEngine:
     ) -> WorkflowExecutionResult:
         """Execute a WorkflowGraph via CompiledGraph (unified execution path).
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant execution.
+        Delegates to GraphTurnExecutor for SRP-compliant execution.
         This method compiles a WorkflowGraph to CompiledGraph and executes
         it through the single CompiledGraph.invoke() engine, providing a
         unified execution path for all workflow types.
@@ -589,7 +589,7 @@ class WorkflowEngine:
     ) -> WorkflowExecutionResult:
         """Execute a WorkflowDefinition via CompiledGraph (unified execution path).
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant execution.
+        Delegates to GraphTurnExecutor for SRP-compliant execution.
         This method compiles a WorkflowDefinition to CompiledGraph and executes
         it through the single CompiledGraph.invoke() engine.
 
@@ -720,7 +720,7 @@ class WorkflowEngine:
     ) -> AsyncIterator[WorkflowEvent]:
         """Stream events from StateGraph execution.
 
-        Delegates to GraphExecutionCoordinator for SRP-compliant streaming.
+        Delegates to GraphTurnExecutor for SRP-compliant streaming.
 
         Args:
             graph: Compiled StateGraph to execute.
@@ -872,14 +872,12 @@ class WorkflowEngine:
             self._yaml_coordinator = YAMLWorkflowCoordinator()
         return self._yaml_coordinator
 
-    def _get_graph_coordinator(self) -> "GraphExecutionCoordinator":
+    def _get_graph_coordinator(self) -> "GraphTurnExecutor":
         """Get or create graph execution coordinator."""
         if self._graph_coordinator is None:
-            from victor.framework.coordinators import GraphExecutionCoordinator
+            from victor.framework.coordinators import GraphTurnExecutor
 
-            self._graph_coordinator = GraphExecutionCoordinator(
-                runner_registry=self._runner_registry
-            )
+            self._graph_coordinator = GraphTurnExecutor(runner_registry=self._runner_registry)
         return self._graph_coordinator
 
     def _get_hitl_coordinator(self) -> "HITLCoordinator":
@@ -906,15 +904,15 @@ class WorkflowEngine:
     def _get_unified_compiler(self) -> "UnifiedWorkflowCompiler":
         """Get or create the unified compiler.
 
-        **Architecture Note**: WorkflowEngine uses UnifiedWorkflowCompiler (not the plugin API)
-        because it requires:
+        **Architecture Note**: UnifiedWorkflowCompiler is the canonical compiler API.
+        WorkflowEngine uses it for:
         - Two-level caching (definition + execution) for performance
         - Cache management APIs (clear_cache, get_cache_stats, invalidate_yaml)
         - Runner registry integration for custom node execution
         - Escape hatch integration (condition_registry, transform_registry)
 
-        The plugin API (create_compiler) provides a simpler facade for basic use cases
-        but doesn't support these advanced features needed by WorkflowEngine.
+        For DI-friendly compile-only usage without caching or execution,
+        see WorkflowCompiler in victor.workflows.compiler.
 
         Returns:
             UnifiedWorkflowCompiler instance with shared caches.

@@ -7,10 +7,20 @@ ToolCoordinator, enabling feature-flagged service layer migration.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+    from victor.agent.coordinators.tool_coordinator import ToolCoordinator, ToolResultContext
     from victor.agent.protocols import ToolAccessContext
 
 logger = logging.getLogger(__name__)
@@ -104,6 +114,18 @@ class ToolServiceAdapter:
             tool_adapter,
             failed_signatures=failed_signatures,
         )
+
+    def process_tool_results(
+        self,
+        pipeline_result: Any,
+        ctx: "ToolResultContext",
+    ) -> List[Dict[str, Any]]:
+        """[LEGACY] Process tool execution results via the coordinator.
+        
+        This method is part of IToolService, which is being superseded by
+        IToolCoordinator.
+        """
+        return self._tool_coordinator.process_tool_results(pipeline_result, ctx)
 
     def _build_tool_access_context(self) -> "ToolAccessContext":
         """Build tool access context."""

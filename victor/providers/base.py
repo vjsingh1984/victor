@@ -15,8 +15,18 @@
 """Base provider interface for LLM providers."""
 
 import logging
+import ssl
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Protocol, runtime_checkable
+from typing import (
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    runtime_checkable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
+    CircuitBreakerError,
     CircuitBreakerRegistry,
 )
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
@@ -161,6 +172,34 @@ def is_tool_calling_provider(provider: Any) -> bool:
     return False
 
 
+def is_caching_provider(provider: Any) -> bool:
+    """Check if a provider supports API-level prompt caching (billing discounts).
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider offers cached token billing discounts
+    """
+    if hasattr(provider, "supports_prompt_caching"):
+        return provider.supports_prompt_caching()
+    return False
+
+
+def has_kv_prefix_caching(provider: Any) -> bool:
+    """Check if a provider benefits from stable prompt prefixes (KV cache reuse).
+
+    Args:
+        provider: Provider instance to check
+
+    Returns:
+        True if provider reuses KV cache for matching prefixes
+    """
+    if hasattr(provider, "supports_kv_prefix_caching"):
+        return provider.supports_kv_prefix_caching()
+    return False
+
+
 class Message(BaseModel):
     """Standard message format across all providers."""
 
@@ -180,11 +219,18 @@ class Message(BaseModel):
 
 
 class ToolDefinition(BaseModel):
-    """Standard tool definition format."""
+    """Standard tool definition format.
+
+    The optional schema_level tracks which verbosity tier was used to
+    generate the description and parameters. It is excluded from
+    serialization (never sent to providers) — used only for internal
+    cache-aware ordering.
+    """
 
     name: str = Field(..., description="Tool name")
     description: str = Field(..., description="What the tool does")
     parameters: Dict[str, Any] = Field(..., description="JSON Schema for tool parameters")
+    schema_level: Optional[str] = Field(default=None, exclude=True)
 
 
 class CompletionResponse(BaseModel):
@@ -312,11 +358,109 @@ class BaseProvider(ABC):
         """
         return False
 
+    def supports_prompt_caching(self) -> bool:
+        """Check if provider supports API-level prompt prefix caching.
+
+        API-level prompt caching means the provider offers a **billing discount**
+        (50-90%) on cached input tokens. For these providers, sending the full
+        tool set (48 tools) every call is optimal because cached tokens are
+        nearly free after the first call.
+
+        This is distinct from KV prefix caching (see supports_kv_prefix_caching),
+        which is a latency optimization at the inference engine level.
+
+        Providers WITHOUT API-level caching (Ollama, LMStudio, llama.cpp, MLX,
+        vLLM) should use per-turn semantic tool selection (5-12 tools) to
+        minimize token overhead.
+
+        Default implementation returns False.
+
+        Returns:
+            True if provider has API-level cached token discounts
+        """
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Check if provider supports KV prefix caching for latency savings.
+
+        KV prefix caching means the inference engine reuses computed key-value
+        state when consecutive requests share the same prompt prefix. This
+        reduces time-to-first-token (TTFT) but does NOT reduce cost — every
+        token still incurs compute on the first call.
+
+        When True, the framework should keep the system prompt + tool definitions
+        stable across turns within a session so the KV cache can be reused.
+
+        Both local engines (Ollama, vLLM, llama.cpp) and cloud APIs (Anthropic,
+        OpenAI) support this. Default is False.
+
+        Returns:
+            True if provider benefits from stable prompt prefixes
+        """
+        return False
+
     def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
         """Get circuit breaker statistics for monitoring."""
         if self._circuit_breaker:
             return self._circuit_breaker.get_stats()
         return None
+
+    def _iter_exception_chain(self, error: Exception) -> List[Exception]:
+        """Yield the wrapped exception chain without looping forever."""
+        chain: List[Exception] = []
+        seen: set[int] = set()
+        current: Optional[BaseException] = error
+
+        while isinstance(current, Exception) and id(current) not in seen:
+            chain.append(current)
+            seen.add(id(current))
+            current = (
+                getattr(current, "__cause__", None)
+                or getattr(current, "__context__", None)
+                or getattr(current, "cause", None)
+            )
+
+        return chain
+
+    def _is_connection_error_like(self, error: Exception) -> bool:
+        """Check whether an exception looks like a transient transport failure."""
+        connection_exception_names = {
+            "APIConnectionError",
+            "ConnectError",
+            "ConnectTimeout",
+            "ReadError",
+            "ReadTimeout",
+            "RemoteProtocolError",
+            "TransportError",
+            "WriteError",
+        }
+        connection_tokens = (
+            "bad record mac",
+            "broken pipe",
+            "connection aborted",
+            "connection error",
+            "connection refused",
+            "connection reset",
+            "remote protocol error",
+            "server disconnected",
+            "ssl",
+            "tls",
+        )
+
+        for candidate in self._iter_exception_chain(error):
+            if isinstance(candidate, (ConnectionError, ssl.SSLError)):
+                return True
+
+            if any(
+                parent.__name__ in connection_exception_names for parent in type(candidate).__mro__
+            ):
+                return True
+
+            candidate_str = str(candidate).lower()
+            if any(token in candidate_str for token in connection_tokens):
+                return True
+
+        return False
 
     def classify_error(self, error: Exception) -> ProviderError:
         """Classify a raw exception into the appropriate ProviderError subtype.
@@ -336,6 +480,15 @@ class BaseProvider(ABC):
         # Tier 0: Already classified
         if isinstance(error, ProviderError):
             return error
+
+        if isinstance(error, CircuitBreakerError):
+            return ProviderRateLimitError(
+                message=f"Provider temporarily unavailable: {error}",
+                provider=self.name,
+                retry_after=error.retry_after,
+                status_code=429,
+                raw_error=error,
+            )
 
         wrapped_error = (
             getattr(error, "last_error", None)
@@ -371,11 +524,25 @@ class BaseProvider(ABC):
                     raw_error=error,
                 )
 
+        if self._is_connection_error_like(error):
+            return ProviderConnectionError(
+                message=f"Connection failed: {error}",
+                provider=self.name,
+                raw_error=error,
+            )
+
         # Tier 2: String-based classification (deprecated — providers should use
         # proper exception types or HTTP status codes instead)
         if any(
             t in error_str
-            for t in ("auth", "unauthorized", "invalid key", "invalid api", "api_key", "401")
+            for t in (
+                "auth",
+                "unauthorized",
+                "invalid key",
+                "invalid api",
+                "api_key",
+                "401",
+            )
         ):
             logger.warning(
                 "String-based error classification triggered for auth error "
@@ -545,8 +712,8 @@ class BaseProvider(ABC):
     async def count_tokens(self, text: str) -> int:
         """Estimate token count for given text.
 
-        Uses tiktoken if available for exact counting, otherwise falls back
-        to character-based estimation.
+        Uses the fast native token counter when available and falls back
+        to word-based estimation.
 
         Args:
             text: Text to count tokens for
@@ -554,9 +721,9 @@ class BaseProvider(ABC):
         Returns:
             Estimated token count
         """
-        from victor.processing.native import count_tokens
+        from victor.processing.native.tokenizer import count_tokens_fast
 
-        return count_tokens(text)
+        return count_tokens_fast(text)
 
     @abstractmethod
     async def close(self) -> None:

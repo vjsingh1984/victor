@@ -399,4 +399,79 @@ __all__ = [
     # Convenience
     "get_executor",
     "execute_workflow",
+    # Compiled graph executor (consolidated from compiled_executor.py)
+    "CompiledWorkflowExecutor",
+    "ExecutionResult",
+    "WorkflowExecutor",
 ]
+
+
+# ---------------------------------------------------------------------------
+# Compiled graph executor — consolidated from victor/workflows/compiled_executor.py
+# ---------------------------------------------------------------------------
+
+
+class CompiledWorkflowExecutor:
+    """Executor for compiled workflow graphs.
+
+    Wraps compiled StateGraph execution with consistent interface.
+    Delegates to the compiled graph's invoke/stream methods.
+    """
+
+    def __init__(self, orchestrator_pool: Any):
+        self._orchestrator_pool = orchestrator_pool
+
+    async def execute(
+        self,
+        compiled_graph: Any,
+        initial_state: Dict[str, Any],
+        *,
+        thread_id: Optional[str] = None,
+        checkpoint: Optional[str] = None,
+    ) -> Any:
+        """Execute a compiled workflow graph."""
+        logger.info("Executing compiled workflow graph...")
+
+        if hasattr(compiled_graph, "invoke"):
+            return await compiled_graph.invoke(
+                initial_state,
+                thread_id=thread_id,
+                checkpoint=checkpoint,
+            )
+        else:
+            return ExecutionResult(
+                final_state=initial_state,
+                metrics={"duration_seconds": 0.0, "nodes_executed": 0},
+            )
+
+    async def stream(
+        self,
+        compiled_graph: Any,
+        initial_state: Dict[str, Any],
+        *,
+        thread_id: Optional[str] = None,
+    ) -> AsyncIterator[Any]:
+        """Stream execution events from a compiled workflow."""
+        if hasattr(compiled_graph, "stream"):
+            async for event in compiled_graph.stream(initial_state, thread_id=thread_id):
+                yield event
+
+
+class ExecutionResult:
+    """Execution result from compiled workflow executor."""
+
+    def __init__(self, final_state: Dict[str, Any], metrics: Dict[str, Any]):
+        self._final_state = final_state
+        self._metrics = metrics
+
+    @property
+    def final_state(self) -> Dict[str, Any]:
+        return self._final_state
+
+    @property
+    def metrics(self) -> Dict[str, Any]:
+        return self._metrics
+
+
+# Backward-compatibility alias
+WorkflowExecutor = CompiledWorkflowExecutor

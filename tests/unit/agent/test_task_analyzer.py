@@ -201,7 +201,10 @@ class TestTaskAnalyzer:
         result = analyzer.analyze("Create a new file called hello.py")
 
         assert isinstance(result, TaskAnalysis)
-        assert result.action_intent in [ActionIntent.WRITE_ALLOWED, ActionIntent.AMBIGUOUS]
+        assert result.action_intent in [
+            ActionIntent.WRITE_ALLOWED,
+            ActionIntent.AMBIGUOUS,
+        ]
 
     def test_analyze_display_request(self):
         """Test analyzing a display-only request."""

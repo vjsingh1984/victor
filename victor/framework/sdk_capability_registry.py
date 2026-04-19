@@ -308,7 +308,11 @@ def get_runtime_capability_registry(*, reset: bool = False) -> RuntimeCapability
             RuntimeCapabilityBinding(
                 capability_id=CapabilityIds.PROMPT_CONTRIBUTIONS,
                 description="Prompt contribution support is provided by framework prompt capabilities.",
-                orchestrator_capabilities=("task_type_hints", "prompt_section", "prompt_builder"),
+                orchestrator_capabilities=(
+                    "task_type_hints",
+                    "prompt_section",
+                    "prompt_builder",
+                ),
                 builtin_provider_imports=(
                     "victor.framework.capabilities.prompt_contributions:PromptContributionCapability",
                 ),
@@ -374,7 +378,10 @@ def get_runtime_capability_registry(*, reset: bool = False) -> RuntimeCapability
             RuntimeCapabilityBinding(
                 capability_id=CapabilityIds.SAFETY_RULES,
                 description="Safety rules are provided by the framework safety rules capability provider.",
-                orchestrator_capabilities=("vertical_safety_patterns", "safety_patterns"),
+                orchestrator_capabilities=(
+                    "vertical_safety_patterns",
+                    "safety_patterns",
+                ),
                 builtin_provider_imports=(
                     "victor.framework.capabilities.safety_rules:SafetyRulesCapabilityProvider",
                 ),

@@ -55,7 +55,16 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TYPE_CHECKING,
+    Protocol,
+    runtime_checkable,
+)
 
 from victor.core.async_utils import run_sync
 

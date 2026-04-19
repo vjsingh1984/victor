@@ -39,16 +39,19 @@ class TestDefaultEmbeddingModel:
         assert DEFAULT_EMBEDDING_MODEL == "BAAI/bge-small-en-v1.5"
 
     def test_settings_unified_model_matches_service(self):
-        """Test settings.unified_embedding_model matches service default."""
+        """Test settings.search.unified_embedding_model matches service default."""
         from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
         from victor.config.settings import Settings
 
         settings = Settings()
-        assert settings.unified_embedding_model == DEFAULT_EMBEDDING_MODEL
+        assert settings.search.unified_embedding_model == DEFAULT_EMBEDDING_MODEL
 
     def test_service_init_uses_default_model(self):
         """Test EmbeddingService __init__ default matches constant."""
-        from victor.storage.embeddings.service import EmbeddingService, DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import (
+            EmbeddingService,
+            DEFAULT_EMBEDDING_MODEL,
+        )
 
         EmbeddingService.reset_instance()
 
@@ -57,7 +60,10 @@ class TestDefaultEmbeddingModel:
 
     def test_get_instance_uses_default_model(self):
         """Test get_instance uses DEFAULT_EMBEDDING_MODEL as default."""
-        from victor.storage.embeddings.service import EmbeddingService, DEFAULT_EMBEDDING_MODEL
+        from victor.storage.embeddings.service import (
+            EmbeddingService,
+            DEFAULT_EMBEDDING_MODEL,
+        )
 
         EmbeddingService.reset_instance()
 
@@ -554,27 +560,27 @@ class TestSettingsIntegration:
     """Tests for settings integration."""
 
     def test_settings_embedding_model_matches_service(self):
-        """Test settings.embedding_model equals service default."""
+        """Test settings.tools.embedding_model equals service default."""
         from victor.config.settings import Settings
         from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
         settings = Settings()
-        assert settings.embedding_model == DEFAULT_EMBEDDING_MODEL
+        assert settings.tools.embedding_model == DEFAULT_EMBEDDING_MODEL
 
     def test_settings_codebase_embedding_model_matches_service(self):
-        """Test settings.codebase_embedding_model equals service default."""
+        """Test settings.search.codebase_embedding_model equals service default."""
         from victor.config.settings import Settings
         from victor.storage.embeddings.service import DEFAULT_EMBEDDING_MODEL
 
         settings = Settings()
-        assert settings.codebase_embedding_model == DEFAULT_EMBEDDING_MODEL
+        assert settings.search.codebase_embedding_model == DEFAULT_EMBEDDING_MODEL
 
     def test_settings_dimension_is_384(self):
-        """Test settings.codebase_dimension is 384 for BGE/MiniLM models."""
+        """Test settings.search.codebase_dimension is 384 for BGE/MiniLM models."""
         from victor.config.settings import Settings
 
         settings = Settings()
-        assert settings.codebase_dimension == 384
+        assert settings.search.codebase_dimension == 384
 
 
 class TestModelQualityBenchmarks:

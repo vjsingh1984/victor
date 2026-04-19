@@ -49,7 +49,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class GraphExecutionCoordinator:
+class GraphTurnExecutor:
     """Coordinator for StateGraph/CompiledGraph execution.
 
     Handles all aspects of graph-based workflow execution including:
@@ -63,7 +63,7 @@ class GraphExecutionCoordinator:
     object with a .state attribute or a raw state dictionary.
 
     Example:
-        coordinator = GraphExecutionCoordinator()
+        coordinator = GraphTurnExecutor()
 
         # Execute a compiled graph
         result = await coordinator.execute(
@@ -357,4 +357,4 @@ class GraphExecutionCoordinator:
             )
 
 
-__all__ = ["GraphExecutionCoordinator"]
+__all__ = ["GraphTurnExecutor"]

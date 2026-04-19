@@ -685,7 +685,11 @@ def show_fep_stats() -> None:
 
     console.print()
     console.print(
-        Panel(f"[bold]Total FEPs:[/] {stats['total']}", title="FEP Statistics", border_style="cyan")
+        Panel(
+            f"[bold]Total FEPs:[/] {stats['total']}",
+            title="FEP Statistics",
+            border_style="cyan",
+        )
     )
     console.print()
 

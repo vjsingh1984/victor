@@ -28,7 +28,9 @@ from victor.config.settings import load_settings
 from victor.agent.orchestrator import AgentOrchestrator
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Victor AI Assistant API", version="2.0.0")
@@ -115,7 +117,9 @@ def _issue_session_token(session_id: str) -> str:
     """Create an HMAC-signed session token."""
     issued_at = int(time.time())
     payload = f"{session_id}:{issued_at}"
-    signature = hmac.new(SESSION_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    signature = hmac.new(
+        SESSION_SECRET.encode(), payload.encode(), hashlib.sha256
+    ).hexdigest()
     token_bytes = f"{payload}:{signature}".encode()
     return base64.urlsafe_b64encode(token_bytes).decode()
 
@@ -126,7 +130,9 @@ def _parse_session_token(token: str) -> Optional[Tuple[str, int]]:
         decoded = base64.urlsafe_b64decode(token.encode()).decode()
         session_id, issued_at_str, signature = decoded.split(":")
         expected_sig = hmac.new(
-            SESSION_SECRET.encode(), f"{session_id}:{issued_at_str}".encode(), hashlib.sha256
+            SESSION_SECRET.encode(),
+            f"{session_id}:{issued_at_str}".encode(),
+            hashlib.sha256,
         ).hexdigest()
         if not hmac.compare_digest(signature, expected_sig):
             return None
@@ -151,7 +157,9 @@ async def _render_with_limits(render_fn, payload: str) -> str:
     _validate_render_payload(payload)
     async with RENDER_SEMAPHORE:
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(None, lambda: render_fn(payload, RENDER_TIMEOUT))
+        return await loop.run_in_executor(
+            None, lambda: render_fn(payload, RENDER_TIMEOUT)
+        )
 
 
 class SessionTokenRequest(BaseModel):
@@ -200,7 +208,9 @@ def _render_drawio_svg(source: str, timeout: Optional[int] = None) -> str:
     """Render Draw.io (or Lucid-style XML) to SVG using local drawio CLI."""
     try:
         with (
-            tempfile.NamedTemporaryFile(mode="w+", suffix=".drawio", delete=True) as fin,
+            tempfile.NamedTemporaryFile(
+                mode="w+", suffix=".drawio", delete=True
+            ) as fin,
             tempfile.NamedTemporaryFile(mode="r", suffix=".svg", delete=True) as fout,
         ):
             fin.write(source)
@@ -212,7 +222,8 @@ def _render_drawio_svg(source: str, timeout: Optional[int] = None) -> str:
             return fout.read()
     except FileNotFoundError:
         raise HTTPException(
-            status_code=500, detail="drawio CLI not found. Please install draw.io desktop/CLI."
+            status_code=500,
+            detail="drawio CLI not found. Please install draw.io desktop/CLI.",
         ) from None
     except subprocess.CalledProcessError as exc:
         raise HTTPException(
@@ -222,7 +233,8 @@ def _render_drawio_svg(source: str, timeout: Optional[int] = None) -> str:
 
 @app.post("/render/plantuml")
 async def render_plantuml(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     svg = await _render_with_limits(_render_plantuml_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
@@ -230,7 +242,8 @@ async def render_plantuml(
 
 @app.post("/render/mermaid")
 async def render_mermaid(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     svg = await _render_with_limits(_render_mermaid_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
@@ -238,13 +251,16 @@ async def render_mermaid(
 
 @app.post("/render/drawio")
 async def render_drawio(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     svg = await _render_with_limits(_render_drawio_svg, payload)
     return Response(content=svg, media_type="image/svg+xml")
 
 
-def _render_graphviz_svg(source: str, engine: str = "dot", timeout: Optional[int] = None) -> str:
+def _render_graphviz_svg(
+    source: str, engine: str = "dot", timeout: Optional[int] = None
+) -> str:
     """Render Graphviz DOT to SVG using local graphviz CLI.
 
     Supported engines: dot, neato, fdp, circo, twopi, sfdp
@@ -308,7 +324,9 @@ def _render_d2_svg(source: str, timeout: Optional[int] = None) -> str:
             detail="d2 CLI not found. Install: curl -fsSL https://d2lang.com/install.sh | sh -s --",
         )
     except subprocess.CalledProcessError as exc:
-        raise HTTPException(status_code=500, detail=f"D2 render failed: {exc.stderr.decode()}")
+        raise HTTPException(
+            status_code=500, detail=f"D2 render failed: {exc.stderr.decode()}"
+        )
 
 
 @app.post("/render/graphviz")
@@ -322,14 +340,18 @@ async def render_graphviz(
     Query param 'engine' can be: dot (default), neato, fdp, circo, twopi, sfdp
     """
     svg = await _render_with_limits(
-        lambda text, timeout=RENDER_TIMEOUT: _render_graphviz_svg(text, engine, timeout), payload
+        lambda text, timeout=RENDER_TIMEOUT: _render_graphviz_svg(
+            text, engine, timeout
+        ),
+        payload,
     )
     return Response(content=svg, media_type="image/svg+xml")
 
 
 @app.post("/render/d2")
 async def render_d2(
-    payload: str = Body(..., media_type="text/plain"), _: None = Depends(_require_api_key)
+    payload: str = Body(..., media_type="text/plain"),
+    _: None = Depends(_require_api_key),
 ) -> Response:
     """Render D2 diagram to SVG."""
     svg = await _render_with_limits(_render_d2_svg, payload)
@@ -553,7 +575,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             # Enforce max sessions before creating a new one
             async with SESSION_LOCK:
                 if len(SESSION_AGENTS) >= MAX_SESSIONS:
-                    await websocket.send_text("[error] Session limit reached, try later.")
+                    await websocket.send_text(
+                        "[error] Session limit reached, try later."
+                    )
                     await websocket.close(code=1013, reason="Session limit reached")
                     return
             session_id = str(uuid.uuid4())
@@ -574,7 +598,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 session_data = SESSION_AGENTS[session_id]
                 agent = session_data["agent"]
                 session_data["last_activity"] = time.time()
-                session_data["connection_count"] = session_data.get("connection_count", 0) + 1
+                session_data["connection_count"] = (
+                    session_data.get("connection_count", 0) + 1
+                )
                 session_token = session_data.get("session_token", session_token)
                 logger.info(
                     f"Reusing existing agent for session {session_id} (connection #{session_data['connection_count']})"
@@ -601,9 +627,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     )
                     session_initialized = True  # Mark as initialized
                 except Exception as e:
-                    logger.error(f"Failed to create AgentOrchestrator: {e}", exc_info=True)
-                    await websocket.send_text(f"[error] Could not initialize agent: {str(e)}")
-                    await websocket.close(code=1011, reason="Agent initialization failed")
+                    logger.error(
+                        f"Failed to create AgentOrchestrator: {e}", exc_info=True
+                    )
+                    await websocket.send_text(
+                        f"[error] Could not initialize agent: {str(e)}"
+                    )
+                    await websocket.close(
+                        code=1011, reason="Agent initialization failed"
+                    )
                     return
 
         # Start heartbeat loop
@@ -649,7 +681,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
                 except Exception as e:
                     logger.error(
-                        f"Session {session_id}: Error during agent response: {e}", exc_info=True
+                        f"Session {session_id}: Error during agent response: {e}",
+                        exc_info=True,
                     )
                     await websocket.send_text(
                         f"[error] An error occurred while processing your request: {str(e)}"
@@ -667,7 +700,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         logger.info(f"Session {session_id}: WebSocket connection disconnected.")
     except Exception as e:
-        logger.error(f"Session {session_id}: Unexpected error in WebSocket: {e}", exc_info=True)
+        logger.error(
+            f"Session {session_id}: Unexpected error in WebSocket: {e}", exc_info=True
+        )
         try:
             await websocket.send_text(f"[error] Server error: {str(e)}")
         except (WebSocketDisconnect, RuntimeError) as send_error:
@@ -685,11 +720,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         if session_id and session_initialized:
             async with SESSION_LOCK:
                 if session_id in SESSION_AGENTS:
-                    current_count = SESSION_AGENTS[session_id].get("connection_count", 1)
+                    current_count = SESSION_AGENTS[session_id].get(
+                        "connection_count", 1
+                    )
                     new_count = max(0, current_count - 1)  # Prevent negative counts
                     SESSION_AGENTS[session_id]["connection_count"] = new_count
                     logger.debug(
                         f"Session {session_id}: Connection count decremented to {new_count}"
                     )
 
-        logger.info(f"Session {session_id}: WebSocket connection closed and cleaned up.")
+        logger.info(
+            f"Session {session_id}: WebSocket connection closed and cleaned up."
+        )

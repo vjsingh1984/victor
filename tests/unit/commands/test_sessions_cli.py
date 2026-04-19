@@ -239,7 +239,10 @@ class TestSessionsCommand:
         ), f"Expected 2 sample sessions but found {len(sample_exported)}. Total exported: {len(exported)}"
 
         # Check metadata structure
-        assert sample_exported[0]["metadata"]["session_id"] in ["myproj-9Kx7Z2", "myproj-9Kx8A3B"]
+        assert sample_exported[0]["metadata"]["session_id"] in [
+            "myproj-9Kx7Z2",
+            "myproj-9Kx8A3B",
+        ]
 
 
 class TestSessionsChatFlags:

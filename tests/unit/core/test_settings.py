@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 from unittest.mock import patch, mock_open, MagicMock
 
+import pytest
 from pydantic import SecretStr
 
 from victor.config.settings import (
@@ -146,15 +147,30 @@ class TestProfileConfig:
 class TestSettings:
     """Tests for Settings class."""
 
+    @pytest.fixture(autouse=True)
+    def _bypass_account_manager(self, tmp_path):
+        """Force get_provider_settings to use legacy ProviderConfigRegistry.
+
+        On developer machines ~/.victor/config.yaml exists, causing
+        AccountManager to return a different dict shape than the legacy
+        path these tests exercise.
+        """
+        fake_config = tmp_path / "nonexistent_config.yaml"
+        with patch("victor.config.accounts.get_account_manager") as mock_get_am:
+            mock_am = MagicMock()
+            mock_am.config_path = fake_config  # .exists() → False
+            mock_get_am.return_value = mock_am
+            yield
+
     def test_settings_defaults(self):
         """Test Settings with default values."""
         settings = Settings()
 
         # Note: default_provider is "ollama" in Settings class
-        assert settings.default_provider == "ollama"
-        assert settings.default_model == "qwen3-coder:30b"
-        assert settings.default_temperature == 0.7
-        assert settings.default_max_tokens == 4096
+        assert settings.provider.default_provider == "ollama"
+        assert settings.provider.default_model == "qwen3-coder:30b"
+        assert settings.provider.default_temperature == 0.7
+        assert settings.provider.default_max_tokens == 4096
         assert settings.log_level == "INFO"
         assert settings.airgapped_mode is False
         assert settings.stream_responses is True
@@ -293,7 +309,9 @@ class TestSettings:
 
             # Mock the model selection to return a predictable value
             with patch.object(
-                Settings, "_choose_default_lmstudio_model", return_value="qwen2.5-coder:7b"
+                Settings,
+                "_choose_default_lmstudio_model",
+                return_value="qwen2.5-coder:7b",
             ):
                 profiles = Settings.load_profiles()
 
@@ -588,7 +606,7 @@ class TestLoadSettings:
 
         assert isinstance(settings, Settings)
         # Note: default_provider is "ollama" in Settings class
-        assert settings.default_provider == "ollama"
+        assert settings.provider.default_provider == "ollama"
 
 
 class TestToolSelectionValidation:

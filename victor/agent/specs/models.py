@@ -94,6 +94,22 @@ class AgentCapabilities:
     can_execute_code: bool = False
     can_modify_files: bool = False
 
+    def resolve_skills(self, registry: Any) -> List[Any]:
+        """Resolve skill names to SkillDefinition objects.
+
+        Args:
+            registry: A SkillRegistry instance
+
+        Returns:
+            List of resolved SkillDefinition objects for skills in this set
+        """
+        resolved = []
+        for skill_name in sorted(self.skills):
+            skill = registry.get_optional(skill_name)
+            if skill is not None:
+                resolved.append(skill)
+        return resolved
+
     def allows_tool(self, tool_name: str) -> bool:
         """Check if a tool is allowed."""
         if tool_name in self.tools:

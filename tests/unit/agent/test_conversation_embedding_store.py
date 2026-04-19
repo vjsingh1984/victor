@@ -94,7 +94,9 @@ class TestConversationEmbeddingSearchResult:
 
     def test_creation(self):
         """Test creating a search result."""
-        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import (
+            ConversationEmbeddingSearchResult,
+        )
 
         result = ConversationEmbeddingSearchResult(
             message_id="msg_123",
@@ -109,7 +111,9 @@ class TestConversationEmbeddingSearchResult:
 
     def test_repr(self):
         """Test string representation."""
-        from victor.agent.conversation_embedding_store import ConversationEmbeddingSearchResult
+        from victor.agent.conversation_embedding_store import (
+            ConversationEmbeddingSearchResult,
+        )
 
         result = ConversationEmbeddingSearchResult(
             message_id="msg_123",
@@ -462,7 +466,8 @@ class TestConversationStoreIntegration:
         Note: The embedding store uses lazy embedding, so messages added to
         ConversationStore are only embedded when search_similar is called.
         """
-        from victor.agent.conversation_memory import ConversationStore, MessageRole
+        from victor.agent.conversation.store import ConversationStore
+        from victor.agent.conversation.types import MessageRole
         from victor.agent.conversation_embedding_store import ConversationEmbeddingStore
 
         mock_service = MockEmbeddingService()

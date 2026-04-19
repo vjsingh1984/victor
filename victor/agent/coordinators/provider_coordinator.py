@@ -104,10 +104,11 @@ class RateLimitInfo:
 
 
 class ProviderCoordinator:
-    """Coordinates provider initialization, switching, and health monitoring.
+    """[DEPRECATED] Coordinates provider initialization, switching, and health monitoring.
 
-    This class consolidates provider-related operations that were spread across
-    the orchestrator, providing a unified interface for:
+    This class is being superseded by ProviderService as part of the 
+    state-passed architectural migration. It remains for backward 
+    compatibility with facade-driven components.
 
     1. Provider Management: Switch providers and models with post-switch hooks
     2. Health Monitoring: Track provider health and provide status

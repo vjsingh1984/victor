@@ -510,6 +510,100 @@ class AstIndexerProtocol(NativeAcceleratorProtocol, Protocol):
 
 
 @runtime_checkable
+class TokenCounterProtocol(NativeAcceleratorProtocol, Protocol):
+    """Protocol for counting tokens in text.
+
+    Provides exact and approximate token counting using BPE tokenization.
+    Hot path: Called for every message during context window management.
+    """
+
+    def count_tokens(self, text: str) -> int:
+        """Count tokens using exact BPE tokenization.
+
+        Args:
+            text: Text to count tokens for
+
+        Returns:
+            Number of tokens
+        """
+        ...
+
+    def count_tokens_fast(self, text: str) -> int:
+        """Count tokens using fast approximate method.
+
+        Optimized for speed over accuracy.
+
+        Args:
+            text: Text to count tokens for
+
+        Returns:
+            Approximate number of tokens
+        """
+        ...
+
+    def count_tokens_batch(self, texts: List[str]) -> List[int]:
+        """Count tokens for multiple texts in batch.
+
+        More efficient than calling count_tokens() in a loop.
+
+        Args:
+            texts: List of texts to count tokens for
+
+        Returns:
+            List of token counts, one per input text
+        """
+        ...
+
+
+@runtime_checkable
+class ContextFitterProtocol(NativeAcceleratorProtocol, Protocol):
+    """Protocol for fitting messages into a context window budget.
+
+    Provides message selection and truncation for context window management.
+    Hot path: Called on every LLM invocation to manage context.
+    """
+
+    def fit_context(
+        self,
+        messages: List[Dict[str, Any]],
+        budget: int,
+        strategy: str = "recency",
+        preserve_system: bool = True,
+    ) -> Any:
+        """Fit messages into a token budget.
+
+        Args:
+            messages: List of message dicts with 'role', 'content', and
+                      optionally 'token_count' and 'priority' fields
+            budget: Maximum token budget
+            strategy: Fitting strategy ("recency", "priority", "balanced")
+            preserve_system: Whether to always preserve system messages
+
+        Returns:
+            FitResult with indices of kept messages and statistics
+        """
+        ...
+
+    def truncate_message(
+        self,
+        content: str,
+        max_tokens: int,
+        preserve_lines: bool = True,
+    ) -> str:
+        """Truncate a message to fit within a token limit.
+
+        Args:
+            content: Message content to truncate
+            max_tokens: Maximum number of tokens allowed
+            preserve_lines: Whether to truncate at line boundaries
+
+        Returns:
+            Truncated content string
+        """
+        ...
+
+
+@runtime_checkable
 class ContentHasherProtocol(NativeAcceleratorProtocol, Protocol):
     """Protocol for content hashing with configurable normalization.
 

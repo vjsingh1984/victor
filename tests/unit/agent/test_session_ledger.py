@@ -36,7 +36,11 @@ class TestLedgerEntry:
 
     def test_frozen(self):
         entry = LedgerEntry(
-            timestamp=1000.0, category="decision", key="d1", summary="test", turn_index=1
+            timestamp=1000.0,
+            category="decision",
+            key="d1",
+            summary="test",
+            turn_index=1,
         )
         with pytest.raises(AttributeError):
             entry.summary = "changed"
@@ -114,7 +118,10 @@ class TestUpdateFromToolResult:
     def test_edit_tool_extraction(self):
         ledger = SessionLedger()
         ledger.update_from_tool_result(
-            "edit", {"path": "/src/foo.py", "content": "new content"}, "OK", turn_index=2
+            "edit",
+            {"path": "/src/foo.py", "content": "new content"},
+            "OK",
+            turn_index=2,
         )
         entries = [e for e in ledger.entries if e.category == "file_modified"]
         assert len(entries) == 1

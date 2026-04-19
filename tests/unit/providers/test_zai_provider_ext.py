@@ -87,7 +87,7 @@ async def test_supports_streaming(zai_provider):
 @pytest.mark.asyncio
 async def test_get_context_window(zai_provider):
     """Test context window retrieval."""
-    assert zai_provider.get_context_window("glm-4.7") == 128000
+    assert zai_provider.get_context_window("glm-4.7") == 200000
     assert zai_provider.get_context_window("glm-4.6") == 128000
     assert zai_provider.get_context_window("glm-4.5") == 128000
     assert zai_provider.get_context_window("glm-4.5-air") == 128000
@@ -219,7 +219,10 @@ async def test_chat_with_tools(zai_provider):
             ToolDefinition(
                 name="get_weather",
                 description="Get weather for a location",
-                parameters={"type": "object", "properties": {"location": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                },
             )
         ]
         response = await zai_provider.chat(messages=messages, model="glm-4.7", tools=tools)

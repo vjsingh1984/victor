@@ -236,7 +236,10 @@ class TestToolConfig:
     def test_get_tool_setting(self):
         """get_tool_setting should return tool-specific setting."""
         config = ToolConfig(
-            tool_settings={"docker": {"runtime": "python3.12"}, "git": {"default_branch": "main"}}
+            tool_settings={
+                "docker": {"runtime": "python3.12"},
+                "git": {"default_branch": "main"},
+            }
         )
 
         assert config.get_tool_setting("docker", "runtime") == "python3.12"
@@ -395,7 +398,10 @@ class TestSafetyEnforcer:
         enforcer = SafetyEnforcer(config=SafetyConfig())
         enforcer.add_rule(
             SafetyRule(
-                name="high", description="High", check_fn=lambda op: True, level=SafetyLevel.HIGH
+                name="high",
+                description="High",
+                check_fn=lambda op: True,
+                level=SafetyLevel.HIGH,
             )
         )
         enforcer.add_rule(
@@ -408,7 +414,10 @@ class TestSafetyEnforcer:
         )
         enforcer.add_rule(
             SafetyRule(
-                name="low", description="Low", check_fn=lambda op: True, level=SafetyLevel.LOW
+                name="low",
+                description="Low",
+                check_fn=lambda op: True,
+                level=SafetyLevel.LOW,
             )
         )
 

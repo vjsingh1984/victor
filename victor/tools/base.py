@@ -35,15 +35,45 @@ from victor.tools.enums import (
 # Import metadata classes from separate module
 from victor.tools.metadata import ToolMetadata, ToolMetadataRegistry
 
-# Import registry classes from separate module (for backward compatibility)
-from victor.tools.registry import Hook, HookError, ToolRegistry
-
 # NOTE: Enums (CostTier, Priority, AccessMode, ExecutionCategory, DangerLevel)
 # have been moved to victor/tools/enums.py and are imported above.
 # ToolMetadata and ToolMetadataRegistry have been moved to victor/tools/metadata.py
 # and are imported above.
 # ToolRegistry, Hook, and HookError have been moved to victor/tools/registry.py
-# and are imported above for backward compatibility.
+# Import them with: from victor.tools.registry import ToolRegistry, Hook, HookError
+
+# Import registry classes from canonical location (for backward compatibility with deprecation)
+import warnings as _warnings
+
+# Direct imports for Hook and HookError (no deprecation needed)
+from victor.tools.registry import Hook, HookError  # noqa: F401
+
+# Lazy import with deprecation warning for ToolRegistry
+_ToolRegistry = None
+
+
+def __getattr__(name: str):
+    """Lazy import with deprecation warning for ToolRegistry.
+
+    This provides backward compatibility while warning users to import
+    from the canonical location (victor.tools.registry).
+    """
+    if name == "ToolRegistry":
+        global _ToolRegistry
+        if _ToolRegistry is None:
+            from victor.tools.registry import ToolRegistry as _TR
+
+            _ToolRegistry = _TR
+
+        _warnings.warn(
+            "Direct import of ToolRegistry from victor.tools.base is deprecated. "
+            "Use 'from victor.tools.registry import ToolRegistry' instead. "
+            "This re-export will be removed in version 0.10.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _ToolRegistry
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 @dataclass
@@ -302,7 +332,7 @@ class BaseTool(ABC):
         2. Otherwise, auto-generate metadata from tool properties
 
         This ensures ALL tools can participate in semantic tool selection
-        without requiring manual configuration in tool_knowledge.yaml.
+        without requiring manual configuration files.
 
         Returns:
             ToolMetadata with semantic information for tool selection

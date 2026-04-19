@@ -137,7 +137,7 @@ class AgentNodeExecutor:
                 task=goal,
                 tool_budget=node.tool_budget,
                 allowed_tools=node.allowed_tools,
-                timeout_seconds=int(node.timeout_seconds) if node.timeout_seconds else 300,
+                timeout_seconds=(int(node.timeout_seconds) if node.timeout_seconds else 300),
                 disable_embeddings=getattr(node, "disable_embeddings", False),
             )
         except Exception as e:

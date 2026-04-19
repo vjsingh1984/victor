@@ -236,7 +236,10 @@ class TestFallbackParsingMixinIntegration:
 
     def test_parse_python_call_from_content(self):
         """Test the mixin method for Python call parsing."""
-        from victor.agent.tool_calling.base import FallbackParsingMixin, ToolCallParseResult
+        from victor.agent.tool_calling.base import (
+            FallbackParsingMixin,
+            ToolCallParseResult,
+        )
 
         # Create a class that uses the mixin
         class TestMixin(FallbackParsingMixin):

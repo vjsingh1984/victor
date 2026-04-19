@@ -59,7 +59,7 @@ class TestConfigValidateCommand:
     def test_config_validate_basic(self, tmp_path):
         """Test basic config validation with existing config."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text("profiles:\n  default:\n    provider: ollama\n")
 
@@ -76,7 +76,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate"])
             # Should pass or fail gracefully
@@ -85,7 +88,7 @@ class TestConfigValidateCommand:
     def test_config_validate_verbose_flag(self, tmp_path):
         """Test verbose output flag."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text("profiles:\n  default:\n    provider: ollama\n")
 
@@ -102,7 +105,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code in [0, 1]
@@ -115,7 +121,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
@@ -124,7 +133,7 @@ class TestConfigValidateCommand:
     def test_config_validate_invalid_yaml(self, tmp_path):
         """Test handling of invalid YAML file."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         # Write invalid YAML that will cause a parse error
         profiles_file.write_text("profiles:\n  default:\n    - invalid: [unclosed")
@@ -134,7 +143,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
@@ -143,7 +155,7 @@ class TestConfigValidateCommand:
     def test_config_validate_missing_profiles_section(self, tmp_path):
         """Test handling of config without profiles section."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         # Write YAML without profiles section
         profiles_file.write_text("other_key: value\n")
@@ -153,7 +165,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
@@ -162,7 +177,7 @@ class TestConfigValidateCommand:
     def test_config_validate_invalid_temperature(self, tmp_path):
         """Test detection of invalid temperature value."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text("profiles:\n  invalid:\n    provider: ollama\n")
 
@@ -180,7 +195,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
@@ -189,7 +207,7 @@ class TestConfigValidateCommand:
     def test_config_validate_invalid_max_tokens(self, tmp_path):
         """Test detection of invalid max_tokens value."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text("profiles:\n  invalid:\n    provider: ollama\n")
 
@@ -207,7 +225,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
@@ -216,7 +237,7 @@ class TestConfigValidateCommand:
     def test_config_validate_unknown_provider(self, tmp_path):
         """Test detection of unknown provider."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text("profiles:\n  unknown:\n    provider: fake_provider\n")
 
@@ -234,7 +255,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 1
@@ -243,7 +267,7 @@ class TestConfigValidateCommand:
     def test_config_validate_cloud_provider_missing_api_key(self, tmp_path):
         """Test warning for cloud provider without API key."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text("profiles:\n  cloud:\n    provider: anthropic\n")
 
@@ -261,7 +285,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             # Should pass with warning (exit code 0)
@@ -271,7 +298,7 @@ class TestConfigValidateCommand:
     def test_config_validate_cloud_provider_with_api_key(self, tmp_path):
         """Test cloud provider with API key configured."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text("profiles:\n  cloud:\n    provider: anthropic\n")
 
@@ -289,7 +316,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 0
@@ -298,7 +328,7 @@ class TestConfigValidateCommand:
     def test_config_validate_multiple_profiles(self, tmp_path):
         """Test validation of multiple profiles."""
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         profiles_file = config_dir / "profiles.yaml"
         profiles_file.write_text(
             "profiles:\n  local:\n    provider: ollama\n  cloud:\n    provider: anthropic\n"
@@ -324,7 +354,10 @@ class TestConfigValidateCommand:
 
         with (
             patch("victor.ui.commands.config.load_settings", return_value=mock_settings),
-            patch("victor.ui.commands.config.validate_configuration", return_value=_VALID_RESULT),
+            patch(
+                "victor.ui.commands.config.validate_configuration",
+                return_value=_VALID_RESULT,
+            ),
         ):
             result = runner.invoke(app, ["config", "validate", "--verbose"])
             assert result.exit_code == 0

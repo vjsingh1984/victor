@@ -234,7 +234,9 @@ class IntelligentAgentPipeline:
                     f"model={self.model!r} (type={type(self.model).__name__}), "
                     f"profile_name={self.profile_name!r} (type={type(self.profile_name).__name__})"
                 )
-                from victor.agent.intelligent_prompt_builder import IntelligentPromptBuilder
+                from victor.agent.intelligent_prompt_builder import (
+                    IntelligentPromptBuilder,
+                )
 
                 self._prompt_builder = await IntelligentPromptBuilder.create(
                     self.provider_name, self.model, self.profile_name

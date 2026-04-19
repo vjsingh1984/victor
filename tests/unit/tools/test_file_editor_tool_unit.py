@@ -24,18 +24,26 @@ from pathlib import Path
 
 from victor.tools.file_editor_tool import edit
 
-try:
-    from victor.tools.file_editor_tool import _is_file_editor_available
 
-    _has_victor_coding = _is_file_editor_available()
-except Exception:
-    _has_victor_coding = False
+def _check_editor():
+    """Check at runtime (not import time) if enhanced editor is available."""
+    try:
+        from victor.tools.file_editor_tool import _is_file_editor_available
 
-# Mark all tests in this module as integration tests (require victor-coding)
-pytestmark = [
-    pytest.mark.integration,
-    pytest.mark.skipif(not _has_victor_coding, reason="Requires victor-coding package"),
-]
+        return _is_file_editor_available()
+    except Exception:
+        return False
+
+
+# These tests require the enhanced editor (EditorProtocol registered via vertical)
+pytestmark = [pytest.mark.integration]
+
+
+@pytest.fixture(autouse=True)
+def skip_without_editor():
+    """Skip if enhanced editor is not registered (runtime check each test)."""
+    if not _check_editor():
+        pytest.skip("Enhanced editor not registered (requires vertical)")
 
 
 class TestEditFiles:
@@ -80,7 +88,13 @@ class TestEditFiles:
     async def test_edit_files_modify_nonexistent_file(self):
         """Test modifying nonexistent file."""
         result = await edit(
-            ops=[{"type": "modify", "path": "/nonexistent/file.txt", "content": "new content"}]
+            ops=[
+                {
+                    "type": "modify",
+                    "path": "/nonexistent/file.txt",
+                    "content": "new content",
+                }
+            ]
         )
         assert result["success"] is False
 
@@ -229,7 +243,14 @@ class TestReplaceOperation:
 
         try:
             result = await edit(
-                ops=[{"type": "replace", "path": temp_path, "old_str": "foo", "new_str": "baz"}]
+                ops=[
+                    {
+                        "type": "replace",
+                        "path": temp_path,
+                        "old_str": "foo",
+                        "new_str": "baz",
+                    }
+                ]
             )
             # Should fail because "foo" is ambiguous
             assert result["success"] is False

@@ -10,13 +10,14 @@ This script adds:
 
 import re
 
+
 def add_runtime_check_function():
     """Add the _check_runtime_initialization function after _registry_totals."""
     with open("scripts/benchmark_startup_kpi.py", "r") as f:
         content = f.read()
 
     # Find the _registry_totals function and add our new function after it
-    registry_totals_end_pattern = r'(            return attempted, applied\n\n)'
+    registry_totals_end_pattern = r"(            return attempted, applied\n\n)"
     runtime_check_function = r'''\1        def _check_runtime_initialization(orchestrator):
             """Check if coordination/interaction runtime components are lazily initialized."""
             runtime_status = {{}}
@@ -69,7 +70,9 @@ def add_runtime_check_function():
 
 '''
 
-    content = re.sub(registry_totals_end_pattern, runtime_check_function, content, count=1)
+    content = re.sub(
+        registry_totals_end_pattern, runtime_check_function, content, count=1
+    )
 
     with open("scripts/benchmark_startup_kpi.py", "w") as f:
         f.write(content)
@@ -84,15 +87,15 @@ def update_measure_once_call():
 
     # Find the line where attempted_total, applied_total are returned
     # and add runtime_init_status
-    old_return = r'            attempted_total, applied_total = _registry_totals\(registry_metrics\)\n            await agent\.close\(\)\n            return elapsed_ms, runtime_flags, registry_metrics, attempted_total, applied_total'
+    old_return = r"            attempted_total, applied_total = _registry_totals\(registry_metrics\)\n            await agent\.close\(\)\n            return elapsed_ms, runtime_flags, registry_metrics, attempted_total, applied_total"
 
-    new_return = r'''            attempted_total, applied_total = _registry_totals(registry_metrics)
+    new_return = r"""            attempted_total, applied_total = _registry_totals(registry_metrics)
 
             # Check runtime initialization status
             runtime_init_status = _check_runtime_initialization(orchestrator)
 
             await agent.close()
-            return elapsed_ms, runtime_flags, registry_metrics, attempted_total, applied_total, runtime_init_status'''
+            return elapsed_ms, runtime_flags, registry_metrics, attempted_total, applied_total, runtime_init_status"""
 
     content = re.sub(old_return, new_return, content, count=1)
 
@@ -108,10 +111,10 @@ def update_cold_unpacking():
         content = f.read()
 
     # Update the cold_ms unpacking
-    old_cold = r'            cold_ms, runtime_flags, registry_metrics, attempted_total, applied_total = \(\n                await _measure_once\(vertical_cls\)\n            \)'
-    new_cold = r'''            cold_ms, runtime_flags, registry_metrics, attempted_total, applied_total, cold_runtime_init = (
+    old_cold = r"            cold_ms, runtime_flags, registry_metrics, attempted_total, applied_total = \(\n                await _measure_once\(vertical_cls\)\n            \)"
+    new_cold = r"""            cold_ms, runtime_flags, registry_metrics, attempted_total, applied_total, cold_runtime_init = (
                 await _measure_once(vertical_cls)
-            )'''
+            )"""
 
     content = re.sub(old_cold, new_cold, content, count=1)
 
@@ -127,8 +130,8 @@ def update_warm_loop():
         content = f.read()
 
     # Update warm loop to discard runtime_init_status
-    old_warm = r'            for _ in range\(warm_iters\):\n                elapsed_ms, _, _, _, _ = await _measure_once\(vertical_cls\)'
-    new_warm = r'            for _ in range(warm_iters):\n                elapsed_ms, _, _, _, _, _ = await _measure_once(vertical_cls)'
+    old_warm = r"            for _ in range\(warm_iters\):\n                elapsed_ms, _, _, _, _ = await _measure_once\(vertical_cls\)"
+    new_warm = r"            for _ in range(warm_iters):\n                elapsed_ms, _, _, _, _, _ = await _measure_once(vertical_cls)"
 
     content = re.sub(old_warm, new_warm, content, count=1)
 
@@ -144,13 +147,13 @@ def update_json_output():
         content = f.read()
 
     # Add runtime_initialization_status to the JSON output
-    old_json = r'''                        "framework_registry_applied_total": applied_total,
-                    \}\s*\)\s*\)\s*'''
-    new_json = r'''                        "framework_registry_applied_total": applied_total,
+    old_json = r"""                        "framework_registry_applied_total": applied_total,
+                    \}\s*\)\s*\)\s*"""
+    new_json = r"""                        "framework_registry_applied_total": applied_total,
                         "runtime_initialization_status": cold_runtime_init,
                     }}
                 )
-            )'''
+            )"""
 
     content = re.sub(old_json, new_json, content, count=1)
 
@@ -166,10 +169,10 @@ def update_return_dict():
         content = f.read()
 
     # Find the line with "framework_registry_applied_total" and add runtime_initialization_status after it
-    old_line = r'''        "framework_registry_applied_total": int\(payload\.get\("framework_registry_applied_total", 0\)\),\n    \}'''
-    new_line = r'''        "framework_registry_applied_total": int(payload.get("framework_registry_applied_total", 0)),
+    old_line = r"""        "framework_registry_applied_total": int\(payload\.get\("framework_registry_applied_total", 0\)\),\n    \}"""
+    new_line = r"""        "framework_registry_applied_total": int(payload.get("framework_registry_applied_total", 0)),
         "runtime_initialization_status": dict(payload.get("runtime_initialization_status", {})),
-    }'''
+    }"""
 
     content = re.sub(old_line, new_line, content, count=1)
 
@@ -193,7 +196,9 @@ def main():
 
         print("\nSuccessfully added runtime initialization checking!")
         print("You still need to manually add:")
-        print("1. CLI arguments: --require-coordination-runtime-lazy, --require-interaction-runtime-lazy")
+        print(
+            "1. CLI arguments: --require-coordination-runtime-lazy, --require-interaction-runtime-lazy"
+        )
         print("2. _collect_runtime_lazy_expectations function")
         print("3. _evaluate_runtime_lazy_expectation_failures function")
         print("4. Wire up the validation in main()")
@@ -201,6 +206,7 @@ def main():
     except Exception as e:
         print(f"\nError: {e}")
         import traceback
+
         traceback.print_exc()
 
 

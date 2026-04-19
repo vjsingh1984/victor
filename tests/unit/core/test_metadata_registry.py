@@ -468,7 +468,13 @@ class TestScoredKeywordMatching:
         registry.register(
             MockTool(
                 name="scan",
-                keywords=["vulnerability", "exploit", "penetration", "assessment", "audit"],
+                keywords=[
+                    "vulnerability",
+                    "exploit",
+                    "penetration",
+                    "assessment",
+                    "audit",
+                ],
             )
         )
 

@@ -52,7 +52,11 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
     from victor.workflows.definition import ComputeNode
-    from victor.workflows.executor import NodeResult, ExecutorNodeStatus, WorkflowContext
+    from victor.workflows.executor import (
+        NodeResult,
+        ExecutorNodeStatus,
+        WorkflowContext,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -766,7 +770,7 @@ class CodeTesterHandler:
 
             return NodeResult(
                 node_id=node.id,
-                status=ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED,
+                status=(ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED),
                 output=output,
                 duration_seconds=time.time() - start_time,
                 tool_calls_used=1,
@@ -874,7 +878,7 @@ class SyntaxCheckHandler:
                     output["valid"] = result.success if hasattr(result, "success") else False
                     if not output["valid"]:
                         output["errors"].append(
-                            {"message": result.output if hasattr(result, "output") else ""}
+                            {"message": (result.output if hasattr(result, "output") else "")}
                         )
 
             output_key = node.output_key or node.id

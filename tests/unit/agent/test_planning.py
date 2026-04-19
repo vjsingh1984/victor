@@ -49,7 +49,14 @@ class TestStepStatus:
 
     def test_all_statuses_defined(self):
         """Verify all expected statuses exist."""
-        expected = {"PENDING", "IN_PROGRESS", "COMPLETED", "FAILED", "SKIPPED", "BLOCKED"}
+        expected = {
+            "PENDING",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "FAILED",
+            "SKIPPED",
+            "BLOCKED",
+        }
         actual = {s.name for s in StepStatus}
         assert actual == expected
 
@@ -70,7 +77,14 @@ class TestStepType:
 
     def test_all_types_defined(self):
         """Verify all expected types exist."""
-        expected = {"RESEARCH", "PLANNING", "IMPLEMENTATION", "TESTING", "REVIEW", "DEPLOYMENT"}
+        expected = {
+            "RESEARCH",
+            "PLANNING",
+            "IMPLEMENTATION",
+            "TESTING",
+            "REVIEW",
+            "DEPLOYMENT",
+        }
         actual = {t.name for t in StepType}
         assert actual == expected
 
@@ -555,9 +569,19 @@ class TestPlanningIntegration:
             goal="Build feature",
             steps=[
                 PlanStep(id="a", description="Research", step_type=StepType.RESEARCH),
-                PlanStep(id="b", description="Plan", depends_on=["a"], step_type=StepType.PLANNING),
+                PlanStep(
+                    id="b",
+                    description="Plan",
+                    depends_on=["a"],
+                    step_type=StepType.PLANNING,
+                ),
                 PlanStep(id="c", description="Build", depends_on=["b"]),
-                PlanStep(id="d", description="Test", depends_on=["c"], step_type=StepType.TESTING),
+                PlanStep(
+                    id="d",
+                    description="Test",
+                    depends_on=["c"],
+                    step_type=StepType.TESTING,
+                ),
             ],
         )
 

@@ -275,6 +275,49 @@ RESEARCH_PROFILE = ProfileTemplate(
     },
 )
 
+BENCHMARK_PROFILE = ProfileTemplate(
+    name="benchmark",
+    display_name="Benchmark Testbed",
+    description=(
+        "Cloud API testbed for running benchmarks (SWE-bench, HumanEval, MBPP). "
+        "Uses OAuth authentication to avoid direct API costs. "
+        "High tool budget and generous timeouts for evaluation runs."
+    ),
+    level=ProfileLevel.EXPERT,
+    settings={
+        "default_provider": "openai",
+        "default_model": "gpt-5.4-mini",
+        "default_temperature": 0.3,  # Low temp for deterministic benchmark runs
+        "default_max_tokens": 16384,
+        # High tool budget for benchmark tasks
+        "fallback_max_tools": 20,
+        # All optimizations
+        "framework_preload_enabled": True,
+        "http_connection_pool_enabled": True,
+        "tool_selection_cache_enabled": True,
+        "tool_deduplication_enabled": True,
+        # Expert tool selection (cloud tier)
+        "tool_selection": {
+            "model_size_tier": "cloud",
+            "base_threshold": 0.65,
+            "base_max_tools": 20,
+            "adaptive": True,
+        },
+        # Generous thresholds for benchmark evaluation
+        "loop_repeat_threshold": 4,
+        "max_continuation_prompts": 3,
+        "max_tool_calls_per_turn": 15,
+        "timeout": 300,
+        "session_idle_timeout": 7200,
+    },
+    provider_settings={
+        "openai": {
+            "auth_mode": "oauth",
+            "description": "GPT-5.4 Mini via OAuth (ChatGPT subscription, no API costs)",
+        },
+    },
+)
+
 # All available profiles
 PROFILES: Dict[str, ProfileTemplate] = {
     "basic": BASIC_PROFILE,
@@ -282,6 +325,7 @@ PROFILES: Dict[str, ProfileTemplate] = {
     "expert": EXPERT_PROFILE,
     "coding": CODING_PROFILE,
     "research": RESEARCH_PROFILE,
+    "benchmark": BENCHMARK_PROFILE,
 }
 
 
@@ -570,10 +614,14 @@ def get_current_profile(config_dir: Optional[Path] = None) -> Optional[str]:
         max_tools = settings.get("fallback_max_tools", 0)
         preload = settings.get("framework_preload_enabled", False)
 
+        provider = settings.get("default_provider", "")
+
         if max_tools == 5 and preload:
             return "basic"
         elif max_tools == 10 and preload:
             return "advanced"
+        elif max_tools == 20 and preload and provider == "openai":
+            return "benchmark"
         elif max_tools == 20 and preload:
             return "expert"
 

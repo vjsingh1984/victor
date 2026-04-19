@@ -79,7 +79,15 @@ class CodeCorrectionConfig:
 
     code_argument_names: Set[str] = field(
         default_factory=lambda: frozenset(
-            {"code", "python_code", "content", "source", "script", "new_content", "file_content"}
+            {
+                "code",
+                "python_code",
+                "content",
+                "source",
+                "script",
+                "new_content",
+                "file_content",
+            }
         )
     )
 
@@ -186,7 +194,10 @@ class CodeCorrectionMiddleware:
 
         if not code_arg:
             return CorrectionResult(
-                "", "", CodeValidationResult(True, Language.UNKNOWN, True, True, (), ()), False
+                "",
+                "",
+                CodeValidationResult(True, Language.UNKNOWN, True, True, (), ()),
+                False,
             )
 
         arg_name, code = code_arg

@@ -24,7 +24,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
-from victor.workflows.executors.factory import NodeExecutorFactory as SharedNodeExecutorFactory
+from victor.workflows.executors.factory import (
+    NodeExecutorFactory as SharedNodeExecutorFactory,
+)
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator

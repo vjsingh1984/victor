@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.observability.integration import ObservabilityIntegration
     from victor.core.verticals.base import VerticalBase, VerticalConfig
+    from victor.observability.debouncing.debouncer import SessionStartDebouncer
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,7 @@ class FrameworkShim:
         - Applies vertical configuration (tools, stages, system prompt)
         - Provides session ID generation and propagation
         - Maintains 100% backward compatibility
+        - Includes event debouncing to prevent log bloat
 
     Attributes:
         orchestrator: Created orchestrator instance (after create_orchestrator())
@@ -156,6 +158,24 @@ class FrameworkShim:
         self._orchestrator: Optional["AgentOrchestrator"] = None
         self._observability: Optional["ObservabilityIntegration"] = None
         self._vertical_config: Optional["VerticalConfig"] = None
+        # Instance-level debouncer (loads from settings)
+        self._debouncer: Optional["SessionStartDebouncer"] = None
+
+    def _get_debouncer(self) -> "SessionStartDebouncer":
+        """Get or create the session start debouncer for this instance.
+
+        The debouncer is created on first access and configured from settings.
+
+        Returns:
+            SessionStartDebouncer instance configured from settings.
+        """
+        if self._debouncer is None:
+            from victor.observability.debouncing import SessionStartDebouncer, DebounceConfig
+
+            # Load config from settings (with fallback to defaults)
+            config = DebounceConfig.from_settings(self._settings)
+            self._debouncer = SessionStartDebouncer(config)
+        return self._debouncer
 
     def _resolve_vertical(
         self, vertical: Optional[Union[Type["VerticalBase"], str]]
@@ -229,9 +249,82 @@ class FrameworkShim:
         if self._enable_observability:
             self._wire_observability()
 
+        # Step 4: Initialize skill auto-selection
+        await self._initialize_skill_matcher()
+
         logger.debug(f"FrameworkShim created orchestrator: session_id={self._session_id}")
 
         return self._orchestrator
+
+    async def _initialize_skill_matcher(self) -> None:
+        """Initialize embedding-based skill auto-selection on the orchestrator.
+
+        Discovers all skills from verticals + entry points + user YAML,
+        pre-embeds them, and attaches the matcher to the orchestrator.
+        Silently skips if disabled or on any error.
+        """
+        try:
+            # Check if auto-selection is enabled via settings
+            if not getattr(self._settings, "skill_auto_select_enabled", True):
+                return
+
+            from victor.framework.skill_matcher import SkillMatcher
+            from victor.framework.skills import SkillRegistry
+
+            registry = SkillRegistry()
+
+            # Load from discovered verticals
+            try:
+                from victor.core.verticals.vertical_loader import VerticalLoader
+
+                loader = VerticalLoader()
+                loader.discover_verticals()
+                for _name, vertical_cls in loader._discovered_verticals.items():
+                    if hasattr(vertical_cls, "get_skills"):
+                        try:
+                            registry.from_vertical(vertical_cls)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+            # Load from entry points + user YAML
+            try:
+                registry.from_entry_points()
+            except Exception:
+                pass
+            try:
+                registry.from_user_skills()
+            except Exception:
+                pass
+
+            if not registry.list_all():
+                return
+
+            # Build thresholds from settings
+            high_t = getattr(self._settings, "skill_auto_select_high_threshold", 0.65)
+            low_t = getattr(self._settings, "skill_auto_select_low_threshold", 0.45)
+            use_edge = getattr(self._settings, "skill_auto_select_use_edge_fallback", True)
+
+            matcher = SkillMatcher(
+                high_threshold=high_t,
+                low_threshold=low_t,
+                use_edge_fallback=use_edge,
+            )
+            await matcher.initialize(registry)
+            self._orchestrator._skill_matcher = matcher
+
+            # Attach analytics tracker
+            from victor.framework.skill_analytics import SkillAnalytics
+
+            self._orchestrator._skill_analytics = SkillAnalytics()
+
+            logger.info(
+                "Skill auto-selection initialized: %d skills indexed",
+                len(registry.list_all()),
+            )
+        except Exception:
+            logger.debug("Skill auto-selection initialization skipped", exc_info=True)
 
     def _apply_vertical(self, vertical: Type["VerticalBase"]) -> None:
         """Apply vertical configuration to orchestrator.
@@ -345,11 +438,29 @@ class FrameworkShim:
     def emit_session_start(self, metadata: Optional[dict] = None) -> None:
         """Emit a session start event if observability is enabled.
 
+        This method includes adaptive debouncing to prevent log bloat from
+        duplicate session_start events that occur within a short time window.
+
         Args:
             metadata: Optional session metadata.
         """
-        if self._observability:
-            self._observability.on_session_start(metadata or {})
+        if not self._observability:
+            return
+
+        # Prepare metadata with session_id (create a copy to avoid modifying caller's dict)
+        event_metadata = dict(metadata or {})  # Create a shallow copy
+        event_metadata.setdefault("session_id", self._session_id)
+
+        # Apply debouncing to prevent log bloat
+        debouncer = self._get_debouncer()
+
+        if not debouncer.should_emit(self._session_id, event_metadata):
+            logger.debug(f"Debounced duplicate session_start: {self._session_id}")
+            return
+
+        # Emit the event
+        self._observability.on_session_start(event_metadata)
+        debouncer.record(self._session_id, event_metadata)
 
     def emit_session_end(
         self,

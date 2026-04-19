@@ -20,7 +20,7 @@ Tests for model metadata parsing, known model lookups, and message serialization
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock
-from victor.agent.conversation_memory import (
+from victor.agent.conversation.store import (
     MessageRole,
     MessagePriority,
     ModelFamily,
@@ -48,7 +48,7 @@ class TestMessageRole:
         assert MessageRole.USER.value == "user"
         assert MessageRole.ASSISTANT.value == "assistant"
         assert MessageRole.TOOL_CALL.value == "tool_call"
-        assert MessageRole.TOOL_RESULT.value == "tool_result"
+        assert MessageRole.TOOL.value == "tool"
 
 
 # =============================================================================
@@ -545,7 +545,7 @@ class TestConversationMessageSerialization:
         """Convert tool result to provider format."""
         msg = ConversationMessage(
             id="msg-1",
-            role=MessageRole.TOOL_RESULT,
+            role=MessageRole.TOOL,
             content="Result",
             timestamp=datetime.now(),
             token_count=6,
@@ -554,7 +554,7 @@ class TestConversationMessageSerialization:
 
         provider_format = msg.to_provider_format()
 
-        assert provider_format["role"] == "assistant"  # Tool results map to assistant
+        assert provider_format["role"] == "tool"  # Per OpenAI spec, tool results keep role=tool
         assert provider_format["tool_call_id"] == "call-123"
 
     def test_to_dict_roundtrip(self):
@@ -578,7 +578,9 @@ class TestConversationMessageSerialization:
         restored = ConversationMessage.from_dict(msg_dict)
 
         assert restored.id == original.id
-        assert restored.role == original.role
+        # role is normalized to string after roundtrip (enum → str via to_dict)
+        original_role = original.role.value if isinstance(original.role, MessageRole) else original.role
+        assert restored.role == original_role
         assert restored.content == original.content
         assert restored.priority == original.priority
         assert restored.tool_name == original.tool_name

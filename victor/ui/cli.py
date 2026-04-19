@@ -19,7 +19,7 @@ from rich.console import Console
 from typing import Optional
 
 from victor import __version__
-from victor.core.utils.coding_support import load_coding_analyze_app
+from victor.core.utils.capability_loader import load_coding_analyze_app
 from victor.ui.commands.benchmark import benchmark_app
 from victor.ui.commands.capabilities import capabilities_app
 from victor.ui.commands.chat import chat_app, _run_default_interactive
@@ -46,9 +46,12 @@ from victor.ui.commands.tools import tools_app
 from victor.ui.commands.scaffold import scaffold_app
 from victor.ui.commands.scheduler import scheduler_app
 from victor.ui.commands.sessions import sessions_app
+from victor.ui.commands.db import db_app
 from victor.ui.commands.vertical import vertical_app
 from victor.ui.commands.plugin import plugin_app
+from victor.ui.commands.skills import skills_app
 from victor.ui.commands.workflow import workflow_app
+from victor.ui.commands.ab_testing import ab_app
 
 # Import new unified auth command
 from victor.ui.commands.auth import auth_app
@@ -67,6 +70,18 @@ console = Console()
 def doctor_command(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed diagnostic output"),
     fix: bool = typer.Option(False, "--fix", "-f", help="Automatically fix common issues"),
+    config: bool = typer.Option(
+        False,
+        "--config",
+        "-c",
+        help="Also validate configuration files (profiles.yaml, settings)",
+    ),
+    providers: bool = typer.Option(
+        False,
+        "--providers",
+        "-p",
+        help="Also check provider connectivity",
+    ),
 ) -> None:
     """Run system diagnostics and troubleshooting.
 
@@ -77,49 +92,179 @@ def doctor_command(
     - Tool availability
     - File permissions
     - Performance optimizations
-    """
-    import sys
 
+    Use --config to include configuration validation.
+    Use --providers to include provider health checks.
+    """
     exit_code = run_doctor(verbose=verbose, fix=fix)
+
+    if config:
+        console.print("\n[bold]Configuration Validation[/]")
+        console.print("-" * 50)
+        try:
+            from victor.config.settings import load_settings
+            from victor.config.validation import (
+                validate_configuration,
+                format_validation_result,
+            )
+
+            settings = load_settings()
+            result = validate_configuration(settings)
+            print(format_validation_result(result))
+            if not result.is_valid:
+                exit_code = 1
+        except Exception as e:
+            console.print(f"[red]\u2717 Config validation failed:[/] {e}")
+            exit_code = 1
+
+    if providers:
+        console.print("\n[bold]Provider Health Checks[/]")
+        console.print("-" * 50)
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+            profiles = settings.load_profiles()
+
+            # Collect unique providers from profiles
+            seen_providers = set()
+            for _name, profile_config in profiles.items():
+                prov = profile_config.provider.lower()
+                if prov not in seen_providers:
+                    seen_providers.add(prov)
+
+            for prov in sorted(seen_providers):
+                try:
+                    from victor.providers.registry import ProviderRegistry
+
+                    if prov in ProviderRegistry.list_providers():
+                        console.print(f"  [green]\u2713[/] {prov}: registered")
+                    else:
+                        console.print(f"  [yellow]?[/] {prov}: not in registry")
+                except Exception:
+                    console.print(f"  [red]\u2717[/] {prov}: check failed")
+        except Exception as e:
+            console.print(f"[red]\u2717 Provider check failed:[/] {e}")
+            exit_code = 1
+
     raise typer.Exit(exit_code)
 
 
-# Register all the subcommands
-# Register unified auth command (comprehensive account management)
-app.add_typer(auth_app, name="auth", help="Manage authentication and provider accounts.")
-app.add_typer(benchmark_app)
-app.add_typer(capabilities_app)
+@app.command("run")
+def run_command(
+    message: str = typer.Argument(..., help="Message to send"),
+    profile: str = typer.Option("default", "-p", "--profile", help="Profile to use"),
+    provider: Optional[str] = typer.Option(None, "--provider", help="Override provider"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    code_only: bool = typer.Option(False, "--code-only", help="Extract only code blocks"),
+    stdin: bool = typer.Option(False, "--stdin", help="Read input from stdin"),
+    input_file: Optional[str] = typer.Option(
+        None, "-f", "--input-file", help="Read input from file"
+    ),
+) -> None:
+    """One-shot query with plain output (non-interactive, pipe-friendly).
+
+    Examples:
+        victor run "explain this function"
+        victor run -p deepseek "write a hello world"
+        echo "explain X" | victor run --stdin
+        victor run --code-only "write hello.py" > hello.py
+    """
+    import sys
+
+    from victor.config.settings import load_settings
+    from victor.core.async_utils import run_sync
+    from victor.ui.commands.chat import run_oneshot
+    from victor.ui.commands.utils import setup_logging
+
+    # Read from stdin if requested
+    if stdin:
+        message = sys.stdin.read().strip()
+    elif input_file:
+        with open(input_file) as f:
+            message = f.read().strip()
+
+    if not message:
+        console.print("[bold red]Error:[/] No message provided.")
+        raise typer.Exit(1)
+
+    setup_logging(command="run", cli_log_level="ERROR")
+    settings = load_settings()
+
+    # Apply provider/model overrides
+    if provider:
+        settings.provider.default_provider = provider
+    if model:
+        settings.provider.default_model = model
+
+    run_sync(
+        run_oneshot(
+            message=message,
+            settings=settings,
+            profile=profile,
+            stream=False,
+            thinking=False,
+            formatter=None,
+            preindex=False,
+            renderer_choice="text",
+            show_reasoning=False,
+        )
+    )
+
+
+# =============================================================================
+# Register all subcommands with rich_help_panel grouping
+# =============================================================================
+
+# --- Core Commands (default panel, shown first) ---
 app.add_typer(chat_app)
-app.add_typer(config_app)
-app.add_typer(dashboard_app)
-app.add_typer(docs_app)
-app.add_typer(observability_app, name="observability")
-app.add_typer(embeddings_app)
-app.add_typer(examples_app)
-app.add_typer(experiment_app)
-app.add_typer(fep_app)
-app.add_typer(index_app)
+app.add_typer(auth_app, name="auth", help="Manage authentication and provider accounts.")
 app.add_typer(init_app)
-app.add_typer(keys_app)
-app.add_typer(mcp_app)
 app.add_typer(models_app)
 app.add_typer(profiles_app)
-app.add_typer(providers_app)
-app.add_typer(security_app)
-app.add_typer(serve_app)
-app.add_typer(test_provider_app)
-app.add_typer(tools_app)
-# Register scaffold_app as "vertical scaffold" subcommand under vertical_app
-vertical_app.add_typer(scaffold_app, name="scaffold")
-app.add_typer(sessions_app)
-app.add_typer(vertical_app)
-app.add_typer(plugin_app)
-# Register workflow_app
-app.add_typer(workflow_app)
 
-# Create coding sub-command for plugin registration
+# --- Development ---
+app.add_typer(tools_app, rich_help_panel="Development")
+app.add_typer(skills_app, rich_help_panel="Development")
+app.add_typer(workflow_app, rich_help_panel="Development")
+app.add_typer(index_app, rich_help_panel="Development")
+app.add_typer(plugin_app, rich_help_panel="Development")
+app.add_typer(serve_app, rich_help_panel="Development")
+app.add_typer(mcp_app, rich_help_panel="Development")
+
+# --- Benchmarking & Experiments ---
+app.add_typer(benchmark_app, rich_help_panel="Benchmarking & Experiments")
+app.add_typer(experiment_app, rich_help_panel="Benchmarking & Experiments")
+app.add_typer(ab_app, rich_help_panel="Benchmarking & Experiments")
+
+# --- Data & Sessions ---
+app.add_typer(sessions_app, rich_help_panel="Data & Sessions")
+app.add_typer(db_app, rich_help_panel="Data & Sessions")
+app.add_typer(embeddings_app, rich_help_panel="Data & Sessions")
+
+# --- Observability ---
+app.add_typer(dashboard_app, rich_help_panel="Observability")
+app.add_typer(observability_app, name="observability", rich_help_panel="Observability")
+
+# --- Documentation ---
+app.add_typer(docs_app, rich_help_panel="Documentation")
+app.add_typer(examples_app, rich_help_panel="Documentation")
+vertical_app.add_typer(scaffold_app, name="scaffold")
+app.add_typer(vertical_app, rich_help_panel="Documentation")
+app.add_typer(capabilities_app, rich_help_panel="Documentation")
+
+# --- Advanced ---
+app.add_typer(config_app, rich_help_panel="Advanced")
+app.add_typer(providers_app, rich_help_panel="Advanced")
+app.add_typer(security_app, rich_help_panel="Advanced")
+app.add_typer(fep_app, rich_help_panel="Advanced")
 coding_app = typer.Typer(name="coding", help="Coding vertical specialized commands.")
-app.add_typer(coding_app)
+app.add_typer(coding_app, rich_help_panel="Advanced")
+
+# --- Deprecated / Hidden ---
+app.add_typer(keys_app, deprecated=True)
+app.add_typer(test_provider_app, hidden=True)
 
 
 def _register_plugin_commands():

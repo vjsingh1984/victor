@@ -4,7 +4,6 @@ import pytest
 
 from victor_sdk.verticals.protocols.base import VerticalBase
 from victor_sdk.verticals.protocols import (
-    CapabilityProvider,
     ToolProvider,
     SafetyProvider,
     PromptProvider,
@@ -135,7 +134,9 @@ class TestVerticalBase:
             def get_workflow_spec(cls) -> dict[str, object]:
                 return {"stage_order": ["missing"]}
 
-        with pytest.raises(VerticalConfigurationError, match="initial_stage|stage_order"):
+        with pytest.raises(
+            VerticalConfigurationError, match="initial_stage|stage_order"
+        ):
             TestVertical.get_definition()
 
     def test_get_stages_default(self):
@@ -221,6 +222,19 @@ class TestCoreTypes:
         assert stage.keywords == ["search"]
         assert stage.next_stages == {"verify"}
         assert stage.min_confidence == 0.8
+        assert stage.to_dict()["tools"] == ["read", "write"]
+
+    def test_stage_definition_accepts_legacy_tools_alias(self):
+        """Legacy ``tools=`` construction should remain supported during migration."""
+        stage = StageDefinition(
+            name="test",
+            tools={"write", "read"},
+        )
+
+        assert stage.description == ""
+        assert stage.required_tools == []
+        assert stage.optional_tools == ["read", "write"]
+        assert stage.tools == {"read", "write"}
 
     def test_stage_definition_get_effective_tools(self):
         """get_effective_tools() returns correct tool list."""
@@ -232,7 +246,11 @@ class TestCoreTypes:
         )
 
         # All tools available (note: result is sorted)
-        assert set(stage.get_effective_tools(["read", "write", "shell"])) == {"read", "write", "shell"}
+        assert set(stage.get_effective_tools(["read", "write", "shell"])) == {
+            "read",
+            "write",
+            "shell",
+        }
 
         # Only some tools available
         assert stage.get_effective_tools(["read"]) == ["read"]
@@ -262,7 +280,9 @@ class TestCoreTypes:
 
         assert config.get_max_tier_for_tools(["read"]) == Tier.BASIC
         assert config.get_max_tier_for_tools(["read", "write"]) == Tier.STANDARD
-        assert config.get_max_tier_for_tools(["read", "write", "shell"]) == Tier.ADVANCED
+        assert (
+            config.get_max_tier_for_tools(["read", "write", "shell"]) == Tier.ADVANCED
+        )
 
     def test_tiered_tool_config_runtime_compatibility_fields(self):
         """TieredToolConfig should expose runtime-compatible tier aliases."""

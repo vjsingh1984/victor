@@ -479,7 +479,7 @@ class WebSocketEventHandler:
                 self._broadcaster.update_subscriptions(
                     client_id,
                     subscriptions,
-                    correlation_id=correlation_id if isinstance(correlation_id, str) else None,
+                    correlation_id=(correlation_id if isinstance(correlation_id, str) else None),
                 )
 
             elif msg_type == "unsubscribe":

@@ -154,6 +154,36 @@ provider_defaults:
     recommended_max_tools: 30
     recommended_tool_budget: 15
 
+  # Z.AI (Zhipu) - cloud provider, GLM models with native tool support
+  zai:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 20
+
+  # Moonshot (Kimi) - cloud provider with tool support
+  moonshot:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 20
+
+  # DeepSeek - cloud provider with tool support
+  deepseek:
+    native_tool_calls: true
+    streaming_tool_calls: true
+    parallel_tool_calls: true
+    tool_choice_param: true
+    requires_strict_prompting: false
+    recommended_max_tools: 30
+    recommended_tool_budget: 20
+
   # Ollama - requires {{ if .Tools }} in Modelfile template
   # Local inference is slower than cloud, especially for 30B+ models
   ollama:
@@ -884,6 +914,24 @@ models:
   # GOOGLE FAMILY
   # ---------------------------------------------------------------------------
 
+  "gemma4*":
+    training:
+      tool_calling: true   # Gemma 4 has native tool/function calling
+      code_generation: true
+
+    providers:
+      ollama:
+        native_tool_calls: true
+        parallel_tool_calls: true
+        requires_strict_prompting: false
+      lmstudio:
+        native_tool_calls: true
+      vllm:
+        native_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 15
+
   "gemma3*":
     training:
       tool_calling: true   # Google trained with tool support
@@ -1465,6 +1513,122 @@ models:
       recommended_tool_budget: 25
       argument_format: json
 
+  "gpt-4o*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      azure:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 25
+      argument_format: json
+      tool_reliability: high
+
+  "gpt-4o-mini*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      azure:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+      tool_reliability: high
+
+  "gpt-5.4-mini*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 25
+      argument_format: json
+      tool_reliability: high
+
+  "gpt-5.4*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+      thinking_mode: true
+
+    providers:
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
+  "gpt-5.4-pro*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+      thinking_mode: true
+
+    providers:
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 35
+      argument_format: json
+      tool_reliability: high
+
+  "o3-*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      openai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
   "gpt-3.5*":
     training:
       tool_calling: true
@@ -1510,10 +1674,125 @@ models:
       argument_format: json
 
   # ---------------------------------------------------------------------------
+  # ANTHROPIC CLAUDE OPUS 4.5
+  # ---------------------------------------------------------------------------
+
+  "claude-opus-4-5*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      anthropic:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      bedrock:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
+  # ---------------------------------------------------------------------------
   # GOOGLE GEMINI MODELS
   # ---------------------------------------------------------------------------
 
   "gemini-*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      google:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      vertex:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+
+  "gemini-3*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+      thinking_mode: true
+
+    providers:
+      google:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      vertex:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
+  "gemini-3.1*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+      thinking_mode: true
+
+    providers:
+      google:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      vertex:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
+  "gemini-2.0*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+      thinking_mode: true
+
+    providers:
+      google:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+      vertex:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
+  "gemini-1.5-flash-8b*":
     training:
       tool_calling: true
       code_generation: true
@@ -1552,6 +1831,142 @@ models:
       recommended_max_tools: 40
       recommended_tool_budget: 20
       argument_format: json
+
+  "grok-4*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      xai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
+  "grok-4.20*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      xai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 35
+      argument_format: json
+      tool_reliability: high
+
+  "grok-4.1-fast*":
+    training:
+      tool_calling: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      xai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 50
+      recommended_tool_budget: 30
+      argument_format: json
+      tool_reliability: high
+
+  "grok-2*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      xai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_max_tools: 40
+      recommended_tool_budget: 20
+      argument_format: json
+
+  # ---------------------------------------------------------------------------
+  # Z.AI GLM Models (GLM-5.x, GLM-4.7)
+  # ---------------------------------------------------------------------------
+
+  "glm-5*":
+    training:
+      tool_calling: true
+      thinking_mode: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      zai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 25
+      tool_reliability: high
+
+  "glm-5.1*":
+    training:
+      tool_calling: true
+      thinking_mode: true
+      code_generation: true
+      reasoning: true
+
+    providers:
+      zai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 30
+      tool_reliability: high
+
+  "glm-4.7*":
+    training:
+      tool_calling: true
+      thinking_mode: true
+      code_generation: true
+
+    providers:
+      zai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+        parallel_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 20
+
+  "glm-4.6*":
+    training:
+      tool_calling: true
+      code_generation: true
+
+    providers:
+      zai:
+        native_tool_calls: true
+        streaming_tool_calls: true
+
+    settings:
+      recommended_tool_budget: 15
 
 # =============================================================================
 # TOOL SERIALIZATION CONFIGURATION

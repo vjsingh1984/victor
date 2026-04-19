@@ -64,8 +64,7 @@ async def main():
 
         try:
             # Create some files
-            (tmpdir / "README.md").write_text(
-                """# Demo Project
+            (tmpdir / "README.md").write_text("""# Demo Project
 
 This is a demo project for testing Victor's git tool.
 
@@ -73,17 +72,14 @@ This is a demo project for testing Victor's git tool.
 - Git integration
 - AI-powered commit messages
 - Smart operations
-"""
-            )
+""")
 
-            (tmpdir / "main.py").write_text(
-                """def main():
+            (tmpdir / "main.py").write_text("""def main():
     print("Hello, World!")
 
 if __name__ == "__main__":
     main()
-"""
-            )
+""")
 
             # Test 1: Git status
             print("\n2️⃣ Git Status")
@@ -147,13 +143,11 @@ if __name__ == "__main__":
             # Test 7: Make more changes
             print("\n8️⃣ Making More Changes")
             print("-" * 70)
-            (tmpdir / "tests.py").write_text(
-                """import pytest
+            (tmpdir / "tests.py").write_text("""import pytest
 
 def test_main():
     assert True
-"""
-            )
+""")
 
             result = await git(operation="stage", files=["tests.py"])
             if result["success"]:
@@ -163,7 +157,9 @@ def test_main():
 
             # Test 8: Commit with manual message
             result = await git(operation="commit", message="test: Add basic test file")
-            print(f"\nCommit result: {result['output'] if result['success'] else result['error']}")
+            print(
+                f"\nCommit result: {result['output'] if result['success'] else result['error']}"
+            )
 
             # Test 9: Switch back to main
             print("\n9️⃣ Switching Branches")
@@ -191,14 +187,14 @@ def test_main():
             # Test 11: Make changes on main
             print("\n1️⃣1️⃣ Making Changes on Main Branch")
             print("-" * 70)
-            (tmpdir / "utils.py").write_text(
-                """def helper():
+            (tmpdir / "utils.py").write_text("""def helper():
     return "Helper function"
-"""
-            )
+""")
 
             result = await git(operation="stage")
-            result = await git(operation="commit", message="feat: Add utility functions")
+            result = await git(
+                operation="commit", message="feat: Add utility functions"
+            )
             if result["success"]:
                 print(result["output"])
             else:
@@ -234,13 +230,14 @@ def test_main():
             print("  ✓ Conflict analysis")
 
             print("\n\n🤖 With AI Provider Available:")
-            print("  • AI-generated commit messages from diff analysis (git_suggest_commit)")
+            print(
+                "  • AI-generated commit messages from diff analysis (git_suggest_commit)"
+            )
             print("  • Auto-generated PR titles and descriptions (git_create_pr)")
             print("  • Conflict resolution suggestions (conflicts)")
 
             print("\n\n📚 API Examples:")
-            print(
-                """
+            print("""
 # Status
 result = await git(operation="status")
 
@@ -267,8 +264,7 @@ result = await git(operation="branch")
 
 # Create/switch branch
 result = await git(operation="branch", branch="feature/new-feature")
-"""
-            )
+""")
 
         finally:
             # Restore original directory

@@ -12,10 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Workflow executor for running workflow definitions.
+"""Workflow executor for running workflow definitions (LEGACY DAG EXECUTOR).
 
-Provides the execution engine that traverses workflow DAGs and
-executes agent nodes using the SubAgent infrastructure.
+.. deprecated::
+    For new code, prefer StateGraphExecutor from victor.workflows.unified_executor.
+    This DAG-based executor is retained for backward compatibility.
+
+This module provides the legacy DAG-based execution engine that traverses
+workflow DAGs and executes agent nodes using the SubAgent infrastructure.
+
+Differences from StateGraphExecutor:
+- Execution Model: Custom DAG traversal vs StateGraph-based execution
+- State Management: dataclass-based state vs TypedDict state
+- Checkpointing: RL CheckpointStore vs StateGraph checkpointing
+- Feature Parity: Legacy features vs modern StateGraph patterns
+
+For new workflows, use StateGraphExecutor for better LangGraph compatibility
+and modern state management patterns.
 """
 
 from __future__ import annotations
@@ -25,10 +38,10 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Protocol, Set
 
 from victor.framework.chain_registry import get_chain_registry
+from victor_sdk.workflows import ExecutorNodeStatus, NodeResult
 from victor.workflows.definition import (
     AgentNode,
     ComputeNode,
@@ -142,59 +155,6 @@ def get_compute_handler(name: str) -> Optional[ComputeHandler]:
 def list_compute_handlers() -> List[str]:
     """List all registered compute handler names."""
     return list(_compute_handlers.keys())
-
-
-class ExecutorNodeStatus(Enum):
-    """Execution status of a workflow executor node.
-
-    Renamed from NodeStatus to be semantically distinct:
-    - ExecutorNodeStatus (here): Executor node status
-    - ProtocolNodeStatus (victor.workflows.protocols): Workflow protocol node status
-    - FrameworkNodeStatus (victor.framework.graph): Framework graph node status
-    """
-
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    SKIPPED = "skipped"
-
-
-@dataclass
-class NodeResult:
-    """Result from executing a workflow node.
-
-    Attributes:
-        node_id: ID of the executed node
-        status: Execution status
-        output: Output data (for agent nodes: agent result)
-        error: Error message if failed
-        duration_seconds: Execution time
-        tool_calls_used: Tool calls made (for agent nodes)
-    """
-
-    node_id: str
-    status: ExecutorNodeStatus
-    output: Optional[Any] = None
-    error: Optional[str] = None
-    duration_seconds: float = 0.0
-    tool_calls_used: int = 0
-
-    @property
-    def success(self) -> bool:
-        """Check if node completed successfully."""
-        return self.status == ExecutorNodeStatus.COMPLETED
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize to dictionary."""
-        return {
-            "node_id": self.node_id,
-            "status": self.status.value,
-            "output": self.output,
-            "error": self.error,
-            "duration_seconds": self.duration_seconds,
-            "tool_calls_used": self.tool_calls_used,
-        }
 
 
 @dataclass
@@ -396,7 +356,11 @@ class WorkflowResult:
 
 
 class WorkflowExecutor:
-    """Executes workflow definitions with optional checkpointing and caching.
+    """Executes workflow definitions with optional checkpointing and caching (LEGACY).
+
+    .. deprecated::
+        For new code, prefer StateGraphExecutor from victor.workflows.unified_executor.
+        This DAG-based executor is retained for backward compatibility.
 
     Traverses the workflow DAG and executes nodes using the
     SubAgent infrastructure. Supports checkpointing for workflow
@@ -405,6 +369,15 @@ class WorkflowExecutor:
     Supports optional node-level caching for deterministic nodes
     (TransformNode, ConditionNode) to improve performance on
     repeated workflow executions.
+
+    Differences from StateGraphExecutor:
+    - Execution Model: Custom DAG traversal vs StateGraph-based execution
+    - State Management: dataclass-based state vs TypedDict state
+    - Checkpointing: RL CheckpointStore vs StateGraph checkpointing
+    - Feature Parity: Legacy features vs modern StateGraph patterns
+
+    For new workflows, use StateGraphExecutor for better LangGraph compatibility
+    and modern state management patterns.
 
     Attributes:
         orchestrator: Agent orchestrator for spawning agents
@@ -436,6 +409,17 @@ class WorkflowExecutor:
             orchestrator,
             cache=WorkflowCache(cache_config),
         )
+
+    Migration to StateGraphExecutor:
+        # Old (DAG-based):
+        from victor.workflows.executor import WorkflowExecutor
+        executor = WorkflowExecutor(orchestrator)
+        result = await executor.execute(workflow, {"files": ["main.py"]})
+
+        # New (StateGraph-based):
+        from victor.workflows.unified_executor import StateGraphExecutor
+        executor = StateGraphExecutor(orchestrator)
+        result = await executor.execute(workflow, {"files": ["main.py"]})
     """
 
     def __init__(
@@ -797,7 +781,7 @@ class WorkflowExecutor:
             self._emit_workflow_step_event(
                 workflow_name=workflow.name,
                 node_id=node_id,
-                node_type=node.node_type.value if hasattr(node, "node_type") else "unknown",
+                node_type=(node.node_type.value if hasattr(node, "node_type") else "unknown"),
                 success=result.status == ExecutorNodeStatus.COMPLETED,
                 duration=result.duration_seconds,
             )
@@ -1054,7 +1038,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED,
+            status=(ExecutorNodeStatus.COMPLETED if result.success else ExecutorNodeStatus.FAILED),
             output=result.summary,
             error=result.error,
             duration_seconds=time.time() - start_time,
@@ -1205,7 +1189,7 @@ class WorkflowExecutor:
 
         return NodeResult(
             node_id=node.id,
-            status=ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED,
+            status=(ExecutorNodeStatus.COMPLETED if success else ExecutorNodeStatus.FAILED),
             output={"results": [r.output for r in node_results if r.output]},
             duration_seconds=time.time() - start_time,
             tool_calls_used=total_tools,

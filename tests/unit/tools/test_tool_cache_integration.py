@@ -1,5 +1,6 @@
 import asyncio
 from typing import Dict
+from unittest.mock import MagicMock, patch
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import Settings
@@ -42,7 +43,8 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
         tool_cache_allowlist=["code_search"],
         tool_cache_dir=tmpdir,  # Use correct setting name
     )
-    orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orch = AgentOrchestrator(settings=settings, provider=_DummyProvider(), model="dummy")
 
     call_count = {"count": 0}
 
@@ -50,8 +52,27 @@ async def _run_twice_with_cache(tmpdir: str) -> int:
         call_count["count"] += 1
         return ToolResult(success=True, output={"ok": True})
 
-    # Monkeypatch tool execution
-    orch.tools.execute = fake_execute  # type: ignore[assignment]
+    # Wire up _tool_service with cache-aware execute_tool_with_retry
+    tool_cache = orch.tool_cache
+    mock_tool_service = MagicMock()
+
+    async def _cached_execute(tool_name, tool_args, context):
+        # Check cache first
+        if tool_cache:
+            cached = tool_cache.get(tool_name, tool_args)
+            if cached is not None:
+                return (cached, True, None)
+
+        result = await fake_execute(tool_name, context)
+
+        # Store in cache
+        if tool_cache and result.success:
+            tool_cache.set(tool_name, tool_args, result)
+
+        return (result, result.success, None)
+
+    mock_tool_service.execute_tool_with_retry = _cached_execute
+    orch._tool_service = mock_tool_service
 
     args = {"query": "test", "root": ".", "k": 1}
 

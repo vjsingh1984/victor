@@ -84,7 +84,7 @@ async def metrics(
     format: str = "summary",
 ) -> Dict[str, Any]:
     """
-    Comprehensive code metrics and quality analysis.
+    Analyze code quality: complexity, coverage, lint errors, and style.
 
     Analyzes code quality metrics including complexity, maintainability,
     technical debt, and code structure. Consolidates multiple metric types
@@ -367,7 +367,7 @@ async def metrics(
         "results": results,
         "files_analyzed": files_analyzed,
         "summary": {
-            "avg_complexity": round(avg_complexity, 2) if "complexity" in metrics_list else None,
+            "avg_complexity": (round(avg_complexity, 2) if "complexity" in metrics_list else None),
             "avg_maintainability": (
                 round(avg_maintainability, 2) if "maintainability" in metrics_list else None
             ),

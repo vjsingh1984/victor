@@ -428,7 +428,7 @@ class TestCliCommands:
         """Test embeddings command help."""
         from victor.ui.cli import app
 
-        result = runner.invoke(app, ["embeddings", "--help"])
+        result = runner.invoke(app, ["embedding", "--help"])
         assert result.exit_code == 0
 
     def test_keys_help(self, runner):
@@ -467,7 +467,9 @@ class TestCheckCodebaseIndex:
 
         with patch.dict("sys.modules", {"victor_coding.codebase.indexer": MagicMock()}):
             with patch(
-                "victor.ui.commands.utils.CodebaseIndex", return_value=mock_index, create=True
+                "victor.ui.commands.utils.CodebaseIndex",
+                return_value=mock_index,
+                create=True,
             ):
                 # Should not raise
                 await check_codebase_index("/tmp", mock_console)

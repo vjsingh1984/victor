@@ -306,7 +306,11 @@ class ToolMetadataEntry:
     @property
     def cache_invalidating(self) -> bool:
         """Tool invalidates cache if access_mode modifies state."""
-        return self.access_mode in {AccessMode.WRITE, AccessMode.EXECUTE, AccessMode.MIXED}
+        return self.access_mode in {
+            AccessMode.WRITE,
+            AccessMode.EXECUTE,
+            AccessMode.MIXED,
+        }
 
     @property
     def requires_configuration(self) -> bool:

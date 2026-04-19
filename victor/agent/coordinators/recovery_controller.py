@@ -34,9 +34,11 @@ class RecoveryResult:
 
 
 class RecoveryController:
-    """Handles error recovery for provider interactions.
+    """[DEPRECATED] Handles error recovery for provider interactions.
 
-    Extracted from ChatCoordinator to isolate recovery logic.
+    This class is being superseded by RecoveryService as part of the
+    state-passed architectural migration. It remains for backward
+    compatibility with facade-driven components.
     """
 
     def __init__(self, max_retries: int = 3, fallback_providers: list[str] = None):

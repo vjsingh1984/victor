@@ -131,7 +131,9 @@ def process_user_data(users):
         print("\n1️⃣ Original code:")
         print(demo_code)
 
-        print("\n2️⃣ Extract validation logic (lines 6-11) into 'validate_user' function...")
+        print(
+            "\n2️⃣ Extract validation logic (lines 6-11) into 'validate_user' function..."
+        )
         result = await extract(
             file=str(file_path),
             start_line=6,
@@ -353,7 +355,9 @@ def main():
         print("  • Organized imports (stdlib → third-party → local)")
         print("  • Descriptive function name (proc → filter_active_items)")
         print("  • Clear parameter names (d → items)")
-        print("  • Meaningful variable names (x → active_items, i → item, r → filtered_data)")
+        print(
+            "  • Meaningful variable names (x → active_items, i → item, r → filtered_data)"
+        )
         print("  • Much more readable and maintainable!")
 
 

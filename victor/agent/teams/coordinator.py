@@ -76,6 +76,7 @@ from victor.teams.types import (
 
 # Import canonical AgentMessage from victor.teams.types
 from victor.teams.types import AgentMessage
+from victor.core.constants import DEFAULT_VERTICAL
 from victor.agent.teams.communication import (
     TeamMessageBus,
     TeamSharedMemory,
@@ -164,7 +165,7 @@ class TeamCoordinator(ITeamCoordinator):
         # Execution context for observability
         self._task_type: str = "unknown"
         self._complexity: str = "medium"
-        self._vertical_name: str = "coding"
+        self._vertical_name: str = DEFAULT_VERTICAL
         self._trigger: str = "auto"  # auto, manual, suggestion
         self._rl_coordinator: Optional[Any] = None
 
@@ -292,7 +293,7 @@ class TeamCoordinator(ITeamCoordinator):
         self,
         task_type: str = "unknown",
         complexity: str = "medium",
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         trigger: str = "auto",
     ) -> None:
         """Set execution context for observability and RL.
@@ -618,7 +619,10 @@ class TeamCoordinator(ITeamCoordinator):
                     sender_id=member.id,
                     message_type=MessageType.RESULT,
                     content=result.output[:500],
-                    data={"success": result.success, "tool_calls": result.tool_calls_used},
+                    data={
+                        "success": result.success,
+                        "tool_calls": result.tool_calls_used,
+                    },
                 )
             )
 
@@ -1153,7 +1157,13 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
                 line = line.strip()
                 if any(
                     line.lower().startswith(prefix)
-                    for prefix in ["found", "discovered", "identified", "located", "detected"]
+                    for prefix in [
+                        "found",
+                        "discovered",
+                        "identified",
+                        "located",
+                        "detected",
+                    ]
                 ):
                     discoveries.append(line)
         return discoveries
@@ -1243,7 +1253,7 @@ Start the pipeline by {member.goal.lower()}. Your output will be passed to the n
             "member_statuses": {
                 mid: status.value for mid, status in execution.member_statuses.items()
             },
-            "duration": time.time() - execution.start_time if execution.start_time else 0,
+            "duration": (time.time() - execution.start_time if execution.start_time else 0),
         }
 
     def get_active_teams(self) -> List[str]:

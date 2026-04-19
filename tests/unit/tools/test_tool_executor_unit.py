@@ -922,7 +922,11 @@ class TestToolExecutorValidateArguments:
 
         mock_tool, _ = mock_tool_with_validation
         mock_tool.validate_parameters_detailed.return_value = ToolValidationResult.failure(
-            ["Missing required parameter: path", "Invalid type for: count", "Extra error"]
+            [
+                "Missing required parameter: path",
+                "Invalid type for: count",
+                "Extra error",
+            ]
         )
 
         registry = ToolRegistry()
@@ -1523,6 +1527,12 @@ class TestToolExecutorCacheInvalidation:
 class TestToolExecutorCodeCorrection:
     """Tests for ToolExecutor code correction middleware integration."""
 
+    @staticmethod
+    def _allowing_safety_checker():
+        checker = MagicMock()
+        checker.check_and_confirm = AsyncMock(return_value=(True, None))
+        return checker
+
     @pytest.mark.asyncio
     async def test_code_correction_applied(self):
         """Test that code correction middleware is applied when enabled."""
@@ -1549,6 +1559,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=True,
+            safety_checker=self._allowing_safety_checker(),
         )
 
         await executor.execute("write_code", {"code": "bad code"})
@@ -1575,6 +1586,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=False,  # Disabled
+            safety_checker=self._allowing_safety_checker(),
         )
 
         await executor.execute("write_code", {"code": "code"})
@@ -1606,6 +1618,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=True,
+            safety_checker=self._allowing_safety_checker(),
         )
 
         result = await executor.execute("write_code", {"code": "bad code"})
@@ -1634,6 +1647,7 @@ class TestToolExecutorCodeCorrection:
             tool_registry=registry,
             code_correction_middleware=mock_middleware,
             enable_code_correction=True,
+            safety_checker=self._allowing_safety_checker(),
         )
 
         result = await executor.execute("write_code", {"code": "code"})
@@ -1731,7 +1745,10 @@ class TestExecCtxDoublePassing:
         mock_tool = MagicMock(spec=BaseTool)
         mock_tool.name = "test_strip"
         mock_tool.execute = AsyncMock(return_value=ToolResult(success=True, output="ok"))
-        mock_tool.parameters = {"type": "object", "properties": {"query": {"type": "string"}}}
+        mock_tool.parameters = {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+        }
 
         registry = ToolRegistry()
         registry.register(mock_tool)

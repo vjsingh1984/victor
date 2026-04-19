@@ -492,7 +492,9 @@ def create_tool_execution_handler(
             orchestrator, "_check_progress_with_handler", _noop_check_progress
         ),
         handle_force_completion_with_handler=getattr(
-            orchestrator, "_handle_force_completion_with_handler", _noop_force_completion
+            orchestrator,
+            "_handle_force_completion_with_handler",
+            _noop_force_completion,
         ),
         handle_budget_exhausted=getattr(
             orchestrator, "_handle_budget_exhausted", _noop_async_generator
@@ -502,5 +504,5 @@ def create_tool_execution_handler(
         ),
         handle_tool_calls=orchestrator._handle_tool_calls,
         get_tool_status_message=get_tool_status_message,
-        observed_files=set(orchestrator.observed_files) if orchestrator.observed_files else set(),
+        observed_files=(set(orchestrator.observed_files) if orchestrator.observed_files else set()),
     )

@@ -93,7 +93,19 @@ class ArgumentNormalizer:
         """
         self.provider_name = provider_name
         self.config = config or {}
-        self.parameter_aliases: Dict[str, Dict[str, str]] = self.config.get("parameter_aliases", {})
+        # Built-in aliases for common model hallucinations (LLMs use wrong param names)
+        _builtin_aliases: Dict[str, Dict[str, str]] = {
+            "shell": {"command": "cmd"},
+            "execute_bash": {"command": "cmd"},
+            "read": {"file_path": "path", "filename": "path"},
+            "read_file": {"file_path": "path", "filename": "path"},
+            "write": {"file_path": "path", "filename": "path"},
+            "ls": {"directory": "path", "dir": "path"},
+            "list_directory": {"directory": "path", "dir": "path"},
+        }
+        user_aliases = self.config.get("parameter_aliases", {})
+        # Merge: user overrides built-in
+        self.parameter_aliases: Dict[str, Dict[str, str]] = {**_builtin_aliases, **user_aliases}
         self.stats: NormalizationStats = {
             "total_calls": 0,
             "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
@@ -217,7 +229,8 @@ class ArgumentNormalizer:
                         return normalized, NormalizationStrategy.PYTHON_AST
             except Exception as e:
                 logger.debug(
-                    f"Preemptive AST normalization failed for {tool_name}: {e}", exc_info=True
+                    f"Preemptive AST normalization failed for {tool_name}: {e}",
+                    exc_info=True,
                 )
 
         # Layer 1: Check if already valid (fast path - most cases after preemptive normalization)

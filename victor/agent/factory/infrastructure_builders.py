@@ -23,6 +23,7 @@ Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -38,7 +39,7 @@ if TYPE_CHECKING:
     from victor.agent.session_ledger import SessionLedger
     from victor.agent.compaction_summarizer import LedgerAwareCompactionSummarizer
     from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.observability.integration import ObservabilityIntegration
     from victor.observability.tracing import ExecutionTracer, ToolCallTracer
     from victor.analytics.logger import UsageLogger
@@ -74,7 +75,9 @@ class InfrastructureBuildersMixin:
         logger.debug("Observability integration created")
         return observability
 
-    def create_tracers(self) -> tuple[Optional["ExecutionTracer"], Optional["ToolCallTracer"]]:
+    def create_tracers(
+        self,
+    ) -> tuple[Optional["ExecutionTracer"], Optional["ToolCallTracer"]]:
         """Create execution and tool call tracers for debugging.
 
         Returns:
@@ -135,7 +138,10 @@ class InfrastructureBuildersMixin:
         Returns:
             Configured MetricsCollector
         """
-        from victor.agent.metrics_collector import MetricsCollector, MetricsCollectorConfig
+        from victor.agent.metrics_collector import (
+            MetricsCollector,
+            MetricsCollectorConfig,
+        )
 
         return MetricsCollector(
             config=MetricsCollectorConfig(
@@ -170,9 +176,28 @@ class InfrastructureBuildersMixin:
             logger.debug("Using enhanced usage logger from DI container")
             return usage_logger
 
-        analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
+        # Determine analytics log file location
+        # Redirect test telemetry to prevent MagicMock leakage to global usage.jsonl
+        import os
+
+        if (
+            os.getenv("PYTEST_XDIST_WORKER")
+            or os.getenv("TEST_MODE")
+            or os.getenv("PYTEST_CURRENT_TEST")
+        ):
+            # Running under pytest - use test-specific log file
+            import tempfile
+
+            test_log_dir = Path(tempfile.gettempdir()) / "victor_test_telemetry"
+            test_log_dir.mkdir(exist_ok=True)
+            analytics_log_file = test_log_dir / "test_usage.jsonl"
+        else:
+            # Normal operation - use global logs directory
+            analytics_log_file = get_project_paths().global_logs_dir / "usage.jsonl"
+
         usage_logger = UsageLogger(
-            analytics_log_file, enabled=getattr(self.settings, "analytics_enabled", True)
+            analytics_log_file,
+            enabled=getattr(self.settings, "analytics_enabled", True),
         )
         logger.debug("Using basic usage logger (enhanced version not available)")
         return usage_logger
@@ -337,7 +362,9 @@ class InfrastructureBuildersMixin:
 
         if use_llm:
             try:
-                from victor.agent.llm_compaction_summarizer import LLMCompactionSummarizer
+                from victor.agent.llm_compaction_summarizer import (
+                    LLMCompactionSummarizer,
+                )
 
                 provider = getattr(self, "_provider", None)
                 if provider is None:
@@ -400,7 +427,12 @@ class InfrastructureBuildersMixin:
         tool_capability_warned = False
 
         logger.debug("Execution state containers initialized")
-        return (observed_files, executed_tools, failed_tool_signatures, tool_capability_warned)
+        return (
+            observed_files,
+            executed_tools,
+            failed_tool_signatures,
+            tool_capability_warned,
+        )
 
     def create_presentation_adapter(self) -> "PresentationProtocol":
         """Create presentation adapter for icon/emoji rendering.

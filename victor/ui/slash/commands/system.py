@@ -72,7 +72,7 @@ class HelpCommand(BaseSlashCommand):
             name="help",
             description="Show available commands",
             usage="/help [command]",
-            aliases=["?", "commands"],
+            aliases=["?"],
             category="system",
         )
 
@@ -133,13 +133,13 @@ class ConfigCommand(BaseSlashCommand):
     def execute(self, ctx: CommandContext) -> None:
         ctx.console.print(
             Panel(
-                f"[bold]Provider:[/] {ctx.settings.default_provider}\n"
-                f"[bold]Model:[/] {ctx.settings.default_model}\n"
-                f"[bold]Ollama URL:[/] {ctx.settings.ollama_base_url}\n"
-                f"[bold]Air-gapped:[/] {ctx.settings.airgapped_mode}\n"
-                f"[bold]Semantic Selection:[/] {ctx.settings.use_semantic_tool_selection}\n"
-                f"[bold]Embedding Model:[/] {ctx.settings.unified_embedding_model}\n"
-                f"[bold]Tool Budget:[/] {ctx.settings.tool_call_budget}\n"
+                f"[bold]Provider:[/] {ctx.settings.provider.default_provider}\n"
+                f"[bold]Model:[/] {ctx.settings.provider.default_model}\n"
+                f"[bold]Ollama URL:[/] {ctx.settings.provider.ollama_base_url}\n"
+                f"[bold]Air-gapped:[/] {ctx.settings.security.airgapped_mode}\n"
+                f"[bold]Semantic Selection:[/] {ctx.settings.tools.use_semantic_tool_selection}\n"
+                f"[bold]Embedding Model:[/] {ctx.settings.search.unified_embedding_model}\n"
+                f"[bold]Tool Budget:[/] {ctx.settings.tools.tool_call_budget}\n"
                 f"[bold]Config Dir:[/] {ctx.settings.get_config_dir()}",
                 title="Configuration",
                 border_style="blue",
@@ -169,7 +169,7 @@ class StatusCommand(BaseSlashCommand):
         agent = ctx.agent
         history = agent.conversation
         tool_calls = getattr(agent, "tool_calls_used", 0)
-        tool_budget = ctx.settings.tool_call_budget
+        tool_budget = ctx.settings.tools.tool_call_budget
 
         content = (
             f"[bold]Provider:[/] {agent.provider_name}\n"
@@ -239,7 +239,7 @@ class ExitCommand(BaseSlashCommand):
             name="exit",
             description="Exit Victor",
             usage="/exit",
-            aliases=["quit", "bye"],
+            aliases=["quit"],
             category="system",
         )
 

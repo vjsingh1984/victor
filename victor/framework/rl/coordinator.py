@@ -35,6 +35,7 @@ from typing import Any, Dict, List, Optional, Set
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.database import get_database
 from victor.core.schema import Tables, Schema
+from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ class AsyncWriterQueue:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> bool:
         """Queue an outcome for async writing.
 
@@ -246,8 +247,8 @@ class AsyncWriterQueue:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -255,6 +256,7 @@ class AsyncWriterQueue:
                         outcome.model,
                         outcome.task_type,
                         outcome.vertical or "general",
+                        self.coordinator._repo_id,
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
@@ -345,7 +347,7 @@ class BatchedOutcomeWriter:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Queue an outcome for batched writing.
 
@@ -394,8 +396,8 @@ class BatchedOutcomeWriter:
                     f"""
                     INSERT INTO {Tables.RL_OUTCOME} (
                         learner_id, provider, model, task_type, vertical,
-                        success, quality_score, metadata
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        repo_id, success, quality_score, metadata
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         learner_name,  # Maps to learner_id column
@@ -403,6 +405,7 @@ class BatchedOutcomeWriter:
                         outcome.model,
                         outcome.task_type,
                         outcome.vertical or "general",
+                        self.coordinator._repo_id,
                         1 if outcome.success else 0,
                         outcome.quality_score,
                         outcome.to_dict()["metadata"],
@@ -488,8 +491,27 @@ class RLCoordinator:
         # Lifecycle state tracking
         self._is_closed = False
 
+        # Per-repo isolation: outcomes are tagged with repo_id
+        self._repo_id: Optional[str] = None
+
+        # Tool name prefixes to exclude from RL recording (test fixtures)
+        self._excluded_tool_prefixes = (
+            "dummy_",
+            "test_",
+            "flaky_",
+            "error_",
+            "always_",
+            "mock_",
+        )
+
+        # Lazy-initialized OptionRegistry for hierarchical RL options
+        self._option_registry: Optional["OptionRegistry"] = None
+
         # Ensure core tables exist
         self._ensure_core_tables()
+
+        # Migrate schema: add repo_id column if missing
+        self._migrate_add_repo_id()
 
         # Auto-register default learners
         self._register_default_learners()
@@ -514,6 +536,63 @@ class RLCoordinator:
 
         self.db.commit()
         logger.debug("RL: Core tables ensured")
+
+    def _migrate_add_repo_id(self) -> None:
+        """Add repo_id column to rl_outcome if missing (backward-compatible)."""
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(f"PRAGMA table_info({Tables.RL_OUTCOME})")
+            columns = {row[1] for row in cursor.fetchall()}
+            if "repo_id" not in columns:
+                cursor.execute(
+                    f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN repo_id TEXT DEFAULT NULL"
+                )
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_repo "
+                    f"ON {Tables.RL_OUTCOME}(repo_id)"
+                )
+                self.db.commit()
+                logger.info("RL: Migrated rl_outcome — added repo_id column")
+        except Exception as e:
+            logger.debug(f"RL: repo_id migration skipped: {e}")
+
+    def set_repo_context(self, repo_id: Optional[str]) -> None:
+        """Set current repo context for outcome isolation.
+
+        When set, all recorded outcomes are tagged with this repo_id,
+        and queries prefer repo-specific data over global data.
+
+        Args:
+            repo_id: Repository identifier (e.g., directory name), or None for global
+        """
+        self._repo_id = repo_id
+        logger.debug(f"RL: Repo context set to {repo_id!r}")
+
+    def get_option_registry(self) -> "OptionRegistry":
+        """Get the OptionRegistry, creating it lazily on first access.
+
+        The OptionRegistry manages hierarchical RL options (Explore, Implement,
+        Debug, Review) — temporal abstractions for multi-step agent skills.
+        It is NOT a learner; use this method instead of ``get_learner()``.
+
+        Returns:
+            OptionRegistry instance with default options registered.
+        """
+        if self._option_registry is None:
+            from victor.framework.rl.option_framework import OptionRegistry
+
+            self._option_registry = OptionRegistry()
+            logger.info(
+                "RL: OptionRegistry initialized with %d options",
+                len(self._option_registry._options),
+            )
+        return self._option_registry
+
+    def _should_record_tool(self, tool_name: str) -> bool:
+        """Check if a tool outcome should be recorded (filters test fixtures)."""
+        if not tool_name:
+            return True
+        return not any(tool_name.startswith(p) for p in self._excluded_tool_prefixes)
 
     def _register_default_learners(self) -> None:
         """Register default learners.
@@ -556,7 +635,7 @@ class RLCoordinator:
             logger.warning(f"RL: Learner '{name}' already registered, replacing")
 
         self._learners[name] = learner
-        logger.info(f"RL: Registered learner '{name}'")
+        logger.debug(f"RL: Registered learner '{name}'")
 
     def set_active_learners(self, learners: List[str]) -> None:
         """Set the active learners allowlist.
@@ -636,11 +715,15 @@ class RLCoordinator:
 
                 return SemanticThresholdLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "model_selector":
-                from victor.framework.rl.learners.model_selector import ModelSelectorLearner
+                from victor.framework.rl.learners.model_selector import (
+                    ModelSelectorLearner,
+                )
 
                 return ModelSelectorLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "cache_eviction":
-                from victor.framework.rl.learners.cache_eviction import CacheEvictionLearner
+                from victor.framework.rl.learners.cache_eviction import (
+                    CacheEvictionLearner,
+                )
 
                 return CacheEvictionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "grounding_threshold":
@@ -652,19 +735,27 @@ class RLCoordinator:
                     name=name, db_connection=self.db, learning_rate=0.1
                 )
             elif name == "quality_weights":
-                from victor.framework.rl.learners.quality_weights import QualityWeightLearner
+                from victor.framework.rl.learners.quality_weights import (
+                    QualityWeightLearner,
+                )
 
                 return QualityWeightLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "tool_selector":
-                from victor.framework.rl.learners.tool_selector import ToolSelectorLearner
+                from victor.framework.rl.learners.tool_selector import (
+                    ToolSelectorLearner,
+                )
 
                 return ToolSelectorLearner(name=name, db_connection=self.db, learning_rate=0.05)
             elif name == "mode_transition":
-                from victor.framework.rl.learners.mode_transition import ModeTransitionLearner
+                from victor.framework.rl.learners.mode_transition import (
+                    ModeTransitionLearner,
+                )
 
                 return ModeTransitionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "prompt_template":
-                from victor.framework.rl.learners.prompt_template import PromptTemplateLearner
+                from victor.framework.rl.learners.prompt_template import (
+                    PromptTemplateLearner,
+                )
 
                 return PromptTemplateLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "team_composition":
@@ -673,29 +764,93 @@ class RLCoordinator:
                 # TeamCompositionLearner has different signature - uses db_path instead of db_connection
                 return TeamCompositionLearner(learning_rate=0.1)
             elif name == "cross_vertical":
-                from victor.framework.rl.learners.cross_vertical import CrossVerticalLearner
+                from victor.framework.rl.learners.cross_vertical import (
+                    CrossVerticalLearner,
+                )
 
                 return CrossVerticalLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "workflow_execution":
-                from victor.framework.rl.learners.workflow_execution import WorkflowExecutionLearner
+                from victor.framework.rl.learners.workflow_execution import (
+                    WorkflowExecutionLearner,
+                )
 
                 return WorkflowExecutionLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "context_pruning":
-                from victor.framework.rl.learners.context_pruning import ContextPruningLearner
+                from victor.framework.rl.learners.context_pruning import (
+                    ContextPruningLearner,
+                )
 
                 return ContextPruningLearner(name=name, db_connection=self.db, learning_rate=0.15)
+            elif name == "prompt_optimizer":
+                # Check settings: skip when prompt optimization is off
+                try:
+                    from victor.config.settings import get_settings
+
+                    settings = get_settings()
+                    po_cfg = getattr(settings, "prompt_optimization", None)
+                    if po_cfg is not None and not po_cfg.enabled:
+                        logger.debug("Prompt optimization disabled — skipping prompt_optimizer")
+                        return None
+                except Exception:
+                    pass  # Settings unavailable — allow creation
+
+                from victor.framework.rl.learners.prompt_optimizer import (
+                    PromptOptimizerLearner,
+                )
+
+                # GEPA v2: use tiered service + Pareto when gepa.enabled
+                strategy = None
+                use_pareto = False
+                max_prompt_chars = 1500
+                try:
+                    from victor.config.settings import get_settings
+
+                    settings = get_settings()
+                    po_cfg = getattr(settings, "prompt_optimization", None)
+                    gepa_cfg = po_cfg.gepa if po_cfg else getattr(settings, "gepa", None)
+                    if gepa_cfg and gepa_cfg.enabled:
+                        from victor.framework.rl.gepa_strategy_adapter import (
+                            GEPAServiceStrategy,
+                        )
+                        from victor.framework.rl.gepa_tier_manager import (
+                            GEPATierManager,
+                        )
+
+                        tier_mgr = GEPATierManager(gepa_cfg)
+                        strategy = GEPAServiceStrategy(tier_mgr)
+                        use_pareto = True
+                        max_prompt_chars = getattr(gepa_cfg, "max_prompt_chars", 1500)
+                        logger.info(
+                            "GEPA v2 enabled: tier=%s, pareto=True",
+                            tier_mgr.get_current_tier(),
+                        )
+                except Exception as e:
+                    logger.debug("GEPA v2 init skipped: %s", e)
+
+                return PromptOptimizerLearner(
+                    name=name,
+                    db_connection=self.db,
+                    learning_rate=0.1,
+                    strategy=strategy,
+                    use_pareto=use_pareto,
+                    max_prompt_chars=max_prompt_chars,
+                )
+            elif name == "option_framework":
+                # OptionRegistry is not a learner — access via get_option_registry()
+                logger.debug("RL: option_framework is not a learner — use get_option_registry()")
+                return None
             else:
                 logger.warning(f"RL: Unknown learner '{name}'")
                 return None
-        except ImportError as e:
-            logger.warning(f"RL: Failed to import learner '{name}': {e}")
+        except (ImportError, TypeError) as e:
+            logger.warning(f"RL: Failed to create learner '{name}': {e}")
             return None
 
     def record_outcome(
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record an outcome for a specific learner.
 
@@ -708,6 +863,12 @@ class RLCoordinator:
         """
         outcome.vertical = vertical
 
+        # Filter test fixture tools from RL recording
+        tool_name = outcome.metadata.get("tool_name", "") if outcome.metadata else ""
+        if not self._should_record_tool(tool_name):
+            logger.debug(f"RL: Skipping test fixture tool '{tool_name}'")
+            return
+
         learner = self.get_learner(learner_name)
         if not learner:
             logger.warning(f"RL: Unknown learner '{learner_name}', skipping outcome")
@@ -717,14 +878,14 @@ class RLCoordinator:
             # Record in learner-specific tables
             learner.record_outcome(outcome)
 
-            # Record in shared outcomes table
+            # Record in shared outcomes table with repo_id
             cursor = self.db.cursor()
             cursor.execute(
                 f"""
                 INSERT INTO {Tables.RL_OUTCOME} (
                     learner_id, provider, model, task_type, vertical,
-                    success, quality_score, metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    repo_id, success, quality_score, metadata
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     learner_name,  # Maps to learner_id column
@@ -732,6 +893,7 @@ class RLCoordinator:
                     outcome.model,
                     outcome.task_type,
                     outcome.vertical or "general",  # Default to "general" if None
+                    self._repo_id,  # Per-repo isolation
                     1 if outcome.success else 0,
                     outcome.quality_score,
                     outcome.to_dict()["metadata"],  # JSON string
@@ -838,6 +1000,185 @@ class RLCoordinator:
             logger.error(f"RL: Failed to get recommendation from {learner_name}: {e}")
             return None
 
+    @staticmethod
+    def format_evolution_report(
+        section: str,
+        generation: int,
+        old_text: str,
+        new_text: str,
+        alpha: float = 1.0,
+        beta_val: float = 1.0,
+        sample_count: int = 0,
+    ) -> str:
+        """Format an auditable evolution report for user visibility.
+
+        Returns a structured text report showing before/after prompt text,
+        generation number, and Thompson Sampling statistics.
+        """
+        max_preview = 300
+        old_preview = (old_text[:max_preview] + "...") if len(old_text) > max_preview else old_text
+        new_preview = (new_text[:max_preview] + "...") if len(new_text) > max_preview else new_text
+        mean = alpha / (alpha + beta_val) if (alpha + beta_val) > 0 else 0.5
+
+        lines = [
+            f"[GEPA Evolution] section={section} gen-{generation}",
+            f"  Stats: α={alpha:.1f} β={beta_val:.1f} mean={mean:.2f} samples={sample_count}",
+            f"  Before ({len(old_text)} chars): {old_preview}",
+            f"  After  ({len(new_text)} chars): {new_preview}",
+        ]
+        return "\n".join(lines)
+
+    def try_evolve_on_session_end(self, provider: str, model: str):
+        """EvoTest: try evolving one prompt section after conversation end.
+
+        Lightweight evolution — picks one section (round-robin), collects
+        recent traces, evolves if enough data. Non-blocking, best-effort.
+
+        Returns:
+            dict with report on success, True for legacy compat, False on skip.
+        """
+        learner = self._learners.get("prompt_optimizer")
+        if learner is None:
+            return False
+
+        sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+        if not sections:
+            return False
+
+        idx = getattr(self, "_evolution_section_idx", 0)
+        section = sections[idx % len(sections)]
+        self._evolution_section_idx = idx + 1
+
+        rec = learner.get_recommendation(provider, model, "default", section_name=section)
+        current_text = rec.value if rec else ""
+        if not current_text:
+            return False
+
+        try:
+            result = learner.evolve(section, current_text, provider)
+            if result:
+                report = self.format_evolution_report(
+                    section=section,
+                    generation=getattr(result, "generation", 0),
+                    old_text=current_text,
+                    new_text=getattr(result, "text", ""),
+                    alpha=getattr(result, "alpha", 1.0),
+                    beta_val=getattr(result, "beta_val", 1.0),
+                    sample_count=getattr(result, "sample_count", 0),
+                )
+                logger.info(f"[evotest] {report}")
+                return {"evolved": True, "section": section, "report": report}
+        except Exception as e:
+            logger.debug(f"[evotest] Evolution skipped: {e}")
+        return False
+
+    def maybe_background_evolve(self, provider: str = "", model: str = "") -> None:
+        """Check staleness and spawn background evolution if needed.
+
+        Called once at chat startup.  If the newest prompt candidate is older
+        than ``_EVOLUTION_STALE_DAYS``, a daemon thread evolves all evolvable
+        sections from existing trace data.  The thread is fire-and-forget —
+        it never blocks the user.
+
+        A filesystem lock prevents concurrent evolution runs across
+        multiple ``victor chat`` sessions.
+        """
+        import threading
+        from datetime import datetime, timedelta, timezone
+
+        _EVOLUTION_STALE_DAYS = 7
+        lock_path = self.storage_path / ".evolution_lock"
+
+        # Quick check: skip if we already spawned a thread this session
+        if getattr(self, "_bg_evolution_started", False):
+            return
+        self._bg_evolution_started = True
+
+        # Check newest candidate timestamp
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                "SELECT MAX(created_at) FROM agent_prompt_candidate"
+            )
+            row = cursor.fetchone()
+            if row and row[0]:
+                # Parse ISO timestamp
+                last_evolved = datetime.fromisoformat(row[0])
+                if last_evolved.tzinfo is None:
+                    last_evolved = last_evolved.replace(tzinfo=timezone.utc)
+                age = datetime.now(timezone.utc) - last_evolved
+                if age < timedelta(days=_EVOLUTION_STALE_DAYS):
+                    logger.debug(
+                        "RL: Last evolution was %s ago — still fresh, skipping background evolve",
+                        age,
+                    )
+                    return
+                logger.info(
+                    "RL: Last evolution was %s ago (>%dd) — starting background evolve",
+                    age,
+                    _EVOLUTION_STALE_DAYS,
+                )
+            else:
+                logger.info("RL: No prompt candidates found — starting background evolve")
+        except Exception as e:
+            logger.debug("RL: Could not check candidate staleness: %s", e)
+            return
+
+        def _evolve_in_background():
+            """Run evolution for all sections in a daemon thread."""
+            # Filesystem lock to prevent concurrent evolution
+            try:
+                lock_path.touch(exist_ok=True)
+                if lock_path.stat().st_size > 0:
+                    logger.debug("RL: Background evolution lock held, skipping")
+                    return
+                lock_path.write_text(str(datetime.now(timezone.utc).isoformat()))
+            except Exception:
+                return
+
+            try:
+                learner = self.get_learner("prompt_optimizer")
+                if learner is None:
+                    return
+
+                sections = getattr(learner, "EVOLVABLE_SECTIONS", [])
+                evolved_count = 0
+                for section in sections:
+                    try:
+                        rec = learner.get_recommendation(
+                            provider or "", model or "", "default",
+                            section_name=section,
+                        )
+                        current_text = rec.value if rec else ""
+                        if not current_text:
+                            continue
+                        result = learner.evolve(section, current_text, provider or "")
+                        if result:
+                            evolved_count += 1
+                    except Exception as e:
+                        logger.debug("RL: Background evolve '%s' failed: %s", section, e)
+
+                if evolved_count:
+                    logger.info(
+                        "RL: Background evolution complete — %d/%d sections evolved",
+                        evolved_count,
+                        len(sections),
+                    )
+            except Exception as e:
+                logger.debug("RL: Background evolution failed: %s", e)
+            finally:
+                try:
+                    lock_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+        thread = threading.Thread(
+            target=_evolve_in_background,
+            name="rl-background-evolve",
+            daemon=True,
+        )
+        thread.start()
+
     # =========================================================================
     # Async Wrappers - Non-blocking versions for async orchestrator
     # =========================================================================
@@ -846,7 +1187,7 @@ class RLCoordinator:
         self,
         learner_name: str,
         outcome: RLOutcome,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         use_queue: Optional[bool] = None,
     ) -> None:
         """Async version of record_outcome - offloads SQLite to thread pool.
@@ -968,7 +1309,11 @@ class RLCoordinator:
         """
         recommendations = {}
 
-        for name in ["continuation_patience", "continuation_prompts", "semantic_threshold"]:
+        for name in [
+            "continuation_patience",
+            "continuation_prompts",
+            "semantic_threshold",
+        ]:
             rec = self.get_recommendation(name, provider, model, task_type)
             if rec:
                 recommendations[name] = rec

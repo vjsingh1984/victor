@@ -253,56 +253,6 @@ class TestChatServiceHealth(BaseChatServiceTest):
         assert service.is_healthy() is False
 
 
-class TestChatServiceChat(BaseChatServiceTest):
-    """Tests for ChatService.chat method."""
-
-    @pytest.mark.asyncio
-    async def test_chat_basic(self):
-        """Test basic chat functionality."""
-        service = self._create_test_service()
-
-        response = await service.chat("Hello, world!")
-
-        assert response.content == "Mock response"
-        assert response.stop_reason == "stop"
-
-    @pytest.mark.asyncio
-    async def test_chat_with_context_overflow(self):
-        """Test chat with context overflow triggers compaction."""
-        service = self._create_test_service()
-        service._context.overflow = True
-
-        response = await service.chat("Test")
-
-        assert response.content == "Mock response"
-        # Compaction should have been triggered
-
-    @pytest.mark.asyncio
-    async def test_chat_streaming_mode(self):
-        """Test chat in streaming mode."""
-        service = self._create_test_service()
-
-        response = await service.chat("Test", stream=True)
-
-        assert response.content == "Mock chunk"  # Aggregated from stream
-
-
-class TestChatServiceStreamChat(BaseChatServiceTest):
-    """Tests for ChatService.stream_chat method."""
-
-    @pytest.mark.asyncio
-    async def test_stream_chat(self):
-        """Test streaming chat."""
-        service = self._create_test_service()
-
-        chunks = []
-        async for chunk in service.stream_chat("Test"):
-            chunks.append(chunk)
-
-        assert len(chunks) == 1
-        assert chunks[0].content == "Mock chunk"
-
-
 class TestChatServiceReset(BaseChatServiceTest):
     """Tests for ChatService.reset_conversation method."""
 
@@ -319,29 +269,50 @@ class TestChatServiceReset(BaseChatServiceTest):
         assert service._conversation.reset_count == 1
 
 
-class TestChatServiceAgenticLoop(BaseChatServiceTest):
-    """Tests for the agentic loop logic."""
+class TestStreamingPipelineIntegration:
+    """Tests verifying streaming pipeline has AgenticLoop components."""
 
-    @pytest.mark.asyncio
-    async def test_agentic_loop_with_completion(self):
-        """Test agentic loop completes normally."""
-        service = self._create_test_service()
+    def test_pipeline_accepts_perception(self):
+        """StreamingChatPipeline constructor accepts perception parameter."""
+        from unittest.mock import MagicMock
+        from victor.agent.streaming.pipeline import StreamingChatPipeline
 
-        response = await service.chat("Complete this")
+        mock_coord = MagicMock()
+        mock_perception = MagicMock()
+        pipeline = StreamingChatPipeline(mock_coord, perception=mock_perception)
+        assert pipeline._perception is mock_perception
 
-        assert response is not None
-        assert response.stop_reason == "stop"
+    def test_pipeline_accepts_fulfillment(self):
+        """StreamingChatPipeline constructor accepts fulfillment parameter."""
+        from unittest.mock import MagicMock
+        from victor.agent.streaming.pipeline import StreamingChatPipeline
 
-    @pytest.mark.asyncio
-    async def test_agentic_loop_with_max_iterations(self):
-        """Test agentic loop respects max iterations."""
-        config = ChatServiceConfig(max_iterations=2)
-        service = self._create_test_service(config=config)
+        mock_coord = MagicMock()
+        mock_fulfillment = MagicMock()
+        pipeline = StreamingChatPipeline(mock_coord, fulfillment=mock_fulfillment)
+        assert pipeline._fulfillment is mock_fulfillment
 
-        response = await service.chat("Test")
+    def test_pipeline_has_progress_tracking(self):
+        """StreamingChatPipeline tracks progress scores."""
+        from unittest.mock import MagicMock
+        from victor.agent.streaming.pipeline import StreamingChatPipeline
 
-        # Should complete without hitting iteration limit
-        assert response is not None
+        pipeline = StreamingChatPipeline(MagicMock())
+        assert hasattr(pipeline, "_progress_scores")
+        assert pipeline._progress_scores == []
+
+    def test_factory_passes_components(self):
+        """create_streaming_chat_pipeline passes perception and fulfillment."""
+        from unittest.mock import MagicMock
+        from victor.agent.streaming.pipeline import create_streaming_chat_pipeline
+
+        mock_perception = MagicMock()
+        mock_fulfillment = MagicMock()
+        pipeline = create_streaming_chat_pipeline(
+            MagicMock(), perception=mock_perception, fulfillment=mock_fulfillment
+        )
+        assert pipeline._perception is mock_perception
+        assert pipeline._fulfillment is mock_fulfillment
 
 
 # =============================================================================

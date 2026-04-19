@@ -553,12 +553,15 @@ class TestGraphStoreProtocol:
         ]
 
         expected_methods = [
+            "initialize",
+            "close",
             "upsert_nodes",
             "upsert_edges",
             "get_neighbors",
             "find_nodes",
             "search_symbols",
             "get_node_by_id",
+            "get_all_nodes",
             "get_nodes_by_file",
             "update_file_mtime",
             "get_stale_files",

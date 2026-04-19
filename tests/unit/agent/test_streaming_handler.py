@@ -1344,7 +1344,10 @@ class TestGenerateToolResultChunks:
             "elapsed": 0.5,
             "args": {
                 "files": [
-                    {"path": f"/file{i}.py", "edits": [{"old_string": "old", "new_string": "new"}]}
+                    {
+                        "path": f"/file{i}.py",
+                        "edits": [{"old_string": "old", "new_string": "new"}],
+                    }
                     for i in range(10)
                 ]
             },
@@ -1641,7 +1644,10 @@ class TestFilterBlockedToolCalls:
         """Returns all tools when none are blocked."""
         tool_calls = [
             {"name": "read_file", "arguments": {"path": "/test.txt"}},
-            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+            {
+                "name": "write_file",
+                "arguments": {"path": "/out.txt", "content": "hello"},
+            },
         ]
 
         # Block checker that blocks nothing
@@ -1660,7 +1666,10 @@ class TestFilterBlockedToolCalls:
         """Returns empty list when all tools are blocked."""
         tool_calls = [
             {"name": "read_file", "arguments": {"path": "/test.txt"}},
-            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+            {
+                "name": "write_file",
+                "arguments": {"path": "/out.txt", "content": "hello"},
+            },
         ]
 
         # Block checker that blocks everything
@@ -1679,7 +1688,10 @@ class TestFilterBlockedToolCalls:
         """Returns only non-blocked tools when some are blocked."""
         tool_calls = [
             {"name": "read_file", "arguments": {"path": "/test.txt"}},
-            {"name": "write_file", "arguments": {"path": "/out.txt", "content": "hello"}},
+            {
+                "name": "write_file",
+                "arguments": {"path": "/out.txt", "content": "hello"},
+            },
             {"name": "list_dir", "arguments": {"path": "/"}},
         ]
 

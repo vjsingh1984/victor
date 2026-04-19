@@ -81,18 +81,55 @@ The refactoring should maintain backward compatibility.""",
     "C3": {
         "name": "Bug fix with context",
         "category": "Code Generation",
-        "prompt": """Fix the bug in the authentication module.
+        "prompt": """Fix the bug in the following authentication module. Do NOT search for files — the code is provided below.
 
-Context:
-- The auth_token becomes invalid after 5 minutes
-- Users are being logged out unexpectedly
-- The token refresh logic exists but isn't being called
+```python
+import time
+import threading
 
-Fix the bug in src/auth/session.py ensuring:
-1. Tokens are refreshed automatically before expiry
+class SessionManager:
+    def __init__(self, token_ttl=300):
+        self.token_ttl = token_ttl  # 5 minutes
+        self._tokens = {}
+        self._lock = threading.Lock()
+
+    def create_session(self, user_id: str) -> str:
+        token = f"tok_{user_id}_{int(time.time())}"
+        with self._lock:
+            self._tokens[token] = {
+                "user_id": user_id,
+                "created_at": time.time(),
+                "expires_at": time.time() + self.token_ttl,
+            }
+        return token
+
+    def validate_token(self, token: str) -> bool:
+        with self._lock:
+            session = self._tokens.get(token)
+            if not session:
+                return False
+            if time.time() > session["expires_at"]:
+                del self._tokens[token]
+                return False
+            return True
+
+    def _refresh_token(self, token: str) -> bool:
+        # BUG: This method exists but is never called
+        with self._lock:
+            session = self._tokens.get(token)
+            if session:
+                session["expires_at"] = time.time() + self.token_ttl
+                return True
+        return False
+```
+
+Bug: Users are being logged out after 5 minutes because `_refresh_token` is never called.
+
+Fix the code ensuring:
+1. Tokens are refreshed automatically before expiry (call _refresh_token in validate_token)
 2. No changes to the public API
 3. Thread safety is maintained
-4. Tests pass""",
+4. Provide the complete fixed code""",
         "complexity": "Medium",
         "timeout_seconds": 120,
         "max_tokens": 3000,
@@ -213,13 +250,13 @@ Provide:
     "T1": {
         "name": "File operations",
         "category": "Tool Usage",
-        "prompt": """Perform the following file operations:
+        "prompt": """Perform the following file operations in /tmp/benchmark_t1/:
 
-1. Create a directory structure: output/{docs,images,data}
-2. Read the file at README.md
-3. Extract all code blocks from the README
-4. Write each code block to a separate file in output/docs/
-5. Create a summary file listing all extracted files
+1. Create a directory structure: /tmp/benchmark_t1/{docs,images,data}
+2. Write a sample file /tmp/benchmark_t1/docs/hello.py with a simple Python function
+3. Read the file back and verify its contents
+4. List the directory structure you created
+5. Create a summary file /tmp/benchmark_t1/summary.txt listing all created files
 
 Use file system tools to complete these operations.""",
         "complexity": "Simple",
@@ -276,7 +313,7 @@ Provide a comprehensive migration plan including:
     "R4": {
         "name": "Debug investigation",
         "category": "Multi-Step Reasoning",
-        "prompt": """Investigate and diagnose the following bug:
+        "prompt": """Investigate and diagnose the following bug. This is an analytical exercise — reason through the problem using the information provided below. Do NOT search for or read files.
 
 Symptom: Users report that search results are inconsistent—the same query
 returns different results on repeated executions, and sometimes returns
@@ -726,7 +763,7 @@ Requirements:
     "W4": {
         "name": "Error recovery",
         "category": "Workflow & Coordination",
-        "prompt": """Execute a workflow with robust error recovery:
+        "prompt": """Design and implement a Python error recovery pipeline. Provide the complete code — do NOT search for files or execute commands.
 
 Scenario: Multi-step data pipeline that must handle failures gracefully.
 
@@ -748,7 +785,9 @@ Additional requirements:
 - Implement circuit breaker pattern (open after 5 consecutive failures)
 - Maintain a dead-letter queue for unrecoverable errors
 - Generate error summary report at pipeline completion
-- Ensure partial progress is preserved (checkpoint after each step)""",
+- Ensure partial progress is preserved (checkpoint after each step)
+
+Provide production-ready Python code with type hints and docstrings.""",
         "complexity": "Medium",
         "timeout_seconds": 180,
         "max_tokens": 4000,
@@ -759,6 +798,7 @@ Additional requirements:
 # ============================================================================
 # Framework Adapters
 # ============================================================================
+
 
 class FrameworkAdapter:
     """Base class for framework benchmark adapters."""
@@ -999,6 +1039,7 @@ class CrewAIAdapter(FrameworkAdapter):
 # Benchmark Runner
 # ============================================================================
 
+
 async def run_benchmark(
     framework: str,
     task_ids: Optional[List[str]] = None,
@@ -1105,8 +1146,9 @@ async def run_benchmark(
         "tasks_failed": failed,
         "success_rate": round(success_rate * 100, 2),
         "total_duration_seconds": round(total_duration, 2),
-        "avg_duration_seconds": round(total_duration / len(tasks_to_run), 2)
-        if tasks_to_run else 0,
+        "avg_duration_seconds": (
+            round(total_duration / len(tasks_to_run), 2) if tasks_to_run else 0
+        ),
         "results": results,
     }
 
@@ -1171,7 +1213,8 @@ def main():
         help="Per-task timeout in seconds",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Enable verbose output",
     )
@@ -1181,19 +1224,22 @@ def main():
         help="Show what would be executed without running",
     )
     parser.add_argument(
-        "--provider", "-p",
+        "--provider",
+        "-p",
         type=str,
         default="anthropic",
         help="LLM provider (anthropic, openai, deepseek, google)",
     )
     parser.add_argument(
-        "--model", "-m",
+        "--model",
+        "-m",
         type=str,
         default=None,
         help="Model name (default: cheapest for provider)",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         action="store_true",
         help="Save results to file",
     )
@@ -1210,15 +1256,17 @@ def main():
     model = args.model or DEFAULT_MODELS.get(args.provider, "gpt-4o-mini")
 
     # Run benchmark
-    results = asyncio.run(run_benchmark(
-        framework=args.framework,
-        task_ids=args.task,
-        timeout=args.timeout,
-        verbose=args.verbose,
-        dry_run=args.dry_run,
-        provider=args.provider,
-        model=model,
-    ))
+    results = asyncio.run(
+        run_benchmark(
+            framework=args.framework,
+            task_ids=args.task,
+            timeout=args.timeout,
+            verbose=args.verbose,
+            dry_run=args.dry_run,
+            provider=args.provider,
+            model=model,
+        )
+    )
 
     # Save results if requested
     if args.output and not args.dry_run and "error" not in results:

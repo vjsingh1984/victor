@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from victor.agent.services.recovery_service import RecoveryService
     from victor.agent.services.session_service import SessionService
     from victor.agent.services.tool_service import ToolService
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.streaming_coordinator import StreamingCoordinator
 
 logger = logging.getLogger(__name__)
@@ -55,8 +55,9 @@ def bootstrap_new_services(
     """Bootstrap all new services with the container.
 
     This function creates and registers all the new service-oriented
-    implementations (ChatService, ToolService, etc.) when their
-    respective feature flags are enabled.
+    implementations (ChatService, ToolService, etc.). Services are
+    always created for availability, but the orchestrator only uses
+    them when USE_SERVICE_LAYER flag is enabled.
 
     Args:
         container: Service container to register services with
@@ -82,23 +83,6 @@ def bootstrap_new_services(
 
     feature_flags = get_feature_flag_manager()
 
-    # Check if any new services should be bootstrapped
-    has_new_services = any(
-        [
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE),
-            feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE),
-        ]
-    )
-
-    if not has_new_services:
-        logger.info("No new service feature flags enabled, skipping bootstrap")
-        return
-
     # Import service protocols and implementations
     from victor.agent.services.protocols import (
         ChatServiceProtocol,
@@ -112,60 +96,62 @@ def bootstrap_new_services(
     # Create service dependencies first (lower-level services)
     services_created: Dict[str, Any] = {}
 
-    # Bootstrap ContextService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_CONTEXT_SERVICE):
-        context_service = _create_context_service(container)
-        services_created["context"] = context_service
-        container.register(
-            ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON
-        )
-        logger.info("Bootstrapped ContextService")
+    # Bootstrap ContextService (always create, used conditionally by orchestrator)
+    context_service = _create_context_service(container)
+    services_created["context"] = context_service
+    container.register(ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON)
+    logger.info("Bootstrapped ContextService")
 
-    # Bootstrap ProviderService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_PROVIDER_SERVICE):
-        provider_service = _create_provider_service(container)
-        services_created["provider"] = provider_service
-        container.register(
-            ProviderServiceProtocol, lambda c: provider_service, ServiceLifetime.SINGLETON
-        )
-        logger.info("Bootstrapped ProviderService")
+    # Bootstrap ProviderService (always create)
+    provider_service = _create_provider_service(container)
+    services_created["provider"] = provider_service
+    container.register(
+        ProviderServiceProtocol,
+        lambda c: provider_service,
+        ServiceLifetime.SINGLETON,
+    )
+    logger.info("Bootstrapped ProviderService")
 
-    # Bootstrap RecoveryService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_RECOVERY_SERVICE):
-        recovery_service = _create_recovery_service(container)
-        services_created["recovery"] = recovery_service
-        container.register(
-            RecoveryServiceProtocol, lambda c: recovery_service, ServiceLifetime.SINGLETON
-        )
-        logger.info("Bootstrapped RecoveryService")
+    # Bootstrap RecoveryService (always create)
+    recovery_service = _create_recovery_service(container)
+    services_created["recovery"] = recovery_service
+    container.register(
+        RecoveryServiceProtocol,
+        lambda c: recovery_service,
+        ServiceLifetime.SINGLETON,
+    )
+    logger.info("Bootstrapped RecoveryService")
 
-    # Bootstrap ToolService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_TOOL_SERVICE):
-        tool_service = _create_tool_service(
-            container,
-            tool_selector=tool_selector,
-            tool_executor=tool_executor,
-        )
-        services_created["tool"] = tool_service
-        container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
-        logger.info("Bootstrapped ToolService")
+    # Bootstrap ToolService (always create)
+    tool_service = _create_tool_service(
+        container,
+        tool_selector=tool_selector,
+        tool_executor=tool_executor,
+    )
+    services_created["tool"] = tool_service
+    container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
+    logger.info("Bootstrapped ToolService")
 
-    # Bootstrap SessionService if enabled
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_SESSION_SERVICE):
-        session_service = _create_session_service(container)
-        services_created["session"] = session_service
-        container.register(
-            SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON
-        )
-        logger.info("Bootstrapped SessionService")
+    # Bootstrap SessionService (always create)
+    session_service = _create_session_service(container)
+    services_created["session"] = session_service
+    container.register(SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON)
+    logger.info("Bootstrapped SessionService")
 
-    # Bootstrap LLMDecisionService — prefer edge model if available
+    # Bootstrap decision service — prefer tiered (edge+balanced+performance),
+    # fall back to single edge, then cloud
     decision_service = None
 
     if feature_flags.is_enabled(FeatureFlag.USE_EDGE_MODEL):
-        decision_service = _create_edge_decision_service()
+        # Try tiered service first (routes different DecisionTypes to different tiers)
+        decision_service = _create_tiered_decision_service()
         if decision_service is not None:
-            logger.info("Bootstrapped LLMDecisionService with edge model")
+            logger.info("Bootstrapped TieredDecisionService (edge/balanced/performance)")
+        else:
+            # Fall back to single edge model
+            decision_service = _create_edge_decision_service()
+            if decision_service is not None:
+                logger.info("Bootstrapped LLMDecisionService with edge model")
 
     if decision_service is None and feature_flags.is_enabled(FeatureFlag.USE_LLM_DECISION_SERVICE):
         decision_service = _create_llm_decision_service(container)
@@ -184,19 +170,18 @@ def bootstrap_new_services(
             ServiceLifetime.SINGLETON,
         )
 
-    # Bootstrap ChatService if enabled (depends on other services)
-    if feature_flags.is_enabled(FeatureFlag.USE_NEW_CHAT_SERVICE):
-        chat_service = _create_chat_service(
-            container,
-            conversation_controller=conversation_controller,
-            streaming_coordinator=streaming_coordinator,
-            provider_service=services_created.get("provider"),
-            tool_service=services_created.get("tool"),
-            context_service=services_created.get("context"),
-            recovery_service=services_created.get("recovery"),
-        )
-        container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
-        logger.info("Bootstrapped ChatService")
+    # Bootstrap ChatService (always create - depends on other services)
+    chat_service = _create_chat_service(
+        container,
+        conversation_controller=conversation_controller,
+        streaming_coordinator=streaming_coordinator,
+        provider_service=services_created.get("provider"),
+        tool_service=services_created.get("tool"),
+        context_service=services_created.get("context"),
+        recovery_service=services_created.get("recovery"),
+    )
+    container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
+    logger.info("Bootstrapped ChatService")
 
 
 def _create_context_service(container: ServiceContainer) -> "ContextService":
@@ -208,7 +193,10 @@ def _create_context_service(container: ServiceContainer) -> "ContextService":
     Returns:
         Configured ContextService instance
     """
-    from victor.agent.services.context_service import ContextService, ContextServiceConfig
+    from victor.agent.services.context_service import (
+        ContextService,
+        ContextServiceConfig,
+    )
 
     config = ContextServiceConfig(
         max_tokens=100000,  # Default, can be overridden
@@ -323,8 +311,20 @@ def _create_session_service(container: ServiceContainer) -> "SessionService":
         Configured SessionService instance
     """
     from victor.agent.services.session_service import SessionService
+    from victor.agent.session_state_manager import create_session_state_manager
 
-    return SessionService()
+    # Create required session state manager
+    session_state_manager = create_session_state_manager(
+        tool_budget=200,  # Default tool budget
+    )
+
+    # Create session service with required dependencies
+    # lifecycle_manager and memory_manager are optional and will be set later
+    return SessionService(
+        session_state_manager=session_state_manager,
+        lifecycle_manager=None,  # Will be set by component_assembler
+        memory_manager=None,  # Will be set by component_assembler
+    )
 
 
 def _create_chat_service(
@@ -368,6 +368,29 @@ def _create_chat_service(
     )
 
 
+def _create_tiered_decision_service() -> Optional[Any]:
+    """Create TieredDecisionService with per-DecisionType tier routing.
+
+    Routes different decision types to different model tiers:
+    - edge (local): tool_selection, skill_selection, intent, completion
+    - balanced (cloud): task_type_classification, multi_skill_decomposition
+    - performance (frontier): opt-in only via settings
+
+    Returns None if creation fails (falls back to single edge service).
+    """
+    try:
+        from victor.agent.services.tiered_decision_service import (
+            create_tiered_decision_service,
+        )
+        from victor.config.decision_settings import DecisionServiceSettings
+
+        config = DecisionServiceSettings()
+        return create_tiered_decision_service(config)
+    except Exception as e:
+        logger.debug("Tiered decision service unavailable: %s", e)
+        return None
+
+
 def _create_edge_decision_service() -> Optional[Any]:
     """Create LLMDecisionService backed by a local edge model (Ollama).
 
@@ -375,7 +398,10 @@ def _create_edge_decision_service() -> Optional[Any]:
     Returns None if Ollama is unavailable.
     """
     try:
-        from victor.agent.edge_model import EdgeModelConfig, create_edge_decision_service
+        from victor.agent.edge_model import (
+            EdgeModelConfig,
+            create_edge_decision_service,
+        )
 
         config = EdgeModelConfig()
         return create_edge_decision_service(config)

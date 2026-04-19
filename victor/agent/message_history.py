@@ -20,7 +20,7 @@ The primary class is `MessageHistory`.
 
 For persistent storage:
 - File-based: see `victor.agent.session.SessionPersistence`
-- SQLite-based with token management: see `victor.agent.conversation_memory.ConversationStore`
+- SQLite-based with token management: see `victor.agent.conversation.store.ConversationStore`
 
 """
 
@@ -30,6 +30,84 @@ from typing import Any, Dict, List, Optional
 from victor.providers.base import Message
 
 logger = logging.getLogger(__name__)
+
+
+class _TrackedList(list):
+    """List subclass that logs when non-Message items are inserted.
+
+    Temporary instrumentation to find where raw strings leak into _messages.
+    """
+
+    def append(self, item: Any) -> None:
+        if not isinstance(item, Message):
+            import traceback
+
+            logger.warning(
+                "TRACKED: non-Message appended: type=%s value=%r caller=\n%s",
+                type(item).__name__,
+                str(item)[:80],
+                "".join(traceback.format_stack()[-4:-1]),
+            )
+        super().append(item)
+
+    def extend(self, items: Any) -> None:
+        # Check if items is a string (would iterate chars)
+        if isinstance(items, str):
+            import traceback
+
+            logger.error(
+                "TRACKED: string passed to extend (would iterate chars!): "
+                "len=%d value=%r caller=\n%s",
+                len(items),
+                items[:80],
+                "".join(traceback.format_stack()[-4:-1]),
+            )
+            return  # Block the corruption
+        for item in items:
+            if not isinstance(item, Message):
+                import traceback
+
+                logger.warning(
+                    "TRACKED: non-Message in extend: type=%s value=%r caller=\n%s",
+                    type(item).__name__,
+                    str(item)[:80],
+                    "".join(traceback.format_stack()[-4:-1]),
+                )
+        super().extend(items)
+
+    def insert(self, index: int, item: Any) -> None:
+        if not isinstance(item, Message):
+            import traceback
+
+            logger.warning(
+                "TRACKED: non-Message inserted at %d: type=%s caller=\n%s",
+                index,
+                type(item).__name__,
+                "".join(traceback.format_stack()[-4:-1]),
+            )
+        super().insert(index, item)
+
+    def __setitem__(self, index: Any, item: Any) -> None:
+        if isinstance(item, list):
+            for i in item:
+                if not isinstance(i, Message):
+                    import traceback
+
+                    logger.warning(
+                        "TRACKED: non-Message in slice assign: type=%s caller=\n%s",
+                        type(i).__name__,
+                        "".join(traceback.format_stack()[-4:-1]),
+                    )
+        elif not isinstance(item, Message):
+            import traceback
+
+            logger.warning(
+                "TRACKED: non-Message set at index %s: type=%s caller=\n%s",
+                index,
+                type(item).__name__,
+                "".join(traceback.format_stack()[-4:-1]),
+            )
+        super().__setitem__(index, item)
 
 
 class MessageHistory:
@@ -58,8 +136,27 @@ class MessageHistory:
         """
         self._system_prompt = system_prompt
         self._system_added = False
-        self._messages: List[Message] = []
+        self.__actual_messages: List[Message] = _TrackedList()
         self._max_history = max_history_messages
+
+    @property
+    def _messages(self) -> List[Message]:
+        return self.__actual_messages
+
+    @_messages.setter
+    def _messages(self, value: Any) -> None:
+        import traceback
+
+        if not isinstance(value, _TrackedList):
+            has_str = any(isinstance(v, str) for v in value) if hasattr(value, '__iter__') else False
+            logger.info(
+                "MESSAGES REPLACED with %s (len=%d, has_str=%s) from:\n%s",
+                type(value).__name__,
+                len(value) if hasattr(value, '__len__') else -1,
+                has_str,
+                "".join(traceback.format_stack()[-4:-1]),
+            )
+        self.__actual_messages = _TrackedList(value) if not isinstance(value, _TrackedList) else value
 
     @property
     def messages(self) -> List[Message]:
@@ -90,7 +187,43 @@ class MessageHistory:
         message = Message(role=role, content=content, **kwargs)
         self._messages.append(message)
         self._trim_history()
+        # Instrumentation: check for non-Message items after each add
+        non_msg = sum(1 for m in self._messages if not isinstance(m, Message))
+        if non_msg > 0:
+            types = {type(m).__name__ for m in self._messages if not isinstance(m, Message)}
+            logger.debug(
+                "NON-MESSAGE DETECTED after add_message(%s): %d non-Message items, types=%s, "
+                "total=%d, caller=%s",
+                role, non_msg, types, len(self._messages),
+                __import__("traceback").format_stack()[-3].strip(),
+            )
         return message
+
+    def append_message(self, message: Any) -> None:
+        """Append a pre-constructed message with type validation.
+
+        Ensures only Message objects enter _messages. Converts dicts and
+        strings defensively to prevent HTTP 400 from malformed history.
+
+        Args:
+            message: Message object, dict with 'role' key, or string
+        """
+        if isinstance(message, Message):
+            self._messages.append(message)
+        elif isinstance(message, dict) and "role" in message:
+            safe_keys = {k: v for k, v in message.items() if k in Message.model_fields}
+            self._messages.append(Message(**safe_keys))
+            logger.debug(
+                "append_message: converted dict to Message (role=%s, keys=%s)",
+                message.get("role"), list(message.keys()),
+            )
+        elif isinstance(message, str):
+            logger.warning("Converting raw string to Message in history")
+            self._messages.append(Message(role="assistant", content=message))
+        else:
+            logger.error("Dropping non-Message object from history: %s", type(message).__name__)
+            return
+        self._trim_history()
 
     def add_user_message(self, content: str) -> Message:
         """Add a user message to conversation history."""
@@ -153,7 +286,8 @@ class MessageHistory:
 
         # Trim from the front (oldest messages), keeping recent ones
         excess = len(self._messages) - self._max_history
-        self._messages = self._messages[excess:]
+        kept = self._messages[excess:]
+        self._messages = _TrackedList(kept)
 
         # Re-add system message at front if it was removed
         if system_msg and (not self._messages or self._messages[0].role != "system"):

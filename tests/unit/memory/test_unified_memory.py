@@ -303,7 +303,10 @@ class TestRecencyRankingStrategy:
         strategy = RecencyRankingStrategy()
         results = [
             MemoryResult(
-                source=MemoryType.ENTITY, content="a", relevance=0.9, timestamp=time.time()
+                source=MemoryType.ENTITY,
+                content="a",
+                relevance=0.9,
+                timestamp=time.time(),
             ),
             MemoryResult(source=MemoryType.ENTITY, content="b", relevance=0.8, timestamp=None),
         ]

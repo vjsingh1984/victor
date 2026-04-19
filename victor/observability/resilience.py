@@ -200,94 +200,124 @@ def retry_with_backoff(
     retryable_exceptions: tuple = (Exception,),
     on_retry: Optional[Callable[[int, Exception, float], None]] = None,
 ) -> Callable[[F], F]:
-    """Decorator for retry with configurable backoff.
+    """Decorator for retry with configurable backoff (COMPATIBILITY WRAPPER).
 
-    Supports both sync and async functions.
+    .. deprecated::
+        This decorator is a compatibility wrapper around the canonical retry
+        implementation in victor.core.retry. For new code, use:
+
+        - `from victor.core.retry import with_retry` for async functions
+        - `from victor.core.retry import with_retry_sync` for sync functions
+        - `RetryExecutor` class for more control
+
+        This wrapper will be removed in version 0.10.0.
+
+    The canonical implementation provides:
+    - More robust error handling with RetryContext
+    - Better observability with hooks (on_retry, on_success, on_failure)
+    - Support for multiple backoff strategies (exponential, linear, fixed, none)
+    - Jitter to prevent thundering herd problems
+    - Exception type filtering (retryable/non-retryable)
 
     Args:
         max_retries: Maximum retry attempts.
         base_delay: Base delay between retries.
-        backoff_strategy: Strategy for calculating delays.
+        backoff_strategy: Strategy for calculating delays (ignored, uses canonical).
         retryable_exceptions: Exceptions that trigger retry.
-        on_retry: Callback called on each retry.
+        on_retry: Callback called on each retry (preserved for compatibility).
 
     Returns:
         Decorated function with retry behavior.
 
     Example:
+        # Old (deprecated):
         @retry_with_backoff(max_retries=3, base_delay=1.0)
         async def fetch_data():
             response = await client.get(url)
             return response.json()
+
+        # New (recommended):
+        from victor.core.retry import with_retry, ExponentialBackoffStrategy
+
+        strategy = ExponentialBackoffStrategy(max_attempts=4, base_delay=1.0)
+        executor = RetryExecutor(strategy)
+
+        @executor.execute_async
+        async def fetch_data():
+            response = await client.get(url)
+            return response.json()
     """
-    strategy = backoff_strategy or ExponentialBackoff()
+    # Import canonical retry implementation
+    from victor.core.retry import (
+        with_retry,
+        with_retry_sync,
+        ExponentialBackoffStrategy as CanonicalExponentialBackoffStrategy,
+        RetryExecutor,
+    )
+
+    # Map legacy parameters to canonical strategy
+    # Note: backoff_strategy parameter is ignored - canonical handles this internally
+    # Convert default (Exception,) to None to mean "retry all exceptions"
+    # The canonical implementation checks for exact type match, not subclass relationships
+    canonical_retryable = None if retryable_exceptions == (Exception,) else (
+        set(retryable_exceptions) if retryable_exceptions else None
+    )
+
+    strategy = CanonicalExponentialBackoffStrategy(
+        max_attempts=max_retries + 1,  # +1 because max_attempts includes initial
+        base_delay=base_delay,
+        max_delay=base_delay * 32,  # Cap at ~32x base
+        multiplier=2.0,
+        jitter=0.1,
+        retryable_exceptions=canonical_retryable,
+    )
+
+    # Create executor with strategy
+    executor = RetryExecutor(strategy)
 
     def decorator(func: F) -> F:
-        @functools.wraps(func)
-        async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception: Optional[Exception] = None
+        # Preserve on_retry callback if provided
+        if on_retry:
+            original_on_retry = strategy.on_retry
+            strategy.on_retry = lambda ctx: on_retry(ctx.attempt, ctx.last_exception, strategy.get_delay(ctx)) if ctx.last_exception else None
 
-            for attempt in range(max_retries + 1):
-                try:
-                    return await func(*args, **kwargs)
-                except retryable_exceptions as e:
-                    last_exception = e
-
-                    if attempt == max_retries:
-                        logger.warning(
-                            f"Retry exhausted for {func.__name__} after "
-                            f"{max_retries + 1} attempts: {e}"
-                        )
-                        raise
-
-                    delay = strategy.calculate_delay(attempt, base_delay)
-
-                    if on_retry:
-                        on_retry(attempt + 1, e, delay)
-
-                    logger.debug(
-                        f"Retry {attempt + 1}/{max_retries} for {func.__name__}, "
-                        f"delay={delay:.2f}s: {e}"
-                    )
-
-                    await asyncio.sleep(delay)
-
-            raise last_exception  # type: ignore
-
-        @functools.wraps(func)
-        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-            last_exception: Optional[Exception] = None
-
-            for attempt in range(max_retries + 1):
-                try:
-                    return func(*args, **kwargs)
-                except retryable_exceptions as e:
-                    last_exception = e
-
-                    if attempt == max_retries:
-                        logger.warning(
-                            f"Retry exhausted for {func.__name__} after "
-                            f"{max_retries + 1} attempts: {e}"
-                        )
-                        raise
-
-                    delay = strategy.calculate_delay(attempt, base_delay)
-
-                    if on_retry:
-                        on_retry(attempt + 1, e, delay)
-
-                    logger.debug(
-                        f"Retry {attempt + 1}/{max_retries} for {func.__name__}, "
-                        f"delay={delay:.2f}s: {e}"
-                    )
-
-                    time.sleep(delay)
-
-            raise last_exception  # type: ignore
-
+        # Use canonical executor
         if asyncio.iscoroutinefunction(func):
+            # For async functions, wrap with executor
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                result = await executor.execute_async(func, *args, **kwargs)
+                # Extract result from RetryResult for backward compatibility
+                if result.success:
+                    return result.result  # type: ignore
+                else:
+                    if result.exception:
+                        raise result.exception
+                    raise RuntimeError("Retry execution failed with no exception")
+
+            # Preserve original function metadata
+            async_wrapper.__name__ = func.__name__
+            async_wrapper.__doc__ = func.__doc__
+            async_wrapper.__module__ = func.__module__
+            async_wrapper.__wrapped__ = func  # type: ignore
             return async_wrapper  # type: ignore
-        return sync_wrapper  # type: ignore
+        else:
+            # For sync functions, wrap with executor
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                result = executor.execute(func, *args, **kwargs)
+                # Extract result from RetryResult for backward compatibility
+                if result.success:
+                    return result.result  # type: ignore
+                else:
+                    if result.exception:
+                        raise result.exception
+                    raise RuntimeError("Retry execution failed with no exception")
+
+            # Preserve original function metadata
+            sync_wrapper.__name__ = func.__name__
+            sync_wrapper.__doc__ = func.__doc__
+            sync_wrapper.__module__ = func.__module__
+            sync_wrapper.__wrapped__ = func  # type: ignore
+            return sync_wrapper  # type: ignore
 
     return decorator
 

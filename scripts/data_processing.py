@@ -1,152 +1,154 @@
-"""Data processing script.
+#!/usr/bin/env python3
+"""
+Sequential data processing workflow:
 
-This script demonstrates a simple sequential data processing workflow:
-1. Load data from ``data.csv``.
-2. Validate the data – check for missing values and invalid types.
-3. If validation fails, clean the data (fill missing values).
-4. Transform the data – normalize numeric fields and encode categoricals.
-5. Save the processed data to ``processed.csv``.
+1. Load data from data.csv
+2. Validate the data (check for missing values, invalid types)
+3. If validation fails, clean the data (fill/remove)
+4. Transform the data (normalize numeric fields, encode categoricals)
+5. Save the processed data to processed.csv
 
-The script is intentionally lightweight and uses only the standard library plus
-``pandas`` and ``numpy`` – both of which are already dependencies of the
-project.
+Each step executes only if the previous step succeeded. If any step fails, an error message is printed and the script stops.
+
+Usage:
+    python scripts/data_processing.py
 """
 
-from __future__ import annotations
-
-import logging
+import sys
 from pathlib import Path
-from typing import List
-
-import numpy as np
 import pandas as pd
-
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 DATA_PATH = Path("data.csv")
-OUTPUT_PATH = Path("processed.csv")
+PROCESSED_PATH = Path("processed.csv")
 
 
 def load_data(path: Path) -> pd.DataFrame:
-    """Load CSV data.
-
-    Parameters
-    ----------
-    path: Path
-        Path to the CSV file.
-
-    Returns
-    -------
-    pd.DataFrame
-        Loaded dataframe.
+    """Load CSV into a DataFrame.
+    Raises FileNotFoundError if the file does not exist.
     """
+    if not path.is_file():
+        raise FileNotFoundError(f"Data file not found: {path}")
     try:
         df = pd.read_csv(path)
-        logger.info("Loaded %d rows and %d columns from %s", *df.shape, path)
-        return df
     except Exception as exc:
-        logger.error("Failed to load data: %s", exc)
-        raise
+        raise RuntimeError(f"Failed to read CSV: {exc}") from exc
+    return df
 
 
 def validate_data(df: pd.DataFrame) -> bool:
-    """Validate dataframe.
-
-    Checks for missing values and basic type consistency.
-
-    Returns
-    -------
-    bool
-        ``True`` if validation passes, ``False`` otherwise.
+    """Return True if data passes validation.
+    Validation checks:
+    - No missing values
+    - All columns have consistent types (numeric columns are numeric, others are string/categorical)
     """
-    # Missing values
-    missing = df.isnull().any().any()
-    if missing:
-        logger.warning("Data contains missing values.")
+    # Check missing values
+    if df.isnull().values.any():
         return False
-
-    # Simple type checks – numeric columns should be numeric
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        if not pd.api.types.is_numeric_dtype(df[col]):
-            logger.warning("Column %s is expected to be numeric.", col)
-            return False
-    logger.info("Data validation passed.")
+    # Check numeric columns
+    for col in df.columns:
+        if pd.api.types.is_numeric_dtype(df[col]):
+            continue
+        if pd.api.types.is_object_dtype(df[col]):
+            continue
+        # For any other dtype, consider invalid
+        return False
     return True
 
 
 def clean_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean data by filling missing values.
-
-    Numeric columns are filled with the mean, categorical with the mode.
+    """Clean data by dropping rows with missing values and converting
+    numeric-like strings to floats.
     """
-    df_clean = df.copy()
-    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        mean_val = df_clean[col].mean()
-        df_clean[col].fillna(mean_val, inplace=True)
-        logger.debug("Filled missing numeric %s with mean %s", col, mean_val)
-
-    # For object/string columns, fill with mode
-    cat_cols = df_clean.select_dtypes(include=[object, "category"]).columns
-    for col in cat_cols:
-        mode_val = df_clean[col].mode(dropna=True)
-        if not mode_val.empty:
-            df_clean[col].fillna(mode_val[0], inplace=True)
-            logger.debug("Filled missing categorical %s with mode %s", col, mode_val[0])
-        else:
-            df_clean[col].fillna("Unknown", inplace=True)
-            logger.debug("Filled missing categorical %s with 'Unknown'", col)
-    return df_clean
+    # Drop rows with any missing values
+    df = df.dropna()
+    # Convert numeric-like strings to numeric types where possible
+    for col in df.columns:
+        if pd.api.types.is_object_dtype(df[col]):
+            try:
+                df[col] = pd.to_numeric(df[col])
+            except Exception:
+                pass  # keep as object if conversion fails
+    return df
 
 
 def transform_data(df: pd.DataFrame) -> pd.DataFrame:
-    """Transform data.
-
-    Normalizes numeric columns using min‑max scaling and one‑hot encodes
-    categorical columns.
+    """Normalize numeric fields and one-hot encode categoricals.
+    Returns transformed DataFrame.
     """
-    df_trans = df.copy()
-    numeric_cols = df_trans.select_dtypes(include=[np.number]).columns
-    if len(numeric_cols) > 0:
-        min_vals = df_trans[numeric_cols].min()
-        max_vals = df_trans[numeric_cols].max()
-        # Avoid division by zero
-        denom = (max_vals - min_vals).replace(0, 1)
-        df_trans[numeric_cols] = (df_trans[numeric_cols] - min_vals) / denom
-        logger.debug("Normalized numeric columns: %s", list(numeric_cols))
+    numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
+    categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
 
-    cat_cols = df_trans.select_dtypes(include=[object, "category"]).columns
-    if len(cat_cols) > 0:
-        df_trans = pd.get_dummies(df_trans, columns=cat_cols, drop_first=True)
-        logger.debug("One‑hot encoded categorical columns: %s", list(cat_cols))
+    numeric_transformer = Pipeline([("scaler", StandardScaler())])
+    categorical_transformer = Pipeline(
+        [("onehot", OneHotEncoder(handle_unknown="ignore", sparse=False))]
+    )
 
-    return df_trans
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", numeric_transformer, numeric_cols),
+            ("cat", categorical_transformer, categorical_cols),
+        ],
+        remainder="passthrough",
+    )
+
+    # Fit and transform
+    transformed_array = preprocessor.fit_transform(df)
+    # Build column names
+    num_features = numeric_cols
+    cat_features = (
+        preprocessor.named_transformers_["cat"]
+        .named_steps["onehot"]
+        .get_feature_names_out(categorical_cols)
+    )
+    all_features = list(num_features) + list(cat_features)
+    transformed_df = pd.DataFrame(transformed_array, columns=all_features)
+    return transformed_df
 
 
 def save_data(df: pd.DataFrame, path: Path) -> None:
-    """Save dataframe to CSV."""
+    """Save DataFrame to CSV."""
     try:
         df.to_csv(path, index=False)
-        logger.info("Saved processed data to %s", path)
     except Exception as exc:
-        logger.error("Failed to save data: %s", exc)
-        raise
+        raise RuntimeError(f"Failed to write CSV: {exc}") from exc
 
 
 def main() -> None:
-    df = load_data(DATA_PATH)
+    try:
+        df = load_data(DATA_PATH)
+        print("Step 1: Data loaded successfully.")
+    except Exception as exc:
+        print(f"Error in Step 1: {exc}")
+        sys.exit(1)
+
     if not validate_data(df):
-        logger.info("Cleaning data...")
-        df = clean_data(df)
-        if not validate_data(df):
-            logger.error("Data still invalid after cleaning. Aborting.")
-            return
-    df = transform_data(df)
-    save_data(df, OUTPUT_PATH)
+        print("Step 2: Validation failed. Cleaning data...")
+        try:
+            df = clean_data(df)
+            print("Step 3: Data cleaned.")
+        except Exception as exc:
+            print(f"Error in Step 3: {exc}")
+            sys.exit(1)
+    else:
+        print("Step 2: Validation succeeded.")
+
+    try:
+        df = transform_data(df)
+        print("Step 4: Data transformed.")
+    except Exception as exc:
+        print(f"Error in Step 4: {exc}")
+        sys.exit(1)
+
+    try:
+        save_data(df, PROCESSED_PATH)
+        print("Step 5: Processed data saved to", PROCESSED_PATH)
+    except Exception as exc:
+        print(f"Error in Step 5: {exc}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
     main()
-

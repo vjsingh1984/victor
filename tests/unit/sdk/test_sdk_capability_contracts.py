@@ -150,7 +150,7 @@ def test_core_task_type_hint_reuses_sdk_contract() -> None:
 
 def test_core_stage_definition_exposes_sdk_compatible_fields() -> None:
     from victor.core.vertical_types import StageDefinition
-    from victor_sdk import normalize_stage_definition
+    from victor_sdk import StageDefinition as SdkStageDefinition, normalize_stage_definition
 
     stage = StageDefinition(
         name="EXECUTION",
@@ -159,6 +159,7 @@ def test_core_stage_definition_exposes_sdk_compatible_fields() -> None:
         next_stages={"VERIFICATION"},
     )
 
+    assert StageDefinition is SdkStageDefinition
     assert stage.description == ""
     assert stage.tools == {"read", "edit"}
     assert stage.required_tools == []

@@ -102,7 +102,9 @@ def create_agent_callback(
     profiles = settings.load_profiles()
 
     if profile not in profiles:
-        raise ValueError(f"Profile '{profile}' not found. Available: {list(profiles.keys())}")
+        raise ValueError(
+            f"Profile '{profile}' not found. Available: {list(profiles.keys())}"
+        )
 
     profile_config = profiles[profile]
     model_name = model_override or profile_config.model
@@ -185,7 +187,9 @@ def create_retry_callback(provider, model_name: str, timeout: int = 120):
         Async callback function for retry with feedback
     """
 
-    async def retry_callback(task: BenchmarkTask, previous_code: str, feedback_prompt: str) -> str:
+    async def retry_callback(
+        task: BenchmarkTask, previous_code: str, feedback_prompt: str
+    ) -> str:
         """Generate corrected code based on feedback."""
         messages = [Message(role="user", content=feedback_prompt)]
 
@@ -296,7 +300,9 @@ async def run_code_gen_benchmark(
     def print_progress(task_idx, total_tasks, result):
         status = "PASS" if result.success else "FAIL"
         print(f"[provider] [{task_idx+1}/{total_tasks}] {result.task_id}")
-        print(f"    Status: {status}, Turns: 1, Tools: 0, Time: {result.duration_seconds:.1f}s")
+        print(
+            f"    Status: {status}, Turns: 1, Tools: 0, Time: {result.duration_seconds:.1f}s"
+        )
         if result.error_message:
             print(f"    Error: {result.error_message[:60]}")
         print(flush=True)
@@ -318,7 +324,9 @@ async def run_code_gen_benchmark(
 
     print("LEVEL: PROVIDER")
     print("-" * 40)
-    print(f"  Pass Rate:      {metrics.pass_rate:.1%} ({metrics.passed}/{metrics.total_tasks})")
+    print(
+        f"  Pass Rate:      {metrics.pass_rate:.1%} ({metrics.passed}/{metrics.total_tasks})"
+    )
     print(f"  Errors:         {metrics.errors}")
     print(f"  Timeouts:       {metrics.timeouts}")
     print(f"  Avg Tokens:     {metrics.avg_tokens:.0f}")
@@ -422,7 +430,11 @@ async def run_benchmark(
     # Progress callback to print results as they complete
     def print_progress(task_idx: int, total_tasks: int, task_result):
         status = "PASS" if task_result.is_success else "FAIL"
-        quality = task_result.code_quality.get_overall_score() if task_result.code_quality else 0
+        quality = (
+            task_result.code_quality.get_overall_score()
+            if task_result.code_quality
+            else 0
+        )
         duration = task_result.duration_seconds or 0
 
         print(f"[{task_idx+1}/{total_tasks}] {task_result.task_id}")
@@ -434,7 +446,10 @@ async def run_benchmark(
         print(flush=True)
 
     result = await harness.run_evaluation(
-        config, agent_callback, progress_callback=print_progress, retry_callback=retry_callback
+        config,
+        agent_callback,
+        progress_callback=print_progress,
+        retry_callback=retry_callback,
     )
 
     # Get metrics from harness
@@ -469,7 +484,9 @@ async def run_benchmark(
         print(f"  Pass@10:        {pass_at_10:.2%}")
     print()
     print(f"Total Duration:   {metrics['duration_seconds']:.1f}s")
-    print(f"Avg per Task:     {metrics['duration_seconds']/metrics['total_tasks']:.1f}s")
+    print(
+        f"Avg per Task:     {metrics['duration_seconds']/metrics['total_tasks']:.1f}s"
+    )
     print()
     print("=" * 70)
 
@@ -507,7 +524,9 @@ async def run_benchmark(
 
 
 async def main():
-    parser = argparse.ArgumentParser(description="Run HumanEval benchmark with Victor agent")
+    parser = argparse.ArgumentParser(
+        description="Run HumanEval benchmark with Victor agent"
+    )
     parser.add_argument(
         "--profile",
         type=str,
@@ -574,7 +593,9 @@ async def main():
         print()
         print(f"  The '{args.mode}' mode has been removed from HumanEval benchmarks.")
         print()
-        print("  HumanEval tests pure code generation - tools add overhead without value.")
+        print(
+            "  HumanEval tests pure code generation - tools add overhead without value."
+        )
         print()
         print("  Options:")
         print("    1. Remove --mode or use --mode provider for HumanEval")

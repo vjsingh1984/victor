@@ -6,7 +6,6 @@ without any victor-ai runtime dependencies.
 
 import subprocess
 import sys
-from typing import List
 
 
 def run_python_script(script: str) -> tuple[bool, str, str]:
@@ -331,7 +330,10 @@ def run_all_e2e_tests():
 
     tests = [
         ("Zero-Dependency Import", test_zero_dependency_import),
-        ("Zero-Dependency Vertical Definition", test_zero_dependency_vertical_definition),
+        (
+            "Zero-Dependency Vertical Definition",
+            test_zero_dependency_vertical_definition,
+        ),
         ("Protocol Implementation", test_protocol_implementation),
         ("Discovery System", test_discovery_system),
         ("Core Types", test_core_types),

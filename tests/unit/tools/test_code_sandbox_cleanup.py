@@ -50,7 +50,10 @@ class TestCodeSandboxContextManager:
 
     def test_context_manager_stops_on_exception(self):
         """Verify stop() is called even when exception occurs."""
-        with patch.object(CodeSandbox, "start"), patch.object(CodeSandbox, "stop") as mock_stop:
+        with (
+            patch.object(CodeSandbox, "start"),
+            patch.object(CodeSandbox, "stop") as mock_stop,
+        ):
             sandbox = CodeSandbox(require_docker=False)
 
             with pytest.raises(ValueError):

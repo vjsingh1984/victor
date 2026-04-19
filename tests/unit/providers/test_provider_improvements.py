@@ -31,11 +31,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 # Import components
-from victor.agent.conversation_memory import (
-    ConversationStore,
-    MessagePriority,
-    MessageRole,
-)
+from victor.agent.conversation.store import ConversationStore
+from victor.agent.conversation.types import MessagePriority, MessageRole
 from victor.analytics.streaming_metrics import (
     StreamingMetricsCollector,
     StreamMetrics,
@@ -181,7 +178,7 @@ class TestConversationStore:
 
         manager.add_message(session.session_id, MessageRole.USER, "Hello")
         manager.add_message(session.session_id, MessageRole.ASSISTANT, "Hi there")
-        manager.add_message(session.session_id, MessageRole.TOOL_RESULT, "Tool output")
+        manager.add_message(session.session_id, MessageRole.TOOL, "Tool output")
 
         stats = manager.get_session_stats(session.session_id)
 
@@ -434,6 +431,67 @@ class TestRetryStrategy:
 
         with pytest.raises(ValueError):
             await retry.execute(value_error)
+
+    @pytest.mark.asyncio
+    async def test_retries_open_circuit_breaker(self, retry, monkeypatch):
+        """Open circuits should be retried after their cooldown."""
+        from victor.providers.circuit_breaker import (
+            CircuitBreakerError as CanonicalCircuitBreakerError,
+        )
+
+        attempts = [0]
+        sleeps: list[float] = []
+
+        async def flaky():
+            attempts[0] += 1
+            if attempts[0] == 1:
+                raise CanonicalCircuitBreakerError(
+                    "Circuit breaker 'provider_OpenAIProvider' is OPEN. Retry after 0.5s",
+                    state=CircuitState.OPEN,
+                    retry_after=0.5,
+                )
+            return "ok"
+
+        async def fake_sleep(delay: float) -> None:
+            sleeps.append(delay)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await retry.execute(flaky)
+
+        assert result == "ok"
+        assert attempts[0] == 2
+        assert sleeps == [0.1]
+
+    @pytest.mark.asyncio
+    async def test_retries_openai_api_connection_error(self, retry, monkeypatch):
+        """OpenAI API transport errors should be retried."""
+        import httpx
+        from openai import APIConnectionError
+
+        attempts = [0]
+        sleeps: list[float] = []
+
+        async def flaky():
+            attempts[0] += 1
+            if attempts[0] == 1:
+                error = APIConnectionError(
+                    request=httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+                )
+                error.__cause__ = OSError("connection reset by peer")
+                raise error
+            return "ok"
+
+        async def fake_sleep(delay: float) -> None:
+            sleeps.append(delay)
+
+        monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+
+        result = await retry.execute(flaky)
+
+        assert result == "ok"
+        assert attempts[0] == 2
+        assert len(sleeps) == 1
 
 
 # =============================================================================
@@ -922,7 +980,8 @@ class TestSharedInfrastructureIntegration:
         from victor.providers.resilience import ResilientProvider
         from victor.providers.concurrency import RequestQueue, ConcurrencyConfig
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
-        from victor.agent.conversation_memory import ConversationStore, MessageRole
+        from victor.agent.conversation.store import ConversationStore
+        from victor.agent.conversation.types import MessageRole
         import tempfile
         from pathlib import Path
 

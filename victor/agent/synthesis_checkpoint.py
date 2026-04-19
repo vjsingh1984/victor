@@ -250,7 +250,11 @@ class TimeoutApproachingCheckpoint(SynthesisCheckpoint):
                     "Provide your best answer with current findings immediately."
                 ),
                 priority=10,
-                metadata={"elapsed": elapsed, "timeout": timeout, "remaining": remaining},
+                metadata={
+                    "elapsed": elapsed,
+                    "timeout": timeout,
+                    "remaining": remaining,
+                },
             )
 
         if time_ratio > self.warning_threshold:
@@ -262,7 +266,11 @@ class TimeoutApproachingCheckpoint(SynthesisCheckpoint):
                     "Consider synthesizing your findings soon."
                 ),
                 priority=7,
-                metadata={"elapsed": elapsed, "timeout": timeout, "remaining": remaining},
+                metadata={
+                    "elapsed": elapsed,
+                    "timeout": timeout,
+                    "remaining": remaining,
+                },
             )
 
         return CheckpointResult(

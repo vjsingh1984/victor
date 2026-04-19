@@ -55,12 +55,16 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional, TYPE_CHECKING
 
+from victor.providers.base import StreamChunk
+
 if TYPE_CHECKING:
-    from victor.agent.conversation_controller import ConversationController, ContextMetrics
+    from victor.agent.conversation.controller import (
+        ConversationController,
+        ContextMetrics,
+    )
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.debug_logger import DebugLogger
     from victor.config.settings import Settings
-    from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
 
@@ -223,9 +227,6 @@ class ContextManager:
             f"freed {compaction_action.chars_freed:,} chars"
         )
 
-        # Import here to avoid circular dependency
-        from victor.providers.base import StreamChunk
-
         chunk: Optional[StreamChunk] = None
         if compaction_action.messages_removed > 0:
             chunk = StreamChunk(
@@ -266,9 +267,6 @@ class ContextManager:
             f"removed {compaction_action.messages_removed} messages, "
             f"freed {compaction_action.chars_freed:,} chars"
         )
-
-        # Import here to avoid circular dependency
-        from victor.providers.base import StreamChunk
 
         chunk: Optional[StreamChunk] = None
         if compaction_action.messages_removed > 0:

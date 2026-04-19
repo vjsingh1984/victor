@@ -297,7 +297,10 @@ _CLEANUP_PATTERNS = [
     (re.compile(r"</?parameter[^>]*>"), ""),  # Parameter tags
     (re.compile(r"</?tool[^>]*>"), ""),  # Tool tags
     (re.compile(r"</?IMPORTANT[^>]*>"), ""),  # Important tags
-    (re.compile(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}'), ""),  # JSON tool calls
+    (
+        re.compile(r'\{"name":\s*"[^"]+",\s*"arguments":\s*\{[^}]*\}\}'),
+        "",
+    ),  # JSON tool calls
     (re.compile(r"\n{4,}"), "\n\n\n"),  # Excessive newlines
 ]
 

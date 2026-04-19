@@ -29,7 +29,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from victor.storage.embeddings.collections import CollectionItem, StaticEmbeddingCollection
+from victor.storage.embeddings.collections import (
+    CollectionItem,
+    StaticEmbeddingCollection,
+)
 from victor.storage.embeddings.service import EmbeddingService, get_embedding_service
 
 logger = logging.getLogger(__name__)
@@ -59,10 +62,14 @@ CONTINUATION_HEURISTIC_PATTERNS = [
     re.compile(r"\b(first|now|next),?\s+let\s+me\b", re.IGNORECASE),
     # "I'll read/check/examine..."
     re.compile(
-        r"\bi['']ll\s+(read|check|examine|look\s+at|analyze|review|explore)\b", re.IGNORECASE
+        r"\bi['']ll\s+(read|check|examine|look\s+at|analyze|review|explore)\b",
+        re.IGNORECASE,
     ),
     # "I need to read/check..."
-    re.compile(r"\bi\s+need\s+to\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
+    re.compile(
+        r"\bi\s+need\s+to\s+(read|check|examine|look\s+at|analyze|review)\b",
+        re.IGNORECASE,
+    ),
     # "I should read/check..."
     re.compile(r"\bi\s+should\s+(read|check|examine|look\s+at|analyze|review)\b", re.IGNORECASE),
     # "Let me start by..."
@@ -185,7 +192,8 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
     ),
     # "Let me know if you'd like more details on any of these"
     re.compile(
-        r"\blet\s+me\s+know\s+if\s+you.*(more\s+details?|elaborate|go\s+deeper)\b", re.IGNORECASE
+        r"\blet\s+me\s+know\s+if\s+you.*(more\s+details?|elaborate|go\s+deeper)\b",
+        re.IGNORECASE,
     ),
     # "Would you like more details on any of..."
     re.compile(
@@ -194,7 +202,8 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
     ),
     # "I can elaborate on any of these if you'd like"
     re.compile(
-        r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b", re.IGNORECASE
+        r"\bi\s+can\s+(elaborate|expand|explain\s+further|provide\s+more\s+detail)\b",
+        re.IGNORECASE,
     ),
 ]
 

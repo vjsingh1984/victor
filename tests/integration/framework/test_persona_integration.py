@@ -51,7 +51,10 @@ class TestPersonaRegistryBasics:
 
     def test_persona_registry_singleton(self):
         """PersonaRegistry follows singleton pattern."""
-        from victor.framework.persona_registry import get_persona_registry, PersonaRegistry
+        from victor.framework.persona_registry import (
+            get_persona_registry,
+            PersonaRegistry,
+        )
 
         registry1 = get_persona_registry()
         registry2 = get_persona_registry()
@@ -491,7 +494,11 @@ class TestPersonaDecoratorRegistration:
 
     def test_persona_decorator_registration(self):
         """@persona decorator registers factory functions."""
-        from victor.framework.persona_registry import get_persona_registry, persona, PersonaSpec
+        from victor.framework.persona_registry import (
+            get_persona_registry,
+            persona,
+            PersonaSpec,
+        )
 
         @persona("coding:decorator_test")
         def my_persona():
@@ -514,7 +521,11 @@ class TestPersonaDecoratorRegistration:
 
     def test_persona_decorator_with_vertical_in_name(self):
         """@persona decorator supports "vertical:name" format."""
-        from victor.framework.persona_registry import get_persona_registry, persona, PersonaSpec
+        from victor.framework.persona_registry import (
+            get_persona_registry,
+            persona,
+            PersonaSpec,
+        )
 
         @persona("research:auto_persona")
         def auto_persona():
@@ -583,7 +594,11 @@ class TestPersonaUtilityFunctions:
 
     def test_create_persona_spec_utility(self):
         """create_persona_spec() utility function creates from factories."""
-        from victor.framework.persona_registry import persona, create_persona_spec, PersonaSpec
+        from victor.framework.persona_registry import (
+            persona,
+            create_persona_spec,
+            PersonaSpec,
+        )
 
         @persona("coding:create_test")
         def factory_persona():
@@ -699,7 +714,9 @@ class TestPersonaIntegrationScenarios:
             "c2", PersonaSpec(name="c2", role="C2", expertise=["c"]), vertical="coding"
         )
         registry.register(
-            "r1", PersonaSpec(name="r1", role="R1", expertise=["r"]), vertical="research"
+            "r1",
+            PersonaSpec(name="r1", role="R1", expertise=["r"]),
+            vertical="research",
         )
 
         # List by vertical

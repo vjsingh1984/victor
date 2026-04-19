@@ -373,7 +373,7 @@ class TestAgentStream:
         """stream should notify state observers on stage changes."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         observer_called = []
 
@@ -412,7 +412,7 @@ class TestAgentStream:
         """stream should catch and suppress observer exceptions."""
         from victor.framework.agent import Agent
         from victor.framework.events import AgentExecutionEvent, EventType
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         # Create an observer that raises an exception
         def failing_observer(old_state, new_state):
@@ -1302,9 +1302,12 @@ class TestAgentCreate:
 
         mock_orchestrator = MagicMock()
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             agent = await Agent.create(provider="anthropic")
 
@@ -1318,9 +1321,12 @@ class TestAgentCreate:
 
         mock_orchestrator = MagicMock()
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             agent = await Agent.create(
                 provider="anthropic",
@@ -1348,9 +1354,12 @@ class TestAgentCreate:
             )
         )
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             # User still chooses anthropic despite not being preferred
             agent = await Agent.create(
@@ -1381,9 +1390,12 @@ class TestAgentCreate:
 
         mock_orchestrator = MagicMock()
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(return_value=mock_orchestrator),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(return_value=mock_orchestrator),
+            ),
         ):
             agent = await Agent.create(
                 provider="anthropic",
@@ -1400,9 +1412,12 @@ class TestAgentCreate:
         from victor.framework.agent import Agent
         from victor.framework.errors import ProviderError
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(side_effect=Exception("Provider API error")),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(side_effect=Exception("Provider API error")),
+            ),
         ):
             with pytest.raises(ProviderError, match="API error"):
                 await Agent.create(provider="anthropic")
@@ -1413,9 +1428,12 @@ class TestAgentCreate:
         from victor.framework.agent import Agent
         from victor.framework.errors import AgentError
 
-        with patch(
-            "victor.framework._internal.create_orchestrator_from_options",
-            new=AsyncMock(side_effect=Exception("Configuration invalid")),
+        with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
+            patch(
+                "victor.framework.agent_factory.AgentFactory.create",
+                new=AsyncMock(side_effect=Exception("Configuration invalid")),
+            ),
         ):
             with pytest.raises(AgentError, match="Configuration invalid"):
                 await Agent.create(provider="anthropic")
@@ -1439,11 +1457,15 @@ class TestAgentCreateTeam:
         mock_team = MagicMock()
 
         with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.framework._internal.create_orchestrator_from_options",
+                "victor.framework.agent_factory.AgentFactory.create",
                 new=AsyncMock(return_value=mock_orchestrator),
             ),
-            patch("victor.framework.teams.AgentTeam.create", new=AsyncMock(return_value=mock_team)),
+            patch(
+                "victor.framework.teams.AgentTeam.create",
+                new=AsyncMock(return_value=mock_team),
+            ),
         ):
             team = await Agent.create_team(
                 name="Test Team",
@@ -1467,12 +1489,14 @@ class TestAgentCreateTeam:
         mock_team = MagicMock()
 
         with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.framework._internal.create_orchestrator_from_options",
+                "victor.framework.agent_factory.AgentFactory.create",
                 new=AsyncMock(return_value=mock_orchestrator),
             ),
             patch(
-                "victor.framework.teams.AgentTeam.create", new=AsyncMock(return_value=mock_team)
+                "victor.framework.teams.AgentTeam.create",
+                new=AsyncMock(return_value=mock_team),
             ) as mock_create,
         ):
             await Agent.create_team(
@@ -1496,12 +1520,14 @@ class TestAgentCreateTeam:
         mock_team = MagicMock()
 
         with (
+            patch("victor.config.settings.load_settings", return_value=MagicMock()),
             patch(
-                "victor.framework._internal.create_orchestrator_from_options",
+                "victor.framework.agent_factory.AgentFactory.create",
                 new=AsyncMock(return_value=mock_orchestrator),
             ),
             patch(
-                "victor.framework.teams.AgentTeam.create", new=AsyncMock(return_value=mock_team)
+                "victor.framework.teams.AgentTeam.create",
+                new=AsyncMock(return_value=mock_team),
             ) as mock_create,
         ):
             await Agent.create_team(

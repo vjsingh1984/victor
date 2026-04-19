@@ -65,7 +65,7 @@ class EmbeddingRegistry:
             raise TypeError(f"{provider_class} must inherit from BaseEmbeddingProvider")
 
         cls._providers[name] = provider_class
-        print(f"Registered embedding provider: {name}")
+        logger.debug("Registered embedding provider: %s", name)
 
     @classmethod
     def get(cls, name: str) -> Type[BaseEmbeddingProvider]:
@@ -255,7 +255,9 @@ def _auto_register_providers() -> None:
         pass  # ProximaDB not installed
 
     try:
-        from victor.storage.vector_stores.proximadb_multi import ProximaDBMultiModelProvider
+        from victor.storage.vector_stores.proximadb_multi import (
+            ProximaDBMultiModelProvider,
+        )
 
         EmbeddingRegistry.register("proximadb_multi", ProximaDBMultiModelProvider)
     except Exception:

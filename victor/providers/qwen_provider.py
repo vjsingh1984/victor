@@ -56,6 +56,8 @@ from victor.providers.oauth_manager import OAuthTokenManager
 QWEN_BASE_URLS = {
     "standard": "https://dashscope.aliyuncs.com/compatible-mode/v1/",
     "portal": "https://portal.qwen.ai/v1/",
+    # Alibaba Cloud Coding Plan: multi-model access (Qwen + GLM + Kimi + MiniMax)
+    "coding": "https://coding.dashscope.aliyuncs.com/v1/",
 }
 
 # Qwen OAuth configuration (for reference / documentation)

@@ -149,7 +149,9 @@ class TestLLMIntentClassification:
     def test_analysis_sets_analysis_provided(self):
         service = _mock_decision_service(
             TaskTypeDecision(
-                task_type="analysis", confidence=0.85, deliverables=["analysis_provided"]
+                task_type="analysis",
+                confidence=0.85,
+                deliverables=["analysis_provided"],
             )
         )
         detector = TaskCompletionDetector(decision_service=service)

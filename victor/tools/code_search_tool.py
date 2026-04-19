@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import time
@@ -14,8 +15,139 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def extract_skeleton(source: str, language: str = "python") -> str:
+    """Extract a program skeleton from source code.
+
+    Returns function/class signatures + docstrings without implementation
+    details. Inspired by arXiv:2604.07502 (SE Conventions for Agentic Dev).
+
+    Args:
+        source: Source code string
+        language: Programming language (currently 'python' supported)
+
+    Returns:
+        Skeleton string with signatures and docstrings
+    """
+    if not source.strip():
+        return ""
+
+    if language != "python":
+        # Fallback: first 50 lines for unknown languages
+        lines = source.split("\n")[:50]
+        return "\n".join(lines)
+
+    lines = source.split("\n")
+    skeleton_lines: List[str] = []
+    in_body = False
+    in_docstring = False
+    docstring_quote: Optional[str] = None
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Import statements — always include
+        if stripped.startswith(("import ", "from ")):
+            skeleton_lines.append(line)
+            in_body = False
+            continue
+
+        # Decorators — include
+        if stripped.startswith("@"):
+            skeleton_lines.append(line)
+            in_body = False
+            continue
+
+        # Class/function definitions — always include
+        if stripped.startswith(("def ", "class ", "async def ")):
+            skeleton_lines.append(line)
+            in_body = True
+            in_docstring = False
+            continue
+
+        # Docstrings right after def/class — include
+        if in_body and not in_docstring:
+            if '"""' in stripped or "'''" in stripped:
+                skeleton_lines.append(line)
+                quote = '"""' if '"""' in stripped else "'''"
+                # Check if single-line docstring
+                if stripped.count(quote) >= 2:
+                    in_body = True  # Continue looking for nested defs
+                    continue
+                in_docstring = True
+                docstring_quote = quote
+                continue
+            elif stripped.startswith("#"):
+                # Comment right after def — include as pseudo-docstring
+                skeleton_lines.append(line)
+                continue
+            else:
+                # First non-docstring line in body — skip body
+                in_body = True
+                continue
+
+        # Inside docstring — include until closing
+        if in_docstring:
+            skeleton_lines.append(line)
+            if docstring_quote and docstring_quote in stripped:
+                in_docstring = False
+            continue
+
+        # Module-level assignments/constants (not indented) — include
+        if not stripped.startswith(" ") and not stripped.startswith("\t"):
+            if "=" in stripped and not stripped.startswith("#"):
+                # Module-level constant
+                skeleton_lines.append(line)
+                in_body = False
+                continue
+
+        # Blank lines between definitions — preserve structure
+        if not stripped and not in_body:
+            skeleton_lines.append(line)
+
+    return "\n".join(skeleton_lines).rstrip()
+
+
 # Legacy cache for semantic indexes (use _get_index_cache() for DI support)
 _INDEX_CACHE: Dict[str, Dict[str, Any]] = {}
+
+
+def clear_index_cache() -> None:
+    """Clear all cached indexes. Call between benchmark tasks for isolation."""
+    _INDEX_CACHE.clear()
+
+
+async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
+    """Validate persistent index integrity with a lightweight check.
+
+    Returns True if index was corrupt and rebuilt, False if healthy.
+    """
+    try:
+        # Quick check: does the vector store have data?
+        store = getattr(index, "_vector_store", None) or getattr(index, "vector_store", None)
+        if store:
+            # Check if table has rows (faster than running a full semantic query)
+            table = getattr(store, "_table", None)
+            if table is not None:
+                row_count = table.count_rows() if hasattr(table, "count_rows") else -1
+                if row_count > 0:
+                    logger.info("Persistent index healthy: %d rows in vector store", row_count)
+                    return False  # Healthy
+
+        # Fallback: try a semantic search with timeout
+        await asyncio.wait_for(
+            index.semantic_search(query="test", max_results=1),
+            timeout=timeout,
+        )
+        return False  # Healthy — no rebuild needed
+    except Exception as e:
+        logger.warning("Persistent index corrupt (%s), forcing rebuild", e)
+        if hasattr(index, "_is_indexed"):
+            index._is_indexed = False
+        try:
+            await index.index_codebase()
+        except Exception as rebuild_err:
+            logger.warning("Index rebuild failed: %s", rebuild_err)
+        return True  # Rebuilt (or attempted)
 
 
 def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -390,13 +522,43 @@ async def _get_or_build_index(
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
 
-    _index_factory = CapabilityRegistry.get_instance().get(CodebaseIndexFactoryProtocol)
-    if _index_factory is None or not CapabilityRegistry.get_instance().is_enhanced(
-        CodebaseIndexFactoryProtocol
-    ):
+    registry = CapabilityRegistry.get_instance()
+    # Ensure plugins are bootstrapped so victor-coding registers its factory
+    registry.ensure_bootstrapped()
+
+    _index_factory = registry.get(CodebaseIndexFactoryProtocol)
+    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
+        # Recovery 1: force plugin capability re-discovery (plugin chain may have
+        # been bootstrapped before victor-coding was installed, or an exception
+        # was silently swallowed during _auto_register_vertical_capabilities)
+        from victor.core.bootstrap import _discover_plugin_capabilities
+
+        _discover_plugin_capabilities(None)
+        _index_factory = registry.get(CodebaseIndexFactoryProtocol)
+
+    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
+        # Recovery 2: direct import — bypasses plugin→vertical→capability chain entirely.
+        # This handles cases where the plugin chain fails silently (DEBUG-level exception
+        # swallowing in _auto_register_vertical_capabilities) but the package IS installed.
+        try:
+            from victor.core.capability_registry import CapabilityStatus
+            from victor.core.search.indexer import EnhancedCodebaseIndexFactory
+
+            factory = EnhancedCodebaseIndexFactory()
+            registry.register(CodebaseIndexFactoryProtocol, factory, CapabilityStatus.ENHANCED)
+            _index_factory = factory
+            logger.info(
+                "[code_search] Recovered CodebaseIndex factory via direct import "
+                "(victor-coding is installed, plugin chain failed)"
+            )
+        except ImportError:
+            pass  # victor-coding genuinely not installed
+
+    if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
         raise ImportError(
-            "Codebase indexing requires victor-coding package. "
-            "Install with: pip install victor-coding"
+            "CodebaseIndex requires a codebase indexing provider "
+            "(e.g., pip install victor-coding). The provider registers "
+            "its factory via CapabilityRegistry at bootstrap."
         )
 
     # Get cache using DI-aware accessor
@@ -453,14 +615,20 @@ async def _get_or_build_index(
 
     # Only do full index if forced or no persistent data exists
     persist_path = Path(default_persist_dir)
-    if force_reindex or not persist_path.exists() or not any(persist_path.iterdir()):
+    has_persistent_data = persist_path.exists() and any(persist_path.iterdir())
+    if force_reindex or not has_persistent_data:
         # First time or forced - full index
         await index.index_codebase()
         rebuilt = True
     else:
-        # Persistent data exists - just ensure indexed (incremental)
-        await index.ensure_indexed(auto_reindex=True)
-        rebuilt = False
+        # Persistent embeddings exist on disk (LanceDB tables).
+        # Mark as indexed so semantic_search() works directly against
+        # the persisted data without triggering a full rebuild.
+        if hasattr(index, "_is_indexed"):
+            index._is_indexed = True
+        logger.info("Using persistent embeddings from %s (skip full rebuild)", persist_path)
+        # Validate integrity — corrupt LanceDB data will fail silently
+        rebuilt = await _probe_index_integrity(index)
 
     index_cache[str(root)] = {
         "index": index,
@@ -492,20 +660,126 @@ async def _literal_search(
     import subprocess
 
     try:
-        # Resolve '.' to the framework's project root
+        # Resolve empty or '.' to the framework's project root
         search_path = path
-        if search_path == ".":
+        if not search_path or search_path == ".":
             try:
                 from victor.config.settings import get_project_paths
 
                 search_path = str(get_project_paths().project_root)
             except Exception:
-                pass
+                search_path = "."  # Fallback to CWD
+
+        # Normalize dotted notation: "Class.method" → search for "def method"
+        # in files containing "class Class". This handles the common pattern
+        # where models search for "SQLCompiler.get_order_by" but the source has
+        # "class SQLCompiler:" and "def get_order_by(self):" on separate lines.
+        search_query = query
+        dotted_class = None
+        if "." in query and not query.startswith(".") and " " not in query:
+            parts = query.rsplit(".", 1)
+            if len(parts) == 2 and parts[0][0].isupper():
+                dotted_class, method = parts
+                search_query = f"def {method}"
+                logger.info(
+                    "Dotted notation detected: %s → searching for '%s' in files with 'class %s'",
+                    query,
+                    search_query,
+                    dotted_class,
+                )
 
         logger.info(
             f"Literal search: query={query!r}, path={path!r}, "
             f"resolved={search_path!r}, exts={exts}"
         )
+
+        # Filename detection: if query looks like a filename (has extension),
+        # use find/rg --files instead of content search
+        filename_exts = (
+            ".py",
+            ".js",
+            ".ts",
+            ".go",
+            ".java",
+            ".c",
+            ".cpp",
+            ".rs",
+            ".yaml",
+            ".yml",
+            ".json",
+            ".toml",
+            ".md",
+            ".txt",
+            ".sh",
+            ".rb",
+            ".php",
+            ".swift",
+            ".kt",
+            ".scala",
+            ".r",
+            ".sql",
+        )
+        query_lower = search_query.lower()
+        is_filename_query = (
+            any(query_lower.endswith(ext) for ext in filename_exts)
+            and " " not in search_query
+            and len(search_query) < 100
+        )
+
+        if is_filename_query:
+            import platform
+
+            system = platform.system()
+            logger.info(
+                f"Filename query detected: using {'dir' if system == 'Windows' else 'find'} "
+                f"for {search_query!r} on {system}"
+            )
+
+            if system == "Windows":
+                # Windows: use dir /s /b for recursive file search
+                find_cmd = ["cmd", "/c", "dir", "/s", "/b", f"*{search_query}*"]
+                find_cwd = search_path
+            else:
+                # Linux / macOS: use find
+                find_cmd = ["find", search_path, "-type", "f", "-name", f"*{search_query}*"]
+                find_cwd = None
+
+            try:
+                # Use asyncio subprocess to avoid blocking event loop
+                proc = await asyncio.create_subprocess_exec(
+                    *find_cmd,
+                    cwd=find_cwd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=15)
+                find_result = type(
+                    "obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")}
+                )
+                found_files = [f.strip() for f in find_result.stdout.splitlines() if f.strip()]
+                if found_files:
+                    results = []
+                    for fpath in found_files[:k]:
+                        results.append(
+                            {
+                                "path": fpath,
+                                "score": 10 if fpath.endswith(search_query) else 5,
+                                "snippet": f"[File found: {fpath}]",
+                            }
+                        )
+                    logger.info(
+                        f"Filename search: found {len(found_files)} files matching "
+                        f"{search_query!r} in {search_path}"
+                    )
+                    return {
+                        "success": True,
+                        "results": results,
+                        "count": len(results),
+                        "mode": "filename",
+                    }
+            except (subprocess.TimeoutExpired, Exception) as e:
+                logger.debug(f"Filename search failed, falling back to content: {e}")
+            # Fall through to content search if find returns nothing
 
         # Build command: prefer ripgrep, fall back to grep
         use_rg = shutil.which("rg") is not None
@@ -536,16 +810,18 @@ async def _literal_search(
                         "--type=yaml",
                     ]
                 )
-            cmd.extend(["--", query, search_path])
+            cmd.extend(["--", search_query, search_path])
         else:
-            cmd = ["grep", "-rn", "--include=*.py", "--", query, search_path]
+            cmd = ["grep", "-rn", "--include=*.py", "--", search_query, search_path]
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
+        # Use asyncio subprocess to avoid blocking event loop
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        result = type("obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")})
 
         # Parse results: group by file, take top k files
         file_matches: Dict[str, List[str]] = {}
@@ -557,6 +833,24 @@ async def _literal_search(
                 if fpath not in file_matches:
                     file_matches[fpath] = []
                 file_matches[fpath].append(line)
+
+        # For dotted notation (Class.method), filter to files containing the class
+        if dotted_class and file_matches:
+            filtered = {}
+            for fpath, matches in file_matches.items():
+                try:
+                    content = Path(fpath).read_text(errors="ignore")
+                    if f"class {dotted_class}" in content:
+                        filtered[fpath] = matches
+                except Exception:
+                    pass
+            if filtered:
+                file_matches = filtered
+                logger.info(
+                    "Dotted notation filter: %d files contain 'class %s'",
+                    len(filtered),
+                    dotted_class,
+                )
 
         # Sort by number of matches (most matches = most relevant)
         ranked = sorted(file_matches.items(), key=lambda x: len(x[1]), reverse=True)
@@ -577,7 +871,12 @@ async def _literal_search(
             f"Literal search: found {len(file_matches)} files matching "
             f"{query!r} in {search_path} ({'rg' if use_rg else 'grep'})"
         )
-        return {"success": True, "results": results, "count": len(results), "mode": "literal"}
+        return {
+            "success": True,
+            "results": results,
+            "count": len(results),
+            "mode": "literal",
+        }
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Search timed out after 30s"}
     except Exception as exc:
@@ -590,8 +889,17 @@ async def _literal_search(
     access_mode=AccessMode.READONLY,  # Only reads files for search
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["query", "path", "mode"],  # Different queries/paths = exploration not loop
-    stages=["initial", "planning", "reading", "analysis"],  # Relevant for exploration stages
+    progress_params=[
+        "query",
+        "path",
+        "mode",
+    ],  # Different queries/paths = exploration not loop
+    stages=[
+        "initial",
+        "planning",
+        "reading",
+        "analysis",
+    ],  # Relevant for exploration stages
     task_types=["search", "analysis"],  # Classification-aware selection
     execution_category="read_only",  # Safe for parallel execution
     keywords=[
@@ -607,9 +915,12 @@ async def _literal_search(
         "crash",
         "failure",
         "find",
+        "find file",
+        "locate file",
         "grep",
         "literal",
         "code search",
+        "filename",
     ],
     mandatory_keywords=[
         "search code",
@@ -626,6 +937,7 @@ async def _literal_search(
         "search",
     ],  # Force inclusion
     aliases=["search"],  # Backward compatibility alias
+    timeout=60.0,  # Embedding search on large repos can be slow
 )
 async def code_search(
     query: str,
@@ -640,10 +952,14 @@ async def code_search(
     exts: Optional[List[str]] = None,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Find code by CONCEPT or TEXT when you DON'T know exact location/name.
+    """Find code by CONCEPT, TEXT, or FILENAME when you DON'T know exact location.
 
     Use this tool for exploration when you need to discover where relevant code
     lives. Returns file snippets ranked by relevance.
+
+    FILENAME SEARCH: Pass a filename (e.g., "fitswcs.py") and the tool will
+    automatically use `find` to locate matching files. No need for a separate
+    find command.
 
     DIFFERS FROM:
     - symbol(): Gets FULL CODE of a known symbol. Use when you know file + name.
@@ -654,12 +970,14 @@ async def code_search(
     - "semantic": Embedding-based search. Best for concepts, patterns, inheritance.
     - "literal": Keyword matching (like grep). Best for exact text/identifiers.
     - "bugs": Similar bug search with graph context when supported by the provider.
+    - "localize": File-level issue localization using semantic seeds plus graph expansion.
+    - "impact": Change-impact / blast-radius analysis using graph expansion when available.
 
     Args:
         query: Search query (semantic concepts or literal text)
         path: Directory to search
         k: Max results
-        mode: Search mode - "semantic" (default), "literal", or "bugs"
+        mode: Search mode - "semantic" (default), "literal", "bugs", "localize", or "impact"
         reindex: Force re-index (semantic mode only)
         file: Filter by file path (semantic mode only)
         symbol: Filter by type (class/function/method) (semantic mode only)
@@ -668,15 +986,38 @@ async def code_search(
         exts: File extensions for literal mode (e.g., [".py", ".js"])
         _exec_ctx: Framework execution context (contains settings, etc.)
 
-    Example:
-        search(query="error handling in providers")  # Semantic: find related concepts
-        search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
-        search(query="json parsing crash on empty payload", mode="bugs")
+        Example:
+            search(query="error handling in providers")  # Semantic: find related concepts
+            search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
+            search(query="json parsing crash on empty payload", mode="bugs")
+            search(query="which files should I edit to add a logger parameter", mode="localize")
+            search(query="what breaks if I change BaseRepository.save", mode="impact")
     """
     # Route to literal search if mode is "literal"
     if mode == "literal":
-        return await _literal_search(query, path, k, exts)
+        result = await _literal_search(query, path, k, exts)
+        if result.get("count", 0) > 0:
+            return result
+        # Auto-escalate: literal returned 0 results, try semantic if available
+        settings = _exec_ctx.get("settings") if _exec_ctx else None
+        disable_embeddings = (_exec_ctx or {}).get("disable_embeddings", False)
+        if settings and not disable_embeddings:
+            logger.info(
+                "Literal search returned 0 results for '%s', auto-escalating to semantic",
+                query,
+            )
+            mode = "semantic"  # Fall through to semantic path below
+        else:
+            return result
     search_root = path
+    # Resolve empty path to project root (benchmark/agent sets this)
+    if not search_root or search_root == ".":
+        try:
+            from victor.config.settings import get_project_paths
+
+            search_root = str(get_project_paths().project_root)
+        except Exception:
+            search_root = "."
     try:
         root_path = Path(search_root).resolve()
         # If path is a file, use its parent directory (model passed file path instead of directory)
@@ -698,7 +1039,10 @@ async def code_search(
 
         settings = _exec_ctx.get("settings") if _exec_ctx else None
         if settings is None:
-            return {"success": False, "error": "Settings not available in tool context."}
+            return {
+                "success": False,
+                "error": "Settings not available in tool context.",
+            }
 
         # Check if embeddings are disabled for this agent (workflow-level service mode)
         disable_embeddings = _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
@@ -725,9 +1069,16 @@ async def code_search(
                 filter_metadata["is_test_file"] = test
                 filters_applied.append(f"test={test}")
 
-        index, rebuilt = await _get_or_build_index(
-            root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx
-        )
+        try:
+            index, rebuilt = await asyncio.wait_for(
+                _get_or_build_index(root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx),
+                timeout=30.0,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning("Semantic index build failed (%s), falling back to literal search", exc)
+            result = await _literal_search(query, path, k, exts)
+            result["fallback"] = "semantic_index_timeout"
+            return result
 
         if mode == "bugs":
             ignored_filters = [
@@ -777,6 +1128,106 @@ async def code_search(
                 }
             else:
                 fallback_metadata = {}
+        elif mode == "localize":
+            ignored_filters = [
+                name
+                for name, value in (("file", file), ("symbol", symbol), ("test", test))
+                if value is not None
+            ]
+            try:
+                localize_issue = getattr(index, "localize_issue", None)
+                if localize_issue is None:
+                    raise NotImplementedError("localize_issue unsupported")
+
+                localization_results = await localize_issue(
+                    issue_description=query,
+                    language=lang,
+                    top_k=k,
+                    include_graph_context=True,
+                    context_limit=min(max(1, k), 3),
+                )
+                ranked_results = _prepare_ranked_results(
+                    localization_results,
+                    search_mode="issue_localization",
+                )
+                extra_metadata = {
+                    "provider_capability": "localize_issue",
+                }
+                if ignored_filters:
+                    extra_metadata["ignored_filters"] = ignored_filters
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
+                return _build_search_response(
+                    results=ranked_results,
+                    mode="localize",
+                    rebuilt=rebuilt,
+                    root_path=root_path,
+                    exec_ctx=_exec_ctx,
+                    filters_applied=filters_applied,
+                    ranking_note="Results ranked by combined_score (issue_localization × importance). Graph-expanded file candidates included when available.",
+                    extra_metadata=extra_metadata,
+                    follow_up_suggestions=follow_up_suggestions,
+                )
+            except NotImplementedError as exc:
+                logger.info(
+                    "Issue localization mode is unsupported by %s; falling back to semantic search",
+                    type(index).__name__,
+                )
+                filters_applied.append("mode_fallback=semantic")
+                fallback_metadata = {
+                    "requested_mode": "localize",
+                    "fallback_mode": "semantic",
+                    "fallback_reason": str(exc),
+                }
+        elif mode == "impact":
+            ignored_filters = [
+                name
+                for name, value in (("file", file), ("symbol", symbol), ("test", test))
+                if value is not None
+            ]
+            try:
+                analyze_change_impact = getattr(index, "analyze_change_impact", None)
+                if analyze_change_impact is None:
+                    raise NotImplementedError("analyze_change_impact unsupported")
+
+                impact_results = await analyze_change_impact(
+                    change_description=query,
+                    language=lang,
+                    top_k=k,
+                    include_graph_context=True,
+                    context_limit=min(max(1, k), 3),
+                )
+                ranked_results = _prepare_ranked_results(
+                    impact_results,
+                    search_mode="change_impact",
+                )
+                extra_metadata = {
+                    "provider_capability": "analyze_change_impact",
+                }
+                if ignored_filters:
+                    extra_metadata["ignored_filters"] = ignored_filters
+                follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
+                return _build_search_response(
+                    results=ranked_results,
+                    mode="impact",
+                    rebuilt=rebuilt,
+                    root_path=root_path,
+                    exec_ctx=_exec_ctx,
+                    filters_applied=filters_applied,
+                    ranking_note="Results ranked by combined_score (change_impact × importance). Graph-expanded blast-radius candidates included when available.",
+                    extra_metadata=extra_metadata,
+                    follow_up_suggestions=follow_up_suggestions,
+                )
+            except NotImplementedError as exc:
+                logger.info(
+                    "Impact mode is unsupported by %s; falling back to semantic search",
+                    type(index).__name__,
+                )
+                filters_applied.append("mode_fallback=semantic")
+                fallback_metadata = {
+                    "requested_mode": "impact",
+                    "fallback_mode": "semantic",
+                    "fallback_reason": str(exc),
+                }
         else:
             fallback_metadata = {}
 
@@ -786,14 +1237,42 @@ async def code_search(
         expand_query = getattr(settings, "semantic_query_expansion_enabled", True)
         enable_hybrid = getattr(settings, "enable_hybrid_search", False)
 
-        # Perform semantic search
-        results = await index.semantic_search(
-            query=query,
-            max_results=k * 2 if enable_hybrid else k,  # Get more for hybrid combining
-            filter_metadata=filter_metadata,
-            similarity_threshold=similarity_threshold,
-            expand_query=expand_query,
-        )
+        # Strip filter fields not in the index schema to avoid LanceDB errors.
+        # The index has: file_path, symbol_name, symbol_type, line_number, end_line.
+        # Fields like "language", "is_test_file" may not exist in all index backends.
+        _INDEX_FILTER_FIELDS = {
+            "file_path",
+            "symbol_name",
+            "symbol_type",
+            "line_number",
+            "end_line",
+        }
+        safe_filter = None
+        if filter_metadata:
+            safe_filter = {k: v for k, v in filter_metadata.items() if k in _INDEX_FILTER_FIELDS}
+            dropped = set(filter_metadata) - set(safe_filter)
+            if dropped:
+                logger.debug("Dropped unsupported filter fields: %s", dropped)
+            if not safe_filter:
+                safe_filter = None
+
+        # Perform semantic search with timeout and literal fallback
+        try:
+            results = await asyncio.wait_for(
+                index.semantic_search(
+                    query=query,
+                    max_results=k * 2 if enable_hybrid else k,
+                    filter_metadata=safe_filter,
+                    similarity_threshold=similarity_threshold,
+                    expand_query=expand_query,
+                ),
+                timeout=15.0,
+            )
+        except (asyncio.TimeoutError, Exception) as exc:
+            logger.warning("Semantic search failed (%s), falling back to literal search", exc)
+            result = await _literal_search(query, path, k, exts)
+            result["fallback"] = "semantic_search_timeout"
+            return result
 
         # Record outcome for RL threshold learning if enabled
         if getattr(settings, "enable_semantic_threshold_rl_learning", False):
@@ -882,7 +1361,9 @@ async def code_search(
 
                     # Combine results using RRF
                     hybrid_results = engine.combine_results(
-                        semantic_dicts, keyword_results.get("results", []), max_results=k
+                        semantic_dicts,
+                        keyword_results.get("results", []),
+                        max_results=k,
                     )
 
                     # Convert back to dict format

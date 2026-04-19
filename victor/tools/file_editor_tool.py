@@ -176,15 +176,27 @@ from victor.tools.base import AccessMode, DangerLevel, Priority
 
 
 def _create_file_editor(backup_dir: str):
-    """Create a FileEditor instance via capability registry."""
+    """Create a FileEditor instance via capability registry.
+
+    The registry may return:
+    - A class (FileEditor) → instantiate with backup_dir
+    - A _LazyCapabilityProxy → resolves to class or instance
+    - An already-instantiated FileEditor → use directly
+    """
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import EditorProtocol
 
     registry = CapabilityRegistry.get_instance()
-    factory = registry.get(EditorProtocol)
-    if factory is not None and registry.is_enhanced(EditorProtocol):
-        # The enhanced provider is a callable factory (the FileEditor class)
-        return factory(backup_dir=backup_dir)
+    provider = registry.get(EditorProtocol)
+    if provider is not None and registry.is_enhanced(EditorProtocol):
+        # If it's a class, instantiate it
+        if isinstance(provider, type):
+            return provider(backup_dir=backup_dir)
+        # Already an instance — reset any stale transaction state
+        # FileEditor uses current_transaction (Optional[EditTransaction]), not _in_transaction
+        if hasattr(provider, "current_transaction"):
+            provider.current_transaction = None
+        return provider
     return None
 
 
@@ -210,7 +222,16 @@ from victor.tools.filesystem import enforce_sandbox_path
     stages=["execution"],  # Conversation stages where relevant
     task_types=["edit", "action"],  # Task types for classification-aware selection
     execution_category="write",  # Cannot run in parallel with conflicting ops
-    keywords=["edit", "modify", "replace", "create", "delete", "rename", "file", "text"],
+    keywords=[
+        "edit",
+        "modify",
+        "replace",
+        "create",
+        "delete",
+        "rename",
+        "file",
+        "text",
+    ],
     # Examples help LLMs understand correct parameter format
     examples=[
         'edit(ops=[{"type": "replace", "path": "config.py", "old_str": "DEBUG = True", "new_str": "DEBUG = False"}])',
@@ -344,15 +365,8 @@ async def edit(
         try:
             ops = json.loads(ops)
         except json.JSONDecodeError as exc:
-            # Try to provide helpful error message and recovery hints
-            error_context = ""
-
             # Detect control character issues (common with embedded newlines)
             if "control character" in str(exc).lower():
-                error_context = (
-                    "\n\nHINT: JSON strings cannot contain raw newlines or tabs. "
-                    "Use \\n for newlines and \\t for tabs within string values."
-                )
                 # Try to fix by escaping control characters in strings
                 try:
                     fixed = _fix_json_control_chars(ops)
@@ -364,23 +378,31 @@ async def edit(
                     pass  # Recovery failed, use original error
 
             if isinstance(ops, str):  # Still a string = parsing failed
-                # Detect delimiter issues
-                if "delimiter" in str(exc).lower():
-                    error_context = "\n\nHINT: Check for missing commas between array elements or object properties."
-                # Detect structure issues
-                elif "Expecting" in str(exc):
-                    error_context = (
-                        "\n\nHINT: Check JSON structure - ensure arrays use [], objects use {}, "
-                        "and strings are quoted."
-                    )
+                # Build a targeted correction prompt showing the error location
+                error_pos = getattr(exc, "pos", 0) or 0
+                snippet_start = max(0, error_pos - 40)
+                snippet_end = min(len(ops), error_pos + 40)
+                error_snippet = ops[snippet_start:snippet_end]
+                pointer = " " * min(40, error_pos - snippet_start) + "^"
 
-                example = (
-                    "\n\nCorrect format example:\n"
-                    '[{"type": "replace", "path": "file.py", "old_str": "x=1", "new_str": "x=2"}]'
+                correction_prompt = (
+                    f"Your edit JSON has a syntax error at position {error_pos}:\n"
+                    f"  ...{error_snippet}...\n"
+                    f"  {pointer} {exc.msg if hasattr(exc, 'msg') else str(exc)}\n\n"
+                    f"Please call edit() again with corrected JSON. Common fixes:\n"
+                    f"- Escape newlines in strings: use \\n not actual newlines\n"
+                    f'- Escape quotes in strings: use \\" not bare quotes\n'
+                    f"- Ensure commas between array elements and object properties\n"
+                    f"- Ensure old_str matches the file content EXACTLY\n\n"
+                    f"Correct format:\n"
+                    f'edit(ops=[{{"type": "replace", "path": "file.py", '
+                    f'"old_str": "exact match", "new_str": "replacement"}}])'
                 )
+
                 return {
                     "success": False,
-                    "error": f"Invalid JSON for operations: {exc}{error_context}{example}",
+                    "error": correction_prompt,
+                    "retryable": True,
                 }
 
     if not ops:
@@ -400,7 +422,10 @@ async def edit(
 
         op_type = op.get("type")
         if not op_type:
-            return {"success": False, "error": f"Operation {i} missing required field: type"}
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: type",
+            }
 
         if op_type not in ["create", "modify", "delete", "rename", "replace"]:
             return {
@@ -409,7 +434,10 @@ async def edit(
             }
 
         if "path" not in op:
-            return {"success": False, "error": f"Operation {i} missing required field: path"}
+            return {
+                "success": False,
+                "error": f"Operation {i} missing required field: path",
+            }
 
         # Validate type-specific requirements
         if op_type == "rename" and "new_path" not in op:
@@ -540,6 +568,17 @@ async def edit(
                 # Read current content
                 original_content = file_path.read_text(encoding="utf-8")
 
+                # Reject no-op edits (old_str == new_str)
+                if old_str == new_str:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"No-op edit rejected: old_str and new_str are identical "
+                            f"for {path}. Provide a different new_str to make an "
+                            f"actual change."
+                        ),
+                    }
+
                 # Check if old_str exists in file
                 occurrences = original_content.count(old_str)
                 if occurrences == 0:
@@ -549,11 +588,26 @@ async def edit(
 
                     # Try to find similar content to help debug
                     hint = ""
+                    context_str = ""
                     if old_str_first_line in original_content:
                         hint = (
                             f" The first line '{old_str_first_line}' exists in file but "
                             f"subsequent lines don't match. Check line endings and indentation."
                         )
+                        # Show surrounding file content to help model retry
+                        file_lines = original_content.splitlines()
+                        for i, line in enumerate(file_lines):
+                            if old_str_first_line in line:
+                                start = max(0, i - 3)
+                                end = min(len(file_lines), i + 8)
+                                numbered = [
+                                    f"{start + j + 1}: {file_lines[start + j]}"
+                                    for j in range(end - start)
+                                ]
+                                context_str = "\n\nActual file content around match:\n" + "\n".join(
+                                    numbered
+                                )
+                                break
                     elif old_str.rstrip() in original_content:
                         hint = " Found match without trailing whitespace. Remove trailing newlines from old_str."
                     elif old_str.lstrip() in original_content:
@@ -564,7 +618,13 @@ async def edit(
                         "error": (
                             f"Replace operation failed: old_str not found in {path}.{hint} "
                             f"Make sure the string matches exactly including whitespace. "
-                            f"Searched for: {repr(old_str_preview)}"
+                            f"Searched for: {repr(old_str_preview)}{context_str}"
+                            + (
+                                "\n\nTo fix: Copy the EXACT text from the file content above "
+                                "as your old_str. Do NOT type it from memory."
+                                if context_str
+                                else ""
+                            )
                         ),
                     }
                 if occurrences > 1:
@@ -590,7 +650,11 @@ async def edit(
                     original_content=original_content,
                     new_content=new_content,
                     tool_name="edit_files",
-                    tool_args={"type": "replace", "path": path, "old_str": old_str[:50]},
+                    tool_args={
+                        "type": "replace",
+                        "path": path,
+                        "old_str": old_str[:50],
+                    },
                 )
 
     except Exception as e:
@@ -660,7 +724,10 @@ async def edit(
         else:
             # Clear change group on failure
             tracker._current_group = None
-            return {"success": False, "error": "Failed to commit changes. Transaction rolled back."}
+            return {
+                "success": False,
+                "error": "Failed to commit changes. Transaction rolled back.",
+            }
     else:
         # Queue only, don't commit
         editor.abort()  # Abort to clean up, since we're not committing

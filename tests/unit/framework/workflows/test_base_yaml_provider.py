@@ -51,7 +51,9 @@ class ConcreteYAMLWorkflowProvider:
     def __init__(self, workflows_dir: Optional[Path] = None):
         self._workflows_dir = workflows_dir
         # Import here to avoid circular imports in fixture scope
-        from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
+        from victor.framework.workflows.base_yaml_provider import (
+            BaseYAMLWorkflowProvider,
+        )
 
         # Create a concrete subclass dynamically
         class TestProvider(BaseYAMLWorkflowProvider):
@@ -159,7 +161,9 @@ class TestCompileWorkflow:
         # The test provider needs a workflow to compile
         # For this test, we'll patch the _get_workflow_path method
         with patch.object(
-            test_provider.provider, "_get_workflow_path", return_value=yaml_workflow_file
+            test_provider.provider,
+            "_get_workflow_path",
+            return_value=yaml_workflow_file,
         ):
             with patch.object(
                 test_provider.provider, "_load_escape_hatches", return_value=({}, {})
@@ -170,7 +174,9 @@ class TestCompileWorkflow:
     def test_compile_workflow_has_workflow_name(self, test_provider, yaml_workflow_file):
         """Test that compiled workflow has correct workflow_name."""
         with patch.object(
-            test_provider.provider, "_get_workflow_path", return_value=yaml_workflow_file
+            test_provider.provider,
+            "_get_workflow_path",
+            return_value=yaml_workflow_file,
         ):
             with patch.object(
                 test_provider.provider, "_load_escape_hatches", return_value=({}, {})
@@ -373,6 +379,8 @@ class TestModuleStructure:
 
     def test_base_yaml_provider_imports_without_error(self):
         """Test that BaseYAMLWorkflowProvider can be imported."""
-        from victor.framework.workflows.base_yaml_provider import BaseYAMLWorkflowProvider
+        from victor.framework.workflows.base_yaml_provider import (
+            BaseYAMLWorkflowProvider,
+        )
 
         assert BaseYAMLWorkflowProvider is not None

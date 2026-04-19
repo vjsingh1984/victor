@@ -59,10 +59,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
 
 from victor.core.async_utils import run_sync
 
@@ -150,10 +151,11 @@ class SessionCostSummary:
 
 
 class SessionCoordinator:
-    """Coordinates session lifecycle and state management.
+    """[DEPRECATED] Coordinates session lifecycle and state management.
 
-    This coordinator provides a unified interface for session management,
-    delegating to specialized components for specific operations.
+    This class is being superseded by SessionService as part of the 
+    state-passed architectural migration. It remains for backward 
+    compatibility with facade-driven components.
 
     Responsibilities:
     - Session ID creation and tracking
@@ -571,7 +573,7 @@ class SessionCoordinator:
                 {
                     "session_id": s.session_id,
                     "created_at": s.created_at.isoformat() if s.created_at else None,
-                    "last_activity": s.last_activity.isoformat() if s.last_activity else None,
+                    "last_activity": (s.last_activity.isoformat() if s.last_activity else None),
                     "project_path": s.project_path,
                     "provider": s.provider,
                     "model": s.model,
@@ -691,8 +693,14 @@ class SessionCoordinator:
             )
             import victor.agent.conversation_embedding_store as ces_module
 
-            # Get the shared embedding service
-            embedding_service = EmbeddingService.get_instance()
+            # Prefer an already-wired memory-manager service to avoid splitting
+            # runtime state. Otherwise use the canonical singleton directly.
+            # This bridge runs before some containerized startup paths, so
+            # explicit singleton resolution is more deterministic here than the
+            # container-preferred helper.
+            embedding_service = vars(memory_manager).get("_embedding_service")
+            if embedding_service is None:
+                embedding_service = EmbeddingService.get_instance()
 
             # Use singleton pattern - check if already exists
             if ces_module._embedding_store is not None:
@@ -753,6 +761,49 @@ class SessionCoordinator:
             conversation_embedding_store = None
 
         return conversation_embedding_store, pending_semantic_cache
+
+    # ========================================================================
+    # Background Task Management
+    # ========================================================================
+
+    @staticmethod
+    def create_background_task(
+        coro: Any,
+        name: str,
+        background_tasks: Set[asyncio.Task],
+        bg_task_lock: threading.Lock,
+    ) -> Optional[asyncio.Task]:
+        """Create and track a background task for graceful shutdown.
+
+        Args:
+            coro: The coroutine to run as a background task.
+            name: Name for the task (for logging).
+            background_tasks: Set tracking active background tasks.
+            bg_task_lock: Lock protecting concurrent add/discard.
+
+        Returns:
+            The created task, or None if no event loop is available.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(coro, name=name)
+
+            with bg_task_lock:
+                background_tasks.add(task)
+
+            def _discard_task(t: asyncio.Task) -> None:
+                with bg_task_lock:
+                    background_tasks.discard(t)
+
+            task.add_done_callback(_discard_task)
+
+            logger.debug(f"Created background task: {name}")
+            return task
+        except RuntimeError:
+            if asyncio.iscoroutine(coro):
+                coro.close()
+            logger.debug(f"No event loop available for background task: {name}")
+            return None
 
     # ========================================================================
     # String Representation

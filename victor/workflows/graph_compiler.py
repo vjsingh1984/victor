@@ -80,7 +80,12 @@ from victor.workflows.context import ExecutionContext, create_execution_context
 from victor.workflows.protocols import NodeRunner, NodeRunnerResult
 
 if TYPE_CHECKING:
-    from victor.workflows.graph_dsl import WorkflowGraph, GraphNode, GraphNodeType, State
+    from victor.workflows.graph_dsl import (
+        WorkflowGraph,
+        GraphNode,
+        GraphNodeType,
+        State,
+    )
     from victor.workflows.definition import WorkflowDefinition, WorkflowNode
     from victor.workflows.node_runners import NodeRunnerRegistry
 

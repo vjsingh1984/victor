@@ -239,7 +239,9 @@ def test_weighted_moving_average(
     assert stats["avg_quality_score"] > 0.7
 
 
-def test_recommendation_confidence_and_reason(learner: ContinuationPromptLearner) -> None:
+def test_recommendation_confidence_and_reason(
+    learner: ContinuationPromptLearner,
+) -> None:
     """Recommendation returns RLRecommendation with metadata."""
     for _ in range(3):
         _record_outcome(

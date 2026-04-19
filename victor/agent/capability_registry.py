@@ -55,12 +55,13 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Capability Method Mappings — re-exported from framework layer
+# Capability Method Mappings — re-exported from core layer
 # =============================================================================
 
-# The canonical definitions live in victor.framework.capability_registry
-# to avoid framework → agent layering violations.
-from victor.framework.capability_registry import (  # noqa: F401
+# The canonical definitions live in victor.core.capability_registry.
+# Previously imported from framework to avoid layering violations, but
+# core is the correct location for this infrastructure.
+from victor.core.capability_registry import (  # noqa: F401
     CAPABILITY_METHOD_MAPPINGS,
     get_method_for_capability,
 )
@@ -311,6 +312,43 @@ class CapabilityRegistryMixin:
             ),
             setter_method=getattr(self, "set_vertical_context", None),
             getter_method=getattr(self, "get_vertical_context", None),
+        )
+
+        # Stream/analytics capabilities
+        self._register_capability(
+            OrchestratorCapability(
+                name="usage_analytics",
+                capability_type=CapabilityType.WORKFLOW,
+                attribute="_usage_analytics",
+                description="Usage analytics tracker component",
+            ),
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="current_stream_context",
+                capability_type=CapabilityType.WORKFLOW,
+                attribute="_current_stream_context",
+                description="Current streaming context for token tracking",
+            ),
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="context_compactor",
+                capability_type=CapabilityType.WORKFLOW,
+                attribute="_context_compactor",
+                description="Context compactor for long conversation management",
+            ),
+        )
+
+        self._register_capability(
+            OrchestratorCapability(
+                name="system_prompt_added",
+                capability_type=CapabilityType.PROMPT,
+                attribute="_system_added",
+                description="Whether system prompt has been added to conversation",
+            ),
         )
 
         # RL capabilities

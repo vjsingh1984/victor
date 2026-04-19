@@ -6,7 +6,7 @@ These protocols define how verticals provide and configure tools.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Protocol, Set, runtime_checkable
+from typing import Any, Dict, List, Optional, Protocol, Set, runtime_checkable
 
 from victor_sdk.core.types import StageDefinition, Tier, TieredToolConfig
 
@@ -104,10 +104,82 @@ class ToolDependencyProviderProtocol(Protocol):
         return []
 
 
+# =============================================================================
+# Promoted Data Types (zero dependency on victor-ai)
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class ToolResultData:
+    """SDK-compatible tool execution result.
+
+    Mirrors victor.tools.base.ToolResult as a plain dataclass
+    (no Pydantic dependency). Use for type hints in external verticals.
+    """
+
+    success: bool
+    output: Any = None
+    error: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+@dataclass(frozen=True)
+class MessageData:
+    """SDK-compatible LLM message.
+
+    Mirrors victor.providers.base.Message as a plain dataclass.
+    """
+
+    role: str
+    content: str
+    name: Optional[str] = None
+
+
+# =============================================================================
+# Promoted Protocols (structural typing for external verticals)
+# =============================================================================
+
+
+@runtime_checkable
+class ToolRegistryProtocol(Protocol):
+    """Protocol for tool registry access.
+
+    External verticals should type-hint against this protocol instead
+    of importing the concrete ToolRegistry from victor.tools.registry.
+    """
+
+    def register(self, name: str, tool: Any) -> None: ...
+
+    def get(self, name: str) -> Any: ...
+
+    def list_tools(self) -> List[str]: ...
+
+    def is_enabled(self, name: str) -> bool: ...
+
+
+@runtime_checkable
+class ProviderRegistryProtocol(Protocol):
+    """Protocol for LLM provider registry access.
+
+    External verticals should type-hint against this protocol instead
+    of importing ProviderRegistry from victor.providers.registry.
+    """
+
+    def get_provider(self, name: str) -> Any: ...
+
+    def list_providers(self) -> List[str]: ...
+
+
 __all__ = [
     "ToolDependency",
     "ToolDependencyProviderProtocol",
     "ToolProvider",
     "ToolSelectionStrategy",
     "TieredToolConfigProvider",
+    # Promoted data types
+    "ToolResultData",
+    "MessageData",
+    # Promoted protocols
+    "ToolRegistryProtocol",
+    "ProviderRegistryProtocol",
 ]

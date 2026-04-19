@@ -116,6 +116,14 @@ class SqliteGraphStore(GraphStoreProtocol):
         self._ensure_schema()
         self._lock = asyncio.Lock()
 
+    async def initialize(self) -> None:
+        """Ensure schema exists for compatibility with higher-level stores."""
+        self._ensure_schema()
+
+    async def close(self) -> None:
+        """Close underlying database connection."""
+        self._db.close()
+
     def _connect(self) -> sqlite3.Connection:
         """Get database connection."""
         return self._db.get_connection()
@@ -223,7 +231,10 @@ class SqliteGraphStore(GraphStoreProtocol):
             conn.commit()
 
     async def get_neighbors(
-        self, node_id: str, edge_types: Optional[Iterable[str]] = None, max_depth: int = 1
+        self,
+        node_id: str,
+        edge_types: Optional[Iterable[str]] = None,
+        max_depth: int = 1,
     ) -> List[GraphEdge]:
         params: list[Any] = [node_id]
         type_clause = ""
@@ -268,7 +279,11 @@ class SqliteGraphStore(GraphStoreProtocol):
     _NODE_COLS = "node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, embedding_ref, metadata"
 
     async def find_nodes(
-        self, *, name: str | None = None, type: str | None = None, file: str | None = None
+        self,
+        *,
+        name: str | None = None,
+        type: str | None = None,
+        file: str | None = None,
     ) -> List[GraphNode]:
         clauses = []
         params: list[Any] = []
@@ -314,10 +329,18 @@ class SqliteGraphStore(GraphStoreProtocol):
                     "path": str(self.db_path),
                 }
             except sqlite3.OperationalError:
-                return {"nodes": node_count, "edges": edge_count, "path": str(self.db_path)}
+                return {
+                    "nodes": node_count,
+                    "edges": edge_count,
+                    "path": str(self.db_path),
+                }
 
     async def search_symbols(
-        self, query: str, *, limit: int = 20, symbol_types: Optional[Iterable[str]] = None
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+        symbol_types: Optional[Iterable[str]] = None,
     ) -> List[GraphNode]:
         """Full-text search across symbol names, signatures, and docstrings."""
         async with self._lock:
@@ -370,17 +393,28 @@ class SqliteGraphStore(GraphStoreProtocol):
         async with self._lock:
             conn = self._connect()
             cur = conn.execute(
-                f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE node_id = ?", (node_id,)
+                f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE node_id = ?",
+                (node_id,),
             )
             row = cur.fetchone()
             return self._row_to_node(row) if row else None
+
+    async def get_all_nodes(self) -> List[GraphNode]:
+        """Get all nodes in the graph."""
+        async with self._lock:
+            conn = self._connect()
+            cur = conn.execute(
+                f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} ORDER BY file, line, name"
+            )
+            return [self._row_to_node(row) for row in cur.fetchall()]
 
     async def get_nodes_by_file(self, file: str) -> List[GraphNode]:
         """Get all symbols in a specific file."""
         async with self._lock:
             conn = self._connect()
             cur = conn.execute(
-                f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE file = ? ORDER BY line", (file,)
+                f"SELECT {self._NODE_COLS} FROM {_NODE_TABLE} WHERE file = ? ORDER BY line",
+                (file,),
             )
             return [self._row_to_node(row) for row in cur.fetchall()]
 
@@ -427,7 +461,8 @@ class SqliteGraphStore(GraphStoreProtocol):
                 conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE src IN ({placeholders})", node_ids)
                 conn.execute(f"DELETE FROM {_EDGE_TABLE} WHERE dst IN ({placeholders})", node_ids)
                 conn.execute(
-                    f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})", node_ids
+                    f"DELETE FROM {_NODE_TABLE} WHERE node_id IN ({placeholders})",
+                    node_ids,
                 )
 
             conn.execute(f"DELETE FROM {_MTIME_TABLE} WHERE file = ?", (file,))

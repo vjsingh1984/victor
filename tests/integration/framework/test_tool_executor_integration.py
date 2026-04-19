@@ -70,45 +70,59 @@ class TestToolExecutorIntegration:
         assert orchestrator.tool_executor.normalizer is orchestrator.argument_normalizer
 
     @pytest.mark.asyncio
-    async def test_handle_tool_calls_uses_executor(self, orchestrator):
-        """Test that _handle_tool_calls routes through ToolExecutor."""
-        # Mock the tool_executor.execute method
-        mock_result = ToolExecutionResult(
-            tool_name="read",  # Now using canonical name
+    async def test_handle_tool_calls_uses_pipeline(self, orchestrator):
+        """Test that _handle_tool_calls routes through ToolPipeline."""
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
+
+        mock_call_result = ToolCallResult(
+            tool_name="read",
+            arguments={"path": "/tmp/test.txt"},
             success=True,
             result="file contents here",
             error=None,
-            execution_time=0.05,
+            execution_time_ms=50.0,
         )
+        mock_pipeline_result = PipelineExecutionResult(results=[mock_call_result])
 
         with patch.object(
-            orchestrator.tool_executor, "execute", return_value=mock_result
+            orchestrator._tool_pipeline,
+            "execute_tool_calls",
+            new_callable=AsyncMock,
+            return_value=mock_pipeline_result,
         ) as mock_exec:
             tool_calls = [{"name": "read_file", "arguments": {"path": "/tmp/test.txt"}}]
             results = await orchestrator._handle_tool_calls(tool_calls)
 
-            # Verify executor was called
+            # Verify pipeline was called
             mock_exec.assert_called_once()
-            call_kwargs = mock_exec.call_args
-            # Now we expect the canonical name "read" (resolved from "read_file")
-            assert call_kwargs.kwargs["tool_name"] == "read"
 
             # Verify result was processed
             assert len(results) == 1
             assert results[0]["success"] is True
 
     @pytest.mark.asyncio
-    async def test_tool_executor_handles_failure(self, orchestrator):
-        """Test that ToolExecutor failure is properly handled."""
-        mock_result = ToolExecutionResult(
-            tool_name="read",  # Canonical name
+    async def test_tool_pipeline_handles_failure(self, orchestrator):
+        """Test that ToolPipeline failure is properly handled."""
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
+
+        mock_call_result = ToolCallResult(
+            tool_name="read",
+            arguments={"path": "/nonexistent"},
             success=False,
             result=None,
             error="File not found",
-            execution_time=0.01,
+            execution_time_ms=10.0,
         )
+        mock_pipeline_result = PipelineExecutionResult(results=[mock_call_result])
 
-        with patch.object(orchestrator.tool_executor, "execute", return_value=mock_result):
+        with patch.object(
+            orchestrator._tool_pipeline,
+            "execute_tool_calls",
+            new_callable=AsyncMock,
+            return_value=mock_pipeline_result,
+        ):
             tool_calls = [{"name": "read_file", "arguments": {"path": "/nonexistent"}}]
             results = await orchestrator._handle_tool_calls(tool_calls)
 
@@ -117,28 +131,36 @@ class TestToolExecutorIntegration:
             assert "error" in results[0]
 
     @pytest.mark.asyncio
-    async def test_context_passed_to_executor(self, orchestrator):
-        """Test that proper context is passed to tool executor."""
-        mock_result = ToolExecutionResult(
-            tool_name="list_directory",
+    async def test_context_passed_to_pipeline(self, orchestrator):
+        """Test that proper context is passed to tool pipeline."""
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
+
+        mock_call_result = ToolCallResult(
+            tool_name="ls",
+            arguments={"root": "."},
             success=True,
             result=["file1.txt", "file2.py"],
             error=None,
+            execution_time_ms=5.0,
         )
+        mock_pipeline_result = PipelineExecutionResult(results=[mock_call_result])
 
         with patch.object(
-            orchestrator.tool_executor, "execute", return_value=mock_result
+            orchestrator._tool_pipeline,
+            "execute_tool_calls",
+            new_callable=AsyncMock,
+            return_value=mock_pipeline_result,
         ) as mock_exec:
             tool_calls = [{"name": "list_directory", "arguments": {"root": "."}}]
             await orchestrator._handle_tool_calls(tool_calls)
 
-            # Verify context was passed
-            call_kwargs = mock_exec.call_args.kwargs
-            assert "context" in call_kwargs
-            context = call_kwargs["context"]
-            assert "code_manager" in context
-            assert "provider" in context
-            assert "settings" in context
+            # Verify pipeline was called with context
+            mock_exec.assert_called_once()
+            call_args = mock_exec.call_args
+            all_kwargs = call_args.kwargs or {}
+            assert "context" in all_kwargs
+            assert all_kwargs["context"] is not None
 
 
 class TestToolExecutorCaching:

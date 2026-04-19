@@ -127,7 +127,10 @@ class TestGetSecureHome:
 
     def test_matches_passwd_when_available(self):
         """Test that result matches passwd database on Unix."""
-        from victor.config.secure_paths import get_secure_home, get_real_home_from_passwd
+        from victor.config.secure_paths import (
+            get_secure_home,
+            get_real_home_from_passwd,
+        )
 
         passwd_home = get_real_home_from_passwd()
         secure_home = get_secure_home()
@@ -139,7 +142,10 @@ class TestGetSecureHome:
     @patch.dict(os.environ, {"HOME": "/tmp/fake_home"})
     def test_detects_home_manipulation(self, caplog):
         """Test that HOME manipulation is detected and logged."""
-        from victor.config.secure_paths import get_secure_home, get_real_home_from_passwd
+        from victor.config.secure_paths import (
+            get_secure_home,
+            get_real_home_from_passwd,
+        )
 
         passwd_home = get_real_home_from_passwd()
         if passwd_home is None:
@@ -446,7 +452,10 @@ class TestXDGSecurePaths:
 
     def test_get_secure_xdg_config_home_default(self):
         """Test default XDG_CONFIG_HOME under ~/.config."""
-        from victor.config.secure_paths import get_secure_xdg_config_home, get_secure_home
+        from victor.config.secure_paths import (
+            get_secure_xdg_config_home,
+            get_secure_home,
+        )
 
         # Without XDG_CONFIG_HOME set, should use default
         with patch.dict(os.environ, {"XDG_CONFIG_HOME": ""}, clear=False):
@@ -455,7 +464,10 @@ class TestXDGSecurePaths:
 
     def test_get_secure_xdg_config_home_valid(self):
         """Test valid XDG_CONFIG_HOME under home."""
-        from victor.config.secure_paths import get_secure_xdg_config_home, get_secure_home
+        from victor.config.secure_paths import (
+            get_secure_xdg_config_home,
+            get_secure_home,
+        )
 
         valid_path = str(get_secure_home() / ".myconfig")
         with patch.dict(os.environ, {"XDG_CONFIG_HOME": valid_path}):
@@ -464,7 +476,10 @@ class TestXDGSecurePaths:
 
     def test_get_secure_xdg_config_home_blocks_escape(self, caplog):
         """Test that XDG_CONFIG_HOME outside home is blocked."""
-        from victor.config.secure_paths import get_secure_xdg_config_home, get_secure_home
+        from victor.config.secure_paths import (
+            get_secure_xdg_config_home,
+            get_secure_home,
+        )
 
         with patch.dict(os.environ, {"XDG_CONFIG_HOME": "/tmp/attacker_config"}):
             result = get_secure_xdg_config_home()
@@ -807,7 +822,10 @@ class TestPluginSandbox:
 
     def test_sandbox_policy_defaults(self):
         """Test default sandbox policy values."""
-        from victor.config.secure_paths import PluginSandboxPolicy, DEFAULT_SANDBOX_POLICY
+        from victor.config.secure_paths import (
+            PluginSandboxPolicy,
+            DEFAULT_SANDBOX_POLICY,
+        )
 
         policy = PluginSandboxPolicy()
         assert policy.allow_network is True
@@ -853,7 +871,10 @@ class TestPluginSandbox:
 
     def test_check_plugin_can_load_with_blocked_paths(self):
         """Test plugin loading blocked by path policy."""
-        from victor.config.secure_paths import check_plugin_can_load, PluginSandboxPolicy
+        from victor.config.secure_paths import (
+            check_plugin_can_load,
+            PluginSandboxPolicy,
+        )
 
         policy = PluginSandboxPolicy(
             blocked_paths=["/tmp/blocked"],

@@ -743,7 +743,12 @@ class TestStateSerializationEdgeCases:
 
         def verify_nones(ctx: Dict[str, Any]) -> Dict[str, Any]:
             ctx["none_preserved"] = ctx.get("none_value") is None
-            ctx["list_nones_preserved"] = ctx.get("list_with_nones") == [1, None, 3, None]
+            ctx["list_nones_preserved"] = ctx.get("list_with_nones") == [
+                1,
+                None,
+                3,
+                None,
+            ]
             return ctx
 
         workflow = (

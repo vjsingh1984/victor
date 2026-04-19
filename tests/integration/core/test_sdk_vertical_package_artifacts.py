@@ -126,7 +126,9 @@ def test_victor_sdk_wheel_and_sdist_include_contract_files(tmp_path: Path) -> No
 
 
 @pytest.mark.integration
-def test_external_vertical_wheel_and_sdist_include_entry_point_and_sources(tmp_path: Path) -> None:
+def test_external_vertical_wheel_and_sdist_include_entry_point_and_sources(
+    tmp_path: Path,
+) -> None:
     """The SDK-only example should package its entry point and source files correctly."""
 
     wheel_path = _build_wheel(EXTERNAL_EXAMPLE_DIR, tmp_path / "example-wheel")

@@ -98,7 +98,10 @@ async def _do_outdated() -> Dict[str, Any]:
     """Check for outdated packages."""
     success, stdout, stderr = await run_pip_async("list", "--outdated", "--format=json")
     if not success:
-        return {"success": False, "error": f"Failed to check outdated packages: {stderr}"}
+        return {
+            "success": False,
+            "error": f"Failed to check outdated packages: {stderr}",
+        }
 
     try:
         outdated = json.loads(stdout)
@@ -159,7 +162,11 @@ async def _do_outdated() -> Dict[str, Any]:
         "success": True,
         "outdated": outdated,
         "count": len(outdated),
-        "by_severity": {"major": major_updates, "minor": minor_updates, "patch": patch_updates},
+        "by_severity": {
+            "major": major_updates,
+            "minor": minor_updates,
+            "patch": patch_updates,
+        },
         "formatted_report": "\n".join(report),
     }
 
@@ -286,7 +293,10 @@ async def _do_tree(package: Optional[str]) -> Dict[str, Any]:
 
     result = await run_command_async(cmd, timeout=60, check_dangerous=False)
     if not result.success:
-        return {"success": False, "error": f"Failed to show dependency tree: {result.stderr}"}
+        return {
+            "success": False,
+            "error": f"Failed to show dependency tree: {result.stderr}",
+        }
 
     return {"success": True, "tree": result.stdout, "package": package}
 
@@ -295,7 +305,10 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
     """Check requirements satisfaction."""
     req_path = Path(requirements_file)
     if not req_path.exists():
-        return {"success": False, "error": f"Requirements file not found: {requirements_file}"}
+        return {
+            "success": False,
+            "error": f"Requirements file not found: {requirements_file}",
+        }
 
     success, stdout, stderr = await run_pip_async("list", "--format=json")
     if not success:
@@ -309,7 +322,10 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
     try:
         requirements = req_path.read_text().strip().split("\n")
     except Exception as e:
-        return {"success": False, "error": f"Failed to read requirements file: {str(e)}"}
+        return {
+            "success": False,
+            "error": f"Failed to read requirements file: {str(e)}",
+        }
 
     missing = []
     mismatched = []
@@ -330,7 +346,11 @@ async def _do_check(requirements_file: str) -> Dict[str, Any]:
             missing.append(req)
         elif operator == "==" and version and installed[pkg_name] != version:
             mismatched.append(
-                {"package": pkg_name, "required": version, "installed": installed[pkg_name]}
+                {
+                    "package": pkg_name,
+                    "required": version,
+                    "installed": installed[pkg_name],
+                }
             )
         else:
             satisfied.append(pkg_name)

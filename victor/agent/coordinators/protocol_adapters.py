@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     import asyncio
 
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.message_history import MessageHistory
     from victor.agent.session_state_manager import SessionStateManager
@@ -153,19 +153,14 @@ class OrchestratorProtocolAdapter:
             "error": exec_result.error if not exec_result.success else None,
         }
 
+    # [LEGACY WRAPPER] Bridges to AgentOrchestrator._handle_tool_calls
     async def execute_tool_calls(
         self,
         tool_calls: List[Any],
     ) -> List[Dict[str, Any]]:
-        """Execute multiple tool calls.
-
-        Delegates to the orchestrator's _handle_tool_calls method.
-
-        Args:
-            tool_calls: List of tool call objects
-
-        Returns:
-            List of tool execution results
+        """[LEGACY] Execute multiple tool calls via orchestrator bridge.
+        
+        Prefer IToolCoordinator for new implementations.
         """
         orch = self._orchestrator
         return await orch._handle_tool_calls(tool_calls)
@@ -263,7 +258,11 @@ class OrchestratorProtocolAdapter:
             "model": self._orchestrator.model,
             "temperature": self._orchestrator.temperature,
             "max_tokens": self._orchestrator.max_tokens,
-            "_system_added": getattr(self._orchestrator, "_system_added", False),
+            "_system_added": (
+                self._orchestrator.get_capability_value("system_prompt_added")
+                if self._orchestrator.has_capability("system_prompt_added")
+                else False
+            ),
         }
 
     def clear_state(self) -> None:
@@ -360,7 +359,7 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.observed_files
 
     async def _handle_tool_calls(self, tool_calls: List[Any]) -> List[Dict[str, Any]]:
-        """Handle tool calls."""
+        """[LEGACY] Handle tool calls via orchestrator bridge."""
         return await self._orchestrator._handle_tool_calls(tool_calls)
 
     def _model_supports_tool_calls(self) -> bool:

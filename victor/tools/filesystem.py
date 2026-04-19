@@ -15,6 +15,7 @@
 """Filesystem tools for reading, writing, and listing contents."""
 
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -1079,8 +1080,17 @@ TEXT_EXTENSIONS = {
     access_mode=AccessMode.READONLY,  # Only reads files
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["path", "offset", "limit"],  # Params indicating exploration progress
-    stages=["reading", "initial", "analysis", "verification"],  # Conversation stages where relevant
+    progress_params=[
+        "path",
+        "offset",
+        "limit",
+    ],  # Params indicating exploration progress
+    stages=[
+        "reading",
+        "initial",
+        "analysis",
+        "verification",
+    ],  # Conversation stages where relevant
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -1180,6 +1190,35 @@ async def read(
             limit = line_end
     file_path = Path(path).expanduser().resolve()
 
+    # Workspace guard: warn if path is outside the current project root.
+    # Returns helpful message so model self-corrects (doesn't raise).
+    # Disabled via VICTOR_DISABLE_WORKSPACE_GUARD=1 for testing.
+    if not os.environ.get("VICTOR_DISABLE_WORKSPACE_GUARD"):
+        try:
+            from victor.config.settings import get_project_paths
+
+            _project_root = Path(get_project_paths().project_root).resolve()
+            if not str(file_path).startswith(str(_project_root)):
+                return (
+                    f"Path '{path}' is outside the current workspace "
+                    f"({_project_root.name}). You are working in the "
+                    f"{_project_root.name} project. Use ls('.') to see files."
+                )
+        except Exception:
+            pass
+
+    # Early return for directory paths (handles "", ".", "src/", etc.)
+    if file_path.is_dir():
+        logger.info("Auto-converting read('%s') → ls('%s')", path, path)
+        try:
+            dir_result = await ls(path=str(file_path), depth=1)
+            return f"Note: '{path}' is a directory, showing contents:\n\n{dir_result}"
+        except Exception as e:
+            return (
+                f"'{path}' is a directory. Listing failed: {e}\n"
+                f"Use ls(path='{path}') to explore."
+            )
+
     if not file_path.exists():
         # Try PathResolver for intelligent path normalization and suggestions
         resolver = get_path_resolver()
@@ -1197,28 +1236,73 @@ async def read(
                 except ValueError:
                     path = str(result.resolved_path)
         except FileNotFoundError:
-            # PathResolver couldn't find the file - provide helpful suggestions
-            suggestions = resolver.suggest_similar(path, limit=5)
-            if suggestions:
-                suggestion_list = "\n  - ".join(suggestions[:5])
-                raise FileNotFoundError(
-                    f"File not found: {path}\n" f"Did you mean one of these?\n  - {suggestion_list}"
-                )
+            # Try fuzzy resolve — search for bare filename in project tree
+            basename = Path(path).name
+            if basename and basename != path:
+                # Already has directory prefix, don't fuzzy search
+                pass
             else:
-                raise FileNotFoundError(f"File not found: {path}")
+                try:
+                    cwd = Path.cwd()
+                    matches = [
+                        m
+                        for m in cwd.rglob(basename)
+                        if m.is_file() and ".victor" not in str(m) and ".git" not in str(m)
+                    ]
+                    if len(matches) == 1:
+                        file_path = matches[0]
+                        logger.info(f"Fuzzy resolved {path} → {file_path}")
+                        try:
+                            path = str(file_path.relative_to(cwd))
+                        except ValueError:
+                            path = str(file_path)
+                        # Skip to reading — file_path is now valid
+                        if file_path.exists():
+                            # Continue to the reading logic below
+                            pass
+                        else:
+                            raise FileNotFoundError(f"File not found: {path}")
+                    else:
+                        raise FileNotFoundError("multiple or none")
+                except (FileNotFoundError, OSError):
+                    pass  # Fall through to suggestions
+
+            # PathResolver couldn't find the file - provide helpful suggestions
+            if not file_path.exists():
+                suggestions = resolver.suggest_similar(path, limit=5)
+                if suggestions:
+                    suggestion_list = "\n  - ".join(suggestions[:5])
+                    raise FileNotFoundError(
+                        f"File not found: {path}\n"
+                        f"Did you mean one of these?\n  - {suggestion_list}"
+                    )
+                else:
+                    raise FileNotFoundError(f"File not found: {path}")
         except IsADirectoryError:
-            raise IsADirectoryError(
-                f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
-                f"or specify a file path within this directory."
-            )
+            # Auto-convert read(dir) → ls(dir)
+            logger.info(f"Auto-converting read('{path}') → ls('{path}')")
+            try:
+                dir_result = await ls(path=path, depth=1)
+                return f"Note: '{path}' is a directory, showing contents:\n\n" f"{dir_result}"
+            except Exception as e:
+                logger.warning("ls() fallback failed for directory '%s': %s", path, e)
+                return (
+                    f"'{path}' is a directory. Listing failed: {e}\n"
+                    f"Use ls(path='{path}') to explore."
+                )
     if not file_path.is_file():
         if file_path.is_dir():
-            raise IsADirectoryError(
-                f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents, "
-                f"or specify a file path within this directory."
-            )
+            # Auto-convert read(dir) → ls(dir) instead of erroring
+            logger.info(f"Auto-converting read('{path}') → ls('{path}')")
+            try:
+                dir_result = await ls(path=path, depth=1)
+                return f"Note: '{path}' is a directory, showing contents:\n\n" f"{dir_result}"
+            except Exception as e:
+                logger.warning("ls() fallback failed for directory '%s': %s", path, e)
+                return (
+                    f"'{path}' is a directory. Listing failed: {e}\n"
+                    f"Use ls(path='{path}') to explore."
+                )
         raise IsADirectoryError(f"Path is not a file: {path}")
 
     # Binary file categories with helpful suggestions
@@ -1481,16 +1565,23 @@ async def read(
             settings = get_settings()
 
             # Check for airgapped mode or local providers
-            if settings.airgapped_mode:
+            if settings.security.airgapped_mode:
                 return 1500, 65536  # ~2000 lines, 32KB for local models (airgapped)
 
             # Check provider name for local indicators
-            provider = getattr(settings, "provider", "").lower()
+            provider_obj = getattr(settings, "provider", None)
+            provider = (
+                provider_obj.default_provider
+                if hasattr(provider_obj, "default_provider")
+                else str(provider_obj or "")
+            ).lower()
             local_providers = {"ollama", "lmstudio", "vllm", "llamacpp", "local"}
             if any(p in provider for p in local_providers):
                 # Try to get model context size from capabilities
                 try:
-                    from victor.providers.model_capabilities import get_model_capabilities
+                    from victor.providers.model_capabilities import (
+                        get_model_capabilities,
+                    )
 
                     model = getattr(settings, "model", "")
                     caps = get_model_capabilities(model)
@@ -1585,7 +1676,11 @@ async def read(
     # Registry-driven metadata for tool selection and cache invalidation
     progress_params=["path"],  # Same file = loop, regardless of content
     stages=["execution"],  # Conversation stages where relevant
-    task_types=["edit", "generation", "action"],  # Task types for classification-aware selection
+    task_types=[
+        "edit",
+        "generation",
+        "action",
+    ],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.WRITE,  # Cannot run in parallel with conflicting ops
     keywords=[
         "write",
@@ -1620,7 +1715,7 @@ async def read(
     ],
 )
 async def write(path: str, content: str, *, use_lsp: bool = True) -> str:
-    """Write file. Creates parent dirs. Use edit_files for partial edits.
+    """Write file. Creates parent dirs. Use edit tool for partial edits.
 
     Automatically uses LSP (Language Server Protocol) enhancement when available:
     - Validates code syntax before writing
@@ -1911,7 +2006,11 @@ async def write_lsp(
                 original_content=original_content,
                 new_content=result.written_content,
                 tool_name="write_lsp",
-                tool_args={"path": path, "validate": validate, "format_code": format_code},
+                tool_args={
+                    "path": path,
+                    "validate": validate,
+                    "format_code": format_code,
+                },
             )
             tracker.commit_change_group()
 
@@ -1973,8 +2072,17 @@ async def write_lsp(
     access_mode=AccessMode.READONLY,  # Only reads directory contents
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
-    progress_params=["path", "depth", "pattern"],  # Params indicating exploration progress
-    stages=["initial", "planning", "reading", "analysis"],  # Conversation stages where relevant
+    progress_params=[
+        "path",
+        "depth",
+        "pattern",
+    ],  # Params indicating exploration progress
+    stages=[
+        "initial",
+        "planning",
+        "reading",
+        "analysis",
+    ],  # Conversation stages where relevant
     task_types=["search", "analysis"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[
@@ -2074,9 +2182,14 @@ async def ls(
             except NotADirectoryError:
                 raise NotADirectoryError(
                     f"Path is not a directory: {path}\n"
-                    f"Suggestion: Use read_file(path='{path}') to read this file instead."
+                    f"Suggestion: Use read(path='{path}') to read this file instead."
                 )
         if not dir_path.is_dir():
+            if dir_path.is_file():
+                raise NotADirectoryError(
+                    f"Path is not a directory: {path}\n"
+                    f"Suggestion: Use read(path='{path}') to read this file instead."
+                )
             raise NotADirectoryError(f"Path is not a directory: {path}")
 
         # Normalize limit (handle non-int input from model)
@@ -2353,7 +2466,12 @@ IMPORTANT_DOC_PATTERNS = [
     danger_level=DangerLevel.SAFE,  # No side effects
     # Registry-driven metadata for tool selection and loop detection
     progress_params=["path", "max_depth"],  # Params indicating exploration progress
-    stages=["initial", "planning", "reading", "analysis"],  # Best used at start of conversation
+    stages=[
+        "initial",
+        "planning",
+        "reading",
+        "analysis",
+    ],  # Best used at start of conversation
     task_types=["analysis", "search"],  # Task types for classification-aware selection
     execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
     keywords=[

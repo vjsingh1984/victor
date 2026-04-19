@@ -68,7 +68,9 @@ def get_vertical_integration_pipeline(
             _PIPELINE = None
 
         if _PIPELINE is None:
-            from victor.framework.vertical_integration import create_integration_pipeline
+            from victor.framework.vertical_integration import (
+                create_integration_pipeline,
+            )
 
             _PIPELINE = create_integration_pipeline(
                 strict=strict,

@@ -85,7 +85,11 @@ def calculate_max_context_chars(
     if isinstance(context_tokens, (int, float)):
         logger.info(f"Model context: {int(context_tokens):,} tokens -> {max_chars:,} chars limit")
     else:
-        logger.info("Model context: %r tokens -> %s chars limit", context_tokens, f"{max_chars:,}")
+        logger.info(
+            "Model context: %r tokens -> %s chars limit",
+            context_tokens,
+            f"{max_chars:,}",
+        )
 
     return max_chars
 

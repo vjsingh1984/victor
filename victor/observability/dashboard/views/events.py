@@ -107,7 +107,14 @@ class EventLogWidget(RichLog):
             Formatted string preview
         """
         # Prioritize interesting fields
-        priority_fields = ["tool_name", "old_stage", "new_stage", "message", "error", "success"]
+        priority_fields = [
+            "tool_name",
+            "old_stage",
+            "new_stage",
+            "message",
+            "error",
+            "success",
+        ]
 
         parts = []
         for field in priority_fields:

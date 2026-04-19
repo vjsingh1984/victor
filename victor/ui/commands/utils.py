@@ -141,6 +141,7 @@ def setup_logging(
     stream: Optional[Any] = None,
     session_id: Optional[str] = None,
     repo_path: Optional[str] = None,
+    cli_debug_modules: Optional[str] = None,
 ) -> "LoggingConfig":
     """Convenience function to load config and configure logging in one call.
 
@@ -167,6 +168,8 @@ def setup_logging(
     config = get_logging_config(
         command=command,
         cli_console_level=cli_log_level,
+        cli_file_level=cli_log_level,  # CLI flag controls both console and file
+        cli_debug_modules=cli_debug_modules,
     )
     configure_logging_from_config(
         config,
@@ -352,6 +355,34 @@ async def graceful_shutdown(agent: Optional[AgentOrchestrator]) -> None:
                 )
     except Exception as e:
         logger.debug(f"RL feedback recording skipped: {e}")
+
+    # Record session outcome for prompt optimizer (lightweight — no LLM call).
+    # This updates posteriors for the active GEPA candidate so it learns
+    # from every chat session, not just benchmarks.
+    try:
+        from victor.framework.rl.base import RLOutcome
+
+        coordinator = get_rl_coordinator()
+        prompt_learner = coordinator.get_learner("prompt_optimizer")
+        if prompt_learner and agent.provider:
+            session_metrics = {}
+            if hasattr(agent, "get_session_metrics"):
+                session_metrics = agent.get_session_metrics() or {}
+            tool_calls = session_metrics.get("tool_calls", 0)
+            if tool_calls > 0:  # Only record if tools were used
+                outcome = RLOutcome(
+                    provider=agent.provider.name,
+                    model=getattr(agent.provider, "model", "unknown"),
+                    task_type="chat",
+                    success=True,
+                    quality_score=min(1.0, 0.5 + tool_calls * 0.05),
+                    metadata={"prompt_section": "ASI_TOOL_EFFECTIVENESS_GUIDANCE"},
+                )
+                prompt_learner.record_outcome(outcome)
+                logger.debug("Prompt optimizer: recorded chat session outcome")
+    except Exception as e:
+        logger.debug(f"Prompt optimizer feedback skipped: {e}")
+
     try:
         shutdown_results = await agent.graceful_shutdown()
         logger.debug(f"Graceful shutdown results: {shutdown_results}")

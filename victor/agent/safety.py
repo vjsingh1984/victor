@@ -545,7 +545,7 @@ class SafetyChecker:
         request = ConfirmationRequest(
             tool_name=tool_name,
             risk_level=risk_level,
-            description="; ".join(descriptions) if descriptions else f"Execute {tool_name}",
+            description=("; ".join(descriptions) if descriptions else f"Execute {tool_name}"),
             details=details,
             arguments=arguments,
         )
@@ -594,7 +594,7 @@ def get_safety_checker() -> SafetyChecker:
             from victor.config.settings import load_settings
 
             settings = load_settings()
-            approval_mode = _resolve_approval_mode(settings.write_approval_mode)
+            approval_mode = _resolve_approval_mode(settings.security.write_approval_mode)
         except Exception:
             # Default to RISKY_ONLY if settings unavailable
             approval_mode = ApprovalMode.RISKY_ONLY
@@ -734,7 +734,10 @@ def create_hitl_confirmation_callback(
         except Exception as e:
             logger.error(f"HITL confirmation error: {e}")
             # Block high-risk operations on error
-            if request.risk_level in (OperationalRiskLevel.HIGH, OperationalRiskLevel.CRITICAL):
+            if request.risk_level in (
+                OperationalRiskLevel.HIGH,
+                OperationalRiskLevel.CRITICAL,
+            ):
                 return False
             return True
 

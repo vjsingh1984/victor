@@ -271,7 +271,10 @@ class TestFunctionToolPlugin:
     def test_function_plugin_init(self):
         """Test FunctionToolPlugin initialization."""
         plugin = FunctionToolPlugin(
-            name="func_plugin", version="1.0.0", tool_functions=[], description="Function plugin"
+            name="func_plugin",
+            version="1.0.0",
+            tool_functions=[],
+            description="Function plugin",
         )
 
         assert plugin.name == "func_plugin"
@@ -354,7 +357,10 @@ class TestFunctionToolPlugin:
     def test_function_plugin_metadata(self):
         """Test FunctionToolPlugin metadata generation."""
         plugin = FunctionToolPlugin(
-            name="meta_test", version="2.0.0", tool_functions=[], description="Metadata test plugin"
+            name="meta_test",
+            version="2.0.0",
+            tool_functions=[],
+            description="Metadata test plugin",
         )
 
         metadata = plugin.get_metadata()

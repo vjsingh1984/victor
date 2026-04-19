@@ -385,7 +385,8 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
         # Verify model is available by testing with a small prompt
         try:
             response = await self.client.post(
-                "/api/embeddings", json={"model": self.config.model_name, "prompt": "test"}
+                "/api/embeddings",
+                json={"model": self.config.model_name, "prompt": "test"},
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as e:
@@ -422,7 +423,8 @@ class OllamaEmbeddingModel(BaseEmbeddingModel):
 
         try:
             response = await self.client.post(
-                "/api/embeddings", json={"model": self.config.model_name, "prompt": text}
+                "/api/embeddings",
+                json={"model": self.config.model_name, "prompt": text},
             )
             response.raise_for_status()
             result = response.json()

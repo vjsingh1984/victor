@@ -83,7 +83,9 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
 
 
@@ -152,7 +154,9 @@ async def demo_playwright_connection(transport_override: str = None):
         return
 
     # Use override if provided, otherwise prefer npx over Docker
-    transport = transport_override if transport_override else ("npx" if has_npx else "docker")
+    transport = (
+        transport_override if transport_override else ("npx" if has_npx else "docker")
+    )
     print(f"\nUsing transport: {transport}")
 
     try:
@@ -182,17 +186,23 @@ async def demo_playwright_connection(transport_override: str = None):
             print("\n   Troubleshooting:")
             if transport == "npx":
                 print("   1. Ensure Node.js is installed: node --version")
-                print("   2. Try running directly: npx @anthropic/mcp-server-playwright")
+                print(
+                    "   2. Try running directly: npx @anthropic/mcp-server-playwright"
+                )
             else:
                 print("   1. Ensure Docker is running: docker info")
-                print("   2. Pull the image: docker pull anthropic/mcp-server-playwright:latest")
+                print(
+                    "   2. Pull the image: docker pull anthropic/mcp-server-playwright:latest"
+                )
             return
 
         print("   Connected successfully!")
 
         # Show server info
         if client.server_info:
-            print(f"\n   Server: {client.server_info.name} v{client.server_info.version}")
+            print(
+                f"\n   Server: {client.server_info.name} v{client.server_info.version}"
+            )
 
         # List available tools
         print("\n2. Discovering available tools...")
@@ -201,7 +211,11 @@ async def demo_playwright_connection(transport_override: str = None):
         print(f"   Found {len(tools)} tools:")
         for tool in tools:
             print(f"\n   - {tool.name}")
-            desc = tool.description[:80] + "..." if len(tool.description) > 80 else tool.description
+            desc = (
+                tool.description[:80] + "..."
+                if len(tool.description) > 80
+                else tool.description
+            )
             print(f"     {desc}")
             if tool.parameters:
                 print(f"     Parameters: {len(tool.parameters)}")
@@ -257,7 +271,11 @@ async def demo_playwright_screenshot(transport_override: str = None):
         print("\nError: Victor MCP integration not available.")
         return
 
-    transport = transport_override if transport_override else ("npx" if check_npx_available() else "docker")
+    transport = (
+        transport_override
+        if transport_override
+        else ("npx" if check_npx_available() else "docker")
+    )
     command = get_playwright_command(transport)
 
     client = MCPClient(
@@ -284,7 +302,14 @@ async def demo_playwright_screenshot(transport_override: str = None):
         print("\n2. Navigating to example.com...")
         print("-" * 70)
 
-        navigate_tool = next((t for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"] if t in tool_names), None)
+        navigate_tool = next(
+            (
+                t
+                for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"]
+                if t in tool_names
+            ),
+            None,
+        )
         if navigate_tool:
             result = await client.call_tool(navigate_tool, url="https://example.com")
             if result.success:
@@ -300,7 +325,19 @@ async def demo_playwright_screenshot(transport_override: str = None):
         print("\n3. Taking screenshot...")
         print("-" * 70)
 
-        screenshot_tool = next((t for t in ["browser_take_screenshot", "screenshot", "playwright_screenshot", "take_screenshot"] if t in tool_names), None)
+        screenshot_tool = next(
+            (
+                t
+                for t in [
+                    "browser_take_screenshot",
+                    "screenshot",
+                    "playwright_screenshot",
+                    "take_screenshot",
+                ]
+                if t in tool_names
+            ),
+            None,
+        )
         if screenshot_tool:
             result = await client.call_tool(screenshot_tool)
             if result.success:
@@ -308,7 +345,10 @@ async def demo_playwright_screenshot(transport_override: str = None):
 
                 # Check if result contains base64 image data
                 if result.result and isinstance(result.result, str):
-                    if result.result.startswith("data:image") or len(result.result) > 1000:
+                    if (
+                        result.result.startswith("data:image")
+                        or len(result.result) > 1000
+                    ):
                         # Save screenshot
                         screenshot_dir = Path("/tmp/playwright-demo")
                         screenshot_dir.mkdir(exist_ok=True)
@@ -317,7 +357,9 @@ async def demo_playwright_screenshot(transport_override: str = None):
                         # Handle base64 data
                         try:
                             if "base64," in result.result:
-                                img_data = base64.b64decode(result.result.split("base64,")[1])
+                                img_data = base64.b64decode(
+                                    result.result.split("base64,")[1]
+                                )
                             else:
                                 img_data = base64.b64decode(result.result)
                             screenshot_path.write_bytes(img_data)
@@ -335,10 +377,24 @@ async def demo_playwright_screenshot(transport_override: str = None):
         print("\n4. Getting page info...")
         print("-" * 70)
 
-        evaluate_tool = next((t for t in ["browser_evaluate", "evaluate", "playwright_evaluate", "execute_script"] if t in tool_names), None)
+        evaluate_tool = next(
+            (
+                t
+                for t in [
+                    "browser_evaluate",
+                    "evaluate",
+                    "playwright_evaluate",
+                    "execute_script",
+                ]
+                if t in tool_names
+            ),
+            None,
+        )
         if evaluate_tool:
             # browser_evaluate expects 'function' parameter with arrow function syntax
-            result = await client.call_tool(evaluate_tool, function="() => document.title")
+            result = await client.call_tool(
+                evaluate_tool, function="() => document.title"
+            )
             if result.success:
                 print(f"   Page title: {result.result}")
             else:
@@ -368,7 +424,11 @@ async def demo_playwright_navigation(transport_override: str = None):
         print("\nError: Victor MCP integration not available.")
         return
 
-    transport = transport_override if transport_override else ("npx" if check_npx_available() else "docker")
+    transport = (
+        transport_override
+        if transport_override
+        else ("npx" if check_npx_available() else "docker")
+    )
     command = get_playwright_command(transport)
 
     client = MCPClient(
@@ -394,10 +454,19 @@ async def demo_playwright_navigation(transport_override: str = None):
         print("-" * 70)
 
         # Navigate to page
-        navigate_tool = next((t for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"] if t in tool_names), None)
+        navigate_tool = next(
+            (
+                t
+                for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"]
+                if t in tool_names
+            ),
+            None,
+        )
         if navigate_tool:
             print("   Navigating to https://httpbin.org/html...")
-            result = await client.call_tool(navigate_tool, url="https://httpbin.org/html")
+            result = await client.call_tool(
+                navigate_tool, url="https://httpbin.org/html"
+            )
             if result.success:
                 print("   Navigation successful!")
             else:
@@ -408,11 +477,26 @@ async def demo_playwright_navigation(transport_override: str = None):
         print("\n3. Getting page content...")
         print("-" * 70)
 
-        content_tool = next((t for t in ["browser_evaluate", "get_content", "playwright_content", "page_content", "evaluate"] if t in tool_names), None)
+        content_tool = next(
+            (
+                t
+                for t in [
+                    "browser_evaluate",
+                    "get_content",
+                    "playwright_content",
+                    "page_content",
+                    "evaluate",
+                ]
+                if t in tool_names
+            ),
+            None,
+        )
         if content_tool:
             if content_tool in ("evaluate", "browser_evaluate"):
                 # browser_evaluate needs arrow function syntax
-                result = await client.call_tool(content_tool, function="() => document.body.innerText")
+                result = await client.call_tool(
+                    content_tool, function="() => document.body.innerText"
+                )
             else:
                 result = await client.call_tool(content_tool)
 
@@ -427,7 +511,9 @@ async def demo_playwright_navigation(transport_override: str = None):
         print("-" * 70)
 
         interaction_tools = ["click", "type", "fill", "select", "hover"]
-        available_interactions = [t for t in tool_names if any(i in t.lower() for i in interaction_tools)]
+        available_interactions = [
+            t for t in tool_names if any(i in t.lower() for i in interaction_tools)
+        ]
 
         if available_interactions:
             print(f"   Interaction tools available:")
@@ -460,7 +546,11 @@ async def demo_playwright_scraping(transport_override: str = None):
         print("\nError: Victor MCP integration not available.")
         return
 
-    transport = transport_override if transport_override else ("npx" if check_npx_available() else "docker")
+    transport = (
+        transport_override
+        if transport_override
+        else ("npx" if check_npx_available() else "docker")
+    )
     command = get_playwright_command(transport)
 
     client = MCPClient(
@@ -485,10 +575,19 @@ async def demo_playwright_scraping(transport_override: str = None):
         print("\n2. Navigating to target page...")
         print("-" * 70)
 
-        navigate_tool = next((t for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"] if t in tool_names), None)
+        navigate_tool = next(
+            (
+                t
+                for t in ["browser_navigate", "navigate", "playwright_navigate", "goto"]
+                if t in tool_names
+            ),
+            None,
+        )
         if navigate_tool:
             # Use httpbin.org/json for structured data
-            result = await client.call_tool(navigate_tool, url="https://httpbin.org/json")
+            result = await client.call_tool(
+                navigate_tool, url="https://httpbin.org/json"
+            )
             if result.success:
                 print("   Navigated to httpbin.org/json")
             else:
@@ -499,11 +598,22 @@ async def demo_playwright_scraping(transport_override: str = None):
         print("\n3. Extracting JSON data...")
         print("-" * 70)
 
-        evaluate_tool = next((t for t in ["browser_evaluate", "evaluate", "playwright_evaluate", "execute_script"] if t in tool_names), None)
+        evaluate_tool = next(
+            (
+                t
+                for t in [
+                    "browser_evaluate",
+                    "evaluate",
+                    "playwright_evaluate",
+                    "execute_script",
+                ]
+                if t in tool_names
+            ),
+            None,
+        )
         if evaluate_tool:
             result = await client.call_tool(
-                evaluate_tool,
-                function="() => document.body.innerText"
+                evaluate_tool, function="() => document.body.innerText"
             )
             if result.success:
                 print("   Extracted data:")
@@ -517,18 +627,20 @@ async def demo_playwright_scraping(transport_override: str = None):
 
         if navigate_tool and evaluate_tool:
             # Navigate to HN
-            result = await client.call_tool(navigate_tool, url="https://news.ycombinator.com")
+            result = await client.call_tool(
+                navigate_tool, url="https://news.ycombinator.com"
+            )
             if result.success:
                 print("   Navigated to Hacker News")
 
                 # Extract titles
                 result = await client.call_tool(
                     evaluate_tool,
-                    function="""() => Array.from(document.querySelectorAll('.titleline > a')).slice(0, 5).map(a => a.innerText).join('\\n')"""
+                    function="""() => Array.from(document.querySelectorAll('.titleline > a')).slice(0, 5).map(a => a.innerText).join('\\n')""",
                 )
                 if result.success:
                     print("\n   Top 5 stories:")
-                    for i, title in enumerate(str(result.result).split('\n')[:5], 1):
+                    for i, title in enumerate(str(result.result).split("\n")[:5], 1):
                         print(f"   {i}. {title}")
                 else:
                     print(f"   Extraction failed: {result.error}")
@@ -547,8 +659,7 @@ def show_integration_examples():
     print("Playwright MCP Integration Examples")
     print("=" * 70)
 
-    print(
-        """
+    print("""
 1. Claude Desktop Configuration
 -------------------------------
 Add to ~/Library/Application Support/Claude/claude_desktop_config.json:
@@ -675,8 +786,7 @@ try:
 
 finally:
     client.disconnect()
-"""
-    )
+""")
 
 
 async def main():

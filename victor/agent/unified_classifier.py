@@ -263,7 +263,10 @@ EXECUTION_KEYWORDS: List[Tuple[str, float]] = [
 # Patterns that negate keywords (compiled for performance)
 NEGATION_PATTERNS: List[re.Pattern] = [
     # "don't/do not analyze"
-    re.compile(r"\b(don't|do\s+not|no\s+need\s+to|skip|without|avoid)\s+(\w+\s+)*", re.IGNORECASE),
+    re.compile(
+        r"\b(don't|do\s+not|no\s+need\s+to|skip|without|avoid)\s+(\w+\s+)*",
+        re.IGNORECASE,
+    ),
     # "not to analyze"
     re.compile(r"\bnot\s+to\s+(\w+)", re.IGNORECASE),
     # "instead of analyzing"
@@ -772,7 +775,10 @@ class UnifiedTaskClassifier:
                             task_type=llm_type,
                             confidence=decision.confidence,
                             is_action_task=llm_type
-                            in (ClassifierTaskType.ACTION, ClassifierTaskType.GENERATION),
+                            in (
+                                ClassifierTaskType.ACTION,
+                                ClassifierTaskType.GENERATION,
+                            ),
                             is_analysis_task=llm_type
                             in (ClassifierTaskType.ANALYSIS, ClassifierTaskType.SEARCH),
                             is_generation_task=llm_type == ClassifierTaskType.GENERATION,

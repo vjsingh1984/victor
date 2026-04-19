@@ -183,7 +183,9 @@ def _extract_tool_calls_from_content(content: str) -> Tuple[List[Dict[str, Any]]
                         }
                     )
                     remaining = re.sub(
-                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>", "", remaining
+                        r"<TOOL_OUTPUT>\s*" + re.escape(match) + r"\s*</TOOL_OUTPUT>",
+                        "",
+                        remaining,
                     )
         except json.JSONDecodeError:
             pass
@@ -246,7 +248,11 @@ class LlamaCppProvider(BaseProvider):
         self._provider_logger = ProviderLogger("llamacpp", __name__)
 
         super().__init__(
-            api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries, **kwargs
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
+            max_retries=max_retries,
+            **kwargs,
         )
         self.base_url = base_url or DEFAULT_LLAMACPP_URLS[0]
         self.timeout = timeout
@@ -337,6 +343,14 @@ class LlamaCppProvider(BaseProvider):
 
     def supports_streaming(self) -> bool:
         """llama.cpp supports streaming."""
+        return True
+
+    def supports_prompt_caching(self) -> bool:
+        """llama.cpp has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """llama.cpp natively reuses KV cache for matching prefixes."""
         return True
 
     async def list_models(self) -> List[Dict[str, Any]]:

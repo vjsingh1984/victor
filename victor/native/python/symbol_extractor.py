@@ -263,7 +263,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
         with self._timed_call("extract_functions", lang=lang):
             if lang == "python":
                 return self._extract_python_functions(source)
-            # TODO: Add support for other languages
+            # Other languages use tree-sitter via victor-coding (29 languages)
             return []
 
     def extract_classes(self, source: str, lang: str) -> List[Symbol]:
@@ -271,7 +271,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
         with self._timed_call("extract_classes", lang=lang):
             if lang == "python":
                 return self._extract_python_classes(source)
-            # TODO: Add support for other languages
+            # Other languages use tree-sitter via victor-coding (29 languages)
             return []
 
     def extract_imports(self, source: str, lang: str) -> List[str]:
@@ -279,7 +279,7 @@ class PythonSymbolExtractor(InstrumentedAccelerator):
         with self._timed_call("extract_imports", lang=lang):
             if lang == "python":
                 return self._extract_python_imports(source)
-            # TODO: Add support for other languages
+            # Other languages use tree-sitter via victor-coding (29 languages)
             return []
 
     def extract_references(self, source: str) -> List[str]:

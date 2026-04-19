@@ -29,6 +29,7 @@ from victor.agent.provider_tool_guidance import (
     ToolGuidanceStrategy,
 )
 from victor.agent.prompt_normalizer import get_prompt_normalizer
+from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
     from victor.agent.query_classifier import QueryClassification
@@ -42,7 +43,15 @@ logger = logging.getLogger(__name__)
 
 
 # Provider classifications
-CLOUD_PROVIDERS: Set[str] = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
+CLOUD_PROVIDERS: Set[str] = {
+    "anthropic",
+    "openai",
+    "google",
+    "xai",
+    "moonshot",
+    "kimi",
+    "deepseek",
+}
 LOCAL_PROVIDERS: Set[str] = {"ollama", "lmstudio", "vllm"}
 
 # Critical grounding rules to prevent hallucination
@@ -139,6 +148,31 @@ DO NOT re-read the full file without parameters - you will get the same truncate
 DO NOT assume content is missing - use offset/search to access additional sections.
 """.strip()
 
+# ASI-derived guidance: Lessons learned from execution trace analysis (GEPA-inspired).
+# These rules were extracted from 64K+ tool execution events across 11 days:
+# - 165 read(dir) errors → directory vs file guidance
+# - 60% literal code_search with 0 results → search mode guidance
+# - 70:9 read:code_search ratio → search-first discovery guidance
+# - 33% edit failure rate → edit precision guidance
+ASI_TOOL_EFFECTIVENESS_GUIDANCE = """
+TOOL EFFECTIVENESS (from execution data):
+- Use code_search(query='...') FIRST to discover relevant files before reading them.
+  Do NOT browse with read→read→read — search finds the right file in one call.
+- code_search works best with mode='semantic' for concepts and patterns.
+  Use mode='literal' only for exact identifiers you know exist.
+- For edits: include 3+ surrounding lines of context in old_str to ensure a unique match.
+  Ambiguous matches (old_str appears 2+ times) will fail — add more context.
+- Use ls() for directories, read() for files. read('directory_name') will auto-convert
+  but wastes a tool call.
+- Only access files within the current project. Never guess paths from other projects.
+  If read('victor') or read('../') fails, you are in the WRONG directory.
+  Use ls('.') to orient yourself in the workspace.
+- Do NOT use shell('rg ...') or shell('grep ...') to search code.
+  Use code_search(query='...') instead — it uses the semantic index.
+- After a failed edit (old_str not found), RE-READ the file at the exact location
+  and copy the text character-by-character. Do NOT guess from memory.
+""".strip()
+
 # Task-type hints are now in vertical prompt contributors (E5 M3).
 # Use get_task_type_hint(task_type, prompt_contributors=[...]) instead.
 
@@ -228,6 +262,9 @@ class SystemPromptBuilder:
         vertical: Optional[str] = None,
         concise_mode: bool = False,
         query_classification: Optional["QueryClassification"] = None,
+        provider_caches: bool = False,
+        provider_has_kv_cache: bool = False,
+        system_prompt_strategy: str = "static",
     ):
         """Initialize the prompt builder.
 
@@ -243,6 +280,16 @@ class SystemPromptBuilder:
             enrichment_service: Optional prompt enrichment service for context injection
             vertical: Current vertical (coding, research, devops, data_analysis) for enrichment
             concise_mode: If True, adds guidance to produce brief, direct responses
+            provider_caches: If True, provider supports API-level prompt caching (Anthropic).
+                Full prompt is optimal (cached at 90% discount). If False, aggressively
+                prune sections and skip MIPROv2 few-shots to save tokens.
+            provider_has_kv_cache: If True, provider supports KV prefix caching (Ollama,
+                LMStudio, etc.). Sections are reduced AND frozen at session start so the
+                system prompt prefix stays byte-identical across turns.
+            system_prompt_strategy: Strategy for system prompt management.
+                - 'static': Freeze at session start for cache optimization (default)
+                - 'dynamic': Rebuild per-turn based on context/tool calls
+                - 'hybrid': Static for API providers, dynamic for local providers
         """
         # Handle both string and ProviderSettings object for provider_name
         # (backward compatibility with settings refactor)
@@ -262,9 +309,12 @@ class SystemPromptBuilder:
         self.task_type = task_type
         self.available_tools = available_tools or []
         self.enrichment_service = enrichment_service
-        self.vertical = vertical or "coding"
+        self.vertical = vertical or DEFAULT_VERTICAL
         self.concise_mode = concise_mode
         self.query_classification = query_classification
+        self.provider_caches = provider_caches
+        self.provider_has_kv_cache = provider_has_kv_cache
+        self.system_prompt_strategy = system_prompt_strategy
 
         # Initialize tool guidance strategy (GAP-5: Provider-specific tool guidance)
         # Use provided strategy or auto-detect based on provider name
@@ -275,6 +325,10 @@ class SystemPromptBuilder:
 
         # Cache merged task hints from vertical contributors
         self._merged_task_hints = None
+
+        # Prompt caching for static mode
+        self._cached_prompt: Optional[str] = None
+        self._cache_key: Optional[str] = None
 
     def is_cloud_provider(self) -> bool:
         """Check if the provider is a cloud-based API with robust tool calling."""
@@ -547,6 +601,67 @@ class SystemPromptBuilder:
         5. Completion guidance (always included for deterministic task completion)
         6. Provider-specific tool guidance (GAP-5)
 
+        System Prompt Strategy:
+        - 'static': Cache prompt after first build, reuse for all turns (default)
+        - 'dynamic': Rebuild every turn based on current context
+        - 'hybrid': Static for API providers (cache benefit), dynamic for local providers
+
+        Returns:
+            System prompt string tailored to the provider/model
+        """
+        # Determine if we should use cached prompt or rebuild
+        strategy = self._get_effective_strategy()
+
+        if strategy == "static":
+            # Return cached prompt if available
+            if self._cached_prompt is not None:
+                logger.debug(
+                    "[SystemPrompt→Cache] Using cached prompt (strategy=static, len=%d)",
+                    len(self._cached_prompt),
+                )
+                return self._cached_prompt
+
+        # Build the prompt
+        prompt = self._build_prompt_internal()
+
+        # Cache for static mode
+        if strategy == "static":
+            self._cached_prompt = prompt
+            logger.debug(
+                "[SystemPrompt→Cache] Cached prompt (strategy=static, len=%d)",
+                len(prompt),
+            )
+        elif strategy == "dynamic":
+            # Clear cache to ensure rebuild next time
+            self._cached_prompt = None
+            logger.debug(
+                "[SystemPrompt→Dynamic] Rebuilt prompt (strategy=dynamic, len=%d)",
+                len(prompt),
+            )
+        # hybrid: cache for API providers, no cache for local
+
+        return prompt
+
+    def _get_effective_strategy(self) -> str:
+        """Get the effective strategy based on configuration and provider type.
+
+        Returns:
+            'static', 'dynamic', or 'hybrid'
+        """
+        strategy = self.system_prompt_strategy
+
+        if strategy == "hybrid":
+            # Static for API providers (cache benefit), dynamic for local
+            if self.provider_caches or self.provider_has_kv_cache:
+                return "static"
+            else:
+                return "dynamic"
+
+        return strategy
+
+    def _build_prompt_internal(self) -> str:
+        """Internal method to build the prompt without caching logic.
+
         Returns:
             System prompt string tailored to the provider/model
         """
@@ -576,12 +691,32 @@ class SystemPromptBuilder:
                 base_prompt = f"{base_prompt}\n\n{tool_constraint}"
 
         if "completion" in sections_to_include:
+            # Static baseline in system prompt. GEPA-evolved versions go to
+            # user messages via PromptComposer/OptimizationInjector.
             base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
 
         if "tool_guidance" in sections_to_include:
             tool_guidance = self.get_provider_tool_guidance()
             if tool_guidance:
                 base_prompt = f"{base_prompt}\n\n{tool_guidance}"
+
+        # Static tool effectiveness guidance in system prompt (baseline).
+        # GEPA-evolved versions are injected via PromptComposer.compose_user_prefix()
+        # into user messages, keeping the system prompt stable for cache efficiency.
+        if "tool_guidance" in sections_to_include:
+            base_prompt = f"{base_prompt}\n\n{ASI_TOOL_EFFECTIVENESS_GUIDANCE}"
+
+        # Log system prompt composition sent to LLM
+        logger.debug(
+            "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
+            "tool_guidance_len=%d prompt_total_len=%d strategy=%s",
+            self.provider_name,
+            sorted(sections_to_include),
+            self._get_tool_constraint_section()[:300] if self.available_tools else "(none)",
+            len(self.get_provider_tool_guidance()),
+            len(base_prompt),
+            self.system_prompt_strategy,
+        )
 
         return base_prompt
 
@@ -598,6 +733,7 @@ class SystemPromptBuilder:
             "tool_constraint",
             "completion",
             "tool_guidance",
+            "few_shot_examples",
         }
 
         try:
@@ -635,6 +771,17 @@ class SystemPromptBuilder:
         except Exception:
             pass
 
+        # For non-caching providers without edge model, use a reduced set.
+        # Full sections are expensive (reparsed every turn) with no cache benefit.
+        if not self.provider_caches:
+            reduced = {"completion", "task_guidance", "tool_constraint"}
+            if self.concise_mode:
+                reduced.add("concise_mode")
+            logger.debug(
+                f"Non-caching provider: using reduced sections {len(reduced)}/{len(all_sections)}"
+            )
+            return reduced
+
         return all_sections
 
     def _build_with_adapter(self) -> str:
@@ -665,7 +812,8 @@ class SystemPromptBuilder:
                 "Tool usage guidelines:\n"
                 "1. For code generation tasks: write the code directly in your response.\n"
                 "2. For exploration tasks: use list_directory and read_file to examine code.\n"
-                "3. For modification tasks: use write_file or edit_files after understanding context.\n"
+                "3. For modification tasks: use write_file or edit_files "
+                "after understanding context.\n"
                 "4. Provide clear, working solutions.\n\n"
                 f"{GROUNDING_RULES}"
             )
@@ -715,7 +863,8 @@ class SystemPromptBuilder:
             "You are an expert code analyst with access to tools for exploring "
             "and modifying code. Use them effectively:\n\n"
             "1. Use list_directory and read_file to examine code before conclusions.\n"
-            "2. If asked to modify code, use write_file or edit_files after understanding context.\n"
+            "2. If asked to modify code, use write_file or edit_files "
+            "after understanding context.\n"
             "3. For call-graph questions, prefer graph(mode='callers'|'callees'|'trace').\n"
             "4. Provide clear, actionable responses based on actual file contents.\n"
             "5. Always cite specific file paths and line numbers when referencing code.\n"
@@ -845,7 +994,8 @@ class SystemPromptBuilder:
         """Build prompt for LMStudio provider."""
         if self.has_native_tool_support():
             return (
-                "You are an expert coding assistant. You can analyze, explain, and generate code.\n\n"
+                "You are an expert coding assistant. "
+                "You can analyze, explain, and generate code.\n\n"
                 "CAPABILITIES:\n"
                 "- Code generation: Write working implementations directly in your response.\n"
                 "- Code analysis: Use tools to explore and understand existing code.\n"

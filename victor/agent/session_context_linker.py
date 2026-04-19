@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
     from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
@@ -106,7 +106,9 @@ class SessionContextLinker:
         hierarchy_data = session_data.get("compaction_hierarchy")
         if hierarchy_data:
             try:
-                from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
+                from victor.agent.compaction_hierarchy import (
+                    HierarchicalCompactionManager,
+                )
 
                 hm = HierarchicalCompactionManager.from_dict(hierarchy_data)
                 active_ctx = hm.get_active_context()

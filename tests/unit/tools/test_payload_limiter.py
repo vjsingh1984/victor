@@ -78,7 +78,10 @@ class TestProviderPayloadLimiter:
             MockToolDefinition(
                 name="test_tool",
                 description="A test tool for testing",
-                parameters={"type": "object", "properties": {"arg1": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"arg1": {"type": "string"}},
+                },
             )
         ]
 
@@ -215,7 +218,10 @@ class TestProviderPayloadLimiter:
             MockToolDefinition(
                 name=f"tool_{i}",
                 description="This is a test tool with a longer description " * 3,
-                parameters={"type": "object", "properties": {"arg": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"arg": {"type": "string"}},
+                },
             )
             for i in range(20)
         ]

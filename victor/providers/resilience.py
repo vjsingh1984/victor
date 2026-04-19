@@ -45,7 +45,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Awaitable, Callable, ClassVar, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -317,12 +317,32 @@ class ProviderRetryConfig:
         ConnectionError,
         TimeoutError,
         asyncio.TimeoutError,
+        CanonicalCircuitBreakerError,
+        CircuitOpenError,
+        # httpx transport errors: RemoteProtocolError, ReadError, etc.
+        # "Server disconnected without sending a response"
+    )
+
+    # Extended patterns that catch httpx transport errors by class name
+    retryable_exception_names: tuple = (
+        "APIConnectionError",
+        "RemoteProtocolError",
+        "ProtocolError",
+        "TransportError",
+        "ConnectTimeout",
+        "ReadError",
+        "ReadTimeout",
+        "ConnectError",
+        "WriteError",
     )
 
     retryable_status_codes: tuple = (429, 500, 502, 503, 504)
 
     # Retryable error message patterns
     retryable_patterns: tuple = (
+        r"connection.?error",
+        r"connection.?reset",
+        r"bad.?record.?mac",
         r"rate.?limit",
         r"overloaded",
         r"capacity",
@@ -446,20 +466,40 @@ class ProviderRetryStrategy:
         Returns:
             True if error should be retried
         """
-        # Check exception type
-        if isinstance(error, self.config.retryable_exceptions):
-            return True
+        seen: set[int] = set()
+        current: Optional[BaseException] = error
 
-        # Check error message patterns
-        error_str = str(error).lower()
-        for pattern in self._compiled_patterns:
-            if pattern.search(error_str):
+        while isinstance(current, Exception) and id(current) not in seen:
+            seen.add(id(current))
+
+            # Check exception type
+            if isinstance(current, self.config.retryable_exceptions):
                 return True
 
-        # Check for status code in error
-        for status_code in self.config.retryable_status_codes:
-            if str(status_code) in error_str:
-                return True
+            # Check exception class name (catches httpx/openai transport errors
+            # without requiring those libraries as direct dependencies here)
+            error_class = type(current).__name__
+            if hasattr(self.config, "retryable_exception_names"):
+                for name in self.config.retryable_exception_names:
+                    if error_class == name:
+                        return True
+                # Also check parent classes
+                for parent in type(current).__mro__:
+                    if parent.__name__ in self.config.retryable_exception_names:
+                        return True
+
+            # Check error message patterns
+            error_str = str(current).lower()
+            for pattern in self._compiled_patterns:
+                if pattern.search(error_str):
+                    return True
+
+            # Check for status code in error
+            for status_code in self.config.retryable_status_codes:
+                if str(status_code) in error_str:
+                    return True
+
+            current = getattr(current, "__cause__", None) or getattr(current, "__context__", None)
 
         return False
 
@@ -521,7 +561,11 @@ class ProviderRetryStrategy:
 class ProviderUnavailableError(Exception):
     """Raised when no providers are available."""
 
-    def __init__(self, primary_error: Exception, fallback_errors: Optional[List[Exception]] = None):
+    def __init__(
+        self,
+        primary_error: Exception,
+        fallback_errors: Optional[List[Exception]] = None,
+    ):
         self.primary_error = primary_error
         self.fallback_errors = fallback_errors or []
 
@@ -542,6 +586,7 @@ class ResilientProvider:
     - Fallback to alternative providers
     - Request timeout handling
     - Comprehensive error logging
+    - ObservabilityBus integration for fallback notifications
 
     Usage:
         resilient = ResilientProvider(
@@ -551,6 +596,21 @@ class ResilientProvider:
 
         response = await resilient.chat(messages, model=model)
     """
+
+    _observability_bus: ClassVar[Optional[Any]] = None
+
+    @classmethod
+    def wire_observability(cls, bus: Any) -> None:
+        """Wire an ObservabilityBus for provider fallback notifications.
+
+        Follows the same pattern as ``CircuitBreakerRegistry.wire_observability``.
+        When wired, lifecycle events are emitted on fallback activation and
+        exhaustion so the dashboard and other subscribers gain visibility.
+
+        Args:
+            bus: ObservabilityBus instance with ``emit_lifecycle_event()`` method.
+        """
+        cls._observability_bus = bus
 
     def __init__(
         self,
@@ -692,6 +752,16 @@ class ResilientProvider:
 
                 self._stats["fallback_successes"] += 1
                 logger.info(f"Fallback provider '{fb_name}' succeeded")
+                if self.__class__._observability_bus is not None:
+                    self.__class__._observability_bus.emit_lifecycle_event(
+                        "provider.fallback.activated",
+                        {
+                            "primary": self._provider_name,
+                            "fallback": fb_name,
+                            "error": str(primary_error),
+                            "model": model,
+                        },
+                    )
                 return result
 
             except CircuitOpenError as e:
@@ -704,6 +774,16 @@ class ResilientProvider:
 
         # All providers failed
         self._stats["total_failures"] += 1
+        if self.__class__._observability_bus is not None:
+            self.__class__._observability_bus.emit_lifecycle_event(
+                "provider.fallback.exhausted",
+                {
+                    "primary": self._provider_name,
+                    "fallback_count": len(self.fallback_providers),
+                    "error": str(primary_error),
+                    "model": model,
+                },
+            )
         raise ProviderUnavailableError(primary_error, fallback_errors)
 
     async def stream(
@@ -771,12 +851,34 @@ class ResilientProvider:
                     async for chunk in stream:
                         yield chunk
                     self._stats["fallback_successes"] += 1
+                    if self.__class__._observability_bus is not None:
+                        self.__class__._observability_bus.emit_lifecycle_event(
+                            "provider.fallback.activated",
+                            {
+                                "primary": self._provider_name,
+                                "fallback": fb_name,
+                                "error": str(primary_err),
+                                "model": model,
+                                "streaming": True,
+                            },
+                        )
                     return
                 except Exception as e:
                     logger.warning(f"Fallback stream '{fb_name}' failed: {e}")
                     continue
 
             self._stats["total_failures"] += 1
+            if self.__class__._observability_bus is not None:
+                self.__class__._observability_bus.emit_lifecycle_event(
+                    "provider.fallback.exhausted",
+                    {
+                        "primary": self._provider_name,
+                        "fallback_count": len(self.fallback_providers),
+                        "error": str(primary_err),
+                        "model": model,
+                        "streaming": True,
+                    },
+                )
             raise primary_err
 
     def get_stats(self) -> Dict[str, Any]:

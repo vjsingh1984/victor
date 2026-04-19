@@ -64,7 +64,10 @@ async def test_compute_executor_uses_input_mapping_and_output_key() -> None:
 
     result = await executor.execute(node, {"value": "AAPL"})
 
-    assert result["computed"] == {"status": "no_tools_executed", "params": {"symbol": "AAPL"}}
+    assert result["computed"] == {
+        "status": "no_tools_executed",
+        "params": {"symbol": "AAPL"},
+    }
     node_result = result["_node_results"]["compute"]
     assert isinstance(node_result, GraphNodeResult)
     assert node_result.success is True
@@ -121,7 +124,9 @@ async def test_parallel_executor_records_failure_with_runtime_graph_node_result(
 
 
 @pytest.mark.asyncio
-async def test_agent_executor_uses_output_key_and_runtime_graph_node_result(monkeypatch) -> None:
+async def test_agent_executor_uses_output_key_and_runtime_graph_node_result(
+    monkeypatch,
+) -> None:
     executor = AgentNodeExecutor(context=None)
     fake_result = SimpleNamespace(summary="done", success=True, tool_calls_used=2, error=None)
 

@@ -497,7 +497,11 @@ class ModeTransitionLearner(BaseLearner):
         if rec is None:
             return ("explore:0", 0.0, 0.3)
 
-        return (rec.value, rec.value if isinstance(rec.value, float) else 0.0, rec.confidence)
+        return (
+            rec.value,
+            rec.value if isinstance(rec.value, float) else 0.0,
+            rec.confidence,
+        )
 
     def get_optimal_budget(self, task_type: str) -> int:
         """Get learned optimal tool budget for a task type.

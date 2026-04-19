@@ -89,7 +89,12 @@ class AnthropicProvider(BaseProvider):
             model="claude",  # Will be set on chat()
             key_source=key_result.source_detail,
             non_interactive=key_result.non_interactive,
-            config={"base_url": base_url, "timeout": timeout, "max_retries": max_retries, **kwargs},
+            config={
+                "base_url": base_url,
+                "timeout": timeout,
+                "max_retries": max_retries,
+                **kwargs,
+            },
         )
 
         super().__init__(
@@ -117,6 +122,14 @@ class AnthropicProvider(BaseProvider):
 
     def supports_streaming(self) -> bool:
         """Anthropic supports streaming."""
+        return True
+
+    def supports_prompt_caching(self) -> bool:
+        """Anthropic explicit cache_control (90% read, 1.25x write premium, 5m-1h TTL)."""
+        return True
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """Anthropic reuses KV cache for matching prompt prefixes."""
         return True
 
     async def chat(
@@ -181,10 +194,24 @@ class AnthropicProvider(BaseProvider):
                 }
 
                 if system_message:
-                    request_params["system"] = system_message
+                    request_params["system"] = [
+                        {
+                            "type": "text",
+                            "text": system_message,
+                            "cache_control": {"type": "ephemeral"},
+                        }
+                    ]
 
                 if tools:
-                    request_params["tools"] = self._convert_tools(tools)
+                    converted = self._convert_tools(tools)
+                    if converted:
+                        # Place cache_control at the stable/dynamic tier boundary.
+                        # Tools are sorted FULL -> COMPACT -> STUB; caching the
+                        # FULL+COMPACT prefix means STUB tools can change per-turn
+                        # without invalidating the cached prefix.
+                        cache_idx = self._find_cache_boundary(tools, converted)
+                        converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
+                    request_params["tools"] = converted
 
                 # Make API call with circuit breaker protection
                 response: AnthropicMessage = await self._execute_with_circuit_breaker(
@@ -282,10 +309,23 @@ class AnthropicProvider(BaseProvider):
             }
 
             if system_message:
-                request_params["system"] = system_message
+                # Use content block format with cache_control for prefix caching.
+                # Anthropic caches the prefix (tools → system → messages) at 90%
+                # discount. The ephemeral TTL (5 min) refreshes on each use.
+                request_params["system"] = [
+                    {
+                        "type": "text",
+                        "text": system_message,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ]
 
             if tools:
-                request_params["tools"] = self._convert_tools(tools)
+                converted = self._convert_tools(tools)
+                if converted:
+                    cache_idx = self._find_cache_boundary(tools, converted)
+                    converted[cache_idx]["cache_control"] = {"type": "ephemeral"}
+                request_params["tools"] = converted
 
             tool_calls: Dict[str, Dict[str, Any]] = {}
             block_index_to_id: Dict[int, str] = {}
@@ -318,7 +358,8 @@ class AnthropicProvider(BaseProvider):
 
                     elif event_type == "content_block_start":
                         block = getattr(event, "content_block", None)
-                        if block and getattr(block, "type", "") == "tool_use":
+                        block_type = getattr(block, "type", "") if block else ""
+                        if block_type == "tool_use":
                             tc_id = getattr(block, "id", None) or f"tool_{len(tool_calls) + 1}"
                             tool_calls[tc_id] = {
                                 "id": tc_id,
@@ -326,9 +367,19 @@ class AnthropicProvider(BaseProvider):
                                 "arguments": getattr(block, "input", {}) or {},
                             }
                             block_index = getattr(
-                                event, "index", getattr(block, "index", len(block_index_to_id))
+                                event,
+                                "index",
+                                getattr(block, "index", len(block_index_to_id)),
                             )
                             block_index_to_id[block_index] = tc_id
+                        elif block_type == "thinking":
+                            # Claude extended thinking block — track index
+                            block_index = getattr(
+                                event,
+                                "index",
+                                getattr(block, "index", -1),
+                            )
+                            block_index_to_id[block_index] = "__thinking__"
 
                     elif event_type == "content_block_delta":
                         delta = getattr(event, "delta", None)
@@ -336,7 +387,16 @@ class AnthropicProvider(BaseProvider):
                         block_index = getattr(
                             event, "index", getattr(event, "content_block_index", None)
                         )
-                        if delta_type == "text_delta" and hasattr(delta, "text"):
+                        if delta_type == "thinking_delta":
+                            # Claude extended thinking — stream as metadata
+                            thinking_text = getattr(delta, "thinking", "")
+                            if thinking_text:
+                                yield StreamChunk(
+                                    content="",
+                                    is_final=False,
+                                    metadata={"reasoning_content": thinking_text},
+                                )
+                        elif delta_type == "text_delta" and hasattr(delta, "text"):
                             yield StreamChunk(content=delta.text or "", is_final=False)
                         elif delta_type in {"input_json_delta", "input_delta"}:
                             tc_id = block_index_to_id.get(block_index)
@@ -412,6 +472,25 @@ class AnthropicProvider(BaseProvider):
         """Convert standard tools to Anthropic format."""
         return convert_tools_to_anthropic_format(tools)
 
+    @staticmethod
+    def _find_cache_boundary(
+        tools: List[ToolDefinition],
+        converted: List[Dict[str, Any]],
+    ) -> int:
+        """Find the index for cache_control placement at the stable/dynamic boundary.
+
+        Tools are sorted FULL -> COMPACT -> STUB. The cache boundary is placed
+        on the last FULL or COMPACT tool so Anthropic caches the stable prefix.
+        STUB tools after the boundary can change per-turn without cache invalidation.
+        """
+        last_stable = len(converted) - 1
+        for i, tool_def in enumerate(tools):
+            level = getattr(tool_def, "schema_level", None)
+            if level == "stub" and i > 0:
+                last_stable = i - 1
+                break
+        return last_stable
+
     def _parse_response(self, response: AnthropicMessage, model: str) -> CompletionResponse:
         """Parse Anthropic API response.
 
@@ -422,13 +501,17 @@ class AnthropicProvider(BaseProvider):
         Returns:
             Normalized CompletionResponse
         """
-        # Extract text content
+        # Extract text content, tool calls, and thinking blocks
         content = ""
         tool_calls = []
+        thinking_content = ""
 
         for block in response.content:
             if block.type == "text":
                 content += block.text
+            elif block.type == "thinking":
+                # Claude extended thinking block — extract reasoning content
+                thinking_content += getattr(block, "thinking", "")
             elif block.type == "tool_use":
                 tool_calls.append(
                     {
@@ -447,6 +530,11 @@ class AnthropicProvider(BaseProvider):
                 "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
             }
 
+        # Include thinking content in metadata for downstream rendering
+        metadata = None
+        if thinking_content:
+            metadata = {"reasoning_content": thinking_content}
+
         return CompletionResponse(
             content=content,
             role="assistant",
@@ -454,7 +542,8 @@ class AnthropicProvider(BaseProvider):
             stop_reason=response.stop_reason,
             usage=usage,
             model=model,
-            raw_response=response.model_dump() if hasattr(response, "model_dump") else None,
+            metadata=metadata,
+            raw_response=(response.model_dump() if hasattr(response, "model_dump") else None),
         )
 
     @staticmethod

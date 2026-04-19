@@ -132,7 +132,9 @@ def main():
         status = "✓" if r.get("success") else "✗"
         time_str = f"{r.get('time_seconds', 0):.2f}s"
         output_str = (
-            f"{r.get('output_length', 0)} chars" if r.get("success") else r.get("error", "N/A")[:20]
+            f"{r.get('output_length', 0)} chars"
+            if r.get("success")
+            else r.get("error", "N/A")[:20]
         )
         print(f"{r['provider']:<20} {status:<10} {time_str:<10} {output_str:<10}")
 

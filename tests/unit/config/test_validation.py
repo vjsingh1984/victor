@@ -148,7 +148,7 @@ class TestValidateToolSettings:
         from victor.config.settings import Settings
 
         settings = Settings()
-        settings.fallback_max_tools = -1
+        settings.tools.fallback_max_tools = -1
 
         result = validate_tool_settings(settings)
         has_invalid_error = any(
@@ -162,7 +162,7 @@ class TestValidateToolSettings:
         from victor.config.settings import Settings
 
         settings = Settings()
-        settings.fallback_max_tools = 100
+        settings.tools.fallback_max_tools = 100
 
         result = validate_tool_settings(settings)
         has_high_warning = any(

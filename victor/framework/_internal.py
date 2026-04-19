@@ -109,7 +109,7 @@ async def create_orchestrator_from_options(
 
     # Apply airgapped mode
     if airgapped:
-        settings.airgapped_mode = True
+        settings.security.airgapped_mode = True
 
     if getattr(settings, "framework_private_fallback_strict_mode", False):
         os.environ.setdefault("VICTOR_STRICT_FRAMEWORK_PRIVATE_FALLBACKS", "1")
@@ -131,7 +131,7 @@ async def create_orchestrator_from_options(
     # Create OrchestratorFactory with provider
     provider_class = ProviderRegistry.get(provider)
     provider_instance = provider_class(
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -139,7 +139,7 @@ async def create_orchestrator_from_options(
     factory = OrchestratorFactory(
         settings=settings,
         provider=provider_instance,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         temperature=temperature,
         max_tokens=max_tokens,
         profile_name=profile or "default",
@@ -151,7 +151,7 @@ async def create_orchestrator_from_options(
     agent = await factory.create_agent(
         mode="foreground",
         provider=provider,
-        model=model or settings.default_model,
+        model=model or settings.provider.default_model,
         tools=tools,
         airgapped=airgapped,
         vertical=vertical,
@@ -217,6 +217,16 @@ def setup_observability_integration(
 
     # Wire into orchestrator
     integration.wire_orchestrator(orchestrator)
+
+    # Wire provider resilience notifications to the same bus so dashboard
+    # and other subscribers see fallback events.  Follows the same pattern
+    # as CircuitBreakerRegistry.wire_observability().
+    try:
+        from victor.providers.resilience import ResilientProvider
+
+        ResilientProvider.wire_observability(integration.event_bus)
+    except Exception:
+        pass  # Non-critical — resilience works without observability
 
     # Ensure reference is stored through public observability ports.
     if isinstance(orchestrator, ObservabilityPortProtocol):

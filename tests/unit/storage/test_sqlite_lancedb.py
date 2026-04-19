@@ -29,6 +29,42 @@ class TestInit:
         s = SqliteLanceDBStore(repo_root=tmp_path, persist_directory=custom)
         assert s.persist_directory == custom
 
+    @pytest.mark.asyncio
+    async def test_initialize_uses_custom_project_db_path(self, tmp_path):
+        custom = tmp_path / "custom_dir"
+        store = SqliteLanceDBStore(repo_root=tmp_path, persist_directory=custom)
+
+        fake_graph_store = MagicMock()
+        fake_graph_store.initialize = AsyncMock()
+
+        class _FakeEmbeddingModel:
+            async def initialize(self):
+                return None
+
+        class _FakeFactory:
+            def create_model(self, *_args, **_kwargs):
+                return _FakeEmbeddingModel()
+
+        class _FakeRegistry:
+            def get(self, *_args, **_kwargs):
+                return _FakeFactory()
+
+        with (
+            patch(
+                "victor.storage.graph.sqlite_store.SqliteGraphStore", return_value=fake_graph_store
+            ) as mock_graph_store,
+            patch(
+                "victor.core.capability_registry.CapabilityRegistry.get_instance",
+                return_value=_FakeRegistry(),
+            ),
+            patch.object(store, "_init_vector_store", AsyncMock()),
+        ):
+            await store.initialize()
+
+        graph_path_arg = mock_graph_store.call_args.args[0]
+        assert Path(graph_path_arg) == custom / "project.db"
+        fake_graph_store.initialize.assert_awaited_once()
+
 
 class TestUnifiedIdHelpers:
     def test_make_symbol_id(self, store):

@@ -141,7 +141,29 @@ class VictorError(Exception):
         return result
 
 
-class ProviderError(VictorError):
+class AgentError(VictorError):
+    """Base for errors surfaced through the Agent public API.
+
+    Adds the recoverable attribute so framework callers can distinguish
+    transient failures (retry) from permanent ones (abort).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        recoverable: bool = True,
+        details: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(message, details=details, **kwargs)
+        self.recoverable = recoverable
+
+    def __str__(self) -> str:
+        return super().__str__()
+
+
+class ProviderError(AgentError):
     """Errors related to LLM providers."""
 
     def __init__(
@@ -299,7 +321,7 @@ class ProviderInvalidResponseError(ProviderError):
             self.details["response_keys"] = list(response_data.keys())[:10]
 
 
-class ToolError(VictorError):
+class ToolError(AgentError):
     """Errors related to tool execution."""
 
     def __init__(
@@ -389,7 +411,7 @@ class ToolTimeoutError(ToolError):
         self.details["timeout"] = timeout
 
 
-class ConfigurationError(VictorError):
+class ConfigurationError(AgentError):
     """Configuration-related errors."""
 
     def __init__(
@@ -679,7 +701,10 @@ class ErrorHandler:
         """Categorize a standard exception and provide recovery hint."""
         # File errors
         if isinstance(exception, (FileNotFoundError, builtins_FileNotFoundError)):
-            return ErrorCategory.FILE_NOT_FOUND, "Check if the file exists and path is correct."
+            return (
+                ErrorCategory.FILE_NOT_FOUND,
+                "Check if the file exists and path is correct.",
+            )
 
         if isinstance(exception, PermissionError):
             return ErrorCategory.FILE_PERMISSION, "Check file permissions."
@@ -693,7 +718,10 @@ class ErrorHandler:
             return ErrorCategory.VALIDATION_ERROR, "Check input values and types."
 
         if isinstance(exception, KeyError):
-            return ErrorCategory.CONFIG_MISSING, "Check that required configuration is set."
+            return (
+                ErrorCategory.CONFIG_MISSING,
+                "Check that required configuration is set.",
+            )
 
         # Default
         return ErrorCategory.UNKNOWN, None
@@ -779,6 +807,47 @@ builtins_FileNotFoundError = (
 T = TypeVar("T")
 
 
+def _handle_error_impl(
+    e: Exception,
+    handler: ErrorHandler,
+    func_name: str,
+    args_count: int,
+    category: ErrorCategory,
+    recovery_hint: Optional[str],
+    reraise: bool,
+    default_return: Optional[Any],
+) -> Any:
+    """Shared error handling logic for sync and async decorators.
+
+    Args:
+        e: The exception to handle
+        handler: ErrorHandler instance
+        func_name: Name of the function that raised the error
+        args_count: Number of arguments passed to the function
+        category: Error category for logging
+        recovery_hint: Recovery hint to include in error
+        reraise: Whether to reraise the exception after logging
+        default_return: Value to return on error (if not reraising)
+
+    Returns:
+        default_return if not reraising
+
+    Raises:
+        VictorError: If reraise is True
+    """
+    error_info = handler.handle(
+        e, context={"function": func_name, "args_count": args_count}
+    )
+    if reraise:
+        raise VictorError(
+            str(e),
+            category=category,
+            recovery_hint=recovery_hint or error_info.recovery_hint,
+            cause=e,
+        ) from e
+    return default_return  # type: ignore
+
+
 def handle_errors(
     category: ErrorCategory = ErrorCategory.UNKNOWN,
     recovery_hint: Optional[str] = None,
@@ -808,17 +877,10 @@ def handle_errors(
             except VictorError:
                 raise  # Don't wrap VictorError
             except Exception as e:
-                error_info = handler.handle(
-                    e, context={"function": func.__name__, "args_count": len(args)}
+                return _handle_error_impl(
+                    e, handler, func.__name__, len(args),
+                    category, recovery_hint, reraise, default_return
                 )
-                if reraise:
-                    raise VictorError(
-                        str(e),
-                        category=category,
-                        recovery_hint=recovery_hint or error_info.recovery_hint,
-                        cause=e,
-                    ) from e
-                return default_return  # type: ignore
 
         return wrapper
 
@@ -842,17 +904,10 @@ def handle_errors_async(
             except VictorError:
                 raise
             except Exception as e:
-                error_info = handler.handle(
-                    e, context={"function": func.__name__, "args_count": len(args)}
+                return _handle_error_impl(
+                    e, handler, func.__name__, len(args),
+                    category, recovery_hint, reraise, default_return
                 )
-                if reraise:
-                    raise VictorError(
-                        str(e),
-                        category=category,
-                        recovery_hint=recovery_hint or error_info.recovery_hint,
-                        cause=e,
-                    ) from e
-                return default_return  # type: ignore
 
         return wrapper  # type: ignore
 

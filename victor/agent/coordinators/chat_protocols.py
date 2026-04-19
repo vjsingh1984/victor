@@ -348,3 +348,31 @@ class ChatOrchestratorProtocol(
 
     _sequence_tracker: Any
     """Optional ToolSequenceTracker for tool sequence analysis."""
+
+
+@runtime_checkable
+class PlanningContextProtocol(Protocol):
+    """Protocol for PlanningCoordinator dependencies.
+
+    Minimal interface that PlanningCoordinator needs from the orchestrator.
+    Enables testing with lightweight mocks instead of full AgentOrchestrator.
+    """
+
+    @property
+    def provider(self) -> Any:
+        """LLM provider instance."""
+        ...
+
+    @property
+    def model(self) -> str:
+        """Current model name."""
+        ...
+
+    @property
+    def max_tokens(self) -> int:
+        """Maximum tokens for completion."""
+        ...
+
+    async def chat(self, user_message: str, use_planning: bool = False) -> Any:
+        """Execute a non-streaming chat turn."""
+        ...

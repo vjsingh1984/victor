@@ -783,7 +783,7 @@ workflows:
                 "check_quality": ConditionNode(
                     id="check_quality",
                     name="Check Quality",
-                    condition=lambda ctx: "good" if ctx.get("quality_score", 0) > 0.8 else "bad",
+                    condition=lambda ctx: ("good" if ctx.get("quality_score", 0) > 0.8 else "bad"),
                     branches={"good": "analyze", "bad": "cleanup"},
                 ),
                 "cleanup": AgentNode(

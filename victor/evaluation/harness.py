@@ -214,7 +214,14 @@ class TaskEnvironment:
             # Checkout specific commit if provided
             if self.task.base_commit and repo_dir.exists():
                 # Fetch the specific commit if not available
-                fetch_cmd = ["git", "fetch", "--depth", "1", "origin", self.task.base_commit]
+                fetch_cmd = [
+                    "git",
+                    "fetch",
+                    "--depth",
+                    "1",
+                    "origin",
+                    self.task.base_commit,
+                ]
                 result = await asyncio.create_subprocess_exec(
                     *fetch_cmd,
                     cwd=repo_dir,
@@ -520,6 +527,8 @@ class EvaluationHarness:
                     "tokens_output": r.tokens_output,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
                     "error_message": r.error_message,
                     "generated_code": r.generated_code,
@@ -569,6 +578,8 @@ class EvaluationHarness:
                     tokens_output=r.get("tokens_output", 0),
                     tool_calls=r.get("tool_calls", 0),
                     turns=r.get("turns", 0),
+                    code_search_calls=r.get("code_search_calls", 0),
+                    graph_calls=r.get("graph_calls", 0),
                     completion_score=r.get("completion_score"),
                     error_message=r.get("error_message"),
                     generated_code=r.get("generated_code"),
@@ -739,7 +750,12 @@ class EvaluationHarness:
 
             try:
                 task_result = await self._run_single_task(
-                    task, runner, agent_callback, config, retry_callback, metrics_collector
+                    task,
+                    runner,
+                    agent_callback,
+                    config,
+                    retry_callback,
+                    metrics_collector,
                 )
                 results.append(task_result)
                 all_results.append(task_result)
@@ -816,7 +832,12 @@ class EvaluationHarness:
             async with semaphore:
                 try:
                     result = await self._run_single_task(
-                        task, runner, agent_callback, config, retry_callback, metrics_collector
+                        task,
+                        runner,
+                        agent_callback,
+                        config,
+                        retry_callback,
+                        metrics_collector,
                     )
                 except Exception as e:
                     result = TaskResult(
@@ -897,6 +918,8 @@ class EvaluationHarness:
                     task_result.tokens_used = partial_data.get("tokens_used", 0)
                     task_result.tool_calls = partial_data.get("tool_calls", 0)
                     task_result.turns = partial_data.get("turns", 0)
+                    task_result.code_search_calls = partial_data.get("code_search_calls", 0)
+                    task_result.graph_calls = partial_data.get("graph_calls", 0)
                     task_result.generated_code = partial_data.get("code", "")
                     logger.info(
                         f"Task timed out - partial metrics recovered: "
@@ -916,6 +939,8 @@ class EvaluationHarness:
                 task_result.tokens_used = agent_output.get("tokens_used", 0)
                 task_result.tool_calls = agent_output.get("tool_calls", 0)
                 task_result.turns = agent_output.get("turns", 0)
+                task_result.code_search_calls = agent_output.get("code_search_calls", 0)
+                task_result.graph_calls = agent_output.get("graph_calls", 0)
                 agent_output = agent_output.get("code", "")
 
             # Self-correction loop (if enabled)
@@ -1156,6 +1181,8 @@ class EvaluationHarness:
                     "tokens_output": r.tokens_output,
                     "tool_calls": r.tool_calls,
                     "turns": r.turns,
+                    "code_search_calls": r.code_search_calls,
+                    "graph_calls": r.graph_calls,
                     "completion_score": r.completion_score,
                     "code_quality": (
                         {

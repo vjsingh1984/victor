@@ -510,7 +510,9 @@ class OrchestratorIntegration:
                 "recommended_mode": context.recommended_mode,
                 "recommended_tool_budget": context.recommended_tool_budget,
                 "should_continue": context.should_continue,
-                "system_prompt_addition": context.system_prompt if context.system_prompt else None,
+                "system_prompt_addition": (
+                    context.system_prompt if context.system_prompt else None
+                ),
             }
         except (AttributeError, KeyError) as e:
             logger.debug(f"IntelligentPipeline prepare_request skipped (not configured): {e}")

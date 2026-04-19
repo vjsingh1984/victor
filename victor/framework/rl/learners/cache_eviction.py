@@ -431,7 +431,10 @@ class CacheEvictionLearner(BaseLearner):
         state_key = f"{util_bucket}:{age_bucket}:{hit_bucket}:{tool_type}"
 
         rec = self.get_recommendation(state_key, "", "cache")
-        return (rec.value if rec else CacheEvictionAction.KEEP, rec.confidence if rec else 0.3)
+        return (
+            rec.value if rec else CacheEvictionAction.KEEP,
+            rec.confidence if rec else 0.3,
+        )
 
     def get_tool_value(self, tool_name: str) -> float:
         """Get estimated value for a tool's cache entries.

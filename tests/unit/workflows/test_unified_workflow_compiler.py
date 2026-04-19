@@ -294,7 +294,10 @@ class TestCompilationFromYAML:
     @pytest.mark.asyncio
     async def test_compile_from_yaml_path(self, yaml_workflow_file: Path, reset_workflow_caches):
         """Test compiling a YAML file path to CompiledGraph."""
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
         compiled = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")
@@ -312,7 +315,10 @@ class TestCompilationFromYAML:
     @pytest.mark.asyncio
     async def test_compile_from_yaml_content(self, sample_yaml_content: str, tmp_path: Path):
         """Test compiling YAML string content via file to CompiledGraph."""
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         # Write content to temp file (current API requires file path)
         yaml_file = tmp_path / "content_test.yaml"
@@ -328,7 +334,10 @@ class TestCompilationFromYAML:
         self, sample_yaml_content: str
     ):
         """YAML content compilation should use the shared parser metadata contract."""
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         compiler = UnifiedWorkflowCompiler()
         compiled = compiler.compile_yaml_content(sample_yaml_content, workflow_name="test_workflow")
@@ -343,7 +352,10 @@ class TestCompilationFromYAML:
     ):
         """Test that agent timeout is parsed from YAML correctly."""
         from victor.workflows.unified_compiler import UnifiedWorkflowCompiler
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowConfig
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowConfig,
+        )
 
         # First verify YAML loader parses timeout correctly
         config = YAMLWorkflowConfig()
@@ -375,8 +387,14 @@ class TestCompilationFromYAML:
         self, workflow_execution_limits_yaml_content: str, tmp_path: Path
     ):
         """Test that workflow-level limits are parsed from YAML correctly."""
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowConfig
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowConfig,
+        )
 
         # Verify YAML loader parses workflow-level limits
         config = YAMLWorkflowConfig()
@@ -404,7 +422,10 @@ class TestCompilationFromYAML:
         self, workflow_execution_block_yaml_content: str, tmp_path: Path
     ):
         """Test that execution block syntax is parsed correctly."""
-        from victor.workflows.yaml_loader import load_workflow_from_yaml, YAMLWorkflowConfig
+        from victor.workflows.yaml_loader import (
+            load_workflow_from_yaml,
+            YAMLWorkflowConfig,
+        )
 
         config = YAMLWorkflowConfig()
         workflows = load_workflow_from_yaml(workflow_execution_block_yaml_content, config=config)
@@ -423,8 +444,15 @@ class TestCompilationFromDefinition:
     @pytest.mark.asyncio
     async def test_compile_from_workflow_definition(self):
         """Test compiling a WorkflowDefinition to CachedCompiledGraph."""
-        from victor.workflows.definition import TransformNode, WorkflowBuilder, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.definition import (
+            TransformNode,
+            WorkflowBuilder,
+            WorkflowDefinition,
+        )
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         # Create a simple workflow definition
         workflow = (
@@ -493,7 +521,10 @@ class TestCompilationFromGraphDSL:
     async def test_compile_from_workflow_graph(self):
         """Test compiling a WorkflowGraph (DSL) to CachedCompiledGraph."""
         from victor.workflows.graph_dsl import State, WorkflowGraph
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         @dataclass
         class TestState(State):
@@ -619,7 +650,10 @@ class TestNodeExecution:
     async def test_agent_node_execution(self, mock_orchestrator):
         """Test that AgentNode compiles correctly."""
         from victor.workflows.definition import AgentNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="agent_test",
@@ -647,8 +681,15 @@ class TestNodeExecution:
     @pytest.mark.asyncio
     async def test_compute_node_execution(self):
         """Test that ComputeNode compiles correctly."""
-        from victor.workflows.definition import ComputeNode, TaskConstraints, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.definition import (
+            ComputeNode,
+            TaskConstraints,
+            WorkflowDefinition,
+        )
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="compute_test",
@@ -680,7 +721,10 @@ class TestNodeExecution:
             TransformNode,
             WorkflowDefinition,
         )
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="condition_test",
@@ -718,7 +762,10 @@ class TestNodeExecution:
     async def test_transform_node_execution(self):
         """Test that TransformNode compiles correctly."""
         from victor.workflows.definition import TransformNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="transform_test",
@@ -748,7 +795,10 @@ class TestNodeExecution:
             TransformNode,
             WorkflowDefinition,
         )
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="parallel_test",
@@ -799,7 +849,10 @@ class TestNodeExecution:
     async def test_hitl_node_compilation(self):
         """Test that HITL nodes compile correctly."""
         from victor.workflows.definition import WorkflowBuilder
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         # Build workflow with HITL approval node
         workflow = (
@@ -826,7 +879,10 @@ class TestNodeExecution:
     async def test_agent_node_with_timeout_configuration(self):
         """Test that AgentNode timeout_seconds is properly configured."""
         from victor.workflows.definition import AgentNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="agent_timeout_test",
@@ -886,7 +942,10 @@ class TestNodeExecution:
     async def test_workflow_level_timeout_configuration(self):
         """Test that workflow-level timeout settings are properly configured."""
         from victor.workflows.definition import TransformNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="workflow_timeout_test",
@@ -958,7 +1017,10 @@ class TestStateHandling:
     async def test_state_dict_input(self):
         """Test that plain dict state works correctly."""
         from victor.workflows.definition import TransformNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="dict_state_test",
@@ -983,7 +1045,10 @@ class TestStateHandling:
     async def test_state_typed_input(self):
         """Test that TypedDict state works correctly with graph DSL."""
         from victor.workflows.graph_dsl import State, WorkflowGraph
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         @dataclass
         class DataclassState(State):
@@ -1011,7 +1076,10 @@ class TestStateHandling:
     async def test_state_dataclass_input(self):
         """Test that dataclass state works correctly."""
         from victor.workflows.graph_dsl import State, WorkflowGraph
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         @dataclass
         class MyDataclassState(State):
@@ -1037,7 +1105,10 @@ class TestStateHandling:
     async def test_state_consistency_across_nodes(self):
         """Test that state flows correctly through multiple nodes."""
         from victor.workflows.definition import TransformNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="state_flow_test",
@@ -1045,19 +1116,28 @@ class TestStateHandling:
                 "step1": TransformNode(
                     id="step1",
                     name="Step 1",
-                    transform=lambda ctx: {**ctx, "step1_value": ctx.get("initial", 0) + 1},
+                    transform=lambda ctx: {
+                        **ctx,
+                        "step1_value": ctx.get("initial", 0) + 1,
+                    },
                     next_nodes=["step2"],
                 ),
                 "step2": TransformNode(
                     id="step2",
                     name="Step 2",
-                    transform=lambda ctx: {**ctx, "step2_value": ctx.get("step1_value", 0) + 1},
+                    transform=lambda ctx: {
+                        **ctx,
+                        "step2_value": ctx.get("step1_value", 0) + 1,
+                    },
                     next_nodes=["step3"],
                 ),
                 "step3": TransformNode(
                     id="step3",
                     name="Step 3",
-                    transform=lambda ctx: {**ctx, "final_value": ctx.get("step2_value", 0) + 1},
+                    transform=lambda ctx: {
+                        **ctx,
+                        "final_value": ctx.get("step2_value", 0) + 1,
+                    },
                     next_nodes=[],
                 ),
             },
@@ -1365,7 +1445,10 @@ class TestAPIConsistency:
         """Test that all compilation methods return CachedCompiledGraph."""
         from victor.workflows.definition import WorkflowBuilder
         from victor.workflows.graph_dsl import State, WorkflowGraph
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         compiler = UnifiedWorkflowCompiler()
 
@@ -1428,7 +1511,10 @@ class TestEdgeCases:
     async def test_single_node_workflow(self):
         """Test workflow with only one node."""
         from victor.workflows.definition import TransformNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="single",
@@ -1453,7 +1539,10 @@ class TestEdgeCases:
     async def test_workflow_with_unicode_names(self):
         """Test workflow with unicode characters in names."""
         from victor.workflows.definition import TransformNode, WorkflowDefinition
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         workflow = WorkflowDefinition(
             name="unicode_test",
@@ -1478,7 +1567,10 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_concurrent_compilation(self, yaml_workflow_file: Path, reset_workflow_caches):
         """Test thread safety of concurrent compilations."""
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         compiler = UnifiedWorkflowCompiler(enable_caching=True)
 
@@ -1580,7 +1672,10 @@ class TestCachedCompiledGraph:
         self, yaml_workflow_file: Path, reset_workflow_caches
     ):
         """Test CachedCompiledGraph wrapper has correct properties."""
-        from victor.workflows.unified_compiler import UnifiedWorkflowCompiler, CachedCompiledGraph
+        from victor.workflows.unified_compiler import (
+            UnifiedWorkflowCompiler,
+            CachedCompiledGraph,
+        )
 
         compiler = UnifiedWorkflowCompiler()
         cached = compiler.compile_yaml(yaml_workflow_file, workflow_name="test_workflow")

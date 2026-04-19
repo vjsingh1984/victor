@@ -38,14 +38,10 @@ The PromptBuilder uses a fluent API pattern for ergonomic construction:
 
 Integration with verticals:
 
-try:
-        from victor_coding.prompts import CodingPromptContributor
-except ImportError:
-    # External vertical package may not be installed
-    pass
-
+    # Prompt contributors are provided by external vertical packages
+    # (e.g., victor-coding) via victor.prompt_contributors entry points.
     builder = PromptBuilder()
-    builder.add_from_contributor(CodingPromptContributor())
+    builder.add_from_contributor(prompt_contributor)
     prompt = builder.build()
 """
 
@@ -673,7 +669,11 @@ def create_coding_prompt_builder() -> PromptBuilder:
         PromptBuilder()
         .add_section("identity", CODING_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section("guidelines", CODING_GUIDELINES, priority=PromptBuilder.PRIORITY_GUIDELINES)
-        .add_section("tool_usage", CODING_TOOL_USAGE, priority=PromptBuilder.PRIORITY_TOOL_GUIDANCE)
+        .add_section(
+            "tool_usage",
+            CODING_TOOL_USAGE,
+            priority=PromptBuilder.PRIORITY_TOOL_GUIDANCE,
+        )
     )
 
 
@@ -692,8 +692,16 @@ def create_devops_prompt_builder() -> PromptBuilder:
     return (
         PromptBuilder()
         .add_section("identity", DEVOPS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
-        .add_section("security", DEVOPS_SECURITY_CHECKLIST, priority=PromptBuilder.PRIORITY_SAFETY)
-        .add_section("pitfalls", DEVOPS_COMMON_PITFALLS, priority=PromptBuilder.PRIORITY_GUIDELINES)
+        .add_section(
+            "security",
+            DEVOPS_SECURITY_CHECKLIST,
+            priority=PromptBuilder.PRIORITY_SAFETY,
+        )
+        .add_section(
+            "pitfalls",
+            DEVOPS_COMMON_PITFALLS,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
+        )
     )
 
 
@@ -713,10 +721,14 @@ def create_research_prompt_builder() -> PromptBuilder:
         PromptBuilder()
         .add_section("identity", RESEARCH_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
-            "quality", RESEARCH_QUALITY_CHECKLIST, priority=PromptBuilder.PRIORITY_GUIDELINES
+            "quality",
+            RESEARCH_QUALITY_CHECKLIST,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
         )
         .add_section(
-            "sources", RESEARCH_SOURCE_HIERARCHY, priority=PromptBuilder.PRIORITY_GUIDELINES + 5
+            "sources",
+            RESEARCH_SOURCE_HIERARCHY,
+            priority=PromptBuilder.PRIORITY_GUIDELINES + 5,
         )
     )
 
@@ -737,10 +749,14 @@ def create_data_analysis_prompt_builder() -> PromptBuilder:
         PromptBuilder()
         .add_section("identity", DATA_ANALYSIS_IDENTITY, priority=PromptBuilder.PRIORITY_IDENTITY)
         .add_section(
-            "libraries", DATA_ANALYSIS_LIBRARIES, priority=PromptBuilder.PRIORITY_CAPABILITIES
+            "libraries",
+            DATA_ANALYSIS_LIBRARIES,
+            priority=PromptBuilder.PRIORITY_CAPABILITIES,
         )
         .add_section(
-            "operations", DATA_ANALYSIS_OPERATIONS, priority=PromptBuilder.PRIORITY_GUIDELINES
+            "operations",
+            DATA_ANALYSIS_OPERATIONS,
+            priority=PromptBuilder.PRIORITY_GUIDELINES,
         )
     )
 

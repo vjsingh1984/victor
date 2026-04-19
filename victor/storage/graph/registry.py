@@ -17,17 +17,21 @@ except Exception:
 def create_graph_store(
     name: str = "sqlite",
     project_path: Optional[Path] = None,
+    *,
+    backend: Optional[str] = None,
 ) -> GraphStoreProtocol:
     """Create a graph store by name.
 
     Args:
         name: Backend name (sqlite, memory, duckdb)
         project_path: Path to project root. If None, uses current directory.
+        backend: Alias for name (used by victor-coding shim). Takes priority if set.
 
     Returns:
         GraphStoreProtocol implementation
     """
-    backend = (name or "sqlite").lower()
+    effective_name = backend if backend is not None else name
+    backend = (effective_name or "sqlite").lower()
     if backend == "sqlite":
         return SqliteGraphStore(project_path=project_path)
     if backend == "memory":

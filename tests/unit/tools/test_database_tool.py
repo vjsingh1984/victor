@@ -142,7 +142,10 @@ class TestDatabaseQuery:
     async def test_query_select_with_limit(self, sqlite_conn):
         """Test SELECT query with limit."""
         result = await database(
-            action="query", connection_id=sqlite_conn, sql="SELECT * FROM users", limit=1
+            action="query",
+            connection_id=sqlite_conn,
+            sql="SELECT * FROM users",
+            limit=1,
         )
         assert result["success"] is True
         assert result["count"] == 1

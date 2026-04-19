@@ -235,7 +235,10 @@ class ToolRegistrar:
     def _get_catalog_loader(self) -> Any:
         """Get or create the catalog loader component."""
         if self._catalog_loader is None:
-            from victor.agent.tool_catalog_loader import ToolCatalogLoader, ToolCatalogConfig
+            from victor.agent.tool_catalog_loader import (
+                ToolCatalogLoader,
+                ToolCatalogConfig,
+            )
 
             self._catalog_loader = ToolCatalogLoader(
                 registry=self.tools,
@@ -281,7 +284,10 @@ class ToolRegistrar:
     def _get_graph_builder(self) -> Any:
         """Get or create the graph builder component."""
         if self._graph_builder is None:
-            from victor.agent.tool_graph_builder import ToolGraphBuilder, ToolGraphConfig
+            from victor.agent.tool_graph_builder import (
+                ToolGraphBuilder,
+                ToolGraphConfig,
+            )
 
             self._graph_builder = ToolGraphBuilder(
                 registry=self.tools,

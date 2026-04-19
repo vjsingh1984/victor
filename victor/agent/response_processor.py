@@ -274,6 +274,7 @@ class ResponseProcessor:
             return None
 
         valid_calls = []
+        invalid_count = 0
         for tc in tool_calls:
             name = tc.get("name", "")
 
@@ -291,10 +292,15 @@ class ResponseProcessor:
             if is_enabled:
                 valid_calls.append(tc)
             else:
-                logger.debug(f"Filtered out disabled tool: {name}")
+                invalid_count += 1
+                # Mark as pre-failed so pipeline returns error with tool_call_id
+                # (OpenAI spec: every tool_calls[].id needs a role=tool response)
+                tc["_invalid"] = True
+                tc["_error"] = f"Unknown tool '{name}'. Use one of the available tools."
+                valid_calls.append(tc)
 
-        if len(valid_calls) != len(tool_calls):
-            logger.warning(f"Filtered {len(tool_calls) - len(valid_calls)} invalid tool calls")
+        if invalid_count:
+            logger.warning(f"Marked {invalid_count} invalid tool calls for error responses")
 
         return valid_calls if valid_calls else None
 

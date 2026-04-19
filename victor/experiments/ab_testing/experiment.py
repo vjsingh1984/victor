@@ -521,7 +521,13 @@ class ABTestManager:
                 experiment_id, user_id, variant_id, allocated_at, context_json
             ) VALUES (?, ?, ?, ?, ?)
         """,
-            (experiment_id, user_id, variant_id, time.time(), json.dumps(context or {})),
+            (
+                experiment_id,
+                user_id,
+                variant_id,
+                time.time(),
+                json.dumps(context or {}),
+            ),
         )
 
         conn.commit()

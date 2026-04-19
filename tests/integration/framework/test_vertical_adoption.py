@@ -221,8 +221,8 @@ class TestPrivacyCapabilityProviderAdoption:
                 assert len(CAPABILITIES) >= 0
             except ImportError:
                 # If capabilities module doesn't exist, that's okay
-                # Just verify the vertical loads
-                DataAnalysisAssistant = _resolve_vertical_attr(
+                # Just verify the vertical loads (skip if not installed)
+                DataAnalysisAssistant = _load_vertical_attr(
                     "victor.dataanalysis",
                     "DataAnalysisAssistant",
                 )
@@ -499,7 +499,10 @@ class TestBackwardCompatibility:
             "victor.research.capabilities",
             "ResearchCapabilityProvider",
         )
-        from victor.framework.capabilities import BaseCapabilityProvider, CapabilityMetadata
+        from victor.framework.capabilities import (
+            BaseCapabilityProvider,
+            CapabilityMetadata,
+        )
 
         # Should instantiate without errors
         research_provider = ResearchCapabilityProvider()

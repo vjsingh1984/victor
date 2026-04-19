@@ -174,7 +174,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_registry_with_mock_sdk(self, mock_registry):
         """Test get_sdk_protocol_registry with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             registry = get_sdk_protocol_registry()
             assert registry is not None
@@ -183,7 +184,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_discover_protocols_with_mock_sdk(self, mock_registry):
         """Test discover_sdk_protocols with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             stats = discover_sdk_protocols()
             assert stats.total_protocols == 20
@@ -192,7 +194,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_tool_providers_with_mock_sdk(self, mock_registry):
         """Test get_sdk_tool_providers with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             providers = get_sdk_tool_providers()
             assert len(providers) == 1
@@ -201,7 +204,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_safety_providers_with_mock_sdk(self, mock_registry):
         """Test get_sdk_safety_providers with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             providers = get_sdk_safety_providers()
             assert len(providers) == 1
@@ -209,7 +213,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_workflow_providers_with_mock_sdk(self, mock_registry):
         """Test get_sdk_workflow_providers with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             providers = get_sdk_workflow_providers()
             assert len(providers) == 1
@@ -217,7 +222,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_prompt_providers_with_mock_sdk(self, mock_registry):
         """Test get_sdk_prompt_providers with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             providers = get_sdk_prompt_providers()
             assert len(providers) == 1
@@ -225,7 +231,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_capability_providers_with_mock_sdk(self, mock_registry):
         """Test get_sdk_capability_providers with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             providers = get_sdk_capability_providers()
             assert "coding-lsp" in providers
@@ -235,7 +242,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_specific_capability_provider_with_mock_sdk(self, mock_registry):
         """Test get_sdk_capability_provider with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             lsp = get_sdk_capability_provider("coding-lsp")
             git = get_sdk_capability_provider("coding-git")
@@ -248,7 +256,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_validators_with_mock_sdk(self, mock_registry):
         """Test get_sdk_validators with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             validators = get_sdk_validators()
             assert "test-validator" in validators
@@ -257,7 +266,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_specific_validator_with_mock_sdk(self, mock_registry):
         """Test get_sdk_validator with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             validator = get_sdk_validator("test-validator")
             assert validator is not None
@@ -266,7 +276,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_list_capabilities_with_mock_sdk(self, mock_registry):
         """Test list_sdk_capabilities with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             capabilities = list_sdk_capabilities()
             assert "coding-lsp" in capabilities
@@ -275,7 +286,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_list_validators_with_mock_sdk(self, mock_registry):
         """Test list_sdk_validators with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             validators = list_sdk_validators()
             assert "test-validator" in validators
@@ -283,7 +295,8 @@ class TestSDKDiscoveryWithMockSDK:
     def test_get_discovery_stats_with_mock_sdk(self, mock_registry):
         """Test get_sdk_discovery_stats with mocked SDK."""
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             stats = get_sdk_discovery_stats()
             assert stats.total_verticals == 5
@@ -297,7 +310,8 @@ class TestSDKDiscoveryWithMockSDK:
         mock_extensions = Mock()
 
         with patch(
-            "victor.core.verticals.sdk_discovery.get_global_registry", return_value=mock_registry
+            "victor.core.verticals.sdk_discovery.get_global_registry",
+            return_value=mock_registry,
         ):
             enhance_vertical_with_sdk_protocols("coding", mock_extensions)
 

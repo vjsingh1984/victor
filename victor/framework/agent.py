@@ -21,7 +21,17 @@ Example:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Callable, Dict, List, Optional, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    Union,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -180,49 +190,32 @@ class Agent:
                 config=AgentConfig(tool_budget=100, enable_semantic_search=True)
             )
         """
-        from victor.framework._internal import create_orchestrator_from_options
+        from victor.config.settings import Settings, load_settings
+        from victor.framework.agent_factory import AgentFactory, InitializationError
 
-        # Extract configuration from vertical if provided
-        # Note: Full vertical integration (middleware, safety, prompts, modes, deps)
-        # is now handled by VerticalIntegrationPipeline in create_orchestrator_from_options
+        # Load settings (or use config overrides)
+        settings = load_settings()
+        if workspace:
+            settings.working_directory = workspace
+
+        # Extract vertical config for backward compat return value
         vertical_config: Optional["VerticalConfig"] = None
-        system_prompt: Optional[str] = None
-
         if vertical:
             vertical_config = vertical.get_config()
-            # Vertical tools override explicit tools if not provided
-            # Note: Pipeline also handles this, but we do it here for tools kwarg compat
-            if tools is None:
-                tools = vertical_config.tools
-            # Get vertical's system prompt for backward compatibility
-            # Note: Pipeline also handles this, but explicit param takes priority
-            system_prompt = vertical_config.system_prompt
-            # Apply provider hints from vertical
-            if vertical_config.provider_hints.get("preferred_providers"):
-                prefs = vertical_config.provider_hints["preferred_providers"]
-                if provider == "anthropic" and "anthropic" not in prefs and prefs:
-                    # Use first preferred provider if default isn't preferred
-                    pass  # Keep user's choice, hints are just hints
 
         try:
-            # Create orchestrator with full vertical integration via pipeline
-            # This achieves parity with CLI (FrameworkShim) path
-            orchestrator = await create_orchestrator_from_options(
+            # Unified creation via AgentFactory — same path as CLI/API
+            factory = AgentFactory(
+                settings=settings,
+                profile=profile or "default",
                 provider=provider,
                 model=model,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
+                vertical=vertical,
                 thinking=thinking,
-                airgapped=airgapped,
-                profile=profile,
-                workspace=workspace,
-                config=config,
-                system_prompt=system_prompt,
-                enable_observability=enable_observability,
                 session_id=session_id,
-                vertical=vertical,  # Pass vertical for unified pipeline integration
+                enable_observability=enable_observability,
             )
+            orchestrator = await factory.create()
             return cls(
                 orchestrator,
                 provider=provider,
@@ -230,6 +223,10 @@ class Agent:
                 vertical=vertical,
                 vertical_config=vertical_config,
             )
+        except InitializationError as e:
+            if e.stage == "credentials":
+                raise ProviderError(str(e), provider=provider) from e
+            raise AgentError(str(e)) from e
         except Exception as e:
             if "provider" in str(e).lower() or "api" in str(e).lower():
                 raise ProviderError(str(e), provider=provider) from e
@@ -462,7 +459,10 @@ class Agent:
                 elif event.type == EventType.CONTENT:
                     print(event.content, end="", flush=True)
         """
-        from victor.framework._internal import format_context_message, stream_with_events
+        from victor.framework._internal import (
+            format_context_message,
+            stream_with_events,
+        )
 
         # Apply context to conversation if provided
         if context:
@@ -724,7 +724,9 @@ class Agent:
         if not event_bus:
             return None
 
-        from victor.observability.event_registry import resolve_subscription_topic_pattern
+        from victor.observability.event_registry import (
+            resolve_subscription_topic_pattern,
+        )
 
         topic_pattern = resolve_subscription_topic_pattern(category)
 
@@ -871,7 +873,9 @@ class Agent:
 
         return {
             "success": result.success if hasattr(result, "success") else True,
-            "final_output": result.final_output if hasattr(result, "final_output") else str(result),
+            "final_output": (
+                result.final_output if hasattr(result, "final_output") else str(result)
+            ),
             "team_name": team_spec.name,
             "goal": goal,
         }
@@ -930,6 +934,18 @@ class Agent:
         """Reset conversation history and state."""
         self._orchestrator.reset_conversation()
         self._state.reset()
+
+    async def warm_up(self) -> None:
+        """Prime the KV cache for faster first responses.
+
+        For local providers (Ollama, LMStudio) with KV prefix caching, the first
+        API call is always cold. This sends a minimal 1-token request to prime
+        the KV cache with the system prompt, making subsequent calls faster.
+
+        No-op for cloud providers or when KV optimization is disabled.
+        """
+        if hasattr(self._orchestrator, "warm_up_kv_cache"):
+            await self._orchestrator.warm_up_kv_cache()
 
     async def close(self) -> None:
         """Clean up resources."""

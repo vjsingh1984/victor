@@ -104,7 +104,7 @@ class TestOrchestratorServiceProvider:
     def mock_settings(self):
         """Create mock settings."""
         settings = MagicMock()
-        settings.unified_embedding_model = "test-model"
+        settings.search.unified_embedding_model = "test-model"
         settings.enable_observability = True
         settings.max_conversation_history = 50
         return settings
@@ -231,7 +231,7 @@ class TestConfigureOrchestratorServices:
     def mock_settings(self):
         """Create mock settings."""
         settings = MagicMock()
-        settings.unified_embedding_model = "test-model"
+        settings.search.unified_embedding_model = "test-model"
         settings.enable_observability = True
         settings.max_conversation_history = 50
         return settings
@@ -259,7 +259,7 @@ class TestBootstrapIntegration:
     def mock_settings(self):
         """Create mock settings with all required attributes."""
         settings = MagicMock()
-        settings.unified_embedding_model = "test-model"
+        settings.search.unified_embedding_model = "test-model"
         settings.enable_observability = True
         settings.max_conversation_history = 50
         settings.analytics_enabled = False
@@ -343,7 +343,7 @@ class TestProtocolConformance:
 
     def test_conversation_state_machine_conforms(self):
         """Test ConversationStateMachine conforms to protocol."""
-        from victor.agent.conversation_state import ConversationStateMachine
+        from victor.agent.conversation.state_machine import ConversationStateMachine
 
         state_machine = ConversationStateMachine()
 
@@ -382,7 +382,7 @@ class TestServiceResolution:
     def configured_container(self):
         """Create a fully configured container."""
         settings = MagicMock()
-        settings.unified_embedding_model = "test-model"
+        settings.search.unified_embedding_model = "test-model"
         settings.enable_observability = True
         settings.max_conversation_history = 50
 

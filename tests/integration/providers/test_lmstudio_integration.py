@@ -348,7 +348,10 @@ async def test_lmstudio_with_custom_parameters(lmstudio_provider):
         model_name = response.json()["data"][0]["id"]
 
     messages = [
-        Message(role="user", content="Write a one-line function to double a number in Python.")
+        Message(
+            role="user",
+            content="Write a one-line function to double a number in Python.",
+        )
     ]
 
     response = await lmstudio_provider.chat(

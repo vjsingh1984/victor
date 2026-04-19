@@ -61,8 +61,14 @@ class TestGetRelevantToolResults:
     def test_filters_by_content_length(self):
         """Test filtering by minimum content length."""
         history = [
-            {"tool": "tool1", "result": {"success": True, "content": "short"}},  # Too short
-            {"tool": "tool2", "result": {"success": True, "content": "x" * 100}},  # Long enough
+            {
+                "tool": "tool1",
+                "result": {"success": True, "content": "short"},
+            },  # Too short
+            {
+                "tool": "tool2",
+                "result": {"success": True, "content": "x" * 100},
+            },  # Long enough
         ]
         result = get_relevant_tool_results(history, min_content_length=50)
         assert len(result) == 1
@@ -129,7 +135,10 @@ class TestGetRelevantToolResults:
     def test_handles_empty_content(self):
         """Test filters out empty content."""
         history = [
-            {"tool": "web_search", "result": {"success": True, "content": ""}}  # Empty content
+            {
+                "tool": "web_search",
+                "result": {"success": True, "content": ""},
+            }  # Empty content
         ]
         result = get_relevant_tool_results(history)
         assert result == []
@@ -213,7 +222,10 @@ class TestExtractToolContext:
     def test_respects_max_results(self):
         """Test max_results limits output."""
         history = [
-            {"tool": f"tool{i}", "result": {"success": True, "content": f"content{i} " * 20}}
+            {
+                "tool": f"tool{i}",
+                "result": {"success": True, "content": f"content{i} " * 20},
+            }
             for i in range(10)
         ]
         result = extract_tool_context(history, max_results=2)
@@ -233,7 +245,10 @@ class TestExtractToolContext:
     def test_format_structure(self):
         """Test format structure matches expected pattern."""
         history = [
-            {"tool": "web_search", "result": {"success": True, "content": "test content " * 10}}
+            {
+                "tool": "web_search",
+                "result": {"success": True, "content": "test content " * 10},
+            }
         ]
         result = extract_tool_context(history)
         # Check structure
@@ -400,7 +415,10 @@ class TestEdgeCases:
     def test_very_long_history(self):
         """Test handling of very long history."""
         history = [
-            {"tool": f"tool{i}", "result": {"success": True, "content": f"content{i} " * 20}}
+            {
+                "tool": f"tool{i}",
+                "result": {"success": True, "content": f"content{i} " * 20},
+            }
             for i in range(1000)
         ]
         result = get_relevant_tool_results(history, max_results=10)
@@ -409,7 +427,10 @@ class TestEdgeCases:
     def test_unicode_content(self):
         """Test handling of unicode content."""
         history = [
-            {"tool": "web_search", "result": {"success": True, "content": "Unicode content: " * 10}}
+            {
+                "tool": "web_search",
+                "result": {"success": True, "content": "Unicode content: " * 10},
+            }
         ]
         result = extract_tool_context(history)
         assert "Unicode content" in result
@@ -419,7 +440,10 @@ class TestEdgeCases:
         history = [
             {
                 "tool": "web_search",
-                "result": {"success": True, "content": "Special chars: @#$%^&*() " * 10},
+                "result": {
+                    "success": True,
+                    "content": "Special chars: @#$%^&*() " * 10,
+                },
             }
         ]
         result = extract_tool_context(history)

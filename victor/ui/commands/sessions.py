@@ -27,7 +27,7 @@ from rich.table import Table
 
 from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
 
-sessions_app = typer.Typer(name="sessions", help="Manage conversation sessions.")
+sessions_app = typer.Typer(name="session", help="Manage conversation sessions.")
 console = Console()
 
 
@@ -149,9 +149,11 @@ def sessions_show(
             if messages:
                 console.print("\n[bold]Recent Messages:[/]")
                 for msg in messages[-5:]:
-                    role_style = {"user": "cyan", "assistant": "green", "system": "dim"}.get(
-                        msg.get("role", ""), "white"
-                    )
+                    role_style = {
+                        "user": "cyan",
+                        "assistant": "green",
+                        "system": "dim",
+                    }.get(msg.get("role", ""), "white")
                     content = msg.get("content", "")
                     # Truncate long messages
                     if len(content) > 200:
@@ -304,7 +306,9 @@ def sessions_clear(
         None, help="Clear sessions with IDs starting with this prefix (min 6 chars)"
     ),
     all: bool = typer.Option(
-        False, "--all", help="Clear all sessions (default behavior when no prefix specified)"
+        False,
+        "--all",
+        help="Clear all sessions (default behavior when no prefix specified)",
     ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation"),
 ) -> None:

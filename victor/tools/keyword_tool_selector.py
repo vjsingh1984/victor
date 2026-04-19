@@ -32,7 +32,10 @@ from victor.tools.selection_common import get_tools_from_message
 from victor.tools.selection_filters import is_small_model
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStage, ConversationStateMachine
+    from victor.agent.conversation.state_machine import (
+        ConversationStage,
+        ConversationStateMachine,
+    )
     from victor.agent.protocols import ToolSelectionContext, ToolSelectorFeatures
 
 logger = logging.getLogger(__name__)
@@ -246,7 +249,7 @@ class KeywordToolSelector:
         if stage is None:
             return self._get_core_tools_cached()
 
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         if stage in {
             ConversationStage.INITIAL,
@@ -344,7 +347,10 @@ class KeywordToolSelector:
         return any(kw in prompt_lower for kw in write_keywords)
 
     def _filter_tools_for_stage(
-        self, tools: List[ToolDefinition], stage: Optional["ConversationStage"], prompt: str = ""
+        self,
+        tools: List[ToolDefinition],
+        stage: Optional["ConversationStage"],
+        prompt: str = "",
     ) -> List[ToolDefinition]:
         """Remove write/execute tools during exploration/analysis stages.
 
@@ -367,7 +373,7 @@ class KeywordToolSelector:
             logger.info("Write intent detected in prompt, skipping stage-based filtering")
             return tools
 
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         if stage not in {
             ConversationStage.INITIAL,

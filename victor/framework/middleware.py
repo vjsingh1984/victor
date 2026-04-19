@@ -1044,7 +1044,13 @@ class OutputValidationMiddleware(MiddlewareProtocol):
         """
         self.validator = validator
         self._applicable_tools = applicable_tools
-        self._argument_names = argument_names or {"content", "code", "data", "text", "body"}
+        self._argument_names = argument_names or {
+            "content",
+            "code",
+            "data",
+            "text",
+            "body",
+        }
         self.auto_fix = auto_fix
         self.block_on_error = block_on_error
         self.max_fix_iterations = max_fix_iterations
@@ -1125,7 +1131,11 @@ class OutputValidationMiddleware(MiddlewareProtocol):
 
         if all_issues:
             metadata["validation_issues"] = [
-                {"message": i.message, "severity": i.severity.value, "location": i.location}
+                {
+                    "message": i.message,
+                    "severity": i.severity.value,
+                    "location": i.location,
+                }
                 for i in all_issues[:10]  # Limit to first 10 issues
             ]
 

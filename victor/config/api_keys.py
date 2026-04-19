@@ -777,16 +777,27 @@ _manager: Optional[APIKeyManager] = None
 def get_api_key(provider: str) -> Optional[str]:
     """Get API key for a provider (convenience function).
 
+    Delegates to UnifiedApiKeyResolver for consistent resolution
+    across env vars, keyring, and config files.
+
     Args:
         provider: Provider name
 
     Returns:
         API key or None
     """
-    global _manager
-    if _manager is None:
-        _manager = APIKeyManager()
-    return _manager.get_key(provider)
+    try:
+        from victor.providers.resolution import UnifiedApiKeyResolver
+
+        resolver = UnifiedApiKeyResolver(non_interactive=True)
+        result = resolver.get_api_key(provider)
+        return result.key
+    except Exception:
+        # Fallback to legacy manager if resolver fails
+        global _manager
+        if _manager is None:
+            _manager = APIKeyManager()
+        return _manager.get_key(provider)
 
 
 def set_api_key(provider: str, key: str, use_keyring: bool = False) -> bool:

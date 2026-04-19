@@ -120,7 +120,7 @@ if __name__ == "__main__":
     # Simulate database operations
     db_metrics.record_query(25.0)  # 25ms query
     db_metrics.record_query(150.0)  # 150ms query
-    db_metrics.record_query(8.0)    # 8ms query
+    db_metrics.record_query(8.0)  # 8ms query
     db_metrics.record_connection(5)
     db_metrics.record_query(45.0)
     db_metrics.record_error()

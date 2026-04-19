@@ -18,7 +18,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "victor-ai"
-version = "0.6.1"
+version = "0.7.0"
 description = "Open-source agentic AI framework with multi-provider support, workflow orchestration, and extensible tool system"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -113,6 +113,11 @@ embeddings = [
     "sentence-transformers>=2.2.0",
     "lancedb>=0.6.0",
     "pyarrow>=14.0",
+]
+
+# LangChain interop: adapt LangChain tools as native Victor tools
+langchain = [
+    "langchain-core>=0.2.0",
 ]
 
 # Interactive examples and playground (typer, rich already in main deps)
@@ -515,6 +520,22 @@ benchmark = "victor.benchmark:plugin"
 # Victor discovers plugins lazily via "victor.plugins" and resolves their
 # registered verticals at runtime.
 # =============================================================================
+
+# =============================================================================
+# Skill Registration (for verticals and third-party packages)
+# =============================================================================
+# Skills are composable units of expertise that bind prompts + tools.
+# Verticals and external packages can register skills via entry points:
+#
+#   [project.entry-points."victor.skills"]
+#   debug = "my_package.skills:debug_skill"
+#   refactor = "my_package.skills:refactor_skill"
+#
+# Each entry point should resolve to a SkillDefinition instance or a
+# callable returning one or a list of SkillDefinition objects.
+# =============================================================================
+[project.entry-points."victor.skills"]
+# Built-in skills will be registered here as they are created
 
 [tool.setuptools.packages.find]
 include = ["victor", "victor.*"]

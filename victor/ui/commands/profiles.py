@@ -234,7 +234,10 @@ def profile_apply(
     # Apply the profile
     try:
         profiles_path = install_profile(
-            profile, config_dir=config_path, provider_override=provider, model_override=model
+            profile,
+            config_dir=config_path,
+            provider_override=provider,
+            model_override=model,
         )
 
         console.print(f"\n[green]✓[/] Applied [bold cyan]{profile.display_name}[/] profile")

@@ -302,7 +302,8 @@ class QLearningStore:
         conn = self._db.get_connection()
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            f"SELECT action_key, q_value FROM {_Q_TABLE} WHERE state_key = ?", (state_key,)
+            f"SELECT action_key, q_value FROM {_Q_TABLE} WHERE state_key = ?",
+            (state_key,),
         ).fetchall()
 
         return {row["action_key"]: row["q_value"] for row in rows}
@@ -1080,7 +1081,7 @@ class AdaptiveModeController:
                 model=self._model_name or "unknown",
                 success=success,
                 quality_score=quality_score,
-                task_type=self._current_state.task_type if self._current_state else "general",
+                task_type=(self._current_state.task_type if self._current_state else "general"),
                 metadata={
                     "from_mode": from_mode,
                     "to_mode": to_mode,

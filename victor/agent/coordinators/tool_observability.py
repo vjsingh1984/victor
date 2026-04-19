@@ -111,7 +111,7 @@ class ToolObservabilityHandler:
                         "tool_id": tool_id,
                         "tool_name": result.tool_name,
                         "success": result.success,
-                        "result_length": len(str(result.result or "")) if result.result else 0,
+                        "result_length": (len(str(result.result or "")) if result.result else 0),
                         "error": str(result.error) if result.error else None,
                         "category": "tool",
                         "arguments": self._sanitize_arguments(result.arguments or {}),

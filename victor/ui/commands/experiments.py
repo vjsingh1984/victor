@@ -183,11 +183,15 @@ def show_experiment(
     info_table.add_row("Created", _format_timestamp(experiment.created_at.isoformat()))
     info_table.add_row(
         "Started",
-        _format_timestamp(experiment.started_at.isoformat()) if experiment.started_at else "-",
+        (_format_timestamp(experiment.started_at.isoformat()) if experiment.started_at else "-"),
     )
     info_table.add_row(
         "Completed",
-        _format_timestamp(experiment.completed_at.isoformat()) if experiment.completed_at else "-",
+        (
+            _format_timestamp(experiment.completed_at.isoformat())
+            if experiment.completed_at
+            else "-"
+        ),
     )
     info_table.add_row("Git Commit", experiment.git_commit_sha or "-")
     info_table.add_row("Git Branch", experiment.git_branch or "-")
@@ -412,7 +416,8 @@ def show_run(
     info_table.add_row("Status", f"[{run.status}]{run.status}[/]")
     info_table.add_row("Started", _format_timestamp(run.started_at.isoformat()))
     info_table.add_row(
-        "Completed", _format_timestamp(run.completed_at.isoformat()) if run.completed_at else "-"
+        "Completed",
+        _format_timestamp(run.completed_at.isoformat()) if run.completed_at else "-",
     )
     info_table.add_row("Duration", _format_duration(run.duration_seconds))
 

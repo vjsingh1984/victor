@@ -114,7 +114,11 @@ class TestMCPDictStrategy:
         """Test identifying MCP dictionary tools."""
         strategy = MCPDictStrategy()
 
-        tool_dict = {"name": "test_tool", "description": "Test description", "parameters": {}}
+        tool_dict = {
+            "name": "test_tool",
+            "description": "Test description",
+            "parameters": {},
+        }
 
         assert strategy.can_handle(tool_dict) is True
 

@@ -39,7 +39,9 @@ from victor.tools.decorators import tool
 logger = logging.getLogger(__name__)
 
 
-def _get_slack_client(context: Optional[Dict[str, Any]] = None) -> Optional["WebClient"]:
+def _get_slack_client(
+    context: Optional[Dict[str, Any]] = None,
+) -> Optional["WebClient"]:
     """Get Slack client from execution context.
 
     Args:
@@ -69,7 +71,12 @@ def is_slack_configured(context: Optional[Dict[str, Any]] = None) -> bool:
     task_types=["action", "search"],
     execution_category="network",
     keywords=["slack", "message", "chat", "channel", "notification", "team"],
-    mandatory_keywords=["send message", "search chat", "post to slack", "slack channel"],
+    mandatory_keywords=[
+        "send message",
+        "search chat",
+        "post to slack",
+        "slack channel",
+    ],
     availability_check=is_slack_configured,  # Only available when configured
 )
 async def slack(
@@ -80,7 +87,7 @@ async def slack(
     thread_ts: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Perform operations on Slack.
+    """Send messages and search conversations in Slack channels.
 
     Args:
         operation: The operation to perform: 'send_message', 'search_messages', 'list_channels'.
@@ -126,7 +133,10 @@ async def slack(
                     "message": "Message sent successfully",
                 }
             else:
-                return {"success": False, "error": response.get("error", "Unknown error")}
+                return {
+                    "success": False,
+                    "error": response.get("error", "Unknown error"),
+                }
 
         elif operation == "search_messages":
             if not query:
@@ -146,7 +156,10 @@ async def slack(
                 ]
                 return {"success": True, "results": results, "count": len(results)}
             else:
-                return {"success": False, "error": response.get("error", "Unknown error")}
+                return {
+                    "success": False,
+                    "error": response.get("error", "Unknown error"),
+                }
 
         elif operation == "list_channels":
             logger.info("[slack] Listing channels")
@@ -164,7 +177,10 @@ async def slack(
                 ]
                 return {"success": True, "results": results, "count": len(results)}
             else:
-                return {"success": False, "error": response.get("error", "Unknown error")}
+                return {
+                    "success": False,
+                    "error": response.get("error", "Unknown error"),
+                }
 
         else:
             return {

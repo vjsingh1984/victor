@@ -55,7 +55,9 @@ from victor.processing.serialization.formats.json_encoder import (
 )
 from victor.processing.serialization.formats.toon_encoder import TOONEncoder
 from victor.processing.serialization.formats.csv_encoder import CSVEncoder
-from victor.processing.serialization.formats.markdown_encoder import MarkdownTableEncoder
+from victor.processing.serialization.formats.markdown_encoder import (
+    MarkdownTableEncoder,
+)
 from victor.processing.serialization.formats.reference_encoder import ReferenceEncoder
 
 __all__ = [

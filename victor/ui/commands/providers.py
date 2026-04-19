@@ -9,7 +9,7 @@ from victor.core.async_utils import run_sync
 from victor.providers.registry import ProviderRegistry
 from victor.providers.health import ProviderHealthChecker
 
-providers_app = typer.Typer(name="providers", help="List all available providers.")
+providers_app = typer.Typer(name="provider", help="List and manage providers.")
 console = Console()
 
 # Aliases map to their primary provider (for consolidation)
@@ -66,7 +66,11 @@ def _list_providers_impl() -> None:
         # Known but untested providers
         "together": ("⚠️ Untested", "Together AI, $25 free credits", None),
         "openrouter": ("✅ Ready", "Unified gateway, 350+ models, Free tier", None),
-        "fireworks": ("✅ Ready", "Fast inference, $1 free credits, Tool calling", None),
+        "fireworks": (
+            "✅ Ready",
+            "Fast inference, $1 free credits, Tool calling",
+            None,
+        ),
         "zai": (
             "✅ Ready",
             "GLM-5/4.7, Coding Plan, Thinking mode, OpenAI-compat",
@@ -295,7 +299,7 @@ async def _verify_provider_async(
 auth_app = typer.Typer(name="auth", help="Manage OAuth authentication for providers.")
 providers_app.add_typer(auth_app)
 
-OAUTH_SUPPORTED_PROVIDERS = ["openai", "qwen"]
+OAUTH_SUPPORTED_PROVIDERS = ["openai", "qwen", "google", "github-copilot"]
 
 
 @auth_app.command("login")
@@ -414,7 +418,7 @@ def auth_status(
             table.add_row(
                 prov,
                 "[yellow]Expired[/]",
-                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
                 "",
             )
         else:
@@ -422,7 +426,7 @@ def auth_status(
             table.add_row(
                 prov,
                 "[green]✓ Active[/]",
-                cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else "",
+                (cached.expires_at.strftime("%Y-%m-%d %H:%M UTC") if cached.expires_at else ""),
                 preview,
             )
 

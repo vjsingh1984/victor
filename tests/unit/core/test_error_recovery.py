@@ -618,7 +618,10 @@ class TestDeepSeekScenario:
         error2 = FileNotFoundError("Symbol not found in .")
         result2 = chain.process(error2, "symbol", result1.modified_args)
         # Should try path variations or skip
-        assert result2.action in (RecoveryAction.RETRY_WITH_INFERRED, RecoveryAction.SKIP)
+        assert result2.action in (
+            RecoveryAction.RETRY_WITH_INFERRED,
+            RecoveryAction.SKIP,
+        )
 
         # Third error: tool not found (after all retries)
         error3 = Exception("Tool 'symbol' not found")

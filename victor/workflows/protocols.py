@@ -447,7 +447,10 @@ class IStreamingWorkflowExecutor(Protocol):
         """
         # Abstract async generator - yield needed for mypy to recognize as generator
         if False:
-            from victor.workflows.streaming import WorkflowStreamChunk, WorkflowEventType
+            from victor.workflows.streaming import (
+                WorkflowStreamChunk,
+                WorkflowEventType,
+            )
 
             yield WorkflowStreamChunk(
                 event_type=WorkflowEventType.WORKFLOW_START,

@@ -438,7 +438,10 @@ class MCPClient:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(
                 None,
-                lambda: (self.process.stdin.write(request_json + "\n"), self.process.stdin.flush()),
+                lambda: (
+                    self.process.stdin.write(request_json + "\n"),
+                    self.process.stdin.flush(),
+                ),
             )
 
             # Read response with timeout to avoid indefinite blocking

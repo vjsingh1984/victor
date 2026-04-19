@@ -10,20 +10,16 @@ RECIPE_TIME = "15 minutes"
 
 
 async def business_requirements_agent(
-    project_description: str,
-    stakeholders: list[str]
+    project_description: str, stakeholders: list[str]
 ):
     """Gather and document business requirements."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.4
-    )
+    agent = Agent.create(temperature=0.4)
 
     stakeholders_str = "\n".join(f"- {s}" for s in stakeholders)
 
-    result = await agent.run(
-        f"""Document business requirements for:
+    result = await agent.run(f"""Document business requirements for:
 
 PROJECT: {project_description}
 
@@ -37,8 +33,7 @@ Provide:
 4. User stories
 5. Acceptance criteria
 6. Assumptions and constraints
-7. Success metrics"""
-    )
+7. Success metrics""")
 
     return result.content
 
@@ -47,12 +42,9 @@ async def use_case_agent(feature_description: str):
     """Write detailed use cases."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.4
-    )
+    agent = Agent.create(temperature=0.4)
 
-    result = await agent.run(
-        f"""Write detailed use cases for: {feature_description}
+    result = await agent.run(f"""Write detailed use cases for: {feature_description}
 
 For each use case provide:
 1. Use case name and ID
@@ -62,8 +54,7 @@ For each use case provide:
 5. Alternative flows
 6. Postconditions
 7. Business rules
-8. Related requirements"""
-    )
+8. Related requirements""")
 
     return result.content
 
@@ -72,14 +63,11 @@ async def user_story_agent(epic: str, user_personas: list[str]):
     """Generate user stories from epics."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.5
-    )
+    agent = Agent.create(temperature=0.5)
 
     personas_str = "\n".join(f"- {p}" for p in user_personas)
 
-    result = await agent.run(
-        f"""Generate user stories for epic: {epic}
+    result = await agent.run(f"""Generate user stories for epic: {epic}
 
 USER PERSONAS:
 {personas_str}
@@ -90,8 +78,7 @@ For each story:
 3. So that [benefit]
 4. Acceptance criteria
 5. Story points estimate
-6. Priority"""
-    )
+6. Priority""")
 
     return result.content
 
@@ -100,13 +87,9 @@ async def test_plan_agent(requirements: str):
     """Generate test plan from requirements."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="coding",
-        temperature=0.3
-    )
+    agent = Agent.create(vertical="coding", temperature=0.3)
 
-    result = await agent.run(
-        f"""Generate comprehensive test plan for:
+    result = await agent.run(f"""Generate comprehensive test plan for:
 
 REQUIREMENTS:
 {requirements}
@@ -119,29 +102,21 @@ Provide:
 5. Test data requirements
 6. Entry/exit criteria
 7. Test schedule
-8. Resource requirements"""
-    )
+8. Resource requirements""")
 
     return result.content
 
 
-async def release_notes_agent(
-    version: str,
-    features: list[str],
-    bug_fixes: list[str]
-):
+async def release_notes_agent(version: str, features: list[str], bug_fixes: list[str]):
     """Generate release notes."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.4
-    )
+    agent = Agent.create(temperature=0.4)
 
     features_str = "\n".join(f"- {f}" for f in features)
     fixes_str = "\n".join(f"- {f}" for f in bug_fixes)
 
-    result = await agent.run(
-        f"""Generate release notes for version {version}.
+    result = await agent.run(f"""Generate release notes for version {version}.
 
 NEW FEATURES:
 {features_str}
@@ -156,8 +131,7 @@ Provide:
 4. Bug fixes
 5. Known issues
 6. Upgrade instructions
-7. Breaking changes (if any)"""
-    )
+7. Breaking changes (if any)""")
 
     return result.content
 
@@ -166,12 +140,9 @@ async def incident_report_agent(incident_description: str):
     """Generate incident report."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.3
-    )
+    agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        f"""Generate incident report for:
+    result = await agent.run(f"""Generate incident report for:
 
 {incident_description}
 
@@ -183,26 +154,18 @@ Provide:
 5. Resolution steps
 6. Lessons learned
 7. Action items to prevent recurrence
-8. Follow-up requirements"""
-    )
+8. Follow-up requirements""")
 
     return result.content
 
 
-async def project_plan_agent(
-    project_goal: str,
-    duration_weeks: int,
-    team_size: int
-):
+async def project_plan_agent(project_goal: str, duration_weeks: int, team_size: int):
     """Generate project plan."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.4
-    )
+    agent = Agent.create(temperature=0.4)
 
-    result = await agent.run(
-        f"""Generate project plan for:
+    result = await agent.run(f"""Generate project plan for:
 
 GOAL: {project_goal}
 DURATION: {duration_weeks} weeks
@@ -216,25 +179,20 @@ Provide:
 5. Resource allocation
 6. Dependencies
 7. Risk assessment
-8. Communication plan"""
-    )
+8. Communication plan""")
 
     return result.content
 
 
 async def meeting_notes_agent(
-    meeting_transcript: str,
-    meeting_type: str = "team standup"
+    meeting_transcript: str, meeting_type: str = "team standup"
 ):
     """Generate structured meeting notes."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.3
-    )
+    agent = Agent.create(temperature=0.3)
 
-    result = await agent.run(
-        f"""Generate structured meeting notes from transcript:
+    result = await agent.run(f"""Generate structured meeting notes from transcript:
 
 MEETING TYPE: {meeting_type}
 
@@ -248,8 +206,7 @@ Provide:
 4. Action items (with owners and due dates)
 5. Discussion highlights
 6. Next steps
-7. Parking lot items"""
-    )
+7. Parking lot items""")
 
     return result.content
 
@@ -258,16 +215,11 @@ async def competitive_analysis_agent(company: str, competitors: list[str]):
     """Analyze competitive landscape."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="research",
-        tools=["web_search"],
-        temperature=0.3
-    )
+    agent = Agent.create(vertical="research", tools=["web_search"], temperature=0.3)
 
     competitors_str = "\n".join(f"- {c}" for c in competitors)
 
-    result = await agent.run(
-        f"""Perform competitive analysis for:
+    result = await agent.run(f"""Perform competitive analysis for:
 
 COMPANY: {company}
 
@@ -285,8 +237,7 @@ Provide:
 1. Competitive matrix
 2. Market share overview
 3. Differentiation opportunities
-4. Threats assessment"""
-    )
+4. Threats assessment""")
 
     return result.content
 
@@ -295,16 +246,11 @@ async def market_research_agent(market: str, focus_areas: list[str]):
     """Conduct market research."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="research",
-        tools=["web_search"],
-        temperature=0.3
-    )
+    agent = Agent.create(vertical="research", tools=["web_search"], temperature=0.3)
 
     focus_str = "\n".join(f"- {f}" for f in focus_areas)
 
-    result = await agent.run(
-        f"""Conduct market research for:
+    result = await agent.run(f"""Conduct market research for:
 
 MARKET: {market}
 
@@ -319,26 +265,18 @@ Provide:
 5. Competitive landscape
 6. Opportunities
 7. Threats
-8. Recommendations"""
-    )
+8. Recommendations""")
 
     return result.content
 
 
-async def pricing_strategy_agent(
-    product: str,
-    costs: str,
-    target_market: str
-):
+async def pricing_strategy_agent(product: str, costs: str, target_market: str):
     """Develop pricing strategy."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.4
-    )
+    agent = Agent.create(temperature=0.4)
 
-    result = await agent.run(
-        f"""Develop pricing strategy for:
+    result = await agent.run(f"""Develop pricing strategy for:
 
 PRODUCT: {product}
 COSTS: {costs}
@@ -351,26 +289,18 @@ Provide:
 4. Tier options (if applicable)
 5. Discount strategy
 6. Price testing approach
-7. Competitive comparison"""
-    )
+7. Competitive comparison""")
 
     return result.content
 
 
-async def go_to_market_agent(
-    product: str,
-    launch_date: str,
-    budget: str
-):
+async def go_to_market_agent(product: str, launch_date: str, budget: str):
     """Create go-to-market plan."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.4
-    )
+    agent = Agent.create(temperature=0.4)
 
-    result = await agent.run(
-        f"""Create go-to-market plan for:
+    result = await agent.run(f"""Create go-to-market plan for:
 
 PRODUCT: {product}
 LAUNCH DATE: {launch_date}
@@ -384,29 +314,20 @@ Provide:
 5. Sales strategy
 6. Launch timeline
 7. KPIs and metrics
-8. Budget allocation"""
-    )
+8. Budget allocation""")
 
     return result.content
 
 
-async def financial_analysis_agent(
-    business_type: str,
-    metrics: list[str]
-):
+async def financial_analysis_agent(business_type: str, metrics: list[str]):
     """Analyze financial metrics and projections."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="dataanalysis",
-        tools=["python"],
-        temperature=0.3
-    )
+    agent = Agent.create(vertical="dataanalysis", tools=["python"], temperature=0.3)
 
     metrics_str = "\n".join(f"- {m}" for m in metrics)
 
-    result = await agent.run(
-        f"""Perform financial analysis for:
+    result = await agent.run(f"""Perform financial analysis for:
 
 BUSINESS TYPE: {business_type}
 
@@ -421,29 +342,22 @@ Provide:
 5. Key financial ratios
 6. Sensitivity analysis
 7. Scenario planning
-8. Recommendations"""
-    )
+8. Recommendations""")
 
     return result.content
 
 
 async def business_intelligence_agent(
-    data_description: str,
-    business_questions: list[str]
+    data_description: str, business_questions: list[str]
 ):
     """Generate BI insights from data."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="dataanalysis",
-        tools=["python"],
-        temperature=0.3
-    )
+    agent = Agent.create(vertical="dataanalysis", tools=["python"], temperature=0.3)
 
     questions_str = "\n".join(f"- {q}" for q in business_questions)
 
-    result = await agent.run(
-        f"""Generate business intelligence insights:
+    result = await agent.run(f"""Generate business intelligence insights:
 
 DATA: {data_description}
 
@@ -457,8 +371,7 @@ Provide:
 4. Correlations
 5. Recommendations
 6. Visualizations to create
-7. Python analysis code"""
-    )
+7. Python analysis code""")
 
     return result.content
 
@@ -467,13 +380,9 @@ async def contract_review_agent(contract_text: str):
     """Review contract for key terms and risks."""
     from victor import Agent
 
-    agent = Agent.create(
-        vertical="security",
-        temperature=0.2
-    )
+    agent = Agent.create(vertical="security", temperature=0.2)
 
-    result = await agent.run(
-        f"""Review this contract and identify key terms and risks:
+    result = await agent.run(f"""Review this contract and identify key terms and risks:
 
 {contract_text}
 
@@ -485,25 +394,18 @@ Provide:
 5. Liability limitations
 6. Risk areas
 7. Missing clauses
-8. Recommendations for revision"""
-    )
+8. Recommendations for revision""")
 
     return result.content
 
 
-async def rfp_response_agent(
-    rfp_document: str,
-    company_capabilities: str
-):
+async def rfp_response_agent(rfp_document: str, company_capabilities: str):
     """Generate RFP response."""
     from victor import Agent
 
-    agent = Agent.create(
-        temperature=0.4
-    )
+    agent = Agent.create(temperature=0.4)
 
-    result = await agent.run(
-        f"""Generate RFP response based on:
+    result = await agent.run(f"""Generate RFP response based on:
 
 RFP REQUIREMENTS:
 {rfp_document}
@@ -519,8 +421,7 @@ Provide:
 5. Timeline
 6. Pricing structure
 7. Team qualifications
-8. Differentiators"""
-    )
+8. Differentiators""")
 
     return result.content
 
@@ -532,11 +433,12 @@ async def demo_business_agents():
     print("1. Business Requirements:")
     result = await business_requirements_agent(
         "Build customer support portal",
-        ["Product Manager", "Support Team", "Customers"]
+        ["Product Manager", "Support Team", "Customers"],
     )
     print(result[:300] + "...\n")
 
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(demo_business_agents())

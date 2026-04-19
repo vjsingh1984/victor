@@ -268,7 +268,14 @@ class TestEditProfile:
 
         result = runner.invoke(
             profiles_app,
-            ["edit", "nonexistent", "--temperature", "0.5", "--config-dir", str(tmp_path)],
+            [
+                "edit",
+                "nonexistent",
+                "--temperature",
+                "0.5",
+                "--config-dir",
+                str(tmp_path),
+            ],
         )
 
         assert "not found" in result.stdout
@@ -335,7 +342,8 @@ class TestDeleteProfile:
             yaml.safe_dump(existing_data, f)
 
         result = runner.invoke(
-            profiles_app, ["delete", "delete_me", "--force", "--config-dir", str(tmp_path)]
+            profiles_app,
+            ["delete", "delete_me", "--force", "--config-dir", str(tmp_path)],
         )
 
         assert result.exit_code == 0
@@ -347,7 +355,8 @@ class TestDeleteProfile:
         profiles_file.touch()
 
         result = runner.invoke(
-            profiles_app, ["delete", "nonexistent", "--force", "--config-dir", str(tmp_path)]
+            profiles_app,
+            ["delete", "nonexistent", "--force", "--config-dir", str(tmp_path)],
         )
 
         assert "not found" in result.stdout

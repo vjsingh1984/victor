@@ -30,10 +30,10 @@ import logging
 from typing import TYPE_CHECKING, Optional, Set
 
 from victor.agent.protocols import IToolSelector
-from victor.tools.base import ToolRegistry
+from victor.tools.registry import ToolRegistry
 
 if TYPE_CHECKING:
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.config.settings import Settings
     from victor.storage.embeddings.service import EmbeddingService
 
@@ -160,7 +160,7 @@ def _auto_select_strategy(
         Strategy name: "keyword" or "semantic"
     """
     # Check air-gapped mode
-    if settings and settings.airgapped_mode:
+    if settings and settings.security.airgapped_mode:
         logger.info("Air-gapped mode detected: using keyword strategy")
         return "keyword"
 
@@ -277,7 +277,10 @@ def _create_hybrid_selector(
             "Either provide embedding_service or use 'keyword' strategy."
         )
 
-    from victor.tools.hybrid_tool_selector import HybridSelectorConfig, HybridToolSelector
+    from victor.tools.hybrid_tool_selector import (
+        HybridSelectorConfig,
+        HybridToolSelector,
+    )
 
     # Create both semantic and keyword selectors
     semantic_selector = _create_semantic_selector(

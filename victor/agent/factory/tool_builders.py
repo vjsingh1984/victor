@@ -29,7 +29,10 @@ from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
     from victor.tools.registry import ToolRegistry
     from victor.agent.tool_executor import ToolExecutor
     from victor.agent.tool_registrar import ToolRegistrar
@@ -42,7 +45,7 @@ if TYPE_CHECKING:
     from victor.agent.argument_normalizer import ArgumentNormalizer
     from victor.agent.context_compactor import ContextCompactor
     from victor.agent.search_router import SearchRouter
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.parallel_executor import ParallelToolExecutor
     from victor.agent.tool_result_deduplicator import ToolResultDeduplicator
@@ -75,7 +78,7 @@ class ToolBuildersMixin:
         Returns:
             ToolRegistry instance for tool storage and management
         """
-        from victor.tools.base import ToolRegistry
+        from victor.tools.registry import ToolRegistry
 
         registry = ToolRegistry()
         logger.debug("ToolRegistry created")
@@ -235,6 +238,11 @@ class ToolBuildersMixin:
         except Exception:
             pass  # Permission system is optional
 
+        # Read cross-turn dedup settings from ToolSettings
+        tool_settings = getattr(self.settings, "tools", None)
+        cross_turn_enabled = getattr(tool_settings, "cross_turn_dedup_enabled", True)
+        cross_turn_ttl = float(getattr(tool_settings, "cross_turn_dedup_ttl", 300))
+
         pipeline = ToolPipeline(
             tool_registry=tools,
             tool_executor=tool_executor,
@@ -244,6 +252,8 @@ class ToolBuildersMixin:
                 enable_analytics=True,
                 enable_failed_signature_tracking=True,
                 enable_semantic_caching=semantic_cache is not None,
+                enable_cross_turn_dedup=cross_turn_enabled,
+                cross_turn_dedup_ttl=cross_turn_ttl,
             ),
             tool_cache=tool_cache,
             argument_normalizer=argument_normalizer,
@@ -293,6 +303,25 @@ class ToolBuildersMixin:
 
         fallback_max_tools = getattr(self.settings, "fallback_max_tools", 8)
 
+        # Merge ToolSettings into tool_selection_config so ToolSelector
+        # has access to max_tool_schema_tokens, schema_promotion_threshold,
+        # and max_mcp_tools_per_turn without a separate settings reference.
+        merged_config = dict(tool_selection)
+        tool_settings = getattr(self.settings, "tools", None)
+        if tool_settings is not None:
+            if "max_tool_schema_tokens" not in merged_config:
+                merged_config["max_tool_schema_tokens"] = getattr(
+                    tool_settings, "max_tool_schema_tokens", 0
+                )
+            if "schema_promotion_threshold" not in merged_config:
+                merged_config["schema_promotion_threshold"] = getattr(
+                    tool_settings, "schema_promotion_threshold", 0.8
+                )
+            if "max_mcp_tools_per_turn" not in merged_config:
+                merged_config["max_mcp_tools_per_turn"] = getattr(
+                    tool_settings, "max_mcp_tools_per_turn", 12
+                )
+
         selector = ToolSelector(
             tools=tools,
             semantic_selector=semantic_selector,
@@ -300,7 +329,7 @@ class ToolBuildersMixin:
             task_tracker=unified_tracker,
             model=model,
             provider_name=provider_name,
-            tool_selection_config=tool_selection,
+            tool_selection_config=merged_config,
             fallback_max_tools=fallback_max_tools,
             on_selection_recorded=on_selection_recorded,
         )
@@ -476,9 +505,9 @@ class ToolBuildersMixin:
         from victor.tools.semantic_selector import SemanticToolSelector
 
         semantic_selector = SemanticToolSelector(
-            embedding_model=self.settings.embedding_model,
-            embedding_provider=self.settings.embedding_provider,
-            ollama_base_url=self.settings.ollama_base_url,
+            embedding_model=self.settings.tools.embedding_model,
+            embedding_provider=self.settings.tools.embedding_provider,
+            ollama_base_url=self.settings.provider.ollama_base_url,
             cache_embeddings=True,
         )
         logger.debug("SemanticToolSelector created")

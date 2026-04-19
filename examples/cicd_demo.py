@@ -192,7 +192,9 @@ async def demo_validate_config():
         if result["success"]:
             print(result.get("formatted_report", ""))
         else:
-            print(f"Validation result: {result.get('formatted_report', result.get('error', ''))}")
+            print(
+                f"Validation result: {result.get('formatted_report', result.get('error', ''))}"
+            )
 
         # Create an invalid config
         print("\n\n3️⃣ Test validation with invalid configuration...")

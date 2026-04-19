@@ -129,21 +129,34 @@ def framework_result_to_benchmark_result(
         generated_code=framework_result.content,
         tests_passed=tests_passed,
         tests_total=tests_total,
-        tests_failed=(tests_total - tests_passed) if tests_passed and tests_total else None,
+        tests_failed=((tests_total - tests_passed) if tests_passed and tests_total else None),
         tokens_used=metadata.get("tokens_used", 0),
         tokens_input=metadata.get("tokens_input", 0),
         tokens_output=metadata.get("tokens_output", 0),
-        tool_calls=len(framework_result.tool_calls) if framework_result.tool_calls else 0,
+        tool_calls=(len(framework_result.tool_calls) if framework_result.tool_calls else 0),
         turns=metadata.get("turns", 0),
         error_message=framework_result.error,
     )
 
 
 def _infer_task_type(benchmark_task: BenchmarkTask) -> FrameworkTaskType:
-    """Infer FrameworkTaskType from benchmark task characteristics."""
+    """Infer FrameworkTaskType from benchmark task characteristics.
+
+    If ``benchmark_task.task_type_hint`` is set, it is resolved first so
+    that non-coding benchmarks can bypass keyword inference entirely.
+    """
+    # 1. Check explicit hint from the benchmark task
+    hint = getattr(benchmark_task, "task_type_hint", None)
+    if hint:
+        hint_upper = hint.strip().upper()
+        try:
+            return FrameworkTaskType[hint_upper]
+        except KeyError:
+            pass  # fall through to keyword inference
+
+    # 2. Keyword-based inference (original logic)
     prompt_lower = benchmark_task.prompt.lower()
 
-    # Check for explicit task type indicators
     if any(word in prompt_lower for word in ["fix", "bug", "error", "issue", "patch"]):
         return FrameworkTaskType.EDIT
     elif any(word in prompt_lower for word in ["add", "implement", "create", "new"]):

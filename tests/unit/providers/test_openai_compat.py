@@ -81,7 +81,13 @@ class TestConvertMessagesToOpenAIFormat:
             Message(
                 role="assistant",
                 content="",
-                tool_calls=[{"id": "call_123", "name": "test_func", "arguments": {"arg1": "val1"}}],
+                tool_calls=[
+                    {
+                        "id": "call_123",
+                        "name": "test_func",
+                        "arguments": {"arg1": "val1"},
+                    }
+                ],
             )
         ]
         result = convert_messages_to_openai_format(messages)
@@ -136,7 +142,12 @@ class TestParseOpenAIToolCalls:
 
     def test_parse_invalid_json_arguments(self):
         """Test parsing tool calls with invalid JSON arguments."""
-        data = [{"id": "call_123", "function": {"name": "test", "arguments": "invalid json"}}]
+        data = [
+            {
+                "id": "call_123",
+                "function": {"name": "test", "arguments": "invalid json"},
+            }
+        ]
         result = parse_openai_tool_calls(data)
         assert result is not None
         assert result[0]["arguments"] == {"raw": "invalid json"}

@@ -65,7 +65,7 @@ class OptimizationResult:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary representation."""
         return {
-            "best_variant_id": self.best_variant.variant_id if self.best_variant else None,
+            "best_variant_id": (self.best_variant.variant_id if self.best_variant else None),
             "best_score": self.best_score,
             "iterations": self.iterations,
             "converged": self.converged,

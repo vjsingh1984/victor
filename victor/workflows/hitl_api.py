@@ -534,7 +534,7 @@ class SQLiteHITLStore:
             status=row["status"],
             response=response,
             created_at=datetime.fromisoformat(row["created_at"]),
-            expires_at=datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None,
+            expires_at=(datetime.fromisoformat(row["expires_at"]) if row["expires_at"] else None),
         )
 
     async def store_request(

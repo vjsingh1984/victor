@@ -392,7 +392,8 @@ class TestUnifiedRegistrySyncBridge:
 
         with (
             patch(
-                "victor.tools.unified.registry.asyncio.get_running_loop", side_effect=RuntimeError
+                "victor.tools.unified.registry.asyncio.get_running_loop",
+                side_effect=RuntimeError,
             ),
             patch("victor.tools.unified.registry.run_sync", return_value=None) as mock_run_sync,
         ):
@@ -410,7 +411,10 @@ class TestUnifiedRegistrySyncBridge:
         registry._selector = selector
 
         with (
-            patch("victor.tools.unified.registry.asyncio.get_running_loop", return_value=object()),
+            patch(
+                "victor.tools.unified.registry.asyncio.get_running_loop",
+                return_value=object(),
+            ),
             patch("victor.tools.unified.registry.asyncio.create_task") as mock_create_task,
             patch("victor.tools.unified.registry.run_sync") as mock_run_sync,
         ):

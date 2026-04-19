@@ -444,7 +444,8 @@ class ModelSpecificPromptRegistry:
         return {
             tid: {
                 "name": self._templates.get(
-                    tid, PromptTemplate(id=tid, name="Unknown", template="", failure_types=[])
+                    tid,
+                    PromptTemplate(id=tid, name="Unknown", template="", failure_types=[]),
                 ).name,
                 "usage_count": stats.usage_count,
                 "success_rate": stats.success_rate,

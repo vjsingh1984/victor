@@ -72,6 +72,7 @@ class StreamingChatContext:
     is_action_task: bool = False
     is_complex_task: bool = False  # GAP-16: Track COMPLEX complexity for lenient progress checking
     needs_execution: bool = False
+    is_qa_task: bool = False  # Pure Q&A task — skip tools entirely
     coarse_task_type: str = "default"
 
     # Content accumulation
@@ -111,6 +112,9 @@ class StreamingChatContext:
 
     # Substantial content threshold for recovery decisions
     substantial_content_threshold: int = 500
+
+    # Pre-execution intent log (LogAct-inspired)
+    intent_log: List[Dict[str, Any]] = field(default_factory=list)
 
     # Tool execution tracking (for budget and progress checks)
     tool_budget: int = 200  # Default tool budget

@@ -63,6 +63,7 @@ _MODULE_MEMBERS = {
         "StreamingToolChunk",
         "StreamingToolAdapterProtocol",
         "StreamingControllerProtocol",
+        "StreamingCoordinatorProtocol",
         "StreamingRecoveryCoordinatorProtocol",
         "ChunkGeneratorProtocol",
         "StreamingHandlerProtocol",

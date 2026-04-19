@@ -255,7 +255,12 @@ class TestLoadWorkflowFromDict:
                 },
                 {"id": "task_a", "type": "agent", "role": "executor", "goal": "Task A"},
                 {"id": "task_b", "type": "agent", "role": "executor", "goal": "Task B"},
-                {"id": "merge", "type": "agent", "role": "writer", "goal": "Merge results"},
+                {
+                    "id": "merge",
+                    "type": "agent",
+                    "role": "writer",
+                    "goal": "Merge results",
+                },
             ],
         }
         workflow = load_workflow_from_dict(data, "parallel_test")
@@ -271,7 +276,12 @@ class TestLoadWorkflowFromDict:
                     "transform": "result = ctx.input",
                     "next": ["next_step"],
                 },
-                {"id": "next_step", "type": "agent", "role": "executor", "goal": "Use result"},
+                {
+                    "id": "next_step",
+                    "type": "agent",
+                    "role": "executor",
+                    "goal": "Use result",
+                },
             ],
         }
         workflow = load_workflow_from_dict(data, "transform_test")

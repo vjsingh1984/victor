@@ -278,9 +278,9 @@ class TestAOTManifestIntegration:
     """Tests for AOT fast-path in PluginRegistry.discover()."""
 
     @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_aot_fast_path_skips_cache(self, mock_get_cache, mock_aot_cls):
-        """When AOT manifest is valid, EntryPointCache should not be called."""
+    @patch("victor.core.plugins.registry.get_entry_point_values")
+    def test_aot_fast_path_skips_shared_discovery(self, mock_get_entry_point_values, mock_aot_cls):
+        """When AOT manifest is valid, shared entry-point discovery should not be called."""
         from victor.core.aot_manifest import AOTManifest, EntryPointEntry
 
         manifest = AOTManifest(
@@ -304,44 +304,44 @@ class TestAOTManifestIntegration:
         with patch.object(registry, "_load_plugin_from_value", return_value=plugin_instance):
             plugins = registry.discover(force=False)
 
-        # EntryPointCache should NOT be called (AOT hit)
-        mock_get_cache.return_value.get_entry_points.assert_not_called()
+        # Shared discovery should NOT be called (AOT hit)
+        mock_get_entry_point_values.assert_not_called()
         assert len(plugins) == 1
         assert plugins[0].name == "test"
 
     @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_aot_miss_falls_through_to_cache(self, mock_get_cache, mock_aot_cls):
-        """When AOT manifest is None, EntryPointCache should be used."""
+    @patch("victor.core.plugins.registry.get_entry_point_values")
+    def test_aot_miss_falls_through_to_shared_discovery(
+        self,
+        mock_get_entry_point_values,
+        mock_aot_cls,
+    ):
+        """When AOT manifest is None, shared entry-point discovery should be used."""
         mock_aot_cls.return_value.load_manifest.return_value = None
-
-        mock_cache = MagicMock()
-        mock_cache.get_entry_points.return_value = {}
-        mock_get_cache.return_value = mock_cache
+        mock_get_entry_point_values.return_value = {}
 
         registry = PluginRegistry()
         registry.discover(force=False)
 
-        # EntryPointCache should be called
-        assert mock_cache.get_entry_points.call_count == 1  # plugins only
+        # Shared discovery should be called
+        mock_get_entry_point_values.assert_called_once_with("victor.plugins", force=False)
 
         # AOT manifest should be updated after slow path
         mock_aot_cls.return_value.build_manifest.assert_called_once()
         mock_aot_cls.return_value.save_manifest.assert_called_once()
 
     @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_force_skips_aot(self, mock_get_cache, mock_aot_cls):
-        """force=True should skip AOT and go straight to EntryPointCache."""
-        mock_cache = MagicMock()
-        mock_cache.get_entry_points.return_value = {}
-        mock_get_cache.return_value = mock_cache
+    @patch("victor.core.plugins.registry.get_entry_point_values")
+    def test_force_skips_aot(self, mock_get_entry_point_values, mock_aot_cls):
+        """force=True should skip AOT and go straight to shared entry-point discovery."""
+        mock_get_entry_point_values.return_value = {}
 
         registry = PluginRegistry()
         registry.discover(force=True)
 
         # AOT should not be loaded when forcing
         mock_aot_cls.return_value.load_manifest.assert_not_called()
+        mock_get_entry_point_values.assert_called_once_with("victor.plugins", force=True)
 
 
 # ===========================================================================
@@ -349,38 +349,33 @@ class TestAOTManifestIntegration:
 # ===========================================================================
 
 
-class TestEntryPointCacheWiring:
-    """Tests for PluginRegistry using EntryPointCache instead of raw entry_points()."""
+class TestSharedEntryPointDiscoveryWiring:
+    """Tests for PluginRegistry using shared entry-point discovery helpers."""
 
     @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_uses_entry_point_cache(self, mock_get_cache, mock_aot):
+    @patch("victor.core.plugins.registry.get_entry_point_values")
+    def test_uses_shared_entry_point_values(self, mock_get_entry_point_values, mock_aot):
         mock_aot.return_value.load_manifest.return_value = None
-        mock_cache = MagicMock()
-        mock_cache.get_entry_points.return_value = {}
-        mock_get_cache.return_value = mock_cache
+        mock_get_entry_point_values.return_value = {}
 
         registry = PluginRegistry()
         registry.discover(force=True)
 
-        mock_get_cache.assert_called()
-        mock_cache.get_entry_points.assert_any_call("victor.plugins", force_refresh=True)
+        mock_get_entry_point_values.assert_called_once_with("victor.plugins", force=True)
 
     @patch("victor.core.plugins.registry.AOTManifestManager")
-    @patch("victor.core.plugins.registry.get_entry_point_cache")
-    def test_cached_discovery_returns_early(self, mock_get_cache, mock_aot):
+    @patch("victor.core.plugins.registry.get_entry_point_values")
+    def test_cached_discovery_returns_early(self, mock_get_entry_point_values, mock_aot):
         mock_aot.return_value.load_manifest.return_value = None
-        mock_cache = MagicMock()
-        mock_cache.get_entry_points.return_value = {}
-        mock_get_cache.return_value = mock_cache
+        mock_get_entry_point_values.return_value = {}
 
         registry = PluginRegistry()
         registry.discover(force=True)
-        mock_get_cache.reset_mock()
+        mock_get_entry_point_values.reset_mock()
 
         # Second call without force should return cached
         registry.discover(force=False)
-        mock_get_cache.assert_not_called()
+        mock_get_entry_point_values.assert_not_called()
 
     def test_load_plugin_from_value_colon_format(self):
         registry = PluginRegistry()

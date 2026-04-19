@@ -279,7 +279,13 @@ class AmbiguityDetector:
                         message=f"Task '{task.id}' has no agent role specified",
                         suggestion="What role should perform this task?",
                         field=f"functional.tasks.{task.id}.role",
-                        options=["researcher", "executor", "planner", "reviewer", "writer"],
+                        options=[
+                            "researcher",
+                            "executor",
+                            "planner",
+                            "reviewer",
+                            "writer",
+                        ],
                     )
                 )
 

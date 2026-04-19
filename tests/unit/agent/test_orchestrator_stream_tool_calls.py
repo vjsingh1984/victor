@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, AsyncIterator, Dict, List, Optional
+from unittest.mock import patch
 
 import pytest
 
@@ -90,13 +91,14 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     settings.tool_cache_enabled = False
     provider = DummyStreamProvider()
 
-    orch = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
-        model="dummy-model",
-        temperature=0.0,
-        max_tokens=32,
-    )
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        orch = AgentOrchestrator(
+            settings=settings,
+            provider=provider,
+            model="dummy-model",
+            temperature=0.0,
+            max_tokens=32,
+        )
 
     dummy_tool = DummyTool()
     orch.tools.register(dummy_tool)
@@ -104,15 +106,21 @@ async def test_orchestrator_executes_streamed_tool_call(monkeypatch):
     orch.tool_executor.tools = orch.tools
     orch._tool_pipeline.tools = orch.tools  # Pipeline's registry
     orch._tool_pipeline.executor.tools = orch.tools  # Pipeline's executor registry
-    # Ensure is_tool_enabled returns True for our test tool
-    orch.is_tool_enabled = lambda name: name == "dummy_tool" or name in {
-        t.name for t in orch.tools.list_tools()
-    }
+
+    # Inject a mock _tool_service so is_tool_enabled can be configured.
+    # bootstrap_new_services was patched out, so _tool_service is None on fresh orchestrators.
+    from unittest.mock import MagicMock
+    mock_tool_svc = MagicMock()
+    orch._tool_service = mock_tool_svc
+    enabled_names = {"dummy_tool"} | {t.name for t in orch.tools.list_tools()}
+    mock_tool_svc.is_tool_enabled = lambda name: name in enabled_names
 
     # Bypass heavy semantic selector; return just our dummy tool definition
     orch._select_tools = lambda *args, **kwargs: [
         ToolDefinition(
-            name="dummy_tool", description="d", parameters={"type": "object", "properties": {}}
+            name="dummy_tool",
+            description="d",
+            parameters={"type": "object", "properties": {}},
         )
     ]
 

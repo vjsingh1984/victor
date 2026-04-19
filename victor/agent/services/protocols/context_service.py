@@ -19,7 +19,16 @@ Defines the interface for context and state management operations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    runtime_checkable,
+)
 
 if TYPE_CHECKING:
     Message = Dict[str, Any]
@@ -72,14 +81,11 @@ class ContextMetrics(Protocol):
 
 @runtime_checkable
 class ContextServiceProtocol(Protocol):
-    """Protocol for context and state management service.
+    """[CANONICAL] Protocol for context and state management service.
 
-    Handles:
-    - Context size monitoring and metrics
-    - Context overflow detection and prevention
-    - Context compaction and optimization
-    - Message history management
-    - Token counting and estimation
+    This protocol represents the target architecture for context operations,
+    replacing the facade-driven Coordinator pattern with a state-passed
+    Service pattern.
 
     This protocol follows the Interface Segregation Principle (ISP)
     by focusing only on context-related operations.

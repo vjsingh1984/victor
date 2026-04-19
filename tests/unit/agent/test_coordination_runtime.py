@@ -5,7 +5,9 @@
 
 from unittest.mock import MagicMock
 
-from victor.agent.runtime.coordination_runtime import create_coordination_runtime_components
+from victor.agent.runtime.coordination_runtime import (
+    create_coordination_runtime_components,
+)
 
 
 def test_create_coordination_runtime_components_lazy_materialization():

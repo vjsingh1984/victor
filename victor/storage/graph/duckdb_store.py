@@ -128,7 +128,10 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 conn.close()
 
     async def get_neighbors(
-        self, node_id: str, edge_types: Optional[Iterable[str]] = None, max_depth: int = 1
+        self,
+        node_id: str,
+        edge_types: Optional[Iterable[str]] = None,
+        max_depth: int = 1,
     ) -> List[GraphEdge]:
         params: list[Any] = [node_id]
         type_clause = ""
@@ -155,7 +158,11 @@ class DuckDBGraphStore(GraphStoreProtocol):
                 conn.close()
 
     async def find_nodes(
-        self, *, name: str | None = None, type: str | None = None, file: str | None = None
+        self,
+        *,
+        name: str | None = None,
+        type: str | None = None,
+        file: str | None = None,
     ) -> List[GraphNode]:
         clauses = []
         params: list[Any] = []

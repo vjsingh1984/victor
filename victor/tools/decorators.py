@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+import asyncio
 import inspect
 import logging
 import warnings
@@ -247,6 +248,9 @@ def tool(
     execution_category: Optional[str] = None,
     # NEW: Availability check for optional tools requiring configuration
     availability_check: Optional[Callable[[], bool]] = None,
+    # Per-tool timeout override (seconds). Overrides pipeline's per_tool_timeout_seconds.
+    # None = use pipeline default (30s). Set higher for slow tools (code_search, web_search).
+    timeout: Optional[float] = None,
 ) -> Union[Callable, Callable[[Callable], Callable]]:
     """
     A decorator that converts a Python function into a Victor tool.
@@ -354,6 +358,7 @@ def tool(
         "progress_params": progress_params,
         "execution_category": execution_category,
         "availability_check": availability_check,
+        "timeout": timeout,
     }
 
     # Capture selection/approval metadata parameters
@@ -375,6 +380,7 @@ def tool(
 
         # Mark as tool for dynamic discovery
         wrapper._is_tool = True  # type: ignore[attr-defined]
+        wrapper._tool_timeout = timeout  # type: ignore[attr-defined]
         # We will attach a class to the wrapper that is the actual tool
         wrapper.Tool = _create_tool_class(
             fn,
@@ -782,7 +788,9 @@ def _create_tool_class(
                 if inspect.iscoroutinefunction(self._fn):
                     result = await self._fn(**kwargs)
                 else:
-                    result = self._fn(**kwargs)
+                    # Offload sync functions to a thread to avoid blocking
+                    # the event loop during CPU-bound or I/O-bound operations.
+                    result = await asyncio.to_thread(self._fn, **kwargs)
 
                 # Handle dict-based error returns for backwards compatibility
                 # Tools returning {"success": False, "error": "..."} should be converted

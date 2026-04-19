@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
     from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.task_analyzer import TaskAnalyzer
@@ -193,24 +193,26 @@ def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
 def _protocol_adapter(self: "AgentOrchestrator") -> Any:
     """Get the protocol adapter for DIP compliance (lazy init)."""
     if self._protocol_adapter is None:
-        from victor.agent.coordinators.protocol_adapters import OrchestratorProtocolAdapter
+        from victor.agent.coordinators.protocol_adapters import (
+            OrchestratorProtocolAdapter,
+        )
 
         self._protocol_adapter = OrchestratorProtocolAdapter(self)
     return self._protocol_adapter
 
 
-def _execution_coordinator(self: "AgentOrchestrator") -> Any:
+def _turn_executor(self: "AgentOrchestrator") -> Any:
     """Get the execution coordinator for agentic loop (lazy init)."""
-    if self._execution_coordinator is None:
-        from victor.agent.coordinators.execution_coordinator import ExecutionCoordinator
+    if self._turn_executor is None:
+        from victor.agent.coordinators.turn_executor import TurnExecutor
 
-        self._execution_coordinator = ExecutionCoordinator(
+        self._turn_executor = TurnExecutor(
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
             execution_provider=self.protocol_adapter,
         )
-    return self._execution_coordinator
+    return self._turn_executor
 
 
 def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
@@ -224,7 +226,7 @@ def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
-            execution_coordinator=self.execution_coordinator,
+            turn_executor=self.turn_executor,
             orchestrator=self,
             query_classifier=QueryClassifier(),
         )
@@ -263,7 +265,9 @@ def _unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
     return self._unified_chat_coordinator
 
 
-def _intelligent_integration(self: "AgentOrchestrator") -> Optional["OrchestratorIntegration"]:
+def _intelligent_integration(
+    self: "AgentOrchestrator",
+) -> Optional["OrchestratorIntegration"]:
     """Get the intelligent pipeline integration (lazy init)."""
     if not self._intelligent_pipeline_enabled:
         return None
@@ -355,7 +359,9 @@ def _recovery_handler(self: "AgentOrchestrator") -> Optional["RecoveryHandler"]:
     return handler
 
 
-def _recovery_integration(self: "AgentOrchestrator") -> "OrchestratorRecoveryIntegration":
+def _recovery_integration(
+    self: "AgentOrchestrator",
+) -> "OrchestratorRecoveryIntegration":
     """Get the recovery integration submodule."""
     integration = getattr(self, "_recovery_integration", None)
     if hasattr(integration, "get_instance"):
@@ -465,6 +471,85 @@ def _cumulative_token_usage_set(self: "AgentOrchestrator", value: dict) -> None:
 # Property installation registry
 # =====================================================================
 
+# =====================================================================
+# Group 5: ToolService convenience methods (delegates to canonical service)
+# =====================================================================
+
+
+def _is_tool_enabled_get(self: "AgentOrchestrator") -> Any:
+    """Check if a tool is enabled via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Args:
+        tool_name: Name of the tool to check
+
+    Returns:
+        True if tool is enabled, False otherwise
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.is_tool_enabled
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.is_tool_enabled
+    raise AttributeError("ToolService not available")
+
+
+def _get_enabled_tools_get(self: "AgentOrchestrator") -> Any:
+    """Get enabled tools via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Returns:
+        Set of enabled tool names
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.get_enabled_tools
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.get_enabled_tools
+    raise AttributeError("ToolService not available")
+
+
+def _set_enabled_tools_get(self: "AgentOrchestrator") -> Any:
+    """Set enabled tools via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Args:
+        tools: Set of tool names to enable
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.set_enabled_tools
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.set_enabled_tools
+    raise AttributeError("ToolService not available")
+
+
+def _resolve_tool_alias_get(self: "AgentOrchestrator") -> Any:
+    """Resolve tool alias via ToolService.
+
+    Delegates to the canonical ToolService instead of ToolCoordinator.
+    This provides a migration path to the service-based architecture.
+
+    Args:
+        tool_name: Tool name or alias to resolve
+
+    Returns:
+        Canonical tool name
+    """
+    if hasattr(self, "_tool_service") and self._tool_service:
+        return self._tool_service.resolve_tool_alias
+    # Fallback to coordinator if service not available
+    if hasattr(self, "_tool_coordinator") and self._tool_coordinator:
+        return self._tool_coordinator.resolve_tool_alias
+    raise AttributeError("ToolService not available")
+
+
 # Map of public property name -> (getter, setter_or_None)
 _PROPERTY_REGISTRY: dict[str, Any] = {
     # Group 1: Simple accessors (getter only)
@@ -488,7 +573,7 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "vertical_context": (_vertical_context, None),
     # Group 2: Lazy coordinators (getter only)
     "protocol_adapter": (_protocol_adapter, None),
-    "execution_coordinator": (_execution_coordinator, None),
+    "turn_executor": (_turn_executor, None),
     "sync_chat_coordinator": (_sync_chat_coordinator, None),
     "streaming_chat_coordinator": (_streaming_chat_coordinator, None),
     "unified_chat_coordinator": (_unified_chat_coordinator, None),
@@ -503,8 +588,14 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
     "tool_calls_used": (_tool_calls_used_get, _tool_calls_used_set),
     "observed_files": (_observed_files_get, _observed_files_set),
     "executed_tools": (_executed_tools_get, _executed_tools_set),
-    "failed_tool_signatures": (_failed_tool_signatures_get, _failed_tool_signatures_set),
-    "_tool_capability_warned": (_tool_capability_warned_get, _tool_capability_warned_set),
+    "failed_tool_signatures": (
+        _failed_tool_signatures_get,
+        _failed_tool_signatures_set,
+    ),
+    "_tool_capability_warned": (
+        _tool_capability_warned_get,
+        _tool_capability_warned_set,
+    ),
     "_read_files_session": (_read_files_session_get, None),
     "_required_files": (_required_files_get, _required_files_set),
     "_required_outputs": (_required_outputs_get, _required_outputs_set),
@@ -512,7 +603,15 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
         _all_files_read_nudge_sent_get,
         _all_files_read_nudge_sent_set,
     ),
-    "_cumulative_token_usage": (_cumulative_token_usage_get, _cumulative_token_usage_set),
+    "_cumulative_token_usage": (
+        _cumulative_token_usage_get,
+        _cumulative_token_usage_set,
+    ),
+    # Group 5: ToolService convenience methods (delegates to canonical service)
+    "is_tool_enabled": (_is_tool_enabled_get, None),
+    "get_enabled_tools": (_get_enabled_tools_get, None),
+    "set_enabled_tools": (_set_enabled_tools_get, None),
+    "resolve_tool_alias": (_resolve_tool_alias_get, None),
 }
 
 

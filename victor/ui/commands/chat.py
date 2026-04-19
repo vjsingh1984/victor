@@ -51,6 +51,31 @@ chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-s
 console = Console()
 
 
+def _display_skill_preview(con: Console, agent: Any, message: str) -> None:
+    """Show skill auto-selection feedback before the LLM response.
+
+    Does a preview match (deterministic, same as coordinator will use)
+    to display which skill(s) will be activated.
+    """
+    matcher = getattr(agent, "_skill_matcher", None)
+    if matcher is None or not getattr(matcher, "_initialized", False):
+        return
+    if getattr(agent, "_skill_auto_disabled", False):
+        return
+    try:
+        matches = matcher.match_multiple_sync(message)
+        if not matches:
+            return
+        if len(matches) == 1:
+            skill, score = matches[0]
+            con.print(f"[dim]\U0001f3af Skill: {skill.name} ({score:.2f})[/]")
+        else:
+            names = " \u2192 ".join(s.name for s, _ in matches)
+            con.print(f"[dim]\U0001f3af Skills: {names}[/]")
+    except Exception:
+        pass
+
+
 @chat_app.callback(invoke_without_command=True)
 def chat(
     ctx: typer.Context,
@@ -81,60 +106,77 @@ def chat(
         "-l",
         help="Set logging level (DEBUG, INFO, WARN, ERROR). Defaults to WARNING or VICTOR_LOG_LEVEL env var.",
         case_sensitive=False,
+        rich_help_panel="Logging",
+    ),
+    debug_modules: str = typer.Option(
+        None,
+        "--debug-modules",
+        help="Comma-separated modules to set to DEBUG level (e.g., code_search,agent_adapter).",
+        rich_help_panel="Logging",
     ),
     thinking: bool = typer.Option(
         False,
         "--thinking/--no-thinking",
         help="Enable extended thinking/reasoning mode (Claude models). Shows model's reasoning process.",
+        rich_help_panel="Agent Behavior",
     ),
     # Automation-friendly options
     json_output: bool = typer.Option(
         False,
         "--json",
         help="Output response as JSON object (for automation/scripting).",
+        rich_help_panel="Output Format",
     ),
     plain: bool = typer.Option(
         False,
         "--plain",
         help="Output plain text without Rich formatting.",
+        rich_help_panel="Output Format",
     ),
     code_only: bool = typer.Option(
         False,
         "--code-only",
         help="Extract and output only code blocks from response.",
+        rich_help_panel="Output Format",
     ),
     stdin: bool = typer.Option(
         False,
         "--stdin",
         help="Read input from stdin (supports multi-line).",
+        rich_help_panel="Input",
     ),
     quiet: bool = typer.Option(
         False,
         "--quiet",
         "-q",
         help="Suppress status messages (only output response).",
+        rich_help_panel="Output Format",
     ),
     renderer: str = typer.Option(
         "auto",
         "--renderer",
         help="Renderer to use for streaming output: auto, rich, rich-text, or text.",
         case_sensitive=False,
+        rich_help_panel="Output Format",
     ),
     mode: Optional[str] = typer.Option(
         None,
         "--mode",
         help="Initial agent mode: build, plan, or explore.",
         case_sensitive=False,
+        rich_help_panel="Agent Behavior",
     ),
     tool_budget: Optional[int] = typer.Option(
         None,
         "--tool-budget",
         help="Override tool call budget for this session.",
+        rich_help_panel="Agent Behavior",
     ),
     max_iterations: Optional[int] = typer.Option(
         None,
         "--max-iterations",
         help="Override maximum total iterations for this session.",
+        rich_help_panel="Agent Behavior",
     ),
     provider: Optional[str] = typer.Option(
         None,
@@ -151,17 +193,20 @@ def chat(
         None,
         "--endpoint",
         help="Override base URL for local providers (ollama, lmstudio, vllm).",
+        rich_help_panel="Auth & Compatibility",
     ),
     input_file: Optional[str] = typer.Option(
         None,
         "--input-file",
         "-f",
         help="Read input from file instead of argument.",
+        rich_help_panel="Input",
     ),
     preindex: bool = typer.Option(
         False,
         "--preindex",
         help="Preload semantic code index at startup (avoids 20-30s delay on first search).",
+        rich_help_panel="Agent Behavior",
     ),
     vertical: Optional[str] = typer.Option(
         None,
@@ -169,88 +214,110 @@ def chat(
         "-V",
         help=f"Vertical template to use ({', '.join(list_verticals()) or 'coding, research, devops'}). "
         "By default, no vertical is applied (uses standard CodingAssistant behavior with framework features).",
+        rich_help_panel="Agent Behavior",
     ),
     workflow: Optional[str] = typer.Option(
         None,
         "--workflow",
         "-w",
         help="Path to YAML workflow file to execute. Runs workflow instead of chat mode.",
+        rich_help_panel="Workflow",
     ),
     validate_workflow: bool = typer.Option(
         False,
         "--validate",
         help="Validate YAML workflow file without executing. Use with --workflow.",
+        rich_help_panel="Workflow",
     ),
     render_format: Optional[str] = typer.Option(
         None,
         "--render",
         "-r",
         help="Render workflow DAG (ascii, mermaid, d2, dot, plantuml, svg, png). Use with --workflow.",
+        rich_help_panel="Workflow",
     ),
     render_output: Optional[str] = typer.Option(
         None,
         "--render-output",
         "-o",
         help="Output file for rendered diagram. Required for svg/png formats.",
+        rich_help_panel="Workflow",
     ),
     auth_mode: Optional[str] = typer.Option(
         None,
         "--auth-mode",
         help="Authentication mode: 'api_key' (default) or 'oauth' (for OpenAI Codex, Qwen Coding Plan).",
         case_sensitive=False,
+        rich_help_panel="Auth & Compatibility",
     ),
     coding_plan: bool = typer.Option(
         False,
         "--coding-plan",
         help="Use coding plan endpoint (Z.AI). Routes to api.z.ai/api/coding/paas/v4/.",
+        rich_help_panel="Auth & Compatibility",
     ),
     legacy_mode: bool = typer.Option(
         False,
         "--legacy",
         help="Use legacy orchestrator creation path (bypasses FrameworkShim). "
         "For backward compatibility and troubleshooting.",
+        rich_help_panel="Auth & Compatibility",
     ),
     enable_observability: bool = typer.Option(
         True,
         "--observability/--no-observability",
         help="Enable observability integration for event tracking.",
+        rich_help_panel="Logging",
     ),
     log_events: bool = typer.Option(
         False,
         "--log-events",
         help="Enable JSONL event logging to ~/.victor/logs/victor.log for dashboard visualization.",
+        rich_help_panel="Logging",
     ),
     show_reasoning: bool = typer.Option(
         False,
         "--show-reasoning",
         help="Show LLM reasoning/thinking content in output.",
+        rich_help_panel="Output Format",
+    ),
+    auto_skill: Optional[bool] = typer.Option(
+        None,
+        "--auto-skill/--no-auto-skill",
+        help="Enable/disable automatic skill selection based on message content. Default: from settings.",
+        rich_help_panel="Agent Behavior",
     ),
     enable_planning: Optional[bool] = typer.Option(
         None,
         "--planning/--no-planning",
         help="Enable structured planning for complex multi-step tasks. Default: auto-detect via query classification.",
+        rich_help_panel="Agent Behavior",
     ),
     planning_model: Optional[str] = typer.Option(
         None,
         "--planning-model",
         help="Override model for planning tasks (e.g., 'qwen3-coder-tools:30b-128K', 'deepseek-chat'). "
         "Takes precedence over profile planning_model setting.",
+        rich_help_panel="Agent Behavior",
     ),
     # Session management options
     list_sessions: bool = typer.Option(
         False,
         "--sessions",
         help="List saved sessions and exit (top 20).",
+        rich_help_panel="Session",
     ),
     session_id: Optional[str] = typer.Option(
         None,
         "--sessionid",
         help="Resume specific session by ID.",
+        rich_help_panel="Session",
     ),
     tui: bool = typer.Option(
         False,
         "--tui/--no-tui",
         help="Use modern TUI interface. Use --no-tui for simple CLI mode (default).",
+        rich_help_panel="Logging",
     ),
 ):
     """Start interactive chat or send a one-shot message."""
@@ -320,13 +387,16 @@ def chat(
         setup_logging(
             command="chat",
             cli_log_level=log_level,
+            cli_debug_modules=debug_modules,
             stream=sys.stderr,
             session_id=session_id,  # Use --sessionid flag value for logging
         )
 
         # Handle --sessions flag (list sessions and exit)
         if list_sessions:
-            from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+            from victor.agent.sqlite_session_persistence import (
+                get_sqlite_session_persistence,
+            )
 
             persistence = get_sqlite_session_persistence()
             sessions = persistence.list_sessions(limit=20)
@@ -398,7 +468,10 @@ def chat(
 
         # Early configuration validation (P0: catch errors at startup, not runtime)
         try:
-            from victor.config.validation import validate_configuration, format_validation_result
+            from victor.config.validation import (
+                validate_configuration,
+                format_validation_result,
+            )
 
             validation_result = validate_configuration(settings)
             if not validation_result.is_valid:
@@ -417,7 +490,7 @@ def chat(
 
         # Apply CLI flags to settings
         if log_events:
-            settings.enable_observability_logging = True
+            settings.observability.enable_observability_logging = True
 
         setup_safety_confirmation()
 
@@ -435,11 +508,11 @@ def chat(
                 extra_fields["base_url"] = endpoint
                 if provider in {"ollama", "lmstudio", "vllm"}:
                     if provider == "ollama":
-                        settings.ollama_base_url = endpoint
+                        settings.provider.ollama_base_url = endpoint
                     elif provider == "lmstudio":
-                        settings.lmstudio_base_urls = [endpoint]
+                        settings.provider.lmstudio_base_urls = [endpoint]
                     elif provider == "vllm":
-                        settings.vllm_base_url = endpoint
+                        settings.provider.vllm_base_url = endpoint
                 else:
                     console.print(
                         "[bold yellow]Warning:[/] --endpoint is ignored for this provider."
@@ -453,15 +526,19 @@ def chat(
             override_profile = ProfileConfig(
                 provider=provider,
                 model=model,
-                temperature=settings.default_temperature,
-                max_tokens=settings.default_max_tokens,
+                temperature=settings.provider.default_temperature,
+                max_tokens=settings.provider.default_max_tokens,
                 **extra_fields,
             )
 
             # Replace profile loader to use the synthetic profile
             settings.load_profiles = lambda: {profile: override_profile}  # type: ignore[attr-defined]
-            settings.default_provider = provider
-            settings.default_model = model
+            settings.provider.default_provider = provider
+            settings.provider.default_model = model
+
+        # Apply auto-skill CLI override to settings
+        if auto_skill is not None:
+            settings.skill_auto_select_enabled = auto_skill
 
         if actual_message:
             run_sync(
@@ -553,7 +630,7 @@ async def run_oneshot(
     if formatter is None:
         formatter = create_formatter()
 
-    settings.one_shot_mode = True
+    settings.automation.one_shot_mode = True
     start_time = time.time()
     session_id = str(uuid.uuid4())
     success = False
@@ -577,42 +654,53 @@ async def run_oneshot(
         )
         thinking = False
 
+    # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
+    if not show_reasoning:
+        try:
+            from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+
+            caps = ModelCapabilityLoader().get_capabilities(
+                settings.provider.default_provider,
+                settings.provider.default_model,
+            )
+            if caps and caps.thinking_mode:
+                show_reasoning = True
+        except Exception:
+            pass
+
     agent = None
     shim: Optional[FrameworkShim] = None
     try:
-        if tool_budget is not None:
-            settings.tool_call_budget = tool_budget
+        # Unified initialization via AgentFactory (replaces legacy/framework split)
+        from victor.framework.agent_factory import AgentFactory, InitializationError
 
-        if legacy_mode:
-            # Legacy path: direct orchestrator creation (no framework features)
-            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
-        else:
-            # Framework path: use FrameworkShim with observability and verticals
-            vertical_class = get_vertical(vertical) if vertical else None
-
-            shim = FrameworkShim(
-                settings,
-                profile_name=profile,
-                thinking=thinking,
-                vertical=vertical_class,
-                enable_observability=enable_observability,
-                session_id=session_id,
-            )
-            agent = await shim.create_orchestrator()
+        vertical_class = get_vertical(vertical) if vertical else None
+        factory = AgentFactory(
+            settings=settings,
+            profile=profile,
+            vertical=vertical_class,
+            thinking=thinking,
+            session_id=session_id,
+            enable_observability=enable_observability,
+            tool_budget=tool_budget,
+            max_iterations=max_iterations if "max_iterations" in dir() else None,
+        )
+        try:
+            agent = await factory.create()
 
             # Set planning model override if provided (for planning coordinator)
             if planning_model:
                 agent._planning_model_override = planning_model
 
-            # Emit session start event if observability is enabled
-            shim.emit_session_start(
-                {
-                    "mode": "oneshot",
-                    "task_type": task_type,
-                    "vertical": vertical,
-                    "thinking": thinking,
-                }
-            )
+            # Note: Observability (shim) is handled by AgentFactory internally
+            # The factory creates the agent with framework features already wired
+        except InitializationError as e:
+            formatter.error(f"{e.stage}: {e.message}")
+            for s in e.suggestions:
+                formatter.info(f"  → {s}")
+            if e.run_command:
+                formatter.info(f"Run: {e.run_command}")
+            raise typer.Exit(1)
 
         if tool_budget is not None:
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
@@ -636,6 +724,9 @@ async def run_oneshot(
 
         # Planning mode requires non-streaming (plan generation → step execution → summary)
         use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
+
+        # Display skill auto-selection feedback before response
+        _display_skill_preview(console, agent, message)
 
         if use_streaming:
             from victor.ui.rendering import (
@@ -715,6 +806,20 @@ async def run_interactive(
         use_tui: If True, use the modern TUI interface. If False, use simple CLI.
         show_reasoning: If True, show LLM reasoning/thinking content in output.
     """
+    # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
+    if not show_reasoning:
+        try:
+            from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
+
+            caps = ModelCapabilityLoader().get_capabilities(
+                settings.provider.default_provider,
+                settings.provider.default_model,
+            )
+            if caps and caps.thinking_mode:
+                show_reasoning = True
+        except Exception:
+            pass
+
     agent = None
     shim: Optional[FrameworkShim] = None
     start_time = time.time()
@@ -730,25 +835,21 @@ async def run_interactive(
             console.print(f"[bold red]Error:[/ ] Profile '{profile}' not found")
             raise typer.Exit(1)
 
-        if tool_budget is not None:
-            settings.tool_call_budget = tool_budget
+        # Unified initialization via AgentFactory
+        from victor.framework.agent_factory import AgentFactory, InitializationError
 
-        if legacy_mode:
-            # Legacy path: direct orchestrator creation (no framework features)
-            agent = await AgentOrchestrator.from_settings(settings, profile, thinking=thinking)
-        else:
-            # Framework path: use FrameworkShim with observability and verticals
-            vertical_class = get_vertical(vertical) if vertical else None
-
-            shim = FrameworkShim(
-                settings,
-                profile_name=profile,
-                thinking=thinking,
-                vertical=vertical_class,
-                enable_observability=enable_observability,
-                session_id=session_id,
-            )
-            agent = await shim.create_orchestrator()
+        vertical_class = get_vertical(vertical) if vertical else None
+        factory = AgentFactory(
+            settings=settings,
+            profile=profile,
+            vertical=vertical_class,
+            thinking=thinking,
+            session_id=session_id,
+            enable_observability=enable_observability,
+            tool_budget=tool_budget,
+        )
+        try:
+            agent = await factory.create()
 
             # Set planning model override if provided (for planning coordinator)
             if planning_model:
@@ -756,7 +857,9 @@ async def run_interactive(
 
             # Resume session if requested
             if resume_session_id:
-                from victor.agent.sqlite_session_persistence import get_sqlite_session_persistence
+                from victor.agent.sqlite_session_persistence import (
+                    get_sqlite_session_persistence,
+                )
                 from victor.agent.message_history import MessageHistory
                 from victor.agent.conversation_state import ConversationStateMachine
 
@@ -791,16 +894,15 @@ async def run_interactive(
                     f"({metadata.get('message_count', 0)} messages)\n"
                 )
 
-            # Emit session start event if observability is enabled
-            shim.emit_session_start(
-                {
-                    "mode": "interactive",
-                    "vertical": vertical,
-                    "thinking": thinking,
-                    "provider": profile_config.provider,
-                    "model": profile_config.model,
-                }
-            )
+            # Note: Observability (shim) is handled by AgentFactory internally
+            # The factory creates the agent with framework features already wired
+        except InitializationError as e:
+            console.print(f"[red]Error ({e.stage}):[/] {e.message}")
+            for s in e.suggestions:
+                console.print(f"  → {s}")
+            if e.run_command:
+                console.print(f"\nRun: [bold]{e.run_command}[/]")
+            raise typer.Exit(1)
 
         if tool_budget is not None:
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
@@ -971,7 +1073,10 @@ async def _run_cli_repl(
 
     while True:
         try:
-            user_input = prompt_session.prompt("You> ")
+            # Use prompt_async() — prompt_toolkit's native async input.
+            # The sync .prompt() internally calls asyncio.run() which crashes
+            # when we're already inside an event loop (run_sync → asyncio.run).
+            user_input = await prompt_session.prompt_async("You> ")
 
             if not user_input.strip():
                 continue

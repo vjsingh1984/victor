@@ -28,9 +28,12 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
-    from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallingCapabilities
+    from victor.agent.tool_calling import (
+        BaseToolCallingAdapter,
+        ToolCallingCapabilities,
+    )
     from victor.agent.response_sanitizer import ResponseSanitizer
-    from victor.agent.conversation_controller import ConversationController
+    from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.context_compactor import ContextCompactor
@@ -38,12 +41,12 @@ if TYPE_CHECKING:
     from victor.agent.tool_sequence_tracker import ToolSequenceTracker
     from victor.agent.tool_output_formatter import ToolOutputFormatter
     from victor.agent.metrics_collector import MetricsCollector
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
     from victor.analytics.logger import UsageLogger
     from victor.analytics.streaming_metrics import StreamingMetricsCollector
     from victor.agent.response_completer import ResponseCompleter
     from victor.agent.message_history import MessageHistory
-    from victor.agent.conversation_state import ConversationStateMachine
+    from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.response_processor import ResponseProcessor
     from victor.agent.streaming.streaming_coordinator import StreamingCoordinator
     from victor.agent.streaming.handler import StreamingChatHandler
@@ -153,7 +156,9 @@ class RuntimeBuildersMixin:
         logger.debug("StreamingChatPipeline created and bound to coordinator")
         return pipeline
 
-    def create_streaming_metrics_collector(self) -> Optional["StreamingMetricsCollector"]:
+    def create_streaming_metrics_collector(
+        self,
+    ) -> Optional["StreamingMetricsCollector"]:
         """Create streaming metrics collector if enabled."""
         from victor.analytics.streaming_metrics import StreamingMetricsCollector
 
@@ -208,7 +213,7 @@ class RuntimeBuildersMixin:
         Returns:
             ConversationController instance configured with model-aware settings
         """
-        from victor.agent.conversation_controller import (
+        from victor.agent.conversation.controller import (
             ConversationController,
             ConversationConfig,
             CompactionStrategy,
@@ -287,7 +292,7 @@ class RuntimeBuildersMixin:
 
         try:
             from victor.config.settings import get_project_paths
-            from victor.agent.conversation_memory import ConversationStore
+            from victor.agent.conversation.store import ConversationStore
 
             paths = get_project_paths()
             paths.project_victor_dir.mkdir(parents=True, exist_ok=True)

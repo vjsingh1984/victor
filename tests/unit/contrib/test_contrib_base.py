@@ -16,8 +16,15 @@
 
 import pytest
 
-from victor.contrib.safety import BaseSafetyExtension, SafetyContext, VerticalSafetyMixin
-from victor.contrib.conversation import BaseConversationManager, VerticalConversationContext
+from victor.contrib.safety import (
+    BaseSafetyExtension,
+    SafetyContext,
+    VerticalSafetyMixin,
+)
+from victor.contrib.conversation import (
+    BaseConversationManager,
+    VerticalConversationContext,
+)
 from victor.contrib.mode_config import BaseModeConfigProvider, ModeHelperMixin
 from victor.contrib.workflows import BaseWorkflowProvider, WorkflowLoaderMixin
 from victor.contrib.testing import VerticalTestCase, MockProviderMixin

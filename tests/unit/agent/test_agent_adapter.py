@@ -30,6 +30,28 @@ from victor.evaluation.agentic_harness import (
     FileEdit,
 )
 from victor.evaluation.protocol import BenchmarkTask, BenchmarkType
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.registry import ToolRegistry
+
+
+class _DummyTool(BaseTool):
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def description(self) -> str:
+        return f"Dummy tool {self._name}"
+
+    @property
+    def parameters(self) -> dict:
+        return {"type": "object", "properties": {}}
+
+    async def execute(self, _exec_ctx: dict, **kwargs):
+        return ToolResult(success=True, output=kwargs)
 
 
 class TestAdapterConfig:
@@ -102,6 +124,39 @@ class TestVictorAgentAdapter:
 
         assert adapter.config.max_turns == 5
         assert adapter.config.tool_budget == 10
+
+    def test_benchmark_tool_allowlist_includes_graph(self):
+        """Benchmark sessions should always expose graph navigation."""
+        assert "graph" in VictorAgentAdapter.benchmark_tool_allowlist()
+
+    def test_benchmark_tool_readiness_reports_missing_graph(self, mock_orchestrator):
+        """Readiness should fail when graph is not registered in the live session."""
+        registry = ToolRegistry()
+        for name in ("read", "edit", "write", "code_search", "ls", "shell"):
+            registry.register(_DummyTool(name))
+        mock_orchestrator.tools = registry
+
+        adapter = VictorAgentAdapter(mock_orchestrator)
+        readiness = adapter.get_benchmark_tool_readiness()
+
+        assert readiness.ready is False
+        assert readiness.missing_tools == ("graph",)
+        assert "code_search" in readiness.enabled_tools
+
+    def test_benchmark_tool_readiness_reports_disabled_tools(self, mock_orchestrator):
+        """Readiness should fail when required tools exist but are disabled."""
+        registry = ToolRegistry()
+        for name in VictorAgentAdapter.benchmark_tool_allowlist():
+            registry.register(_DummyTool(name))
+        registry.disable_tool("graph")
+        mock_orchestrator.tools = registry
+
+        adapter = VictorAgentAdapter(mock_orchestrator)
+        readiness = adapter.get_benchmark_tool_readiness()
+
+        assert readiness.ready is False
+        assert readiness.disabled_tools == ("graph",)
+        assert "graph" not in readiness.enabled_tools
 
     def test_reset(self, adapter):
         """Test reset clears state."""
@@ -187,7 +242,9 @@ class TestVictorAgentAdapter:
         """Test combined patch generation."""
         adapter._file_edits = [
             FileEdit(
-                path="a.py", action="modify", diff="--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new"
+                path="a.py",
+                action="modify",
+                diff="--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+new",
             ),
             FileEdit(
                 path="b.py",
@@ -222,6 +279,30 @@ class TestVictorAgentAdapter:
             assert trace.start_time > 0
             assert trace.end_time >= trace.start_time
             mock_orchestrator.chat.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_execute_task_enables_graph_and_mentions_it_in_prompt(
+        self,
+        adapter,
+        mock_orchestrator,
+    ):
+        """Benchmark workflow guidance should enable and describe graph usage."""
+        task = BenchmarkTask(
+            task_id="test/graph",
+            benchmark=BenchmarkType.CUSTOM,
+            description="Graph test",
+            prompt="Fix a cross-module dependency bug",
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            await adapter.execute_task(task, Path(tmpdir))
+
+        mock_orchestrator.set_enabled_tools.assert_called()
+        enabled_tools = mock_orchestrator.set_enabled_tools.call_args.args[0]
+        assert "graph" in enabled_tools
+
+        prompt = mock_orchestrator.chat.await_args_list[0].args[0]
+        assert "Use graph to inspect callers, callees, dependencies, and impact" in prompt
 
     @pytest.mark.asyncio
     async def test_execute_task_max_turns_limit(self, adapter, mock_orchestrator):

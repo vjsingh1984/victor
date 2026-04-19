@@ -22,7 +22,7 @@ import pytest
 import time
 from unittest.mock import patch
 
-from victor.agent.conversation_state import (
+from victor.agent.conversation.state_machine import (
     ConversationStateMachine,
     ConversationStage,
     ConversationState,

@@ -25,7 +25,7 @@ from victor.agent.context_compactor import (
     TruncationStrategy,
     create_context_compactor,
 )
-from victor.agent.conversation_controller import ContextMetrics
+from victor.agent.conversation.controller import ContextMetrics
 from victor.providers.base import Message
 
 
@@ -61,7 +61,10 @@ class TestCompactorConfig:
 
     def test_default_values(self):
         """Test default configuration values match orchestrator_constants."""
-        from victor.config.orchestrator_constants import CONTEXT_LIMITS, COMPACTION_CONFIG
+        from victor.config.orchestrator_constants import (
+            CONTEXT_LIMITS,
+            COMPACTION_CONFIG,
+        )
 
         config = CompactorConfig()
 
@@ -725,7 +728,7 @@ class TestCheckAndCompactWithRL:
         # Create mock RL learner
         mock_learner = MagicMock()
         mock_recommendation = MagicMock()
-        mock_recommendation.action = "aggressive_compact"
+        mock_recommendation.value = "aggressive_compact"
         mock_recommendation.confidence = 0.9
         mock_recommendation.metadata = {
             "config": {

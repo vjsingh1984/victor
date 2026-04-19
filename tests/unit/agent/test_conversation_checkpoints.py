@@ -307,7 +307,11 @@ class TestConversationCheckpointManager:
         assert result is None
 
         # Enough tools - should checkpoint
-        state2 = {"tool_history": ["a", "b", "c", "d"], "message_count": 2, "stage": "READING"}
+        state2 = {
+            "tool_history": ["a", "b", "c", "d"],
+            "message_count": 2,
+            "stage": "READING",
+        }
         result = await manager.maybe_auto_checkpoint("session_auto", state2)
         assert result is not None
 

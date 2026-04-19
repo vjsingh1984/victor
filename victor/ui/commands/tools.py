@@ -12,7 +12,7 @@ from victor.config.settings import load_settings
 # ToolDefinition is imported for type hinting, though not directly used in the logic
 from victor.providers.base import ToolDefinition  # noqa: F401
 
-tools_app = typer.Typer(name="tools", help="Manage Victor's integrated tools.")
+tools_app = typer.Typer(name="tool", help="Manage Victor's integrated tools.")
 console = Console()
 
 
@@ -78,7 +78,7 @@ def _discover_tools_lightweight() -> List[Tuple[str, str, str]]:
                         except Exception:
                             # Skip tools that can't be instantiated
                             pass
-            except Exception as e:
+            except Exception:
                 # Log but continue with other modules
                 pass
 
@@ -167,8 +167,11 @@ async def _list_tools_async(profile: str) -> None:
     settings = load_settings()
     agent = None
     try:
-        # AgentOrchestrator.from_settings is an async static method
-        agent = await AgentOrchestrator.from_settings(settings, profile)
+        # Unified initialization via AgentFactory
+        from victor.framework.agent_factory import AgentFactory
+
+        factory = AgentFactory(settings=settings, profile=profile)
+        agent = await factory.create()
 
         # Retrieve tools from the agent's ToolRegistry
         # list_tools(only_enabled=False) gets all registered tools, regardless of current enable/disable status
@@ -312,7 +315,12 @@ def cleanup_containers(
                         cmd = container.attrs.get("Config", {}).get("Cmd", [])
                         if cmd and "sleep" in str(cmd) and "infinity" in str(cmd):
                             containers_to_clean.append(
-                                (container.short_id, container.name, "unlabeled", container)
+                                (
+                                    container.short_id,
+                                    container.name,
+                                    "unlabeled",
+                                    container,
+                                )
                             )
                 except Exception:
                     pass

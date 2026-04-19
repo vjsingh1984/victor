@@ -112,6 +112,14 @@ class FeatureFlag(Enum):
     # Phase 8 - Edge Model for micro-decisions
     USE_EDGE_MODEL = "use_edge_model"
 
+    # Phase 10 - Agentic Loop (single-turn execution with perception/evaluation)
+    USE_AGENTIC_LOOP = "use_agentic_loop"
+
+    # Phase 9 - Prompt Optimization (controlled via settings.prompt_optimization)
+    # USE_PROMPT_OPTIMIZER → settings.prompt_optimization.enabled
+    # USE_GEPA_V2          → settings.prompt_optimization.gepa.enabled
+    # USE_GEPA_TRACE_ENRICHMENT → settings.prompt_optimization.gepa.capture_reasoning
+
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
 

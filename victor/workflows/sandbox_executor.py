@@ -216,7 +216,7 @@ class SandboxedExecutor:
             return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace"),
-                error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
+                error=(stderr.decode("utf-8", errors="replace") if process.returncode != 0 else ""),
                 exit_code=process.returncode or 0,
                 sandbox_type="none",
             )
@@ -416,7 +416,7 @@ class SandboxedExecutor:
             return SandboxExecutionResult(
                 success=process.returncode == 0,
                 output=stdout.decode("utf-8", errors="replace"),
-                error=stderr.decode("utf-8", errors="replace") if process.returncode != 0 else "",
+                error=(stderr.decode("utf-8", errors="replace") if process.returncode != 0 else ""),
                 exit_code=process.returncode or 0,
                 sandbox_type="docker",
             )

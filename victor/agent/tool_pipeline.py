@@ -57,9 +57,7 @@ from victor.agent.output_aggregator import (
     AggregationState,
 )
 from victor.agent.synthesis_checkpoint import (
-    SynthesisCheckpoint,
     CompositeSynthesisCheckpoint,
-    CheckpointResult,
     get_checkpoint_for_complexity,
 )
 from victor.config.tool_selection_defaults import (
@@ -78,7 +76,7 @@ except ImportError:
 
 if TYPE_CHECKING:
     from victor.agent.search_router import SearchRouter
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.storage.cache.tool_cache import ToolCache
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
     from victor.agent.signature_store import SignatureStore
@@ -133,6 +131,11 @@ class ToolPipelineConfig:
     # Enables intelligent caching based on semantic similarity, reducing redundant tool calls
     enable_semantic_caching: bool = True
 
+    # Cross-turn dedup: cache results for "effectively idempotent" tools
+    # (web_search, grep_search, http_request, git) across turns within a session.
+    enable_cross_turn_dedup: bool = True
+    cross_turn_dedup_ttl: float = 300.0  # seconds
+
 
 # Tools that are safe to cache (read-only, deterministic for same arguments)
 # Include both lowercase and capitalized variants for tool name normalization
@@ -149,6 +152,22 @@ IDEMPOTENT_TOOLS = IdempotentTools.IDEMPOTENT_TOOLS | frozenset(
         "code_search",  # Semantic code search alias
         "semantic_code_search",
         "refs",  # Reference lookup
+    }
+)
+
+# Cross-turn dedup: tools that are "effectively idempotent" within a session
+# window even though they may be classified as non-idempotent. These produce
+# the same result for identical args within a short time window (e.g., 5 min),
+# making re-execution wasteful. Separate from IDEMPOTENT_TOOLS to allow
+# a shorter TTL and explicit opt-in.
+CROSS_TURN_DEDUP_TOOLS = frozenset(
+    {
+        "web_search",
+        "web_fetch",
+        "http_request",
+        "grep_search",
+        "plan_files",
+        "git",  # git status/log/diff are read-only
     }
 )
 
@@ -421,6 +440,9 @@ class ToolCallResult:
     code_corrected: bool = False
     code_validation_errors: Optional[List[str]] = None
 
+    # OpenAI-compatible tool_call_id — links response to assistant's tool_calls[].id
+    tool_call_id: Optional[str] = None
+
 
 @dataclass
 class PipelineExecutionResult:
@@ -496,7 +518,8 @@ class ToolPipeline:
             tool_cache: Optional cache for tool results
             argument_normalizer: Optional argument normalizer
             code_correction_middleware: Optional middleware for code validation/fixing
-            signature_store: Optional persistent storage for failed signatures (cross-session learning)
+            signature_store: Optional persistent storage for failed
+                signatures (cross-session learning)
             on_tool_start: Callback when tool execution starts
             on_tool_complete: Callback when tool execution completes
             deduplication_tracker: Optional tracker for detecting redundant tool calls
@@ -521,6 +544,9 @@ class ToolPipeline:
         self.on_tool_start = on_tool_start
         self.on_tool_complete = on_tool_complete
         self.on_tool_event = on_tool_event
+
+        # Spin detection: track whether last batch had all calls blocked
+        self.last_batch_all_skipped: bool = False
 
         # Output aggregation and synthesis checkpoints
         self._output_aggregator: Optional[OutputAggregator] = None
@@ -560,9 +586,40 @@ class ToolPipeline:
         # Batch-level deduplication tracking
         self._batch_dedup_count = 0  # Total duplicates skipped
 
+        # Cross-turn dedup cache for "effectively idempotent" tools
+        # Uses the same LRU structure but covers tools outside IDEMPOTENT_TOOLS
+        # (web_search, http_request, grep_search, etc.) with configurable TTL.
+        self._cross_turn_enabled = self.config.enable_cross_turn_dedup
+        self._cross_turn_cache: LRUToolCache = LRUToolCache(
+            max_size=30,
+            ttl_seconds=self.config.cross_turn_dedup_ttl,
+        )
+        self._cross_turn_hits = 0
+
         # File read timestamp tracking for deduplication (prompting loop fix)
         # Prevents re-reading identical files within TTL window
         self._read_file_timestamps: Dict[str, float] = {}
+
+        # Observability: pre-execution intent logging (LogAct-inspired)
+        self._observability_bus: Optional[Any] = None
+        self._trace_enricher: Optional[Any] = None
+
+        # Credit assignment: automatic tool-level credit tracking (FEP-0001 Phase 3)
+        self._credit_tracking_service: Optional[Any] = None
+
+        # Online tool reputation: mid-turn credit feedback (updates per tool call)
+        self._tool_reputation: Optional[Any] = None
+        try:
+            from victor.framework.rl.tool_reputation import ToolReputationTracker
+
+            self._tool_reputation = ToolReputationTracker()
+        except ImportError:
+            pass
+
+    @property
+    def credit_tracking_service(self) -> Any:
+        """Credit tracking service (if enabled). None otherwise."""
+        return self._credit_tracking_service
 
     @property
     def calls_used(self) -> int:
@@ -995,6 +1052,8 @@ class ToolPipeline:
                 else 0.0
             ),
             "batch_dedup_count": self._batch_dedup_count,
+            "cross_turn_hits": self._cross_turn_hits,
+            "cross_turn_cache_size": len(self._cross_turn_cache),
         }
         # Include semantic cache stats if available
         if self.semantic_cache is not None:
@@ -1121,7 +1180,23 @@ class ToolPipeline:
         tool_history: List[Dict[str, Any]] = []
 
         for tool_call in unique_calls:
-            call_result = await self._execute_single_call(tool_call, context)
+            # Capture tool_call_id BEFORE execution so it's set even if the call fails
+            tc_id = tool_call.get("id") if isinstance(tool_call, dict) else None
+
+            # Handle pre-invalidated tool calls (hallucinated names marked by coordinator)
+            if isinstance(tool_call, dict) and tool_call.get("_invalid"):
+                call_result = ToolCallResult(
+                    tool_name=tool_call.get("name", "unknown"),
+                    arguments={},
+                    success=False,
+                    error=tool_call.get("_error", "Unknown tool"),
+                    skipped=True,
+                    skip_reason=tool_call.get("_error"),
+                )
+            else:
+                call_result = await self._execute_single_call(tool_call, context)
+            # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec
+            call_result.tool_call_id = tc_id
             result.results.append(call_result)
 
             # Store result by signature for duplicate resolution (only for dict items)
@@ -1155,7 +1230,7 @@ class ToolPipeline:
                     "tool": tool_name,
                     "args": raw_args,
                     "success": call_result.success,
-                    "result": str(call_result.result)[:500] if call_result.result else "",
+                    "result": (str(call_result.result)[:500] if call_result.result else ""),
                     "error": call_result.error,
                 }
             )
@@ -1174,7 +1249,7 @@ class ToolPipeline:
                 break
 
         # Add skipped results for duplicates (reuse first occurrence's result)
-        for original_idx, signature in duplicate_info:
+        for _original_idx, signature in duplicate_info:
             if signature in results_by_signature:
                 original_result = results_by_signature[signature]
                 # Create a copy marked as from deduplication
@@ -1191,6 +1266,17 @@ class ToolPipeline:
                 )
                 result.results.append(dup_result)
                 result.skipped_calls += 1
+
+        # Track whether ALL tool calls in this batch were skipped/blocked
+        # Used by spin detection in the streaming pipeline
+        self.last_batch_all_skipped = len(result.results) > 0 and all(
+            getattr(r, "skipped", False) for r in result.results
+        )
+        if self.last_batch_all_skipped:
+            logger.info(
+                f"[pipeline] All {len(result.results)} tool calls in batch were "
+                f"skipped/blocked (dedup or session filter)"
+            )
 
         # Check synthesis checkpoint
         if self._synthesis_checkpoint and tool_history:
@@ -1231,12 +1317,10 @@ class ToolPipeline:
         context: Optional[Dict[str, Any]] = None,
         force_parallel: bool = False,
     ) -> PipelineExecutionResult:
-        """Execute tool calls with parallelization when beneficial.
+        """[POTENTIALLY OBSOLETE] Execute tool calls with parallelization.
 
-        Automatically decides whether to use parallel execution based on:
-        - Number of tool calls (>1 for parallel)
-        - Tool categories (read-only tools can parallelize)
-        - Configuration settings
+        Note: The main execute_tool_calls() method now handles internal 
+        parallelization via AsyncToolExecutor. This method may be removed.
 
         Args:
             tool_calls: List of tool call requests
@@ -1367,6 +1451,39 @@ class ToolPipeline:
 
         return result
 
+    def _emit_tool_intent(self, tool_name: str, arguments: Dict[str, Any]) -> None:
+        """Emit pre-execution intent event (LogAct-inspired).
+
+        Records tool intent BEFORE execution, enabling future voting/gating.
+        Uses ObservabilityBus for event emission.
+        """
+        bus = getattr(self, "_observability_bus", None)
+        if bus is None:
+            return
+
+        import hashlib
+
+        args_str = str(sorted(arguments.items())) if arguments else ""
+        args_hash = hashlib.md5(args_str.encode()).hexdigest()[:12]
+
+        reasoning = ""
+        enricher = getattr(self, "_trace_enricher", None)
+        if enricher:
+            reasoning = getattr(enricher, "_pending_reasoning", "") or ""
+
+        try:
+            bus.emit_sync(
+                "tool.intent",
+                {
+                    "tool_name": tool_name,
+                    "arguments_hash": args_hash,
+                    "reasoning_before": reasoning[:500],
+                    "timestamp": time.time(),
+                },
+            )
+        except Exception:
+            pass  # Intent logging is non-critical
+
     async def _execute_single_call(
         self,
         tool_call: Dict[str, Any],
@@ -1473,6 +1590,31 @@ class ToolPipeline:
                     logger.warning(f"on_tool_complete callback failed: {e}")
             return cached_result
 
+        # Cross-turn dedup: cache "effectively idempotent" tools (web_search, etc.)
+        # These produce identical results for identical args within a session window.
+        if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+            signature = self._get_call_signature(tool_name, normalized_args)
+            cross_cached = self._cross_turn_cache.get(signature)
+            if cross_cached is not None:
+                self._cross_turn_hits += 1
+                logger.info(
+                    "[Pipeline] Cross-turn dedup hit for %s (hits=%d)",
+                    tool_name,
+                    self._cross_turn_hits,
+                )
+                self._executed_tools.append(tool_name)
+                if self.on_tool_start:
+                    try:
+                        self.on_tool_start(tool_name, normalized_args)
+                    except Exception as e:
+                        logger.warning(f"on_tool_start callback failed: {e}")
+                if self.on_tool_complete:
+                    try:
+                        self.on_tool_complete(cross_cached)
+                    except Exception as e:
+                        logger.warning(f"on_tool_complete callback failed: {e}")
+                return cross_cached
+
         # Check semantic cache (FAISS-based with mtime invalidation)
         # This catches similar-but-not-identical queries that would return same results
         if self.config.enable_semantic_caching and self.semantic_cache is not None:
@@ -1508,9 +1650,16 @@ class ToolPipeline:
 
         # Session-level file read dedup - prevents re-reading files even if cache was cleared
         # This is a fallback for the prompting loop fix when idempotent cache doesn't match
+        # NOTE: Only dedup reads of the EXACT same file+args within a short window.
+        # Do NOT block re-reads after the file has been edited (agent needs to verify).
+        # Allow re-reads with different offset/limit (reading different sections).
         if tool_name.lower() in ("read", "read_file"):
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
-            if file_path and self._is_duplicate_read(file_path):
+            offset = normalized_args.get("offset")
+            limit = normalized_args.get("limit")
+            # Only dedup exact same file+offset+limit reads
+            dedup_key = f"{file_path}:{offset}:{limit}" if file_path else None
+            if dedup_key and self._is_duplicate_read(dedup_key):
                 logger.info(
                     f"[Pipeline] Skipping duplicate read of {file_path} "
                     "(file was read recently in this session)"
@@ -1525,6 +1674,17 @@ class ToolPipeline:
                     skip_reason="Duplicate file read within session",
                     normalization_applied=normalization_applied,
                 )
+
+        # Invalidate read cache for files that were just edited/written
+        if tool_name.lower() in ("edit", "write", "write_file", "edit_file"):
+            edited_path = normalized_args.get("path") or normalized_args.get("file_path")
+            if edited_path:
+                # Clear all cached reads for this file (any offset/limit)
+                stale_keys = [
+                    k for k in self._read_file_timestamps if k.startswith(f"{edited_path}:")
+                ]
+                for k in stale_keys:
+                    del self._read_file_timestamps[k]
 
         # Code correction middleware - validate and fix code arguments
         code_corrected = False
@@ -1624,6 +1784,9 @@ class ToolPipeline:
             except AttributeError as e:
                 logger.debug(f"Middleware chain not properly configured: {e}")
 
+        # Emit pre-execution intent event (LogAct-inspired)
+        self._emit_tool_intent(tool_name, normalized_args)
+
         # Notify start
         if self.on_tool_start:
             try:
@@ -1632,6 +1795,12 @@ class ToolPipeline:
                 logger.warning(f"on_tool_start callback failed: {e}")
 
         # Execute with per-tool timeout
+        # Log tool call sent to LLM
+        logger.debug(
+            "[ToolCall→LLM] Executing tool=%s args=%s",
+            tool_name,
+            json.dumps(normalized_args, default=str)[:500],
+        )
         start_time = time.monotonic()
         try:
             exec_result = await asyncio.wait_for(
@@ -1640,18 +1809,18 @@ class ToolPipeline:
                     arguments=normalized_args,
                     context=context,
                 ),
-                timeout=self.config.per_tool_timeout_seconds,
+                timeout=self._get_tool_timeout(tool_name),
             )
         except asyncio.TimeoutError:
+            effective_timeout = self._get_tool_timeout(tool_name)
             logger.warning(
-                f"[Pipeline] Tool '{tool_name}' timed out after "
-                f"{self.config.per_tool_timeout_seconds}s"
+                f"[Pipeline] Tool '{tool_name}' timed out after " f"{effective_timeout}s"
             )
             exec_result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
-                error=f"Tool execution timed out after {self.config.per_tool_timeout_seconds}s",
+                error=f"Tool execution timed out after {effective_timeout}s",
             )
         execution_time_ms = (time.monotonic() - start_time) * 1000
 
@@ -1672,10 +1841,23 @@ class ToolPipeline:
             code_validation_errors=code_validation_errors,
         )
 
+        # Log tool result returned to LLM
+        result_preview = str(exec_result.result)[:500] if exec_result.result else "(empty)"
+        logger.debug(
+            "[ToolResult→LLM] tool=%s success=%s time=%.0fms result_preview=%s",
+            tool_name,
+            exec_result.success,
+            execution_time_ms,
+            result_preview,
+        )
+
         # Attempt error recovery fallback on failure
         if not exec_result.success and exec_result.error:
             try:
-                from victor.agent.error_recovery import recover_from_error, RecoveryAction
+                from victor.agent.error_recovery import (
+                    recover_from_error,
+                    RecoveryAction,
+                )
 
                 recovery = recover_from_error(
                     Exception(exec_result.error), tool_name, normalized_args
@@ -1773,6 +1955,21 @@ class ToolPipeline:
         if call_result.success:
             self.cache_result(tool_name, normalized_args, call_result)
 
+            # Cross-turn dedup: cache results for effectively-idempotent tools
+            if self._cross_turn_enabled and tool_name in CROSS_TURN_DEDUP_TOOLS:
+                signature = self._get_call_signature(tool_name, normalized_args)
+                dedup_result = ToolCallResult(
+                    tool_name=call_result.tool_name,
+                    arguments=call_result.arguments,
+                    success=call_result.success,
+                    result=call_result.result,
+                    error=call_result.error,
+                    execution_time_ms=0.0,
+                    cached=True,
+                    normalization_applied=call_result.normalization_applied,
+                )
+                self._cross_turn_cache.set(signature, dedup_result)
+
             # Store in semantic cache (FAISS-based with mtime tracking)
             if self.config.enable_semantic_caching and self.semantic_cache is not None:
                 try:
@@ -1833,6 +2030,30 @@ class ToolPipeline:
             except Exception:
                 logger.debug("on_tool_event fallback emission failed", exc_info=True)
 
+        # Record tool result for credit assignment (FEP-0001 Phase 3)
+        if self._credit_tracking_service is not None:
+            try:
+                self._credit_tracking_service.record_tool_result(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    execution_time_ms=call_result.execution_time_ms,
+                    error=call_result.error,
+                    arguments=call_result.arguments,
+                )
+            except Exception:
+                pass  # Credit tracking is non-critical
+
+        # Update online tool reputation (mid-turn feedback)
+        if self._tool_reputation is not None:
+            try:
+                self._tool_reputation.record(
+                    tool_name=call_result.tool_name,
+                    success=call_result.success,
+                    duration_ms=call_result.execution_time_ms,
+                )
+            except Exception:
+                pass  # Reputation tracking is non-critical
+
         return call_result
 
     def _update_analytics(self, result: ToolCallResult) -> None:
@@ -1870,6 +2091,24 @@ class ToolPipeline:
             "remaining": self.calls_remaining,
             "tools": dict(self._tool_stats),
         }
+
+    def _get_tool_timeout(self, tool_name: str) -> float:
+        """Get effective timeout for a tool, preferring per-tool override.
+
+        Resolution order:
+        1. Per-tool timeout from @tool(timeout=N) decorator
+        2. Pipeline default (config.per_tool_timeout_seconds)
+        """
+        # Check if the tool has a per-tool timeout via the registry
+        try:
+            tool_func = self.executor.get_tool_function(tool_name)
+            if tool_func and hasattr(tool_func, "_tool_timeout"):
+                per_tool = tool_func._tool_timeout
+                if isinstance(per_tool, (int, float)) and per_tool > 0:
+                    return float(per_tool)
+        except Exception:
+            pass
+        return self.config.per_tool_timeout_seconds
 
     def clear_failed_signatures(self) -> None:
         """Clear the failed signature cache."""

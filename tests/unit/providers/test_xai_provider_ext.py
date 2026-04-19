@@ -218,7 +218,10 @@ async def test_chat_with_tools(xai_provider):
             ToolDefinition(
                 name="get_weather",
                 description="Get weather for a location",
-                parameters={"type": "object", "properties": {"location": {"type": "string"}}},
+                parameters={
+                    "type": "object",
+                    "properties": {"location": {"type": "string"}},
+                },
             )
         ]
         response = await xai_provider.chat(messages=messages, model="grok-beta", tools=tools)

@@ -261,6 +261,14 @@ class LMStudioProvider(BaseProvider):
         """LMStudio supports streaming."""
         return True
 
+    def supports_prompt_caching(self) -> bool:
+        """LMStudio has no API-level prompt caching (no billing discount)."""
+        return False
+
+    def supports_kv_prefix_caching(self) -> bool:
+        """LMStudio reuses KV cache for GGUF models with matching prefixes."""
+        return True
+
     def model_uses_thinking_tags(self, model: Optional[str] = None) -> bool:
         """Check if model outputs thinking tags.
 
@@ -343,7 +351,10 @@ class LMStudioProvider(BaseProvider):
             raw_response = resp.json()
 
             models = raw_response.get("data", [])
-            match = next((m for m in models if m.get("id") == model), models[0] if models else None)
+            match = next(
+                (m for m in models if m.get("id") == model),
+                models[0] if models else None,
+            )
 
             if match:
                 capabilities = match.get("capabilities", {}) or {}

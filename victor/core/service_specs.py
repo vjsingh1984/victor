@@ -184,9 +184,15 @@ WORKFLOW_SCOPED_SPECS: List[ServiceSpec] = [
 ]
 
 WORKFLOW_TRANSIENT_SPECS: List[ServiceSpec] = [
-    ServiceSpec(WorkflowCompilerImpl, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT),
     ServiceSpec(
-        WorkflowCompilerProtocol, "_create_workflow_compiler_impl", ServiceLifetime.TRANSIENT
+        WorkflowCompilerImpl,
+        "_create_workflow_compiler_impl",
+        ServiceLifetime.TRANSIENT,
+    ),
+    ServiceSpec(
+        WorkflowCompilerProtocol,
+        "_create_workflow_compiler_impl",
+        ServiceLifetime.TRANSIENT,
     ),
     ServiceSpec(WorkflowExecutor, "_create_workflow_executor", ServiceLifetime.TRANSIENT),
 ]

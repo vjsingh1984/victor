@@ -581,7 +581,7 @@ class ConversationEmbeddingStore:
             "mode": "lazy",
             "total_embeddings": count,
             "max_embeddings": self.MAX_EMBEDDINGS,
-            "usage_pct": (count / self.MAX_EMBEDDINGS * 100) if self.MAX_EMBEDDINGS > 0 else 0,
+            "usage_pct": ((count / self.MAX_EMBEDDINGS * 100) if self.MAX_EMBEDDINGS > 0 else 0),
             "embedding_dimension": self.dimension,
             "embedding_model": self._embedding_service.model_name,
             "lancedb_path": str(self._lancedb_path),

@@ -14,6 +14,9 @@
 
 """Tests for semantic embedding providers (sentence-transformers, Ollama, etc.)."""
 
+import sys
+from types import SimpleNamespace
+
 import pytest
 import numpy as np
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -67,7 +70,7 @@ class TestSentenceTransformersEmbedding:
 
         selector = SemanticToolSelector()
         assert selector.embedding_provider == "sentence-transformers"
-        # Default model comes from settings.unified_embedding_model
+        # Default model comes from settings.search.unified_embedding_model
         # which defaults to BAAI/bge-small-en-v1.5 (or all-MiniLM-L6-v2 as fallback)
         assert selector.embedding_model in [DEFAULT_EMBEDDING_MODEL, "all-MiniLM-L6-v2"]
 
@@ -137,6 +140,69 @@ class TestSentenceTransformersEmbedding:
             # Verify it's a valid embedding (384-dim)
             assert embedding.shape == (384,)
             assert embedding.dtype == np.float32
+
+
+class FakeEmbeddingIndex:
+    def __init__(self, vectors, labels):
+        self.vectors = vectors
+        self.labels = labels
+        self.last_query = None
+
+    def query(self, query, k, threshold):
+        self.last_query = {"query": query, "k": k, "threshold": threshold}
+        return [("mock_tool", 0.91)]
+
+
+class TestEmbeddingIndexAcceleration:
+    @pytest.mark.asyncio
+    async def test_initialize_tool_embeddings_builds_native_index(
+        self, temp_cache_dir, mock_tool_registry
+    ):
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir)
+        fake_embedding = np.array([1.0, 0.0, 0.0], dtype=np.float32)
+        fake_index_class = MagicMock(side_effect=FakeEmbeddingIndex)
+
+        with (
+            patch.object(selector, "_get_embedding", AsyncMock(return_value=fake_embedding)),
+            patch.dict(
+                sys.modules,
+                {"victor_native": SimpleNamespace(EmbeddingIndex=fake_index_class)},
+            ),
+        ):
+            await selector.initialize_tool_embeddings(mock_tool_registry)
+
+        assert selector._embedding_index is not None
+        fake_index_class.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_select_relevant_tools_prefers_native_embedding_index(
+        self, temp_cache_dir, mock_tool_registry
+    ):
+        selector = SemanticToolSelector(cache_dir=temp_cache_dir, cache_embeddings=False)
+        selector._tool_embedding_cache = {"mock_tool": np.array([1.0, 0.0, 0.0], dtype=np.float32)}
+        selector._embedding_index = FakeEmbeddingIndex(
+            [selector._tool_embedding_cache["mock_tool"].tolist()],
+            ["mock_tool"],
+        )
+
+        with (
+            patch.object(
+                selector,
+                "_get_embedding",
+                AsyncMock(return_value=np.array([1.0, 0.0, 0.0], dtype=np.float32)),
+            ),
+            patch.object(selector, "_batch_cosine_similarity", side_effect=AssertionError),
+            patch.object(selector, "_get_relevant_categories", return_value=["mock_tool"]),
+            patch.object(selector, "_get_mandatory_tools", return_value=[]),
+        ):
+            selected = await selector.select_relevant_tools(
+                "find the relevant tool",
+                mock_tool_registry,
+                max_tools=1,
+                similarity_threshold=0.1,
+            )
+
+        assert [tool.name for tool in selected] == ["mock_tool"]
 
     @pytest.mark.asyncio
     async def test_async_execution_in_thread_pool(self, temp_cache_dir):
@@ -299,37 +365,16 @@ class TestToolSelectionWithEmbeddings:
             with patch.object(selector, "_get_relevant_categories", return_value=["mock_tool"]):
                 # Select tools
                 selected_tools = await selector.select_relevant_tools(
-                    "use the mock tool", mock_tool_registry, max_tools=5, similarity_threshold=0.3
+                    "use the mock tool",
+                    mock_tool_registry,
+                    max_tools=5,
+                    similarity_threshold=0.3,
                 )
 
                 # Should select mock_tool since we mocked the category filter
                 tool_names = [t.name for t in selected_tools]
                 assert len(tool_names) > 0
                 assert "mock_tool" in tool_names
-
-
-class TestToolKnowledge:
-    """Tests for legacy tool knowledge methods.
-
-    NOTE: _load_tool_knowledge() was removed - it always returned {}.
-    All metadata now comes from get_metadata(). These tests verify
-    the legacy _build_use_case_text() API still works (returns empty).
-    """
-
-    def test_build_use_case_text_returns_empty(self):
-        """Test _build_use_case_text returns empty for any tool.
-
-        The legacy YAML-based tool knowledge has been removed.
-        This method now always returns empty string.
-        """
-        result = SemanticToolSelector._build_use_case_text("unknown_tool_xyz_123")
-        assert result == ""
-
-        result = SemanticToolSelector._build_use_case_text("read_file")
-        assert result == ""
-
-        result = SemanticToolSelector._build_use_case_text("code_search")
-        assert result == ""
 
 
 class TestCacheOperations:
@@ -712,6 +757,87 @@ class TestConceptualQueryRouting:
         assert "caching" in patterns
         assert "similar to" in patterns
         assert "related to" in patterns
+
+
+class TestSemanticMatchEventMetadata:
+    """Tests for RL event metadata emitted by _emit_semantic_match_event."""
+
+    def test_event_includes_embedding_model_and_results_count(self):
+        """Verify _emit_semantic_match_event sends correct metadata keys.
+
+        The SemanticThresholdLearner reads 'results_count', 'embedding_model',
+        and 'threshold_used' from event metadata. Missing keys caused 100%
+        zero_rate and embedding_model=unknown in RL stats.
+        """
+        selector = SemanticToolSelector(
+            embedding_model="test-model-v1",
+            embedding_provider="sentence-transformers",
+            cache_embeddings=False,
+        )
+
+        # Create mock tools for the event
+        mock_tool = MagicMock()
+        mock_tool.name = "read"
+        selected_tools = [(mock_tool, 0.85), (MagicMock(name="edit"), 0.72)]
+        selected_tools[1][0].name = "edit"
+
+        captured_events = []
+
+        with patch("victor.tools.semantic_selector._get_rl_hooks") as mock_hooks_fn:
+            mock_hooks = MagicMock()
+            mock_hooks.emit = lambda evt: captured_events.append(evt)
+            mock_hooks_fn.return_value = mock_hooks
+
+            selector._emit_semantic_match_event(
+                selected_tools=selected_tools,
+                threshold=0.15,
+                task_type="bug_fix",
+                classification_aware=True,
+                excluded_count=2,
+            )
+
+        assert len(captured_events) == 1
+        event = captured_events[0]
+        meta = event.metadata
+
+        # These keys were missing and caused RL stats corruption
+        assert meta["results_count"] == 2
+        assert meta["embedding_model"] == "test-model-v1"
+        assert meta["embedding_provider"] == "sentence-transformers"
+        assert meta["threshold_used"] == 0.15
+
+        # Existing keys still present
+        assert meta["tools_selected"] == 2
+        assert meta["classification_aware"] is True
+        assert meta["excluded_count"] == 2
+
+    def test_event_with_zero_results_sets_results_count_zero(self):
+        """Verify results_count=0 when no tools selected."""
+        selector = SemanticToolSelector(
+            embedding_model="test-model",
+            cache_embeddings=False,
+        )
+
+        captured_events = []
+
+        with patch("victor.tools.semantic_selector._get_rl_hooks") as mock_hooks_fn:
+            mock_hooks = MagicMock()
+            mock_hooks.emit = lambda evt: captured_events.append(evt)
+            mock_hooks_fn.return_value = mock_hooks
+
+            selector._emit_semantic_match_event(
+                selected_tools=[],
+                threshold=0.15,
+                task_type="default",
+                classification_aware=False,
+                excluded_count=0,
+            )
+
+        assert len(captured_events) == 1
+        meta = captured_events[0].metadata
+        assert meta["results_count"] == 0
+        assert meta["embedding_model"] == "test-model"
+        assert captured_events[0].success is False
 
 
 if __name__ == "__main__":

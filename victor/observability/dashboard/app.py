@@ -655,7 +655,10 @@ class VerticalTraceView(ScrollableContainer):
     """View showing vertical integration traces."""
 
     def compose(self) -> ComposeResult:
-        yield Static("[dim]Vertical integration traces will appear here...[/]", id="trace-content")
+        yield Static(
+            "[dim]Vertical integration traces will appear here...[/]",
+            id="trace-content",
+        )
 
     def add_vertical_event(self, event: MessagingEvent) -> None:
         """Add a vertical integration event (prepends for newest first)."""
@@ -691,7 +694,10 @@ class JSONLBrowser(ScrollableContainer):
         self._events: List[MessagingEvent] = []
 
     def compose(self) -> ComposeResult:
-        yield Static("[dim]Load a JSONL file to browse historical events...[/]", id="jsonl-content")
+        yield Static(
+            "[dim]Load a JSONL file to browse historical events...[/]",
+            id="jsonl-content",
+        )
         yield DataTable(id="jsonl-table")
 
     def on_mount(self) -> None:
@@ -911,7 +917,14 @@ class ToolCallHistoryView(TimeOrderedTableView):
             )
 
         # Default fallback for other tool events
-        return (timestamp, data.get("tool_name", "unknown"), event_name, "N/A", "N/A", "")
+        return (
+            timestamp,
+            data.get("tool_name", "unknown"),
+            event_name,
+            "N/A",
+            "N/A",
+            "",
+        )
 
 
 class StateTransitionView(TimeOrderedTableView):
@@ -1334,7 +1347,15 @@ class ObservabilityDashboard(App):
 
         # Subscribe to all event patterns using canonical event system
         # The canonical system uses pattern-based subscriptions (e.g., "tool.*")
-        patterns = ["tool.*", "state.*", "model.*", "error.*", "lifecycle.*", "metric.*", "trace.*"]
+        patterns = [
+            "tool.*",
+            "state.*",
+            "model.*",
+            "error.*",
+            "lifecycle.*",
+            "metric.*",
+            "trace.*",
+        ]
 
         async def do_subscribe():
             """Perform async subscription to ObservabilityBus."""

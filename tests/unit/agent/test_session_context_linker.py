@@ -4,7 +4,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.session_context_linker import SessionContextLinker, SessionResumeContext
+from victor.agent.session_context_linker import (
+    SessionContextLinker,
+    SessionResumeContext,
+)
 from victor.agent.session_ledger import SessionLedger
 
 

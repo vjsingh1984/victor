@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from typing import TYPE_CHECKING
 
 from victor.agent.debug_logger import TRACE
+from victor.core.constants import DEFAULT_VERTICAL
 
 from victor.agent.argument_normalizer import ArgumentNormalizer, NormalizationStrategy
 from victor.agent.safety import SafetyChecker, get_safety_checker
@@ -289,6 +290,20 @@ class ToolExecutor:
         self._validation_failures: int = 0  # Track validation failures for metrics
         self._errors_by_category: Dict[str, int] = {}  # Track errors by category
 
+        # Session-scoped circuit breaker: tools that returned unavailable=True are
+        # never retried. Populated on first unavailable result; checked before dispatch.
+        self._session_disabled_tools: set[str] = set()
+
+        # Session-scoped path redirect cache: maps a hallucinated path to the
+        # PathResolver's first suggestion. Applied before dispatch to correct
+        # the model when it repeats a bad path across turns.
+        self._failed_path_redirects: Dict[str, str] = {}
+
+    @property
+    def session_disabled_tools(self) -> set[str]:
+        """Read-only view of tools disabled for this session (returned unavailable=True)."""
+        return frozenset(self._session_disabled_tools)  # type: ignore[return-value]
+
     def update_context(self, **kwargs: Any) -> None:
         """Update the shared context passed to tools."""
         self.context.update(kwargs)
@@ -521,7 +536,11 @@ class ToolExecutor:
                     error_summary += f" (+{len(validation.errors) - 3} more)"
 
                 if self.validation_mode == ValidationMode.STRICT:
-                    logger.error("STRICT validation failed for '%s': %s", tool.name, error_summary)
+                    logger.error(
+                        "STRICT validation failed for '%s': %s",
+                        tool.name,
+                        error_summary,
+                    )
                     return False, validation
                 else:  # LENIENT
                     logger.warning(
@@ -542,7 +561,11 @@ class ToolExecutor:
             return True, None
 
     def _complete_tool_call(
-        self, call_id: Optional[str], success: bool, result: Any = None, error: Optional[str] = None
+        self,
+        call_id: Optional[str],
+        success: bool,
+        result: Any = None,
+        error: Optional[str] = None,
     ) -> None:
         """Complete or fail a tool call in the tracer.
 
@@ -582,11 +605,31 @@ class ToolExecutor:
         Returns:
             ToolExecutionResult with execution outcome
         """
+        # Resolve aliases (e.g., "search" → "code_search") before lookup
+        from victor.tools.decorators import resolve_tool_name
+
+        tool_name = resolve_tool_name(tool_name)
+
+        # Issue 3: Circuit breaker — skip tools that are permanently unavailable.
+        if tool_name in self._session_disabled_tools:
+            return ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=(
+                    f"Tool '{tool_name}' is unavailable this session "
+                    "(a required dependency is not installed). "
+                    "Check package installation or use an alternative tool."
+                ),
+            )
+
         # Record tool call start for debugging
         call_id = None
         if self._tool_call_tracer:
             call_id = self._tool_call_tracer.record_call(
-                tool_name=tool_name, arguments=arguments, parent_span_id=parent_span_id or "unknown"
+                tool_name=tool_name,
+                arguments=arguments,
+                parent_span_id=parent_span_id or "unknown",
             )
         # Merge default context with call-specific context
         exec_context = {**self.context}
@@ -613,6 +656,17 @@ class ToolExecutor:
             strategy = None
         else:
             normalized_args, strategy = self.normalizer.normalize_arguments(arguments, tool_name)
+
+        # Issue 1: Path redirect — silently correct paths the model hallucinated
+        # in a prior turn and that PathResolver suggested an alternative for.
+        if self._failed_path_redirects:
+            for _path_key in ("path", "file_path", "filename", "root"):
+                _bad = str(normalized_args.get(_path_key, ""))
+                if _bad and _bad in self._failed_path_redirects:
+                    _fixed = self._failed_path_redirects[_bad]
+                    normalized_args = {**normalized_args, _path_key: _fixed}
+                    logger.info("Path redirect applied: '%s' → '%s'", _bad, _fixed)
+                    break
 
         # Code correction middleware - validate and fix code arguments
         if (
@@ -737,7 +791,9 @@ class ToolExecutor:
         rbac_allowed, rbac_denial = self._check_rbac(tool, tool_name)
         if not rbac_allowed:
             logger.warning(
-                "Tool execution blocked by RBAC: %s for user %s", tool_name, self.current_user
+                "Tool execution blocked by RBAC: %s for user %s",
+                tool_name,
+                self.current_user,
             )
             result = ToolExecutionResult(
                 tool_name=tool_name,
@@ -770,12 +826,37 @@ class ToolExecutor:
             # Invalidate cache for tools that modify state (registry + fallback)
             if self.cache and self.is_cache_invalidating_tool(tool_name):
                 self._invalidate_cache_for_write_tool(tool_name, normalized_args)
+
+            # Issue 3: Session-disable tools that declare themselves permanently unavailable.
+            if isinstance(result, dict) and result.get("unavailable"):
+                self._session_disabled_tools.add(tool_name)
+                logger.info(
+                    "Tool '%s' session-disabled: returned unavailable=True", tool_name
+                )
         else:
             self._stats[tool_name]["failures"] += 1
             # Track failed signature to avoid retrying same failure
             sig = (tool_name, str(sorted(normalized_args.items())))
             if len(self._failed_signatures) < self._max_failed_signatures:
                 self._failed_signatures.add(sig)
+
+            # Issue 1: Record PathResolver suggestion for future path rewriting.
+            # Filesystem tools embed "Did you mean...\n  - /path" in FileNotFoundError.
+            if error and "Did you mean" in error:
+                import re as _re
+
+                for _path_key in ("path", "file_path", "filename", "root"):
+                    _bad = str(normalized_args.get(_path_key, ""))
+                    if _bad:
+                        _match = _re.search(r"-\s+(\S+)", error)
+                        if _match:
+                            self._failed_path_redirects[_bad] = _match.group(1)
+                            logger.info(
+                                "Path suggestion recorded: '%s' → '%s'",
+                                _bad,
+                                _match.group(1),
+                            )
+                        break
 
         # Emit RL event for tool execution (for learner activation)
         self._emit_rl_tool_event(tool_name, success, execution_time, exec_context)
@@ -796,6 +877,12 @@ class ToolExecutor:
                     truncation_info.total_lines,
                     truncation_info.lines_returned,
                     truncation_info.truncation_reason,
+                )
+                remaining = truncation_info.total_lines - truncation_info.lines_returned
+                result = (
+                    result
+                    + f"\n[OUTPUT TRUNCATED: {remaining} lines omitted to fit context window. "
+                    f"Use offset={truncation_info.lines_returned} to read remaining content.]"
                 )
 
         exec_result = ToolExecutionResult(
@@ -913,7 +1000,7 @@ class ToolExecutor:
                 provider=provider,
                 model=model,
                 task_type=context.get("task_type", "general"),
-                vertical=context.get("vertical", "coding"),
+                vertical=context.get("vertical", DEFAULT_VERTICAL),
                 metadata={
                     "execution_time": execution_time,
                 },
@@ -974,7 +1061,13 @@ class ToolExecutor:
                 if isinstance(result, ToolResult):
                     if result.success:
                         self.retry_strategy.on_success(retry_context)
-                        return result.output, True, None, retry_context.attempt - 1, None
+                        return (
+                            result.output,
+                            True,
+                            None,
+                            retry_context.attempt - 1,
+                            None,
+                        )
                     else:
                         # Don't retry if tool explicitly returned failure
                         error = result.error or "Tool returned failure"
@@ -988,7 +1081,13 @@ class ToolExecutor:
                             context={"tool": tool.name, "arguments": arguments},
                         )
                         self._track_error_category(error_info.category)
-                        return result.output, False, error, retry_context.attempt - 1, error_info
+                        return (
+                            result.output,
+                            False,
+                            error,
+                            retry_context.attempt - 1,
+                            error_info,
+                        )
                 else:
                     # Raw result (for tools that don't return ToolResult)
                     self.retry_strategy.on_success(retry_context)
@@ -1106,7 +1205,13 @@ class ToolExecutor:
                     error_msg = str(e)
                     if last_error_info.recovery_hint:
                         error_msg = f"{e}\nRecovery hint: {last_error_info.recovery_hint}"
-                    return None, False, error_msg, retry_context.attempt - 1, last_error_info
+                    return (
+                        None,
+                        False,
+                        error_msg,
+                        retry_context.attempt - 1,
+                        last_error_info,
+                    )
 
     def _track_error_category(self, category: ErrorCategory) -> None:
         """Track error occurrences by category for metrics.

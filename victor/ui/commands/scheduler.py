@@ -312,7 +312,8 @@ def status(
         table.add_column("Enabled")
 
         for s in sorted(
-            schedules, key=lambda x: x.next_run or datetime.max.replace(tzinfo=timezone.utc)
+            schedules,
+            key=lambda x: x.next_run or datetime.max.replace(tzinfo=timezone.utc),
         ):
             next_run = s.next_run.strftime("%Y-%m-%d %H:%M:%S") if s.next_run else "N/A"
             enabled = "[green]Yes[/]" if s.enabled else "[red]No[/]"

@@ -81,7 +81,9 @@ class TestWorkflowCompiler:
     @pytest.mark.asyncio
     async def test_compiler_from_container(self, container):
         """Test that compiler can be resolved from DI container."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
         assert compiler is not None
@@ -89,7 +91,9 @@ class TestWorkflowCompiler:
     @pytest.mark.asyncio
     async def test_compile_from_string(self, container, simple_workflow_yaml):
         """Test compiling workflow from YAML string."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
         compiled = compiler.compile(simple_workflow_yaml)
@@ -101,7 +105,9 @@ class TestWorkflowCompiler:
     @pytest.mark.asyncio
     async def test_compile_from_file(self, container, workflow_file):
         """Test compiling workflow from YAML file."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
         compiled = compiler.compile(workflow_file)
@@ -127,7 +133,9 @@ class TestWorkflowExecutor:
     @pytest.mark.asyncio
     async def test_execute_compiled_workflow(self, container, simple_workflow_yaml):
         """Test executing a compiled workflow."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
         compiled = compiler.compile(simple_workflow_yaml)
@@ -212,7 +220,11 @@ class TestNodeExecutorFactory:
 
         # Test creating agent executor
         agent_node = AgentNode(
-            id="test", name="Test Agent", role="researcher", goal="Test", output_key="result"
+            id="test",
+            name="Test Agent",
+            role="researcher",
+            goal="Test",
+            output_key="result",
         )
         agent_executor = factory.create_executor(agent_node)
         assert agent_executor is not None
@@ -270,7 +282,9 @@ class TestAdapterLayer:
     def test_adapter_import_raises(self):
         """Importing removed adapter classes should raise ImportError."""
         with pytest.raises(ImportError, match="removed in E5 M3"):
-            from victor.workflows.adapter import UnifiedWorkflowCompilerAdapter  # noqa: F401
+            from victor.workflows.adapter import (
+                UnifiedWorkflowCompilerAdapter,
+            )  # noqa: F401
 
     def test_compiled_graph_adapter_import_raises(self):
         """Importing removed CompiledGraphAdapter should raise ImportError."""
@@ -302,7 +316,9 @@ class TestCompiledGraph:
     @pytest.mark.asyncio
     async def test_compiled_graph_has_graph_property(self, container, simple_workflow_yaml):
         """Test that compiled graph has graph property."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
         compiled = compiler.compile(simple_workflow_yaml)
@@ -320,7 +336,9 @@ class TestDiContainerIntegration:
     @pytest.mark.asyncio
     async def test_all_workflow_services_registered(self, container):
         """Test that all workflow services are registered."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
         from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
         from victor.workflows.compiled_executor import WorkflowExecutor
 
@@ -342,7 +360,9 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_compile_invalid_yaml(self, container):
         """Test compiling invalid YAML raises appropriate error."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
 
@@ -352,7 +372,9 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_compile_nonexistent_file(self, container):
         """Test compiling nonexistent file raises appropriate error."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
 
@@ -368,7 +390,9 @@ class TestStreamingExecution:
     @pytest.mark.asyncio
     async def test_compiled_graph_has_stream_method(self, container, simple_workflow_yaml):
         """Test that compiled graph has stream method."""
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
 
         compiler = container.get(WorkflowCompilerImpl)
         compiled = compiler.compile(simple_workflow_yaml)

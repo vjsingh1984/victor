@@ -152,13 +152,21 @@ def reset_service_container():
     yield
     import sys
 
-    if "victor.core.bootstrap" in sys.modules:
+    # Reset via container module directly (not bootstrap which may not be imported)
+    if "victor.core.container" in sys.modules:
+        try:
+            from victor.core.container import reset_container
+
+            reset_container()
+        except ImportError:
+            pass  # Module not loaded, nothing to reset
+    elif "victor.core.bootstrap" in sys.modules:
         try:
             from victor.core.bootstrap import reset_container
 
             reset_container()
         except ImportError:
-            pass  # Module not loaded, nothing to reset
+            pass
 
 
 @pytest.fixture(autouse=True)
@@ -182,6 +190,62 @@ def reset_plugin_registry():
 
 
 @pytest.fixture(autouse=True)
+def reset_capability_registry():
+    """Reset CapabilityRegistry between tests to prevent capability leakage.
+
+    The CapabilityRegistry singleton caches registered capabilities.
+    Without reset, tests that register an EditorProtocol (via vertical
+    loading) pollute the registry for file_editor_tool tests.
+    """
+    yield
+    import sys
+
+    if "victor.core.capability_registry" in sys.modules:
+        try:
+            from victor.core.capability_registry import CapabilityRegistry
+
+            instance = CapabilityRegistry.get_instance()
+            if hasattr(instance, "_capabilities"):
+                instance._capabilities.clear()
+            if hasattr(instance, "_enhanced"):
+                instance._enhanced.clear()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
+def reset_vertical_registry():
+    """Save and restore VerticalRegistry between tests.
+
+    Full snapshot/restore prevents both pollution (new keys leaking) and
+    degradation (prior tests deleting built-in entries).
+    """
+    import sys
+
+    saved = None
+    if "victor.core.verticals.base" in sys.modules:
+        try:
+            from victor.core.verticals.base import VerticalRegistry
+
+            saved = dict(VerticalRegistry._registry)
+        except (ImportError, AttributeError):
+            pass
+    yield
+    if "victor.core.verticals.base" in sys.modules:
+        try:
+            from victor.core.verticals.base import VerticalRegistry
+
+            if saved is not None:
+                VerticalRegistry._registry.clear()
+                VerticalRegistry._registry.update(saved)
+            else:
+                # Module loaded during test — remove everything it added
+                VerticalRegistry._registry.clear()
+        except (ImportError, AttributeError):
+            pass
+
+
+@pytest.fixture(autouse=True)
 def reset_feature_flags():
     """Reset FeatureFlagManager singleton between tests."""
     yield
@@ -196,6 +260,34 @@ def reset_feature_flags():
                 type(mgr)._instance = None
         except (ImportError, AttributeError):
             pass
+
+
+@pytest.fixture(autouse=True)
+def isolate_conversation_database(tmp_path):
+    """Redirect conversation.db to a temp directory during tests.
+
+    Without this, any code path that instantiates ConversationStore
+    without an explicit db_path will write to the real project .victor/
+    directory, polluting it with test-model sessions (37K+ observed).
+
+    Only patches the conversation_db property — other ProjectPaths
+    properties (MCP config, context files) still resolve normally.
+    """
+    from unittest.mock import PropertyMock, patch
+
+    from victor.config.settings import ProjectPaths
+
+    temp_victor = tmp_path / ".victor"
+    temp_victor.mkdir(exist_ok=True)
+    temp_conv_db = temp_victor / "conversation.db"
+
+    with patch.object(
+        ProjectPaths,
+        "conversation_db",
+        new_callable=PropertyMock,
+        return_value=temp_conv_db,
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)
@@ -371,3 +463,27 @@ def cleanup_dangling_asyncio_tasks():
                 task.cancel()
     except RuntimeError:
         pass  # No event loop
+
+
+@pytest.fixture(autouse=True, scope="session")
+def set_test_mode():
+    """Set TEST_MODE environment variable to redirect test telemetry.
+
+    This fixture runs once per test session and sets TEST_MODE to prevent
+    MagicMock events and test telemetry from polluting the global usage.jsonl
+    file. Test events will be redirected to /tmp/victor_test_telemetry/test_usage.jsonl
+    instead.
+
+    Priority: P1 - Prevents MagicMock leakage in global logs (HIGH criticality)
+    """
+    import os
+
+    original = os.environ.get("TEST_MODE")
+    os.environ["TEST_MODE"] = "1"
+
+    yield
+
+    if original is not None:
+        os.environ["TEST_MODE"] = original
+    else:
+        os.environ.pop("TEST_MODE", None)

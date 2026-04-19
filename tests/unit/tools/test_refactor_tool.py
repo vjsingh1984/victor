@@ -403,7 +403,10 @@ class TestExtract:
     async def test_extract_file_not_found(self):
         """Test handling of non-existent file."""
         result = await extract(
-            file="/nonexistent/file.py", start_line=1, end_line=5, function_name="extracted"
+            file="/nonexistent/file.py",
+            start_line=1,
+            end_line=5,
+            function_name="extracted",
         )
 
         assert result["success"] is False

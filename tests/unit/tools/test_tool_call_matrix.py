@@ -31,7 +31,7 @@ def test_matrix_wildcard_matching():
 
 
 def test_orchestrator_uses_profile_provider_name():
-    from unittest.mock import MagicMock
+    from unittest.mock import MagicMock, patch
     import tempfile
 
     from victor.agent.orchestrator import AgentOrchestrator
@@ -49,33 +49,34 @@ def test_orchestrator_uses_profile_provider_name():
         tool_calling_models={"ollama": ["specific-tool-model"]},
         tool_cache_dir_override=tempfile.mkdtemp(),
     )
-    settings.tool_cache_enabled = False
+    settings.tools.tool_cache_enabled = False
 
-    # Test: model in tool_calling_models should be recognized
-    orch_ok = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
-        model="specific-tool-model",
-        provider_name="ollama",
-    )
-    assert orch_ok._model_supports_tool_calls()
+    with patch("victor.core.bootstrap_services.bootstrap_new_services"):
+        # Test: model in tool_calling_models should be recognized
+        orch_ok = AgentOrchestrator(
+            settings=settings,
+            provider=provider,
+            model="specific-tool-model",
+            provider_name="ollama",
+        )
+        assert orch_ok._model_supports_tool_calls()
 
-    # Test: LMStudio has universal tool support via llama.cpp (provider_defaults),
-    # so even "unknown-model" should be tool-capable on LMStudio
-    orch_lmstudio = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
-        model="unknown-model",
-        provider_name="lmstudio",
-    )
-    assert orch_lmstudio._model_supports_tool_calls()
+        # Test: LMStudio has universal tool support via llama.cpp (provider_defaults),
+        # so even "unknown-model" should be tool-capable on LMStudio
+        orch_lmstudio = AgentOrchestrator(
+            settings=settings,
+            provider=provider,
+            model="unknown-model",
+            provider_name="lmstudio",
+        )
+        assert orch_lmstudio._model_supports_tool_calls()
 
-    # Test: Ollama requires specific model patterns, so unknown models are NOT tool-capable
-    # unless they match patterns like llama3.1*, qwen2.5*, mistral*, etc.
-    orch_block = AgentOrchestrator(
-        settings=settings,
-        provider=provider,
-        model="totally-unknown-model-xyz",
-        provider_name="ollama",
-    )
+        # Test: Ollama requires specific model patterns, so unknown models are NOT
+        # tool-capable unless they match patterns like llama3.1*, qwen2.5*, mistral*
+        orch_block = AgentOrchestrator(
+            settings=settings,
+            provider=provider,
+            model="totally-unknown-model-xyz",
+            provider_name="ollama",
+        )
     assert not orch_block._model_supports_tool_calls()

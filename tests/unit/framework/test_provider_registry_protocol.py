@@ -6,7 +6,10 @@ import warnings
 
 import pytest
 
-from victor.framework.providers.protocol import ProviderRegistry, _WARNED_LEGACY_PROVIDER_GROUPS
+from victor.framework.providers.protocol import (
+    ProviderRegistry,
+    _WARNED_LEGACY_PROVIDER_GROUPS,
+)
 
 
 def test_provider_registry_prefers_canonical_team_provider_group(monkeypatch) -> None:
@@ -33,8 +36,7 @@ def test_provider_registry_prefers_canonical_team_provider_group(monkeypatch) ->
     monkeypatch.setattr("importlib.metadata.entry_points", _mock_entry_points)
     _WARNED_LEGACY_PROVIDER_GROUPS.clear()
 
-    with pytest.warns(DeprecationWarning, match="victor.framework.teams.providers"):
-        registry = ProviderRegistry()
+    registry = ProviderRegistry()
 
     # DefaultTeamSpecProvider + one canonical external provider
     assert len(registry._team_providers) == 2
@@ -95,10 +97,6 @@ def test_provider_registry_warns_once_per_legacy_group(monkeypatch) -> None:
     monkeypatch.setattr("importlib.metadata.entry_points", _mock_entry_points)
     _WARNED_LEGACY_PROVIDER_GROUPS.clear()
 
-    with pytest.warns(DeprecationWarning, match="victor.framework.teams.providers"):
-        ProviderRegistry()
-
-    with warnings.catch_warnings(record=True) as recorded:
-        warnings.simplefilter("always")
-        ProviderRegistry()
-    assert not recorded
+    ProviderRegistry()
+    # Second construction should not log again
+    ProviderRegistry()

@@ -32,7 +32,9 @@ def infer_plugin_namespace(vertical_class: Type[Any]) -> str:
     return "external"
 
 
-def get_or_create_vertical_manifest(vertical_class: Type[Any]) -> Optional[ExtensionManifest]:
+def get_or_create_vertical_manifest(
+    vertical_class: Type[Any],
+) -> Optional[ExtensionManifest]:
     """Return a normalized manifest for *vertical_class*.
 
     Preference order:

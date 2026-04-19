@@ -143,8 +143,9 @@ else:
 # Framework coordinator (for testing/lightweight usage)
 # Note: Imported in create_coordinator() to avoid circular dependency
 
-# Communication infrastructure (from agent.teams)
-from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
+# Communication infrastructure (lazy to avoid agent.teams → coordinator chain)
+# Import at call site instead of module level.
+# from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
 
 # Team configuration types (canonical)
 from victor.teams.types import TeamConfig, TeamMember
@@ -264,4 +265,11 @@ def __getattr__(name: str) -> Any:
         # Store in module globals for future access
         globals()[name] = locals()[name]
         return locals()[name]
+    # Communication infrastructure (lazy to avoid agent.teams → coordinator chain)
+    if name in {"TeamMessageBus", "TeamSharedMemory"}:
+        from victor.agent.teams.communication import TeamMessageBus, TeamSharedMemory
+
+        globals()["TeamMessageBus"] = TeamMessageBus
+        globals()["TeamSharedMemory"] = TeamSharedMemory
+        return globals()[name]
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

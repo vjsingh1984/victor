@@ -189,7 +189,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
                 "error_type": type(error).__name__,
                 "recoverable": recoverable,
                 "context": context or {},
-                "traceback": traceback_str[-2000:] if traceback_str else None,  # Last 2000 chars
+                "traceback": (traceback_str[-2000:] if traceback_str else None),  # Last 2000 chars
                 **metadata,
             },
         )
@@ -219,7 +219,7 @@ class ErrorEventEmitter(IErrorEventEmitter):
                 "error_type": type(error).__name__,
                 "recoverable": recoverable,
                 "context": context or {},
-                "traceback": traceback_str[-2000:] if traceback_str else None,  # Last 2000 chars
+                "traceback": (traceback_str[-2000:] if traceback_str else None),  # Last 2000 chars
                 **metadata,
             },
         )

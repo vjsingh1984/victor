@@ -317,7 +317,10 @@ class VictorAPIServer:
                     if chunk.get("type") == "content":
                         event = {"type": "content", "content": chunk.get("content", "")}
                     elif chunk.get("type") == "tool_call":
-                        event = {"type": "tool_call", "tool_call": chunk.get("tool_call", {})}
+                        event = {
+                            "type": "tool_call",
+                            "tool_call": chunk.get("tool_call", {}),
+                        }
                     else:
                         event = chunk
 
@@ -620,7 +623,7 @@ class VictorAPIServer:
                         "description": tool.description or "",
                         "category": category,
                         "cost_tier": cost_tier,
-                        "parameters": tool.parameters if hasattr(tool, "parameters") else {},
+                        "parameters": (tool.parameters if hasattr(tool, "parameters") else {}),
                         "is_dangerous": self._is_dangerous_tool(tool.name),
                         "requires_approval": cost_tier in ("medium", "high")
                         or self._is_dangerous_tool(tool.name),
@@ -1040,14 +1043,17 @@ class VictorAPIServer:
             logger.warning(f"Delayed shutdown encountered error: {e}")
 
     async def _get_orchestrator(self) -> Any:
-        """Get or create the orchestrator."""
+        """Get or create the orchestrator via AgentFactory."""
         if self._orchestrator is None:
-            from victor.agent.orchestrator import AgentOrchestrator
             from victor.config.settings import load_settings
+            from victor.framework.agent_factory import AgentFactory
 
             settings = load_settings()
-            # Create orchestrator with settings
-            self._orchestrator = await AgentOrchestrator.from_settings(settings)
+            factory = AgentFactory(
+                settings=settings,
+                enable_observability=True,
+            )
+            self._orchestrator = await factory.create()
 
         return self._orchestrator
 
@@ -1161,7 +1167,14 @@ class VictorAPIServer:
 
             # Walk directory tree (limit depth)
             max_depth = int(request.query.get("depth", "3"))
-            exclude_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".victor"}
+            exclude_dirs = {
+                ".git",
+                "node_modules",
+                "__pycache__",
+                ".venv",
+                "venv",
+                ".victor",
+            }
 
             def scan_dir(path: Path, depth: int = 0) -> Dict[str, Any]:
                 if depth > max_depth:
@@ -1178,7 +1191,10 @@ class VictorAPIServer:
                     for entry in sorted(
                         path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())
                     ):
-                        if entry.name.startswith(".") and entry.name not in {".github", ".vscode"}:
+                        if entry.name.startswith(".") and entry.name not in {
+                            ".github",
+                            ".vscode",
+                        }:
                             continue
                         if entry.name in exclude_dirs:
                             continue
@@ -1320,14 +1336,26 @@ class VictorAPIServer:
 
             secret_patterns = [
                 (r'(?i)(api[_-]?key|apikey)\s*[:=]\s*["\']?[\w-]{20,}', "API Key"),
-                (r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}', "Secret/Password"),
+                (
+                    r'(?i)(secret|password|passwd|pwd)\s*[:=]\s*["\'][^"\']{8,}',
+                    "Secret/Password",
+                ),
                 (r"(?i)bearer\s+[\w-]{20,}", "Bearer Token"),
                 (r"sk-[a-zA-Z0-9]{20,}", "OpenAI API Key"),
                 (r"ghp_[a-zA-Z0-9]{36}", "GitHub Token"),
                 (r"AKIA[A-Z0-9]{16}", "AWS Access Key"),
             ]
 
-            code_extensions = {".py", ".ts", ".js", ".json", ".yaml", ".yml", ".env", ".sh"}
+            code_extensions = {
+                ".py",
+                ".ts",
+                ".js",
+                ".json",
+                ".yaml",
+                ".yml",
+                ".env",
+                ".sh",
+            }
 
             for path in root.rglob("*"):
                 if path.is_file() and path.suffix.lower() in code_extensions:
@@ -2234,7 +2262,8 @@ class VictorAPIServer:
             agent = self._agents[agent_id]
             if agent.get("status") != "running":
                 return web.json_response(
-                    {"error": f"Agent is not running (status: {agent.get('status')})"}, status=400
+                    {"error": f"Agent is not running (status: {agent.get('status')})"},
+                    status=400,
                 )
 
             # Cancel the task
@@ -2294,7 +2323,11 @@ class VictorAPIServer:
                 cleared += 1
 
             return web.json_response(
-                {"success": True, "cleared": cleared, "message": f"Cleared {cleared} agents"}
+                {
+                    "success": True,
+                    "cleared": cleared,
+                    "message": f"Cleared {cleared} agents",
+                }
             )
 
         except Exception as e:
@@ -2405,7 +2438,11 @@ class VictorAPIServer:
             plan["approved_at"] = asyncio.get_event_loop().time()
 
             return web.json_response(
-                {"success": True, "message": f"Plan {plan_id} approved", "status": "approved"}
+                {
+                    "success": True,
+                    "message": f"Plan {plan_id} approved",
+                    "status": "approved",
+                }
             )
 
         except Exception as e:

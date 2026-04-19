@@ -253,7 +253,7 @@ class TestKeywordToolSelectorStageFiltering:
 
     def test_filter_tools_for_stage_with_write_intent(self, selector):
         """Test _filter_tools_for_stage skips filtering when write intent."""
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         tools = [
             ToolDefinition(name="read_file", description="Read", parameters={}),
@@ -270,7 +270,7 @@ class TestKeywordToolSelectorStageFiltering:
     @patch("victor.tools.keyword_tool_selector.KeywordToolSelector._is_readonly_tool")
     def test_filter_tools_for_stage_analysis(self, mock_is_readonly, selector):
         """Test _filter_tools_for_stage filters in analysis stage."""
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         # Only read_file is readonly
         mock_is_readonly.side_effect = lambda name: name == "read_file"
@@ -298,7 +298,7 @@ class TestKeywordToolSelectorStageFiltering:
 
     def test_get_stage_core_tools_analysis_stage(self, selector):
         """Test _get_stage_core_tools returns readonly tools for analysis."""
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         with patch.object(selector, "_get_core_readonly_cached", return_value={"read_file"}):
             result = selector._get_stage_core_tools(ConversationStage.ANALYSIS)
@@ -306,7 +306,7 @@ class TestKeywordToolSelectorStageFiltering:
 
     def test_get_stage_core_tools_execution_stage(self, selector):
         """Test _get_stage_core_tools returns all core tools for execution."""
-        from victor.agent.conversation_state import ConversationStage
+        from victor.agent.conversation.state_machine import ConversationStage
 
         with patch.object(
             selector, "_get_core_tools_cached", return_value={"read_file", "write_file"}

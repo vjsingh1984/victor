@@ -205,7 +205,10 @@ class TestSessionRecoveryIntegration:
                 {
                     "id": "call_1",
                     "type": "function",
-                    "function": {"name": "read_file", "arguments": '{"path": "app.py"}'},
+                    "function": {
+                        "name": "read_file",
+                        "arguments": '{"path": "app.py"}',
+                    },
                 }
             ],
         )

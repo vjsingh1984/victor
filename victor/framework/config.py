@@ -790,13 +790,19 @@ class SafetyEnforcer:
                         # HIGH level - always block (unless overridden by config)
                         if rule.allow_override and self.config.level == SafetyLevel.LOW:
                             continue  # Allow due to override
-                        return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
+                        return (
+                            False,
+                            f"Blocked by safety rule: {rule.name} - {rule.description}",
+                        )
 
                     elif rule.level == SafetyLevel.MEDIUM:
                         # MEDIUM level - block unless config is LOW
                         if self.config.level == SafetyLevel.LOW:
                             continue  # Warn only, don't block
-                        return False, f"Blocked by safety rule: {rule.name} - {rule.description}"
+                        return (
+                            False,
+                            f"Blocked by safety rule: {rule.name} - {rule.description}",
+                        )
 
                     elif rule.level == SafetyLevel.LOW:
                         # LOW level - warn but don't block (unless config is HIGH)

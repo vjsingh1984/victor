@@ -33,6 +33,7 @@ from victor.agent.tool_registrar import (
     ToolRegistrarConfig,
     RegistrationStats,
 )
+from victor.tools.registry import ToolRegistry
 
 
 class TestToolRegistrarConfig:
@@ -227,6 +228,20 @@ class TestDynamicToolRegistration:
         # Should return a count >= 0
         assert count >= 0
 
+    def test_register_dynamic_tools_includes_graph_tool(self):
+        """Dynamic tool registration should include the graph tool."""
+        settings = MagicMock()
+        settings.load_tool_config.return_value = {}
+        registrar = ToolRegistrar(
+            tools=ToolRegistry(),
+            settings=settings,
+        )
+
+        count = registrar._register_dynamic_tools()
+
+        assert count > 0
+        assert registrar.tools.get("graph") is not None
+
     def test_excluded_files(self, registrar):
         """Test that excluded files are not loaded."""
         # The excluded files are checked inside _register_dynamic_tools
@@ -382,7 +397,10 @@ class TestPluginInitialization:
 
         mock_registry.disable_plugin.assert_called_with("bad_plugin")
 
-    @patch("victor.tools.plugin_registry.ToolPluginRegistry", side_effect=ImportError("No plugins"))
+    @patch(
+        "victor.tools.plugin_registry.ToolPluginRegistry",
+        side_effect=ImportError("No plugins"),
+    )
     def test_plugin_init_error(self, mock_registry_class, registrar):
         """Test handling plugin initialization errors."""
         count = registrar._initialize_plugins()

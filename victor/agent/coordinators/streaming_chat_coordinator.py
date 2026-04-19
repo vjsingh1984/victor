@@ -180,6 +180,16 @@ class StreamingChatCoordinator:
         # Prioritize by stage
         tools = self._tool_context.tool_selector.prioritize_by_stage(user_message, tools)
 
+        # Log tool definitions sent to LLM (permanent, INFO level)
+        if tools:
+            tool_summaries = [f"{t.name}: {(t.description or '')[:80]}" for t in tools]
+            logger.debug(
+                "[ToolDefs→LLM] %d tools selected for query=%s\n  %s",
+                len(tools),
+                user_message[:100],
+                "\n  ".join(tool_summaries),
+            )
+
         return tools
 
     async def _stream_from_provider(
@@ -278,10 +288,15 @@ class StreamingChatCoordinator:
         # Execute tool calls
         tool_results = await self._tool_context._handle_tool_calls(tool_calls)
 
-        # Add tool results to conversation
+        # Add tool results to conversation with tool_call_id for OpenAI spec compliance
         for result in tool_results:
             if result.get("content"):
-                self._chat_context.add_message("tool", result["content"])
+                self._chat_context.add_message(
+                    "tool",
+                    result["content"],
+                    name=result.get("name"),
+                    tool_call_id=result.get("tool_call_id"),
+                )
 
 
 __all__ = [

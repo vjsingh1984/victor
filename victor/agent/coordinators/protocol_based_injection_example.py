@@ -158,7 +158,11 @@ class MockChatOrchestrator:
         return {"mock": "recovery_context"}
 
     async def _handle_recovery_with_integration(
-        self, stream_ctx: Any, full_content: str, tool_calls: Any, mentioned_tools: Any = None
+        self,
+        stream_ctx: Any,
+        full_content: str,
+        tool_calls: Any,
+        mentioned_tools: Any = None,
     ) -> Any:
         return {"mock": "recovery_action"}
 

@@ -57,7 +57,7 @@ from victor.storage.memory.unified import (
 if TYPE_CHECKING:
     from victor.storage.memory.entity_memory import EntityMemory
     from victor.storage.memory.entity_graph import EntityGraph
-    from victor.agent.conversation_memory import ConversationStore
+    from victor.agent.conversation.store import ConversationStore
 
 logger = logging.getLogger(__name__)
 
@@ -108,7 +108,7 @@ class EntityMemoryAdapter:
             # Search entities by name
             entities = await self._memory.search(
                 query=query.query,
-                entity_types=query.filters.get("entity_types") if query.filters else None,
+                entity_types=(query.filters.get("entity_types") if query.filters else None),
                 limit=query.limit,
             )
 
@@ -141,7 +141,7 @@ class EntityMemoryAdapter:
                             "source": entity.source,
                             "mentions": entity.mentions,
                         },
-                        timestamp=entity.last_seen.timestamp() if entity.last_seen else None,
+                        timestamp=(entity.last_seen.timestamp() if entity.last_seen else None),
                     )
                 )
 
@@ -371,7 +371,7 @@ class ConversationMemoryAdapter:
             value: Message content or dict
             metadata: Additional metadata
         """
-        from victor.agent.conversation_memory import MessageRole
+        from victor.agent.conversation.types import MessageRole
 
         session_id = (metadata or {}).get("session_id") or self._session_id
         if not session_id:
@@ -519,7 +519,7 @@ class GraphMemoryAdapter:
                                 "outgoing" if relation.source_id == entity_id else "incoming"
                             ),
                         },
-                        timestamp=relation.last_seen.timestamp() if relation.last_seen else None,
+                        timestamp=(relation.last_seen.timestamp() if relation.last_seen else None),
                     )
                 )
 

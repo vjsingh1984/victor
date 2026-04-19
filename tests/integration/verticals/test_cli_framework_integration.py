@@ -116,7 +116,11 @@ class TestCLIFrameworkIntegration:
         )
         orch.get_capability = MagicMock(
             side_effect=lambda name: (
-                {"name": name, "version": capabilities[name][0], "callable": capabilities[name][1]}
+                {
+                    "name": name,
+                    "version": capabilities[name][0],
+                    "callable": capabilities[name][1],
+                }
                 if name in capabilities
                 else None
             )
@@ -384,8 +388,9 @@ class TestVerticalRegistryIntegration:
     def test_list_verticals_includes_builtins(self):
         """Test list_verticals includes built-in verticals."""
         names = list_verticals()
-        # Built-in verticals
-        assert "coding" in names
+        # benchmark is always built-in; contrib verticals (coding, etc.)
+        # are external packages and may not be installed
+        assert "benchmark" in names
 
 
 class TestBackwardCompatibility:

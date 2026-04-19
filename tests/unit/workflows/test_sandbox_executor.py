@@ -33,7 +33,8 @@ async def test_process_sandbox_uses_asyncio_to_thread_for_communicate() -> None:
     with (
         patch("victor.integrations.mcp.sandbox.SandboxedProcess", return_value=sandbox),
         patch(
-            "victor.workflows.sandbox_executor.asyncio.to_thread", side_effect=call_to_thread
+            "victor.workflows.sandbox_executor.asyncio.to_thread",
+            side_effect=call_to_thread,
         ) as mock_to_thread,
     ):
         result = await executor._execute_process(

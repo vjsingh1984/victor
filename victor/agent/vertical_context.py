@@ -671,6 +671,27 @@ class VerticalContext:
         parts.extend(self.prompt_sections)
         return "\n\n".join(parts)
 
+    @staticmethod
+    def get_vertical_tiered_config() -> Any:
+        """Get TieredToolConfig from active vertical canonical API.
+
+        Returns:
+            TieredToolConfig or None
+        """
+        try:
+            from victor.core.verticals.vertical_loader import get_vertical_loader
+
+            loader = get_vertical_loader()
+            if loader.active_vertical:
+                getter = getattr(loader.active_vertical, "get_tiered_tool_config", None)
+                if callable(getter):
+                    return getter()
+        except Exception as e:
+            import logging
+
+            logging.getLogger(__name__).debug(f"Could not get tiered config from vertical: {e}")
+        return None
+
     # ==========================================================================
     # Serialization
     # ==========================================================================

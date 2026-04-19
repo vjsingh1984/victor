@@ -14,6 +14,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.core.constants import DEFAULT_VERTICAL
+
 __all__ = [
     "ObservabilityProtocol",
     "MetricsCollectorProtocol",
@@ -384,7 +386,7 @@ class RLCoordinatorProtocol(Protocol):
         self,
         learner_name: str,
         outcome: Any,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
     ) -> None:
         """Record an outcome for a specific learner."""
         ...

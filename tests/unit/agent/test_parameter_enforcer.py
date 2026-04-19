@@ -99,7 +99,11 @@ class TestParameterEnforcer:
                 required=True,
                 description="Path to the file to analyze",
                 inference_strategy=InferenceStrategy.FROM_PREVIOUS_ARGS,
-                inference_keys=["path", "file_path", "file"],  # Keys to search in previous args
+                inference_keys=[
+                    "path",
+                    "file_path",
+                    "file",
+                ],  # Keys to search in previous args
             ),
             ParameterSpec(
                 name="symbol_name",

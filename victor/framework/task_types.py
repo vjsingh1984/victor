@@ -825,7 +825,12 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[INFRA] Create or modify infrastructure configs. Review existing setup first.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["read_file", "write_file", "execute_bash", "list_directory"],
+            priority_tools=[
+                "read_file",
+                "write_file",
+                "execute_bash",
+                "list_directory",
+            ],
         ),
     )
 

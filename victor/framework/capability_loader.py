@@ -77,8 +77,63 @@ from victor.framework.protocols import (
     OrchestratorCapability,
 )
 from victor.framework.strict_mode import ensure_not_private_fallback
+from victor_sdk.capabilities import (
+    CapabilityEntry as SDKCapabilityEntry,
+    CapabilityType as SDKCapabilityType,
+    OrchestratorCapability as SDKOrchestratorCapability,
+)
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_capability_type(
+    capability_type: Union[CapabilityType, SDKCapabilityType, str, Any],
+) -> CapabilityType:
+    """Normalize framework/SDK/string capability types to the framework enum."""
+
+    if isinstance(capability_type, CapabilityType):
+        return capability_type
+    if isinstance(capability_type, SDKCapabilityType):
+        return CapabilityType(capability_type.value)
+    if isinstance(capability_type, str):
+        return CapabilityType(capability_type)
+    raise TypeError(f"Unsupported capability type: {capability_type!r}")
+
+
+def _coerce_capability(
+    capability: Union[OrchestratorCapability, SDKOrchestratorCapability, Any],
+) -> OrchestratorCapability:
+    """Convert SDK capability declarations into framework capability declarations."""
+
+    if isinstance(capability, OrchestratorCapability):
+        return capability
+    if isinstance(capability, SDKOrchestratorCapability):
+        return OrchestratorCapability(
+            name=capability.name,
+            capability_type=_normalize_capability_type(capability.capability_type),
+            version=capability.version,
+            setter=capability.setter,
+            getter=capability.getter,
+            attribute=capability.attribute,
+            description=capability.description,
+            required=capability.required,
+            deprecated=capability.deprecated,
+            deprecated_message=capability.deprecated_message,
+        )
+    if hasattr(capability, "name") and hasattr(capability, "capability_type"):
+        return OrchestratorCapability(
+            name=capability.name,
+            capability_type=_normalize_capability_type(capability.capability_type),
+            version=getattr(capability, "version", "1.0"),
+            setter=getattr(capability, "setter", None),
+            getter=getattr(capability, "getter", None),
+            attribute=getattr(capability, "attribute", None),
+            description=getattr(capability, "description", ""),
+            required=getattr(capability, "required", False),
+            deprecated=getattr(capability, "deprecated", False),
+            deprecated_message=getattr(capability, "deprecated_message", ""),
+        )
+    raise TypeError(f"Unsupported capability object: {capability!r}")
 
 
 # =============================================================================
@@ -398,7 +453,13 @@ class CapabilityLoader(DynamicModuleLoader):
 
     def _register_from_entry(
         self,
-        entry: Union[CapabilityEntry, OrchestratorCapability, Dict[str, Any]],
+        entry: Union[
+            CapabilityEntry,
+            SDKCapabilityEntry,
+            OrchestratorCapability,
+            SDKOrchestratorCapability,
+            Dict[str, Any],
+        ],
         source_module: str,
     ) -> Optional[str]:
         """Register capability from an entry definition.
@@ -410,24 +471,26 @@ class CapabilityLoader(DynamicModuleLoader):
         Returns:
             Registered capability name or None
         """
-        if isinstance(entry, CapabilityEntry):
+        if isinstance(entry, (CapabilityEntry, SDKCapabilityEntry)):
             return self._register_capability_internal(
-                capability=entry.capability,
+                capability=_coerce_capability(entry.capability),
                 handler=entry.handler,
                 getter_handler=entry.getter_handler,
                 source_module=source_module,
                 metadata=entry.metadata,
             )
-        elif isinstance(entry, OrchestratorCapability):
+        elif isinstance(entry, (OrchestratorCapability, SDKOrchestratorCapability)):
             return self._register_capability_internal(
-                capability=entry,
+                capability=_coerce_capability(entry),
                 source_module=source_module,
             )
         elif isinstance(entry, dict):
             # Dict format: construct capability from dict
             capability = OrchestratorCapability(
                 name=entry["name"],
-                capability_type=entry.get("capability_type", CapabilityType.TOOL),
+                capability_type=_normalize_capability_type(
+                    entry.get("capability_type", CapabilityType.TOOL)
+                ),
                 version=entry.get("version", "1.0"),
                 setter=entry.get("setter"),
                 getter=entry.get("getter"),
@@ -462,7 +525,9 @@ class CapabilityLoader(DynamicModuleLoader):
         """
         capability = OrchestratorCapability(
             name=meta["name"],
-            capability_type=meta.get("capability_type", CapabilityType.TOOL),
+            capability_type=_normalize_capability_type(
+                meta.get("capability_type", CapabilityType.TOOL)
+            ),
             version=meta.get("version", "1.0"),
             setter=meta.get("setter", meta["name"]),
             getter=meta.get("getter"),

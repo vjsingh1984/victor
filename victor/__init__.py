@@ -35,16 +35,9 @@ Full API (advanced):
     settings = Settings()
     orchestrator = await AgentOrchestrator.from_settings(settings, "default")
 
-For coding-specific features:
-try:
-        from victor_coding import CodingVertical
-try:
-            from victor_coding.codebase import CodebaseIndex
-except ImportError:
-    # External vertical package may not be installed
-    pass
-except ImportError:
-    # victor-coding is an external package and may not be installed
+For coding-specific features, install the victor-coding package:
+    pip install victor-coding
+Verticals are discovered automatically via the victor.plugins entry point.
 """
 
 import os

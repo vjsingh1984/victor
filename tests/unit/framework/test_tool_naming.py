@@ -218,7 +218,8 @@ class TestToolAliases:
 
     def test_search_aliases(self):
         """Verify search tool aliases."""
-        assert TOOL_ALIASES["code_search"] == "grep"
+        assert TOOL_ALIASES["code_search"] == "code_search"
+        assert TOOL_ALIASES["search"] == "code_search"
         assert TOOL_ALIASES["semantic_code_search"] == "code_search"
         assert TOOL_ALIASES["web_summarize"] == "summarize"
 
@@ -238,7 +239,14 @@ class TestToolAliases:
 
     def test_git_aliases(self):
         """Verify git operation aliases all map to 'git'."""
-        git_aliases = ["git_status", "git_diff", "git_log", "git_commit", "git_branch", "git_stage"]
+        git_aliases = [
+            "git_status",
+            "git_diff",
+            "git_log",
+            "git_commit",
+            "git_branch",
+            "git_stage",
+        ]
         for alias in git_aliases:
             assert TOOL_ALIASES[alias] == "git"
 

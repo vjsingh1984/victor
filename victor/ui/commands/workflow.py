@@ -130,7 +130,14 @@ def _detect_vertical_from_path(workflow_path: Path) -> Optional[str]:
     - victor/coding/workflows/feature.yaml -> coding
     - victor/research/workflows/paper.yaml -> research
     """
-    known_verticals = {"coding", "devops", "rag", "dataanalysis", "research", "benchmark"}
+    known_verticals = {
+        "coding",
+        "devops",
+        "rag",
+        "dataanalysis",
+        "research",
+        "benchmark",
+    }
     parts = workflow_path.parts
 
     for part in parts:
@@ -185,11 +192,23 @@ def _load_registered_handlers(vertical: Optional[str]) -> Set[str]:
         try:
             module_name = f"victor.{vertical}.handlers"
             import importlib
+            import inspect
 
             module = importlib.import_module(module_name)
 
             if hasattr(module, "register_handlers"):
-                module.register_handlers()
+                from victor.workflows.executor import register_compute_handler
+
+                register_handlers = module.register_handlers
+                try:
+                    parameters = inspect.signature(register_handlers).parameters
+                except (TypeError, ValueError):
+                    parameters = {}
+
+                if parameters:
+                    register_handlers(register_compute_handler)
+                else:
+                    register_handlers()
             if hasattr(module, "HANDLERS"):
                 handlers.update(module.HANDLERS.keys())
         except ImportError:
@@ -1333,7 +1352,14 @@ def generate_workflow(
         raise typer.Exit(1)
 
     # Validate vertical
-    valid_verticals = {"coding", "devops", "research", "rag", "dataanalysis", "benchmark"}
+    valid_verticals = {
+        "coding",
+        "devops",
+        "research",
+        "rag",
+        "dataanalysis",
+        "benchmark",
+    }
     if vertical.lower() not in valid_verticals:
         console.print(f"[bold red]Error:[/] Unknown vertical: {vertical}")
         console.print(f"Valid options: {', '.join(valid_verticals)}")

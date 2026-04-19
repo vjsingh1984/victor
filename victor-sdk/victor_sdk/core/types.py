@@ -96,19 +96,39 @@ class StageDefinition:
     """
 
     name: str
-    description: str
+    description: str = ""
     required_tools: List[str] = field(default_factory=list)
     optional_tools: List[str] = field(default_factory=list)
     allow_custom_tools: bool = True
     keywords: List[str] = field(default_factory=list)
     next_stages: Set[str] = field(default_factory=set)
     min_confidence: float = 0.5
+    tools: Set[str] = field(default_factory=set)
 
-    @property
-    def tools(self) -> Set[str]:
-        """Return the runtime-compatible union of required and optional tools."""
+    def __post_init__(self) -> None:
+        """Normalize constructor inputs while preserving SDK immutability.
 
-        return set(self.required_tools) | set(self.optional_tools)
+        ``tools`` is accepted as a compatibility alias for legacy runtime code.
+        When explicit required/optional tool lists are absent, the legacy set is
+        promoted into ``optional_tools`` to preserve prior semantics.
+        """
+        normalized_required = list(self.required_tools)
+        normalized_optional = list(self.optional_tools)
+        normalized_keywords = list(self.keywords)
+        normalized_next_stages = set(self.next_stages)
+        normalized_tools = set(self.tools)
+
+        if normalized_tools and not normalized_required and not normalized_optional:
+            normalized_optional = sorted(normalized_tools)
+
+        normalized_tools.update(normalized_required)
+        normalized_tools.update(normalized_optional)
+
+        object.__setattr__(self, "required_tools", normalized_required)
+        object.__setattr__(self, "optional_tools", normalized_optional)
+        object.__setattr__(self, "keywords", normalized_keywords)
+        object.__setattr__(self, "next_stages", normalized_next_stages)
+        object.__setattr__(self, "tools", normalized_tools)
 
     def get_effective_tools(self, available_tools: List[str]) -> List[str]:
         """Get effective tool list for this stage.
@@ -122,7 +142,9 @@ class StageDefinition:
         effective = set(self.required_tools)
 
         # Add optional tools that are available
-        effective.update(tool for tool in self.optional_tools if tool in available_tools)
+        effective.update(
+            tool for tool in self.optional_tools if tool in available_tools
+        )
 
         return sorted(effective)
 
@@ -132,6 +154,7 @@ class StageDefinition:
         return {
             "name": self.name,
             "description": self.description,
+            "tools": sorted(self.tools),
             "required_tools": self.required_tools.copy(),
             "optional_tools": self.optional_tools.copy(),
             "allow_custom_tools": self.allow_custom_tools,
@@ -168,16 +191,14 @@ def normalize_stage_definition(
         # Accept richer runtime stage objects during the migration to the
         # SDK definition contract without importing runtime-only types here.
         return StageDefinition(
-            name=getattr(stage, "name"),
-            description=getattr(stage, "description"),
+            name=stage.name,
+            description=stage.description,
             required_tools=list(getattr(stage, "required_tools", [])),
             optional_tools=sorted(
-                list(
-                    getattr(
-                        stage,
-                        "optional_tools",
-                        getattr(stage, "tools", []),
-                    )
+                getattr(
+                    stage,
+                    "optional_tools",
+                    getattr(stage, "tools", []),
                 )
             ),
             allow_custom_tools=bool(getattr(stage, "allow_custom_tools", True)),
@@ -296,7 +317,9 @@ class TieredToolConfig:
         """
         available_set = set(available_tools)
 
-        if available_set.issuperset(set(self.basic_tools + self.standard_tools + self.advanced_tools)):
+        if available_set.issuperset(
+            set(self.basic_tools + self.standard_tools + self.advanced_tools)
+        ):
             return Tier.ADVANCED
         elif available_set.issuperset(set(self.basic_tools + self.standard_tools)):
             return Tier.STANDARD
@@ -453,7 +476,11 @@ def normalize_prompt_templates(
 
     if isinstance(templates, list):
         return [
-            template if isinstance(template, PromptTemplateDefinition) else normalize_prompt_template("", template)
+            (
+                template
+                if isinstance(template, PromptTemplateDefinition)
+                else normalize_prompt_template("", template)
+            )
             for template in templates
         ]
     return [
@@ -525,10 +552,16 @@ def normalize_task_type_hints(
 
     if isinstance(hints, list):
         return [
-            hint if isinstance(hint, TaskTypeHintDefinition) else normalize_task_type_hint("", hint)
+            (
+                hint
+                if isinstance(hint, TaskTypeHintDefinition)
+                else normalize_task_type_hint("", hint)
+            )
             for hint in hints
         ]
-    return [normalize_task_type_hint(task_type, hint) for task_type, hint in hints.items()]
+    return [
+        normalize_task_type_hint(task_type, hint) for task_type, hint in hints.items()
+    ]
 
 
 @dataclass(frozen=True)
@@ -549,7 +582,9 @@ class PromptMetadata:
         }
 
 
-def normalize_prompt_metadata(metadata: Union[Dict[str, Any], PromptMetadata]) -> PromptMetadata:
+def normalize_prompt_metadata(
+    metadata: Union[Dict[str, Any], PromptMetadata],
+) -> PromptMetadata:
     """Normalize prompt metadata payloads to PromptMetadata."""
 
     if isinstance(metadata, PromptMetadata):
@@ -557,7 +592,9 @@ def normalize_prompt_metadata(metadata: Union[Dict[str, Any], PromptMetadata]) -
     if isinstance(metadata, dict):
         return PromptMetadata(
             templates=normalize_prompt_templates(metadata.get("templates", {})),
-            task_type_hints=normalize_task_type_hints(metadata.get("task_type_hints", {})),
+            task_type_hints=normalize_task_type_hints(
+                metadata.get("task_type_hints", {})
+            ),
             metadata=dict(metadata.get("metadata", {})),
         )
     raise TypeError(
@@ -734,7 +771,9 @@ class TeamDefinition:
         """Normalize nested member declarations and formation strings."""
 
         object.__setattr__(self, "formation", _normalize_team_formation(self.formation))
-        object.__setattr__(self, "members", normalize_team_member_definitions(list(self.members)))
+        object.__setattr__(
+            self, "members", normalize_team_member_definitions(list(self.members))
+        )
         object.__setattr__(self, "tags", list(self.tags))
         object.__setattr__(self, "task_types", list(self.task_types))
         object.__setattr__(self, "metadata", dict(self.metadata))
@@ -765,9 +804,9 @@ def _normalize_team_formation(formation: Any) -> str:
     if isinstance(formation, str):
         return formation.lower()
     if hasattr(formation, "value"):
-        return str(getattr(formation, "value")).lower()
+        return str(formation.value).lower()
     if hasattr(formation, "name"):
-        return str(getattr(formation, "name")).lower()
+        return str(formation.name).lower()
     raise TypeError(f"Unsupported team formation type: {type(formation)!r}")
 
 
@@ -820,10 +859,7 @@ def normalize_team_definitions(
             )
         return normalized_teams
 
-    return [
-        normalize_team_definition(team_id, team)
-        for team_id, team in teams.items()
-    ]
+    return [normalize_team_definition(team_id, team) for team_id, team in teams.items()]
 
 
 @dataclass(frozen=True)
@@ -852,7 +888,9 @@ class TeamMetadata:
         return payload
 
 
-def normalize_team_metadata(metadata: Union[Dict[str, Any], TeamMetadata]) -> TeamMetadata:
+def normalize_team_metadata(
+    metadata: Union[Dict[str, Any], TeamMetadata],
+) -> TeamMetadata:
     """Normalize team metadata payloads to TeamMetadata."""
 
     if isinstance(metadata, TeamMetadata):
@@ -939,7 +977,9 @@ def normalize_capability_requirements(
 ) -> List[CapabilityRequirement]:
     """Normalize a list of capability requirements to typed objects."""
 
-    return [normalize_capability_requirement(requirement) for requirement in requirements]
+    return [
+        normalize_capability_requirement(requirement) for requirement in requirements
+    ]
 
 
 @dataclass
@@ -1047,12 +1087,15 @@ class VerticalDefinition:
     tier: Tier = Tier.STANDARD
     metadata: Dict[str, Any] = field(default_factory=dict)
     extensions: Dict[str, Any] = field(default_factory=dict)
+    skills: List[Any] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Normalize and validate constructor payloads."""
 
         try:
-            normalized_tier = Tier(self.tier) if isinstance(self.tier, str) else self.tier
+            normalized_tier = (
+                Tier(self.tier) if isinstance(self.tier, str) else self.tier
+            )
             normalized_tool_requirements = normalize_tool_requirements(
                 list(self.tool_requirements)
             )
@@ -1062,7 +1105,8 @@ class VerticalDefinition:
             normalized_tools = list(self.tools)
             if not normalized_tools and normalized_tool_requirements:
                 normalized_tools = [
-                    requirement.tool_name for requirement in normalized_tool_requirements
+                    requirement.tool_name
+                    for requirement in normalized_tool_requirements
                 ]
             normalized_prompt_metadata = normalize_prompt_metadata(self.prompt_metadata)
             normalized_stages = normalize_stage_definitions(dict(self.stages))
@@ -1072,18 +1116,23 @@ class VerticalDefinition:
             )
             normalized_metadata = dict(self.metadata)
             normalized_extensions = dict(self.extensions)
+            normalized_skills = list(self.skills)
         except VerticalConfigurationError:
             raise
         except Exception as exc:
             raise VerticalConfigurationError(
                 "Vertical definition payload could not be normalized.",
-                vertical_name=self.name if isinstance(self.name, str) and self.name else None,
+                vertical_name=(
+                    self.name if isinstance(self.name, str) and self.name else None
+                ),
                 details={"error": str(exc)},
             ) from exc
 
         object.__setattr__(self, "tier", normalized_tier)
         object.__setattr__(self, "tool_requirements", normalized_tool_requirements)
-        object.__setattr__(self, "capability_requirements", normalized_capability_requirements)
+        object.__setattr__(
+            self, "capability_requirements", normalized_capability_requirements
+        )
         object.__setattr__(self, "tools", normalized_tools)
         object.__setattr__(self, "prompt_metadata", normalized_prompt_metadata)
         object.__setattr__(self, "stages", normalized_stages)
@@ -1091,6 +1140,7 @@ class VerticalDefinition:
         object.__setattr__(self, "workflow_metadata", normalized_workflow_metadata)
         object.__setattr__(self, "metadata", normalized_metadata)
         object.__setattr__(self, "extensions", normalized_extensions)
+        object.__setattr__(self, "skills", normalized_skills)
 
         self.validate()
 
@@ -1109,7 +1159,9 @@ class VerticalDefinition:
         validate_definition_version(self.definition_version)
 
         if not isinstance(self.name, str) or not self.name.strip():
-            raise VerticalConfigurationError("Vertical definition name must be a non-empty string.")
+            raise VerticalConfigurationError(
+                "Vertical definition name must be a non-empty string."
+            )
 
         if not isinstance(self.description, str):
             raise VerticalConfigurationError(
@@ -1124,7 +1176,9 @@ class VerticalDefinition:
             )
 
         invalid_tools = [
-            tool_name for tool_name in self.tools if not isinstance(tool_name, str) or not tool_name.strip()
+            tool_name
+            for tool_name in self.tools
+            if not isinstance(tool_name, str) or not tool_name.strip()
         ]
         if invalid_tools:
             raise VerticalConfigurationError(
@@ -1177,7 +1231,9 @@ class VerticalDefinition:
                 )
 
             missing_stages = [
-                stage_name for stage_name in stage_order if stage_name not in self.stages
+                stage_name
+                for stage_name in stage_order
+                if stage_name not in self.stages
             ]
             if missing_stages:
                 raise VerticalConfigurationError(
@@ -1186,14 +1242,18 @@ class VerticalDefinition:
                     details={"missing_stages": missing_stages},
                 )
 
-        template_task_types = [template.task_type for template in self.prompt_metadata.templates]
+        template_task_types = [
+            template.task_type for template in self.prompt_metadata.templates
+        ]
         if len(template_task_types) != len(set(template_task_types)):
             raise VerticalConfigurationError(
                 "Prompt metadata template task types must be unique.",
                 vertical_name=self.name,
             )
 
-        hint_task_types = [hint.task_type for hint in self.prompt_metadata.task_type_hints]
+        hint_task_types = [
+            hint.task_type for hint in self.prompt_metadata.task_type_hints
+        ]
         if len(hint_task_types) != len(set(hint_task_types)):
             raise VerticalConfigurationError(
                 "Prompt metadata task-type hints must be unique.",
@@ -1239,7 +1299,10 @@ class VerticalDefinition:
                         details={"team_id": team.team_id, "role": member.role},
                     )
 
-        if self.team_metadata.default_team is not None and self.team_metadata.default_team not in team_ids:
+        if (
+            self.team_metadata.default_team is not None
+            and self.team_metadata.default_team not in team_ids
+        ):
             raise VerticalConfigurationError(
                 "Team metadata default_team must reference a declared team.",
                 vertical_name=self.name,
@@ -1258,7 +1321,9 @@ class VerticalDefinition:
         if self.tool_requirements:
             config_extensions["tool_requirements"] = self.tool_requirements.copy()
         if self.capability_requirements:
-            config_extensions["capability_requirements"] = self.capability_requirements.copy()
+            config_extensions["capability_requirements"] = (
+                self.capability_requirements.copy()
+            )
         if (
             self.prompt_metadata.templates
             or self.prompt_metadata.task_type_hints
@@ -1273,7 +1338,11 @@ class VerticalDefinition:
             or self.workflow_metadata.metadata
         ):
             config_extensions["workflow_metadata"] = self.workflow_metadata.to_dict()
-        if self.team_metadata.teams or self.team_metadata.default_team is not None or self.team_metadata.metadata:
+        if (
+            self.team_metadata.teams
+            or self.team_metadata.default_team is not None
+            or self.team_metadata.metadata
+        ):
             config_extensions["team_metadata"] = self.team_metadata.to_dict()
 
         return VerticalConfig(

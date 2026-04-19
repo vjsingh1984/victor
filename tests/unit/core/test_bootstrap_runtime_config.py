@@ -14,7 +14,9 @@ from victor.core.bootstrap import _configure_extension_loader_runtime
 class TestBootstrapRuntimeConfig:
     """Tests for bootstrap-time extension-loader runtime settings application."""
 
-    def test_configure_extension_loader_runtime_applies_pressure_and_starts_reporter(self):
+    def test_configure_extension_loader_runtime_applies_pressure_and_starts_reporter(
+        self,
+    ):
         """Enabled reporter config should apply thresholds and start reporter."""
         settings = Settings(
             extension_loader_warn_queue_threshold=10,
@@ -75,7 +77,9 @@ class TestBootstrapRuntimeConfig:
         mock_start.assert_not_called()
         mock_stop.assert_called_once_with(timeout=2.0)
 
-    def test_configure_extension_loader_runtime_coerces_invalid_values_to_defaults(self):
+    def test_configure_extension_loader_runtime_coerces_invalid_values_to_defaults(
+        self,
+    ):
         """Non-typed/mock settings values should safely fall back to defaults."""
         settings = MagicMock()
         settings.extension_loader_warn_queue_threshold = MagicMock()

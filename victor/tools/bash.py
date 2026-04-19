@@ -17,9 +17,14 @@ from __future__ import annotations
 """Bash command execution tool with readonly mode support."""
 
 import asyncio
+import logging
 import platform
+import re
 import shlex
+import shutil
 from typing import Any, Dict, List, Optional, Set
+
+logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
 from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priority
@@ -274,6 +279,66 @@ def get_allowed_readonly_commands() -> List[str]:
     return commands
 
 
+# =========================================================================
+# Command Optimizer Pipeline
+# =========================================================================
+# Pluggable chain of command optimizers applied before execution.
+# Each optimizer is a callable (str) -> str that may rewrite the command
+# for better performance. Optimizers are applied in registration order.
+# =========================================================================
+
+_command_optimizers: List[Any] = []
+
+
+def register_command_optimizer(optimizer: Any) -> Any:
+    """Register a command optimizer. Can be used as a decorator."""
+    _command_optimizers.append(optimizer)
+    return optimizer
+
+
+def optimize_command(cmd: str) -> str:
+    """Apply all registered command optimizers to a shell command."""
+    for opt in _command_optimizers:
+        cmd = opt(cmd)
+    return cmd
+
+
+@register_command_optimizer
+def _optimize_grep_to_rg(cmd: str) -> str:
+    """Replace slow recursive grep with ripgrep (rg) when available.
+
+    grep -r/-R on large repos can hang for minutes. ripgrep is 10-100x faster
+    because it respects .gitignore, uses memory-mapped I/O, and parallelizes.
+    Basic grep flags (-n, -i, -l, -c, -w, -e) are compatible with rg.
+    """
+    if not re.match(r"^grep\s+.*-[rR]", cmd) and not re.match(r"^grep\s+-[a-zA-Z]*[rR]", cmd):
+        return cmd
+
+    if not shutil.which("rg"):
+        return cmd
+
+    # Replace 'grep' with 'rg' and remove -r/-R (rg is recursive by default)
+    optimized = re.sub(r"^grep\b", "rg", cmd)
+    optimized = re.sub(
+        r"\s-([a-zA-Z]*)r([a-zA-Z]*)",
+        lambda m: (f" -{m.group(1)}{m.group(2)}" if m.group(1) or m.group(2) else ""),
+        optimized,
+    )
+    optimized = re.sub(
+        r"\s-([a-zA-Z]*)R([a-zA-Z]*)",
+        lambda m: (f" -{m.group(1)}{m.group(2)}" if m.group(1) or m.group(2) else ""),
+        optimized,
+    )
+    # Clean up empty flag groups and extra whitespace
+    optimized = re.sub(r"\s-\s", " ", optimized)
+    optimized = re.sub(r"\s+", " ", optimized).strip()
+
+    if optimized != cmd:
+        logger.info(f"Shell optimizer: grep→rg rewrite: {cmd!r} → {optimized!r}")
+
+    return optimized
+
+
 def _is_dangerous(command: str) -> bool:
     """Check if command is potentially dangerous.
 
@@ -324,13 +389,18 @@ async def shell(
     timeout: Optional[int] = None,
     dangerous: bool = False,
 ) -> Dict[str, Any]:
-    """Run shell command with safety checks. Returns stdout/stderr/return_code.
+    """Execute a shell command. The `cmd` parameter is required.
+
+    Example: shell(cmd="ls -la") or shell(cmd="git status")
 
     Args:
-        cmd: Shell command to run
-        cwd: Working directory
-        timeout: Seconds before timeout
-        dangerous: Allow risky commands
+        cmd: The shell command string to execute (required)
+        cwd: Working directory for the command
+        timeout: Maximum seconds before timeout
+        dangerous: Set true only for destructive commands (rm, kill, etc.)
+
+    Returns:
+        Dict with stdout, stderr, return_code keys
     """
     if not cmd:
         return {
@@ -344,6 +414,36 @@ async def shell(
     # Apply default timeout from centralized config
     if timeout is None:
         timeout = ProcessTimeouts.BASH_DEFAULT
+
+    # Apply command optimizer pipeline (grep→rg, etc.)
+    cmd = optimize_command(cmd)
+
+    # Redirect broad recursive search commands to code_search (when available).
+    # Models bypass the semantic index by calling shell("rg ...") directly.
+    # Allow targeted single-file searches (grep -n "pattern" specific_file.py)
+    # since those are precise and don't benefit from semantic search.
+    import re as _re
+
+    _base_cmd = cmd.strip().split("|")[0].strip()
+    if _re.match(r"^\s*(rg|grep|ag|ack)\s+", _base_cmd, _re.IGNORECASE):
+        # Allow targeted searches: grep on a specific file path (not recursive)
+        _is_recursive = bool(_re.search(r"\s-[a-zA-Z]*r[a-zA-Z]*\s", _base_cmd))
+        _targets_file = bool(
+            _re.search(r"\s[\w./\-]+\.\w{1,10}\s*$", _base_cmd)
+            or _re.search(r"\s[\w./\-]+\.\w{1,10}\s*\|", cmd.strip())
+        )
+        if not _targets_file or _is_recursive:
+            return {
+                "success": False,
+                "error": (
+                    "Use code_search(query='...') instead of shell search commands. "
+                    "code_search uses the semantic index and is more reliable. "
+                    "Example: code_search(query='FilePathField', mode='semantic')"
+                ),
+                "stdout": "",
+                "stderr": "",
+                "return_code": -1,
+            }
 
     # Check for dangerous commands
     if not dangerous and _is_dangerous(cmd):
@@ -571,6 +671,9 @@ async def shell_readonly(
     # Apply default timeout from centralized config
     if timeout is None:
         timeout = ProcessTimeouts.BASH_DEFAULT
+
+    # Apply command optimizer pipeline (grep→rg, etc.)
+    cmd = optimize_command(cmd)
 
     # Validate working directory exists before execution
     effective_cwd = cwd or os.getcwd()

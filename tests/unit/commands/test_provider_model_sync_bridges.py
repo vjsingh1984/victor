@@ -234,7 +234,11 @@ class TestABTestingSyncBridge:
     @pytest.mark.parametrize(
         ("command", "helper_name", "args"),
         [
-            ("create_experiment", "_create_experiment_async", (Path("experiment.yaml"),)),
+            (
+                "create_experiment",
+                "_create_experiment_async",
+                (Path("experiment.yaml"),),
+            ),
             ("start_experiment", "_start_experiment_async", ("exp_123",)),
             ("stop_experiment", "_stop_experiment_async", ("exp_123",)),
             ("show_status", "_show_status_async", ("exp_123",)),
@@ -347,7 +351,7 @@ class TestConfigSyncBridge:
         tmp_path: Path,
     ) -> None:
         config_dir = tmp_path / ".victor"
-        config_dir.mkdir()
+        config_dir.mkdir(exist_ok=True)
         (config_dir / "profiles.yaml").write_text("profiles:\n  default:\n    provider: ollama\n")
 
         settings = MagicMock()
@@ -374,7 +378,8 @@ class TestConfigSyncBridge:
             ),
             patch.object(config_cmd, "format_validation_result", return_value="ok"),
             patch(
-                "victor.providers.registry.ProviderRegistry.list_providers", return_value=["ollama"]
+                "victor.providers.registry.ProviderRegistry.list_providers",
+                return_value=["ollama"],
             ),
             patch.object(config_cmd, "_check_connectivity", mock_async),
             patch.object(config_cmd, "run_sync", return_value=None) as mock_run_sync,
@@ -426,12 +431,20 @@ class TestBenchmarkSyncBridge:
             "pass_rate": 1.0,
             "duration_seconds": 1.0,
             "total_tokens": 42,
+            "total_tool_calls": 5,
+            "total_code_search_calls": 0,
+            "total_graph_calls": 0,
+            "tasks_using_code_intelligence": 0,
+            "code_intelligence_task_coverage": 0.0,
         }
         result.task_results = []
 
         with (
             patch.object(benchmark_cmd, "_configure_log_level"),
-            patch("victor.evaluation.benchmarks.HumanEvalRunner", Mock(return_value=runner)),
+            patch(
+                "victor.evaluation.benchmarks.HumanEvalRunner",
+                Mock(return_value=runner),
+            ),
             patch("victor.evaluation.protocol.EvaluationConfig", return_value=config),
             patch.object(benchmark_cmd, "_run_benchmark_async", mock_async),
             patch.object(benchmark_cmd, "run_sync", return_value=result) as mock_run_sync,
@@ -440,6 +453,7 @@ class TestBenchmarkSyncBridge:
             benchmark_cmd.run_benchmark(
                 benchmark="humaneval",
                 max_tasks=2,
+                start_task=0,
                 model="model-x",
                 profile="default",
                 output=None,
@@ -449,6 +463,9 @@ class TestBenchmarkSyncBridge:
                 resume=False,
                 provider=None,
                 log_level=None,
+                debug_modules=None,
+                no_edge_model=False,
+                account=None,
             )
 
         mock_async.assert_called_once_with(
@@ -460,6 +477,8 @@ class TestBenchmarkSyncBridge:
             max_turns=4,
             resume=False,
             provider_override=None,
+            start_task=0,
+            resolved_account=None,
         )
         mock_run_sync.assert_called_once_with(coro)
 
@@ -488,16 +507,17 @@ class TestDashboardSyncBridge:
 
 
 class TestInitSyncBridge:
-    def test_generate_enhanced_init_content_uses_shared_sync_bridge(self) -> None:
+    def test_generate_init_content_enhanced_uses_shared_sync_bridge(self) -> None:
         coro = object()
         mock_async = Mock(return_value=coro)
         on_progress = Mock()
 
         with (
-            patch.object(init_cmd, "_generate_enhanced_init_content_async", mock_async),
+            patch.object(init_cmd, "_generate_init_content_async", mock_async),
             patch.object(init_cmd, "run_sync", return_value="content") as mock_run_sync,
         ):
-            result = init_cmd._generate_enhanced_init_content(
+            result = init_cmd._generate_init_content(
+                mode="enhanced",
                 use_llm=True,
                 include_conversations=False,
                 on_progress=on_progress,
@@ -508,24 +528,28 @@ class TestInitSyncBridge:
 
         assert result == "content"
         mock_async.assert_called_once_with(
+            mode="enhanced",
             use_llm=True,
             include_conversations=False,
             on_progress=on_progress,
             force=True,
             include_dirs=["src"],
             exclude_dirs=["tests"],
+            provider=None,
+            model=None,
         )
         mock_run_sync.assert_called_once_with(coro)
 
-    def test_generate_index_init_content_uses_shared_sync_bridge(self) -> None:
+    def test_generate_init_content_index_uses_shared_sync_bridge(self) -> None:
         coro = object()
         mock_async = Mock(return_value=coro)
 
         with (
-            patch.object(init_cmd, "_generate_index_init_content_async", mock_async),
+            patch.object(init_cmd, "_generate_init_content_async", mock_async),
             patch.object(init_cmd, "run_sync", return_value="content") as mock_run_sync,
         ):
-            result = init_cmd._generate_index_init_content(
+            result = init_cmd._generate_init_content(
+                mode="index",
                 force=False,
                 include_dirs=["src"],
                 exclude_dirs=["tests"],
@@ -533,11 +557,34 @@ class TestInitSyncBridge:
 
         assert result == "content"
         mock_async.assert_called_once_with(
+            mode="index",
+            use_llm=False,
+            include_conversations=False,
+            on_progress=None,
             force=False,
             include_dirs=["src"],
             exclude_dirs=["tests"],
+            provider=None,
+            model=None,
         )
         mock_run_sync.assert_called_once_with(coro)
+
+    def test_generate_init_content_quick_bypasses_run_sync(self) -> None:
+        """Quick mode is sync — should not call run_sync."""
+        mock_smart = Mock(return_value="quick content")
+
+        with (
+            patch.object(init_cmd, "load_codebase_analyzer_attr", return_value=mock_smart),
+            patch.object(init_cmd, "run_sync") as mock_run_sync,
+        ):
+            result = init_cmd._generate_init_content(
+                mode="quick",
+                include_dirs=["src"],
+                exclude_dirs=["tests"],
+            )
+
+        assert result == "quick content"
+        mock_run_sync.assert_not_called()
 
 
 class TestServeSyncBridge:

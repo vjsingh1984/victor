@@ -909,6 +909,38 @@ class TaskTypeHintProtocol(Protocol):
 
 
 # =============================================================================
+# Task Classifier Phrase Protocol
+# =============================================================================
+
+
+@runtime_checkable
+class TaskClassifierPhraseProtocol(Protocol):
+    """Protocol for contributing additional classifier phrases per task type.
+
+    Verticals can register enhanced implementations to extend the semantic
+    task classifier with domain-specific phrases. The classifier merges
+    these phrases with its built-in phrase lists during initialization.
+
+    Example implementation in a vertical::
+
+        class MedicalClassifierPhrases:
+            def get_classifier_phrases(self) -> Dict[str, List[str]]:
+                return {
+                    "analyze": ["diagnose symptoms", "review lab results"],
+                    "search": ["find clinical trials", "search medical literature"],
+                }
+    """
+
+    def get_classifier_phrases(self) -> Dict[str, List[str]]:
+        """Return additional phrases keyed by TaskType value string.
+
+        Returns:
+            Dict mapping TaskType.value strings to lists of classifier phrases.
+        """
+        ...
+
+
+# =============================================================================
 # Ignore Patterns Protocol
 # =============================================================================
 

@@ -524,7 +524,15 @@ class IntelligentPromptBuilder:
     """
 
     # Cloud providers with robust native tool calling
-    CLOUD_PROVIDERS = {"anthropic", "openai", "google", "xai", "moonshot", "kimi", "deepseek"}
+    CLOUD_PROVIDERS = {
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+        "moonshot",
+        "kimi",
+        "deepseek",
+    }
     LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
 
     # Grounding rules

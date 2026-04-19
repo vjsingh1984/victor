@@ -31,7 +31,9 @@ def test_vertical_definition_to_dict_and_to_config_round_trip() -> None:
         tool_requirements=[
             ToolRequirement(tool_name="read", purpose="inspect files"),
             ToolRequirement(tool_name="write", purpose="modify files"),
-            ToolRequirement(tool_name="git", required=False, purpose="optional vcs workflows"),
+            ToolRequirement(
+                tool_name="git", required=False, purpose="optional vcs workflows"
+            ),
         ],
         capability_requirements=[
             CapabilityRequirement(
@@ -41,9 +43,7 @@ def test_vertical_definition_to_dict_and_to_config_round_trip() -> None:
         ],
         system_prompt="You are a coding assistant.",
         prompt_metadata={
-            "templates": {
-                "analysis": "Analyze the repository."
-            },
+            "templates": {"analysis": "Analyze the repository."},
             "task_type_hints": {
                 "analysis": {
                     "hint": "Start with reading the relevant files.",
@@ -76,15 +76,22 @@ def test_vertical_definition_to_dict_and_to_config_round_trip() -> None:
 
     assert payload["name"] == "coding"
     assert payload["tool_requirements"][2]["tool_name"] == "git"
-    assert payload["capability_requirements"][0]["capability_id"] == CapabilityIds.FILE_OPS
+    assert (
+        payload["capability_requirements"][0]["capability_id"] == CapabilityIds.FILE_OPS
+    )
     assert payload["prompt_metadata"]["templates"][0]["task_type"] == "analysis"
     assert payload["stages"]["planning"]["description"] == "Plan first"
     assert payload["workflow_metadata"]["initial_stage"] == "planning"
     assert isinstance(config, VerticalConfig)
     assert config.metadata["vertical_version"] == "2.1.0"
     assert config.extensions["tool_requirements"][2].tool_name == "git"
-    assert config.extensions["capability_requirements"][0].capability_id == CapabilityIds.FILE_OPS
-    assert config.extensions["prompt_metadata"]["templates"][0]["task_type"] == "analysis"
+    assert (
+        config.extensions["capability_requirements"][0].capability_id
+        == CapabilityIds.FILE_OPS
+    )
+    assert (
+        config.extensions["prompt_metadata"]["templates"][0]["task_type"] == "analysis"
+    )
     assert config.extensions["workflow_metadata"]["initial_stage"] == "planning"
     assert round_trip.name == definition.name
     assert round_trip.tool_requirements[2].tool_name == "git"
@@ -164,13 +171,22 @@ def test_sdk_vertical_base_exposes_get_definition() -> None:
     assert definition.capability_requirements[0].capability_id == CapabilityIds.FILE_OPS
     assert definition.prompt_metadata.templates[0].task_type == "analysis"
     assert definition.prompt_metadata.task_type_hints[0].tool_budget == 8
-    assert definition.workflow_metadata.provider_hints["preferred_providers"] == ["anthropic"]
+    assert definition.workflow_metadata.provider_hints["preferred_providers"] == [
+        "anthropic"
+    ]
     assert definition.workflow_metadata.evaluation_criteria == ["accuracy", "coverage"]
     assert config.metadata["vertical_version"] == "3.0.0"
     assert config.extensions["tool_requirements"][0].tool_name == "read"
-    assert config.extensions["capability_requirements"][0].capability_id == CapabilityIds.FILE_OPS
-    assert config.extensions["prompt_metadata"]["templates"][0]["task_type"] == "analysis"
-    assert config.extensions["workflow_metadata"]["provider_hints"]["preferred_providers"] == ["anthropic"]
+    assert (
+        config.extensions["capability_requirements"][0].capability_id
+        == CapabilityIds.FILE_OPS
+    )
+    assert (
+        config.extensions["prompt_metadata"]["templates"][0]["task_type"] == "analysis"
+    )
+    assert config.extensions["workflow_metadata"]["provider_hints"][
+        "preferred_providers"
+    ] == ["anthropic"]
 
 
 def test_sdk_vertical_base_allows_explicit_tool_requirements() -> None:
@@ -193,7 +209,9 @@ def test_sdk_vertical_base_allows_explicit_tool_requirements() -> None:
         def get_tool_requirements(cls) -> list[ToolRequirement]:
             return [
                 ToolRequirement(tool_name="read", purpose="required"),
-                ToolRequirement(tool_name="shell", required=False, purpose="optional execution"),
+                ToolRequirement(
+                    tool_name="shell", required=False, purpose="optional execution"
+                ),
             ]
 
         @classmethod
@@ -276,7 +294,9 @@ def test_vertical_definition_rejects_invalid_workflow_stage_references() -> None
                     description="Plan first",
                 )
             },
-            workflow_metadata={"workflow_spec": {"stage_order": ["planning", "execution"]}},
+            workflow_metadata={
+                "workflow_spec": {"stage_order": ["planning", "execution"]}
+            },
         )
 
 

@@ -5,9 +5,8 @@ These protocols define how verticals provide and customize prompts.
 
 from __future__ import annotations
 
-from typing import Protocol, runtime_checkable, List, Dict, Any, Optional
+from typing import Protocol, runtime_checkable, List, Dict, Any
 
-from victor_sdk.core.types import Tier
 
 
 @runtime_checkable

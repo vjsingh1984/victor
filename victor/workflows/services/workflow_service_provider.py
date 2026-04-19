@@ -202,7 +202,9 @@ class WorkflowServiceProvider:
             container: DI container to register services in
         """
         # Import concrete implementations for registration
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
         from victor.workflows.compiled_executor import WorkflowExecutor
         from victor.workflows.compiler_protocols import WorkflowCompilerProtocol
 
@@ -411,7 +413,9 @@ class WorkflowServiceProvider:
         Returns:
             WorkflowCompilerImpl instance
         """
-        from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
+        from victor.workflows.compiler.workflow_compiler_impl import (
+            WorkflowCompilerImpl,
+        )
         from victor.workflows.compiler_protocols import NodeExecutorFactoryProtocol
         from victor.workflows.validator import WorkflowValidator
         from victor.workflows.yaml_loader import YAMLWorkflowLoader

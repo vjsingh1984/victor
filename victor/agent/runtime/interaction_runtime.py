@@ -58,11 +58,16 @@ def create_interaction_runtime_components(
             tool_access_controller=tool_access_controller,
         )
         coordinator.set_mode_controller(mode_controller)
-        coordinator.set_orchestrator_reference(orchestrator)
+        # Pass enabled tools directly instead of orchestrator reference
+        orch_tools = getattr(orchestrator, "_enabled_tools", None)
+        if orch_tools:
+            coordinator.set_enabled_tools(orch_tools)
         return coordinator
 
     def _build_session_coordinator() -> Any:
-        from victor.agent.coordinators.session_coordinator import create_session_coordinator
+        from victor.agent.coordinators.session_coordinator import (
+            create_session_coordinator,
+        )
 
         return create_session_coordinator(
             session_state_manager=session_state_manager,

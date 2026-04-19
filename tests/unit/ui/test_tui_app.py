@@ -258,10 +258,18 @@ def test_load_project_session_async_uses_to_thread() -> None:
             "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
             return_value=persistence,
         ),
-        patch("victor.agent.message_history.MessageHistory.from_dict", return_value=history),
+        patch(
+            "victor.agent.message_history.MessageHistory.from_dict",
+            return_value=history,
+        ),
         patch(
             "victor.ui.tui.app.asyncio.to_thread",
-            AsyncMock(return_value={"conversation": {"messages": []}, "metadata": {"title": "P"}}),
+            AsyncMock(
+                return_value={
+                    "conversation": {"messages": []},
+                    "metadata": {"title": "P"},
+                }
+            ),
         ) as to_thread,
     ):
         asyncio.run(app._load_project_session_async("project-session-1"))

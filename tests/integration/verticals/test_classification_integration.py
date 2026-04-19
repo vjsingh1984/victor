@@ -47,7 +47,11 @@ from victor.classification import (
     match_first_pattern,
 )
 from victor.classification.nudge_engine import reset_singletons
-from victor.agent.prompt_normalizer import PromptNormalizer, get_prompt_normalizer, reset_normalizer
+from victor.agent.prompt_normalizer import (
+    PromptNormalizer,
+    get_prompt_normalizer,
+    reset_normalizer,
+)
 from victor.framework.task.protocols import TaskComplexity
 
 
@@ -265,7 +269,11 @@ Create a phased rollout plan.
         matcher = PatternMatcher()
         result = matcher.match(prompt)
         assert result is not None
-        assert result.task_type in [TaskType.ARCHITECTURE, TaskType.REFACTOR, TaskType.PLAN]
+        assert result.task_type in [
+            TaskType.ARCHITECTURE,
+            TaskType.REFACTOR,
+            TaskType.PLAN,
+        ]
 
     @requires_ollama()
     def test_security_vulnerability_request(self):

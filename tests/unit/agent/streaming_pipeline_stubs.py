@@ -26,6 +26,7 @@ class DummyStreamContext:
         self.pending_grounding_feedback: Optional[str] = None
         self.total_tokens = 0
         self.total_accumulated_chars = 0
+        self.force_completion = False
 
     def accumulate_content(self, content: str) -> None:
         self.total_accumulated_chars = len(content)
@@ -38,7 +39,11 @@ class OrchestratorStub:
     def __init__(self) -> None:
         self._tool_planner = SimpleNamespace(infer_goals_from_message=lambda _: [])
         self.tool_budget = 0
-        self.debug_logger = SimpleNamespace(reset=lambda: None)
+        self.debug_logger = SimpleNamespace(
+            reset=lambda: None,
+            log_iteration_start=lambda *_, **__: None,
+            log_limits=lambda *_, **__: None,
+        )
         self.thinking = None
         self._required_files: List[str] = []
         self._required_outputs: List[str] = []
@@ -46,7 +51,7 @@ class OrchestratorStub:
         self._all_files_read_nudge_sent = False
         self._task_completion_detector = None
         self.sanitizer = SimpleNamespace(sanitize=lambda text: text, strip_markup=lambda text: text)
-        self.add_message = lambda role, content: None
+        self.add_message = lambda role, content, **kwargs: None
         self._recovery_coordinator = SimpleNamespace(
             check_natural_completion=lambda *_, **__: None,
             get_recovery_fallback_message=lambda *_, **__: "fallback",
@@ -64,6 +69,7 @@ class OrchestratorStub:
             record_iteration=lambda *_, **__: None,
             check_loop_warning=lambda: None,
             get_metrics=lambda: {},
+            unique_resources=set(),
         )
         self._streaming_handler = SimpleNamespace(handle_loop_warning=lambda *_, **__: None)
         self.tool_calls_used = 0
@@ -73,6 +79,48 @@ class OrchestratorStub:
         self._consecutive_blocked_attempts = 0
         self._cumulative_prompt_interventions = 0
         self._record_intelligent_outcome = lambda **__: None
+        self._force_finalize = False
+        self._container = None
+        self._session_tools = None
+        self._context_assembler = None
+        self._cache_optimization_enabled = False
+
+    def get_session_tools(self):
+        return self._session_tools
+
+    def get_assembled_messages(self, current_query=None):
+        return self.messages
+
+    # Methods moved from DummyCoordinator to OrchestratorStub (pipeline now calls orch directly)
+    def _apply_intent_guard(self, message: str):
+        return None
+
+    def _apply_task_guidance(self, *args, **kwargs):
+        return None
+
+    def _get_max_context_chars(self):
+        return 1000
+
+    async def _handle_context_and_iteration_limits(self, *args, **kwargs):
+        return (True, None)
+
+    async def _select_tools_for_turn(self, *args, **kwargs):
+        return []
+
+    def _parse_and_validate_tool_calls(self, tool_calls, full_content):
+        return tool_calls, full_content
+
+    async def _handle_recovery_with_integration(self, *args, **kwargs):
+        return SimpleNamespace(action="continue")
+
+    def _apply_recovery_action(self, *args, **kwargs):
+        return None
+
+    def _create_recovery_context(self, *_):
+        return object()
+
+    async def _validate_intelligent_response(self, *args, **kwargs):
+        return None
 
 
 class DummyCoordinator:
@@ -81,82 +129,40 @@ class DummyCoordinator:
     def __init__(self, pre_chunks=None, limit_result=None) -> None:
         self._stream_ctx = DummyStreamContext()
         self._pre_chunks = pre_chunks or []
-        self._limit_result = limit_result or (True, None)
         self._create_stream_calls: List[str] = []
-        self._selected_tools = []
         self._provider_response = ("", None, None, False)
-        self._recovery_action = SimpleNamespace(action="continue")
         self._empty_recovery = (False, None, None)
-        self._validate_result = None
         self._intent_classification_handler = None
         self._continuation_handler = None
         self._tool_execution_handler = None
         self._orchestrator = OrchestratorStub()
-        self._recovery_ctx = object()
+
+        # Override orchestrator defaults if custom limit_result provided
+        if limit_result is not None:
+            self._orchestrator._handle_context_and_iteration_limits = self._make_limit_handler(
+                limit_result
+            )
+
+    @staticmethod
+    def _make_limit_handler(result):
+        async def handler(*args, **kwargs):
+            return result
+
+        return handler
 
     async def _create_stream_context(self, user_message: str):
         self._create_stream_calls.append(user_message)
         return self._stream_ctx
 
-    def _extract_required_files_from_prompt(self, message: str):
-        return []
-
-    def _extract_required_outputs_from_prompt(self, message: str):
-        return []
-
-    def _apply_intent_guard(self, message: str):
-        return None
-
-    def _apply_task_guidance(
-        self,
-        user_message: str,
-        unified_task_type,
-        is_analysis_task: bool,
-        is_action_task: bool,
-        needs_execution: bool,
-        max_exploration_iterations: int,
-    ):
-        return None
-
-    def _get_decision_service(self):
-        return None
-
     async def _run_iteration_pre_checks(self, *args, **kwargs):
         for chunk in self._pre_chunks:
             yield chunk
 
-    def _log_iteration_debug(self, *args, **kwargs):
-        return None
-
-    def _get_max_context_chars(self):
-        return 1000
-
-    async def _handle_context_and_iteration_limits(self, *args, **kwargs):
-        return self._limit_result
-
-    async def _select_tools_for_turn(self, *args, **kwargs):
-        return self._selected_tools
-
     async def _stream_provider_response(self, *args, **kwargs):
         return self._provider_response
 
-    def _parse_and_validate_tool_calls(self, tool_calls, full_content):
-        return tool_calls, full_content
-
-    async def _handle_recovery_with_integration(self, *args, **kwargs):
-        return self._recovery_action
-
-    def _apply_recovery_action(self, *args, **kwargs):
-        return None
-
     async def _handle_empty_response_recovery(self, *args, **kwargs):
         return self._empty_recovery
-
-    def _create_recovery_context(self, *_):
-        return self._recovery_ctx
-
-    async def _validate_intelligent_response(self, *args, **kwargs):
-        return self._validate_result
 
 
 class StubIntentHandler:

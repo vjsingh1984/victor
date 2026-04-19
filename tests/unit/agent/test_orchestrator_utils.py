@@ -462,7 +462,9 @@ class TestGetToolStatusMessage:
     def test_edit_files_single_file(self):
         """Test status message for edit_files with single file."""
         result = get_tool_status_message(
-            "edit_files", {"files": [{"path": "main.py"}]}, presentation=self.presentation
+            "edit_files",
+            {"files": [{"path": "main.py"}]},
+            presentation=self.presentation,
         )
         assert result == f"{self.ICON_PREFIX} Editing: main.py"
 

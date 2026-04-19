@@ -68,7 +68,10 @@ class TestListProviders:
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_list_providers_with_mocked_registry(self, mock_registry):
         """Test list_providers with mocked registry."""
-        mock_registry.list_providers.return_value = ["test_provider", "another_provider"]
+        mock_registry.list_providers.return_value = [
+            "test_provider",
+            "another_provider",
+        ]
 
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0
@@ -272,7 +275,10 @@ class TestEdgeCases:
     @patch("victor.ui.commands.providers.ProviderRegistry")
     def test_unicode_in_provider_name(self, mock_registry):
         """Test handling of unicode in provider names."""
-        mock_registry.list_providers.return_value = ["provider_日本語", "provider_emoji_🚀"]
+        mock_registry.list_providers.return_value = [
+            "provider_日本語",
+            "provider_emoji_🚀",
+        ]
 
         result = runner.invoke(providers_app, [])
         assert result.exit_code == 0

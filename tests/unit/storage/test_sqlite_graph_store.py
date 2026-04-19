@@ -46,6 +46,9 @@ async def test_sqlite_graph_store_upsert_and_query(tmp_path):
     assert len(found) == 1
     assert found[0].node_id == "symbol:main.py:foo"
 
+    all_nodes = await store.get_all_nodes()
+    assert len(all_nodes) == 2
+
     neighbors = await store.get_neighbors("file:main.py")
     assert len(neighbors) == 1
     assert neighbors[0].dst == "symbol:main.py:foo"

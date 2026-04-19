@@ -61,8 +61,8 @@ class EdgeModelConfig:
 
     enabled: bool = True
     provider: str = "ollama"
-    model: str = "qwen2.5-coder:1.5b"
-    timeout_ms: int = 2000
+    model: str = "qwen3.5:2b"
+    timeout_ms: int = 4000
     max_tokens: int = 50
     cache_ttl: int = 120
     confidence_threshold: float = 0.6
@@ -70,6 +70,32 @@ class EdgeModelConfig:
     tool_selection_enabled: bool = True
     prompt_focus_enabled: bool = True
     max_tools: int = 6
+    # Per-task-type timeouts: simpler decisions get shorter timeouts
+    timeout_by_task: Dict[str, int] = field(
+        default_factory=lambda: {
+            "classification": 2000,
+            "completion_check": 2000,
+            "prompt_focus": 4000,
+            "tool_selection": 6000,
+        }
+    )
+    # Per-task-type cache TTL: stable decisions cached longer
+    cache_ttl_by_task: Dict[str, int] = field(
+        default_factory=lambda: {
+            "classification": 300,
+            "completion_check": 300,
+            "prompt_focus": 180,
+            "tool_selection": 120,
+        }
+    )
+
+    def get_timeout_for_task(self, task_type: str) -> int:
+        """Get the timeout in ms for a specific task type."""
+        return self.timeout_by_task.get(task_type, self.timeout_ms)
+
+    def get_cache_ttl_for_task(self, task_type: str) -> int:
+        """Get the cache TTL in seconds for a specific task type."""
+        return self.cache_ttl_by_task.get(task_type, self.cache_ttl)
 
 
 # Tool selection prompt — edge model picks most relevant tools
@@ -264,6 +290,11 @@ def select_prompt_sections_with_edge_model(
         List of section names to include, or None if unavailable
     """
     try:
+        from victor.agent.decisions.chain import should_use_llm
+
+        if not should_use_llm("prompt_focus"):
+            return None
+
         from victor.agent.decisions.schemas import DecisionType
 
         decision = service.decide_sync(

@@ -404,7 +404,7 @@ class UnifiedTaskConfigLoader:
             },
         },
         "global": {
-            "max_total_iterations": 50,
+            "max_total_iterations": 100,
             "min_content_threshold": 150,
             "signature_history_size": 10,
             "max_overlapping_reads_per_file": 3,
@@ -443,7 +443,7 @@ class UnifiedTaskConfigLoader:
                 self._config = {
                     "task_types": task_config.get("task_types", {}),
                     "global": {
-                        "max_total_iterations": 50,
+                        "max_total_iterations": 100,
                         "min_content_threshold": 150,
                         "signature_history_size": 10,
                         "max_overlapping_reads_per_file": 3,
@@ -564,7 +564,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Global settings
         global_config = self._config_loader.get_global_config()
-        self._max_total_iterations = global_config.get("max_total_iterations", 50)
+        self._max_total_iterations = global_config.get("max_total_iterations", 100)
         self._min_content_threshold = global_config.get("min_content_threshold", 150)
         self._base_max_overlapping_reads = global_config.get("max_overlapping_reads_per_file", 3)
         self._base_max_searches_per_prefix = global_config.get("max_searches_per_query_prefix", 2)
@@ -826,7 +826,17 @@ class UnifiedTaskTracker(ModeAwareMixin):
         if tool_name in {"shell", "bash"} and arguments:
             cmd = arguments.get("cmd", "")
             # Check for write-like shell commands
-            write_commands = ["mkdir", "touch", "echo", "cat >", "cp", "mv", "rm", "chmod", "chown"]
+            write_commands = [
+                "mkdir",
+                "touch",
+                "echo",
+                "cat >",
+                "cp",
+                "mv",
+                "rm",
+                "chmod",
+                "chown",
+            ]
             is_write_operation = any(wc in cmd for wc in write_commands)
 
         if is_write_operation:
@@ -1529,7 +1539,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
         Returns:
             Detected TrackerTaskType
         """
-        from victor.storage.embeddings.task_classifier import TaskType as ClassifierTaskType
+        from victor.storage.embeddings.task_classifier import (
+            TaskType as ClassifierTaskType,
+        )
         from victor.storage.embeddings.task_classifier import TaskTypeClassifier
 
         # Use the singleton classifier instance
@@ -1774,7 +1786,9 @@ def create_tracker_for_task(task_type: TrackerTaskType) -> UnifiedTaskTracker:
     return tracker
 
 
-def create_tracker_from_message(message: str) -> Tuple[UnifiedTaskTracker, TrackerTaskType]:
+def create_tracker_from_message(
+    message: str,
+) -> Tuple[UnifiedTaskTracker, TrackerTaskType]:
     """Create a tracker by classifying a message.
 
     Args:

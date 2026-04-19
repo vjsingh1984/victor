@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Middleware pipeline for cross-cutting concerns.
+"""Core middleware pipeline using inheritance from ``Middleware`` base class.
 
-This module provides a composable middleware system for handling cross-cutting
-concerns such as logging, metrics, error handling, and validation.
+This middleware layer handles pipeline cross-cutting concerns (logging,
+metrics, error handling). It uses an inheritance-based pattern with a
+``Middleware`` abstract base class.
+
+Note: ``victor.framework.middleware`` uses ``MiddlewareProtocol`` instead
+(structural typing, no shared base) for tool-call audit events. The two
+middleware layers serve different purposes and are intentionally separate.
 
 Design Patterns:
 - Chain of Responsibility: Middleware chain for request processing

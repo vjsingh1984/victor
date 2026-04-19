@@ -37,6 +37,10 @@ class GraphEdge:
 class GraphStoreProtocol(Protocol):
     """Interface for pluggable graph stores."""
 
+    async def initialize(self) -> None: ...
+
+    async def close(self) -> None: ...
+
     async def upsert_nodes(self, nodes: Iterable[GraphNode]) -> None: ...
 
     async def upsert_edges(self, edges: Iterable[GraphEdge]) -> None: ...
@@ -46,7 +50,11 @@ class GraphStoreProtocol(Protocol):
     ) -> List[GraphEdge]: ...
 
     async def find_nodes(
-        self, *, name: str | None = None, type: str | None = None, file: str | None = None
+        self,
+        *,
+        name: str | None = None,
+        type: str | None = None,
+        file: str | None = None,
     ) -> List[GraphNode]: ...
 
     async def search_symbols(
@@ -57,6 +65,10 @@ class GraphStoreProtocol(Protocol):
 
     async def get_node_by_id(self, node_id: str) -> GraphNode | None:
         """Get a single node by its ID."""
+        ...
+
+    async def get_all_nodes(self) -> List[GraphNode]:
+        """Get all nodes in the graph (bulk retrieval for analytics)."""
         ...
 
     async def get_nodes_by_file(self, file: str) -> List[GraphNode]:

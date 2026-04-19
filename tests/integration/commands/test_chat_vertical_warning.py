@@ -73,7 +73,10 @@ def test_chat_missing_coding_vertical_emits_capability_warning(monkeypatch):
     from victor.core import bootstrap as bootstrap_module
     from victor.core.plugins.registry import PluginRegistry
     from victor.core.verticals.base import VerticalRegistry
-    from victor.core.verticals.vertical_loader import VerticalLoader, get_vertical_loader
+    from victor.core.verticals.vertical_loader import (
+        VerticalLoader,
+        get_vertical_loader,
+    )
 
     original_discover = VerticalLoader.discover_verticals
     original_plugin_discover = PluginRegistry.discover

@@ -318,7 +318,13 @@ class ImplementOption(Option):
             name="implement_feature",
             description="Implement code changes for the task",
         )
-        self._implement_tools = {"write_file", "edit_file", "execute_code", "run_tests", "bash"}
+        self._implement_tools = {
+            "write_file",
+            "edit_file",
+            "execute_code",
+            "run_tests",
+            "bash",
+        }
 
     def can_initiate(self, state: OptionState) -> bool:
         """Can initiate when we have enough context."""

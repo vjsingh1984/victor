@@ -1232,7 +1232,9 @@ def workflow(
         Decorator function
     """
 
-    def decorator(func: Callable[[], WorkflowDefinition]) -> Callable[[], WorkflowDefinition]:
+    def decorator(
+        func: Callable[[], WorkflowDefinition],
+    ) -> Callable[[], WorkflowDefinition]:
         @functools.wraps(func)
         def wrapper() -> WorkflowDefinition:
             defn = func()

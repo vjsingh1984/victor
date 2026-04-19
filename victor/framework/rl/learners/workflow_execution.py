@@ -62,6 +62,7 @@ from typing import Any, Dict, List, Optional
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.core.schema import Tables
+from victor.core.constants import DEFAULT_VERTICAL
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +251,7 @@ class WorkflowExecutionLearner(BaseLearner):
         success: bool,
         duration_seconds: float = 0.0,
         quality_score: float = 0.5,
-        vertical: str = "coding",
+        vertical: str = DEFAULT_VERTICAL,
         mode: str = "build",
     ) -> None:
         """Record a workflow execution outcome.
@@ -511,7 +512,7 @@ class WorkflowExecutionLearner(BaseLearner):
             stats[wf_name]["task_types"][task_type] = {
                 "q_value": row[2],
                 "execution_count": execution_count,
-                "success_rate": success_count / execution_count if execution_count > 0 else 0.0,
+                "success_rate": (success_count / execution_count if execution_count > 0 else 0.0),
                 "avg_duration": row[5],
                 "avg_quality": row[6],
             }

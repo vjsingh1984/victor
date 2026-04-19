@@ -125,27 +125,56 @@ class ParallelToolExecutor:
         # Cannot parallelize single or empty calls
         if len(tool_calls) <= 1:
             return False
-        # Cannot parallelize if writes are present
-        if self._has_write_tools(tool_calls):
-            return False
+        # Writes to different files CAN parallelize via dependency graph.
+        # Only serialize when multiple writes target the SAME file or when
+        # a write has no extractable file path (unknown target).
         return True
 
     def _extract_file_dependencies(self, tool_calls: List[Dict[str, Any]]) -> Dict[int, Set[int]]:
-        dependencies = {i: set() for i in range(len(tool_calls))}
-        path_writers = {}
+        """Build a per-file dependency graph for tool calls.
+
+        Dependency rules:
+        - A read on path P depends on all prior writes to P
+        - A write on path P depends on all prior writes to P (serialization)
+        - A write with no extractable path depends on ALL prior writes
+          (conservative: unknown target could conflict with anything)
+        """
+        dependencies: Dict[int, Set[int]] = {i: set() for i in range(len(tool_calls))}
+        path_writers: Dict[str, List[int]] = {}  # path -> [writer indices]
+        unresolved_writers: List[int] = []  # writes with no extractable path
 
         for i, tc in enumerate(tool_calls):
             name = tc.get("name", "")
             args = tc.get("arguments", {})
+            if isinstance(args, str):
+                import json as _json
+
+                try:
+                    args = _json.loads(args)
+                except Exception:
+                    args = {}
             path = args.get("path") or args.get("file_path")
 
-            if not path:
-                continue
-
             if name in WRITE_TOOLS:
-                path_writers.setdefault(path, []).append(i)
-            elif name in READ_TOOLS and path in path_writers:
-                dependencies[i].update(path_writers[path])
+                if path:
+                    # Write→write on same file: serialize
+                    if path in path_writers:
+                        dependencies[i].update(path_writers[path])
+                    path_writers.setdefault(path, []).append(i)
+                else:
+                    # Unknown write target: depends on ALL prior writes
+                    for prev_writers in path_writers.values():
+                        dependencies[i].update(prev_writers)
+                    dependencies[i].update(unresolved_writers)
+                    unresolved_writers.append(i)
+                # All unresolved writes also depend on this one
+                # (handled by future iterations looking at unresolved_writers)
+            elif name in READ_TOOLS:
+                # Read depends on prior writes to same path
+                if path and path in path_writers:
+                    dependencies[i].update(path_writers[path])
+                # Read also depends on unresolved writes (conservative)
+                dependencies[i].update(unresolved_writers)
 
         return dependencies
 
@@ -162,12 +191,8 @@ class ParallelToolExecutor:
 
         context = context or {}
 
-        # Simple parallelization: skip if writes present or disabled
-        if (
-            not self.config.enable_parallel
-            or len(tool_calls) <= 1
-            or self._has_write_tools(tool_calls)
-        ):
+        # Sequential fallback only when parallelism is disabled or single call
+        if not self.config.enable_parallel or len(tool_calls) <= 1:
             return await self._execute_sequential(tool_calls, context, result, start_time)
 
         # Parallel execution with dependency handling

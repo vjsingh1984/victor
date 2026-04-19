@@ -439,7 +439,14 @@ class ToolCallExtractor:
             mode = "find"  # default
             if any(
                 word in query.lower()
-                for word in ["neighbor", "connected", "related", "calls", "callee", "caller"]
+                for word in [
+                    "neighbor",
+                    "connected",
+                    "related",
+                    "calls",
+                    "callee",
+                    "caller",
+                ]
             ):
                 mode = "neighbors"
             elif any(word in query.lower() for word in ["path", "between", "connection"]):
