@@ -447,6 +447,9 @@ class ConversationStore:
         # Load caches
         self._load_lookup_caches(conn)
 
+        # Apply hybrid compaction schema enhancements
+        self._apply_hybrid_compaction_schema(conn)
+
         # Auto-maintenance: vacuum if fragmented, cleanup stale sessions
         self._auto_maintenance()
 
@@ -475,6 +478,115 @@ class ConversationStore:
                     logger.info(f"Auto-vacuum: reclaimed {freelist} free pages")
         except sqlite3.Error as e:
             logger.debug(f"Auto-maintenance skipped: {e}")
+
+    def _apply_hybrid_compaction_schema(self, conn: sqlite3.Connection) -> None:
+        """Apply enhanced schema for hybrid compaction system.
+
+        Adds JSON1 extension support, new columns for dual-format storage,
+        and analytics tables for monitoring compaction performance.
+
+        This is a non-breaking migration - all new columns have DEFAULT values.
+        """
+        try:
+            # Enable JSON1 extension (built-in to Python's sqlite3)
+            conn.execute("SELECT json_extract('{\"test\": 1}', '$.test')")
+
+            # Add new columns to messages table (if not exist)
+            messages_columns = [
+                ("metadata_json", "TEXT DEFAULT '{}'"),  # JSON metadata
+                ("priority", "INTEGER DEFAULT 50"),  # Message priority
+            ]
+
+            for col_name, col_def in messages_columns:
+                try:
+                    conn.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_def}")
+                    logger.info(f"Added column {col_name} to messages table")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column name" not in str(e).lower():
+                        logger.warning(f"Failed to add column {col_name} to messages: {e}")
+
+            # Add new columns to context_summaries table (if not exist)
+            summary_columns = [
+                ("summary_format", "TEXT DEFAULT 'natural'"),  # 'xml', 'natural', 'both'
+                ("summary_xml", "TEXT"),  # Machine-readable XML format
+                ("summary_text", "TEXT"),  # Natural language format
+                ("summary_json", "TEXT DEFAULT '{}'"),  # Structured summary data
+                ("messages_summarized_json", "TEXT DEFAULT '[]'"),  # Native JSON array
+                ("strategy_used", "TEXT"),  # 'rule_based', 'llm_based', 'hybrid'
+                ("complexity_score", "REAL"),  # 0.0-1.0 complexity score
+                ("estimated_tokens_saved", "INTEGER DEFAULT 0"),  # Token savings
+            ]
+
+            for col_name, col_def in summary_columns:
+                try:
+                    conn.execute(f"ALTER TABLE context_summaries ADD COLUMN {col_name} {col_def}")
+                    logger.info(f"Added column {col_name} to context_summaries table")
+                except sqlite3.OperationalError as e:
+                    if "duplicate column name" not in str(e).lower():
+                        logger.warning(f"Failed to add column {col_name} to context_summaries: {e}")
+
+            # Create compaction_history table for analytics
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS compaction_history (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    strategy_used TEXT NOT NULL,
+                    message_count_before INTEGER NOT NULL,
+                    message_count_after INTEGER NOT NULL,
+                    token_count_before INTEGER NOT NULL,
+                    token_count_after INTEGER NOT NULL,
+                    duration_ms INTEGER NOT NULL,
+                    llm_provider TEXT,
+                    llm_model TEXT,
+                    success BOOLEAN NOT NULL,
+                    error_message TEXT,
+                    created_at TIMESTAMP NOT NULL,
+                    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                )
+            """)
+
+            # Create topic_segments table (future-proofing for topic-aware segmentation)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS topic_segments (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    topic_name TEXT NOT NULL,
+                    start_message_id TEXT NOT NULL,
+                    end_message_id TEXT,
+                    message_count INTEGER DEFAULT 0,
+                    metadata_json TEXT DEFAULT '{}',
+                    created_at TIMESTAMP NOT NULL,
+                    FOREIGN KEY (session_id) REFERENCES sessions(session_id),
+                    FOREIGN KEY (start_message_id) REFERENCES messages(id),
+                    FOREIGN KEY (end_message_id) REFERENCES messages(id)
+                )
+            """)
+
+            # Create indexes for enhanced queries
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_summaries_strategy
+                ON context_summaries(strategy_used, created_at)
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_compaction_history_session
+                ON compaction_history(session_id, created_at)
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_compaction_history_strategy
+                ON compaction_history(strategy_used, created_at)
+            """)
+
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_topic_segments_session
+                ON topic_segments(session_id, created_at)
+            """)
+
+            logger.info("Applied hybrid compaction schema enhancements")
+
+        except sqlite3.Error as e:
+            logger.warning(f"Failed to apply hybrid compaction schema: {e}")
 
     def _populate_lookup_tables(self, conn: sqlite3.Connection) -> None:
         """Populate lookup tables with predefined enum values."""
@@ -1548,12 +1660,14 @@ class ConversationStore:
         await asyncio.to_thread(self._persist_message, session_id, message)
         await asyncio.to_thread(self._update_session_activity, session_id)
 
+        session = self._sessions.get(session_id)
+        total_tokens = session.current_tokens if session else 0
         logger.debug(
             "Added %s message to %s (async). " "Tokens: %d, Total: %d",
             role.value,
             session_id,
             message.token_count,
-            message.session.current_tokens,
+            total_tokens,
         )
         return message
 
@@ -2035,6 +2149,240 @@ class ConversationStore:
             )
 
         logger.debug(f"Stored compaction summary for session {session_id}")
+
+    def store_compaction_summary_enhanced(
+        self,
+        session_id: str,
+        summary_xml: str,
+        summary_text: str,
+        summary_json: Dict[str, Any],
+        messages_summarized: List[str],
+        strategy_used: str,
+        complexity_score: float,
+        tokens_saved: int,
+        duration_ms: int,
+        llm_provider: Optional[str] = None,
+        llm_model: Optional[str] = None,
+        success: bool = True,
+        error_message: Optional[str] = None,
+    ) -> str:
+        """Store enhanced compaction summary with dual formats.
+
+        Stores both XML (machine-readable) and natural language formats,
+        along with metadata for analytics and monitoring.
+
+        Args:
+            session_id: Session the summary belongs to
+            summary_xml: Machine-readable XML format
+            summary_text: Natural language format
+            summary_json: Structured summary data as dict
+            messages_summarized: List of message IDs that were summarized
+            strategy_used: 'rule_based', 'llm_based', or 'hybrid'
+            complexity_score: 0.0-1.0 complexity score
+            tokens_saved: Estimated tokens saved
+            duration_ms: Compaction duration in milliseconds
+            llm_provider: LLM provider used (if applicable)
+            llm_model: LLM model used (if applicable)
+            success: Whether compaction succeeded
+            error_message: Error message if failed
+
+        Returns:
+            Summary ID
+        """
+        summary_id = f"sum_{uuid.uuid4().hex[:12]}"
+
+        with sqlite3.connect(self.db_path) as conn:
+            # Determine format
+            if summary_xml and summary_text:
+                summary_format = "both"
+            elif summary_xml:
+                summary_format = "xml"
+            else:
+                summary_format = "natural"
+
+            # Store enhanced summary
+            conn.execute(
+                """
+                INSERT INTO context_summaries (
+                    id, session_id, summary_format, summary_xml, summary_text,
+                    summary_json, messages_summarized, messages_summarized_json,
+                    strategy_used, complexity_score, estimated_tokens_saved,
+                    token_count, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    summary_id,
+                    session_id,
+                    summary_format,
+                    summary_xml,
+                    summary_text,
+                    json_dumps(summary_json),
+                    json_dumps(messages_summarized),
+                    json_dumps(messages_summarized),
+                    strategy_used,
+                    complexity_score,
+                    tokens_saved,
+                    len(summary_xml or summary_text) // self.chars_per_token,
+                    datetime.now().isoformat(),
+                ),
+            )
+
+            # Log to compaction_history for analytics
+            history_id = f"hist_{uuid.uuid4().hex[:12]}"
+            conn.execute(
+                """
+                INSERT INTO compaction_history (
+                    id, session_id, strategy_used, message_count_before,
+                    message_count_after, token_count_before, token_count_after,
+                    duration_ms, llm_provider, llm_model, success, error_message,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    history_id,
+                    session_id,
+                    strategy_used,
+                    len(messages_summarized),  # message_count_before
+                    0,  # message_count_after (not tracked here)
+                    tokens_saved + len(summary_xml or summary_text) // self.chars_per_token,  # token_count_before (estimated)
+                    len(summary_xml or summary_text) // self.chars_per_token,  # token_count_after
+                    duration_ms,
+                    llm_provider,
+                    llm_model,
+                    success,
+                    error_message,
+                    datetime.now().isoformat(),
+                ),
+            )
+
+        logger.debug(
+            f"Stored enhanced compaction summary for session {session_id} "
+            f"(strategy={strategy_used}, tokens_saved={tokens_saved})"
+        )
+
+        return summary_id
+
+    def get_compaction_summaries(
+        self,
+        session_id: str,
+        format_preference: str = "both",
+        limit: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Retrieve compaction summaries with format preference.
+
+        Args:
+            session_id: Session to retrieve summaries for
+            format_preference: 'xml', 'natural', or 'both'
+            limit: Maximum number of summaries to retrieve
+
+        Returns:
+            List of summary dictionaries
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            if format_preference == "xml":
+                cursor = conn.execute(
+                    """
+                    SELECT id, summary_xml as summary, strategy_used,
+                           complexity_score, estimated_tokens_saved, created_at
+                    FROM context_summaries
+                    WHERE session_id = ? AND summary_xml IS NOT NULL
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (session_id, limit),
+                )
+            elif format_preference == "natural":
+                cursor = conn.execute(
+                    """
+                    SELECT id, summary_text as summary, strategy_used,
+                           complexity_score, estimated_tokens_saved, created_at
+                    FROM context_summaries
+                    WHERE session_id = ? AND summary_text IS NOT NULL
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (session_id, limit),
+                )
+            else:  # both
+                cursor = conn.execute(
+                    """
+                    SELECT id, summary_xml, summary_text, strategy_used,
+                           complexity_score, estimated_tokens_saved, created_at
+                    FROM context_summaries
+                    WHERE session_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (session_id, limit),
+                )
+
+            summaries = []
+            for row in cursor.fetchall():
+                summary = {
+                    "id": row[0],
+                    "summary_xml": row[1] if format_preference != "natural" else None,
+                    "summary_text": row[2] if format_preference == "natural" else row[2],
+                    "strategy_used": row[3],
+                    "complexity_score": row[4],
+                    "estimated_tokens_saved": row[5],
+                    "created_at": row[6],
+                }
+                if format_preference == "both":
+                    summary["summary_xml"] = row[1]
+                    summary["summary_text"] = row[2]
+                    summary["strategy_used"] = row[3]
+                summaries.append(summary)
+
+            return summaries
+
+    def get_compaction_history(
+        self,
+        session_id: str,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Retrieve compaction history for analytics.
+
+        Args:
+            session_id: Session to retrieve history for
+            limit: Maximum number of events to retrieve
+
+        Returns:
+            List of compaction event dictionaries
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, session_id, strategy_used, message_count_before,
+                       message_count_after, token_count_before, token_count_after,
+                       duration_ms, llm_provider, llm_model, success, error_message,
+                       created_at
+                FROM compaction_history
+                WHERE session_id = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+                """,
+                (session_id, limit),
+            )
+
+            history = []
+            for row in cursor.fetchall():
+                history.append({
+                    "id": row[0],
+                    "session_id": row[1],
+                    "strategy_used": row[2],
+                    "message_count_before": row[3],
+                    "message_count_after": row[4],
+                    "token_count_before": row[5],
+                    "token_count_after": row[6],
+                    "duration_ms": row[7],
+                    "llm_provider": row[8],
+                    "llm_model": row[9],
+                    "success": bool(row[10]),
+                    "error_message": row[11],
+                    "created_at": row[12],
+                })
+
+            return history
 
     def get_historical_tool_results(
         self,

@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from victor.agent.compaction_summarizer import CompactionSummaryStrategy
     from victor.agent.context_reminder import ContextReminderManager
     from victor.agent.compaction_hierarchy import HierarchicalCompactionManager
+    from victor.agent.compaction_router import CompactionRouter
 
 
 class CompactionStrategy(Enum):
@@ -96,7 +97,7 @@ class ContextMetrics:
     estimated_tokens: int
     message_count: int
     is_overflow_risk: bool = False
-    max_context_chars: int = 200000
+    max_context_chars: int = CONTEXT_LIMITS.max_context_chars
 
     @property
     def total_chars(self) -> int:
@@ -143,6 +144,7 @@ class ConversationController:
         compaction_summarizer: Optional["CompactionSummaryStrategy"] = None,
         context_reminder_manager: Optional["ContextReminderManager"] = None,
         hierarchical_manager: Optional["HierarchicalCompactionManager"] = None,
+        compaction_router: Optional["CompactionRouter"] = None,
     ):
         self.config = config or ConversationConfig()
         self._history = message_history or MessageHistory()
@@ -154,6 +156,7 @@ class ConversationController:
         self._system_added = False
         self._context_callbacks: List[Callable[[ContextMetrics], None]] = []
         self._compaction_summarizer = compaction_summarizer
+        self._compaction_router = compaction_router  # NEW: Hybrid compaction router
         self._compaction_summaries: List[str] = []
         self._current_plan: Optional[Any] = None
         self._context_reminder_manager = context_reminder_manager
@@ -443,27 +446,64 @@ class ConversationController:
                     normalized.append(Message(**safe))
                 elif isinstance(m, str):
                     normalized.append(Message(role="assistant", content=m))
-            self._history._messages = normalized
+            from victor.agent.message_history import _TrackedList
+            self._history._messages = _TrackedList(normalized)
 
         # Score all messages for importance
-        scored_messages = self._score_messages(current_query)
+        scored_messages = self._score_messages(current_query=current_query)
 
         # Sort by score (descending) and keep top N
         scored_messages.sort(key=lambda x: x.score, reverse=True)
 
-        # Always keep system message
-        system_msg = None
+        # ALWAYS keep root system message (at index 0) for caching stability
+        # AND keep the most recent system message if it differs from the root.
+        system_msgs_to_keep = []
         if (
             self.messages
             and hasattr(self.messages[0], "role")
             and self.messages[0].role == "system"
         ):
-            system_msg = self.messages[0]
-            # Remove system from scored list (we'll add it back)
+            system_msgs_to_keep.append(self.messages[0])
+            # Remove from scored list to handle separately
             scored_messages = [sm for sm in scored_messages if sm.index != 0]
+
+        # Find any other system messages (e.g. dynamic instructions)
+        # We only want to keep the MOST RECENT one if there are many.
+        other_system_msgs = [sm for sm in scored_messages if sm.message.role == "system"]
+        if other_system_msgs:
+            # Sort by index to find the last one
+            other_system_msgs.sort(key=lambda x: x.index)
+            recent_system = other_system_msgs[-1]
+            # If it's different from root, we might want to keep it
+            if recent_system.message.content != system_msgs_to_keep[0].content:
+                system_msgs_to_keep.append(recent_system.message)
+            
+            # Remove all other system messages from the candidates
+            system_indices = {sm.index for sm in other_system_msgs}
+            scored_messages = [sm for sm in scored_messages if sm.index not in system_indices]
 
         # Keep top messages (up to target)
         messages_to_keep = scored_messages[:target]
+
+        # Ensure balanced representation: Guaranteed Role Minimums
+        # We need at least 1 USER and 1 ASSISTANT (as requested by user fix)
+        # but also ensure they don't get buried if target is small.
+        kept_roles = {sm.message.role for sm in messages_to_keep}
+        
+        # 1. Ensure USER message survives (at least one)
+        if "user" not in kept_roles:
+            for sm in scored_messages[target:]:
+                if sm.message.role == "user":
+                    messages_to_keep.append(sm)
+                    break
+
+        # 2. Ensure ASSISTANT message survives (the most recent one)
+        if "assistant" not in kept_roles:
+            # Look backwards from all scored messages for the latest assistant turn
+            for sm in reversed(scored_messages):
+                if sm.message.role == "assistant":
+                    messages_to_keep.append(sm)
+                    break
 
         # Preserve tool-call pairs: if an assistant message with tool_calls
         # is kept, ensure its corresponding tool responses are also kept.
@@ -505,12 +545,15 @@ class ConversationController:
                 self.persist_compaction_summary(summary, message_ids)
 
         # Rebuild message list
-        removed_count = len(self.messages) - len(messages_to_keep) - (1 if system_msg else 0)
+        removed_count = len(self.messages) - len(messages_to_keep) - len(system_msgs_to_keep)
         self._history.clear()
 
-        if system_msg:
-            self._history.append_message(system_msg)
+        # Add preserved system messages first (Root + Recent Dynamic)
+        for msg in system_msgs_to_keep:
+            self._history.append_message(msg)
 
+        # Add conversation messages in their original chronological order
+        messages_to_keep.sort(key=lambda x: x.index)
         for scored_msg in messages_to_keep:
             self._history.append_message(scored_msg.message)
 
@@ -539,6 +582,30 @@ class ConversationController:
         """
         msgs_to_score = messages if messages is not None else self.messages
 
+        # DEBUG: trace source of msgs_to_score
+        if msgs_to_score:
+            import traceback as _tb
+
+            sample_types = [type(m).__name__ for m in msgs_to_score[:5]]
+            history_id = id(self._history) if hasattr(self, '_history') else 'N/A'
+            history_msgs_types = (
+                [type(m).__name__ for m in self._history._messages[:5]]
+                if hasattr(self, '_history') and hasattr(self._history, '_messages')
+                else ['N/A']
+            )
+            logger.info(
+                "SCORE_TRACE: msgs_to_score len=%d types=%s | "
+                "messages_param=%s | history_id=%s | history._messages types=%s | "
+                "self.messages id=%s | history.messages id=%s",
+                len(msgs_to_score),
+                sample_types,
+                "provided" if messages is not None else "self.messages",
+                history_id,
+                history_msgs_types,
+                id(self.messages),
+                id(self._history.messages) if hasattr(self, '_history') else 'N/A',
+            )
+
         # Pre-process: handle system messages and pinned content before canonical scoring
         scored: List[MessageImportance] = []
         scorable_msgs: List[Message] = []
@@ -549,10 +616,16 @@ class ConversationController:
         # into the history, or after serialization round-trips.
         non_message_count = sum(1 for m in msgs_to_score if not isinstance(m, Message))
         if non_message_count > 0:
+            # Log type info for debugging — helps identify where non-Message items come from
+            type_counts: dict = {}
+            for m in msgs_to_score:
+                t = type(m).__name__
+                type_counts[t] = type_counts.get(t, 0) + 1
             logger.info(
-                "Normalizing %d non-Message items in history (%d total)",
+                "Normalizing %d non-Message items in history (%d total), types: %s",
                 non_message_count,
                 len(msgs_to_score),
+                type_counts,
             )
             converted = []
             for m in msgs_to_score:
@@ -666,14 +739,20 @@ class ConversationController:
 
         return 0.0
 
-    def _generate_compaction_summary(self, removed_messages: List[Message]) -> str:
+    def _generate_compaction_summary(
+        self,
+        removed_messages: List[Message],
+        current_query: Optional[str] = None,
+    ) -> str:
         """Generate a summary of removed messages for context preservation.
 
-        Delegates to compaction summarizer strategy if available, otherwise
-        falls back to keyword-based extraction.
+        Delegates to CompactionRouter if available (hybrid system),
+        otherwise uses legacy compaction summarizer strategy,
+        otherwise falls back to keyword-based extraction.
 
         Args:
             removed_messages: Messages being removed
+            current_query: Optional current query for relevance scoring
 
         Returns:
             Summary string, or empty string if nothing noteworthy
@@ -681,7 +760,71 @@ class ConversationController:
         if not removed_messages:
             return ""
 
-        # Delegate to strategy if available
+        # NEW: Use CompactionRouter if available (hybrid compaction system)
+        if self._compaction_router:
+            try:
+                import asyncio
+
+                # Try to run async router in sync context
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop and loop.is_running():
+                    # We're in an async context, need to run in thread
+                    import concurrent.futures
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        future = pool.submit(
+                            asyncio.run,
+                            self._compaction_router.compact(
+                                removed_messages,
+                                current_query=current_query,
+                                session_id=self._session_id,
+                            )
+                        )
+                        result = future.result(timeout=10.0)
+                else:
+                    # No async context, run directly
+                    result = asyncio.run(
+                        self._compaction_router.compact(
+                            removed_messages,
+                            current_query=current_query,
+                            session_id=self._session_id,
+                        )
+                    )
+
+                # Store enhanced summary in conversation store if available
+                if self._conversation_store and self._session_id:
+                    try:
+                        # Check if store has the enhanced method
+                        if hasattr(self._conversation_store, 'store_compaction_summary_enhanced'):
+                            # Store with dual formats
+                            self._conversation_store.store_compaction_summary_enhanced(
+                                session_id=self._session_id,
+                                summary_xml=result.summary if "<summary>" in result.summary else None,
+                                summary_text=result.summary if "<summary>" not in result.summary else None,
+                                summary_json={"strategy": result.strategy_used.value},
+                                messages_summarized=[f"msg_{i}" for i in range(len(removed_messages))],
+                                strategy_used=result.strategy_used.value,
+                                complexity_score=result.complexity_score,
+                                tokens_saved=result.tokens_saved,
+                                duration_ms=result.duration_ms,
+                                llm_provider=None,  # Could be extracted from result
+                                llm_model=None,  # Could be extracted from result
+                                success=result.success,
+                                error_message=result.error_message,
+                            )
+                    except Exception as e:
+                        logger.debug(f"Failed to store enhanced summary: {e}")
+
+                return result.summary
+
+            except Exception as e:
+                logger.warning(f"Compaction router failed, using fallback: {e}")
+
+        # Legacy: Delegate to strategy if available
         if self._compaction_summarizer:
             try:
                 return self._compaction_summarizer.summarize(removed_messages)
