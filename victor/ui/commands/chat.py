@@ -733,65 +733,65 @@ async def run_oneshot(
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
 
-        if tool_budget is not None:
-            agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
-        if max_iterations is not None:
-            agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
+            if tool_budget is not None:
+                agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
+            if max_iterations is not None:
+                agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
 
-        if mode:
-            from victor.agent.mode_controller import AgentMode, get_mode_controller
+            if mode:
+                from victor.agent.mode_controller import AgentMode, get_mode_controller
 
-            controller = get_mode_controller()
-            try:
-                controller.switch_mode(AgentMode(mode))
-            except Exception:
-                # Fallback: ignore invalid mode silently (validated earlier)
-                pass
+                controller = get_mode_controller()
+                try:
+                    controller.switch_mode(AgentMode(mode))
+                except Exception:
+                    # Fallback: ignore invalid mode silently (validated earlier)
+                    pass
 
-        if preindex:
-            await preload_semantic_index(os.getcwd(), settings, console)
+            if preindex:
+                await preload_semantic_index(os.getcwd(), settings, console)
 
-        agent.start_embedding_preload()
+            agent.start_embedding_preload()
 
-        # Planning mode requires non-streaming (plan generation → step execution → summary)
-        use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
+            # Planning mode requires non-streaming (plan generation → step execution → summary)
+            use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
 
-        # Display skill auto-selection feedback before response
-        _display_skill_preview(console, agent, message)
+            # Display skill auto-selection feedback before response
+            _display_skill_preview(console, agent, message)
 
-        if use_streaming:
-            from victor.ui.rendering import (
-                FormatterRenderer,
-                LiveDisplayRenderer,
-                stream_response,
-            )
+            if use_streaming:
+                from victor.ui.rendering import (
+                    FormatterRenderer,
+                    LiveDisplayRenderer,
+                    stream_response,
+                )
 
-            use_live = renderer_choice in {"rich", "auto"}
-            if renderer_choice in {"rich-text", "text"}:
-                use_live = False
-            renderer = (
-                LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
-            )
-            await stream_response(agent, message, renderer, suppress_thinking=not show_reasoning)
-        else:
-            # Use streaming pipeline with BufferedRenderer to capture
-            # tool calls and reasoning that agent.chat() would swallow
-            from victor.ui.rendering import (
-                BufferedRenderer,
-                stream_response,
-            )
+                use_live = renderer_choice in {"rich", "auto"}
+                if renderer_choice in {"rich-text", "text"}:
+                    use_live = False
+                renderer = (
+                    LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
+                )
+                await stream_response(agent, message, renderer, suppress_thinking=not show_reasoning)
+            else:
+                # Use streaming pipeline with BufferedRenderer to capture
+                # tool calls and reasoning that agent.chat() would swallow
+                from victor.ui.rendering import (
+                    BufferedRenderer,
+                    stream_response,
+                )
 
-            buffered = BufferedRenderer(
-                show_reasoning=show_reasoning,
-                plain=formatter._plain if hasattr(formatter, "_plain") else False,
-            )
-            await stream_response(agent, message, buffered, suppress_thinking=not show_reasoning)
-            buffered.flush(console)
+                buffered = BufferedRenderer(
+                    show_reasoning=show_reasoning,
+                    plain=formatter._plain if hasattr(formatter, "_plain") else False,
+                )
+                await stream_response(agent, message, buffered, suppress_thinking=not show_reasoning)
+                buffered.flush(console)
 
-        success = True
-        if hasattr(agent, "get_session_metrics"):
-            metrics = agent.get_session_metrics()
-            tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
+            success = True
+            if hasattr(agent, "get_session_metrics"):
+                metrics = agent.get_session_metrics()
+                tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
 
     except InitializationError as e:
         formatter.error(f"{e.stage}: {e.message}")
