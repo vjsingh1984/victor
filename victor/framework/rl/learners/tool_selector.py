@@ -98,6 +98,11 @@ class ToolSelectorLearner(BaseLearner):
         self._tool_success_counts: Dict[str, int] = {}  # tool_name -> success count
         self._total_selections: int = 0
 
+        # Priority 4 Phase 2: lazy-loaded integration with existing components
+        # These are populated on first use to avoid circular imports at init time.
+        self._predictor: Optional[Any] = None   # ToolPredictor from Priority 3
+        self._analytics: Optional[Any] = None   # UsageAnalytics singleton
+
         # Load state from database
         self._load_state()
 
@@ -498,4 +503,140 @@ class ToolSelectorLearner(BaseLearner):
             "epsilon": self.epsilon,
             "learning_rate": self.learning_rate,
             "top_tools": self.get_tool_rankings(list(self._tool_q_values.keys())[:10], "default"),
+            "predictor_wired": self._predictor is not None,
+            "analytics_wired": self._analytics is not None,
         }
+
+    # ------------------------------------------------------------------
+    # Priority 4 Phase 2: ToolPredictor + UsageAnalytics integration
+    # ------------------------------------------------------------------
+
+    def _ensure_predictor(self) -> Optional[Any]:
+        """Lazy-load the existing Priority 3 ToolPredictor."""
+        if self._predictor is None:
+            try:
+                from victor.agent.planning.tool_predictor import ToolPredictor
+                self._predictor = ToolPredictor()
+            except Exception as e:
+                logger.debug("tool_selector: ToolPredictor unavailable: %s", e)
+        return self._predictor
+
+    def _ensure_analytics(self) -> Optional[Any]:
+        """Lazy-load the existing UsageAnalytics singleton."""
+        if self._analytics is None:
+            try:
+                from victor.agent.usage_analytics import UsageAnalytics
+                self._analytics = UsageAnalytics.get_instance()
+            except Exception as e:
+                logger.debug("tool_selector: UsageAnalytics unavailable: %s", e)
+        return self._analytics
+
+    def get_next_tool_prediction(
+        self,
+        task_description: str,
+        current_step: str = "exploration",
+        recent_tools: Optional[List[str]] = None,
+        task_type: str = "default",
+    ) -> Optional[str]:
+        """Predict the next best tool using the existing Priority 3 ToolPredictor.
+
+        Delegates entirely to ToolPredictor — does not reimplement prediction logic.
+
+        Args:
+            task_description: Description of the current task
+            current_step: Current workflow step
+            recent_tools: Tools used recently in this session
+            task_type: Task type for pattern matching
+
+        Returns:
+            Name of the predicted next tool, or None if predictor unavailable
+        """
+        predictor = self._ensure_predictor()
+        if predictor is None:
+            return None
+
+        try:
+            predictions = predictor.predict_tools(
+                task_description=task_description,
+                current_step=current_step,
+                recent_tools=recent_tools or [],
+                task_type=task_type,
+            )
+            return predictions[0].tool_name if predictions else None
+        except Exception as e:
+            logger.debug("tool_selector: prediction failed: %s", e)
+            return None
+
+    def feed_outcome_to_predictor(self, outcome: "RLOutcome") -> None:
+        """Feed a tool execution outcome back into the Priority 3 CooccurrenceTracker.
+
+        This closes the RL→Predictor feedback loop: outcomes recorded via
+        record_outcome() also update the co-occurrence patterns that
+        ToolPredictor uses for future sequence-based predictions.
+
+        Args:
+            outcome: Outcome containing tools_used list in metadata
+        """
+        predictor = self._ensure_predictor()
+        if predictor is None or not hasattr(predictor, "_cooccurrence_tracker"):
+            return
+
+        tracker = predictor._cooccurrence_tracker
+        if tracker is None:
+            return
+
+        tools_used = outcome.metadata.get("tools_used", [])
+        if not tools_used:
+            tool_name = outcome.metadata.get("tool_name")
+            if tool_name:
+                tools_used = [tool_name]
+
+        if tools_used:
+            try:
+                tracker.record_tool_sequence(
+                    tools=tools_used,
+                    task_type=outcome.task_type or "default",
+                    success=outcome.success,
+                )
+            except Exception as e:
+                logger.debug("tool_selector: cooccurrence feed failed: %s", e)
+
+    def get_analytics_enhanced_rankings(
+        self, available_tools: List[str], task_type: str
+    ) -> List[Tuple[str, float, float]]:
+        """Blend RL Q-values with UsageAnalytics success rates for richer rankings.
+
+        Applies a 80/20 blend: 80% RL Q-value (learned over sessions) +
+        20% analytics success rate (current session). Falls back to pure
+        Q-value ranking when analytics is unavailable.
+
+        Args:
+            available_tools: Tool names to rank
+            task_type: Current task type
+
+        Returns:
+            List of (tool_name, blended_score, confidence) sorted descending
+        """
+        base_rankings = self.get_tool_rankings(available_tools, task_type)
+        analytics = self._ensure_analytics()
+
+        if analytics is None:
+            return base_rankings
+
+        enhanced = []
+        for tool_name, q_value, confidence in base_rankings:
+            try:
+                insights = analytics.get_tool_insights(tool_name)
+                analytics_rate = insights.get("success_rate", q_value)
+                blended = 0.8 * q_value + 0.2 * analytics_rate
+            except Exception:
+                blended = q_value
+            enhanced.append((tool_name, blended, confidence))
+
+        enhanced.sort(key=lambda x: x[1], reverse=True)
+        return enhanced
+
+    def record_outcome(self, outcome: "RLOutcome") -> None:
+        """Override to also feed the outcome to the Priority 3 CooccurrenceTracker."""
+        super().record_outcome(outcome)
+        self.feed_outcome_to_predictor(outcome)
