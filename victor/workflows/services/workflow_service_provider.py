@@ -334,12 +334,16 @@ class WorkflowServiceProvider:
         - Providing service container access
         - Tracking execution metadata
 
-        Returns:
-            ExecutionContext instance
-        """
-        from victor.workflows.execution_context import ExecutionContext
+        SEAM BOUNDARY: Workflow node-level execution context (not agent or tool-level)
+        - Use WorkflowNodeContext for: Workflow node executors, per-node execution state
+        - Do NOT use for: Agent orchestrator (use RuntimeExecutionContext), tools (use ToolExecutionContext)
 
-        return ExecutionContext(
+        Returns:
+            WorkflowNodeContext instance
+        """
+        from victor.workflows.execution_context import WorkflowNodeContext
+
+        return WorkflowNodeContext(
             orchestrator=None,
             settings=self._settings,
             services=container,

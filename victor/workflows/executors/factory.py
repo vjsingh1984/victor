@@ -209,16 +209,21 @@ class NodeExecutorFactory:
         )
 
     def _resolve_execution_context(self) -> Any:
-        """Resolve execution context for registered executors."""
+        """Resolve execution context for registered executors.
+
+        SEAM BOUNDARY: Workflow node-level execution context (not agent or tool-level)
+        - Use WorkflowNodeContext for: Workflow node executors, per-node execution state
+        - Do NOT use for: Agent orchestrator (use RuntimeExecutionContext), tools (use ToolExecutionContext)
+        """
         from victor.workflows.compiler_protocols import ExecutionContextProtocol
-        from victor.workflows.execution_context import ExecutionContext
+        from victor.workflows.execution_context import WorkflowNodeContext
 
         if hasattr(self._container, "get_optional"):
             context = self._container.get_optional(ExecutionContextProtocol)
             if context is not None:
                 return context
 
-        return ExecutionContext(services=self._container)
+        return WorkflowNodeContext(services=self._container)
 
     def supports_node_type(self, node_type: str) -> bool:
         """Check if a node type is supported.

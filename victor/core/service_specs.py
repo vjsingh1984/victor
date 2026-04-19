@@ -75,7 +75,6 @@ from victor.workflows.compiler_protocols import (
 )
 from victor.workflows.compiler.workflow_compiler_impl import WorkflowCompilerImpl
 from victor.workflows.compiled_executor import WorkflowExecutor
-from victor.workflows.execution_context import ExecutionContext
 from victor.workflows.orchestrator_pool import OrchestratorPool
 from victor.workflows.validator import WorkflowValidator
 

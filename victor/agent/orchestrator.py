@@ -94,7 +94,7 @@ if TYPE_CHECKING:
     from victor.agent.orchestrator_recovery import OrchestratorRecoveryIntegration
     from victor.agent.tool_output_formatter import ToolOutputFormatter
     from victor.agent.tool_pipeline import ToolPipeline
-    from victor.runtime.context import ExecutionContext
+    from victor.runtime.context import RuntimeExecutionContext
     from victor.agent.streaming_controller import StreamingController
     from victor.agent.task_analyzer import TaskAnalyzer
     from victor.agent.tool_registrar import ToolRegistrar
@@ -758,21 +758,25 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         logger.debug("Bootstrapped service layer")
 
-    def _create_execution_context(self) -> "ExecutionContext":
-        """Create an ExecutionContext carrying all runtime dependencies.
+    def _create_execution_context(self) -> "RuntimeExecutionContext":
+        """Create a RuntimeExecutionContext carrying all runtime dependencies.
+
+        SEAM BOUNDARY: Agent-level execution context (not workflow or tool-level)
+        - Use RuntimeExecutionContext for: Agent orchestrator, session management, DI services
+        - Do NOT use for: Workflow nodes (use WorkflowNodeContext), tools (use ToolExecutionContext)
 
         Replaces scattered get_global_manager() / get_instance() calls
         with explicit context passing. Created after services are
         bootstrapped so all dependencies are available.
 
         Returns:
-            ExecutionContext with settings, container, state manager,
+            RuntimeExecutionContext with settings, container, state manager,
             and lazy service accessor.
         """
-        from victor.runtime.context import ExecutionContext
+        from victor.runtime.context import RuntimeExecutionContext
 
         session_id = getattr(self, "_memory_session_id", "") or ""
-        return ExecutionContext.create(
+        return RuntimeExecutionContext.create(
             settings=self.settings,
             container=self._container,
             session_id=session_id,
@@ -1002,7 +1006,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         AgentRuntimeBootstrapper.prepare_components(self, settings)
         AgentRuntimeBootstrapper.finalize(self)
 
-        # Create ExecutionContext — explicit context object replacing global singletons.
+        # Create RuntimeExecutionContext — explicit context object replacing global singletons.
         # Available after services are bootstrapped; passed to coordinators and workflows.
         self._execution_context = self._create_execution_context()
 
