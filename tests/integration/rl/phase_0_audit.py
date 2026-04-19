@@ -30,7 +30,7 @@ from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
 from victor.framework.rl.coordinator import get_rl_coordinator
 
 # ---------------------------------------------------------------------------
-# Part 1: Learner Inventory — all 14 learners must exist and be importable
+# Part 1: Learner Inventory — 15 learners (14 original + user_feedback from Phase 1)
 # ---------------------------------------------------------------------------
 
 EXPECTED_LEARNERS = [
@@ -47,14 +47,15 @@ EXPECTED_LEARNERS = [
     "quality_weights",
     "semantic_threshold",
     "tool_selector",
+    "user_feedback",
     "workflow_execution",
 ]
 
 
 class TestLearnerInventory:
-    """Part 1: Verify all 14 learners exist."""
+    """Part 1: Verify all 15 learners exist (14 original + user_feedback from Phase 1)."""
 
-    def test_all_14_learners_exist(self):
+    def test_all_learners_exist(self):
         """All expected learner files must be importable."""
         import importlib
         missing = []
@@ -66,16 +67,16 @@ class TestLearnerInventory:
                 missing.append(f"{name}: {e}")
         assert not missing, f"Missing learners: {missing}"
 
-    def test_learner_count_is_14(self):
-        """Exactly 14 learners — catches accidental additions or deletions."""
+    def test_learner_count_is_15(self):
+        """Exactly 15 learners — catches accidental additions or deletions."""
         import os
         learner_dir = "victor/framework/rl/learners"
         files = [
             f[:-3] for f in os.listdir(learner_dir)
             if f.endswith(".py") and not f.startswith("_")
         ]
-        assert len(files) == 14, (
-            f"Expected 14 learners, found {len(files)}: {sorted(files)}"
+        assert len(files) == 15, (
+            f"Expected 15 learners, found {len(files)}: {sorted(files)}"
         )
 
     @pytest.mark.parametrize("learner_name", EXPECTED_LEARNERS)
@@ -361,7 +362,7 @@ class TestNoDuplicationGuards:
     """Part 6: Guard tests that prevent Priority 4 from duplicating existing work."""
 
     def test_all_learners_extended_not_replaced(self):
-        """All 14 learners must still be present after any Priority 4 work."""
+        """All 15 learners must still be present after any Priority 4 work."""
         import importlib
         for name in EXPECTED_LEARNERS:
             try:

@@ -513,6 +513,9 @@ class RLCoordinator:
         # Migrate schema: add repo_id column if missing
         self._migrate_add_repo_id()
 
+        # Migrate schema: add Phase 1 columns (feedback_source, session_id, etc.)
+        self._migrate_add_phase1_columns()
+
         # Auto-register default learners
         self._register_default_learners()
 
@@ -555,6 +558,41 @@ class RLCoordinator:
                 logger.info("RL: Migrated rl_outcome — added repo_id column")
         except Exception as e:
             logger.debug(f"RL: repo_id migration skipped: {e}")
+
+    def _migrate_add_phase1_columns(self) -> None:
+        """Add Priority 4 Phase 1 columns to rl_outcome (backward-compatible)."""
+        phase1_columns = {
+            "feedback_source": "TEXT DEFAULT NULL",
+            "user_feedback": "TEXT DEFAULT NULL",
+            "helpful": "INTEGER DEFAULT NULL",
+            "correction": "TEXT DEFAULT NULL",
+            "session_summary": "TEXT DEFAULT NULL",
+            "session_id": "TEXT DEFAULT NULL",
+        }
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(f"PRAGMA table_info({Tables.RL_OUTCOME})")
+            existing = {row[1] for row in cursor.fetchall()}
+            added = []
+            for col, typedef in phase1_columns.items():
+                if col not in existing:
+                    cursor.execute(
+                        f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN {col} {typedef}"
+                    )
+                    added.append(col)
+            if added:
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_feedback_source "
+                    f"ON {Tables.RL_OUTCOME}(feedback_source, created_at)"
+                )
+                cursor.execute(
+                    f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session_id "
+                    f"ON {Tables.RL_OUTCOME}(session_id)"
+                )
+                self.db.commit()
+                logger.info("RL: Migrated rl_outcome — added columns: %s", added)
+        except Exception as e:
+            logger.debug("RL: Phase 1 migration skipped: %s", e)
 
     def set_repo_context(self, repo_id: Optional[str]) -> None:
         """Set current repo context for outcome isolation.
@@ -835,6 +873,10 @@ class RLCoordinator:
                     use_pareto=use_pareto,
                     max_prompt_chars=max_prompt_chars,
                 )
+            elif name == "user_feedback":
+                from victor.framework.rl.learners.user_feedback import UserFeedbackLearner
+
+                return UserFeedbackLearner(name=name, db_connection=self.db, learning_rate=0.1)
             elif name == "option_framework":
                 # OptionRegistry is not a learner — access via get_option_registry()
                 logger.debug("RL: option_framework is not a learner — use get_option_registry()")
@@ -878,25 +920,34 @@ class RLCoordinator:
             # Record in learner-specific tables
             learner.record_outcome(outcome)
 
-            # Record in shared outcomes table with repo_id
+            # Record in shared outcomes table with repo_id and Phase 1 columns
+            meta = outcome.metadata or {}
             cursor = self.db.cursor()
             cursor.execute(
                 f"""
                 INSERT INTO {Tables.RL_OUTCOME} (
                     learner_id, provider, model, task_type, vertical,
-                    repo_id, success, quality_score, metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    repo_id, success, quality_score, metadata,
+                    feedback_source, user_feedback, helpful, correction, session_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    learner_name,  # Maps to learner_id column
+                    learner_name,
                     outcome.provider,
                     outcome.model,
                     outcome.task_type,
-                    outcome.vertical or "general",  # Default to "general" if None
-                    self._repo_id,  # Per-repo isolation
+                    outcome.vertical or "general",
+                    self._repo_id,
                     1 if outcome.success else 0,
                     outcome.quality_score,
-                    outcome.to_dict()["metadata"],  # JSON string
+                    outcome.to_dict()["metadata"],
+                    meta.get("feedback_source"),
+                    meta.get("user_feedback"),
+                    1 if meta.get("helpful") is True else (
+                        0 if meta.get("helpful") is False else None
+                    ),
+                    meta.get("correction"),
+                    meta.get("session_id"),
                 ),
             )
             self.db.commit()

@@ -752,6 +752,53 @@ class UsageAnalytics:
                 "avg_session_duration_seconds": avg_duration,
             }
 
+    def persist_to_rl_database(self, repo_id: Optional[str] = None) -> bool:
+        """Persist the current session summary to the RL outcomes database.
+
+        Bridges in-memory UsageAnalytics data into the RL framework so that
+        MetaLearningCoordinator can query historical trends without re-implementing
+        session aggregation.
+
+        Args:
+            repo_id: Optional repository identifier for isolation
+
+        Returns:
+            True if persisted successfully, False if nothing to persist or error
+        """
+        summary = self.get_session_summary()
+        if summary.get("status") == "no_sessions":
+            return False
+
+        try:
+            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.framework.rl.base import RLOutcome
+            import json
+
+            coord = get_rl_coordinator()
+            if repo_id:
+                coord.set_repo_context(repo_id)
+
+            outcome = RLOutcome(
+                provider="usage_analytics",
+                model="aggregation",
+                task_type="session_summary",
+                success=True,
+                quality_score=None,
+                metadata={
+                    "feedback_source": "auto",
+                    "session_summary": json.dumps(summary),
+                    "total_sessions": summary.get("total_sessions", 0),
+                    "avg_turns_per_session": summary.get("avg_turns_per_session", 0.0),
+                    "avg_tool_calls_per_session": summary.get("avg_tool_calls_per_session", 0.0),
+                },
+                vertical="general",
+            )
+            coord.record_outcome("tool_selector", outcome)
+            return True
+        except Exception as e:
+            logger.debug("UsageAnalytics: persist_to_rl_database failed: %s", e)
+            return False
+
     def get_optimization_recommendations(self) -> List[Dict[str, Any]]:
         """Get actionable optimization recommendations.
 
