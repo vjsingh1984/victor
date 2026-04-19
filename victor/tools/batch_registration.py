@@ -123,10 +123,7 @@ class BatchRegistrationValidator:
             try:
                 # Validate tool name uniqueness
                 if tool.name in context.tools:
-                    context.add_error(
-                        tool.name,
-                        f"Duplicate tool name: {tool.name}"
-                    )
+                    context.add_error(tool.name, f"Duplicate tool name: {tool.name}")
                     continue
 
                 # Validate tool metadata
@@ -158,7 +155,7 @@ class BatchRegistrationValidator:
             context.add_error(tool.name, "Tool description is required")
 
         # Validate tags
-        if hasattr(tool, 'tags') and tool.tags:
+        if hasattr(tool, "tags") and tool.tags:
             if not isinstance(tool.tags, list):
                 context.add_error(tool.name, "Tags must be a list")
 
@@ -174,7 +171,7 @@ class BatchRegistrationValidator:
             tool: Tool to validate
             context: Validation context to update
         """
-        if not hasattr(tool, 'parameters') or tool.parameters is None:
+        if not hasattr(tool, "parameters") or tool.parameters is None:
             return
 
         parameters = tool.parameters
@@ -183,18 +180,18 @@ class BatchRegistrationValidator:
             return
 
         # Validate schema structure
-        if parameters.get('type') != 'object':
+        if parameters.get("type") != "object":
             context.add_error(tool.name, "Parameters root type must be 'object'")
 
         # Validate properties if present
-        properties = parameters.get('properties', {})
+        properties = parameters.get("properties", {})
         if not isinstance(properties, dict):
             context.add_error(tool.name, "Properties must be a dict")
             return
 
         # Check for required fields
         for prop_name, prop_schema in properties.items():
-            if prop_schema.get('required', False):
+            if prop_schema.get("required", False):
                 # Property exists in schema, validation happens during execution
                 pass
 
@@ -244,7 +241,7 @@ class BatchRegistrar:
 
         # Process in chunks to avoid memory spikes
         for chunk_start in range(0, len(tools), chunk_size):
-            chunk = tools[chunk_start:chunk_start + chunk_size]
+            chunk = tools[chunk_start : chunk_start + chunk_size]
 
             # Validate chunk
             validation_context = self._validator.validate_batch(chunk)
@@ -254,7 +251,7 @@ class BatchRegistrar:
                 result.failed.extend(validation_context.validation_errors)
                 raise BatchRegistrationError(
                     f"Validation failed with {len(validation_context.validation_errors)} errors",
-                    partial_result=result
+                    partial_result=result,
                 )
 
             # Accumulate errors

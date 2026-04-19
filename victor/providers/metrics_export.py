@@ -53,6 +53,9 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
+from victor.core.health import HealthStatus
+from victor.providers.circuit_breaker import CircuitState
+
 logger = logging.getLogger(__name__)
 
 
@@ -349,14 +352,24 @@ class ResilienceMetricsExporter:
             "total_providers": len(health_metrics) or len(resilience_metrics),
             "circuit_breakers": {
                 "total": len(cb_metrics),
-                "open": sum(1 for cb in cb_metrics.values() if cb.state == "open"),
-                "half_open": sum(1 for cb in cb_metrics.values() if cb.state == "half_open"),
-                "closed": sum(1 for cb in cb_metrics.values() if cb.state == "closed"),
+                "open": sum(1 for cb in cb_metrics.values() if cb.state == CircuitState.OPEN.value),
+                "half_open": sum(
+                    1 for cb in cb_metrics.values() if cb.state == CircuitState.HALF_OPEN.value
+                ),
+                "closed": sum(
+                    1 for cb in cb_metrics.values() if cb.state == CircuitState.CLOSED.value
+                ),
             },
             "health": {
-                "healthy": sum(1 for h in health_metrics.values() if h.status == "healthy"),
-                "degraded": sum(1 for h in health_metrics.values() if h.status == "degraded"),
-                "unhealthy": sum(1 for h in health_metrics.values() if h.status == "unhealthy"),
+                "healthy": sum(
+                    1 for h in health_metrics.values() if h.status == HealthStatus.HEALTHY.value
+                ),
+                "degraded": sum(
+                    1 for h in health_metrics.values() if h.status == HealthStatus.DEGRADED.value
+                ),
+                "unhealthy": sum(
+                    1 for h in health_metrics.values() if h.status == HealthStatus.UNHEALTHY.value
+                ),
                 "average_latency_ms": round(
                     (
                         sum(h.latency_ms for h in health_metrics.values()) / len(health_metrics)

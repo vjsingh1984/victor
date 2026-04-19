@@ -869,7 +869,9 @@ async def _execute_workflow_async(
             if result.state:
                 console.print("\n[bold]Final State:[/]")
                 # Convert Pydantic model to dict if needed
-                state_dict = result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
+                state_dict = (
+                    result.state.to_dict() if hasattr(result.state, "to_dict") else result.state
+                )
                 display_state = {
                     k: v
                     for k, v in state_dict.items()

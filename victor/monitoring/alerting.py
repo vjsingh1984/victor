@@ -135,7 +135,7 @@ class PerformanceAlertManager:
         performance_threshold_pct: float = 200.0,  # 2× baseline
         error_rate_threshold_pct: float = 5.0,  # 5% errors
         cache_hit_rate_threshold_pct: float = 50.0,  # 50% hit rate
-        alert_handlers: Optional[List[AlertHandler]] = None
+        alert_handlers: Optional[List[AlertHandler]] = None,
     ):
         """Initialize alert manager.
 
@@ -190,15 +190,17 @@ class PerformanceAlertManager:
                 threshold_value=threshold,
                 metadata={
                     "baseline_ms": baseline,
-                    "regression_pct": ((duration_ms - baseline) / baseline) * 100
-                }
+                    "regression_pct": ((duration_ms - baseline) / baseline) * 100,
+                },
             )
             self._trigger_alert(alert)
             return alert
 
         return None
 
-    def check_error_rate(self, operation: str, metrics: Dict[str, Any]) -> Optional[PerformanceAlert]:
+    def check_error_rate(
+        self, operation: str, metrics: Dict[str, Any]
+    ) -> Optional[PerformanceAlert]:
         """Check if error rate exceeds threshold.
 
         Args:
@@ -221,14 +223,16 @@ class PerformanceAlertManager:
                 metadata={
                     "error_count": metrics.get("error_count", 0),
                     "total_count": metrics.get("count", 0),
-                }
+                },
             )
             self._trigger_alert(alert)
             return alert
 
         return None
 
-    def check_cache_hit_rate(self, cache_type: str, stats: Dict[str, Any]) -> Optional[PerformanceAlert]:
+    def check_cache_hit_rate(
+        self, cache_type: str, stats: Dict[str, Any]
+    ) -> Optional[PerformanceAlert]:
         """Check if cache hit rate drops below threshold.
 
         Args:
@@ -253,7 +257,7 @@ class PerformanceAlertManager:
                     "hits": stats.get("hits", 0),
                     "misses": stats.get("misses", 0),
                     "cache_size": stats.get("cache_size", 0),
-                }
+                },
             )
             self._trigger_alert(alert)
             return alert
@@ -300,9 +304,7 @@ class PerformanceAlertManager:
         logger.info(f"Suppressed alerts for {operation} until {until.isoformat()}")
 
     def get_alert_history(
-        self,
-        severity: Optional[AlertSeverity] = None,
-        limit: int = 100
+        self, severity: Optional[AlertSeverity] = None, limit: int = 100
     ) -> List[PerformanceAlert]:
         """Get alert history.
 

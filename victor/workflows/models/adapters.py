@@ -90,10 +90,7 @@ class StateAdapter:
         return StateAdapter.to_dict(model)
 
     @staticmethod
-    def from_legacy_format(
-        data: Dict[str, Any],
-        model_class: Type[T]
-    ) -> T:
+    def from_legacy_format(data: Dict[str, Any], model_class: Type[T]) -> T:
         """Create Pydantic model from legacy TypedDict format.
 
         This is the primary method for migrating existing TypedDict-based
@@ -193,12 +190,18 @@ class WorkflowExecutionContextAdapter:
             error=error if error is not None else model.error,
             iteration=iteration if iteration is not None else model.iteration,
             visited_nodes=visited_nodes if visited_nodes is not None else model.visited_nodes,
-            parallel_results=parallel_results if parallel_results is not None else model.parallel_results,
+            parallel_results=(
+                parallel_results if parallel_results is not None else model.parallel_results
+            ),
             hitl_pending=hitl_pending if hitl_pending is not None else model.hitl_pending,
             hitl_response=hitl_response if hitl_response is not None else model.hitl_response,
             as_of_date=as_of_date if as_of_date is not None else model.as_of_date,
-            lookback_periods=lookback_periods if lookback_periods is not None else model.lookback_periods,
-            include_end_date=include_end_date if include_end_date is not None else model.include_end_date,
+            lookback_periods=(
+                lookback_periods if lookback_periods is not None else model.lookback_periods
+            ),
+            include_end_date=(
+                include_end_date if include_end_date is not None else model.include_end_date
+            ),
             is_complete=is_complete if is_complete is not None else model.is_complete,
             success=success if success is not None else model.success,
             data={**model.data, **legacy_update.get("data", {})},

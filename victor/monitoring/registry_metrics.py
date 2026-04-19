@@ -18,7 +18,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge, start_http_server, CollectorRegistry, REGISTRY
+    from prometheus_client import (
+        Counter,
+        Histogram,
+        Gauge,
+        start_http_server,
+        CollectorRegistry,
+        REGISTRY,
+    )
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -43,7 +51,7 @@ class OperationMetrics:
     operation: str
     count: int = 0
     total_duration_ms: float = 0.0
-    min_duration_ms: float = float('inf')
+    min_duration_ms: float = float("inf")
     max_duration_ms: float = 0.0
     last_duration_ms: float = 0.0
     error_count: int = 0
@@ -88,7 +96,9 @@ class OperationMetrics:
             "operation": self.operation,
             "count": self.count,
             "avg_duration_ms": round(self.avg_duration_ms, 3),
-            "min_duration_ms": round(self.min_duration_ms, 3) if self.min_duration_ms != float('inf') else 0,
+            "min_duration_ms": (
+                round(self.min_duration_ms, 3) if self.min_duration_ms != float("inf") else 0
+            ),
             "max_duration_ms": round(self.max_duration_ms, 3),
             "last_duration_ms": round(self.last_duration_ms, 3),
             "error_count": self.error_count,
@@ -138,34 +148,34 @@ class RegistryMetricsCollector:
 
         # Counters
         self._operation_counter = Counter(
-            'registry_operations_total',
-            'Total number of registry operations',
-            ['operation', 'status'],
-            registry=self._prometheus_registry
+            "registry_operations_total",
+            "Total number of registry operations",
+            ["operation", "status"],
+            registry=self._prometheus_registry,
         )
 
         # Histograms
         self._operation_duration = Histogram(
-            'registry_operation_duration_ms',
-            'Registry operation duration in milliseconds',
-            ['operation'],
+            "registry_operation_duration_ms",
+            "Registry operation duration in milliseconds",
+            ["operation"],
             buckets=(0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0),
-            registry=self._prometheus_registry
+            registry=self._prometheus_registry,
         )
 
         # Gauges
         self._cache_size = Gauge(
-            'registry_cache_size',
-            'Current cache size',
-            ['cache_type'],
-            registry=self._prometheus_registry
+            "registry_cache_size",
+            "Current cache size",
+            ["cache_type"],
+            registry=self._prometheus_registry,
         )
 
         self._cache_hit_rate = Gauge(
-            'registry_cache_hit_rate',
-            'Cache hit rate percentage',
-            ['cache_type'],
-            registry=self._prometheus_registry
+            "registry_cache_hit_rate",
+            "Cache hit rate percentage",
+            ["cache_type"],
+            registry=self._prometheus_registry,
         )
 
     @contextmanager
@@ -258,10 +268,7 @@ class RegistryMetricsCollector:
                     return self._metrics[operation].to_dict()
                 return {}
 
-            return {
-                op: metrics.to_dict()
-                for op, metrics in self._metrics.items()
-            }
+            return {op: metrics.to_dict() for op, metrics in self._metrics.items()}
 
     def get_summary(self) -> Dict[str, Any]:
         """Get summary of all metrics.
@@ -274,13 +281,13 @@ class RegistryMetricsCollector:
             total_errors = sum(m.error_count for m in self._metrics.values())
 
             # Calculate overall error rate
-            overall_error_rate = (total_errors / total_operations * 100) if total_operations > 0 else 0.0
+            overall_error_rate = (
+                (total_errors / total_operations * 100) if total_operations > 0 else 0.0
+            )
 
             # Get slowest operations
             sorted_ops = sorted(
-                self._metrics.items(),
-                key=lambda x: x[1].avg_duration_ms,
-                reverse=True
+                self._metrics.items(), key=lambda x: x[1].avg_duration_ms, reverse=True
             )
 
             return {
@@ -361,13 +368,16 @@ def monitored_operation(operation: str):
         ...     # Implementation
         ...     pass
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
             collector = get_metrics_collector()
             with collector.record_operation(operation):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

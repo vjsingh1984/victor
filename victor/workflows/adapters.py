@@ -46,7 +46,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, TypedDict
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union
+
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 
 from victor.core.async_utils import run_sync, run_sync_in_thread
 from victor.workflows.definition import (
@@ -62,11 +64,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class AdapterWorkflowState(TypedDict, total=False):
-    """Standard state for adapted WorkflowBuilder-to-StateGraph flows.
+class AdapterWorkflowStateModel(BaseModel):
+    """Standard state for adapted WorkflowBuilder-to-StateGraph flows (Pydantic v2).
 
     This state model is adapter-specific and intentionally distinct from the
     compiled runtime `victor.workflows.runtime_types.WorkflowState`.
+
+    Migrated from TypedDict to Pydantic for better type safety and validation.
 
     Attributes:
         context: Original workflow context (from WorkflowBuilder)
@@ -78,16 +82,80 @@ class AdapterWorkflowState(TypedDict, total=False):
         is_complete: Whether workflow has completed
     """
 
-    context: Dict[str, Any]
-    messages: List[Dict[str, Any]]
-    current_node: str
-    visited_nodes: List[str]
-    results: Dict[str, Any]
-    error: Optional[str]
-    is_complete: bool
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+    )
+
+    context: Dict[str, Any] = Field(default_factory=dict)
+    messages: List[Dict[str, Any]] = Field(default_factory=list)
+    current_node: str = Field(default="")
+    visited_nodes: List[str] = Field(default_factory=list)
+    results: Dict[str, Any] = Field(default_factory=dict)
+    error: Optional[str] = None
+    is_complete: bool = Field(default=False)
+
+    @field_validator("visited_nodes")
+    @classmethod
+    def validate_visited_nodes(cls, v: List[str]) -> List[str]:
+        """Validate visited_nodes list."""
+        if v and len(set(v)) != len(v):
+            raise ValueError("visited_nodes must be unique (no duplicates)")
+        return v
+
+    # Dict-like interface for StateGraph compatibility
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value by key (dict-like interface)."""
+        return getattr(self, key, default)
+
+    def keys(self) -> List[str]:
+        """Return list of keys (dict-like interface)."""
+        return [
+            "context",
+            "messages",
+            "current_node",
+            "visited_nodes",
+            "results",
+            "error",
+            "is_complete",
+        ]
+
+    def values(self) -> List[Any]:
+        """Return list of values (dict-like interface)."""
+        return [
+            self.context,
+            self.messages,
+            self.current_node,
+            self.visited_nodes,
+            self.results,
+            self.error,
+            self.is_complete,
+        ]
+
+    def items(self) -> List[Tuple[str, Any]]:
+        """Return list of (key, value) tuples (dict-like interface)."""
+        return [
+            ("context", self.context),
+            ("messages", self.messages),
+            ("current_node", self.current_node),
+            ("visited_nodes", self.visited_nodes),
+            ("results", self.results),
+            ("error", self.error),
+            ("is_complete", self.is_complete),
+        ]
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item by key (dict-like subscript access)."""
+        return getattr(self, key, None)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item by key (dict-like subscript access)."""
+        setattr(self, key, value)
 
 
-WorkflowState = AdapterWorkflowState
+# Type alias for backward compatibility
+AdapterWorkflowState = AdapterWorkflowStateModel
+WorkflowState = AdapterWorkflowStateModel
 
 
 @dataclass
@@ -106,7 +174,7 @@ class AdaptedNode:
 
     name: str
     node_type: WorkflowNodeType
-    handler: Callable[[AdapterWorkflowState], AdapterWorkflowState]
+    handler: Callable[[AdapterWorkflowStateModel], AdapterWorkflowStateModel]
     next_nodes: List[str] = field(default_factory=list)
     conditional_edges: Dict[str, str] = field(default_factory=dict)
     tool_budget: int = 10
@@ -165,8 +233,8 @@ class WorkflowToGraphAdapter:
         # Import here to avoid circular imports
         from victor.framework.graph import StateGraph, END
 
-        # Create StateGraph with workflow state
-        graph: StateGraph[AdapterWorkflowState] = StateGraph(AdapterWorkflowState)
+        # Create StateGraph with workflow state (Pydantic model)
+        graph: StateGraph[AdapterWorkflowStateModel] = StateGraph(AdapterWorkflowStateModel)
 
         # Convert each node
         for node in workflow.nodes:
@@ -210,31 +278,31 @@ class WorkflowToGraphAdapter:
 
         def create_handler(
             n: WorkflowNode,
-        ) -> Callable[[AdapterWorkflowState], AdapterWorkflowState]:
+        ) -> Callable[[AdapterWorkflowStateModel], AdapterWorkflowStateModel]:
             """Create a state-updating handler for the node."""
 
-            def handler(state: AdapterWorkflowState) -> AdapterWorkflowState:
-                # Update state with node execution
-                new_state = dict(state)
-                new_state["current_node"] = n.name
+            def handler(state: AdapterWorkflowStateModel) -> AdapterWorkflowStateModel:
+                # Update state with node execution (Pydantic model)
+                new_state = state.model_copy(deep=True)
+                new_state.current_node = n.name
 
                 # Track visited nodes
-                visited = list(state.get("visited_nodes", []))
+                visited = list(state.visited_nodes)
                 visited.append(n.name)
-                new_state["visited_nodes"] = visited
+                new_state.visited_nodes = visited
 
                 # Add placeholder result
                 # In production, this would execute the actual agent
-                results = dict(state.get("results", {}))
+                results = dict(state.results)
                 results[n.name] = {
                     "status": "pending",
                     "node_type": (
                         n.node_type.value if hasattr(n.node_type, "value") else str(n.node_type)
                     ),
                 }
-                new_state["results"] = results
+                new_state.results = results
 
-                return new_state  # type: ignore
+                return new_state
 
             return handler
 

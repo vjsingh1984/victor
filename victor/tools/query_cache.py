@@ -85,10 +85,7 @@ class QueryCache:
     """
 
     def __init__(
-        self,
-        default_ttl_seconds: int = 30,
-        max_size: int = 1000,
-        cleanup_threshold: int = 1200
+        self, default_ttl_seconds: int = 30, max_size: int = 1000, cleanup_threshold: int = 1200
     ):
         """Initialize query cache.
 
@@ -113,7 +110,7 @@ class QueryCache:
         key: str,
         compute_fn: Callable[[], T],
         ttl: Optional[timedelta] = None,
-        tags: Optional[Set[str]] = None
+        tags: Optional[Set[str]] = None,
     ) -> T:
         """Get cached result or compute and cache.
 
@@ -151,11 +148,7 @@ class QueryCache:
         logger.debug(f"Cache miss: {key}")
 
         value = compute_fn()
-        entry = CacheEntry(
-            value=value,
-            ttl=ttl or self._default_ttl,
-            tags=tags or set()
-        )
+        entry = CacheEntry(value=value, ttl=ttl or self._default_ttl, tags=tags or set())
         self._cache[key] = entry
 
         # Trigger cleanup if over threshold
@@ -222,10 +215,7 @@ class QueryCache:
     def _cleanup(self) -> None:
         """Clean up expired and least-recently-used entries."""
         # Remove expired entries
-        expired_keys = [
-            key for key, entry in self._cache.items()
-            if not entry.is_valid()
-        ]
+        expired_keys = [key for key, entry in self._cache.items() if not entry.is_valid()]
         for key in expired_keys:
             del self._cache[key]
             self._stats["evictions"] += 1
@@ -233,18 +223,14 @@ class QueryCache:
         # If still over max size, remove least-hit entries
         if len(self._cache) > self._max_size:
             # Sort by hit count and remove lowest 10%
-            sorted_entries = sorted(
-                self._cache.items(),
-                key=lambda x: x[1].hit_count
-            )
+            sorted_entries = sorted(self._cache.items(), key=lambda x: x[1].hit_count)
             to_remove_count = int(len(self._cache) * 0.1)
             for key, _ in sorted_entries[:to_remove_count]:
                 del self._cache[key]
                 self._stats["evictions"] += 1
 
         logger.debug(
-            f"Cache cleanup: {len(self._cache)} entries, "
-            f"{self._stats['evictions']} evictions"
+            f"Cache cleanup: {len(self._cache)} entries, " f"{self._stats['evictions']} evictions"
         )
 
     def get_stats(self) -> Dict[str, Any]:
@@ -326,7 +312,7 @@ def cached_query(
     cache: QueryCache,
     ttl_seconds: Optional[int] = None,
     key_fn: Optional[Callable[..., str]] = None,
-    tag_fn: Optional[Callable[..., Set[str]]] = None
+    tag_fn: Optional[Callable[..., Set[str]]] = None,
 ):
     """Decorator for caching query method results.
 
@@ -345,6 +331,7 @@ def cached_query(
         ...     def get_by_tag(self, tag: str) -> List[BaseTool]:
         ...         return [t for t in self._tools if tag in t.tags]
     """
+
     def decorator(func):
         @wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -375,6 +362,7 @@ def cached_query(
             return cache_instance.get(key, compute, ttl=ttl, tags=tags)
 
         return wrapper
+
     return decorator
 
 

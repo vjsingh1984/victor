@@ -11,7 +11,9 @@ import ast
 import json
 import logging
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, TypedDict
+from typing import Any, Dict, Optional, Tuple
+
+from pydantic import BaseModel, Field
 
 # Import native extensions with unified availability check
 try:
@@ -33,16 +35,50 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class ToolStats(TypedDict):
-    calls: int
-    normalizations: int
+class ToolStats(BaseModel):
+    """Statistics for tool argument normalization (Pydantic v2)."""
+
+    model_config = {"validate_assignment": True}
+
+    calls: int = Field(default=0, ge=0, description="Number of times tool was called")
+    normalizations: int = Field(default=0, ge=0, description="Number of arguments normalized")
+
+    # Dict-like interface for backward compatibility
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
 
 
-class NormalizationStats(TypedDict):
-    total_calls: int
-    normalizations: Dict[str, int]
-    failures: int
-    by_tool: Dict[str, ToolStats]
+class NormalizationStats(BaseModel):
+    """Aggregate normalization statistics (Pydantic v2)."""
+
+    model_config = {"validate_assignment": True, "arbitrary_types_allowed": True}
+
+    total_calls: int = Field(default=0, ge=0, description="Total normalization calls")
+    normalizations: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Normalizations per strategy",
+    )
+    failures: int = Field(default=0, ge=0, description="Total normalization failures")
+    by_tool: Dict[str, ToolStats] = Field(
+        default_factory=dict,
+        description="Per-tool statistics",
+    )
+
+    # Dict-like interface for backward compatibility
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
 
 
 class NormalizationStrategy(Enum):
@@ -106,12 +142,12 @@ class ArgumentNormalizer:
         user_aliases = self.config.get("parameter_aliases", {})
         # Merge: user overrides built-in
         self.parameter_aliases: Dict[str, Dict[str, str]] = {**_builtin_aliases, **user_aliases}
-        self.stats: NormalizationStats = {
-            "total_calls": 0,
-            "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
-            "failures": 0,
-            "by_tool": {},
-        }
+        self.stats: NormalizationStats = NormalizationStats(
+            total_calls=0,
+            normalizations={strategy.value: 0 for strategy in NormalizationStrategy},
+            failures=0,
+            by_tool={},
+        )
         self._alias_stats = {"total": 0, "aliased": 0, "by_tool": {}}
 
     def normalize_parameter_aliases(
@@ -179,12 +215,12 @@ class ArgumentNormalizer:
         Returns:
             (normalized_arguments, strategy_used)
         """
-        self.stats["total_calls"] += 1
+        self.stats.total_calls += 1
 
         # Track per-tool stats
-        if tool_name not in self.stats["by_tool"]:
-            self.stats["by_tool"][tool_name] = {"calls": 0, "normalizations": 0}
-        self.stats["by_tool"][tool_name]["calls"] += 1
+        if tool_name not in self.stats.by_tool:
+            self.stats.by_tool[tool_name] = ToolStats(calls=0, normalizations=0)
+        self.stats.by_tool[tool_name].calls += 1
 
         # Layer 0: Normalize parameter aliases (model-specific -> standard names)
         # This runs first so subsequent layers work with standard param names
@@ -221,8 +257,8 @@ class ArgumentNormalizer:
                         f"[{self.provider_name}] {tool_name}: Normalized version is_valid={is_valid}"
                     )
                     if is_valid:
-                        self.stats["normalizations"][NormalizationStrategy.PYTHON_AST.value] += 1
-                        self.stats["by_tool"][tool_name]["normalizations"] += 1
+                        self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
+                        self.stats.by_tool[tool_name].normalizations += 1
                         logger.info(
                             f"[{self.provider_name}] Preemptively normalized {tool_name} arguments via AST"
                         )
@@ -239,7 +275,7 @@ class ArgumentNormalizer:
             is_valid = self._is_valid_json_dict(arguments)
             logger.debug(f"[{self.provider_name}] {tool_name}: Layer 1 - is_valid={is_valid}")
             if is_valid:
-                self.stats["normalizations"][NormalizationStrategy.DIRECT.value] += 1
+                self.stats.normalizations[NormalizationStrategy.DIRECT.value] += 1
                 return arguments, NormalizationStrategy.DIRECT
         except Exception as e:
             logger.error(
@@ -248,14 +284,14 @@ class ArgumentNormalizer:
             )
 
         # Not valid - need normalization
-        self.stats["by_tool"][tool_name]["normalizations"] += 1
+        self.stats.by_tool[tool_name].normalizations += 1
 
         # Layer 2: Try Python AST conversion for string values (if not already tried)
         if not has_json_like_strings:
             try:
                 normalized = self._normalize_via_ast(arguments)
                 if self._is_valid_json_dict(normalized):
-                    self.stats["normalizations"][NormalizationStrategy.PYTHON_AST.value] += 1
+                    self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
                     logger.info(
                         f"[{self.provider_name}] Normalized {tool_name} arguments via AST conversion"
                     )
@@ -267,7 +303,7 @@ class ArgumentNormalizer:
         try:
             normalized = self._normalize_via_regex(arguments)
             if self._is_valid_json_dict(normalized):
-                self.stats["normalizations"][NormalizationStrategy.REGEX_QUOTES.value] += 1
+                self.stats.normalizations[NormalizationStrategy.REGEX_QUOTES.value] += 1
                 logger.info(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
                 return normalized, NormalizationStrategy.REGEX_QUOTES
         except Exception as e:
@@ -277,7 +313,7 @@ class ArgumentNormalizer:
         try:
             normalized = self._normalize_via_manual_repair(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
-                self.stats["normalizations"][NormalizationStrategy.MANUAL_REPAIR.value] += 1
+                self.stats.normalizations[NormalizationStrategy.MANUAL_REPAIR.value] += 1
                 logger.info(
                     f"[{self.provider_name}] Normalized {tool_name} arguments via manual repair"
                 )
@@ -286,7 +322,7 @@ class ArgumentNormalizer:
             logger.debug(f"Manual repair failed for {tool_name}: {e}")
 
         # All strategies failed
-        self.stats["failures"] += 1
+        self.stats.failures += 1
         logger.error(
             f"[{self.provider_name}] Failed to normalize {tool_name} arguments "
             f"after all strategies. Original: {arguments}"
@@ -625,27 +661,27 @@ class ArgumentNormalizer:
             Dictionary with normalization metrics
         """
         success_rate = (
-            (self.stats["total_calls"] - self.stats["failures"]) / max(self.stats["total_calls"], 1)
+            (self.stats.total_calls - self.stats.failures) / max(self.stats.total_calls, 1)
         ) * 100
 
         return {
             "provider": self.provider_name,
-            "total_calls": self.stats["total_calls"],
-            "normalizations": self.stats["normalizations"],
-            "failures": self.stats["failures"],
+            "total_calls": self.stats.total_calls,
+            "normalizations": self.stats.normalizations,
+            "failures": self.stats.failures,
             "success_rate": round(success_rate, 2),
-            "by_tool": self.stats["by_tool"],
+            "by_tool": self.stats.by_tool,
             "alias_stats": self._alias_stats,
         }
 
     def reset_stats(self) -> None:
         """Reset statistics (useful for testing)."""
-        self.stats = {
-            "total_calls": 0,
-            "normalizations": {strategy.value: 0 for strategy in NormalizationStrategy},
-            "failures": 0,
-            "by_tool": {},
-        }
+        self.stats = NormalizationStats(
+            total_calls=0,
+            normalizations={strategy.value: 0 for strategy in NormalizationStrategy},
+            failures=0,
+            by_tool={},
+        )
         self._alias_stats = {"total": 0, "aliased": 0, "by_tool": {}}
 
     def log_stats(self) -> None:

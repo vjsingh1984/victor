@@ -115,7 +115,7 @@ class FeatureFlagCache:
         cache: Dict[FeatureFlag, CacheEntry],
         stats: Dict[str, int],
         flag: FeatureFlag,
-        default: bool
+        default: bool,
     ) -> bool:
         """Check cache with fallback to raw check.
 
@@ -195,9 +195,7 @@ class FeatureFlagCache:
         """Exit context manager and clear scoped cache."""
         if self._scoped:
             self._local_cache.clear()
-            logger.debug(
-                f"Scoped cache stats: {self.get_stats()}"
-            )
+            logger.debug(f"Scoped cache stats: {self.get_stats()}")
 
     @classmethod
     def clear_global_cache(cls) -> None:
@@ -225,11 +223,14 @@ def with_cache_scope(ttl_seconds: int = 60):
         ...         if is_enabled(FeatureFlag.use_strategy_based_tool_registration):
         ...             pass
     """
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             with FeatureFlagCache.scope(ttl_seconds=ttl_seconds):
                 return func(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

@@ -15,7 +15,7 @@ These classes implement the protocols defined in victor.workflows.protocols.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Literal, Optional, Set, TYPE_CHECKING
 
 from victor.workflows.protocols import (
     ProtocolNodeStatus,
@@ -25,6 +25,10 @@ from victor.workflows.protocols import (
     IWorkflowEdge,
     IWorkflowGraph,
 )
+
+# Type alias for router functions with Literal return types for better type safety
+# Example: RouterFunction[Literal["success", "error"]] for a router that returns those values
+RouterFunction = Callable[[Dict[str, Any]], str]
 
 
 class DuplicateNodeError(Exception):
@@ -181,13 +185,26 @@ class _RouterEdge:
 
     Used by add_conditional_edge to create multiple conditional edges
     based on a router function's output.
+
+    Type Safety:
+        Router functions should use Literal return types for compile-time checking:
+        ```python
+        from typing import Literal
+
+        def route_by_status(state: Dict[str, Any]) -> Literal["success", "error", "retry"]:
+            if state.get("error"):
+                return "error"
+            if state.get("needs_retry"):
+                return "retry"
+            return "success"
+        ```
     """
 
     def __init__(
         self,
         source_id: str,
         target_id: str,
-        router: Callable[[Dict[str, Any]], str],
+        router: RouterFunction,
         route_key: str,
     ):
         self.source_id = source_id
@@ -301,7 +318,7 @@ class BasicWorkflowGraph:
     def add_conditional_edge(
         self,
         source_id: str,
-        router: Callable[[Dict[str, Any]], str],
+        router: RouterFunction,
         targets: Dict[str, str],
     ) -> "BasicWorkflowGraph":
         """Add conditional branching edges based on a router function.
@@ -321,13 +338,23 @@ class BasicWorkflowGraph:
             InvalidEdgeError: If source or any target node doesn't exist.
 
         Example:
-            def route_by_status(state):
-                return "success" if state.get("ok") else "error"
+            from typing import Literal
+
+            def route_by_status(state: Dict[str, Any]) -> Literal["success", "error", "retry"]:
+                if state.get("error"):
+                    return "error"
+                if state.get("needs_retry"):
+                    return "retry"
+                return "success"
 
             graph.add_conditional_edge(
                 source_id="check",
                 router=route_by_status,
-                targets={"success": "handle_success", "error": "handle_error"}
+                targets={
+                    "success": "handle_success",
+                    "error": "handle_error",
+                    "retry": "retry_step"
+                }
             )
         """
         if source_id not in self._nodes:

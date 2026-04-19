@@ -62,15 +62,14 @@ class MockTool(BaseTool):
 
     async def execute(self, _exec_ctx, **kwargs):
         from victor.tools.base import ToolResult
+
         return ToolResult(success=True, output="test output")
 
 
 def create_mock_tool(n: int) -> MockTool:
     """Create a mock tool with consistent properties."""
     return MockTool(
-        name=f"tool_{n}",
-        description=f"Test tool {n}",
-        tags=[f"tag_{n % 10}", f"category_{n % 5}"]
+        name=f"tool_{n}", description=f"Test tool {n}", tags=[f"tag_{n % 10}", f"category_{n % 5}"]
     )
 
 
@@ -228,6 +227,7 @@ class TestFeatureFlagCachePerformance:
 
         # Clear cache first
         from victor.core.feature_flags import reset_feature_flag_manager
+
         reset_feature_flag_manager()
 
         def check_flags():
@@ -285,10 +285,7 @@ class TestQueryCachePerformance:
 
         def perform_cached_queries():
             for i in range(100):
-                cache.get(
-                    f"tool_{i}",
-                    lambda idx=i: registry.get(f"tool_{idx}")
-                )
+                cache.get(f"tool_{i}", lambda idx=i: registry.get(f"tool_{idx}"))
 
         benchmark(perform_cached_queries)
 

@@ -31,9 +31,19 @@ import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional, Callable
 
 logger = logging.getLogger(__name__)
+
+
+class TelemetryStatus(str, Enum):
+    """Status of a telemetry span or operation."""
+
+    PENDING = "pending"  # Operation is in progress
+    SUCCESS = "success"  # Operation completed successfully
+    ERROR = "error"  # Operation failed
+    SKIPPED = "skipped"  # Operation was skipped
 
 
 @dataclass
@@ -56,7 +66,7 @@ class VerticalLoadSpan:
     operation: str
     start_time_ns: int
     end_time_ns: Optional[int] = None
-    status: str = "pending"  # pending, success, error, skipped
+    status: TelemetryStatus = TelemetryStatus.PENDING
     error: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     extensions_loaded: int = 0
@@ -72,12 +82,12 @@ class VerticalLoadSpan:
     @property
     def is_success(self) -> bool:
         """Check if operation succeeded."""
-        return self.status == "success"
+        return self.status == TelemetryStatus.SUCCESS
 
     @property
     def is_error(self) -> bool:
         """Check if operation failed."""
-        return self.status == "error"
+        return self.status == TelemetryStatus.ERROR
 
 
 @contextmanager

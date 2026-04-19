@@ -22,7 +22,6 @@ from typing import Any, Dict, Optional
 
 from victor.workflows.models import WorkflowStateModel
 
-
 # Type alias for backward compatibility
 WorkflowState = WorkflowStateModel
 

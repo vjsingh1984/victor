@@ -33,12 +33,18 @@ Key Differences from victor.workflows:
 
 Example:
     from victor.framework.graph import StateGraph, Node, Edge, END
+    from pydantic import BaseModel, Field
+    from typing import List, Optional
 
-    # Define typed state
-    class AgentState(TypedDict):
-        messages: list[str]
-        task: str
-        result: Optional[str]
+    # Define typed state (Pydantic RECOMMENDED for type safety)
+    class AgentState(BaseModel):
+        messages: List[str] = Field(default_factory=list)
+        task: str = Field(default="")
+        result: Optional[str] = None
+
+        # Dict-like interface for StateGraph compatibility
+        class Config:
+            arbitrary_types_allowed = True
 
     # Create graph
     graph = StateGraph(AgentState)
@@ -63,6 +69,9 @@ Example:
     # Compile and run
     app = graph.compile()
     result = await app.invoke({"messages": [], "task": "Fix bug"})
+
+Note: TypedDict is still supported for backward compatibility, but Pydantic models
+are recommended for better validation and error messages in production code.
 """
 
 from __future__ import annotations
@@ -94,6 +103,9 @@ from typing import (
     runtime_checkable,
 )
 
+# Pydantic for type-safe state models (recommended over TypedDict)
+from pydantic import BaseModel, Field, ConfigDict
+
 logger = logging.getLogger(__name__)
 
 # Import focused configs for ISP compliance
@@ -113,6 +125,56 @@ T = TypeVar("T")
 # Sentinel for end of graph
 END = "__end__"
 START = "__start__"
+
+
+# Example state models for developers (Pydantic recommended over TypedDict)
+class AgentStateModel(BaseModel):
+    """Example Pydantic state model for agent workflows.
+
+    This is a RECOMMENDED pattern for type-safe state management in StateGraph.
+    Use Pydantic models instead of TypedDict for better validation and error messages.
+
+    Example:
+        from victor.framework.graph import StateGraph, AgentStateModel
+
+        graph = StateGraph(AgentStateModel)
+        graph.add_node("agent", agent_handler)
+        result = await graph.invoke({"task": "Analyze data"})
+    """
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+    )
+
+    messages: List[str] = Field(default_factory=list, description="Conversation messages")
+    task: str = Field(default="", description="Current task being processed")
+    result: Optional[str] = Field(default=None, description="Task result")
+
+    # Dict-like interface for StateGraph compatibility
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get a value by key (dict-like interface)."""
+        return getattr(self, key, default)
+
+    def keys(self) -> List[str]:
+        """Return list of keys (dict-like interface)."""
+        return ["messages", "task", "result"]
+
+    def values(self) -> List[Any]:
+        """Return list of values (dict-like interface)."""
+        return [self.messages, self.task, self.result]
+
+    def items(self) -> List[Tuple[str, Any]]:
+        """Return list of (key, value) tuples (dict-like interface)."""
+        return [("messages", self.messages), ("task", self.task), ("result", self.result)]
+
+    def __getitem__(self, key: str) -> Any:
+        """Get item by key (dict-like subscript access)."""
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        """Set item by key (dict-like subscript access)."""
+        setattr(self, key, value)
 
 
 class CopyOnWriteState(Generic[StateType]):
@@ -2540,6 +2602,7 @@ __all__ = [
     "default_state_merger",
     # State management
     "CopyOnWriteState",  # Copy-on-write state wrapper (P2 scalability)
+    "AgentStateModel",  # Example Pydantic state model (recommended over TypedDict)
     # Execution
     "GraphExecutionResult",
     "GraphConfig",

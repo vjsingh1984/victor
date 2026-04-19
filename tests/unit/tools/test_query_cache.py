@@ -27,8 +27,7 @@ class TestCacheEntry:
         """Test cache entry expiration with TTL."""
         # Create entry with 1ms TTL
         entry = CacheEntry(
-            value="test_result",
-            ttl=__import__("datetime").timedelta(milliseconds=1)
+            value="test_result", ttl=__import__("datetime").timedelta(milliseconds=1)
         )
         assert entry.is_valid()
 
@@ -50,10 +49,7 @@ class TestCacheEntry:
 
     def test_cache_entry_tags(self):
         """Test tag-based invalidation."""
-        entry = CacheEntry(
-            value="test_result",
-            tags={"tool:foo", "category:read"}
-        )
+        entry = CacheEntry(value="test_result", tags={"tool:foo", "category:read"})
 
         # Should invalidate with matching tags
         assert entry.should_invalidate({"tool:foo"})
@@ -130,11 +126,8 @@ class TestQueryCache:
 
         # Cache with 1ms TTL
         from datetime import timedelta
-        cache.get(
-            "test_key",
-            compute_fn,
-            ttl=timedelta(milliseconds=1)
-        )
+
+        cache.get("test_key", compute_fn, ttl=timedelta(milliseconds=1))
         assert compute_count[0] == 1
 
         # Wait for expiration
@@ -235,12 +228,9 @@ class TestQueryCache:
 
         # Add entries with short TTL
         from datetime import timedelta
+
         for i in range(15):
-            cache.get(
-                f"key{i}",
-                lambda: "value",
-                ttl=timedelta(milliseconds=1)
-            )
+            cache.get(f"key{i}", lambda: "value", ttl=timedelta(milliseconds=1))
 
         # Wait for expiration
         time.sleep(0.01)
@@ -333,10 +323,7 @@ class TestCachedQueryDecorator:
             return f"{category}:limit_{limit}"
 
         class TestClass:
-            @cached_query(
-                cache=lambda self: cache,
-                key_fn=custom_key_fn
-            )
+            @cached_query(cache=lambda self: cache, key_fn=custom_key_fn)
             def get_by_category(self, category: str, limit: int) -> list:
                 call_count[0] += 1
                 return list(range(limit))
@@ -367,10 +354,7 @@ class TestCachedQueryDecorator:
             return {f"tag:{tag}"}
 
         class TestClass:
-            @cached_query(
-                cache=lambda self: cache,
-                tag_fn=tag_fn
-            )
+            @cached_query(cache=lambda self: cache, tag_fn=tag_fn)
             def get_by_tag(self, tag: str) -> list:
                 call_count[0] += 1
                 return [f"tool_{i}" for i in range(5)]

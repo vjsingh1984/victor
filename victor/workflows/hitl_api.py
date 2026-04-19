@@ -212,7 +212,7 @@ class HITLStore:
         now = _utc_now()
         pending = []
         for stored in self._requests.values():
-            if stored.status == "pending":
+            if stored.status == HITLStatus.PENDING.value:
                 # Check if expired
                 if stored.expires_at and now > stored.expires_at:
                     stored.status = "expired"
@@ -310,8 +310,8 @@ class HITLStore:
         except asyncio.TimeoutError:
             # Mark as timed out
             async with self._lock:
-                if stored.status == "pending":
-                    stored.status = "timeout"
+                if stored.status == HITLStatus.PENDING.value:
+                    stored.status = HITLStatus.TIMEOUT.value
             return None
 
     async def subscribe(
@@ -370,7 +370,7 @@ class HITLStore:
         async with self._lock:
             for request_id, stored in self._requests.items():
                 if stored.expires_at and now > stored.expires_at:
-                    if stored.status == "pending":
+                    if stored.status == HITLStatus.PENDING.value:
                         stored.status = "expired"
                         event = self._events.get(request_id)
                         if event:

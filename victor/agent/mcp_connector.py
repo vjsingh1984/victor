@@ -328,7 +328,9 @@ class MCPConnector:
 
             registered = result.success_count
             if registered > 0:
-                logger.info(f"MCPConnector: batch registered {registered}/{len(adapter_tools)} MCP tools")
+                logger.info(
+                    f"MCPConnector: batch registered {registered}/{len(adapter_tools)} MCP tools"
+                )
 
             return registered
 

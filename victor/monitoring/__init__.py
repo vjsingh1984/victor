@@ -64,8 +64,7 @@ def get_alert_manager() -> PerformanceAlertManager:
 
     if _global_alert_manager is None:
         from victor.monitoring.alerting import LoggingAlertHandler
-        _global_alert_manager = PerformanceAlertManager(
-            alert_handlers=[LoggingAlertHandler()]
-        )
+
+        _global_alert_manager = PerformanceAlertManager(alert_handlers=[LoggingAlertHandler()])
 
     return _global_alert_manager

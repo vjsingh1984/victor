@@ -158,13 +158,7 @@ class TestRegistryMetricsCollector:
         """Test recording cache statistics."""
         collector = RegistryMetricsCollector(enabled=True)
 
-        stats = {
-            "hits": 100,
-            "misses": 20,
-            "evictions": 5,
-            "cache_size": 50,
-            "hit_rate": 0.83
-        }
+        stats = {"hits": 100, "misses": 20, "evictions": 5, "cache_size": 50, "hit_rate": 0.83}
 
         collector.record_cache_stats("query", stats)
 
@@ -231,7 +225,7 @@ class TestPerformanceAlert:
             operation="test_op",
             message="Test alert",
             current_value=100.0,
-            threshold_value=50.0
+            threshold_value=50.0,
         )
 
         assert alert.alert_type == "performance"
@@ -248,7 +242,7 @@ class TestPerformanceAlert:
             message="Test alert",
             current_value=100.0,
             threshold_value=50.0,
-            metadata={"baseline_ms": 25.0}
+            metadata={"baseline_ms": 25.0},
         )
 
         data = alert.to_dict()
@@ -265,6 +259,7 @@ class TestLoggingAlertHandler:
     def test_handle_alert(self, caplog):
         """Test handling alert with logging."""
         import logging
+
         caplog.set_level(logging.INFO)
 
         handler = LoggingAlertHandler()
@@ -274,7 +269,7 @@ class TestLoggingAlertHandler:
             operation="test_op",
             message="Test alert",
             current_value=100.0,
-            threshold_value=50.0
+            threshold_value=50.0,
         )
 
         handler.handle_alert(alert)
@@ -285,6 +280,7 @@ class TestLoggingAlertHandler:
     def test_severity_levels(self, caplog):
         """Test different severity levels."""
         import logging
+
         caplog.set_level(logging.DEBUG)
 
         handler = LoggingAlertHandler()
@@ -296,7 +292,7 @@ class TestLoggingAlertHandler:
             operation="test_op",
             message="Warning",
             current_value=100.0,
-            threshold_value=50.0
+            threshold_value=50.0,
         )
         handler.handle_alert(alert_warning)
         assert "WARNING" in caplog.text
@@ -308,7 +304,7 @@ class TestLoggingAlertHandler:
             operation="test_op",
             message="Error",
             current_value=100.0,
-            threshold_value=50.0
+            threshold_value=50.0,
         )
         handler.handle_alert(alert_error)
         assert "ERROR" in caplog.text
@@ -336,9 +332,7 @@ class TestPerformanceAlertManager:
 
     def test_check_performance_within_threshold(self):
         """Test performance check within threshold."""
-        manager = PerformanceAlertManager(
-            performance_threshold_pct=200.0  # 2×
-        )
+        manager = PerformanceAlertManager(performance_threshold_pct=200.0)  # 2×
         manager.set_baseline("test_op", 10.0)
 
         # 15ms is within 2× baseline (20ms)
@@ -348,9 +342,7 @@ class TestPerformanceAlertManager:
 
     def test_check_performance_exceeds_threshold(self):
         """Test performance check exceeds threshold."""
-        manager = PerformanceAlertManager(
-            performance_threshold_pct=200.0  # 2×
-        )
+        manager = PerformanceAlertManager(performance_threshold_pct=200.0)  # 2×
 
         # Mock handler to capture alert
         mock_handler = MagicMock()
@@ -372,15 +364,9 @@ class TestPerformanceAlertManager:
 
     def test_check_error_rate_within_threshold(self):
         """Test error rate check within threshold."""
-        manager = PerformanceAlertManager(
-            error_rate_threshold_pct=5.0
-        )
+        manager = PerformanceAlertManager(error_rate_threshold_pct=5.0)
 
-        metrics = {
-            "error_rate": 2.0,  # Below 5%
-            "error_count": 1,
-            "count": 50
-        }
+        metrics = {"error_rate": 2.0, "error_count": 1, "count": 50}  # Below 5%
 
         alert = manager.check_error_rate("test_op", metrics)
 
@@ -388,19 +374,13 @@ class TestPerformanceAlertManager:
 
     def test_check_error_rate_exceeds_threshold(self):
         """Test error rate check exceeds threshold."""
-        manager = PerformanceAlertManager(
-            error_rate_threshold_pct=5.0
-        )
+        manager = PerformanceAlertManager(error_rate_threshold_pct=5.0)
 
         # Mock handler
         mock_handler = MagicMock()
         manager.alert_handlers = [mock_handler]
 
-        metrics = {
-            "error_rate": 10.0,  # Exceeds 5%
-            "error_count": 5,
-            "count": 50
-        }
+        metrics = {"error_rate": 10.0, "error_count": 5, "count": 50}  # Exceeds 5%
 
         alert = manager.check_error_rate("test_op", metrics)
 
@@ -410,16 +390,9 @@ class TestPerformanceAlertManager:
 
     def test_check_cache_hit_rate_within_threshold(self):
         """Test cache hit rate check within threshold."""
-        manager = PerformanceAlertManager(
-            cache_hit_rate_threshold_pct=50.0
-        )
+        manager = PerformanceAlertManager(cache_hit_rate_threshold_pct=50.0)
 
-        stats = {
-            "hit_rate": 0.8,  # 80% - above 50%
-            "hits": 80,
-            "misses": 20,
-            "cache_size": 100
-        }
+        stats = {"hit_rate": 0.8, "hits": 80, "misses": 20, "cache_size": 100}  # 80% - above 50%
 
         alert = manager.check_cache_hit_rate("query", stats)
 
@@ -427,20 +400,13 @@ class TestPerformanceAlertManager:
 
     def test_check_cache_hit_rate_below_threshold(self):
         """Test cache hit rate below threshold."""
-        manager = PerformanceAlertManager(
-            cache_hit_rate_threshold_pct=50.0
-        )
+        manager = PerformanceAlertManager(cache_hit_rate_threshold_pct=50.0)
 
         # Mock handler
         mock_handler = MagicMock()
         manager.alert_handlers = [mock_handler]
 
-        stats = {
-            "hit_rate": 0.3,  # 30% - below 50%
-            "hits": 30,
-            "misses": 70,
-            "cache_size": 100
-        }
+        stats = {"hit_rate": 0.3, "hits": 30, "misses": 70, "cache_size": 100}  # 30% - below 50%
 
         alert = manager.check_cache_hit_rate("query", stats)
 

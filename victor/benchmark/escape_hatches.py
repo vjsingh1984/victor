@@ -33,7 +33,8 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, List
+from enum import Enum
+from typing import TYPE_CHECKING, Any, Dict, List, Literal
 
 if TYPE_CHECKING:
     from victor.tools.registry import ToolRegistry
@@ -48,11 +49,39 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
+# Enums for Type-Safe Return Values
+# =============================================================================
+
+
+class SolutionQuality(str, Enum):
+    """Quality assessment of a benchmark solution."""
+
+    HIGH_QUALITY = "high_quality"  # Solution passes all quality thresholds
+    NEEDS_IMPROVEMENT = "needs_improvement"  # Solution passes but has quality issues
+    FAILED = "failed"  # Solution does not meet minimum requirements
+
+
+class CoverageStatus(str, Enum):
+    """Test coverage assessment for a solution."""
+
+    SUFFICIENT = "sufficient"  # Coverage meets all requirements
+    NEEDS_MORE_TESTS = "needs_more_tests"  # Coverage below thresholds
+
+
+class ComplexityLevel(str, Enum):
+    """Complexity assessment of a problem/solution."""
+
+    SIMPLE = "simple"  # Low complexity, straightforward solution
+    MEDIUM = "medium"  # Moderate complexity, some challenges
+    COMPLEX = "complex"  # High complexity, requires careful approach
+
+
+# =============================================================================
 # Condition Functions
 # =============================================================================
 
 
-def solution_quality_check(ctx: Dict[str, Any]) -> str:
+def solution_quality_check(ctx: Dict[str, Any]) -> SolutionQuality:
     """Check solution quality based on multiple factors.
 
     Evaluates test pass rate, code quality metrics, and solution completeness.
@@ -65,7 +94,7 @@ def solution_quality_check(ctx: Dict[str, Any]) -> str:
             - pass_threshold (float): Minimum pass rate required (default 0.8)
 
     Returns:
-        "high_quality", "needs_improvement", or "failed"
+        SolutionQuality enum value: HIGH_QUALITY, NEEDS_IMPROVEMENT, or FAILED
     """
     test_results = ctx.get("test_results", {})
     code_quality = ctx.get("code_quality", {})
@@ -80,10 +109,10 @@ def solution_quality_check(ctx: Dict[str, Any]) -> str:
     # Check for critical failures
     if test_results.get("error"):
         logger.warning(f"Solution failed: {test_results.get('error')}")
-        return "failed"
+        return SolutionQuality.FAILED
 
     if pass_rate < 0.3:
-        return "failed"
+        return SolutionQuality.FAILED
 
     # Quality factors
     lint_score = code_quality.get("lint_score", 1.0)
@@ -92,16 +121,16 @@ def solution_quality_check(ctx: Dict[str, Any]) -> str:
     # High quality: good pass rate, clean code, complete solution
     if pass_rate >= pass_threshold and lint_score >= 0.9 and completeness >= 0.9:
         if complexity_ok:
-            return "high_quality"
+            return SolutionQuality.HIGH_QUALITY
 
     # Needs improvement: passing but could be better
     if pass_rate >= 0.5 or completeness >= 0.5:
-        return "needs_improvement"
+        return SolutionQuality.NEEDS_IMPROVEMENT
 
-    return "failed"
+    return SolutionQuality.FAILED
 
 
-def test_coverage_check(ctx: Dict[str, Any]) -> str:
+def test_coverage_check(ctx: Dict[str, Any]) -> CoverageStatus:
     """Check if test coverage is sufficient for the solution.
 
     Evaluates line coverage, branch coverage, and edge case handling.
@@ -114,7 +143,7 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
             - edge_cases_covered (list): List of covered edge cases
 
     Returns:
-        "sufficient" or "needs_more_tests"
+        CoverageStatus enum value: SUFFICIENT or NEEDS_MORE_TESTS
     """
     coverage_report = ctx.get("coverage_report", {})
     min_line = ctx.get("min_line_coverage", 0.7)
@@ -128,12 +157,12 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
     # Check line coverage
     if line_coverage < min_line:
         logger.info(f"Line coverage {line_coverage:.1%} below threshold {min_line:.1%}")
-        return "needs_more_tests"
+        return CoverageStatus.NEEDS_MORE_TESTS
 
     # Check branch coverage
     if branch_coverage < min_branch:
         logger.info(f"Branch coverage {branch_coverage:.1%} below threshold {min_branch:.1%}")
-        return "needs_more_tests"
+        return CoverageStatus.NEEDS_MORE_TESTS
 
     # Check edge case coverage
     if required_edge_cases:
@@ -143,12 +172,12 @@ def test_coverage_check(ctx: Dict[str, Any]) -> str:
 
         if len(missing) > len(required_set) * 0.3:  # Allow 30% missing
             logger.info(f"Missing edge cases: {missing}")
-            return "needs_more_tests"
+            return CoverageStatus.NEEDS_MORE_TESTS
 
-    return "sufficient"
+    return CoverageStatus.SUFFICIENT
 
 
-def complexity_check(ctx: Dict[str, Any]) -> str:
+def complexity_check(ctx: Dict[str, Any]) -> ComplexityLevel:
     """Assess problem complexity to adjust strategy.
 
     Evaluates code size, cyclomatic complexity, and problem domain.
@@ -161,7 +190,7 @@ def complexity_check(ctx: Dict[str, Any]) -> str:
             - domain (str): Problem domain (e.g., "algorithm", "system")
 
     Returns:
-        "simple", "medium", or "complex"
+        ComplexityLevel enum value: SIMPLE, MEDIUM, or COMPLEX
     """
     problem = ctx.get("problem", {})
     code_metrics = ctx.get("code_metrics", {})
@@ -171,33 +200,33 @@ def complexity_check(ctx: Dict[str, Any]) -> str:
     # Check explicit difficulty if provided
     difficulty = problem.get("difficulty", "").lower()
     if difficulty in ["easy", "trivial"]:
-        return "simple"
+        return ComplexityLevel.SIMPLE
     if difficulty in ["hard", "expert", "advanced"]:
-        return "complex"
+        return ComplexityLevel.COMPLEX
 
     # Check code complexity metrics
     cyclomatic = code_metrics.get("cyclomatic_complexity", 0)
     if cyclomatic > 20:
-        return "complex"
+        return ComplexityLevel.COMPLEX
     if cyclomatic > 10:
-        return "medium"
+        return ComplexityLevel.MEDIUM
 
     # Check estimated size
     if estimated_loc > 500:
-        return "complex"
+        return ComplexityLevel.COMPLEX
     if estimated_loc > 100:
-        return "medium"
+        return ComplexityLevel.MEDIUM
 
     # Check domain complexity
     complex_domains = ["distributed", "concurrent", "ml", "compiler", "database"]
     if domain.lower() in complex_domains:
-        return "complex"
+        return ComplexityLevel.COMPLEX
 
     medium_domains = ["algorithm", "system", "network"]
     if domain.lower() in medium_domains:
-        return "medium"
+        return ComplexityLevel.MEDIUM
 
-    return "simple"
+    return ComplexityLevel.SIMPLE
 
 
 # =============================================================================
@@ -1003,6 +1032,10 @@ def register_handlers() -> None:
 
 
 __all__ = [
+    # Enums
+    "SolutionQuality",
+    "CoverageStatus",
+    "ComplexityLevel",
     # Conditions
     "solution_quality_check",
     "test_coverage_check",

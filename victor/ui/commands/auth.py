@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -38,6 +39,16 @@ import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
+
+
+class AuthStatus(str, Enum):
+    """OAuth authentication status for a provider."""
+
+    AUTHENTICATED = "authenticated"  # Valid token exists and is not expired
+    EXPIRED = "expired"  # Token exists but has expired
+    PENDING = "pending"  # No valid token (not authenticated or token missing)
+
+
 from rich.table import Table
 from rich.text import Text
 
@@ -116,11 +127,11 @@ auth_app = typer.Typer(name="auth", help="Manage authentication and provider acc
 console = Console()
 
 
-def _get_oauth_status(provider: str) -> str:
+def _get_oauth_status(provider: str) -> AuthStatus:
     """Check OAuth token status for a provider without triggering login.
 
     Returns:
-        "authenticated" if valid token exists, "expired" if token expired, "pending" otherwise.
+        AuthStatus enum: AUTHENTICATED if valid token exists, EXPIRED if token expired, PENDING otherwise.
     """
     try:
         from pathlib import Path
@@ -132,7 +143,7 @@ def _get_oauth_status(provider: str) -> str:
         token_file = Path.home() / ".victor" / "oauth_tokens.yaml"
 
     if not token_file.exists():
-        return "pending"
+        return AuthStatus.PENDING
 
     try:
         import yaml
@@ -141,7 +152,7 @@ def _get_oauth_status(provider: str) -> str:
             all_tokens = yaml.safe_load(f) or {}
         data = all_tokens.get(provider)
         if data is None or not data.get("access_token"):
-            return "pending"
+            return AuthStatus.PENDING
 
         # Check expiry
         expires_at = data.get("expires_at")
@@ -150,11 +161,11 @@ def _get_oauth_status(provider: str) -> str:
 
             exp = datetime.fromisoformat(expires_at)
             if exp <= datetime.now(timezone.utc):
-                return "expired"
+                return AuthStatus.EXPIRED
 
-        return "authenticated"
+        return AuthStatus.AUTHENTICATED
     except Exception:
-        return "pending"
+        return AuthStatus.PENDING
 
 
 # =============================================================================

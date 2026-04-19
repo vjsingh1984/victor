@@ -1819,9 +1819,7 @@ class ConversationStore:
                 cost_usd_micros = row["cost_usd_micros"] or 0
 
                 total_tokens = prompt_tokens + completion_tokens
-                cache_hit_rate = (
-                    (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0.0
-                )
+                cache_hit_rate = (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0.0
 
                 return {
                     "prompt_tokens": prompt_tokens,
@@ -1870,8 +1868,7 @@ class ConversationStore:
                         (hours,),
                     )
                 else:
-                    cursor = conn.execute(
-                        """
+                    cursor = conn.execute("""
                         SELECT
                             COUNT(*) as session_count,
                             COALESCE(SUM(prompt_tokens), 0) as total_prompt_tokens,
@@ -1880,8 +1877,7 @@ class ConversationStore:
                             COALESCE(SUM(reasoning_tokens), 0) as total_reasoning_tokens,
                             COALESCE(SUM(cost_usd_micros), 0) as total_cost_usd_micros
                         FROM sessions
-                        """
-                    )
+                        """)
 
                 row = cursor.fetchone()
                 total_prompt = row["total_prompt_tokens"] or 0
