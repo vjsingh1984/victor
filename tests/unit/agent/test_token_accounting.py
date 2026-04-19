@@ -175,3 +175,83 @@ class TestTokenAccountingWiring:
         ))
 
         mock_ctrl.record_actual_usage.assert_not_called()
+
+
+class TestConversationStoreTokenSchema:
+    """ConversationStore sessions table has token accounting columns."""
+
+    def test_sessions_table_has_token_columns(self, tmp_path):
+        """New DB must have prompt_tokens, completion_tokens, cached_tokens, etc."""
+        import sqlite3
+        from victor.agent.conversation.store import ConversationStore
+
+        db_path = tmp_path / "test.db"
+        store = ConversationStore(db_path=db_path)
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.execute("PRAGMA table_info(sessions)")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        for col in ("prompt_tokens", "completion_tokens", "cached_tokens",
+                    "reasoning_tokens", "cost_usd_micros"):
+            assert col in cols, f"sessions table missing column: {col}"
+
+    def test_update_session_token_usage_accumulates(self, tmp_path):
+        """update_session_token_usage adds to existing values on repeated calls."""
+        import sqlite3
+        from victor.agent.conversation.store import ConversationStore
+
+        db_path = tmp_path / "test.db"
+        store = ConversationStore(db_path=db_path)
+        session_id = "test-session-token"
+        store.create_session(session_id)
+
+        store.update_session_token_usage(session_id, prompt_tokens=100, completion_tokens=50)
+        store.update_session_token_usage(session_id, prompt_tokens=200, completion_tokens=80)
+
+        conn = sqlite3.connect(str(db_path))
+        row = conn.execute(
+            "SELECT prompt_tokens, completion_tokens FROM sessions WHERE session_id=?",
+            (session_id,),
+        ).fetchone()
+        conn.close()
+
+        assert row[0] == 300, f"Expected 300 prompt_tokens, got {row[0]}"
+        assert row[1] == 130, f"Expected 130 completion_tokens, got {row[1]}"
+
+    def test_update_session_token_usage_no_crash_for_missing_session(self, tmp_path):
+        """Calling update for a non-existent session_id must not raise."""
+        from victor.agent.conversation.store import ConversationStore
+
+        store = ConversationStore(db_path=tmp_path / "test.db")
+        store.update_session_token_usage("nonexistent", prompt_tokens=50, completion_tokens=20)
+
+    def test_migration_adds_token_columns_to_existing_db(self, tmp_path):
+        """Existing DB without token columns gets them added via migration."""
+        import sqlite3
+
+        db_path = str(tmp_path / "old.db")
+        # Create a minimal old sessions table without token columns
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE sessions (
+                session_id TEXT PRIMARY KEY,
+                created_at TIMESTAMP NOT NULL,
+                last_activity TIMESTAMP NOT NULL
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+        # Opening ConversationStore should migrate the table
+        from pathlib import Path
+        from victor.agent.conversation.store import ConversationStore
+        ConversationStore(db_path=Path(db_path))
+
+        conn = sqlite3.connect(db_path)
+        cursor = conn.execute("PRAGMA table_info(sessions)")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+
+        assert "prompt_tokens" in cols
+        assert "completion_tokens" in cols

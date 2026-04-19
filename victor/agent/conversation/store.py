@@ -338,7 +338,13 @@ class ConversationStore:
                 context_tokens INTEGER,
                 tool_capable INTEGER DEFAULT 0,
                 is_moe INTEGER DEFAULT 0,
-                is_reasoning INTEGER DEFAULT 0
+                is_reasoning INTEGER DEFAULT 0,
+                -- Token accounting: actual API-returned counts (NULL until first API response)
+                prompt_tokens INTEGER DEFAULT 0,
+                completion_tokens INTEGER DEFAULT 0,
+                cached_tokens INTEGER DEFAULT 0,
+                reasoning_tokens INTEGER DEFAULT 0,
+                cost_usd_micros INTEGER DEFAULT 0
             );
 
             -- Messages table
@@ -717,6 +723,12 @@ class ConversationStore:
             ("tool_capable", "INTEGER DEFAULT 0"),
             ("is_moe", "INTEGER DEFAULT 0"),
             ("is_reasoning", "INTEGER DEFAULT 0"),
+            # Token accounting columns (added for actual API token tracking)
+            ("prompt_tokens", "INTEGER DEFAULT 0"),
+            ("completion_tokens", "INTEGER DEFAULT 0"),
+            ("cached_tokens", "INTEGER DEFAULT 0"),
+            ("reasoning_tokens", "INTEGER DEFAULT 0"),
+            ("cost_usd_micros", "INTEGER DEFAULT 0"),
         ]
 
         columns_added = []
@@ -1676,6 +1688,55 @@ class ConversationStore:
                 "UPDATE sessions SET last_activity = ? " "WHERE session_id = ?",
                 (datetime.now().isoformat(), session_id),
             )
+
+    def update_session_token_usage(
+        self,
+        session_id: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        cached_tokens: int = 0,
+        reasoning_tokens: int = 0,
+        cost_usd_micros: int = 0,
+    ) -> None:
+        """Persist cumulative API token usage for a session.
+
+        Accumulates (+=) into the existing row so repeated calls are additive.
+        Safe to call after every turn — uses INSERT OR IGNORE + UPDATE pattern
+        to handle sessions not yet persisted to DB.
+
+        Args:
+            session_id: Session to update
+            prompt_tokens: Actual prompt tokens from API response
+            completion_tokens: Actual completion tokens
+            cached_tokens: Cache-hit tokens (reduces effective cost)
+            reasoning_tokens: Extended reasoning tokens (if applicable)
+            cost_usd_micros: Cost in USD micros (1e-6 USD)
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    """
+                    UPDATE sessions
+                    SET prompt_tokens     = COALESCE(prompt_tokens, 0)     + ?,
+                        completion_tokens = COALESCE(completion_tokens, 0) + ?,
+                        cached_tokens     = COALESCE(cached_tokens, 0)     + ?,
+                        reasoning_tokens  = COALESCE(reasoning_tokens, 0)  + ?,
+                        cost_usd_micros   = COALESCE(cost_usd_micros, 0)   + ?,
+                        last_activity     = ?
+                    WHERE session_id = ?
+                    """,
+                    (
+                        prompt_tokens,
+                        completion_tokens,
+                        cached_tokens,
+                        reasoning_tokens,
+                        cost_usd_micros,
+                        __import__("datetime").datetime.now().isoformat(),
+                        session_id,
+                    ),
+                )
+        except Exception as e:
+            logger.debug("update_session_token_usage skipped: %s", e)
 
     # -----------------------------------------------------------------
     # Async variants — offload blocking SQLite I/O to thread pool
