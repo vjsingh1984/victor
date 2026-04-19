@@ -1738,6 +1738,183 @@ class ConversationStore:
         except Exception as e:
             logger.debug("update_session_token_usage skipped: %s", e)
 
+    def update_message_token_count(
+        self,
+        session_id: str,
+        message_id: str,
+        actual_token_count: int,
+    ) -> None:
+        """Update an individual message's token count with actual API value.
+
+        Replaces the estimated token count set during add_message() with the
+        actual token count from the API response. This enables accurate per-
+        message token tracking for analytics and cost estimation.
+
+        Args:
+            session_id: Session containing the message
+            message_id: Message to update
+            actual_token_count: Actual token count from API response
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    """
+                    UPDATE messages
+                    SET token_count = ?
+                    WHERE session_id = ? AND message_id = ?
+                    """,
+                    (actual_token_count, session_id, message_id),
+                )
+                conn.commit()
+
+            # Also update in-memory session if loaded
+            session = self._sessions.get(session_id)
+            if session:
+                for msg in session.messages:
+                    if msg.id == message_id:
+                        # Adjust session total: remove estimate, add actual
+                        session.current_tokens -= msg.token_count
+                        msg.token_count = actual_token_count
+                        session.current_tokens += actual_token_count
+                        break
+        except Exception as e:
+            logger.debug("update_message_token_count skipped: %s", e)
+
+    def get_session_token_stats(
+        self,
+        session_id: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Get comprehensive token statistics for a session.
+
+        Returns token usage, cost estimates, cache hit rate, and reasoning
+        token usage from the sessions table.
+
+        Args:
+            session_id: Session to query
+
+        Returns:
+            Dict with keys: prompt_tokens, completion_tokens, cached_tokens,
+            reasoning_tokens, total_tokens, cache_hit_rate, cost_usd_micros,
+            or None if session not found
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.execute(
+                    """
+                    SELECT prompt_tokens, completion_tokens, cached_tokens, reasoning_tokens, cost_usd_micros
+                    FROM sessions
+                    WHERE session_id = ?
+                    """,
+                    (session_id,),
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return None
+
+                prompt_tokens = row["prompt_tokens"] or 0
+                completion_tokens = row["completion_tokens"] or 0
+                cached_tokens = row["cached_tokens"] or 0
+                reasoning_tokens = row["reasoning_tokens"] or 0
+                cost_usd_micros = row["cost_usd_micros"] or 0
+
+                total_tokens = prompt_tokens + completion_tokens
+                cache_hit_rate = (
+                    (cached_tokens / prompt_tokens * 100) if prompt_tokens > 0 else 0.0
+                )
+
+                return {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "cached_tokens": cached_tokens,
+                    "reasoning_tokens": reasoning_tokens,
+                    "total_tokens": total_tokens,
+                    "cache_hit_rate": round(cache_hit_rate, 2),
+                    "cost_usd_micros": cost_usd_micros,
+                    "cost_usd": cost_usd_micros / 1_000_000,
+                }
+        except Exception as e:
+            logger.debug("get_session_token_stats error: %s", e)
+            return None
+
+    def get_total_token_usage(
+        self,
+        hours: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Get aggregate token usage across all sessions.
+
+        Useful for monitoring overall usage and cost estimation.
+
+        Args:
+            hours: Only include sessions from the last N hours. None = all time.
+
+        Returns:
+            Dict with aggregate statistics
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                if hours is not None:
+                    cursor = conn.execute(
+                        """
+                        SELECT
+                            COUNT(*) as session_count,
+                            COALESCE(SUM(prompt_tokens), 0) as total_prompt_tokens,
+                            COALESCE(SUM(completion_tokens), 0) as total_completion_tokens,
+                            COALESCE(SUM(cached_tokens), 0) as total_cached_tokens,
+                            COALESCE(SUM(reasoning_tokens), 0) as total_reasoning_tokens,
+                            COALESCE(SUM(cost_usd_micros), 0) as total_cost_usd_micros
+                        FROM sessions
+                        WHERE datetime(last_activity) >= datetime('now', '-' || ? || ' hours')
+                        """,
+                        (hours,),
+                    )
+                else:
+                    cursor = conn.execute(
+                        """
+                        SELECT
+                            COUNT(*) as session_count,
+                            COALESCE(SUM(prompt_tokens), 0) as total_prompt_tokens,
+                            COALESCE(SUM(completion_tokens), 0) as total_completion_tokens,
+                            COALESCE(SUM(cached_tokens), 0) as total_cached_tokens,
+                            COALESCE(SUM(reasoning_tokens), 0) as total_reasoning_tokens,
+                            COALESCE(SUM(cost_usd_micros), 0) as total_cost_usd_micros
+                        FROM sessions
+                        """
+                    )
+
+                row = cursor.fetchone()
+                total_prompt = row["total_prompt_tokens"] or 0
+                total_completion = row["total_completion_tokens"] or 0
+                total_cached = row["total_cached_tokens"] or 0
+
+                return {
+                    "session_count": row["session_count"] or 0,
+                    "total_prompt_tokens": total_prompt,
+                    "total_completion_tokens": total_completion,
+                    "total_cached_tokens": total_cached,
+                    "total_reasoning_tokens": row["total_reasoning_tokens"] or 0,
+                    "total_tokens": total_prompt + total_completion,
+                    "total_cost_usd_micros": row["total_cost_usd_micros"] or 0,
+                    "total_cost_usd": (row["total_cost_usd_micros"] or 0) / 1_000_000,
+                    "cache_hit_rate": (
+                        round(total_cached / total_prompt * 100, 2) if total_prompt > 0 else 0.0
+                    ),
+                }
+        except Exception as e:
+            logger.debug("get_total_token_usage error: %s", e)
+            return {
+                "session_count": 0,
+                "total_prompt_tokens": 0,
+                "total_completion_tokens": 0,
+                "total_cached_tokens": 0,
+                "total_reasoning_tokens": 0,
+                "total_tokens": 0,
+                "total_cost_usd_micros": 0,
+                "total_cost_usd": 0.0,
+                "cache_hit_rate": 0.0,
+            }
+
     # -----------------------------------------------------------------
     # Async variants — offload blocking SQLite I/O to thread pool
     # Use these from async contexts to avoid blocking the event loop.
