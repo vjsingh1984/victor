@@ -753,11 +753,33 @@ class SessionCoordinator:
                     cleanup_interval=60.0,
                 )
                 logger.debug("Semantic tool cache created, pending wire to pipeline")
+            except ImportError as e:
+                logger.warning(
+                    f"ToolResultCache not available: {e}. "
+                    "Semantic tool caching will be disabled. "
+                    "This is optional - Victor will work normally without it."
+                )
             except Exception as e:
-                logger.warning(f"Failed to initialize semantic tool cache: {e}")
+                logger.warning(
+                    f"Failed to initialize semantic tool cache: {e}. "
+                    "Semantic tool caching will be disabled. "
+                    "This is optional - Victor will work normally without it."
+                )
 
+        except ImportError as e:
+            logger.warning(
+                f"ConversationEmbeddingStore not available: {e}. "
+                "Semantic search in conversations will be disabled. "
+                "This is optional - Victor will work normally without it. "
+                "To enable, install victor-coding: pip install victor-coding"
+            )
+            conversation_embedding_store = None
         except Exception as e:
-            logger.warning(f"Failed to initialize ConversationEmbeddingStore: {e}")
+            logger.warning(
+                f"Failed to initialize ConversationEmbeddingStore: {e}. "
+                "Semantic search in conversations will be disabled. "
+                "This is optional - Victor will work normally without it."
+            )
             conversation_embedding_store = None
 
         return conversation_embedding_store, pending_semantic_cache

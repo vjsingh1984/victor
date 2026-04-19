@@ -424,6 +424,22 @@ class ZAIProvider(BaseProvider):
                         provider=self.name,
                         status_code=429,
                     ) from e
+                elif e.response.status_code == 400:
+                    # HTTP 400 - Bad Request (likely message format issue)
+                    error_detail = e.response.text[:500] if e.response.text else ""
+                    try:
+                        import json as _json
+                        error_json = _json.loads(error_detail)
+                        error_msg = error_json.get("error", {}).get("message", error_detail)
+                    except Exception:
+                        error_msg = error_detail
+
+                    raise ProviderError(
+                        message=f"z.ai request format error: {error_msg}",
+                        provider=self.name,
+                        status_code=400,
+                        raw_error=e,
+                    ) from e
                 else:
                     error_body = ""
                     try:
@@ -526,6 +542,19 @@ class ZAIProvider(BaseProvider):
                             provider=self.name,
                             status_code=429,
                         )
+                    elif response.status_code == 400:
+                        # HTTP 400 - Bad Request (likely message format issue)
+                        try:
+                            import json as _json
+                            error_json = _json.loads(error_text)
+                            error_msg = error_json.get("error", {}).get("message", error_text)
+                        except Exception:
+                            error_msg = error_text
+                        raise ProviderError(
+                            message=f"z.ai request format error: {error_msg}",
+                            provider=self.name,
+                            status_code=400,
+                        )
                     else:
                         raise ProviderError(
                             message=f"z.ai HTTP error {response.status_code}: {error_text}",
@@ -589,6 +618,22 @@ class ZAIProvider(BaseProvider):
                     message=f"Rate limit exceeded: {error_text or 'HTTP 429'}",
                     provider=self.name,
                     status_code=429,
+                ) from e
+            elif e.response.status_code == 400:
+                # HTTP 400 - Bad Request (likely message format issue)
+                error_detail = e.response.text[:500] if e.response.text else ""
+                try:
+                    import json as _json
+                    error_json = _json.loads(error_detail)
+                    error_msg = error_json.get("error", {}).get("message", error_detail)
+                except Exception:
+                    error_msg = error_detail
+
+                raise ProviderError(
+                    message=f"z.ai request format error: {error_msg}",
+                    provider=self.name,
+                    status_code=400,
+                    raw_error=e,
                 ) from e
             else:
                 error_body = ""
@@ -764,6 +809,13 @@ class ZAIProvider(BaseProvider):
                 msg["role"] = "user"
                 msg["content"] = f"[Tool result] {msg.get('content', '')}"
 
+        # Validate messages before sending
+        if not formatted_messages:
+            raise ValueError(
+                "Cannot send request with empty messages list. "
+                "This usually indicates a conversation initialization issue."
+            )
+
         payload: Dict[str, Any] = {
             "model": model,
             "messages": formatted_messages,
@@ -771,6 +823,15 @@ class ZAIProvider(BaseProvider):
             "max_tokens": max_tokens,
             "stream": stream,
         }
+
+        # Log message composition for debugging
+        self._provider_logger.logger.debug(
+            "Z.AI payload: model=%s, messages=%d, tools=%s, stream=%s",
+            model,
+            len(formatted_messages),
+            tools is not None,
+            stream,
+        )
 
         # Add tools if provided
         if tools:
