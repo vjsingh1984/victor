@@ -90,6 +90,7 @@ import logging
 import threading
 import time
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -118,6 +119,14 @@ _EXTENSION_LOADER_PRESSURE_TOPIC = "vertical.extensions.loader.pressure"
 
 _METRICS_REPORTER_LOCK = threading.Lock()
 _METRICS_REPORTER_SINGLETON: Optional["ExtensionLoaderMetricsReporter"] = None
+
+
+class PressureLevel(str, Enum):
+    """Pressure level for extension loader queue and in-flight operations."""
+
+    ERROR = "error"  # Critical saturation (at or above error thresholds)
+    WARN = "warn"  # Elevated load (at or above warning thresholds)
+    OK = "ok"  # Normal operation (below all thresholds)
 
 
 def _build_team_spec_provider_from_definition(definition: Any) -> Optional[Any]:
@@ -221,7 +230,7 @@ class ExtensionLoaderPressureMonitor:
         self.error_in_flight_threshold: int = 8
         self.pressure_cooldown_seconds: float = 5.0
         self.emit_pressure_events: bool = False
-        self.last_pressure_level: str = "ok"
+        self.last_pressure_level: PressureLevel = PressureLevel.OK
         self.last_pressure_emit_ts: float = 0.0
 
         # Track optional modules already reported missing (avoid log spam).
@@ -295,19 +304,27 @@ class ExtensionLoaderPressureMonitor:
     # Pressure level evaluation
     # ------------------------------------------------------------------
 
-    def pressure_level(self, *, queued: int, in_flight: int) -> str:
-        """Return pressure level for current loader queue and in-flight counts."""
+    def pressure_level(self, *, queued: int, in_flight: int) -> PressureLevel:
+        """Return pressure level for current loader queue and in-flight counts.
+
+        Args:
+            queued: Number of extensions waiting in queue
+            in_flight: Number of extensions currently being loaded
+
+        Returns:
+            PressureLevel enum: ERROR if at error thresholds, WARN if at warning thresholds, OK otherwise
+        """
         if queued >= self.error_queue_threshold or in_flight >= self.error_in_flight_threshold:
-            return "error"
+            return PressureLevel.ERROR
         if queued >= self.warn_queue_threshold or in_flight >= self.warn_in_flight_threshold:
-            return "warn"
-        return "ok"
+            return PressureLevel.WARN
+        return PressureLevel.OK
 
     # ------------------------------------------------------------------
     # Pressure event emission
     # ------------------------------------------------------------------
 
-    def emit_pressure_event(self, level: str, snapshot: Dict[str, Any], reason: str) -> None:
+    def emit_pressure_event(self, level: PressureLevel, snapshot: Dict[str, Any], reason: str) -> None:
         """Emit queue-pressure signal for extension loader saturation."""
         try:
             from victor.core.events import get_observability_bus
@@ -358,15 +375,15 @@ class ExtensionLoaderPressureMonitor:
             cooldown = self.pressure_cooldown_seconds
             elapsed = now - self.last_pressure_emit_ts
 
-            if level == "ok":
-                self.last_pressure_level = "ok"
+            if level == PressureLevel.OK:
+                self.last_pressure_level = PressureLevel.OK
                 return
 
             if level != previous_level or elapsed >= cooldown:
                 self.last_pressure_level = level
                 self.last_pressure_emit_ts = now
                 should_emit = True
-                if level == "error":
+                if level == PressureLevel.ERROR:
                     self._metrics["pressure_errors"] += 1
                 else:
                     self._metrics["pressure_warnings"] += 1
@@ -379,7 +396,7 @@ class ExtensionLoaderPressureMonitor:
             "(reason=%s, thresholds q:%s/%s in_f:%s/%s)"
         )
         args = (
-            level.upper(),
+            level.value.upper(),
             queued,
             in_flight,
             reason,

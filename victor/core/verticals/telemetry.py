@@ -110,9 +110,9 @@ def vertical_load_span(
         with vertical_load_span("coding", "load") as span:
             try:
                 vertical = load_vertical("coding")
-                span.status = "success"
+                span.status = TelemetryStatus.SUCCESS
             except Exception as e:
-                span.status = "error"
+                span.status = TelemetryStatus.ERROR
                 span.error = str(e)
     """
     span = VerticalLoadSpan(
@@ -258,7 +258,7 @@ class VerticalLoadTelemetry:
             ) as otel_span:
                 if span.is_error:
                     otel_span.set_status(trace.Status(trace.StatusCode.ERROR, span.error))
-                elif span.status == "skipped":
+                elif span.status == TelemetryStatus.SKIPPED:
                     otel_span.set_status(trace.Status(trace.StatusCode.UNSET))
 
         except ImportError:
