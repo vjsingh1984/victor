@@ -137,13 +137,17 @@ class AnthropicProvider(BaseProvider):
                 # Strip the data URI prefix to get raw base64
                 if "," in data_uri:
                     header, b64_data = data_uri.split(",", 1)
-                    media_type = header.split(":")[1].split(";")[0] if ":" in header else "image/png"
+                    media_type = (
+                        header.split(":")[1].split(";")[0] if ":" in header else "image/png"
+                    )
                 else:
                     b64_data, media_type = data_uri, "image/png"
-                content.append({
-                    "type": "image",
-                    "source": {"type": "base64", "media_type": media_type, "data": b64_data},
-                })
+                content.append(
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": media_type, "data": b64_data},
+                    }
+                )
             if msg.content:
                 content.append({"type": "text", "text": msg.content})
             return {"role": "user", "content": content}

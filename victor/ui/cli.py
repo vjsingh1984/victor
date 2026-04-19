@@ -34,16 +34,22 @@ from victor.ui.commands.experiments import experiment_app
 from victor.ui.commands.fep import fep_app
 from victor.ui.commands.index import index_app
 from victor.ui.commands.init import init_app
+
+
 # Lazy imports for deprecated/hidden commands (startup performance)
 def _get_keys_app():
     """Lazy import for deprecated keys command."""
     from victor.ui.commands.keys import keys_app
+
     return keys_app
+
 
 def _get_test_provider_app():
     """Lazy import for hidden test_provider command."""
     from victor.ui.commands.test_provider import test_provider_app
+
     return test_provider_app
+
 
 # Regular imports (alphabetically ordered)
 from victor.ui.commands.mcp import mcp_app
@@ -273,6 +279,7 @@ app.add_typer(fep_app, rich_help_panel="Advanced")
 coding_app = typer.Typer(name="coding", help="Coding vertical specialized commands.")
 app.add_typer(coding_app, rich_help_panel="Advanced")
 
+
 # --- Deprecated / Hidden (lazy-loaded for startup performance) ---
 # Lazy loading wrapper for deprecated/hidden commands
 class LazyTyper:
@@ -389,9 +396,7 @@ def callback(
 
             if is_first_time_user():
                 console.print("\n[bold cyan]Welcome to Victor![/]")
-                console.print(
-                    "Let's get you set up in 2 minutes...\n"
-                )
+                console.print("Let's get you set up in 2 minutes...\n")
                 from victor.ui.commands.onboarding import run_onboarding
 
                 exit_code = run_onboarding()

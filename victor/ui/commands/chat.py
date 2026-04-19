@@ -770,9 +770,13 @@ async def run_oneshot(
                 if renderer_choice in {"rich-text", "text"}:
                     use_live = False
                 renderer = (
-                    LiveDisplayRenderer(console) if use_live else FormatterRenderer(formatter, console)
+                    LiveDisplayRenderer(console)
+                    if use_live
+                    else FormatterRenderer(formatter, console)
                 )
-                await stream_response(agent, message, renderer, suppress_thinking=not show_reasoning)
+                await stream_response(
+                    agent, message, renderer, suppress_thinking=not show_reasoning
+                )
             else:
                 # Use streaming pipeline with BufferedRenderer to capture
                 # tool calls and reasoning that agent.chat() would swallow
@@ -785,7 +789,9 @@ async def run_oneshot(
                     show_reasoning=show_reasoning,
                     plain=formatter._plain if hasattr(formatter, "_plain") else False,
                 )
-                await stream_response(agent, message, buffered, suppress_thinking=not show_reasoning)
+                await stream_response(
+                    agent, message, buffered, suppress_thinking=not show_reasoning
+                )
                 buffered.flush(console)
 
             success = True

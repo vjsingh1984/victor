@@ -146,7 +146,9 @@ def profile_list(
     recommended = get_recommended_profile()
     from victor.ui.emoji import get_icon
 
-    console.print(f"\n{get_icon('info')} [yellow]Recommended for you:[/] {recommended.display_name}")
+    console.print(
+        f"\n{get_icon('info')} [yellow]Recommended for you:[/] {recommended.display_name}"
+    )
     console.print("   Use: [bold]victor profile apply {recommended.name}[/]")
 
 
@@ -248,7 +250,9 @@ def profile_apply(
 
         from victor.ui.emoji import get_icon
 
-        console.print(f"\n{get_icon('success')} Applied [bold cyan]{profile.display_name}[/] profile")
+        console.print(
+            f"\n{get_icon('success')} Applied [bold cyan]{profile.display_name}[/] profile"
+        )
         console.print(f"[dim]Config written to: {profiles_path}[/]")
 
         # Show summary

@@ -476,7 +476,9 @@ async def preload_semantic_index(
         from rich.console import Console as RichConsole
 
         if isinstance(console_obj, RichConsole):
-            with console_obj.status("[bold green]Building semantic code index (one-time)...[/]", spinner="dots") as status:
+            with console_obj.status(
+                "[bold green]Building semantic code index (one-time)...[/]", spinner="dots"
+            ) as status:
                 status.update("Indexing files...")
                 start_time = time.time()
                 index, rebuilt = await _get_or_build_index(root_path, settings, force_reindex=force)

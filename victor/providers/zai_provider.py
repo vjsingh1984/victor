@@ -429,6 +429,7 @@ class ZAIProvider(BaseProvider):
                     error_detail = e.response.text[:500] if e.response.text else ""
                     try:
                         import json as _json
+
                         error_json = _json.loads(error_detail)
                         error_msg = error_json.get("error", {}).get("message", error_detail)
                     except Exception:
@@ -546,6 +547,7 @@ class ZAIProvider(BaseProvider):
                         # HTTP 400 - Bad Request (likely message format issue)
                         try:
                             import json as _json
+
                             error_json = _json.loads(error_text)
                             error_msg = error_json.get("error", {}).get("message", error_text)
                         except Exception:
@@ -624,6 +626,7 @@ class ZAIProvider(BaseProvider):
                 error_detail = e.response.text[:500] if e.response.text else ""
                 try:
                     import json as _json
+
                     error_json = _json.loads(error_detail)
                     error_msg = error_json.get("error", {}).get("message", error_detail)
                 except Exception:

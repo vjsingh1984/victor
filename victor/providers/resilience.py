@@ -45,7 +45,10 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Awaitable, Callable, ClassVar, Dict, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, ClassVar, Dict, List, Optional, TypeVar
+
+if TYPE_CHECKING:
+    from victor.core.retry import RetryContext
 
 logger = logging.getLogger(__name__)
 
@@ -414,7 +417,8 @@ class ProviderRetryStrategy:
         # Use core BaseRetryStrategy for standard retry logic
         # ProviderRetryConfig maps to ExponentialBackoffStrategy parameters
         self._base_strategy = ExponentialBackoffStrategy(
-            max_attempts=self.config.max_retries + 1,  # BaseRetryStrategy counts attempts, ProviderRetryStrategy counts retries
+            max_attempts=self.config.max_retries
+            + 1,  # BaseRetryStrategy counts attempts, ProviderRetryStrategy counts retries
             base_delay=self.config.base_delay_seconds,
             max_delay=self.config.max_delay_seconds,
             multiplier=self.config.exponential_base,
