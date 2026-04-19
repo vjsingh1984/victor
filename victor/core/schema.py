@@ -1009,7 +1009,7 @@ class Schema:
 
 
 # Schema version for migrations
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 
 def get_migration_sql(from_version: int, to_version: int) -> List[str]:
@@ -1056,6 +1056,14 @@ def get_migration_sql(from_version: int, to_version: int) -> List[str]:
             Schema.GRAPH_MODULE_METRIC,
             Schema.GRAPH_MODULE_METRIC_HISTORY,
             Schema.GRAPH_MODULE_METRIC_INDEXES,
+        ],
+        # Version 3 -> 4: Priority 4 - Add session_id column to rl_outcome for user feedback linking
+        4: [
+            # Add session_id column for conversation linking
+            f"ALTER TABLE {Tables.RL_OUTCOME} ADD COLUMN session_id TEXT",
+            # Add indexes for performance
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_session ON {Tables.RL_OUTCOME}(session_id, created_at)",
+            f"CREATE INDEX IF NOT EXISTS idx_rl_outcome_repo ON {Tables.RL_OUTCOME}(repo_id, created_at)",
         ],
     }
 
