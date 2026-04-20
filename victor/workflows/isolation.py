@@ -374,8 +374,28 @@ def register_builtin_providers() -> None:
     logger.debug("Registered built-in sandbox providers")
 
 
-# Type alias for sandbox types
-SandboxType = Literal["none", "process", "docker"]
+# =============================================================================
+# Enums for Workflow Isolation
+# =============================================================================
+
+
+class SandboxType(str, Enum):
+    """Sandbox type for workflow execution.
+
+    Isolation levels for workflow node execution:
+    - NONE: Direct inline execution (fastest, least isolation)
+    - PROCESS: Subprocess with resource limits via rlimit
+    - DOCKER: Full container isolation (safest, slower startup)
+    """
+
+    NONE = "none"  # Direct inline execution
+    PROCESS = "process"  # Subprocess with resource limits
+    DOCKER = "docker"  # Full container isolation
+
+
+# Backward compatibility
+_SandboxTypeLiteral = Literal["none", "process", "docker"]
+
 
 # Deployment target hierarchy:
 # - Local: execution on the same machine

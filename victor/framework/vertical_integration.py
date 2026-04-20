@@ -131,6 +131,7 @@ import time
 import warnings
 import weakref
 from dataclasses import dataclass, field
+from enum import Enum
 
 from victor.framework.integration_registry import IntegrationPlanRegistry
 from pathlib import Path
@@ -463,8 +464,27 @@ class ExtensionLoadErrorInfo:
         }
 
 
-# Type alias for validation status
-ValidationStatus = Literal["success", "partial", "failed"]
+# =============================================================================
+# Enums for Vertical Integration
+# =============================================================================
+
+
+class ValidationStatus(str, Enum):
+    """Validation status for vertical capabilities.
+
+    Indicates the validation result:
+    - SUCCESS: All capabilities validated successfully
+    - PARTIAL: Some capabilities validated, others failed
+    - FAILED: All capabilities failed validation
+    """
+
+    SUCCESS = "success"  # All capabilities validated
+    PARTIAL = "partial"  # Some capabilities validated
+    FAILED = "failed"  # All capabilities failed
+
+
+# Backward compatibility
+_ValidationStatusLiteral = Literal["success", "partial", "failed"]
 
 
 @dataclass
