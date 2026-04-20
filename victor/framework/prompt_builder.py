@@ -58,6 +58,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Literal,
     Optional,
     Tuple,
     Union,
@@ -73,6 +74,9 @@ if TYPE_CHECKING:
     from victor.core.verticals.protocols import PromptContributorProtocol
 
 logger = logging.getLogger(__name__)
+
+# Type aliases for prompt builder
+PromptScope = Literal["workspace", "project", "user"]
 
 
 @dataclass
@@ -1043,7 +1047,7 @@ class WorkspaceContextBuilder:
 # ---------------------------------------------------------------------------
 
 
-def _classify_scope(file_dir: Path, workspace_dir: Path) -> str:
+def _classify_scope(file_dir: Path, workspace_dir: Path) -> PromptScope:
     """Determine the scope label for a discovered file.
 
     Args:

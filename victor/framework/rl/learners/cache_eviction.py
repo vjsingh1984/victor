@@ -28,6 +28,7 @@ Sprint 3: Cache & Grounding Learners
 import logging
 import math
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, Optional, Tuple
 
 from victor.framework.rl.base import BaseLearner, RLOutcome, RLRecommendation
@@ -43,6 +44,42 @@ class CacheEvictionAction:
     KEEP = "keep"
     PROMOTE_L1 = "promote_to_l1"
     DEMOTE_L2 = "demote_to_l2"
+
+
+class UtilizationLevel(str, Enum):
+    """Cache utilization level for eviction decisions."""
+
+    LOW = "low"  # < 50%
+    MEDIUM = "medium"  # 50-75%
+    HIGH = "high"  # 75-90%
+    CRITICAL = "critical"  # > 90%
+
+
+class CacheAge(str, Enum):
+    """Cache entry age bucket."""
+
+    FRESH = "fresh"  # < 1 minute
+    RECENT = "recent"  # 1-5 minutes
+    WARM = "warm"  # 5-60 minutes
+    STALE = "stale"  # > 1 hour
+
+
+class HitFrequency(str, Enum):
+    """Cache entry hit frequency."""
+
+    ZERO = "zero"  # No hits
+    LOW = "low"  # 1-2 hits
+    MEDIUM = "medium"  # 3-9 hits
+    HIGH = "high"  # 10+ hits
+
+
+class ToolType(str, Enum):
+    """Tool type category for cache state representation."""
+
+    SEARCH = "search"
+    READ = "read"
+    COMPUTE = "compute"
+    OTHER = "other"
 
 
 class CacheEvictionLearner(BaseLearner):
@@ -499,40 +536,40 @@ class CacheEvictionLearner(BaseLearner):
 
         return max(-1.0, min(1.0, reward))
 
-    def _discretize_utilization(self, utilization: float) -> str:
+    def _discretize_utilization(self, utilization: float) -> UtilizationLevel:
         """Discretize cache utilization to bucket."""
         if utilization < 0.5:
-            return "low"
+            return UtilizationLevel.LOW
         elif utilization < 0.75:
-            return "medium"
+            return UtilizationLevel.MEDIUM
         elif utilization < 0.9:
-            return "high"
+            return UtilizationLevel.HIGH
         else:
-            return "critical"
+            return UtilizationLevel.CRITICAL
 
-    def _discretize_age(self, age_seconds: float) -> str:
+    def _discretize_age(self, age_seconds: float) -> CacheAge:
         """Discretize entry age to bucket."""
         if age_seconds < 60:
-            return "fresh"  # < 1 minute
+            return CacheAge.FRESH  # < 1 minute
         elif age_seconds < 300:
-            return "recent"  # < 5 minutes
+            return CacheAge.RECENT  # < 5 minutes
         elif age_seconds < 3600:
-            return "warm"  # < 1 hour
+            return CacheAge.WARM  # < 1 hour
         else:
-            return "stale"  # >= 1 hour
+            return CacheAge.STALE  # >= 1 hour
 
-    def _discretize_hits(self, hit_count: int) -> str:
+    def _discretize_hits(self, hit_count: int) -> HitFrequency:
         """Discretize hit count to bucket."""
         if hit_count == 0:
-            return "zero"
+            return HitFrequency.ZERO
         elif hit_count < 3:
-            return "low"
+            return HitFrequency.LOW
         elif hit_count < 10:
-            return "medium"
+            return HitFrequency.MEDIUM
         else:
-            return "high"
+            return HitFrequency.HIGH
 
-    def _get_tool_type(self, tool_name: str) -> str:
+    def _get_tool_type(self, tool_name: str) -> ToolType:
         """Get tool type category for state representation."""
         # Map tools to categories for generalization
         search_tools = {"code_search", "semantic_code_search", "web_search", "grep"}
@@ -540,13 +577,13 @@ class CacheEvictionLearner(BaseLearner):
         compute_tools = {"code_review", "analyze_code", "refactor"}
 
         if tool_name in search_tools:
-            return "search"
+            return ToolType.SEARCH
         elif tool_name in read_tools:
-            return "read"
+            return ToolType.READ
         elif tool_name in compute_tools:
-            return "compute"
+            return ToolType.COMPUTE
         else:
-            return "other"
+            return ToolType.OTHER
 
     def export_metrics(self) -> Dict[str, Any]:
         """Export learner metrics for monitoring.

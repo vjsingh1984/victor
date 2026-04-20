@@ -60,7 +60,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, AsyncIterator, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, Dict, List, Literal, Optional, TYPE_CHECKING
 
 from victor.agent.turn_policy import (
     FulfillmentCriteriaBuilder,
@@ -78,6 +78,9 @@ from victor.framework.fulfillment import FulfillmentDetector, TaskType
 from victor.framework.perception_integration import Perception, PerceptionIntegration
 
 logger = logging.getLogger(__name__)
+
+# Type aliases for agentic loop decisions
+AdaptiveTerminationDecision = Literal["plateau", "extend"]
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.turn_executor import (
@@ -946,7 +949,7 @@ class AgenticLoop:
         self,
         iteration: int,
         evaluation: EvaluationResult,
-    ) -> Optional[str]:
+    ) -> Optional[AdaptiveTerminationDecision]:
         """Check if loop should adaptively terminate or extend.
 
         Inspired by Fast-Slow Architecture (arXiv:2604.01681):
