@@ -341,7 +341,16 @@ def chat(
         rich_help_panel="Expert Interface",
     ),
 ):
-    """Start interactive chat or send a one-shot message."""
+    """Start interactive chat or send a one-shot message.
+
+    \f
+    **Quick Start:**
+        victor chat                    # Interactive with defaults
+        victor chat "Your message"     # One-shot message
+
+    **For advanced options and examples:**
+        victor chat --help-full
+    """
     # Handle --help-full flag for comprehensive help
     if help_full:
         from rich.markdown import Markdown
