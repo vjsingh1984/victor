@@ -27,12 +27,40 @@ This service handles:
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 # Message is a dict with 'role' and 'content' keys
 Message = Dict[str, Any]
+
+
+class UtilizationTrend(str, Enum):
+    """Context utilization trend direction."""
+
+    INCREASING = "increasing"
+    DECREASING = "decreasing"
+    STABLE = "stable"
+    UNKNOWN = "unknown"
+
+
+class CompactionFrequency(str, Enum):
+    """Context compaction frequency category."""
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    UNKNOWN = "unknown"
+
+
+class CompactionUrgency(str, Enum):
+    """Context compaction urgency level."""
+
+    NOW = "now"
+    SOON = "soon"
+    WITHIN_5_MINUTES = "within_5_minutes"
+    NO_URGENCY = "no_urgency"
 
 
 class ContextServiceConfig:
@@ -920,11 +948,11 @@ class ContextService:
 
         return max(h.get("utilization", 0) for h in history)
 
-    def _calculate_utilization_trend(self) -> str:
+    def _calculate_utilization_trend(self) -> UtilizationTrend:
         """Calculate utilization trend direction."""
         history = self.get_utilization_history()
         if len(history) < 5:
-            return "unknown"
+            return UtilizationTrend.UNKNOWN
 
         # Compare recent vs older samples
         recent = history[-5:]
@@ -934,11 +962,11 @@ class ContextService:
         older_avg = sum(h.get("utilization", 0) for h in older) / len(older)
 
         if recent_avg > older_avg + 5:
-            return "increasing"
+            return UtilizationTrend.INCREASING
         elif recent_avg < older_avg - 5:
-            return "decreasing"
+            return UtilizationTrend.DECREASING
         else:
-            return "stable"
+            return UtilizationTrend.STABLE
 
     def _calculate_growth_rate(self, history: List[Dict[str, Any]]) -> float:
         """Calculate context growth rate in tokens per minute."""
@@ -977,23 +1005,23 @@ class ContextService:
         else:
             return None
 
-    def _determine_compaction_frequency(self) -> str:
+    def _determine_compaction_frequency(self) -> CompactionFrequency:
         """Determine compaction frequency category."""
         compact_count = self._metrics.get("compaction_count", 0)
         history = self.get_utilization_history()
 
         if len(history) == 0:
-            return "unknown"
+            return CompactionFrequency.UNKNOWN
 
         # Compactions per sample
         freq = compact_count / len(history)
 
         if freq > 0.1:
-            return "high"
+            return CompactionFrequency.HIGH
         elif freq > 0.05:
-            return "medium"
+            return CompactionFrequency.MEDIUM
         else:
-            return "low"
+            return CompactionFrequency.LOW
 
     def _calculate_optimization_score(self) -> float:
         """Calculate context optimization score (0.0-1.0)."""
@@ -1036,18 +1064,18 @@ class ContextService:
 
         return recommendations
 
-    def _calculate_compaction_time(self) -> str:
+    def _calculate_compaction_time(self) -> CompactionUrgency:
         """Calculate recommended compaction time."""
         risk_score = self.get_overflow_risk_score()
 
         if risk_score > 0.8:
-            return "now"
+            return CompactionUrgency.NOW
         elif risk_score > 0.6:
-            return "soon"
+            return CompactionUrgency.SOON
         elif risk_score > 0.4:
-            return "within_5_minutes"
+            return CompactionUrgency.WITHIN_5_MINUTES
         else:
-            return "no_urgency"
+            return CompactionUrgency.NO_URGENCY
 
     def _calculate_compaction_efficiency(self) -> float:
         """Calculate compaction efficiency (tokens removed / total)."""

@@ -30,12 +30,22 @@ import asyncio
 import logging
 import time
 from datetime import datetime
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+
+
+class RecoveryStrategy(str, Enum):
+    """Error recovery strategy selection."""
+
+    RETRY = "retry"  # Retry the operation immediately
+    BACKOFF = "backoff"  # Retry with exponential backoff
+    FALLBACK = "fallback"  # Use fallback method
+    GIVE_UP = "give_up"  # Abort the operation
 
 
 class RecoveryContextImpl:
@@ -620,7 +630,7 @@ class RecoveryService:
         error_type: str,
         attempt_count: int,
         context: Optional[RecoveryContextImpl] = None,
-    ) -> str:
+    ) -> RecoveryStrategy:
         """Select appropriate recovery strategy based on error and context.
 
         Analyzes the error type and attempt count to recommend the
@@ -632,42 +642,42 @@ class RecoveryService:
             context: Optional recovery context
 
         Returns:
-            Recovery strategy name
+            Recovery strategy enum value
 
         Example:
             strategy = service.select_recovery_strategy(error_type, attempts)
-            # Returns: "retry", "fallback", "backoff", "give_up"
+            # Returns: RecoveryStrategy.RETRY, FALLBACK, BACKOFF, or GIVE_UP
         """
         # Don't retry certain errors
         if error_type in {"auth", "validation"}:
-            return "give_up"
+            return RecoveryStrategy.GIVE_UP
 
         # Rate limiting: backoff
         if error_type == "rate_limit":
             if attempt_count < 3:
-                return "backoff"
+                return RecoveryStrategy.BACKOFF
             else:
-                return "fallback"
+                return RecoveryStrategy.FALLBACK
 
         # Connection errors: retry with backoff
         if error_type == "connection":
             if attempt_count < self._max_retry_attempts:
-                return "retry"
+                return RecoveryStrategy.RETRY
             else:
-                return "fallback"
+                return RecoveryStrategy.FALLBACK
 
         # Timeout errors: retry with backoff
         if error_type == "timeout":
             if attempt_count < 2:
-                return "backoff"
+                return RecoveryStrategy.BACKOFF
             else:
-                return "fallback"
+                return RecoveryStrategy.FALLBACK
 
         # Unknown: retry conservatively
         if attempt_count < 2:
-            return "retry"
+            return RecoveryStrategy.RETRY
         else:
-            return "backoff"
+            return RecoveryStrategy.BACKOFF
 
     def get_recovery_config(
         self,

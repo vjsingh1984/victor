@@ -55,6 +55,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -78,6 +79,19 @@ from victor.framework.graph import (
 )
 from victor.workflows.context import ExecutionContext, create_execution_context
 from victor.workflows.protocols import NodeRunner, NodeRunnerResult
+
+logger = logging.getLogger(__name__)
+
+
+class NodeCategory(str, Enum):
+    """Workflow node type classification for runner lookup."""
+
+    AGENT = "agent"
+    COMPUTE = "compute"
+    CONDITION = "condition"
+    PARALLEL = "parallel"
+    TRANSFORM = "transform"
+    UNKNOWN = "unknown"
 
 if TYPE_CHECKING:
     from victor.workflows.graph_dsl import (
@@ -640,7 +654,7 @@ class WorkflowDefinitionCompiler:
 
         return passthrough
 
-    def _get_node_type(self, workflow_node: "WorkflowNode") -> str:
+    def _get_node_type(self, workflow_node: "WorkflowNode") -> NodeCategory:
         """Get the node type string for runner lookup."""
         from victor.workflows.definition import (
             AgentNode as DefAgentNode,
@@ -651,16 +665,16 @@ class WorkflowDefinitionCompiler:
         )
 
         if isinstance(workflow_node, DefAgentNode):
-            return "agent"
+            return NodeCategory.AGENT
         elif isinstance(workflow_node, DefComputeNode):
-            return "compute"
+            return NodeCategory.COMPUTE
         elif isinstance(workflow_node, DefConditionNode):
-            return "condition"
+            return NodeCategory.CONDITION
         elif isinstance(workflow_node, DefParallelNode):
-            return "parallel"
+            return NodeCategory.PARALLEL
         elif isinstance(workflow_node, DefTransformNode):
-            return "transform"
-        return "unknown"
+            return NodeCategory.TRANSFORM
+        return NodeCategory.UNKNOWN
 
     def _extract_config(self, workflow_node: "WorkflowNode") -> Dict[str, Any]:
         """Extract configuration from workflow node."""
