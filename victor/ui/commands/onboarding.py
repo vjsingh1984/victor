@@ -77,7 +77,7 @@ class OnboardingWizard:
             Exit code (0 for success, 1 for cancellation/error)
         """
         try:
-            self.console.clear()
+            # Removed console.clear() - jarring UX, destroys user context
             self._show_welcome()
 
             if not self._confirm_start():

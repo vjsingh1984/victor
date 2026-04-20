@@ -111,7 +111,7 @@ class TestProviderConfiguration:
         """Getting default model works."""
         wizard = OnboardingWizard()
 
-        assert "qwen2.5-coder" in wizard._get_default_model("ollama")
+        assert "qwen3.5" in wizard._get_default_model("ollama")
         assert "claude" in wizard._get_default_model("anthropic").lower()
         assert "gpt" in wizard._get_default_model("openai").lower()
 

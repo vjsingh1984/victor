@@ -229,6 +229,56 @@ def run_command(
     )
 
 
+@app.command("onboarding")
+def onboarding_command(
+    force: bool = typer.Option(False, "--force", "-f", help="Re-run onboarding even if completed before"),
+) -> None:
+    """Run the interactive onboarding wizard for first-time setup.
+
+    The onboarding wizard guides you through:
+    - Environment detection (Ollama, API keys)
+    - Profile selection based on experience level
+    - Provider and model configuration
+    - Configuration validation
+    - Testing the setup
+
+    Use --force to re-run onboarding even if you've completed it before.
+    """
+    from victor.ui.commands.onboarding import run_onboarding
+    from victor.config.settings import is_first_time_user
+
+    # Check if onboarding was already completed
+    if not force and not is_first_time_user():
+        console.print("\n[yellow]⚠[/] Onboarding already completed.")
+        console.print("")
+        console.print("To re-run onboarding, use:")
+        console.print("  [cyan]victor onboarding --force[/]")
+        console.print("")
+        console.print("Or reconfigure your profile with:")
+        console.print("  [cyan]victor profile list[/]")
+        console.print("  [cyan]victor profile set-default <profile>[/]")
+        return
+
+    # Run the onboarding wizard
+    console.print("\n[bold cyan]Welcome to Victor![/]")
+    console.print("Let's get you set up in 2 minutes...\n")
+
+    exit_code = run_onboarding()
+
+    if exit_code == 0:
+        console.print("\n[green]✓ Setup complete![/]")
+        console.print("")
+        console.print("Next steps:")
+        console.print("  1. [cyan]victor chat[/] - Start chatting")
+        console.print("  2. [cyan]victor doctor[/] - Run diagnostics")
+        console.print("  3. [cyan]victor profile list[/] - See all profiles")
+    else:
+        console.print("\n[yellow]Onboarding interrupted.[/]")
+        console.print("Run [cyan]victor onboarding[/] again to complete setup.")
+
+    raise typer.Exit(exit_code)
+
+
 # =============================================================================
 # Register all subcommands with rich_help_panel grouping
 # =============================================================================
