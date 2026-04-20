@@ -166,7 +166,7 @@ class ToolCall:
 
         result = {
             "name": self.name,
-            "arguments": sanitize_arguments_for_serialization(self.arguments)
+            "arguments": sanitize_arguments_for_serialization(self.arguments),
         }
         if self.id:
             result["id"] = self.id

@@ -396,7 +396,10 @@ class OnboardingWizard:
         """
         models = {
             "ollama": [
-                {"id": "qwen3.5:27b-q4_K_M", "description": "MoE model, fast + knowledgeable (recommended)"},
+                {
+                    "id": "qwen3.5:27b-q4_K_M",
+                    "description": "MoE model, fast + knowledgeable (recommended)",
+                },
                 {"id": "qwen2.5-coder:7b", "description": "Coding-focused, 7B params"},
                 {
                     "id": "qwen2.5-coder:14b",

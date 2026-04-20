@@ -139,6 +139,8 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=6,
             priority_tools=["grep", "ls", "read"],
             keywords=["find", "search", "where", "locate", "look for"],
+            token_budget=500,  # NEW: Concise search results
+            skip_planning=True,  # NEW: Direct execution
         ),
         "create": TaskTypeHint(
             task_type="create",
@@ -148,6 +150,10 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=5,
             priority_tools=["read", "write", "ls"],
             keywords=["create", "new", "add", "generate", "make"],
+            token_budget=800,  # NEW: Constrain response length
+            context_budget=2000,  # NEW: Limit context tokens
+            skip_planning=True,  # NEW: Direct execution for simple creation
+            skip_evaluation=True,  # NEW: Skip LLM evaluation
         ),
         "edit": TaskTypeHint(
             task_type="edit",
@@ -157,6 +163,9 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=5,
             priority_tools=["read", "edit", "write"],
             keywords=["edit", "modify", "change", "update", "fix"],
+            token_budget=600,  # NEW: Focused edits
+            context_budget=1500,  # NEW: Limited context
+            skip_evaluation=True,  # NEW: Skip LLM evaluation
         ),
         "debug": TaskTypeHint(
             task_type="debug",

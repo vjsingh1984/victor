@@ -429,7 +429,7 @@ class QueryService:
         """
         # Try to get metrics from database
         try:
-            async with aiosqlite.connect(self.paths.conversation_db) as db:
+            async with aiosqlite.connect(self.paths.conversation_db):
                 # Count messages (proxy for activity)
                 # TODO: Use message count for activity metrics
                 # async with db.execute("SELECT COUNT(*) as count FROM messages") as cursor:

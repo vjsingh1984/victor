@@ -146,7 +146,10 @@ class ErrorEventEmitter(IErrorEventEmitter):
                 return False, suffix
 
             # Suppress this duplicate
-            return True, f" ({entry['count']} times suppressed, last seen {int(now - entry['first_seen'])}s ago)"
+            return (
+                True,
+                f" ({entry['count']} times suppressed, last seen {int(now - entry['first_seen'])}s ago)",
+            )
 
         else:
             # First time seeing this warning
@@ -320,7 +323,8 @@ class ErrorEventEmitter(IErrorEventEmitter):
         """
         now = time.time()
         expired = [
-            h for h, entry in self._warning_dedup.items()
+            h
+            for h, entry in self._warning_dedup.items()
             if now - entry["last_seen"] > self._dedup_window
         ]
         for h in expired:
