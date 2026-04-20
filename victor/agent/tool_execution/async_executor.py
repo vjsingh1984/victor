@@ -88,7 +88,8 @@ class ExecutionConfig:
     max_concurrent: int = 10
     enable_write_parallelization: bool = True
     enable_priority_scheduling: bool = True
-    default_timeout: float = 30.0
+    # Increased from 30 to 60 seconds for semantic search operations
+    default_timeout: float = 60.0
 
 
 class AsyncToolExecutor:

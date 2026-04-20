@@ -1104,8 +1104,9 @@ class ToolExecutor:
 
                 # Execute the tool — strip _exec_ctx if LLM hallucinated it in arguments
                 arguments.pop("_exec_ctx", None)
-                # Per-tool timeout: tools can declare timeout_seconds, default 30s
-                per_attempt_timeout = getattr(tool, "timeout_seconds", 30.0)
+                # Per-tool timeout: tools can declare timeout_seconds, default 60s
+                # Increased from 30 to 60 seconds for semantic search operations
+                per_attempt_timeout = getattr(tool, "timeout_seconds", 60.0)
                 result = await asyncio.wait_for(
                     tool.execute(_exec_ctx=context, **arguments),
                     timeout=per_attempt_timeout,

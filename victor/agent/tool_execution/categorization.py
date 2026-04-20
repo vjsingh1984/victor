@@ -74,7 +74,8 @@ class ToolCallSpec:
     category: ToolCategory = ToolCategory.COMPUTE
     dependencies: Set[str] = field(default_factory=set)
     priority: int = 0
-    timeout: float = 30.0
+    # Increased from 30 to 60 seconds for semantic search operations
+    timeout: float = 60.0
 
 
 # Optimized tool categorization using frozenset for O(1) lookups

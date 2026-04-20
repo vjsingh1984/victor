@@ -107,7 +107,8 @@ class ToolPipelineConfig:
     code_correction_auto_fix: bool = True
 
     # Per-tool-call timeout for serial execution path
-    per_tool_timeout_seconds: float = 30.0
+    # Increased from 30 to 60 seconds for semantic search (code_search, etc.)
+    per_tool_timeout_seconds: float = 60.0
 
     # Parallel execution settings
     enable_parallel_execution: bool = True
