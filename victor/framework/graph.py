@@ -229,6 +229,10 @@ class StateValidator:
             return False
         try:
             from typing_extensions import TypedDict
+            # Check for TypedDict-specific attributes
+            if hasattr(self._schema, '__required_keys__'):
+                return True
+            # Fallback to issubclass check
             return isinstance(self._schema, type) and issubclass(self._schema, TypedDict)
         except (ImportError, TypeError):
             return False
@@ -1750,9 +1754,14 @@ class CompiledGraph(Generic[StateType]):
         exec_config = config or self._config
 
         # Validate input state if enabled
-        if self._validator and exec_config.validation.validate_on_entry:
+        if exec_config.validation.enabled and self._state_schema is not None:
+            # Use existing validator or create temporary one
+            validator = self._validator or StateValidator(
+                schema=self._state_schema,
+                strict=exec_config.validation.strict
+            )
             state_dict = input_state if isinstance(input_state, dict) else dict(input_state)
-            errors = self._validator.validate(state_dict)
+            errors = validator.validate(state_dict)
             if errors:
                 if exec_config.validation.strict:
                     raise StateValidationError(errors, state_dict)
@@ -1865,9 +1874,14 @@ class CompiledGraph(Generic[StateType]):
                     )
 
                 # Validate state after node execution if enabled
-                if self._validator and exec_config.validation.validate_after_nodes:
+                if exec_config.validation.enabled and self._state_schema is not None:
+                    # Use existing validator or create temporary one
+                    validator = self._validator or StateValidator(
+                        schema=self._state_schema,
+                        strict=exec_config.validation.strict
+                    )
                     state_dict = state if isinstance(state, dict) else dict(state)
-                    errors = self._validator.validate(state_dict)
+                    errors = validator.validate(state_dict)
                     if errors:
                         if exec_config.validation.strict:
                             return GraphExecutionResult(

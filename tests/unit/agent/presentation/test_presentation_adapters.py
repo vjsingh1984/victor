@@ -324,14 +324,18 @@ class TestEmojiAdapterLazyImport:
 
     def test_module_getattr_provides_class(self):
         """Module __getattr__ provides EmojiPresentationAdapter lazily."""
-        import victor.agent.presentation as mod
+        import sys
 
+        # Use sys.modules to avoid re-import confusion from mirrored test directory
+        # structure (tests/unit/agent/ shadows 'agent' in sys.path when imported fresh)
+        mod = sys.modules["victor.agent.presentation"]
         cls = mod.EmojiPresentationAdapter
         assert cls.__name__ == "EmojiPresentationAdapter"
 
     def test_module_getattr_raises_for_unknown(self):
         """Module __getattr__ raises AttributeError for unknown names."""
-        import victor.agent.presentation as mod
+        import sys
 
+        mod = sys.modules["victor.agent.presentation"]
         with pytest.raises(AttributeError, match="has no attribute"):
             _ = mod.NonExistentClass

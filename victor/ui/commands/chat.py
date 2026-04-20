@@ -707,7 +707,9 @@ async def run_oneshot(
         # Unified initialization via AgentFactory (replaces legacy/framework split)
         from victor.framework.agent_factory import AgentFactory, InitializationError
 
-        vertical_class = get_vertical(vertical) if vertical else None
+        # Pass original vertical string to AgentFactory (preserves name for error reporting)
+        # AgentFactory will resolve it to a class internally
+        vertical_param = vertical if vertical else None
 
         # Show initialization progress for first-time setup (can take 20-30s)
         with console.status("[bold green]Initializing Victor...[/]", spinner="dots") as status:
@@ -715,7 +717,7 @@ async def run_oneshot(
             factory = AgentFactory(
                 settings=settings,
                 profile=profile,
-                vertical=vertical_class,
+                vertical=vertical_param,
                 thinking=thinking,
                 session_id=session_id,
                 enable_observability=enable_observability,
@@ -883,11 +885,12 @@ async def run_interactive(
         # Unified initialization via AgentFactory
         from victor.framework.agent_factory import AgentFactory, InitializationError
 
-        vertical_class = get_vertical(vertical) if vertical else None
+        # Pass original vertical string to AgentFactory (preserves name for error reporting)
+        vertical_param = vertical if vertical else None
         factory = AgentFactory(
             settings=settings,
             profile=profile,
-            vertical=vertical_class,
+            vertical=vertical_param,
             thinking=thinking,
             session_id=session_id,
             enable_observability=enable_observability,

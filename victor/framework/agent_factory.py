@@ -88,6 +88,9 @@ class AgentFactory:
         self._max_iterations = max_iterations
         self._orchestrator: Optional["AgentOrchestrator"] = None
 
+        # Store original vertical name for error reporting
+        self._vertical_name = vertical if isinstance(vertical, str) else None
+
         # Resolve vertical from string or class
         self._vertical = self._resolve_vertical(vertical)
 
@@ -116,7 +119,8 @@ class AgentFactory:
 
         # Step 2: Bootstrap container with vertical
         try:
-            vertical_name = self._vertical.name if self._vertical else None
+            # Use stored vertical name (preserves original name even if vertical not found)
+            vertical_name = self._vertical_name or (self._vertical.name if self._vertical else None)
             ensure_bootstrapped(self._settings, vertical=vertical_name)
         except Exception as e:
             raise InitializationError(

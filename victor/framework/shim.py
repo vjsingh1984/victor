@@ -151,7 +151,11 @@ class FrameworkShim:
         self._settings = settings
         self._profile_name = profile_name
         self._thinking = thinking
+
+        # Store original vertical name for error reporting
+        self._vertical_name = vertical if isinstance(vertical, str) else None
         self._vertical = self._resolve_vertical(vertical)
+
         self._enable_observability = enable_observability
         self._session_id = session_id or str(uuid.uuid4())
         # Set after create_orchestrator()
@@ -231,7 +235,8 @@ class FrameworkShim:
 
         # Step 0: Ensure bootstrap with correct vertical BEFORE orchestrator creation
         # This ensures vertical services are registered with the correct vertical name
-        vertical_name = self._vertical.name if self._vertical else None
+        # Use stored vertical name (preserves original name even if vertical not found)
+        vertical_name = self._vertical_name or (self._vertical.name if self._vertical else None)
         ensure_bootstrapped(self._settings, vertical=vertical_name)
 
         # Step 1: Create base orchestrator
