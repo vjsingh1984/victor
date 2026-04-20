@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Any, DefaultDict, Dict, Iterable, List, Literal, Optional, Set
 
@@ -13,6 +14,68 @@ from victor.tools.code_search_tool import _get_or_build_index
 from victor.tools.context import ToolExecutionContext
 from victor.tools.decorators import tool
 
+
+# =============================================================================
+# Enums for Graph Operations
+# =============================================================================
+
+
+class GraphDirection(str, Enum):
+    """Direction for graph traversal.
+
+    Determines which edges to follow:
+    - OUT: Follow outgoing edges (forward)
+    - IN: Follow incoming edges (backward)
+    - BOTH: Follow both directions (undirected)
+    """
+
+    OUT = "out"  # Follow outgoing edges
+    IN = "in"  # Follow incoming edges
+    BOTH = "both"  # Follow both directions
+
+
+class GraphMode(str, Enum):
+    """Mode for graph analysis operations.
+
+    Determines what type of analysis to perform:
+    - find: Find nodes by query
+    - neighbors: Get neighboring nodes
+    - pagerank: Calculate PageRank scores
+    - centrality: Calculate centrality measures
+    - path: Find paths between nodes
+    - impact: Analyze impact/dependencies
+    - clusters: Find connected components
+    - stats: Calculate graph statistics
+    - subgraph: Extract subgraph
+    - file_deps: File dependency analysis
+    - patterns: Find code patterns
+    - module_pagerank: Module-level PageRank
+    - module_centrality: Module-level centrality
+    - call_flow: Call flow analysis
+    - callers: Find callers of a node
+    - callees: Find callees of a node
+    - trace: Trace execution paths
+    """
+
+    FIND = "find"  # Find nodes by query
+    NEIGHBORS = "neighbors"  # Get neighboring nodes
+    PAGERANK = "pagerank"  # Calculate PageRank scores
+    CENTRALITY = "centrality"  # Calculate centrality measures
+    PATH = "path"  # Find paths between nodes
+    IMPACT = "impact"  # Analyze impact/dependencies
+    CLUSTERS = "clusters"  # Find connected components
+    STATS = "stats"  # Calculate graph statistics
+    SUBGRAPH = "subgraph"  # Extract subgraph
+    FILE_DEPS = "file_deps"  # File dependency analysis
+    PATTERNS = "patterns"  # Find code patterns
+    MODULE_PAGERANK = "module_pagerank"  # Module-level PageRank
+    MODULE_CENTRALITY = "module_centrality"  # Module-level centrality
+    CALL_FLOW = "call_flow"  # Call flow analysis
+    CALLERS = "callers"  # Find callers of a node
+    CALLEES = "callees"  # Find callees of a node
+    TRACE = "trace"  # Trace execution paths
+
+
 ALL_EDGE_TYPES = [
     "CALLS",
     "REFERENCES",
@@ -22,28 +85,6 @@ ALL_EDGE_TYPES = [
     "COMPOSED_OF",
     "IMPORTS",
 ]
-
-GraphMode = Literal[
-    "find",
-    "neighbors",
-    "pagerank",
-    "centrality",
-    "path",
-    "impact",
-    "clusters",
-    "stats",
-    "subgraph",
-    "file_deps",
-    "patterns",
-    "module_pagerank",
-    "module_centrality",
-    "call_flow",
-    "callers",
-    "callees",
-    "trace",
-]
-
-GraphDirection = Literal["out", "in", "both"]
 
 _RUNTIME_EDGE_TYPES = {"CALLS", "REFERENCES", "INHERITS", "IMPLEMENTS", "COMPOSED_OF"}
 _SYMBOL_TYPES = {
@@ -215,7 +256,7 @@ class GraphAnalyzer:
         self,
         node_id: str,
         *,
-        direction: GraphDirection = "out",
+        direction: GraphDirection = GraphDirection.OUT,
         edge_types: Optional[Iterable[str]] = None,
         max_depth: int = 1,
         node_types: Optional[Set[str]] = None,
@@ -738,7 +779,7 @@ def _build_stats(loaded: LoadedGraph) -> Dict[str, Any]:
     timeout=60.0,
 )
 async def graph(
-    mode: GraphMode = "neighbors",
+    mode: GraphMode = GraphMode.NEIGHBORS,
     path: str = ".",
     node: Optional[str] = None,
     source: Optional[str] = None,

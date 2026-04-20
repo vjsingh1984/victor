@@ -27,6 +27,7 @@ Supports three strategies:
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import TYPE_CHECKING, Literal, Optional, Set
 
 from victor.agent.protocols import IToolSelector

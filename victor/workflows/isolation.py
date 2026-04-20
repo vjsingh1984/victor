@@ -52,7 +52,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type, Union
 
 if TYPE_CHECKING:
     from victor.workflows.definition import ConstraintsProtocol
@@ -424,23 +424,45 @@ class ExecutionLocality(str, Enum):
 # Backward compatibility
 _ExecutionLocalityLiteral = Literal["local", "remote"]
 
-LocalTarget = Literal[
-    "inline",  # Direct process execution (fastest)
-    "subprocess",  # OS subprocess with rlimit
-    "docker",  # Local Docker container
-    "kubernetes",  # Local K8s (minikube, kind)
-]
 
-RemoteTarget = Literal[
-    "docker",  # Remote Docker daemon
-    "kubernetes",  # Generic remote K8s
-    "eks",  # AWS EKS
-    "aks",  # Azure AKS
-    "gke",  # Google GKE
-    "ecs",  # AWS ECS Fargate
-    "airflow",  # Airflow DAG trigger
-    "api",  # Generic REST API
-]
+class LocalTarget(str, Enum):
+    """Local execution target type.
+
+    Determines how to execute workflows locally:
+    - inline: Direct process execution (fastest)
+    - subprocess: OS subprocess with rlimit
+    - docker: Local Docker container
+    - kubernetes: Local K8s (minikube, kind)
+    """
+
+    INLINE = "inline"  # Direct process execution (fastest)
+    SUBPROCESS = "subprocess"  # OS subprocess with rlimit
+    DOCKER = "docker"  # Local Docker container
+    KUBERNETES = "kubernetes"  # Local K8s (minikube, kind)
+
+
+class RemoteTarget(str, Enum):
+    """Remote execution target type.
+
+    Determines which remote infrastructure to use:
+    - docker: Remote Docker daemon
+    - kubernetes: Generic remote K8s
+    - eks: AWS EKS
+    - aks: Azure AKS
+    - gke: Google GKE
+    - ecs: AWS ECS Fargate
+    - airflow: Airflow DAG trigger
+    - api: Generic REST API
+    """
+
+    DOCKER = "docker"  # Remote Docker daemon
+    KUBERNETES = "kubernetes"  # Generic remote K8s
+    EKS = "eks"  # AWS EKS
+    AKS = "aks"  # Azure AKS
+    GKE = "gke"  # Google GKE
+    ECS = "ecs"  # AWS ECS Fargate
+    AIRFLOW = "airflow"  # Airflow DAG trigger
+    API = "api"  # Generic REST API
 
 
 @dataclass
@@ -505,11 +527,11 @@ class ConnectionConfig:
 
     Example:
         # Local Docker
-        config = ConnectionConfig(protocol="docker", endpoint="unix:///var/run/docker.sock")
+        config = ConnectionConfig(protocol=NetworkProtocol.DOCKER, endpoint="unix:///var/run/docker.sock")
 
         # Remote EKS
         config = ConnectionConfig(
-            protocol="k8s",
+            protocol=NetworkProtocol.K8S,
             auth_method="iam",
             region="us-west-2",
         )
@@ -587,16 +609,16 @@ class DeploymentConfig:
 
     Example (Local Docker):
         config = DeploymentConfig(
-            locality="local",
-            target="docker",
+            locality=ExecutionLocality.LOCAL,
+            target=LocalTarget.DOCKER,
         )
 
     Example (Remote EKS):
         config = DeploymentConfig(
-            locality="remote",
-            target="eks",
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.EKS,
             connection=ConnectionConfig(
-                protocol="k8s",
+                protocol=NetworkProtocol.K8S,
                 auth_method="iam",
                 region="us-west-2",
             ),
@@ -607,8 +629,8 @@ class DeploymentConfig:
 
     Example (Airflow handoff):
         config = DeploymentConfig(
-            locality="remote",
-            target="airflow",
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.AIRFLOW,
             connection=ConnectionConfig(
                 protocol="http",
                 endpoint="https://airflow.company.com/api/v1",
@@ -617,8 +639,8 @@ class DeploymentConfig:
         )
     """
 
-    locality: ExecutionLocality = "local"
-    target: str = "inline"  # LocalTarget or RemoteTarget
+    locality: ExecutionLocality = ExecutionLocality.LOCAL
+    target: Union[LocalTarget, RemoteTarget] = LocalTarget.INLINE  # type: ignore[assignment]
     connection: Optional[ConnectionConfig] = None
     cluster_name: Optional[str] = None
     namespace: Optional[str] = "default"
@@ -684,17 +706,17 @@ class DeploymentConfig:
     @classmethod
     def local_inline(cls) -> "DeploymentConfig":
         """Create config for direct inline execution."""
-        return cls(locality="local", target="inline")
+        return cls(locality=ExecutionLocality.LOCAL, target=LocalTarget.INLINE)
 
     @classmethod
     def local_subprocess(cls) -> "DeploymentConfig":
         """Create config for sandboxed subprocess execution."""
-        return cls(locality="local", target="subprocess")
+        return cls(locality=ExecutionLocality.LOCAL, target=LocalTarget.SUBPROCESS)
 
     @classmethod
     def local_docker(cls, image: Optional[str] = None) -> "DeploymentConfig":
         """Create config for local Docker execution."""
-        return cls(locality="local", target="docker")
+        return cls(locality=ExecutionLocality.LOCAL, target=LocalTarget.DOCKER)
 
     @classmethod
     def remote_eks(
@@ -706,9 +728,9 @@ class DeploymentConfig:
     ) -> "DeploymentConfig":
         """Create config for AWS EKS execution."""
         return cls(
-            locality="remote",
-            target="eks",
-            connection=ConnectionConfig(protocol="k8s", auth_method="iam", region=region),
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.EKS,
+            connection=ConnectionConfig(protocol=NetworkProtocol.K8S, auth_method="iam", region=region),
             cluster_name=cluster_name,
             namespace=namespace,
             gpu_required=gpu,
@@ -723,10 +745,10 @@ class DeploymentConfig:
     ) -> "DeploymentConfig":
         """Create config for Airflow DAG trigger."""
         return cls(
-            locality="remote",
-            target="airflow",
+            locality=ExecutionLocality.REMOTE,
+            target=RemoteTarget.AIRFLOW,
             connection=ConnectionConfig(
-                protocol="http",
+                protocol=NetworkProtocol.HTTP,
                 endpoint=endpoint,
                 auth_method=auth_method,
             ),
