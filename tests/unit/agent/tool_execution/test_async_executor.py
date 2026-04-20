@@ -650,7 +650,7 @@ class TestAsyncToolExecutor:
         executor = AsyncToolExecutor(
             config=ExecutionConfig(
                 max_concurrent=10,  # General limit
-                max_embedding_concurrent=4,  # Lower limit for embedding tools
+                max_embedding_concurrent=2,  # Lower limit for embedding tools (safer)
                 embedding_intensive_tools={"code_search"},
             )
         )
@@ -688,8 +688,8 @@ class TestAsyncToolExecutor:
 
         assert len(results) == 8
         assert all(r.success for r in results)
-        # Should not exceed max_embedding_concurrent of 4
-        assert max_active <= 4
+        # Should not exceed max_embedding_concurrent of 2
+        assert max_active <= 2
 
         # Verify stats tracked correctly
         stats = executor.get_stats()

@@ -95,7 +95,8 @@ class ExecutionConfig:
     # Tools that use embedding models and need lower concurrency limits
     embedding_intensive_tools: Set[str] = field(default_factory=lambda: {"code_search"})
     # Limit concurrent embedding operations to prevent resource exhaustion
-    max_embedding_concurrent: int = 4
+    # Reduced from 4 to 2 for safer headroom (5+ causes failures)
+    max_embedding_concurrent: int = 2
 
 
 class AsyncToolExecutor:
