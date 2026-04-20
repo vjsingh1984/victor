@@ -31,6 +31,7 @@ Features:
 """
 
 import sqlite3
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
@@ -45,6 +46,44 @@ _DEFAULT_MAX_ROWS: int = 100
 
 # Legacy session-level connection cache (use _get_connection_pool() for DI support)
 _connections: Dict[str, Any] = {}
+
+
+@dataclass
+class DatabaseConnection:
+    """Database connection configuration.
+
+    Consolidates all connection parameters into a single object.
+    Reduces parameter count from 6 to 1 for database operations.
+    """
+    db_type: str = "sqlite"
+    database: Optional[str] = None
+    host: Optional[str] = None
+    port: Optional[int] = None
+    username: Optional[str] = None
+    password: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for internal use."""
+        return {
+            "db_type": self.db_type,
+            "database": self.database,
+            "host": self.host,
+            "port": self.port,
+            "username": self.username,
+            "password": self.password,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DatabaseConnection":
+        """Create from dictionary for backward compatibility."""
+        return cls(
+            db_type=data.get("db_type", "sqlite"),
+            database=data.get("database"),
+            host=data.get("host"),
+            port=data.get("port"),
+            username=data.get("username"),
+            password=data.get("password"),
+        )
 
 
 def _get_connection_pool(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -491,17 +530,12 @@ async def _do_disconnect(
 )
 async def database(
     action: str,
-    database: Optional[str] = None,
-    db_type: str = "sqlite",
-    host: Optional[str] = None,
-    port: Optional[int] = None,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
+    connection: Optional[DatabaseConnection] = None,
     connection_id: Optional[str] = None,
     sql: Optional[str] = None,
     table: Optional[str] = None,
     limit: Optional[int] = None,
-    allow_modifications: Optional[bool] = None,
+    allow_modifications: bool = False,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
@@ -517,12 +551,7 @@ async def database(
 
     Args:
         action: Operation to perform - 'connect', 'query', 'tables', 'describe', 'schema', 'disconnect'.
-        database: Database name or path (required for connect).
-        db_type: Database type - 'sqlite', 'postgresql', 'mysql', 'sqlserver' (default: 'sqlite').
-        host: Database host for remote databases (default: 'localhost').
-        port: Database port (defaults vary by db_type).
-        username: Database username for authenticated connections.
-        password: Database password for authenticated connections.
+        connection: DatabaseConnection object with db_type, database, host, port, username, password.
         connection_id: Connection ID from previous connect (required for query/tables/describe/schema/disconnect).
         sql: SQL query to execute (required for query action).
         table: Table name (required for describe action).
@@ -541,8 +570,14 @@ async def database(
 
     Example:
         # Connect to PostgreSQL
-        database(action="connect", database="mydb", db_type="postgresql",
-                host="localhost", username="user", password="pass")
+        conn = DatabaseConnection(
+            db_type="postgresql",
+            database="mydb",
+            host="localhost",
+            username="user",
+            password="pass"
+        )
+        database(action="connect", connection=conn)
 
         # Query with returned connection_id
         database(action="query", connection_id="postgresql_123",
@@ -560,9 +595,20 @@ async def database(
     pool = _get_connection_pool(_exec_ctx)
 
     if action_lower == "connect":
-        if not database:
-            return {"success": False, "error": "Missing required parameter: database"}
-        return await _do_connect(database, db_type, host, port, username, password, pool)
+        if connection is None:
+            return {
+                "success": False,
+                "error": "Missing required parameter: connection (DatabaseConnection object)"
+            }
+        return await _do_connect(
+            connection.database,
+            connection.db_type,
+            connection.host,
+            connection.port,
+            connection.username,
+            connection.password,
+            pool
+        )
 
     elif action_lower == "query":
         if not connection_id:

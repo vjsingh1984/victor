@@ -846,12 +846,12 @@ class SemanticToolSelector:
         """
         # Map action types to tool names that complete them
         action_to_tools = {
-            "show_diff": ["git", "shell", "shell_readonly"],
+            "show_diff": ["git", "shell"],
             "edit": ["edit", "write", "patch"],
             "read": ["read", "symbol", "search", "overview", "ls"],
             "create": ["write", "scaffold"],
             "test": ["test", "shell"],
-            "commit": ["git", "commit_msg"],
+            "commit": ["git"],
             "pr": ["pr", "git"],
         }
 
@@ -1302,7 +1302,7 @@ class SemanticToolSelector:
         pending_action_tools = {
             "show_diff": ["shell"],
             "edit": ["edit", "read"],
-            "commit": ["commit_msg", "shell"],
+            "commit": ["git"],
             "pr": ["pr"],
             "test": ["shell", "test"],
         }

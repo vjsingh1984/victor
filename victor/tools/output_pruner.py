@@ -114,6 +114,14 @@ class ToolOutputPruner:
             "strip_comments": True,
             "strip_blank_lines": True,
         },
+        "research": {
+            "max_lines": 500,  # Need full content for research tasks
+            "strip_comments": False,  # Preserve all context
+            "strip_blank_lines": False,  # Keep structure
+            "preserve_paper_ids": True,  # Don't truncate arXiv IDs (e.g., 1234.56789)
+            "preserve_search_results": True,  # Keep full search output
+            "preserve_urls": True,  # Keep paper URLs
+        },
         # Default rule for unknown task types
         "default": {
             "max_lines": 100,  # Conservative default

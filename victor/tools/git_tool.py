@@ -181,10 +181,11 @@ async def git(
     author_email: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Run git operations: status, diff, stash, log, branch, checkout.
+    """Run git operations: status, diff, stash, log, branch, commit_msg, conflicts.
 
     Operations: status, diff (staged=True for staged), stage (files or all),
-    commit (message required), log (limit), branch (list/create/switch).
+    commit (message required), log (limit), branch (list/create/switch),
+    commit_msg (generate AI commit message), conflicts (analyze merge conflicts).
     Supports custom author_name/author_email for commits.
     """
     if not operation:
@@ -322,68 +323,30 @@ async def git(
 
         return {"success": True, "output": stdout, "error": ""}
 
-    else:
-        return {
-            "success": False,
-            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch",
-        }
+    # Commit message generation operation
+    elif operation == "commit_msg":
+        provider, model = _get_provider_and_model(context)
+        if not provider:
+            return {
+                "success": False,
+                "output": "",
+                "error": "No LLM provider available for AI generation",
+            }
 
+        # Get staged diff
+        success, diff, stderr = await _run_git_async("diff", "--staged")
 
-@tool(
-    category="git",
-    priority=Priority.MEDIUM,  # Task-specific AI operation
-    access_mode=AccessMode.READONLY,  # Only reads diff, doesn't commit
-    danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["commit message", "ai", "generate", "suggest", "conventional commit"],
-    mandatory_keywords=["generate commit message", "suggest commit"],  # Force inclusion
-    task_types=["generation", "git"],  # Classification-aware selection
-    use_cases=["generating commit messages", "creating conventional commits"],
-    examples=["suggest a commit message", "generate commit message for staged changes"],
-)
-async def commit_msg(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Generate a commit message from staged git changes.
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
 
-    Analyzes the staged diff and generates a conventional commit message
-    using the configured LLM provider. The generated message follows the
-    conventional commit format: type(scope): subject
+        if not diff:
+            return {"success": False, "output": "", "error": "No staged changes to analyze"}
 
-    Types used: feat, fix, docs, style, refactor, test, chore
+        # Get list of changed files
+        _, files, _ = await _run_git_async("diff", "--staged", "--name-only")
 
-    Args:
-        context: Tool execution context (injected by decorator, do not pass manually)
-
-    Returns:
-        Dictionary containing:
-        - success: bool - Whether message generation succeeded
-        - output: str - The generated commit message
-        - error: str - Error message if failed (empty on success)
-
-    Note:
-        Requires staged changes (git add) before calling this tool.
-        Uses the configured LLM provider for message generation.
-    """
-    provider, model = _get_provider_and_model(context)
-    if not provider:
-        return {
-            "success": False,
-            "output": "",
-            "error": "No LLM provider available for AI generation",
-        }
-
-    # Get staged diff
-    success, diff, stderr = await _run_git_async("diff", "--staged")
-
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    if not diff:
-        return {"success": False, "output": "", "error": "No staged changes to analyze"}
-
-    # Get list of changed files
-    _, files, _ = await _run_git_async("diff", "--staged", "--name-only")
-
-    # Prepare prompt for LLM
-    prompt = f"""Analyze these git changes and generate a concise, conventional commit message.
+        # Prepare prompt for LLM
+        prompt = f"""Analyze these git changes and generate a concise, conventional commit message.
 
 Changed files:
 {files}
@@ -399,32 +362,146 @@ Subject: Present tense, lowercase, no period, max 50 chars
 
 Generate ONLY the commit message, nothing else."""
 
-    try:
-        # Call LLM
-        from victor.providers.base import Message
+        try:
+            # Call LLM
+            from victor.providers.base import Message
 
-        response = await provider.complete(
-            model=model or "default",
-            messages=[Message(role="user", content=prompt)],
-            temperature=0.3,  # Lower temperature for consistency
-            max_tokens=200,
-        )
+            response = await provider.complete(
+                model=model or "default",
+                messages=[Message(role="user", content=prompt)],
+                temperature=0.3,  # Lower temperature for consistency
+                max_tokens=200,
+            )
 
-        message = response.content.strip()
+            message = response.content.strip()
 
-        # Clean up message
-        message = message.replace('"', "").replace("'", "")
-        if message.startswith("Commit message:"):
-            message = message.replace("Commit message:", "").strip()
+            # Clean up message
+            message = message.replace('"', "").replace("'", "")
+            if message.startswith("Commit message:"):
+                message = message.replace("Commit message:", "").strip()
 
-        return {"success": True, "output": message, "error": ""}
+            return {"success": True, "output": message, "error": ""}
 
-    except Exception as e:
+        except Exception as e:
+            return {
+                "success": False,
+                "output": "",
+                "error": f"AI generation failed: {str(e)}",
+            }
+
+    # Conflicts analysis operation
+    elif operation == "conflicts":
+        # Get list of conflicted files
+        success, status, stderr = await _run_git_async("status", "--short")
+
+        if not success:
+            return {"success": False, "output": "", "error": stderr}
+
+        # Find conflicted files (marked with UU)
+        conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
+
+        if not conflicted:
+            return {"success": True, "output": "No merge conflicts detected", "error": ""}
+
+        # Analyze each conflicted file
+        analysis = [f"Found {len(conflicted)} conflicted file(s):\n"]
+
+        for file in conflicted:
+            analysis.append(f"\n{file}:")
+
+            # Read file to show conflict markers
+            try:
+                with open(file) as f:
+                    content = f.read()
+
+                # Count conflict markers
+                conflict_count = content.count("<<<<<<< ")
+
+                analysis.append(f"   {conflict_count} conflict(s) in file")
+
+                # Show first conflict context
+                if "<<<<<<< " in content:
+                    start = content.find("<<<<<<< ")
+                    end = content.find(">>>>>>> ", start)
+                    if end != -1:
+                        conflict_section = content[start : end + 50]
+                        analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
+
+            except Exception as e:
+                analysis.append(f"   Error reading file: {e}")
+
+        # If AI available, get resolution suggestions
+        provider, model = _get_provider_and_model(context)
+        if provider:
+            analysis.append("\n\nAI-generated resolution suggestions:")
+            try:
+                # Collect conflict details for AI analysis
+                conflict_details = []
+                for file in conflicted[:3]:  # Limit to first 3 files for context size
+                    try:
+                        with open(file) as f:
+                            content = f.read()
+                        # Extract conflict sections
+                        conflicts_in_file = []
+                        pos = 0
+                        while True:
+                            start = content.find("<<<<<<< ", pos)
+                            if start == -1:
+                                break
+                            end = content.find(">>>>>>> ", start)
+                            if end == -1:
+                                break
+                            # Get the full conflict block
+                            end_line = content.find("\n", end)
+                            if end_line == -1:
+                                end_line = len(content)
+                            conflict_block = content[start:end_line]
+                            conflicts_in_file.append(conflict_block[:500])  # Limit size
+                            pos = end_line
+                        if conflicts_in_file:
+                            conflict_details.append(
+                                f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
+                            )
+                    except Exception as e:
+                        logger.debug("Failed to read merge conflict details for %s: %s", file, e)
+
+                if conflict_details:
+                    prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
+
+{chr(10).join(conflict_details)}
+
+For each conflict:
+1. Explain what changed in each branch
+2. Suggest which changes to keep or how to combine them
+3. Provide the resolved code if possible
+
+Be concise and practical."""
+
+                    from victor.providers.base import Message
+
+                    response = await provider.complete(
+                        model=model or "default",
+                        messages=[Message(role="user", content=prompt)],
+                        temperature=0.3,
+                        max_tokens=1000,
+                    )
+
+                    suggestions = response.content.strip()
+                    # Indent the suggestions for better formatting
+                    for line in suggestions.split("\n"):
+                        analysis.append(f"   {line}")
+
+            except Exception as e:
+                analysis.append(f"\n   AI analysis failed: {e}")
+
+        return {"success": True, "output": "\n".join(analysis), "error": ""}
+
+    else:
         return {
             "success": False,
-            "output": "",
-            "error": f"AI generation failed: {str(e)}",
+            "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch, commit_msg, conflicts",
         }
+
 
 
 @tool(
@@ -597,149 +674,4 @@ DESCRIPTION:
         }
 
 
-@tool(
-    category="git",
-    priority=Priority.MEDIUM,  # Context-specific conflict resolution
-    access_mode=AccessMode.READONLY,  # Only analyzes, doesn't modify
-    danger_level=DangerLevel.SAFE,  # No side effects
-    keywords=["merge conflict", "conflict", "resolve", "rebase", "merge"],
-    use_cases=[
-        "analyzing merge conflicts",
-        "resolving git conflicts",
-        "conflict resolution help",
-    ],
-    examples=["analyze conflicts", "show merge conflicts", "help resolve conflicts"],
-)
-async def conflicts(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Analyze and resolve merge conflicts in the current branch.
-
-    Detects files with merge conflicts (marked as UU in git status) and provides
-    detailed information about each conflict, including previews of conflict
-    markers and step-by-step resolution instructions.
-
-    Args:
-        context: Tool execution context (injected by decorator, do not pass manually)
-
-    Returns:
-        Dictionary containing:
-        - success: bool - Whether analysis succeeded
-        - output: str - Conflict analysis with file list, conflict counts,
-            conflict previews, and resolution steps
-        - error: str - Error message if failed (empty on success)
-
-    Note:
-        Call this after a failed merge or rebase to understand what needs
-        to be resolved. After manual resolution, stage files with git add
-        and continue with git merge --continue or git rebase --continue.
-    """
-    # Get list of conflicted files
-    success, status, stderr = await _run_git_async("status", "--short")
-
-    if not success:
-        return {"success": False, "output": "", "error": stderr}
-
-    # Find conflicted files (marked with UU)
-    conflicted = [line.split()[-1] for line in status.split("\n") if line.startswith("UU")]
-
-    if not conflicted:
-        return {"success": True, "output": "No merge conflicts detected", "error": ""}
-
-    # Analyze each conflicted file
-    analysis = [f"Found {len(conflicted)} conflicted file(s):\n"]
-
-    for file in conflicted:
-        analysis.append(f"\n{file}:")
-
-        # Read file to show conflict markers
-        try:
-            with open(file) as f:
-                content = f.read()
-
-            # Count conflict markers
-            conflict_count = content.count("<<<<<<< ")
-
-            analysis.append(f"   {conflict_count} conflict(s) in file")
-
-            # Show first conflict context
-            if "<<<<<<< " in content:
-                start = content.find("<<<<<<< ")
-                end = content.find(">>>>>>> ", start)
-                if end != -1:
-                    conflict_section = content[start : end + 50]
-                    analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
-
-        except Exception as e:
-            analysis.append(f"   Error reading file: {e}")
-
-    # If AI available, get resolution suggestions
-    provider, model = _get_provider_and_model(context)
-    if provider:
-        analysis.append("\n\nAI-generated resolution suggestions:")
-        try:
-            # Collect conflict details for AI analysis
-            conflict_details = []
-            for file in conflicted[:3]:  # Limit to first 3 files for context size
-                try:
-                    with open(file) as f:
-                        content = f.read()
-                    # Extract conflict sections
-                    conflicts_in_file = []
-                    pos = 0
-                    while True:
-                        start = content.find("<<<<<<< ", pos)
-                        if start == -1:
-                            break
-                        end = content.find(">>>>>>> ", start)
-                        if end == -1:
-                            break
-                        # Get the full conflict block
-                        end_line = content.find("\n", end)
-                        if end_line == -1:
-                            end_line = len(content)
-                        conflict_block = content[start:end_line]
-                        conflicts_in_file.append(conflict_block[:500])  # Limit size
-                        pos = end_line
-                    if conflicts_in_file:
-                        conflict_details.append(
-                            f"File: {file}\n" + "\n---\n".join(conflicts_in_file[:2])
-                        )
-                except Exception as e:
-                    logger.debug("Failed to read merge conflict details for %s: %s", file, e)
-
-            if conflict_details:
-                prompt = f"""Analyze these git merge conflicts and suggest how to resolve them.
-
-{chr(10).join(conflict_details)}
-
-For each conflict:
-1. Explain what changed in each branch
-2. Suggest which changes to keep or how to combine them
-3. Provide the resolved code if possible
-
-Be concise and practical."""
-
-                from victor.providers.base import Message
-
-                response = await provider.complete(
-                    model=model or "default",
-                    messages=[Message(role="user", content=prompt)],
-                    temperature=0.3,
-                    max_tokens=1000,
-                )
-
-                suggestions = response.content.strip()
-                # Indent the suggestions for better formatting
-                for line in suggestions.split("\n"):
-                    analysis.append(f"   {line}")
-            else:
-                analysis.append("   Could not extract conflict details for AI analysis.")
-        except Exception as e:
-            analysis.append(f"   AI analysis failed: {e}")
-
-    analysis.append("\n\nTo resolve:")
-    analysis.append("1. Edit conflicted files manually")
-    analysis.append("2. Remove conflict markers (<<<<<<, =======, >>>>>>>)")
-    analysis.append("3. Stage resolved files: git add <file>")
-    analysis.append("4. Continue: git merge --continue or git rebase --continue")
-
-    return {"success": True, "output": "\n".join(analysis), "error": ""}
+    return await git(operation="conflicts", context=context)

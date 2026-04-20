@@ -104,6 +104,13 @@ READONLY_COMMANDS_UNIX: Set[str] = {
     # Development
     "python",  # Will filter for -c, --version, etc
     "node",  # Will filter for -e, --version, etc
+    # CLI tools (readonly subcommands)
+    "gh",  # GitHub CLI
+    "az",  # Azure CLI
+    "kubectl",  # Kubernetes CLI
+    # Research tools
+    "arxiv",  # arXiv CLI
+    "web_search",  # Web search tool
 }
 
 READONLY_COMMANDS_WINDOWS: Set[str] = {
@@ -193,6 +200,54 @@ NPM_READONLY_SUBCOMMANDS: Set[str] = {
     "why",
 }
 
+# GitHub CLI (gh) readonly subcommands
+GH_READONLY_SUBCOMMANDS: Set[str] = {
+    "view",
+    "list",
+    "search",
+    "repo",
+    "issue",
+    "pr",
+    "release",
+    "workflow",
+    "run",
+    "actions",
+    "auth",
+    "config",
+    "secret",
+    "variable",
+    "environment",
+}
+
+# Azure CLI (az) readonly subcommands
+AZ_READONLY_SUBCOMMANDS: Set[str] = {
+    "list",
+    "show",
+    "find",
+    "account",
+    "config",
+    "monitor",
+    "log",
+    "metrics",
+}
+
+# Kubernetes (kubectl) readonly subcommands
+KUBECTL_READONLY_SUBCOMMANDS: Set[str] = {
+    "get",
+    "describe",
+    "logs",
+    "top",
+    "api-resources",
+    "api-versions",
+    "cluster-info",
+    "version",
+    "auth",
+    "certificate",
+    "cp",
+    "diff",
+    "explain",
+}
+
 
 def _get_readonly_commands() -> Set[str]:
     """Get platform-specific readonly commands."""
@@ -256,6 +311,20 @@ def _is_readonly_command(cmd: str) -> bool:
     if base_cmd == "npm":
         subcommand = _extract_subcommand(cmd, "npm")
         return subcommand in NPM_READONLY_SUBCOMMANDS if subcommand else False
+
+    if base_cmd == "gh":
+        subcommand = _extract_subcommand(cmd, "gh")
+        return subcommand in GH_READONLY_SUBCOMMANDS if subcommand else False
+
+    if base_cmd == "az":
+        # Azure CLI has nested subcommands (e.g., "vm list")
+        # For simplicity, allow if first subcommand is readonly
+        subcommand = _extract_subcommand(cmd, "az")
+        return subcommand in AZ_READONLY_SUBCOMMANDS if subcommand else False
+
+    if base_cmd == "kubectl":
+        subcommand = _extract_subcommand(cmd, "kubectl")
+        return subcommand in KUBECTL_READONLY_SUBCOMMANDS if subcommand else False
 
     # Check for sed with -i (in-place edit)
     if base_cmd == "sed" and "-i" in cmd:
@@ -388,6 +457,9 @@ async def shell(
     cwd: Optional[str] = None,
     timeout: Optional[int] = None,
     dangerous: bool = False,
+    readonly: bool = False,
+    stdout_limit: Optional[int] = None,
+    stderr_limit: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Execute a shell command. The `cmd` parameter is required.
 
@@ -398,6 +470,9 @@ async def shell(
         cwd: Working directory for the command
         timeout: Maximum seconds before timeout
         dangerous: Set true only for destructive commands (rm, kill, etc.)
+        readonly: If True, only allows safe readonly commands (ls, cat, git status, etc.)
+        stdout_limit: Max lines for stdout (None=unlimited, default: 10000)
+        stderr_limit: Max lines for stderr (None=unlimited, default: 2000)
 
     Returns:
         Dict with stdout, stderr, return_code keys
@@ -455,6 +530,22 @@ async def shell(
             "return_code": -1,
         }
 
+    # Check readonly mode restrictions
+    if readonly and not _is_readonly_command(cmd):
+        base_cmd = _extract_base_command(cmd)
+        return {
+            "success": False,
+            "error": (
+                f"Command '{base_cmd}' is not allowed in readonly mode. "
+                f"Allowed commands: {', '.join(sorted(get_allowed_readonly_commands())[:15])}... "
+                "Use 'shell' tool without readonly=True for other commands."
+            ),
+            "stdout": "",
+            "stderr": "",
+            "return_code": -1,
+            "cwd": os.getcwd(),
+        }
+
     # Validate working directory exists before execution
     if cwd:
         import os
@@ -469,6 +560,55 @@ async def shell(
             }
 
     try:
+        # Check cache for read-only commands (CI/CD queries, git log, etc.)
+        from victor.tools.shell_command_cache import get_shell_cache, execute_with_cache
+
+        # Use cache for read-only commands
+        if not dangerous and _is_readonly_command(cmd):
+            try:
+                returncode, stdout_str, stderr_str = execute_with_cache(
+                    cmd,
+                    cwd=cwd,
+                    shell=True,
+                    timeout=timeout,
+                )
+
+                # Apply truncation to cached results too
+                final_stdout_limit = stdout_limit if stdout_limit is not None else 10000
+                final_stderr_limit = stderr_limit if stderr_limit is not None else 2000
+
+                from victor.tools.subprocess_executor import _truncate_output_by_lines
+
+                stdout_str, stdout_truncated, stdout_lines = _truncate_output_by_lines(
+                    stdout_str,
+                    final_stdout_limit,
+                    max_bytes=None,
+                    stream_name="stdout"
+                )
+
+                stderr_str, stderr_truncated, stderr_lines = _truncate_output_by_lines(
+                    stderr_str,
+                    final_stderr_limit,
+                    max_bytes=None,
+                    stream_name="stderr"
+                )
+
+                return {
+                    "success": returncode == 0,
+                    "stdout": stdout_str,
+                    "stderr": stderr_str,
+                    "return_code": returncode,
+                    "command": cmd,
+                    "working_dir": cwd,
+                    "cached": True,
+                    "truncated": stdout_truncated or stderr_truncated,
+                    "stdout_lines": stdout_lines,
+                    "stderr_lines": stderr_lines,
+                }
+            except Exception as cache_error:
+                # If caching fails, fall through to normal execution
+                logger.warning(f"Cache lookup failed, executing directly: {cache_error}")
+
         # Create subprocess
         process = await asyncio.create_subprocess_shell(
             cmd,
@@ -497,6 +637,30 @@ async def shell(
         stdout_str = stdout.decode("utf-8") if stdout else ""
         stderr_str = stderr.decode("utf-8") if stderr else ""
 
+        # Apply defaults: 10K stdout lines, 2K stderr lines (None=unlimited)
+        final_stdout_limit = stdout_limit if stdout_limit is not None else 10000
+        final_stderr_limit = stderr_limit if stderr_limit is not None else 2000
+
+        # Truncate stdout
+        from victor.tools.subprocess_executor import _truncate_output_by_lines
+
+        stdout_str, stdout_truncated, stdout_lines = _truncate_output_by_lines(
+            stdout_str,
+            final_stdout_limit,
+            max_bytes=None,  # Use internal 1MB default
+            stream_name="stdout"
+        )
+
+        # Truncate stderr
+        stderr_str, stderr_truncated, stderr_lines = _truncate_output_by_lines(
+            stderr_str,
+            final_stderr_limit,
+            max_bytes=None,  # Use internal 1MB default
+            stream_name="stderr"
+        )
+
+        was_truncated = stdout_truncated or stderr_truncated
+
         result = {
             "success": process.returncode == 0,
             "stdout": stdout_str,
@@ -504,7 +668,18 @@ async def shell(
             "return_code": process.returncode,
             "command": cmd,
             "working_dir": cwd,
+            "truncated": was_truncated,
+            "stdout_lines": stdout_lines,
+            "stderr_lines": stderr_lines,
         }
+
+        # Cache successful read-only command results
+        if process.returncode == 0 and not dangerous and _is_readonly_command(cmd):
+            try:
+                cache = get_shell_cache()
+                cache.set(cmd, (process.returncode, stdout_str, stderr_str), cwd)
+            except Exception as cache_error:
+                logger.warning(f"Failed to cache command result: {cache_error}")
 
         # Include informative error message when command fails
         if process.returncode != 0:
@@ -544,224 +719,3 @@ async def shell(
         }
 
 
-@tool(
-    category="exploration",
-    priority=Priority.HIGH,  # Available for exploration
-    access_mode=AccessMode.READONLY,  # Only read operations
-    danger_level=DangerLevel.SAFE,  # Readonly commands are safe
-    # Registry-driven metadata for tool selection
-    stages=[
-        "initial",
-        "exploring",
-        "analyzing",
-        "planning",
-        "reading",
-    ],  # Available in exploration stages
-    task_types=["exploration", "analysis", "understanding"],
-    execution_category=ExecutionCategory.READ_ONLY,  # No state changes
-    mandatory_keywords=[
-        "git status",
-        "git log",
-        "git diff",
-        "git branch",
-        "run git",
-        "execute git",
-        "check git",
-        "review git",
-        "uncommitted changes",
-        "committed changes",
-    ],
-    keywords=[
-        "pwd",
-        "cd",
-        "ls",
-        "cat",
-        "head",
-        "tail",
-        "grep",
-        "find",
-        "tree",
-        "file",
-        "wc",
-        "directory",
-        "navigate",
-        "explore",
-        "git",
-        "git status",
-        "git log",
-        "git diff",
-        "git branch",
-        "git show",
-        "shell readonly",
-        "safe shell",
-        "readonly command",
-    ],
-    use_cases=[
-        "navigating directories",
-        "viewing file contents",
-        "exploring codebase structure",
-        "checking git status",
-        "viewing git history",
-        "finding files",
-        "reviewing uncommitted changes",
-        "viewing git diff",
-    ],
-    examples=[
-        "pwd - show current directory",
-        "ls -la - list files with details",
-        "cat file.txt - view file contents",
-        "git status - check git status",
-        "git log --oneline -10 - view recent commits",
-        "git diff - show uncommitted changes",
-        "git branch -a - list all branches",
-        "find . -name '*.py' - find Python files",
-    ],
-)
-async def shell_readonly(
-    cmd: str,
-    cwd: Optional[str] = None,
-    timeout: Optional[int] = None,
-) -> Dict[str, Any]:
-    """Execute readonly shell commands for exploration (pwd, ls, cat, grep, git status, etc).
-
-    This tool only allows safe, readonly commands that cannot modify files or state.
-    Use this for navigating directories, viewing files, and exploring the codebase.
-
-    Allowed commands include: pwd, ls, cat, head, tail, grep, find, tree, file, wc,
-    git status/log/diff/branch, and similar readonly operations.
-
-    Args:
-        cmd: Readonly shell command to run
-        cwd: Working directory (optional, defaults to current)
-        timeout: Seconds before timeout (optional)
-
-    Returns:
-        Dict with stdout, stderr, return_code, cwd context
-    """
-    import os
-    from pathlib import Path
-
-    if not cmd:
-        return {
-            "success": False,
-            "error": "Missing required parameter: cmd",
-            "stdout": "",
-            "stderr": "",
-            "return_code": -1,
-            "cwd": os.getcwd(),
-        }
-
-    # Validate command is readonly
-    if not _is_readonly_command(cmd):
-        base_cmd = _extract_base_command(cmd)
-        allowed = get_allowed_readonly_commands()
-        return {
-            "success": False,
-            "error": (
-                f"Command '{base_cmd}' is not allowed in readonly mode. "
-                f"Allowed commands: {', '.join(allowed[:15])}... "
-                "Use 'shell' tool for other commands."
-            ),
-            "stdout": "",
-            "stderr": "",
-            "return_code": -1,
-            "cwd": os.getcwd(),
-        }
-
-    # Apply default timeout from centralized config
-    if timeout is None:
-        timeout = ProcessTimeouts.BASH_DEFAULT
-
-    # Apply command optimizer pipeline (grep→rg, etc.)
-    cmd = optimize_command(cmd)
-
-    # Validate working directory exists before execution
-    effective_cwd = cwd or os.getcwd()
-    if not os.path.isdir(effective_cwd):
-        return {
-            "success": False,
-            "error": f"Working directory does not exist: {effective_cwd}",
-            "stdout": "",
-            "stderr": "",
-            "return_code": -1,
-            "cwd": os.getcwd(),
-        }
-
-    try:
-        # Create subprocess
-        process = await asyncio.create_subprocess_shell(
-            cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=effective_cwd,
-        )
-
-        # Wait for completion with timeout
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                process.communicate(),
-                timeout=timeout,
-            )
-        except asyncio.TimeoutError:
-            process.kill()
-            await process.wait()
-            return {
-                "success": False,
-                "error": f"Command timed out after {timeout} seconds",
-                "stdout": "",
-                "stderr": "",
-                "return_code": -1,
-                "cwd": effective_cwd,
-            }
-
-        stdout_str = stdout.decode("utf-8") if stdout else ""
-        stderr_str = stderr.decode("utf-8") if stderr else ""
-
-        # Compute relative path from current working directory
-        try:
-            relative_cwd = str(Path(effective_cwd).relative_to(Path.cwd()))
-        except ValueError:
-            relative_cwd = effective_cwd
-
-        result = {
-            "success": process.returncode == 0,
-            "stdout": stdout_str,
-            "stderr": stderr_str,
-            "return_code": process.returncode,
-            "command": cmd,
-            "cwd": os.getcwd(),  # Root cwd for context
-            "working_dir": effective_cwd,
-            "relative_working_dir": relative_cwd if relative_cwd != "." else ".",
-        }
-
-        # Include informative error message when command fails
-        if process.returncode != 0:
-            error_parts = []
-            error_parts.append(f"Command failed with exit code {process.returncode}")
-            if stderr_str.strip():
-                stderr_preview = stderr_str.strip()
-                if len(stderr_preview) > 500:
-                    stderr_preview = stderr_preview[:250] + "\n...\n" + stderr_preview[-250:]
-                error_parts.append(f"stderr: {stderr_preview}")
-            result["error"] = "\n".join(error_parts)
-
-        return result
-
-    except FileNotFoundError:
-        return {
-            "success": False,
-            "error": f"Working directory not found: {effective_cwd}",
-            "stdout": "",
-            "stderr": "",
-            "return_code": -1,
-            "cwd": os.getcwd(),
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Failed to execute command: {str(e)}",
-            "stdout": "",
-            "stderr": "",
-            "return_code": -1,
-            "cwd": os.getcwd(),
-        }

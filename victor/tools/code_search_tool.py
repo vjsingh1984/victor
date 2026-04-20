@@ -3,6 +3,7 @@ import importlib.util
 import logging
 import os
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
@@ -14,6 +15,20 @@ if TYPE_CHECKING:
     from victor.tools.cache_manager import CacheNamespace
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SearchFilters:
+    """Filters for code search operations.
+
+    Consolidates filter parameters into a single object.
+    Reduces parameter count from 5 to 1 for code_search.
+    """
+    file_pattern: Optional[str] = None  # Search by filename pattern
+    symbol: Optional[str] = None         # Search by symbol name
+    language: Optional[str] = None       # Filter by programming language
+    test_only: Optional[bool] = None      # Only search test files
+    extensions: Optional[List[str]] = None  # Filter by file extensions
 
 
 def extract_skeleton(source: str, language: str = "python") -> str:
@@ -1038,11 +1053,7 @@ async def code_search(
     k: int = 10,
     mode: str = "semantic",
     reindex: bool = False,
-    file: Optional[str] = None,
-    symbol: Optional[str] = None,
-    lang: Optional[str] = None,
-    test: Optional[bool] = None,
-    exts: Optional[List[str]] = None,
+    filters: Optional[SearchFilters] = None,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Find code by CONCEPT, TEXT, or FILENAME when you DON'T know exact location.
@@ -1050,44 +1061,57 @@ async def code_search(
     Use this tool for exploration when you need to discover where relevant code
     lives. Returns file snippets ranked by relevance.
 
-    FILENAME SEARCH: Pass a filename (e.g., "fitswcs.py") and the tool will
-    automatically use `find` to locate matching files. No need for a separate
-    find command.
+    Modes:
+    - semantic: Vector search using embeddings (default)
+    - text: Literal text search
+    - filename: Search by filename pattern
+
+    Args:
+        query: Search query (code concept, text, or filename pattern)
+        path: Root directory to search (default: ".")
+        k: Maximum number of results to return (default: 10)
+        mode: Search mode - 'semantic', 'text', or 'filename' (default: 'semantic')
+        reindex: Force rebuild of search index (default: False)
+        filters: SearchFilters object with file_pattern, symbol, language, test_only, extensions
+
+    Returns:
+        Dictionary with search results including matches, scores, file paths
+
+    Example:
+        # Simple semantic search
+        code_search(query="dataclass validation", path=".")
+
+        # Search with filters
+        filters = SearchFilters(
+            language="python",
+            test_only=True,
+            extensions=[".py"]
+        )
+        code_search(query="pytest fixtures", path=".", filters=filters)
+
+        # Filename search (auto-detected from query)
+        code_search(query="*.py", path=".")
 
     DIFFERS FROM:
     - symbol(): Gets FULL CODE of a known symbol. Use when you know file + name.
     - refs(): Finds USAGE locations of a known symbol. Use for "where is X called".
     - graph(): Shows RELATIONSHIPS between symbols. Use for dependencies/impact.
 
-    Modes:
-    - "semantic": Embedding-based search. Best for concepts, patterns, inheritance.
+    Legacy modes:
     - "literal": Keyword matching (like grep). Best for exact text/identifiers.
     - "bugs": Similar bug search with graph context when supported by the provider.
     - "localize": File-level issue localization using semantic seeds plus graph expansion.
     - "impact": Change-impact / blast-radius analysis using graph expansion when available.
-
-    Args:
-        query: Search query (semantic concepts or literal text)
-        path: Directory to search
-        k: Max results
-        mode: Search mode - "semantic" (default), "literal", "bugs", "localize", or "impact"
-        reindex: Force re-index (semantic mode only)
-        file: Filter by file path (semantic mode only)
-        symbol: Filter by type (class/function/method) (semantic mode only)
-        lang: Filter by language (python/rust/js) (semantic and bugs modes)
-        test: Filter test files (true/false) (semantic mode only)
-        exts: File extensions for literal mode (e.g., [".py", ".js"])
-        _exec_ctx: Framework execution context (contains settings, etc.)
-
-        Example:
-            search(query="error handling in providers")  # Semantic: find related concepts
-            search(query="BaseProvider", mode="literal")  # Literal: grep-like text match
-            search(query="json parsing crash on empty payload", mode="bugs")
-            search(query="which files should I edit to add a logger parameter", mode="localize")
-            search(query="what breaks if I change BaseRepository.save", mode="impact")
     """
+    # Auto-detect filename search mode
+    if filters and filters.file_pattern and not filters.symbol:
+        # If only file_pattern is provided, treat as filename search
+        if mode == "semantic":
+            mode = "filename"
+
     # Route to literal search if mode is "literal"
     if mode == "literal":
+        exts = filters.extensions if filters else None
         result = await _literal_search(query, path, k, exts)
         if result.get("count", 0) > 0:
             return result
@@ -1188,26 +1212,27 @@ async def code_search(
         disable_embeddings = _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
         if disable_embeddings:
             logger.info("Embeddings disabled for this agent, falling back to literal search")
+            exts = filters.extensions if filters else None
             return await _literal_search(query, path, k, exts)
 
         # Build metadata filter from optional parameters
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []
 
-        if any([file, symbol, lang, test is not None]):
+        if filters and any([filters.file_pattern, filters.symbol, filters.language, filters.test_only is not None]):
             filter_metadata = {}
-            if file:
-                filter_metadata["file_path"] = file
-                filters_applied.append(f"file={file}")
-            if symbol:
-                filter_metadata["symbol_type"] = symbol
-                filters_applied.append(f"symbol={symbol}")
-            if lang:
-                filter_metadata["language"] = lang
-                filters_applied.append(f"lang={lang}")
-            if test is not None:
-                filter_metadata["is_test_file"] = test
-                filters_applied.append(f"test={test}")
+            if filters.file_pattern:
+                filter_metadata["file_path"] = filters.file_pattern
+                filters_applied.append(f"file={filters.file_pattern}")
+            if filters.symbol:
+                filter_metadata["symbol_type"] = filters.symbol
+                filters_applied.append(f"symbol={filters.symbol}")
+            if filters.language:
+                filter_metadata["language"] = filters.language
+                filters_applied.append(f"lang={filters.language}")
+            if filters.test_only is not None:
+                filter_metadata["is_test_file"] = filters.test_only
+                filters_applied.append(f"test={filters.test_only}")
 
         try:
             index, rebuilt = await asyncio.wait_for(
@@ -1252,20 +1277,23 @@ async def code_search(
             except Exception as cache_err:
                 logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
 
+            exts = filters.extensions if filters else None
             result = await _literal_search(query, path, k, exts)
             result["fallback"] = "semantic_index_timeout"
             return result
 
         if mode == "bugs":
-            ignored_filters = [
-                name
-                for name, value in (("file", file), ("symbol", symbol), ("test", test))
-                if value is not None
-            ]
+            ignored_filters = []
+            if filters:
+                ignored_filters = [
+                    name
+                    for name, value in (("file", filters.file_pattern), ("symbol", filters.symbol), ("test", filters.test_only))
+                    if value is not None
+                ]
             try:
                 bug_results = await index.find_similar_bugs(
                     bug_description=query,
-                    language=lang,
+                    language=filters.language if filters else None,
                     top_k=k,
                     include_graph_context=True,
                     context_limit=min(max(1, k), 3),
@@ -1305,11 +1333,13 @@ async def code_search(
             else:
                 fallback_metadata = {}
         elif mode == "localize":
-            ignored_filters = [
-                name
-                for name, value in (("file", file), ("symbol", symbol), ("test", test))
-                if value is not None
-            ]
+            ignored_filters = []
+            if filters:
+                ignored_filters = [
+                    name
+                    for name, value in (("file", filters.file_pattern), ("symbol", filters.symbol), ("test", filters.test_only))
+                    if value is not None
+                ]
             try:
                 localize_issue = getattr(index, "localize_issue", None)
                 if localize_issue is None:
@@ -1317,7 +1347,7 @@ async def code_search(
 
                 localization_results = await localize_issue(
                     issue_description=query,
-                    language=lang,
+                    language=filters.language if filters else None,
                     top_k=k,
                     include_graph_context=True,
                     context_limit=min(max(1, k), 3),
@@ -1355,11 +1385,13 @@ async def code_search(
                     "fallback_reason": str(exc),
                 }
         elif mode == "impact":
-            ignored_filters = [
-                name
-                for name, value in (("file", file), ("symbol", symbol), ("test", test))
-                if value is not None
-            ]
+            ignored_filters = []
+            if filters:
+                ignored_filters = [
+                    name
+                    for name, value in (("file", filters.file_pattern), ("symbol", filters.symbol), ("test", filters.test_only))
+                    if value is not None
+                ]
             try:
                 analyze_change_impact = getattr(index, "analyze_change_impact", None)
                 if analyze_change_impact is None:
@@ -1367,7 +1399,7 @@ async def code_search(
 
                 impact_results = await analyze_change_impact(
                     change_description=query,
-                    language=lang,
+                    language=filters.language if filters else None,
                     top_k=k,
                     include_graph_context=True,
                     context_limit=min(max(1, k), 3),
