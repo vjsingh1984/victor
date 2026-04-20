@@ -373,6 +373,35 @@ class EnhancedUsageLogger:
         """Returns True if logging is enabled."""
         return self._enabled
 
+    def _sanitize_log_data(self, data: Any) -> Any:
+        """Sanitize log data to remove non-serializable objects.
+
+        Args:
+            data: Data to sanitize (can be dict, list, or primitive)
+
+        Returns:
+            Sanitized data safe for JSON serialization
+        """
+        import inspect
+        from types import CoroutineType
+
+        if isinstance(data, dict):
+            return {k: self._sanitize_log_data(v) for k, v in data.items()}
+        elif isinstance(data, (list, tuple)):
+            return [self._sanitize_log_data(item) for item in data]
+        elif isinstance(data, CoroutineType):
+            # Coroutines can't be serialized, return a placeholder
+            return "<coroutine>"
+        elif inspect.isgenerator(data):
+            # Generators can't be serialized
+            return "<generator>"
+        elif hasattr(data, '__dict__'):
+            # For objects, try to serialize their dict representation
+            return self._sanitize_log_data(data.__dict__)
+        else:
+            # Primitives and JSON-serializable types
+            return data
+
     def log_event(self, event_type: str, data: Dict[str, Any]) -> None:
         """Log a usage event.
 
@@ -394,11 +423,14 @@ class EnhancedUsageLogger:
         if self._scrubber:
             data = self._scrubber.scrub_dict(data)
 
+        # Sanitize data to remove non-serializable objects (coroutines, generators, etc.)
+        sanitized_data = self._sanitize_log_data(data)
+
         log_entry = {
             "session_id": self.session_id,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "event_type": event_type,
-            "data": data,
+            "data": sanitized_data,
         }
 
         try:
