@@ -625,13 +625,8 @@ class ToolCoordinator:
             logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL}' (shell enabled)")
             return ToolNames.SHELL
 
-        # Fall back to shell_readonly if enabled
-        if self._registry and self._registry.is_tool_enabled(ToolNames.SHELL_READONLY):
-            logger.debug(f"Resolved '{tool_name}' to '{ToolNames.SHELL_READONLY}' (readonly mode)")
-            return ToolNames.SHELL_READONLY
-
-        # Neither enabled - return canonical name (will fail validation)
-        logger.debug(f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'")
+        # Shell not enabled - return canonical name (will fail validation)
+        logger.debug(f"Shell tool not enabled for '{tool_name}', using canonical '{canonical}'")
         return canonical
 
     # =====================================================================

@@ -390,7 +390,7 @@ class StageLayer(AccessLayer, ModeAwareMixin):
             "list_directory",
             "search",
             "code_search",
-            "shell_readonly",
+            "shell",
         }
     )
 

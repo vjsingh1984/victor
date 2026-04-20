@@ -28,6 +28,7 @@ from victor.config.orchestrator_constants import (
     COMPACTION_CONFIG,
     CONTEXT_LIMITS,
     SEMANTIC_THRESHOLDS,
+    TASK_COMPACTION_CONFIGS,
 )
 from victor.providers.base import Message
 
@@ -440,6 +441,7 @@ class ConversationController:
         self,
         target_messages: Optional[int] = None,
         current_query: Optional[str] = None,
+        task_type: Optional[str] = None,
     ) -> int:
         """Smart context compaction using configured strategy.
 
@@ -455,11 +457,29 @@ class ConversationController:
         Args:
             target_messages: Target number of messages to keep (default: min_messages_to_keep)
             current_query: Current user query for semantic relevance scoring
+            task_type: Optional task type for task-specific compaction configuration
 
         Returns:
             Number of messages removed
         """
-        target = target_messages or self.config.min_messages_to_keep
+        # Use task-specific config if available
+        if task_type and task_type in TASK_COMPACTION_CONFIGS:
+            task_config = TASK_COMPACTION_CONFIGS[task_type]
+            target = target_messages or task_config.min_messages_after_compact
+            logger.info(f"Using task-specific compaction config for '{task_type}'")
+            # Temporarily override config values for this compaction
+            original_config = self.config
+            # Note: We can't modify self.config directly (frozen dataclass),
+            # so we'll use the task_config values inline below
+            min_messages = task_config.min_messages_after_compact
+            tool_result_weight = task_config.tool_result_retention_weight
+            recent_weight = task_config.recent_message_weight
+        else:
+            target = target_messages or self.config.min_messages_to_keep
+            min_messages = self.config.min_messages_to_keep
+            tool_result_weight = self.config.tool_result_retention_weight
+            recent_weight = self.config.recent_message_weight
+
         strategy = self.config.compaction_strategy
 
         if len(self.messages) <= target + 1:  # +1 for system message

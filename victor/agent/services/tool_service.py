@@ -536,7 +536,7 @@ class ToolService:
 
         Handles shell variants and other tool aliases by:
         1. Converting to canonical name using tool_names registry
-        2. Checking if full shell is enabled, fallback to shell_readonly
+        2. Checking if shell is enabled
         3. Returning the canonical name for non-shell tools
 
         Args:
@@ -547,10 +547,10 @@ class ToolService:
 
         Example:
             canonical = service.resolve_tool_alias("bash")
-            # Returns "shell" or "shell_readonly" depending on what's enabled
+            # Returns "shell" if enabled
 
             canonical = service.resolve_tool_alias("execute_bash")
-            # Returns "shell" if enabled, else "shell_readonly"
+            # Returns "shell" if enabled
         """
         from victor.tools.tool_names import ToolNames, get_canonical_name
 
@@ -560,7 +560,6 @@ class ToolService:
         # Step 2: Define shell aliases that need special handling
         shell_aliases = {
             "shell",
-            "shell_readonly",
             "run",
             "bash",
             "execute",
@@ -572,8 +571,6 @@ class ToolService:
         try:
             if hasattr(ToolNames, "SHELL"):
                 shell_aliases.add(str(ToolNames.SHELL))
-            if hasattr(ToolNames, "SHELL_READONLY"):
-                shell_aliases.add(str(ToolNames.SHELL_READONLY))
         except Exception:
             pass  # ToolNames not fully available, use string aliases
 
@@ -583,32 +580,20 @@ class ToolService:
                 self._logger.debug(f"Resolved '{tool_name}' to canonical '{canonical}'")
             return canonical
 
-        # Step 4: Handle shell aliases - check which variant is enabled
-        # Try full shell first
+        # Step 4: Handle shell aliases - check if shell is enabled
         try:
             shell_canonical = str(ToolNames.SHELL) if hasattr(ToolNames, "SHELL") else "shell"
-            readonly_canonical = (
-                str(ToolNames.SHELL_READONLY)
-                if hasattr(ToolNames, "SHELL_READONLY")
-                else "shell_readonly"
-            )
         except Exception:
             shell_canonical = "shell"
-            readonly_canonical = "shell_readonly"
 
-        # Check if full shell is enabled
+        # Check if shell is enabled
         if self.is_tool_enabled(shell_canonical):
             self._logger.debug(f"Resolved '{tool_name}' to '{shell_canonical}' (shell enabled)")
             return shell_canonical
 
-        # Fall back to shell_readonly if enabled
-        if self.is_tool_enabled(readonly_canonical):
-            self._logger.debug(f"Resolved '{tool_name}' to '{readonly_canonical}' (readonly mode)")
-            return readonly_canonical
-
-        # Neither enabled - return canonical name (will fail validation later)
+        # Shell not enabled - return canonical name (will fail validation later)
         self._logger.debug(
-            f"No shell variant enabled for '{tool_name}', using canonical '{canonical}'"
+            f"Shell tool not enabled for '{tool_name}', using canonical '{canonical}'"
         )
         return canonical
 

@@ -1240,7 +1240,7 @@ class ToolSelector(ModeAwareMixin):
                 return tools
 
         STAGE_PRESERVED_TOOLS: Set[str] = {
-            "shell_readonly",
+            "shell",
             "git",
         }
         preserved_tools.update(STAGE_PRESERVED_TOOLS)
