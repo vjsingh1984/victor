@@ -1128,6 +1128,33 @@ async def code_search(
                     "error": f"Search root '{search_root}' not found. Please provide a valid directory path.",
                 }
 
+        # Check if path is a subdirectory of project root to avoid duplicate embeddings
+        try:
+            from victor.config.settings import get_project_paths
+
+            project_root = Path(get_project_paths().project_root).resolve()
+            # Check if root_path is a subdirectory of project_root
+            try:
+                root_path.relative_to(project_root)
+                is_subdirectory = True
+            except ValueError:
+                # root_path is not relative to project_root
+                is_subdirectory = False
+
+            if is_subdirectory and root_path != project_root:
+                # Path is a subdirectory of project root
+                rel_path = root_path.relative_to(project_root)
+                logger.warning(
+                    f"[code_search] Searching in subdirectory '{rel_path}' instead of project root. "
+                    f"This may reduce visibility and duplicate embedding storage. "
+                    f"Consider using path='.' for full project coverage."
+                )
+                # For now, still proceed with subdirectory search but log warning
+                # TODO: In future, could automatically use project root with subdirectory filter
+        except Exception:
+            # If we can't determine project root, proceed with provided path
+            pass
+
         settings = _exec_ctx.get("settings") if _exec_ctx else None
         if settings is None:
             return {

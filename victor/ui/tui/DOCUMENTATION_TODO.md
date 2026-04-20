@@ -1,56 +1,33 @@
-# TUI Widget Documentation TODO
+# TUI Widget Documentation - COMPLETE ✅
 
-This document tracks the remaining docstring work for `victor/ui/tui/widgets.py`.
+All TUI widget `compose()` methods now have complete docstrings!
 
-## Completed ✅
-- Line 100: `StatusBar.compose()` - Added docstring
-- Line 671: `ToolCallWidget.compose()` - Added docstring
-- Line 486: `InputWidget.action_submit()` - Already had docstring
+## Completed Docstrings
 
-## Remaining TODO
-The following `compose()` and `action_*()` methods need docstrings:
-- Line 395: `EnhancedConversationLog.compose()` - Message display widget
-- Line 744: `CodeBlock.compose()` - Syntax-highlighted code widget
-- Line 811: `ThinkingSidebar.compose()` - Collapsible reasoning panel
-- Line 901: `ToolProgressPanel.compose()` - Tool execution visualization
-- Line 1058: `FollowUpWidget.compose()` - Interactive suggestion buttons
+### Core Input Widgets
+- ✅ `InputWidget.compose()` (Line 407) - Message input with history support
+- ✅ `StatusBar.compose()` (Line 100) - Status bar widget
 
-## Docstring Pattern
+### Message Display Widgets
+- ✅ `ThinkingWidget.compose()` (Line 781) - Thinking/reasoning content panel
+- ✅ `CodeBlock.compose()` (Line 859) - Syntax-highlighted code with copy button
 
-Follow this pattern for TUI widget methods:
+### Tool & Progress Widgets
+- ✅ `ToolCallWidget.compose()` (Line 671) - Tool call status display
+- ✅ `ToolProgressPanel.compose()` (Line 1117) - Real-time tool execution progress
 
-```python
-def compose(self) -> ComposeResult:
-    """Compose the [Widget Name] widget.
+## Notes
 
-    [Brief description of what the widget displays and its purpose.]
+**EnhancedConversationLog**: Does not have a custom `compose()` method — inherits from `VerticalScroll`.
 
-    Returns:
-        ComposeResult: The child widgets for the [Widget Name].
+**FollowUpWidget**: Class does not exist in the current codebase (likely removed during refactoring).
 
-    Layout:
-        - [Component 1]: [Description]
-        - [Component 2]: [Description]
-        - ...
-    """
-    # Widget implementation
-```
+**ThinkingSidebar**: Was renamed to `ThinkingWidget`.
 
-For action handlers:
+All major TUI widgets now have complete docstrings following the standard pattern:
+- Brief description of widget purpose
+- Returns section documenting ComposeResult
+- Layout section listing child widgets and their purposes
 
-```python
-def action_[name](self) -> None:
-    """Handle [action description].
-
-    Triggered by: [User action or keyboard shortcut]
-
-    Side effects:
-        - [Effect 1]
-        - [Effect 2]
-    """
-    # Implementation
-```
-
-## Priority
-This is P3 (Low Priority) - Documentation completeness. The widgets are fully functional,
-only docstrings are missing for contributor onboarding.
+## Priority: COMPLETED
+This was P3 (Low Priority) - Documentation completeness for contributor onboarding.

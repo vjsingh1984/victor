@@ -1272,6 +1272,8 @@ class ToolCoordinator:
                         "elapsed": elapsed_ms / 1000,
                         "args": normalized_args,
                         "follow_up_suggestions": follow_up_suggestions,
+                        "tool_call_id": call_result.tool_call_id,  # Include for OpenAI spec compliance
+                        "content": formatted_output,  # Include for streaming chat coordinator
                     }
                 )
             else:
@@ -1309,6 +1311,8 @@ class ToolCoordinator:
                         "success": False,
                         "elapsed": elapsed_ms / 1000,
                         "error": error_display,
+                        "tool_call_id": call_result.tool_call_id,  # Include for OpenAI spec compliance
+                        "content": formatted_error,  # Include for streaming chat coordinator
                     }
                 )
 

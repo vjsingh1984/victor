@@ -47,7 +47,20 @@ except ImportError:
         return str(e)
 
 
-chat_app = typer.Typer(name="chat", help="Start interactive chat or send a one-shot message.")
+chat_app = typer.Typer(
+    name="chat",
+    help="""Start interactive chat or send a one-shot message.
+
+    **Basic Usage:**
+        victor chat                    # Start interactive chat
+        victor chat "Hello, Victor!"    # Send one-shot message
+
+    **Advanced Options:**
+        Use --help-full to see all 37 options organized by category.
+        Workflow options: Use 'victor workflow' command instead.
+        Session options: Use 'victor sessions' command instead.
+    """,
+)
 console = Console()
 
 
@@ -79,6 +92,12 @@ def _display_skill_preview(con: Console, agent: Any, message: str) -> None:
 @chat_app.callback(invoke_without_command=True)
 def chat(
     ctx: typer.Context,
+    help_full: bool = typer.Option(
+        False,
+        "--help-full",
+        help="Show full help with all 37 options (advanced usage).",
+        is_eager=True,
+    ),
     message: Optional[str] = typer.Argument(
         None,
         help="Message to send (put BEFORE options, or use -m instead). Interactive mode if omitted.",
@@ -323,6 +342,105 @@ def chat(
     ),
 ):
     """Start interactive chat or send a one-shot message."""
+    # Handle --help-full flag for comprehensive help
+    if help_full:
+        from rich.markdown import Markdown
+
+        full_help = """
+# Victor Chat - Full Help
+
+**Victor** has 37 options organized into 11 categories for progressive disclosure.
+
+## Quick Reference
+- Basic chat: `victor chat`
+- One-shot: `victor chat "your message"`
+- Switch provider: `victor chat -p anthropic`
+- Use profile: `victor chat --profile coding`
+
+## Core Options (Beginner-Friendly)
+These are the most commonly used options:
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--profile`, `-p` | Profile from profiles.yaml | `-p coding` |
+| `--provider` | Override provider | `--provider ollama` |
+| `--model` | Override model | `--model llama3.2` |
+| `--stream` | Enable streaming (default: ON) | `--no-stream` |
+| `--thinking` | Enable extended reasoning | `--thinking` |
+
+## Category Reference
+
+### Output Format (4 options)
+`--json`, `--plain`, `--code-only`, `--quiet`, `-q`
+
+### Input (2 options)
+`--stdin`, `--input-file`, `-f`
+
+### Logging (2 options)
+`--log-level`, `-l`, `--debug-modules`
+
+### Advanced Agent Behavior (8 options)
+`--mode`, `--tool-budget`, `--max-iterations`, `--preindex`,
+`--vertical`, `-V`, `--auto-skill`, `--planning`, `--planning-model`
+
+### Workflow (4 options)
+Use `victor workflow` command instead for full workflow features.
+`--workflow`, `-w`, `--validate`, `--render`, `-r`, `--render-output`, `-o`
+
+### Session (2 options)
+Use `victor sessions` command instead for session management.
+`--sessions`, `--sessionid`
+
+### Expert Options (9 options)
+Advanced debugging and compatibility options:
+- **Logging**: `--observability`, `--log-events`
+- **Output**: `--show-reasoning`, `--renderer`
+- **Auth**: `--endpoint`, `--auth-mode`, `--coding-plan`
+- **Interface**: `--tui`, `--legacy`
+
+## Examples
+
+**Interactive Chat:**
+```bash
+victor chat                              # Interactive with defaults
+victor chat -p anthropic --thinking      # Use Claude with reasoning
+victor chat -p ollama --model llama3.2  # Use local model
+```
+
+**One-Shot Messages:**
+```bash
+victor chat "Explain recursion"         # Basic message
+victor chat "Analyze this file" -f code.py --preindex
+victor chat "Plan a REST API" --mode plan
+```
+
+**Automation:**
+```bash
+victor chat "Generate tests" --json --quiet > tests.json
+victor chat "Refactor" --code-only > refactored.py
+```
+
+**Workflows:**
+```bash
+victor workflow validate ./workflow.yaml
+victor workflow render ./workflow.yaml --format svg -o diagram.svg
+```
+
+**Sessions:**
+```bash
+victor chat --sessions                    # List recent sessions
+victor chat --sessionid abc123            # Resume session
+```
+
+## See Also
+- `victor workflow --help` - Workflow commands
+- `victor sessions --help` - Session management
+- `victor profile --help` - Profile management
+- `victor init --wizard` - First-time setup
+"""
+        console.print(Markdown(full_help))
+        raise typer.Exit(0)
+
     if ctx.invoked_subcommand is None:
         renderer = renderer.lower()
         if renderer not in {"auto", "rich", "rich-text", "text"}:
@@ -809,7 +927,39 @@ async def run_oneshot(
             formatter.info(f"Run: {e.run_command}")
         raise typer.Exit(1)
     except Exception as e:
-        formatter.error(str(e))
+        # Use contextual error formatting for better UX
+        error_message = format_exception_for_user(e)
+        formatter.error(error_message)
+
+        # Suggest provider switching for provider-specific errors
+        error_str = str(e).lower()
+        is_provider_error = any(
+            term in error_str
+            for term in ["api key", "unauthorized", "rate limit", "timeout", "connection", "network"]
+        )
+
+        if is_provider_error:
+            provider = getattr(profile_config, "provider", "unknown")
+            if provider != "ollama":
+                formatter.info(
+                    "💡 Try switching to a different provider:\n"
+                    "  victor chat -p ollama  # Local models (free)\n"
+                    "  victor chat -p openai  # GPT models"
+                )
+            else:
+                formatter.info(
+                    "💡 Try switching to a cloud provider:\n"
+                    "  victor chat -p anthropic  # Claude models\n"
+                    "  victor chat -p openai  # GPT models"
+                )
+
+        formatter.info("Run 'victor doctor' for diagnostics")
+
+        # Show traceback in debug mode only
+        if os.getenv("VICTOR_DEBUG"):
+            import traceback
+            formatter.error(traceback.format_exc())
+
         raise typer.Exit(1)
     finally:
         # Emit session end event
@@ -1012,10 +1162,30 @@ async def run_interactive(
             tool_calls_made = metrics.get("tool_calls", 0) if metrics else 0
 
     except Exception as e:
-        console.print(f"[bold red]Error:[/ ] {str(e)}")
-        import traceback
+        # Use contextual error formatting for better UX
+        error_message = format_exception_for_user(e)
+        console.print(f"[bold red]Error:[/]\n{error_message}")
 
-        console.print(traceback.format_exc())
+        # Show traceback in debug mode only
+        if os.getenv("VICTOR_DEBUG"):
+            import traceback
+            console.print(traceback.format_exc())
+
+        # Suggest provider switching for provider-specific errors
+        error_str = str(e).lower()
+        is_provider_error = any(
+            term in error_str
+            for term in ["api key", "unauthorized", "rate limit", "timeout", "connection", "network"]
+        )
+
+        if is_provider_error:
+            console.print(
+                "\n[yellow]💡 Try switching to a different provider:[/]"
+                "\n  [dim]victor chat -p ollama[/]  # Local models (free)"
+                "\n  [dim]victor chat -p anthropic[/]  # Claude models"
+            )
+
+        console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         raise typer.Exit(1)
     finally:
         # Emit session end event
@@ -1187,6 +1357,54 @@ async def _run_cli_repl(
             if os.getenv("VICTOR_DEBUG"):
                 import traceback
                 console.print(traceback.format_exc())
+
+            # Save conversation state on error for recovery
+            try:
+                if hasattr(agent, "get_conversation_history"):
+                    from victor.agent.sqlite_session_persistence import (
+                        get_sqlite_session_persistence,
+                    )
+
+                    persistence = get_sqlite_session_persistence()
+                    conversation = agent.get_conversation_history()
+
+                    # Get current provider/model for context
+                    provider = getattr(profile_config, "provider", "unknown")
+                    model = getattr(profile_config, "model", "unknown")
+
+                    session_id = persistence.save_session(
+                        conversation=conversation,
+                        model=model,
+                        provider=provider,
+                        profile=profile,
+                        tags=["error-recovery", "auto-saved"],
+                    )
+                    console.print(
+                        f"\n[dim]💾 Conversation auto-saved. Resume with: victor chat --resume {session_id}[/]"
+                    )
+            except Exception as save_error:
+                # Silently fail if save doesn't work — error message is more important
+                pass
+
+            # Suggest provider switching for provider-specific errors
+            error_str = str(e).lower()
+            is_provider_error = any(
+                term in error_str
+                for term in ["api key", "unauthorized", "rate limit", "timeout", "connection", "network"]
+            )
+
+            if is_provider_error and provider != "ollama":
+                console.print(
+                    "\n[yellow]💡 Try switching to a different provider:[/]"
+                    f"\n  [dim]victor chat -p ollama[/]  # Local models (free)[/]"
+                    f"\n  [dim]victor chat -p openai[/]  # GPT models[/]"
+                )
+            elif is_provider_error:
+                console.print(
+                    "\n[yellow]💡 Try switching to a cloud provider:[/]"
+                    f"\n  [dim]victor chat -p anthropic[/]  # Claude models[/]"
+                    f"\n  [dim]victor chat -p openai[/]  # GPT models[/]"
+                )
 
             console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
 

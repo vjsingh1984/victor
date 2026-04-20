@@ -812,6 +812,14 @@ async def graph(
 
         if mode == "stats":
             result = _build_stats(loaded)
+        elif mode == "search":
+            # Alias for 'find' mode - more intuitive for users
+            search_query = query or node or file
+            if not search_query:
+                raise ValueError("search mode requires query, node, or file")
+            result = {
+                "matches": loaded.analyzer.search(search_query, node_types=node_types, limit=top_k)
+            }
         elif mode == "find":
             search_query = query or node or file
             if not search_query:

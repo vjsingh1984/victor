@@ -31,6 +31,7 @@ import pytest
 # cache instead of doing a fresh lookup against the stale sys.path.
 import victor.agent.presentation  # noqa: F401 — populates sys.modules early
 import victor.agent.safety  # noqa: F401 — populates sys.modules early
+import victor.agent.background_agent  # noqa: F401 — populates sys.modules early
 
 _UNIT_TEST_REPO_ROOT = Path(__file__).resolve().parents[2]
 

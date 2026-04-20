@@ -405,6 +405,19 @@ class InputWidget(Static):
         self._history_task: asyncio.Task | None = None
 
     def compose(self) -> ComposeResult:
+        """Compose the input widget.
+
+        Creates a text input area with a prompt indicator and hint label.
+        Supports Up/Down arrow navigation through conversation history.
+
+        Returns:
+            ComposeResult: The child widgets for the input area.
+
+        Layout:
+            - Prompt indicator (❯): Visual prompt marker
+            - SubmitTextArea: Multi-line text input with submit on Ctrl+Enter/Ctrl+J
+            - Hint label: Shows keyboard shortcuts and status messages
+        """
         with Vertical():
             with Horizontal(classes="input-row"):
                 yield Label("❯", classes="prompt-indicator")
@@ -766,6 +779,17 @@ class ThinkingWidget(Static):
         self.content = content
 
     def compose(self) -> ComposeResult:
+        """Compose the thinking widget.
+
+        Displays the model's extended thinking/reasoning process in a styled panel.
+
+        Returns:
+            ComposeResult: The child widgets for the thinking display.
+
+        Layout:
+            - Header label: "Thinking..." in bold magenta
+            - Content Static: Shows the thinking/reasoning text content
+        """
         with Vertical():
             yield Label(
                 Text("Thinking...", style="bold magenta"),
@@ -833,6 +857,17 @@ class CodeBlock(Static):
         self.show_line_numbers = show_line_numbers
 
     def compose(self) -> ComposeResult:
+        """Compose the code block widget.
+
+        Displays syntax-highlighted code with a copy button and language label.
+
+        Returns:
+            ComposeResult: The child widgets for the code block display.
+
+        Layout:
+            - Header row: Language label (e.g., [python]) and Copy button
+            - Static Syntax widget: Syntax-highlighted code with Monokai theme
+        """
         with Horizontal(classes="code-header-row"):
             yield Label(f"[{self.language}]", classes="code-header")
             yield Button("Copy", classes="copy-button", variant="default")
@@ -1080,6 +1115,20 @@ class ToolProgressPanel(Static):
         self._output_preview = ""
 
     def compose(self) -> ComposeResult:
+        """Compose the tool progress panel.
+
+        Displays real-time tool execution progress with status, progress bar,
+        and optional cancel button.
+
+        Returns:
+            ComposeResult: The child widgets for the progress panel.
+
+        Layout:
+            - Header row: Tool name with icon, status icon (⏳/✓/✗), elapsed time
+            - ProgressBar: Visual progress indicator (0-100%)
+            - Output preview: Shows recent tool output (max 4 lines)
+            - Cancel button: Only shown if on_cancel callback provided
+        """
         args_preview = self._format_args_preview()
 
         with Vertical():

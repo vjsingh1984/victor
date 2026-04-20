@@ -1830,7 +1830,7 @@ class ToolPipeline:
                 error=f"Tool execution timed out after {effective_timeout}s",
                 error_info=ErrorInfo(
                     message=f"Tool '{tool_name}' timed out after {effective_timeout}s",
-                    category=ErrorCategory.TIMEOUT,
+                    category=ErrorCategory.TOOL_TIMEOUT,
                     severity=ErrorSeverity.WARNING,
                     correlation_id=f"timeout_{tool_name}_{int(time.time())}",
                     traceback=tb_str[-2000:],  # Last 2000 chars

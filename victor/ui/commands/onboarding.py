@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -403,7 +404,6 @@ class OnboardingWizard:
                 {"id": "llama3.2:3b", "description": "Fast, efficient, 3B params"},
             ],
             "anthropic": [
-                {"id": "claude-sonnet-4-5-20250514", "description": "Balanced, fast"},
                 {"id": "claude-3-5-sonnet-20241022", "description": "Powerful, newer"},
             ],
             "openai": [
@@ -411,14 +411,26 @@ class OnboardingWizard:
                 {"id": "gpt-4o-mini", "description": "Very fast, efficient"},
             ],
             "google": [
-                {
-                    "id": "gemini-2.0-flash-exp",
-                    "description": "Very fast, experimental",
-                },
+                {"id": "gemini-2.0-flash-exp", "description": "Very fast, experimental"},
                 {"id": "gemini-1.5-pro", "description": "Balanced"},
             ],
             "lmstudio": [
                 {"id": "local-model", "description": "Your loaded model"},
+            ],
+            "vllm": [
+                {"id": "local-model", "description": "Your loaded model"},
+            ],
+            "deepseek": [
+                {"id": "deepseek-chat", "description": "Fast, efficient"},
+            ],
+            "xai": [
+                {"id": "grok-beta", "description": "Fast, capable"},
+            ],
+            "zai": [
+                {"id": "glm-4.7", "description": "Fast, cost-effective"},
+            ],
+            "cohere": [
+                {"id": "command-r-plus", "description": "Command-optimized"},
             ],
         }
         return models.get(provider, [])
@@ -464,6 +476,17 @@ class OnboardingWizard:
             )
             self.console.print("\n  [green]✓[/] Configuration saved to:")
             self.console.print(f"  [dim]{profiles_path}[/]")
+
+            # Create onboarding completion marker
+            marker_file = self.config_dir / ".onboarding_completed"
+            completed_at = datetime.now().isoformat()
+            marker_file.write_text(
+                f"# Onboarding completed successfully\n"
+                f"# Completed at: {completed_at}\n"
+                f"# Profile: {profile.name}\n"
+                f"# Provider: {provider}\n"
+                f"# Model: {model}\n"
+            )
 
         except Exception as e:
             self.console.print(f"\n  [red]✗[/] Failed to save configuration: {e}")

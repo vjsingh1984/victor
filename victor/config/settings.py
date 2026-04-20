@@ -2253,16 +2253,28 @@ def is_first_time_user() -> bool:
     """Detect if this is a first-time user.
 
     A user is considered a first-time user if:
-    1. No profiles.yaml exists in ~/.victor/
-    2. No API keys are configured in environment
+    1. No onboarding completion marker exists
+    2. No profiles.yaml exists in ~/.victor/
+    3. No API keys are configured in environment
+    4. Ollama is not available (local provider check)
+
+    The onboarding completion marker (.onboarding_completed) is authoritative:
+    if it exists, the user has completed setup regardless of current provider status.
 
     Returns:
         True if this appears to be a first-time user
     """
     from pathlib import Path
 
-    # Check if profiles.yaml exists
+    # Check if onboarding was already completed
     victor_dir = Path.home() / ".victor"
+    onboarding_marker = victor_dir / ".onboarding_completed"
+
+    if onboarding_marker.exists():
+        # User has completed onboarding, not first-time
+        return False
+
+    # Check if profiles.yaml exists
     profiles_path = victor_dir / "profiles.yaml"
 
     if not profiles_path.exists():

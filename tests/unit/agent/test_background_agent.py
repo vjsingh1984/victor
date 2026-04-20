@@ -380,9 +380,11 @@ class TestGlobalFunctions:
 
     def test_get_agent_manager_uninitialized(self):
         """get_agent_manager should return None before initialization."""
-        # Reset global state
-        import victor.agent.background_agent as module
+        # Reset global state by accessing the already-imported module from sys.modules
+        # to avoid triggering a fresh import lookup that can fail with mirrored test dirs
+        import sys
 
+        module = sys.modules["victor.agent.background_agent"]
         module._agent_manager = None
         assert get_agent_manager() is None
 
