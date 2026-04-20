@@ -642,3 +642,120 @@ class TestAsyncToolExecutor:
         # but both should execute
         assert len(execution_order) == 2
         assert set(execution_order) == {"low", "high"}
+
+    @pytest.mark.asyncio
+    async def test_embedding_intensive_concurrency_limit(self):
+        """Test that embedding-intensive tools have lower concurrency limit."""
+
+        executor = AsyncToolExecutor(
+            config=ExecutionConfig(
+                max_concurrent=10,  # General limit
+                max_embedding_concurrent=4,  # Lower limit for embedding tools
+                embedding_intensive_tools={"code_search"},
+            )
+        )
+
+        active_count = 0
+        max_active = 0
+        lock = asyncio.Lock()
+
+        async def mock_executor(call: ToolCallSpec) -> str:
+            nonlocal active_count, max_active
+
+            async with lock:
+                active_count += 1
+                max_active = max(max_active, active_count)
+
+            await asyncio.sleep(0.1)
+
+            async with lock:
+                active_count -= 1
+
+            return f"Result for {call.name}"
+
+        # Create 8 code_search tool calls (embedding-intensive)
+        specs = [
+            ToolCallSpec(
+                name="code_search",
+                arguments={"query": f"test query {i}"},
+                call_id=f"search-{i}",
+                category=ToolCategory.READ_ONLY,
+            )
+            for i in range(8)
+        ]
+
+        results = await executor.execute_tool_calls(specs, mock_executor)
+
+        assert len(results) == 8
+        assert all(r.success for r in results)
+        # Should not exceed max_embedding_concurrent of 4
+        assert max_active <= 4
+
+        # Verify stats tracked correctly
+        stats = executor.get_stats()
+        assert stats["embedding_intensive_executions"] == 8
+
+    @pytest.mark.asyncio
+    async def test_embedding_intensive_mixed_with_regular_tools(self):
+        """Test mixing embedding-intensive and regular tools."""
+
+        executor = AsyncToolExecutor(
+            config=ExecutionConfig(
+                max_concurrent=10,
+                max_embedding_concurrent=2,  # Very low limit for test
+                embedding_intensive_tools={"code_search"},
+            )
+        )
+
+        active_count = 0
+        max_active = 0
+        lock = asyncio.Lock()
+
+        async def mock_executor(call: ToolCallSpec) -> str:
+            nonlocal active_count, max_active
+
+            async with lock:
+                active_count += 1
+                max_active = max(max_active, active_count)
+
+            await asyncio.sleep(0.1)
+
+            async with lock:
+                active_count -= 1
+
+            return f"Result for {call.name}"
+
+        # Mix of embedding-intensive and regular tools
+        specs = [
+            # 4 code_search (embedding-intensive, max 2 concurrent)
+            ToolCallSpec(
+                name="code_search",
+                arguments={"query": f"search {i}"},
+                call_id=f"search-{i}",
+                category=ToolCategory.READ_ONLY,
+            )
+            for i in range(4)
+        ] + [
+            # 4 regular read tools (max 10 concurrent)
+            ToolCallSpec(
+                name="read_file",
+                arguments={"file_path": f"/path/to/file{i}.py"},
+                call_id=f"read-{i}",
+                category=ToolCategory.READ_ONLY,
+            )
+            for i in range(4)
+        ]
+
+        results = await executor.execute_tool_calls(specs, mock_executor)
+
+        assert len(results) == 8
+        assert all(r.success for r in results)
+        # Overall concurrency should be limited by general semaphore
+        # but code_search should be further limited
+        assert max_active <= 10
+
+        # Verify stats
+        stats = executor.get_stats()
+        assert stats["embedding_intensive_executions"] == 4
+        assert stats["total_executions"] == 8
+

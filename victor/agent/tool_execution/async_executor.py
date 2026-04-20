@@ -83,6 +83,8 @@ class ExecutionConfig:
         enable_write_parallelization: Enable parallelization with file locking
         enable_priority_scheduling: Enable priority-based scheduling
         default_timeout: Default timeout per tool in seconds
+        embedding_intensive_tools: Set of tool names that are embedding-intensive
+        max_embedding_concurrent: Maximum concurrent embedding-intensive tool executions
     """
 
     max_concurrent: int = 10
@@ -90,6 +92,10 @@ class ExecutionConfig:
     enable_priority_scheduling: bool = True
     # Increased from 30 to 60 seconds for semantic search operations
     default_timeout: float = 60.0
+    # Tools that use embedding models and need lower concurrency limits
+    embedding_intensive_tools: Set[str] = field(default_factory=lambda: {"code_search"})
+    # Limit concurrent embedding operations to prevent resource exhaustion
+    max_embedding_concurrent: int = 4
 
 
 class AsyncToolExecutor:
@@ -132,6 +138,9 @@ class AsyncToolExecutor:
         # Concurrency control
         self._semaphore = asyncio.Semaphore(self.config.max_concurrent)
 
+        # Embedding-intensive tool semaphore (lower limit to prevent resource exhaustion)
+        self._embedding_semaphore = asyncio.Semaphore(self.config.max_embedding_concurrent)
+
         # File locking for concurrent writes
         self._file_locks: Dict[str, asyncio.Lock] = {}
         self._lock_lock = asyncio.Lock()
@@ -142,6 +151,7 @@ class AsyncToolExecutor:
             "parallel_executions": 0,
             "sequential_executions": 0,
             "file_locks_acquired": 0,
+            "embedding_intensive_executions": 0,
             "total_duration_ms": 0.0,
         }
 
@@ -195,58 +205,78 @@ class AsyncToolExecutor:
         """
         start_time = time.time()
 
-        # Acquire semaphore for concurrency control
-        async with self._semaphore:
-            # Acquire file lock for write operations
-            file_lock = None
-            if call.category == ToolCategory.WRITE and self.config.enable_write_parallelization:
-                files = extract_files_from_args(call.arguments)
-                if files:
-                    file_lock = await self._get_file_lock(files[0])
+        # Check if this is an embedding-intensive tool
+        is_embedding_intensive = call.name in self.config.embedding_intensive_tools
+        if is_embedding_intensive:
+            self._stats["embedding_intensive_executions"] += 1
 
-            try:
-                if file_lock:
-                    async with file_lock:
-                        result = await asyncio.wait_for(
-                            executor_func(call),
-                            timeout=call.timeout,
-                        )
-                else:
+        # Acquire semaphore for concurrency control
+        # For embedding-intensive tools, also acquire the embedding semaphore
+        if is_embedding_intensive:
+            # Acquire both semaphores (nested context managers)
+            async with self._embedding_semaphore, self._semaphore:
+                return await self._execute_with_locking(call, executor_func, start_time)
+        else:
+            async with self._semaphore:
+                return await self._execute_with_locking(call, executor_func, start_time)
+
+    async def _execute_with_locking(
+        self,
+        call: ToolCallSpec,
+        executor_func: callable,
+        start_time: float,
+    ) -> ExecutionResult:
+        """Execute tool call with file locking if needed."""
+        # Acquire file lock for write operations
+        file_lock = None
+        if call.category == ToolCategory.WRITE and self.config.enable_write_parallelization:
+            files = extract_files_from_args(call.arguments)
+            if files:
+                file_lock = await self._get_file_lock(files[0])
+
+        try:
+            if file_lock:
+                async with file_lock:
                     result = await asyncio.wait_for(
                         executor_func(call),
                         timeout=call.timeout,
                     )
-
-                duration = (time.time() - start_time) * 1000
-                return ExecutionResult(
-                    call_id=call.call_id,
-                    success=True,
-                    result=result,
-                    error=None,
-                    duration_ms=duration,
-                    parallelizable=True,
+            else:
+                result = await asyncio.wait_for(
+                    executor_func(call),
+                    timeout=call.timeout,
                 )
 
-            except asyncio.TimeoutError:
-                duration = (time.time() - start_time) * 1000
-                return ExecutionResult(
-                    call_id=call.call_id,
-                    success=False,
-                    result=None,
-                    error=f"Timeout after {call.timeout}s",
-                    duration_ms=duration,
-                    parallelizable=True,
-                )
-            except Exception as e:
-                duration = (time.time() - start_time) * 1000
-                return ExecutionResult(
-                    call_id=call.call_id,
-                    success=False,
-                    result=None,
-                    error=str(e),
-                    duration_ms=duration,
-                    parallelizable=True,
-                )
+            duration = (time.time() - start_time) * 1000
+            return ExecutionResult(
+                call_id=call.call_id,
+                success=True,
+                result=result,
+                error=None,
+                duration_ms=duration,
+                parallelizable=True,
+            )
+
+        except asyncio.TimeoutError:
+            duration = (time.time() - start_time) * 1000
+            return ExecutionResult(
+                call_id=call.call_id,
+                success=False,
+                result=None,
+                error=f"Timeout after {call.timeout}s",
+                duration_ms=duration,
+                parallelizable=True,
+            )
+        except Exception as e:
+            duration = (time.time() - start_time) * 1000
+            return ExecutionResult(
+                call_id=call.call_id,
+                success=False,
+                result=None,
+                error=str(e),
+                duration_ms=duration,
+                parallelizable=True,
+            )
 
     async def _execute_batch(
         self,
@@ -429,5 +459,6 @@ class AsyncToolExecutor:
             "parallel_executions": 0,
             "sequential_executions": 0,
             "file_locks_acquired": 0,
+            "embedding_intensive_executions": 0,
             "total_duration_ms": 0.0,
         }
