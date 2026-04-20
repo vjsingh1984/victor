@@ -113,8 +113,7 @@ Tools for running commands and code.
 
 | Tool | Description | Cost | Example Usage |
 |------|-------------|------|---------------|
-| `shell` | Execute shell commands | FREE | "Run pytest tests/" |
-| `shell_readonly` | Safe readonly commands | FREE | "Show current directory" |
+| `shell` | Execute shell commands with safety controls | FREE | "Run pytest tests/" |
 | `sandbox` | Run Python in isolated container | MEDIUM | "Execute this data analysis script" |
 | `test` | Run pytest with structured output | FREE | "Run the unit tests" |
 
@@ -125,7 +124,7 @@ User: Run the tests for the auth module
 Victor calls: test(path="tests/unit/test_auth.py")
 ```
 
-**Shell Safety**: The `shell` tool blocks dangerous commands like `rm -rf /`. Use `shell_readonly` for exploration without risk of modifications.
+**Shell Safety**: The `shell` tool supports a `readonly=True` parameter for safe exploration (pwd, ls, cat, grep, git status, etc.) and blocks dangerous commands like `rm -rf /` unless explicitly allowed.
 
 ### Git Operations
 
@@ -133,17 +132,15 @@ Tools for version control.
 
 | Tool | Description | Cost | Example Usage |
 |------|-------------|------|---------------|
-| `git` | Unified git operations | FREE | "Show git status" |
-| `commit_msg` | AI-generated commit messages | LOW | "Generate a commit message" |
+| `git` | Unified git operations (status, commit, log, diff, branch, commit_msg, conflicts) | FREE/LOW | "Show git status" |
 | `pr` | Create GitHub pull requests | LOW | "Create a PR for this branch" |
-| `conflicts` | Analyze merge conflicts | FREE | "Help me resolve these conflicts" |
 
 **Example: Git Workflow**
 ```
 User: Stage all changes and commit with a descriptive message
 
 Victor calls: git(operation="stage")
-Victor calls: commit_msg()  # Generates message from diff
+Victor calls: git(operation="commit_msg")  # Generates message from diff
 Victor calls: git(operation="commit", message="feat(auth): add OAuth2 support for SSO login")
 ```
 
@@ -414,7 +411,7 @@ For detailed custom tool development, see:
 ```
 1. Use git(operation="status") to see changes
 2. Use git(operation="diff") to review modifications
-3. Use commit_msg() to generate message
+3. Use git(operation="commit_msg") to generate message
 4. Use git(operation="commit") to commit
 ```
 
