@@ -557,6 +557,24 @@ class PromptBuilder:
                     for tool in task_hint.priority_tools:
                         self.add_tool_hint(tool, f"Prioritized for {task_type}", 0.2)
 
+                # Add execution guidance based on skip flags (arXiv:2604.01681)
+                execution_guidance = []
+                if hasattr(task_hint, "skip_planning") and task_hint.skip_planning:
+                    execution_guidance.append("Execute directly without extensive planning")
+                if hasattr(task_hint, "skip_evaluation") and task_hint.skip_evaluation:
+                    execution_guidance.append("No need to explicitly verify results")
+                if hasattr(task_hint, "token_budget") and task_hint.token_budget:
+                    execution_guidance.append(f"Keep response concise (target ~{task_hint.token_budget} tokens)")
+
+                if execution_guidance:
+                    guidance_text = "Execution constraints:\n- " + "\n- ".join(execution_guidance)
+                    self.add_section(
+                        name="task_execution_guidance",
+                        content=guidance_text,
+                        priority=self.PRIORITY_GUIDELINES + 5,  # Just after guidelines
+                        header="",
+                    )
+
         return self
 
     def merge(self, other: "PromptBuilder") -> Self:

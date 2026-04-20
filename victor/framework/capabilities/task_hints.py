@@ -68,6 +68,10 @@ class TaskTypeHint:
         tool_budget: Recommended tool budget for this task type
         priority_tools: Tools to prioritize for this task
         keywords: Keywords that suggest this task type
+        token_budget: Max tokens for response generation (NEW)
+        context_budget: Max context tokens to include (NEW)
+        skip_planning: Skip planning phase for direct execution (NEW)
+        skip_evaluation: Skip evaluation/verification steps (NEW)
     """
 
     task_type: str
@@ -77,6 +81,10 @@ class TaskTypeHint:
     tool_budget: int = 15
     priority_tools: List[str] = field(default_factory=list)
     keywords: List[str] = field(default_factory=list)
+    token_budget: Optional[int] = None  # NEW: Max response tokens
+    context_budget: Optional[int] = None  # NEW: Max context tokens
+    skip_planning: bool = False  # NEW: Skip planning phase
+    skip_evaluation: bool = False  # NEW: Skip LLM evaluation
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -88,6 +96,10 @@ class TaskTypeHint:
             "tool_budget": self.tool_budget,
             "priority_tools": self.priority_tools,
             "keywords": self.keywords,
+            "token_budget": self.token_budget,  # NEW
+            "context_budget": self.context_budget,  # NEW
+            "skip_planning": self.skip_planning,  # NEW
+            "skip_evaluation": self.skip_evaluation,  # NEW
         }
 
 

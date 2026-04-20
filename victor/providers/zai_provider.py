@@ -773,44 +773,13 @@ class ZAIProvider(BaseProvider):
 
         formatted_messages = fix_orphaned_tool_messages(formatted_messages)
 
-        # Validate message structure before sending
-        for i, msg in enumerate(formatted_messages):
-            role = msg.get("role", "")
-            has_tool_calls = "tool_calls" in msg
-            has_tool_call_id = "tool_call_id" in msg
-
-            # Assistant messages with tool_calls must be followed by tool responses
-            if role == "assistant" and has_tool_calls:
-                expected_ids = {tc["id"] for tc in msg["tool_calls"] if "id" in tc}
-                next_ids = set()
-                for j in range(i + 1, len(formatted_messages)):
-                    nxt = formatted_messages[j]
-                    if nxt.get("role") == "tool":
-                        nxt_id = nxt.get("tool_call_id")
-                        if nxt_id:
-                            next_ids.add(nxt_id)
-                    else:
-                        break
-                missing = expected_ids - next_ids
-                if missing:
-                    self._provider_logger.logger.warning(
-                        "Z.AI payload: assistant[%d] tool_calls missing responses: %s",
-                        i,
-                        missing,
-                    )
-                    # Strip the tool_calls to prevent API error
-                    del msg["tool_calls"]
-                    if msg.get("content") is None:
-                        msg["content"] = ""
-
-            # Tool messages must have tool_call_id
-            if role == "tool" and not has_tool_call_id:
-                self._provider_logger.logger.warning(
-                    "Z.AI payload: tool[%d] missing tool_call_id, converting to user",
-                    i,
-                )
-                msg["role"] = "user"
-                msg["content"] = f"[Tool result] {msg.get('content', '')}"
+        # NOTE: Validation block removed (was causing tool_calls to be stripped)
+        # The previous validation (lines 776-814) was incorrectly removing tool_calls
+        # from assistant messages when responses weren't yet in the conversation history.
+        # This is NORMAL for chat scenarios - the API expects tool_calls without responses,
+        # executes them, and returns responses which are then added to the conversation.
+        # The fix_orphaned_tool_messages() function above is sufficient to handle cases where
+        # context compaction removes old tool responses.
 
         # Validate messages before sending
         if not formatted_messages:

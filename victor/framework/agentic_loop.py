@@ -76,6 +76,7 @@ from victor.framework.evaluation_nodes import (
 )
 from victor.framework.fulfillment import FulfillmentDetector, TaskType
 from victor.framework.perception_integration import Perception, PerceptionIntegration
+from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,130 @@ if TYPE_CHECKING:
     from victor.storage.memory.unified import UnifiedMemoryCoordinator
     from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
     from victor.framework.agent import Agent
+
+
+class PlanningGate:
+    """Fast-Slow Planning Gate for skipping LLM planning on simple tasks.
+
+    Based on arXiv:2604.01681 - Fast-Slow Architecture for Agentic Systems.
+    Uses rule-based heuristics to determine if LLM planning is necessary or if
+    direct execution fast-path would suffice.
+
+    This reduces LLM calls by 30%+ for simple, straightforward tasks.
+    """
+
+    # Patterns that can be handled without LLM planning (fast-path)
+    FAST_PATTERNS = {
+        "create_simple": True,  # Just write the file
+        "action": True,  # Just execute the command
+        "search": True,  # Just run the search
+        "quick_question": True,  # Direct answer needed
+    }
+
+    def __init__(self, enabled: bool = True):
+        """Initialize the planning gate.
+
+        Args:
+            enabled: Whether the gate is enabled (for feature flagging)
+        """
+        self.enabled = enabled
+        self._fast_path_count = 0
+        self._total_decisions = 0
+
+    def should_use_llm_planning(
+        self,
+        task_type: str,
+        tool_budget: int,
+        query_complexity: Optional[float] = None,
+        query_length: int = 0,
+        context: Optional[Dict[str, Any]] = None,
+        skip_planning: bool = False,
+    ) -> bool:
+        """Determine if LLM planning is needed or if rule-based fast-path suffices.
+
+        Args:
+            task_type: Detected task type (e.g., "create_simple", "edit")
+            tool_budget: Number of tools allowed for this task
+            query_complexity: Optional complexity score (0-1, lower is simpler)
+            query_length: Length of query in characters
+            context: Optional execution context
+            skip_planning: Task type hint flag to skip planning
+
+        Returns:
+            False if task can proceed without LLM planning (fast-path)
+            True if LLM planning is recommended (slow-path)
+        """
+        self._total_decisions += 1
+
+        if not self.enabled:
+            return True  # Gate disabled, always use LLM planning
+
+        # Fast Pattern 0: Task type hint explicitly requests skip planning
+        if skip_planning:
+            logger.info(
+                f"[PlanningGate] Fast-path: task_type={task_type} "
+                f"skip_planning=True (from TaskTypeHint, skips LLM planning)"
+            )
+            self._fast_path_count += 1
+            return False  # Skip LLM planning
+
+        # Fast Pattern 1: Simple task types with low tool budget
+        if task_type in self.FAST_PATTERNS and tool_budget <= 3:
+            logger.info(
+                f"[PlanningGate] Fast-path: task_type={task_type}, "
+                f"tool_budget={tool_budget} (skips LLM planning)"
+            )
+            self._fast_path_count += 1
+            return False  # Skip LLM planning
+
+        # Fast Pattern 2: Low query complexity (if provided)
+        if query_complexity is not None and query_complexity < 0.3:
+            logger.info(
+                f"[PlanningGate] Fast-path: query_complexity={query_complexity:.2f} "
+                f"(skips LLM planning)"
+            )
+            self._fast_path_count += 1
+            return False  # Skip LLM planning
+
+        # Fast Pattern 3: Short, direct queries
+        if query_length > 0 and query_length < 50:
+            # Check for action keywords
+            query_lower = context.get("query", "").lower() if context else ""
+            action_keywords = [
+                "run ", "execute", "create ", "write ", "delete ",
+                "list ", "show ", "get ", "find ", "search ",
+            ]
+            if any(keyword in query_lower for keyword in action_keywords):
+                logger.info(
+                    f"[PlanningGate] Fast-path: short action query "
+                    f"(length={query_length}, skips LLM planning)"
+                )
+                self._fast_path_count += 1
+                return False  # Skip LLM planning
+
+        # Default: Use LLM planning (slow-path)
+        logger.debug(
+            f"[PlanningGate] Slow-path: task_type={task_type}, "
+            f"tool_budget={tool_budget} (uses LLM planning)"
+        )
+        return True
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get statistics about gate decisions.
+
+        Returns:
+            Dict with fast_path_count, total_decisions, fast_path_percentage
+        """
+        fast_path_pct = (
+            (self._fast_path_count / self._total_decisions * 100)
+            if self._total_decisions > 0
+            else 0.0
+        )
+        return {
+            "fast_path_count": self._fast_path_count,
+            "total_decisions": self._total_decisions,
+            "fast_path_percentage": fast_path_pct,
+        }
 
 
 class LoopStage(Enum):
@@ -278,6 +403,14 @@ class AgenticLoop:
 
         self.fulfillment = FulfillmentDetector() if enable_fulfillment_check else None
 
+        # Initialize planning gate for fast-slow architecture
+        self.planning_gate = PlanningGate(
+            enabled=self.config.get("enable_planning_gate", True)
+        )
+
+        # Initialize task hint provider for enhanced task type hints
+        self._task_hint_provider = TaskTypeHintCapabilityProvider()
+
         # Try to extract turn_executor from orchestrator if not provided
         if self.turn_executor is None and hasattr(orchestrator, "turn_executor"):
             self.turn_executor = orchestrator.turn_executor
@@ -318,12 +451,75 @@ class AgenticLoop:
 
         try:
             for i in range(1, effective_max + 1):
+                # FAST-SLOW PLANNING GATE (arXiv:2604.01681)
+                # Check if LLM planning is needed or if rule-based fast-path suffices
+                # This gate runs BEFORE PERCEIVE to potentially skip the planning stage
+                use_llm_planning = True
+                skip_reason = None
+
+                if i == 1:  # Only check on first iteration
+                    # Extract task information from perception or context
+                    # We need to perceive first to get task_type, but we can shortcut
+                    # For now, use heuristics from query and context
+                    task_type = context.get("task_type", "unknown") if context else "unknown"
+                    tool_budget = context.get("tool_budget", 10) if context else 10
+
+                    # Try to get query complexity from perception if available
+                    # Otherwise use simple heuristics
+                    query_complexity = None
+                    if hasattr(self, '_last_perception'):
+                        last_perc = self._last_perception
+                        query_complexity = getattr(last_perc, 'query_complexity', None)
+
+                    # Extract skip_planning flag from TaskTypeHint if available
+                    skip_planning = False
+                    task_hint = None
+                    if hasattr(self, '_task_hint_provider'):
+                        task_hint = self._task_hint_provider.get_hint(task_type)
+                        if task_hint and hasattr(task_hint, 'skip_planning'):
+                            skip_planning = task_hint.skip_planning
+
+                    # Check with planning gate
+                    use_llm_planning = self.planning_gate.should_use_llm_planning(
+                        task_type=task_type,
+                        tool_budget=tool_budget,
+                        query_complexity=query_complexity,
+                        query_length=len(query),
+                        context={**context, "query": query} if context else {"query": query},
+                        skip_planning=skip_planning,  # Pass TaskTypeHint skip flag
+                    )
+
+                    if not use_llm_planning:
+                        skip_reason = "fast_path"
+                        logger.info(
+                            f"[Iteration {i}/{effective_max}] FAST-PATH DETECTED: "
+                            f"Skipping LLM planning, proceeding directly to execution"
+                        )
+
                 iteration = LoopIteration(iteration=i, stage=LoopStage.PERCEIVE)
 
                 # PERCEIVE
                 logger.info(f"[Iteration {i}/{effective_max}] PERCEIVE")
                 perception = await self.perception.perceive(query, context, conversation_history)
                 iteration.perception = perception
+                self._last_perception = perception  # Cache for next iteration check
+
+                # Update task_type from perception for more accurate gating
+                state["perception"] = perception.to_dict()
+                if hasattr(perception, "task_analysis") and perception.task_analysis:
+                    state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
+
+                # Skip planning stage if in fast-path
+                if not use_llm_planning and skip_reason == "fast_path":
+                    logger.info(f"[Iteration {i}/{effective_max}] SKIP PLAN (fast-path)")
+                    iteration.plan = None  # No plan needed
+                    state["plan"] = None
+                else:
+                    # PLAN (use existing PlanningCoordinator if available)
+                    logger.info(f"[Iteration {i}/{effective_max}] PLAN")
+                    plan = await self._plan(perception, state)
+                    iteration.plan = plan
+                    state["plan"] = plan
                 state["perception"] = perception.to_dict()
 
                 # DETECT PHASE (for phase-aware context management)

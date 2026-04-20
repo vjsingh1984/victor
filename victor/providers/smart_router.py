@@ -1,0 +1,702 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Smart Routing Engine for Automatic Provider Selection.
+
+This module provides intelligent routing that automatically switches between
+providers based on health, resources, cost, latency, and performance history.
+
+Key components:
+- RoutingDecision: Dataclass for routing decisions with rationale
+- RoutingDecisionEngine: Multi-factor routing logic
+- SmartRoutingProvider: Provider wrapper that implements smart routing
+
+Usage:
+    from victor.providers.smart_router import SmartRoutingProvider
+    from victor.providers.routing_config import SmartRoutingConfig
+
+    # Create smart routing provider
+    config = SmartRoutingConfig(enabled=True, profile_name="balanced")
+    smart_provider = SmartRoutingProvider(
+        providers=[ollama, anthropic, openai],
+        config=config,
+    )
+
+    # Use like any other provider
+    response = await smart_provider.chat(messages, model=model)
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from victor.providers.base import BaseProvider, CompletionResponse, Message
+from victor.providers.health import ProviderHealthChecker
+from victor.providers.performance_tracker import ProviderPerformanceTracker, RequestMetric
+from victor.providers.resilience import ResilientProvider
+from victor.providers.resource_detector import ResourceAvailabilityDetector
+from victor.providers.routing_config import SmartRoutingConfig, load_routing_profiles
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RoutingDecision:
+    """Routing decision with rationale.
+
+    Attributes:
+        selected_provider: Chosen provider name
+        fallback_chain: Ordered list of fallback providers
+        rationale: Human-readable explanation
+        confidence: Confidence score (0.0 to 1.0)
+        factors: Dict of factors considered and their weights
+    """
+
+    selected_provider: str
+    fallback_chain: List[str]
+    rationale: str
+    confidence: float
+    factors: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for logging."""
+        return {
+            "selected_provider": self.selected_provider,
+            "fallback_chain": self.fallback_chain,
+            "rationale": self.rationale,
+            "confidence": self.confidence,
+            "factors": self.factors,
+        }
+
+
+class RoutingDecisionEngine:
+    """Makes intelligent routing decisions based on multiple factors.
+
+    Factors considered (in order of priority):
+    1. Provider health (circuit breaker state, recent errors)
+    2. Resource availability (GPU, API quota)
+    3. Cost preference (local free vs cloud paid)
+    4. Latency preference (local slow vs cloud fast)
+    5. Performance history (success rate, latency trends)
+    """
+
+    def __init__(
+        self,
+        config: SmartRoutingConfig,
+        performance_tracker: ProviderPerformanceTracker,
+        resource_detector: ResourceAvailabilityDetector,
+        health_checker: ProviderHealthChecker,
+        available_providers: List[str],
+    ):
+        """Initialize routing decision engine.
+
+        Args:
+            config: Smart routing configuration
+            performance_tracker: Performance tracking instance
+            resource_detector: Resource detection instance
+            health_checker: Health checking instance
+            available_providers: List of available provider names
+        """
+        self.config = config
+        self.tracker = performance_tracker
+        self.detector = resource_detector
+        self.checker = health_checker
+        self.available_providers = available_providers
+
+        # Load routing profile
+        self.profile = load_routing_profiles().get(config.profile_name)
+        if not self.profile:
+            logger.warning(f"Profile '{config.profile_name}' not found, using 'balanced'")
+            self.profile = load_routing_profiles().get("balanced")
+
+        logger.debug(
+            f"RoutingDecisionEngine initialized with {len(available_providers)} providers, "
+            f"profile='{config.profile_name}'"
+        )
+
+    async def decide(
+        self,
+        task_type: str = "default",
+        model_hint: Optional[str] = None,
+        preferred_providers: Optional[List[str]] = None,
+    ) -> RoutingDecision:
+        """Make routing decision based on multiple factors.
+
+        Args:
+            task_type: Type of task (default, coding, chat, etc.)
+            model_hint: Suggested model (can influence provider choice)
+            preferred_providers: User-suggested providers (respected if provided)
+
+        Returns:
+            RoutingDecision with selected provider and fallback chain
+        """
+        # Get candidate providers
+        candidates = await self._get_candidates(
+            task_type=task_type,
+            preferred_providers=preferred_providers,
+        )
+
+        if not candidates:
+            # No candidates available
+            logger.error("No providers available for routing")
+            return RoutingDecision(
+                selected_provider="",
+                fallback_chain=[],
+                rationale="No providers available",
+                confidence=0.0,
+                factors={"error": "no_candidates"},
+            )
+
+        # Score each provider
+        scored_providers = []
+        for provider in candidates:
+            score, factors = await self._score_provider(
+                provider=provider,
+                task_type=task_type,
+            )
+            scored_providers.append((provider, score, factors))
+
+        # Sort by score (descending)
+        scored_providers.sort(key=lambda x: x[1], reverse=True)
+
+        # Select best provider
+        selected_provider, selected_score, selected_factors = scored_providers[0]
+
+        # Build fallback chain (remaining providers in score order)
+        fallback_chain = [p for p, _, _ in scored_providers[1:]]
+
+        # Generate rationale
+        rationale = self._generate_rationale(
+            selected_provider=selected_provider,
+            score=selected_score,
+            factors=selected_factors,
+        )
+
+        decision = RoutingDecision(
+            selected_provider=selected_provider,
+            fallback_chain=fallback_chain,
+            rationale=rationale,
+            confidence=selected_score,
+            factors=selected_factors,
+        )
+
+        logger.info(
+            f"Routing decision: {decision.selected_provider} "
+            f"(confidence={decision.confidence:.2f}, "
+            f"fallbacks={len(decision.fallback_chain)})"
+        )
+
+        return decision
+
+    def _generate_rationale(
+        self,
+        selected_provider: str,
+        score: float,
+        factors: Dict[str, float],
+    ) -> str:
+        """Generate human-readable rationale for routing decision.
+
+        Args:
+            selected_provider: Chosen provider
+            score: Confidence score
+            factors: Factor scores
+
+        Returns:
+            Rationale string
+        """
+        # Find highest-weighted factor
+        max_factor = max(factors.items(), key=lambda x: x[1])
+
+        rationale = f"Selected {selected_provider} (confidence={score:.2f})"
+
+        if max_factor[1] >= 0.8:
+            rationale += f" based on {max_factor[0]} ({max_factor[1]:.2f})"
+
+        return rationale
+
+    async def _get_candidates(
+        self,
+        task_type: str,
+        preferred_providers: Optional[List[str]],
+    ) -> List[str]:
+        """Get list of candidate providers for routing.
+
+        Args:
+            task_type: Type of task
+            preferred_providers: User-suggested providers
+
+        Returns:
+            List of provider names
+        """
+        # If user specified providers, use those
+        if preferred_providers:
+            candidates = [p.lower() for p in preferred_providers if p.lower() in self.available_providers]
+            if candidates:
+                logger.debug(f"Using user-specified providers: {candidates}")
+                return candidates
+
+        # Get fallback chain from profile
+        fallback_chain = self.profile.get_fallback_chain(task_type)
+
+        # Filter to available providers
+        candidates = [p for p in fallback_chain if p in self.available_providers]
+
+        logger.debug(f"Found {len(candidates)} candidates for task_type={task_type}")
+        return candidates
+
+    async def _score_provider(
+        self,
+        provider: str,
+        task_type: str,
+    ) -> tuple[float, Dict[str, Any]]:
+        """Score a provider based on multiple factors.
+
+        Args:
+            provider: Provider name
+            task_type: Type of task
+
+        Returns:
+            Tuple of (score, factors_dict)
+        """
+        factors = {}
+        total_score = 0.0
+        weight_sum = 0.0
+
+        # Factor 1: Provider health (weight: 0.3)
+        health_score = await self._score_health(provider)
+        factors["health"] = health_score
+        total_score += 0.3 * health_score
+        weight_sum += 0.3
+
+        # Factor 2: Resource availability (weight: 0.25)
+        resource_score = await self._score_resources(provider)
+        factors["resources"] = resource_score
+        total_score += 0.25 * resource_score
+        weight_sum += 0.25
+
+        # Factor 3: Cost preference (weight: 0.15)
+        cost_score = await self._score_cost(provider)
+        factors["cost"] = cost_score
+        total_score += 0.15 * cost_score
+        weight_sum += 0.15
+
+        # Factor 4: Latency preference (weight: 0.15)
+        latency_score = await self._score_latency(provider)
+        factors["latency"] = latency_score
+        total_score += 0.15 * latency_score
+        weight_sum += 0.15
+
+        # Factor 5: Performance history (weight: 0.15)
+        perf_score = await self._score_performance(provider)
+        factors["performance"] = perf_score
+        total_score += 0.15 * perf_score
+        weight_sum += 0.15
+
+        # Normalize score
+        if weight_sum > 0:
+            normalized_score = total_score / weight_sum
+        else:
+            normalized_score = 0.0
+
+        return normalized_score, factors
+
+    async def _score_health(self, provider: str) -> float:
+        """Score provider health (0.0 to 1.0).
+
+        Checks:
+        - Provider registration
+        - API key availability
+        - Circuit breaker state
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            Health score
+        """
+        # Check health cache
+        health_result = self.checker.get_provider_health(provider)
+
+        if not health_result:
+            # No health info, run quick check
+            try:
+                health_result = await self.checker.check_provider(
+                    provider=provider,
+                    model="test",
+                    check_connectivity=False,
+                )
+            except Exception as e:
+                logger.debug(f"Health check failed for {provider}: {e}")
+                return 0.3  # Low score for unknown providers
+
+        if health_result.healthy:
+            return 1.0
+        else:
+            # Check if issues are critical
+            critical_issues = ["api_key", "authentication", "auth"]
+            if any(issue in str(health_result.issues).lower() for issue in critical_issues):
+                return 0.0  # Critical failure
+            else:
+                return 0.3  # Non-critical issues
+
+    async def _score_resources(self, provider: str) -> float:
+        """Score resource availability (0.0 to 1.0).
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            Resource score
+        """
+        # Check GPU availability for local providers
+        local_providers = {"ollama", "lmstudio", "vllm"}
+        if provider in local_providers:
+            gpu = await self.detector.check_gpu_availability()
+            if gpu.available:
+                return 1.0
+            else:
+                return 0.0  # Local provider needs GPU
+
+        # Cloud providers don't have resource constraints
+        return 1.0
+
+    async def _score_cost(self, provider: str) -> float:
+        """Score cost preference alignment (0.0 to 1.0).
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            Cost score
+        """
+        # Local providers are free
+        local_providers = {"ollama", "lmstudio", "vllm"}
+        if provider in local_providers:
+            if self.profile.cost_preference == "low":
+                return 1.0  # Perfect match
+            elif self.profile.cost_preference == "normal":
+                return 0.7  # Good match
+            else:  # high
+                return 0.3  # Poor match
+
+        # Cloud providers have costs
+        # (Simplified - in reality, would check actual pricing)
+        if self.profile.cost_preference == "low":
+            return 0.3  # Poor match
+        elif self.profile.cost_preference == "normal":
+            return 0.7  # Good match
+        else:  # high
+            return 1.0  # Perfect match
+
+    async def _score_latency(self, provider: str) -> float:
+        """Score latency preference alignment (0.0 to 1.0).
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            Latency score
+        """
+        # Local providers are slower
+        local_providers = {"ollama", "lmstudio", "vllm"}
+        if provider in local_providers:
+            if self.profile.latency_preference == "low":
+                return 0.3  # Poor match (local is slow)
+            elif self.profile.latency_preference == "normal":
+                return 0.7  # Good match
+            else:  # high
+                return 1.0  # Perfect match (accuracy over speed)
+
+        # Cloud providers are faster
+        if self.profile.latency_preference == "low":
+            return 1.0  # Perfect match
+        elif self.profile.latency_preference == "normal":
+            return 0.7  # Good match
+        else:  # high
+            return 0.5  # Neutral
+
+    async def _score_performance(self, provider: str) -> float:
+        """Score based on performance history (0.0 to 1.0).
+
+        Args:
+            provider: Provider name
+
+        Returns:
+            Performance score
+        """
+        if not self.config.learning_enabled:
+            return 0.5  # Neutral if learning disabled
+
+        # Get composite score from tracker
+        score = self.tracker.get_provider_score(provider)
+        return score
+
+
+class SmartRoutingProvider:
+    """Provider wrapper that implements smart routing.
+
+    Wraps multiple providers and intelligently routes requests based on:
+    - Health status
+    - Resource availability
+    - Cost and latency preferences
+    - Historical performance
+
+    Delegates actual execution to ResilientProvider for retry and circuit breaking.
+
+    Usage:
+        smart_provider = SmartRoutingProvider(
+            providers=[ollama_provider, anthropic_provider],
+            config=SmartRoutingConfig(enabled=True),
+        )
+
+        response = await smart_provider.chat(messages, model=model)
+    """
+
+    def __init__(
+        self,
+        providers: List[BaseProvider],
+        config: SmartRoutingConfig,
+    ):
+        """Initialize smart routing provider.
+
+        Args:
+            providers: List of available provider instances
+            config: Smart routing configuration
+        """
+        self.providers = {p.name: p for p in providers}
+        self.config = config
+
+        # Create supporting components
+        self.tracker = ProviderPerformanceTracker(
+            window_size=config.performance_window_size
+        )
+        self.detector = ResourceAvailabilityDetector()
+        self.checker = ProviderHealthChecker()
+
+        # Create resilient providers for each base provider
+        self.resilient_providers: Dict[str, ResilientProvider] = {}
+        for name, provider in self.providers.items():
+            self.resilient_providers[name] = ResilientProvider(
+                provider=provider,
+                request_timeout=120.0,
+            )
+
+        # Create routing engine
+        self.engine = RoutingDecisionEngine(
+            config=config,
+            performance_tracker=self.tracker,
+            resource_detector=self.detector,
+            health_checker=self.checker,
+            available_providers=list(self.providers.keys()),
+        )
+
+        logger.info(
+            f"SmartRoutingProvider initialized with {len(providers)} providers, "
+            f"profile='{config.profile_name}'"
+        )
+
+    @property
+    def name(self) -> str:
+        """Provider name."""
+        return "smart-router"
+
+    def supports_tools(self) -> bool:
+        """Check if any provider supports tools."""
+        return any(
+            getattr(p, "supports_tools", lambda: False)()
+            for p in self.providers.values()
+        )
+
+    def supports_streaming(self) -> bool:
+        """Check if any provider supports streaming."""
+        return any(
+            getattr(p, "supports_streaming", lambda: False)()
+            for p in self.providers.values()
+        )
+
+    async def chat(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        task_type: str = "default",
+        **kwargs,
+    ) -> CompletionResponse:
+        """Execute chat with smart routing.
+
+        Args:
+            messages: List of messages
+            model: Model identifier
+            task_type: Type of task (influences routing)
+            **kwargs: Additional arguments for provider
+
+        Returns:
+            Chat response
+
+        Raises:
+            Exception: If all providers fail
+        """
+        # Make routing decision
+        decision = await self.engine.decide(
+            task_type=task_type,
+            model_hint=model,
+            preferred_providers=None,  # Could be added as parameter
+        )
+
+        if not decision.selected_provider:
+            raise Exception("No providers available for routing")
+
+        # Get primary provider
+        primary_provider = self.resilient_providers.get(decision.selected_provider)
+        if not primary_provider:
+            raise Exception(f"Provider '{decision.selected_provider}' not found")
+
+        # Build fallback chain
+        fallback_providers = [
+            self.resilient_providers[name]
+            for name in decision.fallback_chain
+            if name in self.resilient_providers
+        ]
+
+        # Update primary provider's fallbacks
+        primary_provider.fallback_providers = [fb.provider for fb in fallback_providers]
+
+        # Execute with metrics tracking
+        start_time = time.time()
+        try:
+            response = await primary_provider.chat(messages, model=model, **kwargs)
+            latency_ms = (time.time() - start_time) * 1000
+
+            # Record successful metric
+            self.tracker.record_request(
+                RequestMetric(
+                    provider=decision.selected_provider,
+                    model=model,
+                    success=True,
+                    latency_ms=latency_ms,
+                    timestamp=datetime.now(),
+                )
+            )
+
+            logger.info(
+                f"Smart routing success: {decision.selected_provider} "
+                f"({latency_ms:.0f}ms, rationale: {decision.rationale})"
+            )
+
+            return response
+
+        except Exception as e:
+            latency_ms = (time.time() - start_time) * 1000
+
+            # Record failed metric
+            self.tracker.record_request(
+                RequestMetric(
+                    provider=decision.selected_provider,
+                    model=model,
+                    success=False,
+                    latency_ms=latency_ms,
+                    timestamp=datetime.now(),
+                    error_type=type(e).__name__,
+                )
+            )
+
+            logger.warning(
+                f"Smart routing failed: {decision.selected_provider} "
+                f"({latency_ms:.0f}ms, error: {e})"
+            )
+
+            raise
+
+    async def stream(
+        self,
+        messages: List[Message],
+        *,
+        model: str,
+        task_type: str = "default",
+        **kwargs,
+    ):
+        """Stream chat with smart routing.
+
+        Note: Streaming has limited retry capability.
+
+        Args:
+            messages: List of messages
+            model: Model identifier
+            task_type: Type of task
+            **kwargs: Additional arguments
+
+        Yields:
+            Stream chunks
+        """
+        # Make routing decision
+        decision = await self.engine.decide(
+            task_type=task_type,
+            model_hint=model,
+        )
+
+        if not decision.selected_provider:
+            raise Exception("No providers available for routing")
+
+        # Get primary provider
+        primary_provider = self.resilient_providers.get(decision.selected_provider)
+        if not primary_provider:
+            raise Exception(f"Provider '{decision.selected_provider}' not found")
+
+        # Stream with metrics tracking
+        start_time = time.time()
+        success = False
+        chunks_received = 0
+
+        try:
+            async for chunk in primary_provider.stream(messages, model=model, **kwargs):
+                chunks_received += 1
+                yield chunk
+
+            success = True
+
+        finally:
+            latency_ms = (time.time() - start_time) * 1000
+
+            # Record metric
+            self.tracker.record_request(
+                RequestMetric(
+                    provider=decision.selected_provider,
+                    model=model,
+                    success=success,
+                    latency_ms=latency_ms,
+                    timestamp=datetime.now(),
+                    error_type=None if success else "StreamingError",
+                )
+            )
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get routing statistics.
+
+        Returns:
+            Dict with routing stats
+        """
+        return {
+            "config": {
+                "profile": self.config.profile_name,
+                "learning_enabled": self.config.learning_enabled,
+                "window_size": self.config.performance_window_size,
+            },
+            "providers": list(self.providers.keys()),
+            "performance": self.tracker.get_stats(),
+        }

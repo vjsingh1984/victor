@@ -202,7 +202,7 @@ class TestResourceAvailabilityDetector:
     def test_clear_cache(self, detector):
         """Test clearing GPU cache."""
         # Populate cache
-        detector._gpu_cache = GPUAvailable(available=True)
+        detector._gpu_cache = GPUAvailability(available=True)
         detector._gpu_cache_time = datetime.now()
 
         detector.clear_cache()
@@ -214,7 +214,7 @@ class TestResourceAvailabilityDetector:
     async def test_cache_invalidation(self, detector):
         """Test that cache expires after TTL."""
         # Set cache time to past
-        detector._gpu_cache = GPUAvailable(available=True)
+        detector._gpu_cache = GPUAvailability(available=True)
         detector._gpu_cache_time = datetime.now()
 
         # Modify TTL to 0 for testing
@@ -230,7 +230,7 @@ class TestResourceAvailabilityDetector:
         # Just verify it doesn't crash
         gpu = await detector._check_nvidia_gpu()
 
-        assert isinstance(gpu, GPUAvailable)
+        assert isinstance(gpu, GPUAvailability)
 
     @pytest.mark.asyncio
     async def test_check_apple_gpu(self, detector):
@@ -239,7 +239,7 @@ class TestResourceAvailabilityDetector:
         # Just verify it doesn't crash
         gpu = await detector._check_apple_gpu()
 
-        assert isinstance(gpu, GPUAvailable)
+        assert isinstance(gpu, GPUAvailability)
 
     @pytest.mark.asyncio
     async def test_check_amd_gpu(self, detector):
@@ -248,7 +248,7 @@ class TestResourceAvailabilityDetector:
         # Just verify it doesn't crash
         gpu = await detector._check_amd_gpu()
 
-        assert isinstance(gpu, GPUAvailable)
+        assert isinstance(gpu, GPUAvailability)
 
 
     def test_is_provider_available_local_without_gpu(self, detector):

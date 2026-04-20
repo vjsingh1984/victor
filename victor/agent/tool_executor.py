@@ -877,6 +877,35 @@ class ToolExecutor:
                     f"Use offset={truncation_info.lines_returned} to read remaining content.]"
                 )
 
+        # Apply task-aware output pruning for token reduction (arXiv:2604.04979)
+        # This reduces tokens by 40-60% while preserving essential information
+        if success and isinstance(result, str):
+            from victor.tools.output_pruner import get_output_pruner
+
+            task_type = context.get("task_type", "unknown") if context else "unknown"
+            pruner = get_output_pruner()
+
+            pruned_result, pruning_info = pruner.prune(
+                tool_output=result,
+                task_type=task_type,
+                tool_name=tool_name,
+                context=context,
+            )
+
+            if pruning_info.was_pruned:
+                logger.info(
+                    "Tool %s output pruned: %s",
+                    tool_name,
+                    pruning_info,
+                )
+                result = pruned_result
+
+                # Merge truncation and pruning info for observability
+                if truncation_info:
+                    truncation_info.pruning_info = pruning_info
+                else:
+                    truncation_info = pruning_info
+
         exec_result = ToolExecutionResult(
             tool_name=tool_name,
             success=success,
