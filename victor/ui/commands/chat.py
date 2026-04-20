@@ -1396,6 +1396,7 @@ def _create_cli_prompt_session():
     """
     from prompt_toolkit import PromptSession
     from prompt_toolkit.history import FileHistory, InMemoryHistory
+    from prompt_toolkit.key_binding import KeyBindings
 
     # Use a persistent history file in ~/.victor/
     try:
@@ -1434,7 +1435,10 @@ def _create_cli_prompt_session():
     except Exception:
         history = InMemoryHistory()
 
-    return PromptSession(history=history)
+    # Create key bindings for the session
+    key_bindings = KeyBindings()
+
+    return PromptSession(history=history, key_bindings=key_bindings)
 
 
 async def _run_cli_repl(
