@@ -161,8 +161,13 @@ class ToolCall:
     raw: Optional[Any] = None  # Raw provider-specific data
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary format."""
-        result = {"name": self.name, "arguments": self.arguments}
+        """Convert to dictionary format with sanitization."""
+        from victor.agent.argument_sanitizer import sanitize_arguments_for_serialization
+
+        result = {
+            "name": self.name,
+            "arguments": sanitize_arguments_for_serialization(self.arguments)
+        }
         if self.id:
             result["id"] = self.id
         return result

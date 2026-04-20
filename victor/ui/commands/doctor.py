@@ -59,8 +59,9 @@ class DiagnosticCheck:
 class DoctorChecks:
     """Diagnostic checks for Victor."""
 
-    def __init__(self, verbose: bool = False):
+    def __init__(self, verbose: bool = False, fix: bool = False):
         self.verbose = verbose
+        self.fix = fix
         self.checks: List[DiagnosticCheck] = []
 
     def add_check(
@@ -360,6 +361,58 @@ class DoctorChecks:
 
         return self.checks
 
+    def fix_issues(self) -> List[str]:
+        """Attempt to automatically fix common issues.
+
+        Returns:
+            List of fix descriptions that were applied
+        """
+        fixes_applied = []
+
+        for check in self.checks:
+            if check.severity == Severity.SUCCESS or check.severity == Severity.INFO:
+                continue
+
+            # Attempt fixes for specific checks
+            if check.name == "config_directory" and "not found" in check.message.lower():
+                # Create config directory if it doesn't exist
+                try:
+                    from pathlib import Path
+
+                    config_dir = Path.home() / ".victor"
+                    config_dir.mkdir(exist_ok=True)
+                    (config_dir / "config.yaml").write_text("# Victor configuration\n")
+                    fixes_applied.append(f"Created config directory: {config_dir}")
+                except Exception as e:
+                    self.checks.append(
+                        DiagnosticCheck(
+                            name="config_directory_fix",
+                            severity=Severity.ERROR,
+                            message=f"Failed to create config directory: {e}",
+                            suggestion="Create directory manually: mkdir -p ~/.victor",
+                            passed=False,
+                        )
+                    )
+
+            elif check.name == "performance_settings" and "disabled" in check.message.lower():
+                # Enable performance settings
+                try:
+                    import subprocess
+
+                    result = subprocess.run(
+                        ["victor", "config", "set", "cache_optimization", "true"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if result.returncode == 0:
+                        fixes_applied.append("Enabled cache optimization")
+                except Exception:
+                    # Silently skip if config set command doesn't work
+                    pass
+
+        return fixes_applied
+
     def print_results(self) -> int:
         """Print diagnostic results to console.
 
@@ -417,7 +470,7 @@ class DoctorChecks:
             console.print("\n[green]✓ Your system is ready to use Victor![/]")
             return 0
         elif errors > 0:
-            console.print("\n[red]✗ Found {errors} error(s) that should be fixed[/]")
+            console.print(f"\n[red]✗ Found {errors} error(s) that should be fixed[/]")
             console.print(
                 "[yellow]Run 'victor config validate' for detailed configuration validation[/]"
             )
@@ -441,10 +494,34 @@ def run_doctor(verbose: bool = False, fix: bool = False) -> int:
     Returns:
         Exit code (0 for success, 1 for errors)
     """
-    doctor = DoctorChecks(verbose=verbose)
+    from rich.console import Console
+
+    console = Console()
+
+    doctor = DoctorChecks(verbose=verbose, fix=fix)
 
     try:
+        # Run initial checks
         doctor.run_all_checks()
+
+        # Attempt fixes if requested
+        if fix:
+            console.print("\n[yellow]🔧 Attempting to fix issues...[/]\n")
+            fixes_applied = doctor.fix_issues()
+
+            if fixes_applied:
+                console.print(f"[green]✓ Applied {len(fixes_applied)} fix(es):[/]")
+                for fix_desc in fixes_applied:
+                    console.print(f"  • {fix_desc}")
+                console.print("")
+
+                # Re-run checks to verify fixes
+                console.print("[cyan]Re-running diagnostics to verify fixes...[/]\n")
+                doctor.checks.clear()  # Clear previous checks
+                doctor.run_all_checks()
+            else:
+                console.print("[yellow]⚠ No auto-fixes available for detected issues[/]\n")
+
         return doctor.print_results()
     except Exception as e:
         print(f"[red]✗ Doctor command failed:[/] {e}")

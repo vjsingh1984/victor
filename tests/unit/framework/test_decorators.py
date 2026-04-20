@@ -31,7 +31,7 @@ class TestAgentDecorator:
         @agent(provider="anthropic")
         async def my_agent(prompt: str) -> str:
             """You are a helpful assistant."""
-            ...
+            pass  # Framework handles implementation
 
         assert isinstance(my_agent, AgentCallable)
 
@@ -41,7 +41,7 @@ class TestAgentDecorator:
         @agent(provider="anthropic")
         async def code_reviewer(prompt: str) -> str:
             """Review code."""
-            ...
+            pass  # Framework handles implementation
 
         assert code_reviewer.__name__ == "code_reviewer"
 
@@ -51,7 +51,7 @@ class TestAgentDecorator:
         @agent(provider="anthropic")
         async def helper(prompt: str) -> str:
             """You are an expert code reviewer."""
-            ...
+            pass  # Framework handles implementation
 
         assert helper._system_prompt == "You are an expert code reviewer."
 
@@ -61,7 +61,7 @@ class TestAgentDecorator:
         @agent(provider="anthropic", system_prompt="Custom prompt")
         async def helper(prompt: str) -> str:
             """Ignored docstring."""
-            ...
+            pass  # Framework handles implementation
 
         assert helper._system_prompt == "Custom prompt"
 
@@ -69,7 +69,8 @@ class TestAgentDecorator:
         """No docstring → _system_prompt is None."""
 
         @agent(provider="openai")
-        async def bare(prompt: str) -> str: ...
+        async def bare(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         assert bare._system_prompt is None
 
@@ -77,7 +78,8 @@ class TestAgentDecorator:
         """Provider argument is stored on AgentCallable."""
 
         @agent(provider="ollama", model="llama3")
-        async def local_agent(prompt: str) -> str: ...
+        async def local_agent(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         assert local_agent._provider == "ollama"
         assert local_agent._model == "llama3"
@@ -86,7 +88,8 @@ class TestAgentDecorator:
         """tools argument is stored."""
 
         @agent(provider="anthropic", tools=["filesystem", "git"])
-        async def fs_agent(prompt: str) -> str: ...
+        async def fs_agent(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         assert fs_agent._tools == ["filesystem", "git"]
 
@@ -94,7 +97,8 @@ class TestAgentDecorator:
         """Underlying agent is lazy — None until first __call__."""
 
         @agent(provider="anthropic")
-        async def lazy(prompt: str) -> str: ...
+        async def lazy(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         assert lazy.agent is None
 
@@ -102,7 +106,8 @@ class TestAgentDecorator:
         """reset() sets _agent back to None."""
 
         @agent(provider="anthropic")
-        async def resettable(prompt: str) -> str: ...
+        async def resettable(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         resettable._agent = MagicMock()  # Simulate a created agent
         resettable.reset()
@@ -112,7 +117,8 @@ class TestAgentDecorator:
         """repr shows provider and function name."""
 
         @agent(provider="anthropic")
-        async def my_agent(prompt: str) -> str: ...
+        async def my_agent(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         r = repr(my_agent)
         assert "my_agent" in r
@@ -130,7 +136,7 @@ class TestAgentDecorator:
         @agent(provider="anthropic")
         async def my_agent(prompt: str) -> str:
             """System prompt here."""
-            ...
+            pass  # Framework handles implementation
 
         with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
             result = await my_agent("do something")
@@ -146,7 +152,8 @@ class TestAgentDecorator:
         mock_agent.get_orchestrator.return_value = MagicMock()
 
         @agent(provider="anthropic")
-        async def cached(prompt: str) -> str: ...
+        async def cached(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         with patch(
             "victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)
@@ -165,7 +172,8 @@ class TestAgentDecorator:
         mock_agent.get_orchestrator.return_value = MagicMock()
 
         @agent(provider="anthropic")
-        async def ctx_agent(prompt: str) -> str: ...
+        async def ctx_agent(prompt: str) -> str:
+            pass  # Framework handles implementation
 
         ctx = {"file": "auth.py"}
         with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
@@ -183,7 +191,7 @@ class TestAgentDecorator:
         @agent(provider="anthropic")
         async def doc_agent(prompt: str) -> str:
             """You are a documentation writer."""
-            ...
+            pass  # Framework handles implementation
 
         with patch("victor.framework.agent.Agent.create", new=AsyncMock(return_value=mock_agent)):
             await doc_agent("write docs")
@@ -210,7 +218,9 @@ class TestTaskDecorator:
         """@task wraps a function in TaskDefinition."""
 
         @task(description="Generate tests", expected_output="pytest file")
-        async def gen_tests(agent, path: str): ...
+async def gen_tests(agent, path: str):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         assert isinstance(gen_tests, TaskDefinition)
 
@@ -218,7 +228,9 @@ class TestTaskDecorator:
         """description is stored as attribute."""
 
         @task(description="Write docs", expected_output="Markdown file")
-        async def write_docs(agent, module: str): ...
+async def write_docs(agent, module: str):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         assert write_docs.description == "Write docs"
 
@@ -226,7 +238,9 @@ class TestTaskDecorator:
         """expected_output is stored as attribute."""
 
         @task(description="Analyse", expected_output="JSON report")
-        async def analyse(agent, src: str): ...
+async def analyse(agent, src: str):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         assert analyse.expected_output == "JSON report"
 
@@ -234,7 +248,9 @@ class TestTaskDecorator:
         """tools defaults to empty list when not provided."""
 
         @task(description="Simple task")
-        async def simple(agent): ...
+async def simple(agent):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         assert simple.tools == []
 
@@ -242,7 +258,9 @@ class TestTaskDecorator:
         """tools list is stored on TaskDefinition."""
 
         @task(description="FS task", tools=["filesystem", "git"])
-        async def fs_task(agent): ...
+async def fs_task(agent):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         assert fs_task.tools == ["filesystem", "git"]
 
@@ -250,7 +268,9 @@ class TestTaskDecorator:
         """__name__ matches the decorated function."""
 
         @task(description="Named task")
-        async def named_fn(agent): ...
+async def named_fn(agent):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         assert named_fn.__name__ == "named_fn"
 
@@ -271,7 +291,9 @@ class TestTaskDecorator:
         """async_execution flag is stored."""
 
         @task(description="Concurrent task", async_execution=True)
-        async def concurrent(agent): ...
+async def concurrent(agent):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         assert concurrent.async_execution is True
 
@@ -286,7 +308,9 @@ class TestTaskDecorator:
         """repr shows function name and description."""
 
         @task(description="My important task")
-        async def my_task(agent): ...
+async def my_task(agent):
+            pass  # Framework handles implementation
+            pass  # Framework handles implementation
 
         r = repr(my_task)
         assert "my_task" in r

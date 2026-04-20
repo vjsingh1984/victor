@@ -1133,7 +1133,7 @@ TEXT_EXTENSIONS = {
         "what does",
     ],  # Force inclusion
     priority_hints=[
-        "TRUNCATION: 1500 lines/64KB. Always ends on complete lines.",
+        "TRUNCATION: 10000 lines/64KB. Always ends on complete lines.",
         "PAGINATION: When truncated, output includes 'Use offset=N to continue' - use that exact offset value.",
         "Use for TEXT and CODE files only (.py, .js, .json, .yaml, .md, etc.)",
         "NOT for binary files (.pdf, .docx, .db, .pyc, images, archives)",
@@ -1154,8 +1154,11 @@ async def read(
 ) -> str:
     """Read text/code file. Binary files rejected.
 
+    Use this tool for READING FILE CONTENTS.
+    For listing directory contents, use ls(path='directory/') instead.
+
     TRUNCATION LIMITS:
-    - Maximum 1500 lines OR 64KB (whichever is reached first)
+    - Maximum 10000 lines OR 64KB (whichever is reached first)
     - Always truncates at complete line boundaries (never mid-line)
     - When truncated, includes: "[... N more lines. Use offset=X to continue ...]"
 
@@ -1165,7 +1168,7 @@ async def read(
     - Use search param to find specific content without reading entire file
 
     Args:
-        path: File path
+        path: File path (MUST be a file, NOT a directory)
         offset: Start line (0=beginning). Use for pagination of large files.
         limit: Max lines to read (0=auto, applies configured limits).
                Set explicit limit to override auto-truncation.
@@ -1178,6 +1181,8 @@ async def read(
     Returns:
         File content with line numbers. If truncated, includes continuation hint
         with exact offset to use for next read.
+
+    Note: If you need to list files in a directory, use ls(path='directory/') instead.
     """
     # Handle parameter aliases from models that use different names
     if line_start is not None and offset == 0:
@@ -1566,7 +1571,7 @@ async def read(
 
             # Check for airgapped mode or local providers
             if settings.security.airgapped_mode:
-                return 1500, 65536  # ~2000 lines, 32KB for local models (airgapped)
+                return 10000, 65536  # ~10000 lines, 64KB for local models (airgapped)
 
             # Check provider name for local indicators
             provider_obj = getattr(settings, "provider", None)
@@ -1592,24 +1597,34 @@ async def read(
                         max_tokens = context_window // 4  # Use 25% of context for file reads
                         # Estimate ~3 bytes per token (average), ~40 chars per line
                         max_lines = min(
-                            1500, max(100, max_tokens // 3)
+                            10000, max(100, max_tokens // 3)
                         )  # Ensure at least 100 lines
                         max_bytes = min(65536, max_tokens * 3)  # ~3 bytes per token average
                         return max_lines, max_bytes
                 except Exception as e:
                     logger.debug("Failed to compute context-aware truncation limits: %s", e)
-                return 1500, 65536  # Fallback for local models: 1500, 64KB
+                return 10000, 65536  # Fallback for local models: 10000 lines, 64KB
 
             # Cloud models get higher limits (large context windows)
             # Anthropic: 200K tokens, GPT-4: 128K tokens
             # 100KB ≈ 25K tokens at 4 bytes/token, reasonable for large context
-            return 1500, 65536  # ~2500 lines, 100KB for cloud models
+            return 10000, 65536  # ~10000 lines, 64KB for cloud models
         except Exception as e:
             # Default to cloud limits if settings unavailable
             logger.debug("Settings unavailable for truncation limits, using defaults: %s", e)
-            return 1500, 65536  # ~1500 lines, 64KB
+            return 10000, 65536  # ~10000 lines, 64KB
 
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
+
+    # Check file size and adapt limit if needed for large files
+    file_size = len(content.encode('utf-8'))
+    if limit == 0 and file_size > 500000:  # 500KB threshold
+        # For large files, use higher default limit
+        MAX_LINES = 50000
+        logger.info(
+            f"Large file detected ({file_size} bytes), "
+            f"increasing read limit to {MAX_LINES} lines"
+        )
 
     lines = content.split("\n")
     total_lines = len(lines)
@@ -2132,8 +2147,20 @@ async def ls(
 ) -> List[Dict[str, Any]]:
     """List directory contents with file sizes.
 
+    ⚠️ CRITICAL: This tool ONLY works on DIRECTORIES, not files.
+    If you need to read file contents, use read(path='file_path') instead.
+
+    Before calling ls():
+    1. Check if the path is a file or directory
+    2. If it's a file (e.g., victor/ui/cli.py), use read() instead
+    3. Only call ls() on directory paths (e.g., victor/ui/)
+
+    WRONG: ls(path='victor/ui/cli.py')  # This is a FILE
+    RIGHT: ls(path='victor/ui/')        # This is a DIRECTORY
+    RIGHT: read(path='victor/ui/cli.py') # Use read() for files
+
     Args:
-        path: Directory path
+        path: Directory path (MUST be a directory, NOT a file)
         recursive: All levels (ignores depth)
         depth: Levels to explore (default=2 for subdirectory visibility)
         pattern: Glob filter (*.py, test_*)
@@ -2174,22 +2201,99 @@ async def ls(
                 if suggestions:
                     suggestion_list = "\n  - ".join(suggestions[:5])
                     raise FileNotFoundError(
-                        f"Directory not found: {path}\n"
-                        f"Did you mean one of these?\n  - {suggestion_list}"
+                        f"❌ Directory not found: {path}\n"
+                        f"💡 Did you mean one of these?\n"
+                        f"  - {suggestion_list}\n"
+                        f"🔍 Use find(name='filename') to search for files"
                     )
                 else:
-                    raise FileNotFoundError(f"Directory not found: {path}")
+                    raise FileNotFoundError(
+                        f"❌ Directory not found: {path}\n"
+                        f"💡 Use find(name='filename') to search for files\n"
+                        f"💡 Use overview(path='.') to see project structure"
+                    )
             except NotADirectoryError:
                 raise NotADirectoryError(
-                    f"Path is not a directory: {path}\n"
-                    f"Suggestion: Use read(path='{path}') to read this file instead."
+                    f"❌ ERROR: The path '{path}' is a FILE, NOT a DIRECTORY.\n"
+                    f"🔧 CORRECT ACTION: Use read(path='{path}') instead of ls(path='{path}')\n"
+                    f"📖 EXAMPLE: To read this file, call: read(path='{path}')\n"
+                    f"💡 TIP: The ls() tool ONLY works on directories (e.g., ls(path='victor/ui/'))"
                 )
         if not dir_path.is_dir():
             if dir_path.is_file():
-                raise NotADirectoryError(
-                    f"Path is not a directory: {path}\n"
-                    f"Suggestion: Use read(path='{path}') to read this file instead."
-                )
+                # ls() on a file returns comprehensive filesystem metadata
+                logger.info(f"ls() called on file '{path}', returning file metadata")
+                try:
+                    stat_info = dir_path.stat()
+                    import pwd
+                    import grp
+
+                    # Get ownership (fallback to numeric IDs if names unavailable)
+                    try:
+                        owner = pwd.getpwuid(stat_info.st_uid).pw_name
+                    except KeyError:
+                        owner = str(stat_info.st_uid)
+                    try:
+                        group = grp.getgrgid(stat_info.st_gid).gr_name
+                    except KeyError:
+                        group = str(stat_info.st_gid)
+
+                    # Get permissions in octal and symbolic form
+                    perms_octal = oct(stat_info.st_mode)[-3:]
+                    import stat as stat_module
+                    perms_symbolic = stat_module.filemode(stat_info.st_mode)
+
+                    # Get timestamps
+                    import datetime
+                    created = datetime.datetime.fromtimestamp(stat_info.st_ctime)
+                    modified = datetime.datetime.fromtimestamp(stat_info.st_mtime)
+                    accessed = datetime.datetime.fromtimestamp(stat_info.st_atime)
+
+                    # Build file metadata item
+                    item = {
+                        "name": dir_path.name,
+                        "path": str(dir_path),
+                        "type": "file",
+                        "depth": 0,
+                        "size": stat_info.st_size,
+                        "extension": dir_path.suffix.lower() if dir_path.suffix else "",
+                        # Permissions and ownership
+                        "permissions": perms_octal,
+                        "permissions_symbolic": perms_symbolic,
+                        "owner": owner,
+                        "group": group,
+                        # Timestamps
+                        "created": created.isoformat(),
+                        "modified": modified.isoformat(),
+                        "accessed": accessed.isoformat(),
+                        # Additional metadata
+                        "inode": stat_info.st_ino,
+                        "nlinks": stat_info.st_nlink,
+                        "auto_converted": True,
+                        "hint": f"Note: '{path}' is a file. Use read() to see contents.",
+                    }
+
+                    # Return in same format as directory listing
+                    cwd = str(Path.cwd())
+                    try:
+                        relative_target = str(dir_path.relative_to(Path.cwd()))
+                    except ValueError:
+                        relative_target = str(dir_path)
+
+                    return {
+                        "cwd": cwd,
+                        "target": relative_target if relative_target != "." else ".",
+                        "items": [item],
+                        "count": 1,
+                        "auto_converted_from_file": True,
+                    }
+                except Exception as e:
+                    # Fallback to error if metadata collection fails
+                    logger.warning(f"ls() file metadata collection failed: {e}")
+                    raise NotADirectoryError(
+                        f"Path is not a directory: {path}\n"
+                        f"Suggestion: Use read(path='{path}') to read this file instead."
+                    )
             raise NotADirectoryError(f"Path is not a directory: {path}")
 
         # Normalize limit (handle non-int input from model)

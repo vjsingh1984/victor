@@ -24,7 +24,7 @@ Usage::
     @victor.agent(provider="anthropic", tools=["filesystem", "git"])
     async def code_reviewer(prompt: str) -> str:
         \"\"\"You are a senior code reviewer focused on security and correctness.\"\"\"
-        ...
+        pass  # Framework handles implementation
 
     # Calling the decorated function runs the agent
     result = await code_reviewer("Review auth.py for SQL injection risks")
@@ -266,7 +266,7 @@ def agent(
         @victor.agent(provider="anthropic", tools=["filesystem", "git"])
         async def dev_agent(prompt: str) -> str:
             \"\"\"You are a senior software engineer. Be concise and precise.\"\"\"
-            ...
+            pass  # Framework handles implementation
 
         result = await dev_agent("Add type hints to utils.py")
         print(result.content)

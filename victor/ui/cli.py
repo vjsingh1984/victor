@@ -53,7 +53,6 @@ def _get_test_provider_app():
 
 # Regular imports (alphabetically ordered)
 from victor.ui.commands.mcp import mcp_app
-from victor.ui.commands.mcp import mcp_app
 from victor.ui.commands.models import models_app
 from victor.ui.commands.profiles import profiles_app
 from victor.ui.commands.providers import providers_app

@@ -226,6 +226,15 @@ class ArgumentNormalizer:
         # This runs first so subsequent layers work with standard param names
         arguments, was_aliased = self.normalize_parameter_aliases(arguments, tool_name)
 
+        # Layer 0.1: Sanitize non-JSON-serializable objects (Ellipsis, Path, etc.)
+        # This MUST happen before primitive type coercion to prevent serialization errors
+        from victor.agent.argument_sanitizer import sanitize_arguments_for_serialization
+
+        arguments = sanitize_arguments_for_serialization(arguments)
+        logger.debug(
+            f"[{self.provider_name}] {tool_name}: Sanitized arguments for JSON serialization"
+        )
+
         # Layer 0.5: Coerce primitive types (str -> int/float/bool)
         # Some models (OpenRouter, Fireworks) output integers as strings like "0" or "30"
         arguments = self._coerce_primitive_types(arguments, tool_name)

@@ -2279,18 +2279,37 @@ def is_first_time_user() -> bool:
         or os.getenv("XAI_API_KEY")
     )
 
-    # Also check if Ollama is available (local provider)
-    try:
-        import subprocess
+    # If API keys are configured, not first time user (skip Ollama check)
+    if has_keys:
+        return False
 
-        result = subprocess.run(
-            ["ollama", "list"],
-            capture_output=True,
-            timeout=2,
-        )
-        has_ollama = result.returncode == 0
-    except Exception:
-        has_ollama = False
+    # Also check if Ollama is available (local provider)
+    # Use cached result to avoid 2-second subprocess timeout on every call
+    ollama_cache_file = victor_dir / ".ollama_available"
+
+    if ollama_cache_file.exists():
+        # Use cached result
+        has_ollama = True
+    else:
+        # Check Ollama availability once and cache result
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True,
+                timeout=2,
+            )
+            has_ollama = result.returncode == 0
+
+            # Cache the result
+            if has_ollama:
+                try:
+                    ollama_cache_file.touch()
+                except Exception:
+                    pass  # Fail silently if cache can't be written
+        except Exception:
+            has_ollama = False
 
     # If no keys and no Ollama, consider it first-time
-    return not (has_keys or has_ollama)
+    return not has_ollama

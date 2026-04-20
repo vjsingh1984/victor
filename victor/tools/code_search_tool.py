@@ -1,4 +1,5 @@
 import asyncio
+import importlib.util
 import logging
 import os
 import time
@@ -555,14 +556,76 @@ async def _get_or_build_index(
             pass  # victor-coding genuinely not installed
 
     if _index_factory is None or not registry.is_enhanced(CodebaseIndexFactoryProtocol):
-        raise ImportError(
-            "CodebaseIndex requires a codebase indexing provider "
-            "(e.g., pip install victor-coding). The provider registers "
-            "its factory via CapabilityRegistry at bootstrap."
-        )
+        # Enhanced error messages with installation guidance
+        try:
+            if importlib.util.find_spec("victor_coding") is not None:
+                # Package is installed but factory not registered - guide user
+                raise ImportError(
+                    "CodebaseIndex factory not registered. The victor-coding package "
+                    "is installed but failed to register its provider. Try:\n"
+                    "  1. Restart your Python session\n"
+                    "  2. Reinstall: pip install --force-reinstall victor-coding\n"
+                    "  3. Check for errors during package import\n\n"
+                    "For literal/keyword search only, use mode='literal' in code_search()."
+                )
+            else:
+                # Package not installed - guide installation
+                raise ImportError(
+                    "CodebaseIndex requires victor-coding package for semantic search. "
+                    "To enable semantic code search:\n"
+                    "  pip install victor-coding\n\n"
+                    "For literal/keyword search only, use mode='literal' in code_search()."
+                )
+        except ImportError as e:
+            # Re-raise with enhanced message
+            raise
 
     # Get cache using DI-aware accessor
     index_cache = _get_index_cache(exec_ctx)
+
+    # Get or create failure cache for index build failures
+    failure_cache = None
+    cache_manager = None
+    if exec_ctx and isinstance(exec_ctx, dict):
+        cache_manager = exec_ctx.get("cache_manager")
+    elif exec_ctx and hasattr(exec_ctx, "cache_manager"):
+        cache_manager = exec_ctx.cache_manager
+
+    if cache_manager:
+        # Use ToolCacheManager if available
+        failure_cache = cache_manager.get_namespace("index_build_failures")
+    else:
+        # Fallback to simple dict cache (not recommended for production)
+        if not hasattr(_get_or_build_index, "_failure_cache"):
+            _get_or_build_index._failure_cache = {}
+        failure_cache = _get_or_build_index._failure_cache
+
+    # Check for recent build failures before attempting build
+    if failure_cache and not force_reindex:
+        import hashlib
+        root_hash = hashlib.md5(str(root).encode()).hexdigest()
+        failure_key = f"{root_hash}_build_failure"
+
+        failure_entry = failure_cache.get(failure_key)
+        if failure_entry:
+            # Check if failure entry is still valid (hasn't expired)
+            if hasattr(failure_entry, "is_expired") and not failure_entry.is_expired():
+                logger.info(
+                    f"[code_search] Skipping index build due to recent failure: {failure_entry.value.get('error', 'Unknown error')}"
+                )
+                raise ImportError(
+                    f"Semantic index build recently failed: {failure_entry.value.get('error', 'Unknown error')}\n"
+                    f"Use reindex=True to retry, or mode='literal' for keyword search."
+                )
+            elif isinstance(failure_entry, dict):
+                # Fallback for simple dict cache (no expiry check)
+                logger.info(
+                    f"[code_search] Skipping index build due to recent failure: {failure_entry.get('error', 'Unknown error')}"
+                )
+                raise ImportError(
+                    f"Semantic index build recently failed: {failure_entry.get('error', 'Unknown error')}\n"
+                    f"Use reindex=True to retry, or mode='literal' for keyword search."
+                )
 
     cache_entry = index_cache.get(str(root))
     cached_index = cache_entry["index"] if cache_entry else None
@@ -635,6 +698,34 @@ async def _get_or_build_index(
         "latest_mtime": latest,
         "indexed_at": time.time(),
     }
+
+    # Clear failure cache on successful build
+    try:
+        import hashlib
+        root_hash = hashlib.md5(str(root).encode()).hexdigest()
+        failure_key = f"{root_hash}_build_failure"
+
+        # Get failure cache (same logic as above)
+        failure_cache = None
+        cache_manager = None
+        if exec_ctx and isinstance(exec_ctx, dict):
+            cache_manager = exec_ctx.get("cache_manager")
+        elif exec_ctx and hasattr(exec_ctx, "cache_manager"):
+            cache_manager = exec_ctx.cache_manager
+
+        if cache_manager:
+            failure_cache = cache_manager.get_namespace("index_build_failures")
+        else:
+            if not hasattr(_get_or_build_index, "_failure_cache"):
+                _get_or_build_index._failure_cache = {}
+            failure_cache = _get_or_build_index._failure_cache
+
+        if failure_cache and failure_cache.get(failure_key):
+            failure_cache.delete(failure_key)
+            logger.info(f"[code_search] Cleared index build failure cache after successful build")
+    except Exception as cache_err:
+        logger.debug(f"[code_search] Failed to clear index build failure cache: {cache_err}")
+
     return index, rebuilt
 
 
@@ -1075,7 +1166,41 @@ async def code_search(
                 timeout=30.0,
             )
         except (asyncio.TimeoutError, Exception) as exc:
+            error_msg = str(exc)
             logger.warning("Semantic index build failed (%s), falling back to literal search", exc)
+
+            # Cache the failure for 1 hour to prevent repeated attempts
+            try:
+                import hashlib
+                root_hash = hashlib.md5(str(root_path).encode()).hexdigest()
+                failure_key = f"{root_hash}_build_failure"
+
+                # Get failure cache (same logic as in _get_or_build_index)
+                failure_cache = None
+                cache_manager = None
+                if _exec_ctx and isinstance(_exec_ctx, dict):
+                    cache_manager = _exec_ctx.get("cache_manager")
+                elif _exec_ctx and hasattr(_exec_ctx, "cache_manager"):
+                    cache_manager = _exec_ctx.cache_manager
+
+                if cache_manager:
+                    failure_cache = cache_manager.get_namespace("index_build_failures")
+                else:
+                    if not hasattr(_get_or_build_index, "_failure_cache"):
+                        _get_or_build_index._failure_cache = {}
+                    failure_cache = _get_or_build_index._failure_cache
+
+                if failure_cache:
+                    from victor.tools.cache_manager import GenericCacheEntry
+                    failure_entry = GenericCacheEntry(
+                        value={"error": error_msg, "timestamp": time.time()},
+                        ttl=3600,  # 1 hour
+                    )
+                    failure_cache.set(failure_key, failure_entry)
+                    logger.info(f"[code_search] Cached index build failure for 1 hour")
+            except Exception as cache_err:
+                logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
+
             result = await _literal_search(query, path, k, exts)
             result["fallback"] = "semantic_index_timeout"
             return result

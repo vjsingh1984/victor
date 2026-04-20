@@ -37,6 +37,7 @@ import logging
 import re
 import threading
 import time
+import traceback
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
@@ -56,6 +57,7 @@ from victor.agent.output_aggregator import (
     OutputAggregator,
     AggregationState,
 )
+from victor.core.errors import ErrorInfo, ErrorCategory, ErrorSeverity
 from victor.agent.synthesis_checkpoint import (
     CompositeSynthesisCheckpoint,
     get_checkpoint_for_complexity,
@@ -442,6 +444,9 @@ class ToolCallResult:
 
     # OpenAI-compatible tool_call_id — links response to assistant's tool_calls[].id
     tool_call_id: Optional[str] = None
+
+    # Structured error information with traceback and metadata
+    error_info: Optional["ErrorInfo"] = None
 
 
 @dataclass
@@ -1813,14 +1818,53 @@ class ToolPipeline:
             )
         except asyncio.TimeoutError:
             effective_timeout = self._get_tool_timeout(tool_name)
+            tb_str = traceback.format_exc()
             logger.warning(
-                f"[Pipeline] Tool '{tool_name}' timed out after " f"{effective_timeout}s"
+                f"[Pipeline] Tool '{tool_name}' timed out after {effective_timeout}s",
+                exc_info=True
             )
             exec_result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
                 error=f"Tool execution timed out after {effective_timeout}s",
+                error_info=ErrorInfo(
+                    message=f"Tool '{tool_name}' timed out after {effective_timeout}s",
+                    category=ErrorCategory.TIMEOUT,
+                    severity=ErrorSeverity.WARNING,
+                    correlation_id=f"timeout_{tool_name}_{int(time.time())}",
+                    traceback=tb_str[-2000:],  # Last 2000 chars
+                    details={
+                        "tool_name": tool_name,
+                        "timeout_seconds": effective_timeout,
+                        "arguments": normalized_args,
+                    },
+                ),
+            )
+        except Exception as e:
+            tb_str = traceback.format_exc()
+            logger.error(
+                f"[Pipeline] Tool '{tool_name}' execution failed: {e}",
+                exc_info=True
+            )
+            exec_result = ToolExecutionResult(
+                tool_name=tool_name,
+                success=False,
+                result=None,
+                error=str(e),
+                error_info=ErrorInfo(
+                    message=f"Tool '{tool_name}' execution failed: {str(e)}",
+                    category=ErrorCategory.EXECUTION_ERROR,
+                    severity=ErrorSeverity.ERROR,
+                    correlation_id=f"error_{tool_name}_{int(time.time())}",
+                    traceback=tb_str[-2000:],  # Last 2000 chars
+                    details={
+                        "tool_name": tool_name,
+                        "exception_type": type(e).__name__,
+                        "arguments": normalized_args,
+                    },
+                    original_exception=str(e),
+                ),
             )
         execution_time_ms = (time.monotonic() - start_time) * 1000
 
@@ -1839,6 +1883,7 @@ class ToolPipeline:
             normalization_applied=normalization_applied,
             code_corrected=code_corrected,
             code_validation_errors=code_validation_errors,
+            error_info=exec_result.error_info,  # Preserve structured error info
         )
 
         # Log tool result returned to LLM
@@ -1885,6 +1930,7 @@ class ToolPipeline:
                                 result=fb_result.result,
                                 error=fb_result.error,
                                 execution_time_ms=((time.monotonic() - start_time) * 1000),
+                                error_info=fb_result.error_info,  # Preserve from fallback
                             )
             except Exception as e:
                 logger.debug(f"[Pipeline] Error recovery fallback failed: {e}")

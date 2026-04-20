@@ -1179,10 +1179,16 @@ async def _run_cli_repl(
             console.print("\n[dim]Goodbye![/]")
             break
         except Exception as e:
-            console.print(f"[red]Error:[/ ] {e}")
-            import traceback
+            # Use contextual error formatting for better UX
+            error_message = format_exception_for_user(e)
+            console.print(f"[bold red]Error:[/]\n{error_message}")
 
-            console.print(traceback.format_exc())
+            # Show traceback in debug mode only
+            if os.getenv("VICTOR_DEBUG"):
+                import traceback
+                console.print(traceback.format_exc())
+
+            console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
 
 
 async def run_workflow_mode(

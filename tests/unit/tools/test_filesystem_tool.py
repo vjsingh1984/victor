@@ -285,13 +285,34 @@ async def test_list_directory_not_found():
 
 @pytest.mark.asyncio
 async def test_list_directory_not_a_directory():
-    """Test listing a file path."""
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as f:
+    """Test listing a file path returns file metadata."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w") as f:
+        f.write("test content")
         temp_path = f.name
 
     try:
-        with pytest.raises(NotADirectoryError):
-            await ls(path=temp_path)
+        # ls() on a file should return file metadata in ls format
+        result = await ls(path=temp_path)
+        # Should return a dict with items list (same format as directory listing)
+        assert isinstance(result, dict)
+        assert "items" in result
+        assert result["count"] == 1
+        assert result["auto_converted_from_file"] is True
+
+        # Check the single file item has comprehensive metadata
+        item = result["items"][0]
+        assert item["type"] == "file"
+        # Path may be resolved to absolute form (e.g., /private/var on macOS)
+        assert item["path"] == str(Path(temp_path).resolve())
+        assert "name" in item
+        assert "size" in item
+        assert "permissions" in item
+        assert "owner" in item
+        assert "group" in item
+        assert "modified" in item
+        assert "auto_converted" in item
+        assert "hint" in item
+        assert item["hint"].startswith("Note:")
     finally:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
