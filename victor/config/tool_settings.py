@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
+import os
+from typing import Dict, List, Set
 
 from pydantic import BaseModel, Field
 
@@ -90,6 +91,25 @@ class ToolSettings(BaseModel):
     tool_output_expand_hotkey: str = Field(
         default="^O",
         description="Hotkey to expand tool output (default: Ctrl+O, format: ^X for Ctrl+X)",
+    )
+
+    # Embedding-intensive tool concurrency configuration
+    # These tools use embedding models and need lower concurrency limits
+    # to prevent resource exhaustion (memory, CPU, embedding model contention)
+    max_embedding_concurrent: int = Field(
+        default_factory=lambda: int(os.getenv("VICTOR_MAX_EMBEDDING_CONCURRENT", "2")),
+        ge=1,
+        le=10,
+        description="Maximum concurrent embedding-intensive tool executions (default: 2, env: VICTOR_MAX_EMBEDDING_CONCURRENT)",
+    )
+    embedding_intensive_tools: Set[str] = Field(
+        default_factory=lambda: set(
+            os.getenv(
+                "VICTOR_EMBEDDING_INTENSIVE_TOOLS",
+                "code_search,semantic_code_search",
+            ).split(",")
+        ),
+        description="Tool names that require embedding concurrency limits (default: code_search,semantic_code_search, env: VICTOR_EMBEDDING_INTENSIVE_TOOLS)",
     )
 
 

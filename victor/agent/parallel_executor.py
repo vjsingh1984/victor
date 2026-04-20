@@ -36,6 +36,24 @@ from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.agent.tool_executor import ToolExecutionResult, ToolExecutor
 
+
+def _get_embedding_config():
+    """Get embedding-intensive tool configuration from settings.
+
+    Returns:
+        Tuple of (max_embedding_concurrent, embedding_intensive_tools)
+    """
+    try:
+        from victor.config.tool_settings import get_tool_settings
+        settings = get_tool_settings()
+        return (
+            settings.max_embedding_concurrent,
+            settings.embedding_intensive_tools,
+        )
+    except Exception:
+        # Fallback if settings not available
+        return 2, {"code_search"}
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,6 +93,10 @@ class ParallelExecutionConfig:
     enable_parallel: bool = True
     parallelize_reads: bool = True
     timeout_per_tool: float = 60.0
+    # Embedding-intensive tool concurrency limits
+    # Loaded from ToolSettings to support environment variable configuration
+    max_embedding_concurrent: int = 2
+    embedding_intensive_tools: Set[str] = field(default_factory=lambda: {"code_search"})
 
 
 @dataclass
@@ -95,7 +117,15 @@ class ParallelToolExecutor:
         progress_callback: Optional[Callable[[str, str, bool], None]] = None,
     ):
         self.executor = tool_executor
-        self.config = config or ParallelExecutionConfig()
+        # Load config with embedding settings from ToolSettings if not provided
+        if config is None:
+            max_emb, emb_tools = _get_embedding_config()
+            self.config = ParallelExecutionConfig(
+                max_embedding_concurrent=max_emb,
+                embedding_intensive_tools=emb_tools,
+            )
+        else:
+            self.config = config
         self.progress_callback = progress_callback
 
     def _get_category(self, tool_name: str) -> ToolCategory:
@@ -213,8 +243,42 @@ class ParallelToolExecutor:
                     result.failed_count += 1
                 break
 
-            # Execute batch with concurrency limit
-            batch = ready[: self.config.max_concurrent]
+            # Separate embedding-intensive tools from regular tools
+            embedding_ready = []
+            regular_ready = []
+            for i in ready:
+                tool_name = tool_calls[i].get("name", "")
+                if tool_name in self.config.embedding_intensive_tools:
+                    embedding_ready.append(i)
+                else:
+                    regular_ready.append(i)
+
+            # Build batch respecting both concurrency limits
+            # Count currently running embedding-intensive and regular tools
+            running_embedding = sum(
+                1 for i in pending
+                if i not in ready and tool_calls[i].get("name", "") in self.config.embedding_intensive_tools
+            )
+            running_regular = sum(
+                1 for i in pending
+                if i not in ready and tool_calls[i].get("name", "") not in self.config.embedding_intensive_tools
+            )
+
+            # Calculate how many of each type we can add
+            available_embedding_slots = max(0, self.config.max_embedding_concurrent - running_embedding)
+            available_regular_slots = max(0, self.config.max_concurrent - running_embedding - running_regular)
+
+            # Select tools for batch
+            batch = []
+            batch.extend(embedding_ready[:available_embedding_slots])
+            batch.extend(regular_ready[:available_regular_slots - len(batch)])
+
+            # If batch is empty but we have ready tasks, we're at capacity
+            if not batch and ready:
+                # Wait for current tasks to complete before adding more
+                await asyncio.sleep(0.01)
+                continue
+
             tasks = [self._execute_single(tool_calls[i], context) for i in batch]
             batch_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -312,5 +376,12 @@ def create_parallel_executor(
     enable: bool = True,
     progress_callback: Optional[Callable[[str, str, bool], None]] = None,
 ) -> ParallelToolExecutor:
-    config = ParallelExecutionConfig(max_concurrent=max_concurrent, enable_parallel=enable)
+    # Load embedding settings from ToolSettings
+    max_emb, emb_tools = _get_embedding_config()
+    config = ParallelExecutionConfig(
+        max_concurrent=max_concurrent,
+        enable_parallel=enable,
+        max_embedding_concurrent=max_emb,
+        embedding_intensive_tools=emb_tools,
+    )
     return ParallelToolExecutor(tool_executor, config, progress_callback)
