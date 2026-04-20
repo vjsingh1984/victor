@@ -1825,9 +1825,9 @@ class ToolPipeline:
                 cmd = normalized_args.get("cmd", "unknown command")
                 error_msg = f"Command timed out after {effective_timeout}s: {cmd}"
                 suggestion = (
-                    f"The command may be hung or waiting for input.\n"
-                    f"Try: Run the command manually to check if it's interactive, "
-                    f"increase timeout with --tool-budget, or use a non-interactive alternative."
+                    "The command may be hung or waiting for input.\n"
+                    "Try: Run the command manually to check if it's interactive, "
+                    "increase timeout with --tool-budget, or use a non-interactive alternative."
                 )
             else:
                 error_msg = f"Tool '{tool_name}' timed out after {effective_timeout}s"
@@ -1839,7 +1839,7 @@ class ToolPipeline:
             # Log technical details for debugging (hidden from user)
             logger.warning(
                 f"[Pipeline] Tool '{tool_name}' timed out after {effective_timeout}s",
-                exc_info=False  # Don't log full traceback to reduce noise
+                exc_info=False,  # Don't log full traceback to reduce noise
             )
 
             exec_result = ToolExecutionResult(
@@ -1863,10 +1863,7 @@ class ToolPipeline:
             )
         except Exception as e:
             tb_str = traceback.format_exc()
-            logger.error(
-                f"[Pipeline] Tool '{tool_name}' execution failed: {e}",
-                exc_info=True
-            )
+            logger.error(f"[Pipeline] Tool '{tool_name}' execution failed: {e}", exc_info=True)
             exec_result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,

@@ -177,17 +177,20 @@ class TestCompleteOptimizationPipeline:
         pruner = get_output_pruner()
 
         # Simulate tool output for code generation task
-        tool_output = "\n".join([
-            "# This is a comment",
-            "import sys",
-            "",
-            "def function1():",
-            "    pass",
-            "# Another comment",
-            "",
-            "def function2():",
-            "    pass",
-        ] * 20)  # Create 200-line file
+        tool_output = "\n".join(
+            [
+                "# This is a comment",
+                "import sys",
+                "",
+                "def function1():",
+                "    pass",
+                "# Another comment",
+                "",
+                "def function2():",
+                "    pass",
+            ]
+            * 20
+        )  # Create 200-line file
 
         # Apply pruning for code_generation task
         pruned, info = pruner.prune(
@@ -375,9 +378,12 @@ class TestOptimizationPipelineMetrics:
         # Calculate cost reduction
         baseline_cost = baseline_avg_tokens * baseline_avg_calls * baseline_model_cost
         optimized_cost = (
-            baseline_avg_tokens * optimized_token_multiplier
-            * baseline_avg_calls * optimized_call_multiplier
-            * baseline_model_cost * optimized_model_multiplier
+            baseline_avg_tokens
+            * optimized_token_multiplier
+            * baseline_avg_calls
+            * optimized_call_multiplier
+            * baseline_model_cost
+            * optimized_model_multiplier
         )
 
         cost_reduction = (baseline_cost - optimized_cost) / baseline_cost

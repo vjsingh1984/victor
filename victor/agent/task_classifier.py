@@ -156,7 +156,7 @@ REASONING: <one sentence>"""
             cached = self._get_from_cache(query)
             if cached:
                 self._cache_hits += 1
-                logger.debug(f"[TaskClassifier] Cache hit for query")
+                logger.debug("[TaskClassifier] Cache hit for query")
                 return cached
 
         # Use edge model for classification
@@ -315,9 +315,7 @@ REASONING: <one sentence>"""
                 pass
         return 0.8  # Default
 
-    def _extract_alternatives(
-        self, response: str, valid_types: List[str]
-    ) -> Dict[str, float]:
+    def _extract_alternatives(self, response: str, valid_types: List[str]) -> Dict[str, float]:
         """Extract alternative task types from response."""
         import re
 

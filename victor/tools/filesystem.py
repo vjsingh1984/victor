@@ -1617,7 +1617,7 @@ async def read(
     MAX_LINES, MAX_BYTES = _get_truncation_limits()
 
     # Check file size and adapt limit if needed for large files
-    file_size = len(content.encode('utf-8'))
+    file_size = len(content.encode("utf-8"))
     if limit == 0 and file_size > 500000:  # 500KB threshold
         # For large files, use higher default limit
         MAX_LINES = 50000
@@ -2241,10 +2241,12 @@ async def ls(
                     # Get permissions in octal and symbolic form
                     perms_octal = oct(stat_info.st_mode)[-3:]
                     import stat as stat_module
+
                     perms_symbolic = stat_module.filemode(stat_info.st_mode)
 
                     # Get timestamps
                     import datetime
+
                     created = datetime.datetime.fromtimestamp(stat_info.st_ctime)
                     modified = datetime.datetime.fromtimestamp(stat_info.st_mtime)
                     accessed = datetime.datetime.fromtimestamp(stat_info.st_atime)
@@ -2253,15 +2255,15 @@ async def ls(
                     content_preview = None
                     try:
                         if stat_info.st_size < 100_000:  # Only preview files smaller than 100KB
-                            with open(dir_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            with open(dir_path, "r", encoding="utf-8", errors="ignore") as f:
                                 lines = []
                                 for i, line in enumerate(f):
                                     if i >= 10:
                                         break
-                                    lines.append(line.rstrip('\n'))
-                                preview_text = '\n'.join(lines)
+                                    lines.append(line.rstrip("\n"))
+                                preview_text = "\n".join(lines)
                                 if len(preview_text) > 500:
-                                    preview_text = preview_text[:500] + '...'
+                                    preview_text = preview_text[:500] + "..."
                                 content_preview = preview_text
                     except Exception as preview_error:
                         logger.debug(f"Failed to generate content preview: {preview_error}")

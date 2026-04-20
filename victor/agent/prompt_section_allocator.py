@@ -402,6 +402,7 @@ class PromptSectionBudgetAllocator:
 
 # Convenience functions
 
+
 def allocate_prompt_sections(
     sections: Dict[str, SectionMetadata],
     context: Dict[str, Any],

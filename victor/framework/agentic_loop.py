@@ -199,8 +199,16 @@ class PlanningGate:
             # Check for action keywords
             query_lower = context.get("query", "").lower() if context else ""
             action_keywords = [
-                "run ", "execute", "create ", "write ", "delete ",
-                "list ", "show ", "get ", "find ", "search ",
+                "run ",
+                "execute",
+                "create ",
+                "write ",
+                "delete ",
+                "list ",
+                "show ",
+                "get ",
+                "find ",
+                "search ",
             ]
             if any(keyword in query_lower for keyword in action_keywords):
                 logger.info(
@@ -405,9 +413,7 @@ class AgenticLoop:
         self.fulfillment = FulfillmentDetector() if enable_fulfillment_check else None
 
         # Initialize planning gate for fast-slow architecture
-        self.planning_gate = PlanningGate(
-            enabled=self.config.get("enable_planning_gate", True)
-        )
+        self.planning_gate = PlanningGate(enabled=self.config.get("enable_planning_gate", True))
 
         # Initialize task hint provider for enhanced task type hints
         self._task_hint_provider = TaskTypeHintCapabilityProvider()
@@ -472,16 +478,16 @@ class AgenticLoop:
                     # Try to get query complexity from perception if available
                     # Otherwise use simple heuristics
                     query_complexity = None
-                    if hasattr(self, '_last_perception'):
+                    if hasattr(self, "_last_perception"):
                         last_perc = self._last_perception
-                        query_complexity = getattr(last_perc, 'query_complexity', None)
+                        query_complexity = getattr(last_perc, "query_complexity", None)
 
                     # Extract skip_planning flag from TaskTypeHint if available
                     skip_planning = False
                     task_hint = None
-                    if hasattr(self, '_task_hint_provider'):
+                    if hasattr(self, "_task_hint_provider"):
                         task_hint = self._task_hint_provider.get_hint(task_type)
-                        if task_hint and hasattr(task_hint, 'skip_planning'):
+                        if task_hint and hasattr(task_hint, "skip_planning"):
                             skip_planning = task_hint.skip_planning
 
                     # Check with planning gate

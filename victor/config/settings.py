@@ -1117,8 +1117,12 @@ class Settings(BaseSettings):
     #
     # Enable via: victor chat --enable-smart-routing --routing-profile balanced
     smart_routing_enabled: bool = False  # Master switch for smart routing
-    smart_routing_profile: str = "balanced"  # Routing profile (balanced, cost-optimized, performance, local-first)
-    smart_routing_fallback_chain: Optional[List[str]] = None  # Custom fallback chain (overrides profile)
+    smart_routing_profile: str = (
+        "balanced"  # Routing profile (balanced, cost-optimized, performance, local-first)
+    )
+    smart_routing_fallback_chain: Optional[List[str]] = (
+        None  # Custom fallback chain (overrides profile)
+    )
     smart_routing_performance_window: int = 100  # Number of requests for learning
     smart_routing_learning_enabled: bool = True  # Enable adaptive learning
     smart_routing_resource_awareness: bool = True  # Enable GPU/API quota detection
@@ -2412,9 +2416,8 @@ def validate_default_model(settings: "Settings") -> tuple[bool, str | None]:
         )
     except subprocess.TimeoutExpired:
         return False, (
-            "Ollama command timed out. Check if Ollama is running:\n"
-            "  [cyan]ollama serve[/]"
+            "Ollama command timed out. Check if Ollama is running:\n" "  [cyan]ollama serve[/]"
         )
-    except Exception as e:
+    except Exception:
         # Unexpected error - don't block startup
         return True, None

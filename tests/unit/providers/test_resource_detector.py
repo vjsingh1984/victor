@@ -250,7 +250,6 @@ class TestResourceAvailabilityDetector:
 
         assert isinstance(gpu, GPUAvailability)
 
-
     def test_is_provider_available_local_without_gpu(self, detector):
         """Test local provider availability without GPU."""
         gpu = GPUAvailability(available=False, reason="No GPU")

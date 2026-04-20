@@ -3,7 +3,11 @@
 import pytest
 import time
 import numpy as np
-from victor.agent.semantic_response_cache import SemanticResponseCache, CachedResponse, get_semantic_cache
+from victor.agent.semantic_response_cache import (
+    SemanticResponseCache,
+    CachedResponse,
+    get_semantic_cache,
+)
 
 
 class TestSemanticResponseCache:

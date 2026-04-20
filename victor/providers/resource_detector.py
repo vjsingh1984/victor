@@ -218,8 +218,7 @@ class ResourceAvailabilityDetector:
 
         # No GPU detected
         return GPUAvailability(
-            available=False,
-            reason="No GPU detected (NVIDIA, Apple Silicon, or AMD)"
+            available=False, reason="No GPU detected (NVIDIA, Apple Silicon, or AMD)"
         )
 
     async def _check_nvidia_gpu(self) -> GPUAvailability:

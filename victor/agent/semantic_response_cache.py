@@ -127,8 +127,8 @@ class SemanticResponseCache:
                 logger.info(f"Loaded embedding model: {self.embedding_model_name}")
             except ImportError:
                 logger.warning(
-                    f"sentence_transformers not available. "
-                    f"Install with: pip install sentence-transformers"
+                    "sentence_transformers not available. "
+                    "Install with: pip install sentence-transformers"
                 )
                 raise
 
@@ -252,11 +252,7 @@ class SemanticResponseCache:
 
     def _cleanup_expired(self) -> None:
         """Remove expired cache entries."""
-        expired = [
-            key
-            for key, cached in self._cache.items()
-            if cached.is_expired()
-        ]
+        expired = [key for key, cached in self._cache.items() if cached.is_expired()]
 
         for key in expired:
             del self._cache[key]

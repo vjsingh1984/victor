@@ -146,7 +146,9 @@ class TestPlanningGate:
             tool_budget=5,
             query_complexity=None,
             query_length=100,
-            context={"query": "I need to understand the architecture of this system"},  # Long, no action keyword
+            context={
+                "query": "I need to understand the architecture of this system"
+            },  # Long, no action keyword
         )
 
         assert result is True, "long query without action keywords should use LLM planning"

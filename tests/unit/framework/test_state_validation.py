@@ -20,7 +20,6 @@ from pydantic import BaseModel, Field, ValidationError, ConfigDict
 
 from victor.framework.graph import StateGraph, StateValidator, StateValidationError
 
-
 # =============================================================================
 # Test State Models
 # =============================================================================
@@ -167,10 +166,7 @@ class TestStateGraphValidation:
 
         config = GraphConfig(
             validation=ValidationConfig(
-                enabled=True,
-                strict=False,
-                validate_on_entry=True,
-                validate_after_nodes=True
+                enabled=True, strict=False, validate_on_entry=True, validate_after_nodes=True
             )
         )
 
@@ -201,11 +197,7 @@ class TestStateGraphValidation:
         from victor.framework.config import GraphConfig, ValidationConfig
 
         config = GraphConfig(
-            validation=ValidationConfig(
-                enabled=True,
-                strict=True,
-                validate_on_entry=True
-            )
+            validation=ValidationConfig(enabled=True, strict=True, validate_on_entry=True)
         )
 
         # Missing required field 'task'
@@ -235,10 +227,7 @@ class TestStateGraphValidation:
 
         config = GraphConfig(
             validation=ValidationConfig(
-                enabled=True,
-                strict=False,
-                validate_on_entry=True,
-                log_errors=True
+                enabled=True, strict=False, validate_on_entry=True, log_errors=True
             )
         )
 

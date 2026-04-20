@@ -72,6 +72,7 @@ class TestDecisionConditions:
         condition = ProjectTypeCondition(["python"])
         # Test with pyproject.toml
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "pyproject.toml").touch()
             context = {"root_path": tmpdir}
@@ -81,6 +82,7 @@ class TestDecisionConditions:
         """Test project type detection for Rust."""
         condition = ProjectTypeCondition(["rust"])
         import tempfile
+
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "Cargo.toml").touch()
             context = {"root_path": tmpdir}

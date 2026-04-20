@@ -75,7 +75,9 @@ class RoutingProfile:
         for task_type, providers in self.fallback_chains.items():
             self.fallback_chains[task_type] = [p.lower() for p in providers]
 
-        logger.debug(f"Routing profile '{self.name}' initialized with {len(self.fallback_chains)} task types")
+        logger.debug(
+            f"Routing profile '{self.name}' initialized with {len(self.fallback_chains)} task types"
+        )
 
     def get_fallback_chain(self, task_type: str = "default") -> List[str]:
         """Get fallback chain for specific task type.

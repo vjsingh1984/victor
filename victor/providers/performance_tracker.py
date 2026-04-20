@@ -199,8 +199,12 @@ class ProviderPerformanceTracker:
         recent = sorted_metrics[mid:]
 
         # Calculate average latencies
-        older_latency = sum(m.latency_ms for m in older if m.success) / max(1, sum(1 for m in older if m.success))
-        recent_latency = sum(m.latency_ms for m in recent if m.success) / max(1, sum(1 for m in recent if m.success))
+        older_latency = sum(m.latency_ms for m in older if m.success) / max(
+            1, sum(1 for m in older if m.success)
+        )
+        recent_latency = sum(m.latency_ms for m in recent if m.success) / max(
+            1, sum(1 for m in recent if m.success)
+        )
 
         # Determine trend (10% threshold)
         if recent_latency < older_latency * 0.9:
@@ -235,11 +239,7 @@ class ProviderPerformanceTracker:
         trend_score = trend_scores.get(trend, 0.7)
 
         # Composite score
-        composite_score = (
-            0.4 * success_rate +
-            0.3 * latency_score +
-            0.3 * trend_score
-        )
+        composite_score = 0.4 * success_rate + 0.3 * latency_score + 0.3 * trend_score
 
         logger.debug(
             f"Provider {provider} score: {composite_score:.2f} "
@@ -254,10 +254,7 @@ class ProviderPerformanceTracker:
         Returns:
             Dict mapping provider name to score
         """
-        return {
-            provider: self.get_provider_score(provider)
-            for provider in self.metrics.keys()
-        }
+        return {provider: self.get_provider_score(provider) for provider in self.metrics.keys()}
 
     def get_best_provider(self, candidates: List[str]) -> Optional[str]:
         """Get the best provider from a list of candidates.
@@ -271,10 +268,7 @@ class ProviderPerformanceTracker:
         if not candidates:
             return None
 
-        scores = {
-            provider: self.get_provider_score(provider)
-            for provider in candidates
-        }
+        scores = {provider: self.get_provider_score(provider) for provider in candidates}
 
         # Return provider with highest score
         return max(scores.items(), key=lambda x: x[1])[0] if scores else None

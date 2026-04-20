@@ -50,23 +50,15 @@ def config_show(
     provider_table.add_row(
         "Default Provider",
         settings.provider.default_provider,
-        "settings.yaml" if (Path.home() / ".victor" / "settings.yaml").exists() else "default"
+        "settings.yaml" if (Path.home() / ".victor" / "settings.yaml").exists() else "default",
     )
     provider_table.add_row(
         "Default Model",
         settings.provider.default_model,
-        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default"
+        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default",
     )
-    provider_table.add_row(
-        "Temperature",
-        str(settings.provider.default_temperature),
-        "default"
-    )
-    provider_table.add_row(
-        "Max Tokens",
-        str(settings.provider.default_max_tokens),
-        "default"
-    )
+    provider_table.add_row("Temperature", str(settings.provider.default_temperature), "default")
+    provider_table.add_row("Max Tokens", str(settings.provider.default_max_tokens), "default")
 
     console.print("[bold]Provider Configuration[/]")
     console.print(provider_table)
@@ -81,17 +73,13 @@ def config_show(
     tools_table.add_row(
         "Tool Budget",
         str(settings.tools.fallback_max_tools),
-        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default"
+        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default",
     )
     tools_table.add_row(
-        "Cache Enabled",
-        "Yes" if settings.tools.tool_selection_cache_enabled else "No",
-        "default"
+        "Cache Enabled", "Yes" if settings.tools.tool_selection_cache_enabled else "No", "default"
     )
     tools_table.add_row(
-        "Deduplication",
-        "Yes" if settings.tools.enable_tool_deduplication else "No",
-        "default"
+        "Deduplication", "Yes" if settings.tools.enable_tool_deduplication else "No", "default"
     )
 
     console.print("[bold]Tool Settings[/]")
@@ -106,15 +94,15 @@ def config_show(
 
     files_table.add_row(
         "profiles.yaml",
-        "[green]Exists[/]" if (config_dir / "profiles.yaml").exists() else "[dim]Not found[/]"
+        "[green]Exists[/]" if (config_dir / "profiles.yaml").exists() else "[dim]Not found[/]",
     )
     files_table.add_row(
         "settings.yaml",
-        "[green]Exists[/]" if (config_dir / "settings.yaml").exists() else "[dim]Not found[/]"
+        "[green]Exists[/]" if (config_dir / "settings.yaml").exists() else "[dim]Not found[/]",
     )
     files_table.add_row(
         "api_keys.yaml",
-        "[yellow]Deprecated[/]" if (config_dir / "api_keys.yaml").exists() else "[dim]Not found[/]"
+        "[yellow]Deprecated[/]" if (config_dir / "api_keys.yaml").exists() else "[dim]Not found[/]",
     )
 
     console.print("[bold]Configuration Files[/]")
@@ -123,6 +111,7 @@ def config_show(
 
     # Environment Variables
     import os
+
     env_vars = {
         "VICTOR_LOG_LEVEL": os.getenv("VICTOR_LOG_LEVEL"),
         "ANTHROPIC_API_KEY": "[red]***SET***[/]" if os.getenv("ANTHROPIC_API_KEY") else None,

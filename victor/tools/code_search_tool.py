@@ -576,7 +576,7 @@ async def _get_or_build_index(
                     "  pip install victor-coding\n\n"
                     "For literal/keyword search only, use mode='literal' in code_search()."
                 )
-        except ImportError as e:
+        except ImportError:
             # Re-raise with enhanced message
             raise
 
@@ -603,6 +603,7 @@ async def _get_or_build_index(
     # Check for recent build failures before attempting build
     if failure_cache and not force_reindex:
         import hashlib
+
         root_hash = hashlib.md5(str(root).encode()).hexdigest()
         failure_key = f"{root_hash}_build_failure"
 
@@ -702,6 +703,7 @@ async def _get_or_build_index(
     # Clear failure cache on successful build
     try:
         import hashlib
+
         root_hash = hashlib.md5(str(root).encode()).hexdigest()
         failure_key = f"{root_hash}_build_failure"
 
@@ -722,7 +724,7 @@ async def _get_or_build_index(
 
         if failure_cache and failure_cache.get(failure_key):
             failure_cache.delete(failure_key)
-            logger.info(f"[code_search] Cleared index build failure cache after successful build")
+            logger.info("[code_search] Cleared index build failure cache after successful build")
     except Exception as cache_err:
         logger.debug(f"[code_search] Failed to clear index build failure cache: {cache_err}")
 
@@ -1219,6 +1221,7 @@ async def code_search(
             # Cache the failure for 1 hour to prevent repeated attempts
             try:
                 import hashlib
+
                 root_hash = hashlib.md5(str(root_path).encode()).hexdigest()
                 failure_key = f"{root_hash}_build_failure"
 
@@ -1239,12 +1242,13 @@ async def code_search(
 
                 if failure_cache:
                     from victor.tools.cache_manager import GenericCacheEntry
+
                     failure_entry = GenericCacheEntry(
                         value={"error": error_msg, "timestamp": time.time()},
                         ttl=3600,  # 1 hour
                     )
                     failure_cache.set(failure_key, failure_entry)
-                    logger.info(f"[code_search] Cached index build failure for 1 hour")
+                    logger.info("[code_search] Cached index build failure for 1 hour")
             except Exception as cache_err:
                 logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
 

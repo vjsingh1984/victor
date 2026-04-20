@@ -95,14 +95,10 @@ def get_query_service() -> QueryService:
 async def get_recent_events(
     limit: int = Query(100, ge=1, le=1000, description="Maximum events to return"),
     offset: int = Query(0, ge=0, description="Number of events to skip"),
-    event_types: Optional[str] = Query(
-        None, description="Comma-separated event types to filter"
-    ),
+    event_types: Optional[str] = Query(None, description="Comma-separated event types to filter"),
     session_id: Optional[str] = Query(None, description="Filter by session ID"),
     tool_name: Optional[str] = Query(None, description="Filter by tool name"),
-    severity: Optional[str] = Query(
-        None, description="Filter by severity (error, warning, info)"
-    ),
+    severity: Optional[str] = Query(None, description="Filter by severity (error, warning, info)"),
 ) -> EventsResponse:
     """Get recent events with pagination.
 

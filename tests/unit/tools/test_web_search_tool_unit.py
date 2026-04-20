@@ -372,6 +372,7 @@ class TestGetRateLimiter:
         """Test that default parameters are used."""
         # Reset global rate limiter
         from victor.tools.web_search_tool import _RATE_LIMITER
+
         web_search_tool_module._RATE_LIMITER = None
 
         limiter = _get_rate_limiter()
@@ -386,6 +387,7 @@ class TestGetRateLimiter:
         """Test that custom parameters are applied."""
         # Reset global rate limiter
         from victor.tools.web_search_tool import _RATE_LIMITER
+
         web_search_tool_module._RATE_LIMITER = None
 
         limiter = _get_rate_limiter(

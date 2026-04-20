@@ -21,6 +21,7 @@ events, sessions, and metrics with caching, filtering, and pagination.
 
 from __future__ import annotations
 
+import asyncio
 import aiosqlite
 import json
 from dataclasses import dataclass, field
@@ -228,7 +229,7 @@ class QueryService:
                         )
                         events.append(event)
 
-        except Exception as e:
+        except Exception:
             # Log error but don't fail - try JSONL next
             pass
 
@@ -259,9 +260,9 @@ class QueryService:
         try:
             # Read and parse JSONL file
             all_events = []
-            async with aiosqlite.connect(usage_log) as db:
+            async with aiosqlite.connect(usage_log):
                 # SQLite can't read JSONL directly, use file I/O
-                import asyncio
+                # Open file in thread to avoid blocking event loop
 
                 async with asyncio.to_thread(open, usage_log, "r") as f:
                     for line in f:
@@ -276,21 +277,18 @@ class QueryService:
             if filters:
                 if filters.event_types:
                     filtered_events = [
-                        e for e in filtered_events
-                        if e.get("event_type") in filters.event_types
+                        e for e in filtered_events if e.get("event_type") in filters.event_types
                     ]
 
                 if filters.start_time:
                     filtered_events = [
-                        e for e in filtered_events
-                        if datetime.fromisoformat(e.get("timestamp", ""))
-                        >= filters.start_time
+                        e
+                        for e in filtered_events
+                        if datetime.fromisoformat(e.get("timestamp", "")) >= filters.start_time
                     ]
 
             # Sort by timestamp (newest first) and paginate
-            filtered_events.sort(
-                key=lambda e: e.get("timestamp", ""), reverse=True
-            )
+            filtered_events.sort(key=lambda e: e.get("timestamp", ""), reverse=True)
 
             for event_data in filtered_events[offset : offset + limit]:
                 event = Event(
@@ -304,7 +302,7 @@ class QueryService:
                 )
                 events.append(event)
 
-        except Exception as e:
+        except Exception:
             # Log error but return empty list
             pass
 
@@ -352,9 +350,7 @@ class QueryService:
             )
 
             persistence = get_sqlite_session_persistence()
-            sessions_data = await asyncio.to_thread(
-                persistence.list_sessions, limit
-            )
+            sessions_data = await asyncio.to_thread(persistence.list_sessions, limit)
 
             for session_data in sessions_data[offset : offset + limit]:
                 metadata = session_data.get("metadata", {})
@@ -410,12 +406,8 @@ class QueryService:
 
                     session = SessionInfo(
                         id=session_data.get("session_id", session_file.stem),
-                        created_at=datetime.fromisoformat(
-                            metadata.get("created_at", "")
-                        ),
-                        updated_at=datetime.fromisoformat(
-                            metadata.get("updated_at", "")
-                        ),
+                        created_at=datetime.fromisoformat(metadata.get("created_at", "")),
+                        updated_at=datetime.fromisoformat(metadata.get("updated_at", "")),
                         message_count=metadata.get("message_count", 0),
                         provider=metadata.get("provider", "unknown"),
                         model=metadata.get("model", "unknown"),
@@ -439,11 +431,10 @@ class QueryService:
         try:
             async with aiosqlite.connect(self.paths.conversation_db) as db:
                 # Count messages (proxy for activity)
-                async with db.execute(
-                    "SELECT COUNT(*) as count FROM messages"
-                ) as cursor:
-                    row = await cursor.fetchone()
-                    message_count = row["count"] if row else 0
+                # TODO: Use message count for activity metrics
+                # async with db.execute("SELECT COUNT(*) as count FROM messages") as cursor:
+                #     row = await cursor.fetchone()
+                #     message_count = row["count"] if row else 0
 
                 # Calculate metrics (simplified - will be enhanced with AggregationService)
                 return MetricsSnapshot(

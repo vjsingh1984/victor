@@ -246,7 +246,9 @@ class RoutingDecisionEngine:
         """
         # If user specified providers, use those
         if preferred_providers:
-            candidates = [p.lower() for p in preferred_providers if p.lower() in self.available_providers]
+            candidates = [
+                p.lower() for p in preferred_providers if p.lower() in self.available_providers
+            ]
             if candidates:
                 logger.debug(f"Using user-specified providers: {candidates}")
                 return candidates
@@ -486,9 +488,7 @@ class SmartRoutingProvider:
         self.config = config
 
         # Create supporting components
-        self.tracker = ProviderPerformanceTracker(
-            window_size=config.performance_window_size
-        )
+        self.tracker = ProviderPerformanceTracker(window_size=config.performance_window_size)
         self.detector = ResourceAvailabilityDetector()
         self.checker = ProviderHealthChecker()
 
@@ -521,16 +521,12 @@ class SmartRoutingProvider:
 
     def supports_tools(self) -> bool:
         """Check if any provider supports tools."""
-        return any(
-            getattr(p, "supports_tools", lambda: False)()
-            for p in self.providers.values()
-        )
+        return any(getattr(p, "supports_tools", lambda: False)() for p in self.providers.values())
 
     def supports_streaming(self) -> bool:
         """Check if any provider supports streaming."""
         return any(
-            getattr(p, "supports_streaming", lambda: False)()
-            for p in self.providers.values()
+            getattr(p, "supports_streaming", lambda: False)() for p in self.providers.values()
         )
 
     async def chat(

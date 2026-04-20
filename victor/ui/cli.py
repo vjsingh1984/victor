@@ -231,7 +231,9 @@ def run_command(
 
 @app.command("onboarding")
 def onboarding_command(
-    force: bool = typer.Option(False, "--force", "-f", help="Re-run onboarding even if completed before"),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Re-run onboarding even if completed before"
+    ),
 ) -> None:
     """Run the interactive onboarding wizard for first-time setup.
 

@@ -564,7 +564,9 @@ class PromptBuilder:
                 if hasattr(task_hint, "skip_evaluation") and task_hint.skip_evaluation:
                     execution_guidance.append("No need to explicitly verify results")
                 if hasattr(task_hint, "token_budget") and task_hint.token_budget:
-                    execution_guidance.append(f"Keep response concise (target ~{task_hint.token_budget} tokens)")
+                    execution_guidance.append(
+                        f"Keep response concise (target ~{task_hint.token_budget} tokens)"
+                    )
 
                 if execution_guidance:
                     guidance_text = "Execution constraints:\n- " + "\n- ".join(execution_guidance)

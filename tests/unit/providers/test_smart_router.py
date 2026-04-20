@@ -369,6 +369,7 @@ class TestSmartRoutingProvider:
     @pytest.mark.asyncio
     async def test_stream_success(self, smart_provider, mock_providers):
         """Test successful stream execution."""
+
         # Mock stream chunks
         async def mock_stream(*args, **kwargs):
             chunks = [MagicMock(content="Hello"), MagicMock(content=" World")]
@@ -393,6 +394,7 @@ class TestSmartRoutingProvider:
     @pytest.mark.asyncio
     async def test_stream_metrics_recording(self, smart_provider, mock_providers):
         """Test that stream metrics are recorded."""
+
         async def mock_stream(*args, **kwargs):
             yield MagicMock(content="test")
 

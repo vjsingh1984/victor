@@ -179,9 +179,7 @@ class ToolOutputPruner:
         pruning_reason = ""
 
         # Get task-specific rules
-        task_rules = self.TASK_PRUNING_RULES.get(
-            task_type, self.TASK_PRUNING_RULES["default"]
-        )
+        task_rules = self.TASK_PRUNING_RULES.get(task_type, self.TASK_PRUNING_RULES["default"])
 
         # Get tool-specific overrides
         tool_overrides = self.TOOL_PRUNING_OVERRIDES.get(tool_name, {})
@@ -192,9 +190,7 @@ class ToolOutputPruner:
         # Apply line limit
         max_lines = rules.get("max_lines", 100)
         if max_lines > 0 and original_lines > max_lines:
-            pruned_output = self._apply_line_limit(
-                pruned_output, max_lines, tool_name, rules
-            )
+            pruned_output = self._apply_line_limit(pruned_output, max_lines, tool_name, rules)
             was_pruned = True
             pruning_reason = f"max_lines={max_lines}"
 
@@ -277,9 +273,7 @@ class ToolOutputPruner:
             for line in lines:
                 stripped = line.strip()
                 # Detect end of imports
-                if in_imports and stripped and not stripped.startswith(
-                    ("import", "from", "#")
-                ):
+                if in_imports and stripped and not stripped.startswith(("import", "from", "#")):
                     in_imports = False
 
                 if in_imports or (stripped and stripped.startswith(("import", "from"))):
@@ -300,9 +294,7 @@ class ToolOutputPruner:
     def _strip_comments(self, output: str) -> str:
         """Remove comment lines from output."""
         lines = output.split("\n")
-        filtered = [
-            line for line in lines if not line.strip().startswith("#")
-        ]
+        filtered = [line for line in lines if not line.strip().startswith("#")]
         return "\n".join(filtered)
 
     def _strip_blank_lines(self, output: str) -> str:
@@ -315,8 +307,7 @@ class ToolOutputPruner:
         """Truncate lines that exceed max length."""
         lines = output.split("\n")
         truncated = [
-            line[:max_length] + "..." if len(line) > max_length else line
-            for line in lines
+            line[:max_length] + "..." if len(line) > max_length else line for line in lines
         ]
         return "\n".join(truncated)
 

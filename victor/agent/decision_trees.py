@@ -83,7 +83,9 @@ class FileTypeCondition(DecisionCondition):
             extensions: List of file extensions (e.g., [".py", ".txt"])
             match_all: True if all extensions must match, False if any
         """
-        self.extensions = [ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in extensions]
+        self.extensions = [
+            ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in extensions
+        ]
         self.match_all = match_all
 
     def evaluate(self, context: Dict[str, Any]) -> bool:
@@ -272,7 +274,9 @@ class PreComputedDecisionTrees:
         """
         # Condition: Does query contain code-specific keywords?
         has_code_keywords = DecisionNode(
-            condition=KeywordCondition(["function", "class", "variable", "import"], match_all=False),
+            condition=KeywordCondition(
+                ["function", "class", "variable", "import"], match_all=False
+            ),
             true_action=DecisionResult(
                 action=DecisionAction.TOOL_CALL,
                 confidence=0.9,
@@ -305,7 +309,9 @@ class PreComputedDecisionTrees:
         """
         # Condition: Is it a file not found error?
         is_file_not_found = DecisionNode(
-            condition=KeywordCondition(["not found", "no such file", "file not found"], match_all=False),
+            condition=KeywordCondition(
+                ["not found", "no such file", "file not found"], match_all=False
+            ),
             true_action=DecisionResult(
                 action=DecisionAction.TOOL_CALL,
                 confidence=0.95,
@@ -346,7 +352,9 @@ class PreComputedDecisionTrees:
                 reasoning="Simple filesystem task, using fast model",
             ),
             false_node=DecisionNode(
-                condition=KeywordCondition(["analyze", "refactor", "optimize", "generate"], match_all=False),
+                condition=KeywordCondition(
+                    ["analyze", "refactor", "optimize", "generate"], match_all=False
+                ),
                 true_action=DecisionResult(
                     action=DecisionAction.MODEL_TIER,
                     confidence=0.8,
@@ -405,6 +413,7 @@ class PreComputedDecisionTrees:
 
 
 # Convenience functions
+
 
 def decide_without_llm(
     tree_name: str,

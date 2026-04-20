@@ -120,9 +120,7 @@ class RateLimiter:
             # Clean old requests outside the 1-minute window
             if host in self._request_times:
                 cutoff = now - 60.0
-                self._request_times[host] = [
-                    ts for ts in self._request_times[host] if ts > cutoff
-                ]
+                self._request_times[host] = [ts for ts in self._request_times[host] if ts > cutoff]
 
             # Check if we can make a request now
             if self._request_times.get(host, []):
@@ -397,7 +395,9 @@ async def _request_text(
                                 connection_timeout=int(
                                     config.get("http_connection_pool_connection_timeout", 30)
                                 ),
-                                total_timeout=int(config.get("http_connection_pool_total_timeout", 60)),
+                                total_timeout=int(
+                                    config.get("http_connection_pool_total_timeout", 60)
+                                ),
                             )
                         )
                         response = await pool.request(

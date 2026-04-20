@@ -260,7 +260,9 @@ class TestParadigmRouter:
         router.route("create_simple", "create file", 0, 0.1)  # Direct
         router.route("edit", "fix bug", 0, 0.4)  # Focused
         router.route("design", "design system", 0, 0.8)  # Deep
-        router.route("unknown", "help me understand this better", 2, 0.25)  # Standard (unknown type, some history)
+        router.route(
+            "unknown", "help me understand this better", 2, 0.25
+        )  # Standard (unknown type, some history)
         router.route("action", "run tests", 0, 0.1)  # Direct
 
         stats = router.get_statistics()
@@ -300,9 +302,9 @@ class TestParadigmRouterIntegration:
                 history_length=0,
                 query_complexity=0.1,
             )
-            assert decision.paradigm == ProcessingParadigm.DIRECT, (
-                f"Task type {task_type} should route to DIRECT paradigm"
-            )
+            assert (
+                decision.paradigm == ProcessingParadigm.DIRECT
+            ), f"Task type {task_type} should route to DIRECT paradigm"
             assert decision.model_tier == ModelTier.SMALL
 
     def test_all_focused_task_types_route_correctly(self):
@@ -318,9 +320,9 @@ class TestParadigmRouterIntegration:
                 history_length=0,
                 query_complexity=0.4,
             )
-            assert decision.paradigm == ProcessingParadigm.FOCUSED, (
-                f"Task type {task_type} should route to FOCUSED paradigm"
-            )
+            assert (
+                decision.paradigm == ProcessingParadigm.FOCUSED
+            ), f"Task type {task_type} should route to FOCUSED paradigm"
             assert decision.model_tier == ModelTier.MEDIUM
 
     def test_all_deep_task_types_route_correctly(self):
@@ -336,9 +338,9 @@ class TestParadigmRouterIntegration:
                 history_length=0,
                 query_complexity=0.7,
             )
-            assert decision.paradigm == ProcessingParadigm.DEEP, (
-                f"Task type {task_type} should route to DEEP paradigm"
-            )
+            assert (
+                decision.paradigm == ProcessingParadigm.DEEP
+            ), f"Task type {task_type} should route to DEEP paradigm"
             assert decision.model_tier == ModelTier.LARGE
 
     def test_all_action_keywords_detected(self):
@@ -365,9 +367,9 @@ class TestParadigmRouterIntegration:
                 history_length=0,
                 query_complexity=0.2,
             )
-            assert decision.paradigm == ProcessingParadigm.DIRECT, (
-                f"Action query '{query}' should route to DIRECT paradigm"
-            )
+            assert (
+                decision.paradigm == ProcessingParadigm.DIRECT
+            ), f"Action query '{query}' should route to DIRECT paradigm"
 
     def test_complexity_thresholds_correct(self):
         """Test complexity thresholds are correct."""

@@ -177,7 +177,7 @@ REASONING: <one sentence>"""
             cached = self._get_from_cache(query)
             if cached:
                 self._cache_hits += 1
-                logger.debug(f"[ComplexityEstimator] Cache hit for query")
+                logger.debug("[ComplexityEstimator] Cache hit for query")
                 return cached
 
         # Use edge model for estimation

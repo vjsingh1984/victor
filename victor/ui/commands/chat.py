@@ -834,9 +834,7 @@ async def run_oneshot(
         settings.smart_routing_profile = routing_profile
         if fallback_chain:
             settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
-        console.print(
-            f"[green]✓[/] Smart routing enabled (profile={routing_profile})"
-        )
+        console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
 
     try:
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
@@ -897,9 +895,7 @@ async def run_oneshot(
                 # Ask user if they want to continue
                 from rich.prompt import Confirm
 
-                if not Confirm.ask(
-                    "Continue anyway?", default=False, show_default=True
-                ):
+                if not Confirm.ask("Continue anyway?", default=False, show_default=True):
                     console.print("\n[yellow]Setup cancelled.[/]")
                     console.print("Fix the issue above and run 'victor chat' again.\n")
                     raise typer.Exit(code=1)
@@ -1040,7 +1036,14 @@ async def run_oneshot(
         error_str = str(e).lower()
         is_provider_error = any(
             term in error_str
-            for term in ["api key", "unauthorized", "rate limit", "timeout", "connection", "network"]
+            for term in [
+                "api key",
+                "unauthorized",
+                "rate limit",
+                "timeout",
+                "connection",
+                "network",
+            ]
         )
 
         if is_provider_error:
@@ -1063,6 +1066,7 @@ async def run_oneshot(
         # Show traceback in debug mode only
         if os.getenv("VICTOR_DEBUG"):
             import traceback
+
             formatter.error(traceback.format_exc())
 
         raise typer.Exit(1)
@@ -1139,9 +1143,7 @@ async def run_interactive(
         settings.smart_routing_profile = routing_profile
         if fallback_chain:
             settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
-        console.print(
-            f"[green]✓[/] Smart routing enabled (profile={routing_profile})"
-        )
+        console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
 
     try:
         profiles = settings.load_profiles()
@@ -1288,13 +1290,21 @@ async def run_interactive(
         # Show traceback in debug mode only
         if os.getenv("VICTOR_DEBUG"):
             import traceback
+
             console.print(traceback.format_exc())
 
         # Suggest provider switching for provider-specific errors
         error_str = str(e).lower()
         is_provider_error = any(
             term in error_str
-            for term in ["api key", "unauthorized", "rate limit", "timeout", "connection", "network"]
+            for term in [
+                "api key",
+                "unauthorized",
+                "rate limit",
+                "timeout",
+                "connection",
+                "network",
+            ]
         )
 
         if is_provider_error:
@@ -1475,6 +1485,7 @@ async def _run_cli_repl(
             # Show traceback in debug mode only
             if os.getenv("VICTOR_DEBUG"):
                 import traceback
+
                 console.print(traceback.format_exc())
 
             # Save conversation state on error for recovery
@@ -1509,7 +1520,14 @@ async def _run_cli_repl(
             error_str = str(e).lower()
             is_provider_error = any(
                 term in error_str
-                for term in ["api key", "unauthorized", "rate limit", "timeout", "connection", "network"]
+                for term in [
+                    "api key",
+                    "unauthorized",
+                    "rate limit",
+                    "timeout",
+                    "connection",
+                    "network",
+                ]
             )
 
             if is_provider_error and provider != "ollama":

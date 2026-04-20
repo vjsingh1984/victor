@@ -38,12 +38,14 @@ logger = logging.getLogger(__name__)
 # Optional imports for enhanced functionality
 try:
     from victor.agent.complexity_estimator import ComplexityEstimator, get_complexity_estimator
+
     COMPLEXITY_ESTIMATOR_AVAILABLE = True
 except ImportError:
     COMPLEXITY_ESTIMATOR_AVAILABLE = False
 
 try:
     from victor.agent.task_classifier import TaskClassifier, get_task_classifier
+
     TASK_CLASSIFIER_AVAILABLE = True
 except ImportError:
     TASK_CLASSIFIER_AVAILABLE = False
@@ -355,8 +357,7 @@ class ParadigmRouter:
             )
             self._paradigm_stats["direct"] += 1
             logger.info(
-                f"[ParadigmRouter] DIRECT: task_type={task_type}, "
-                f"model=SMALL, max_tokens=500"
+                f"[ParadigmRouter] DIRECT: task_type={task_type}, " f"model=SMALL, max_tokens=500"
             )
             return decision
 
@@ -375,13 +376,10 @@ class ParadigmRouter:
                 skip_planning=True,
                 skip_evaluation=True,
                 confidence=0.85,
-                reasoning=f"Direct execution: action query, short, no history, "
-                f"low complexity",
+                reasoning="Direct execution: action query, short, no history, " "low complexity",
             )
             self._paradigm_stats["direct"] += 1
-            logger.info(
-                f"[ParadigmRouter] DIRECT: action query, model=SMALL, max_tokens=600"
-            )
+            logger.info("[ParadigmRouter] DIRECT: action query, model=SMALL, max_tokens=600")
             return decision
 
         # Fast Pattern 3: Focused processing for medium tasks
@@ -426,8 +424,7 @@ class ParadigmRouter:
             )
             self._paradigm_stats["deep"] += 1
             logger.info(
-                f"[ParadigmRouter] DEEP: task_type={task_type}, "
-                f"model=LARGE, max_tokens=4000"
+                f"[ParadigmRouter] DEEP: task_type={task_type}, " f"model=LARGE, max_tokens=4000"
             )
             return decision
 

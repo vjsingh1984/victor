@@ -184,7 +184,9 @@ class StateValidationError(Exception):
     def __init__(self, errors: List[str], state: Dict[str, Any]):
         self.errors = errors
         self.state = state
-        message = f"State validation failed with {len(errors)} error(s):\n" + "\n".join(f"  - {e}" for e in errors)
+        message = f"State validation failed with {len(errors)} error(s):\n" + "\n".join(
+            f"  - {e}" for e in errors
+        )
         super().__init__(message)
 
 
@@ -219,6 +221,7 @@ class StateValidator:
             return False
         try:
             from pydantic import BaseModel
+
             return isinstance(self._schema, type) and issubclass(self._schema, BaseModel)
         except (ImportError, TypeError):
             return False
@@ -229,8 +232,9 @@ class StateValidator:
             return False
         try:
             from typing_extensions import TypedDict
+
             # Check for TypedDict-specific attributes
-            if hasattr(self._schema, '__required_keys__'):
+            if hasattr(self._schema, "__required_keys__"):
                 return True
             # Fallback to issubclass check
             return isinstance(self._schema, type) and issubclass(self._schema, TypedDict)
@@ -304,10 +308,9 @@ class StateValidator:
             hints = get_type_hints(self._schema)
             if hasattr(self._schema, "__required_keys__"):
                 required = self._schema.__required_keys__
-                optional = set(hints.keys()) - required
+                # optional = set(hints.keys()) - required  # TODO: Use for optional validation
             else:
                 required = set(hints.keys())
-                optional = set()
 
             # Check required fields
             for key in required:
@@ -1636,10 +1639,7 @@ class CompiledGraph(Generic[StateType]):
         validation_config = self._config.validation
         self._validator: Optional[StateValidator] = None
         if validation_config.enabled and state_schema is not None:
-            self._validator = StateValidator(
-                schema=state_schema,
-                strict=validation_config.strict
-            )
+            self._validator = StateValidator(schema=state_schema, strict=validation_config.strict)
         else:
             self._validator = None
 
@@ -1757,8 +1757,7 @@ class CompiledGraph(Generic[StateType]):
         if exec_config.validation.enabled and self._state_schema is not None:
             # Use existing validator or create temporary one
             validator = self._validator or StateValidator(
-                schema=self._state_schema,
-                strict=exec_config.validation.strict
+                schema=self._state_schema, strict=exec_config.validation.strict
             )
             state_dict = input_state if isinstance(input_state, dict) else dict(input_state)
             errors = validator.validate(state_dict)
@@ -1877,8 +1876,7 @@ class CompiledGraph(Generic[StateType]):
                 if exec_config.validation.enabled and self._state_schema is not None:
                     # Use existing validator or create temporary one
                     validator = self._validator or StateValidator(
-                        schema=self._state_schema,
-                        strict=exec_config.validation.strict
+                        schema=self._state_schema, strict=exec_config.validation.strict
                     )
                     state_dict = state if isinstance(state, dict) else dict(state)
                     errors = validator.validate(state_dict)
@@ -1893,7 +1891,9 @@ class CompiledGraph(Generic[StateType]):
                                 node_history=node_history,
                             )
                         elif exec_config.validation.log_errors:
-                            logger.warning(f"State validation failed after node '{current_node}': {errors}")
+                            logger.warning(
+                                f"State validation failed after node '{current_node}': {errors}"
+                            )
 
                 # Track execution
                 logger.debug(f"Executed node: {current_node}")

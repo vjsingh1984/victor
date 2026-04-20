@@ -263,16 +263,19 @@ class TestPruningIntegration:
         pruner = ToolOutputPruner(enabled=True)
 
         # Simulate reading a 100-line file
-        output = "\n".join([
-            "# Comment line",
-            "import sys",
-            "from pathlib import Path",
-            "",
-            "def function():",
-            "    pass",
-            "",
-            # ... more lines
-        ] + [f"code_line_{i}: value = {i}" for i in range(100)])
+        output = "\n".join(
+            [
+                "# Comment line",
+                "import sys",
+                "from pathlib import Path",
+                "",
+                "def function():",
+                "    pass",
+                "",
+                # ... more lines
+            ]
+            + [f"code_line_{i}: value = {i}" for i in range(100)]
+        )
 
         pruned, info = pruner.prune(
             tool_output=output,
@@ -291,14 +294,17 @@ class TestPruningIntegration:
         pruner = ToolOutputPruner(enabled=True)
 
         # 50-line file with many comments
-        output = "\n".join([
-            "# Important comment",
-            "line of code",
-            "",
-            "# Another comment",
-            "more code",
-            # ... repeat
-        ] * 10)
+        output = "\n".join(
+            [
+                "# Important comment",
+                "line of code",
+                "",
+                "# Another comment",
+                "more code",
+                # ... repeat
+            ]
+            * 10
+        )
 
         pruned, info = pruner.prune(
             tool_output=output,
