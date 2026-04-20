@@ -740,6 +740,24 @@ def _build_file_dependency_result(
     return result
 
 
+def _find_similar_node_names(
+    analyzer: GraphAnalyzer, node_ref: str, max_suggestions: int = 5
+) -> List[str]:
+    """Find similar node names for error suggestions.
+
+    Args:
+        analyzer: GraphAnalyzer instance
+        node_ref: The node reference that failed to resolve
+        max_suggestions: Maximum number of suggestions to return
+
+    Returns:
+        List of similar node names
+    """
+    # Use the analyzer's search method to find similar nodes
+    results = analyzer.search(node_ref, limit=max_suggestions)
+    return [r["name"] for r in results]
+
+
 def _build_stats(loaded: LoadedGraph) -> Dict[str, Any]:
     node_types: Dict[str, int] = {}
     edge_types: Dict[str, int] = {}
@@ -867,7 +885,12 @@ async def graph(
                 target_ref, preferred_types=preferred_types
             )
             if resolved_id is None:
-                raise ValueError(f"Could not resolve graph node '{target_ref}'")
+                # Suggest similar node names
+                suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
+                error_msg = f"Could not resolve graph node '{target_ref}'"
+                if suggestions:
+                    error_msg += f"\n\nDid you mean one of these?\n  - " + "\n  - ".join(suggestions[:5])
+                raise ValueError(error_msg)
 
             effective_direction = direction
             if mode == "callers":
@@ -904,7 +927,21 @@ async def graph(
             resolved_source = loaded.analyzer.resolve_node_id(source, preferred_types=_SYMBOL_TYPES)
             resolved_target = loaded.analyzer.resolve_node_id(target, preferred_types=_SYMBOL_TYPES)
             if resolved_source is None or resolved_target is None:
-                raise ValueError("Could not resolve source or target node")
+                # Determine which node failed and provide suggestions
+                error_parts = []
+                if resolved_source is None:
+                    source_suggestions = _find_similar_node_names(loaded.analyzer, source)
+                    error_parts.append(f"Source '{source}' not found")
+                    if source_suggestions:
+                        error_parts.append("  Did you mean?")
+                        error_parts.extend(f"    - {s}" for s in source_suggestions[:3])
+                if resolved_target is None:
+                    target_suggestions = _find_similar_node_names(loaded.analyzer, target)
+                    error_parts.append(f"Target '{target}' not found")
+                    if target_suggestions:
+                        error_parts.append("  Did you mean?")
+                        error_parts.extend(f"    - {s}" for s in target_suggestions[:3])
+                raise ValueError("\n".join(error_parts))
             result = loaded.analyzer.shortest_path(
                 resolved_source,
                 resolved_target,

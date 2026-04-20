@@ -224,13 +224,35 @@ class LiveDisplayRenderer:
             self._live.update(Markdown(new_content))
 
     def on_thinking_content(self, text: str) -> None:
-        """Accumulate thinking content - will render on thinking_end.
+        """Display thinking content immediately during streaming.
 
         Args:
-            text: Thinking text to accumulate
+            text: Thinking text to display
         """
-        # Just accumulate - don't print each chunk to avoid duplication
+        if not text or not text.strip():
+            return
+
+        # Pause live display to show thinking content
+        self.pause()
+
+        # Render thinking content with a distinct style
+        # Use a panel or styled text to make it stand out
+        from rich.panel import Panel
+        from rich.markdown import Markdown
+        from rich.text import Text
+
+        # Create a styled thinking indicator
+        thinking_text = Text(text, style="dim italic")
+        self.console.print(thinking_text)
+
+        # Also accumulate for final content
         self._thinking_buffer += text
+
+        # Mark that we've shown this thinking content
+        self._last_thinking_rendered = text
+
+        # Resume live display
+        self.resume()
 
     def on_thinking_start(self) -> None:
         """Show thinking indicator and pause Live display."""

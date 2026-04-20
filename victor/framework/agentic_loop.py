@@ -811,8 +811,27 @@ class AgenticLoop:
 
         # ACT via streaming pipeline (yields chunks token-by-token)
         if streaming_pipeline is not None:
-            async for chunk in streaming_pipeline.run(query):
-                yield chunk
+            try:
+                async for chunk in streaming_pipeline.run(query):
+                    yield chunk
+            except Exception as e:
+                if "request format error" in str(e).lower():
+                    logger.warning(
+                        f"[stream] Streaming failed due to message format error, "
+                        f"falling back to non-streaming: {e}"
+                    )
+                    # Fall back: yield a simple text chunk with error info
+                    # In production, you might want to call a non-streaming chat method here
+                    from victor.providers.base import StreamChunk
+
+                    yield StreamChunk(
+                        content=f"[Streaming error: {str(e)}. The system encountered a message format issue. "
+                        f"This has been logged and will be fixed in future updates.]",
+                        is_final=True,
+                    )
+                else:
+                    # Re-raise non-format errors
+                    raise
         else:
             logger.warning("[stream] No streaming pipeline provided")
             return

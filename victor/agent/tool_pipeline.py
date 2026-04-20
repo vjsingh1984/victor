@@ -849,6 +849,23 @@ class ToolPipeline:
             args_str = str(args)
         return f"{tool_name}:{args_str}"
 
+    def _generate_tool_call_id(self, tool_name: str) -> str:
+        """Generate a deterministic tool_call_id if one isn't provided.
+
+        Uses tool name + timestamp to create a unique ID that's consistent
+        for the same tool call within a session.
+
+        Args:
+            tool_name: Name of the tool being called
+
+        Returns:
+            A 16-character hex string tool_call_id
+        """
+        import hashlib
+        timestamp = int(time.time() * 1000)
+        hash_input = f"{tool_name}_{timestamp}"
+        return hashlib.md5(hash_input.encode()).hexdigest()[:16]
+
     def is_known_failure(self, tool_name: str, args: Dict[str, Any]) -> bool:
         """Check if a tool call is known to fail.
 
@@ -1191,17 +1208,26 @@ class ToolPipeline:
 
             # Handle pre-invalidated tool calls (hallucinated names marked by coordinator)
             if isinstance(tool_call, dict) and tool_call.get("_invalid"):
+                tool_name = tool_call.get("name", "unknown")
+                # Generate tool_call_id if not provided
+                if tc_id is None:
+                    tc_id = self._generate_tool_call_id(tool_name)
                 call_result = ToolCallResult(
-                    tool_name=tool_call.get("name", "unknown"),
+                    tool_name=tool_name,
                     arguments={},
                     success=False,
                     error=tool_call.get("_error", "Unknown tool"),
                     skipped=True,
                     skip_reason=tool_call.get("_error"),
+                    tool_call_id=tc_id,
                 )
             else:
                 call_result = await self._execute_single_call(tool_call, context)
             # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec
+            # Generate deterministic ID if not provided
+            if tc_id is None:
+                tool_name = tool_call.get("name", "unknown") if isinstance(tool_call, dict) else "unknown"
+                tc_id = self._generate_tool_call_id(tool_name)
             call_result.tool_call_id = tc_id
             result.results.append(call_result)
 
@@ -1269,6 +1295,7 @@ class ToolPipeline:
                     cached=True,  # Mark as effectively cached
                     skipped=True,
                     skip_reason="Deduplicated (duplicate call in batch)",
+                    tool_call_id=self._generate_tool_call_id(original_result.tool_name),
                 )
                 result.results.append(dup_result)
                 result.skipped_calls += 1

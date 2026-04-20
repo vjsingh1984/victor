@@ -50,6 +50,7 @@ from victor.agent.coordinators.tool_coordinator import (
 )
 from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
 from victor.agent.coordinators.tool_retry import ToolRetryExecutor
+# DEPRECATED: ChatCoordinator - Use ChatService from victor.agent.services instead
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.agent.coordinators.chat_protocols import (
     ChatContextProtocol,
@@ -100,7 +101,7 @@ from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
 from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
 
 __all__ = [
-    "ChatCoordinator",
+    "ChatCoordinator",  # DEPRECATED - Use ChatService instead
     "ChatContextProtocol",
     "ChatOrchestratorProtocol",
     "ProviderContextProtocol",

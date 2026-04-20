@@ -51,6 +51,65 @@ def reset_path_resolver() -> None:
     _path_resolver = None
 
 
+def _list_available_directories(base_path: Path, max_count: int = 10) -> List[str]:
+    """List available directories at the given path level.
+
+    Args:
+        base_path: Parent path to search
+        max_count: Maximum number of directories to return
+
+    Returns:
+        List of directory names
+    """
+    if not base_path.exists():
+        return []
+
+    try:
+        return [
+            d.name
+            for d in sorted(base_path.iterdir())
+            if d.is_dir() and not d.name.startswith(".")
+        ][:max_count]
+    except PermissionError:
+        return []
+
+
+def _validate_directory_with_suggestions(path: Path) -> None:
+    """Validate directory exists, providing helpful suggestions if not.
+
+    Args:
+        path: Path to validate
+
+    Raises:
+        FileNotFoundError: With helpful suggestions if directory doesn't exist
+    """
+    if path.exists():
+        return
+
+    # Try to find similar directories
+    if path.parent.exists():
+        available = _list_available_directories(path.parent)
+        if available:
+            # Find directories with similar names
+            from difflib import get_close_matches
+
+            suggestions = get_close_matches(path.name, available, n=3, cutoff=0.6)
+            if suggestions:
+                raise FileNotFoundError(
+                    f"Directory not found: {path}\n\n"
+                    f"Did you mean one of these?\n  - "
+                    + "\n  - ".join(suggestions)
+                    + f"\n\nAvailable directories in {path.parent.name}:\n  - "
+                    + "\n  - ".join(available[:5])
+                )
+
+    # Fallback: general error
+    raise FileNotFoundError(
+        f"Directory not found: {path}\n\n"
+        f"Tip: Check the path is correct and the directory exists."
+    )
+
+
 # ============================================================================
 # PATH NORMALIZATION
 # ============================================================================
@@ -2609,8 +2668,9 @@ async def overview(
 
     try:
         root = Path(path).expanduser().resolve()
-        if not root.exists():
-            raise FileNotFoundError(f"Directory not found: {path}")
+        # Validate directory exists with helpful suggestions
+        _validate_directory_with_suggestions(root)
+
         if not root.is_dir():
             # GAP-14 FIX: If a file path is given, use its parent directory
             # This is a common model mistake - be helpful and auto-correct

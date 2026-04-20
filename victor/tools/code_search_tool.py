@@ -1184,7 +1184,7 @@ async def _literal_search(
         "search",
     ],  # Force inclusion
     aliases=["search"],  # Backward compatibility alias
-    timeout=60.0,  # Embedding search on large repos can be slow
+    timeout=300.0,  # Increased to 5 minutes for large codebases (was 60s)
 )
 async def code_search(
     query: str,
@@ -1376,7 +1376,7 @@ async def code_search(
         try:
             index, rebuilt = await asyncio.wait_for(
                 _get_or_build_index(root_path, settings, force_reindex=reindex, exec_ctx=_exec_ctx),
-                timeout=30.0,
+                timeout=180.0,  # Increased to 3 minutes for large codebases (was 30s)
             )
         except (asyncio.TimeoutError, Exception) as exc:
             error_msg = str(exc)

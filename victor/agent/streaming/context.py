@@ -101,6 +101,9 @@ class StreamingChatContext:
     full_content: str = ""
     mentioned_tools_detected: List[str] = field(default_factory=list)
 
+    # Thinking/reasoning content accumulation
+    reasoning_buffer: str = ""  # Accumulate LLM reasoning/thinking content separately from regular content
+
     # Recovery tracking
     consecutive_empty_responses: int = 0
     total_blocked_attempts: int = 0

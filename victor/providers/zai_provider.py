@@ -746,24 +746,30 @@ class ZAIProvider(BaseProvider):
             # Tool response messages: include tool_call_id if available
             elif msg.role == "tool":
                 tool_call_id = getattr(msg, "tool_call_id", None)
-                tool_name = getattr(msg, "name", None)
+                tool_name = getattr(msg, "name", None) or "unknown"
                 if tool_call_id:
                     formatted_msg["tool_call_id"] = tool_call_id
                     if tool_call_id not in valid_tool_call_ids:
-                        # Orphaned tool response — skip to avoid API error
+                        # Orphaned tool response — generate fallback tool_call_id
+                        import hashlib
+                        import time
+                        fallback_id = hashlib.md5(f"{tool_name}_{time.time()}".encode()).hexdigest()[:16]
+                        formatted_msg["tool_call_id"] = fallback_id
                         self._provider_logger.logger.debug(
-                            "Skipping orphaned tool response (tool_call_id=%s)",
+                            "Generated fallback tool_call_id for orphaned response: %s (original: %s)",
+                            fallback_id,
                             tool_call_id,
                         )
-                        continue
                 else:
-                    # Tool message without tool_call_id — shouldn't happen with
-                    # proper propagation. Log and skip to avoid API rejection.
-                    self._provider_logger.logger.warning(
-                        "Tool message missing tool_call_id for '%s', skipping",
-                        tool_name or "unknown",
+                    # Tool message without tool_call_id — generate fallback
+                    import hashlib
+                    import time
+                    fallback_id = hashlib.md5(f"{tool_name}_{time.time()}".encode()).hexdigest()[:16]
+                    formatted_msg["tool_call_id"] = fallback_id
+                    self._provider_logger.logger.debug(
+                        "Generated fallback tool_call_id for tool response missing ID: %s",
+                        fallback_id,
                     )
-                    continue
 
             formatted_messages.append(formatted_msg)
 
@@ -948,7 +954,13 @@ class ZAIProvider(BaseProvider):
         # Extract reasoning_content if present (thinking mode)
         metadata = None
         if "reasoning_content" in delta:
-            metadata = {"reasoning_content": delta.get("reasoning_content")}
+            reasoning_content = delta.get("reasoning_content")
+            if reasoning_content:
+                # Signal to renderer that this is thinking content
+                metadata = {
+                    "reasoning_content": reasoning_content,
+                    "thinking_mode": True,
+                }
 
         # Handle tool call deltas (OpenAI streaming format)
         tool_call_deltas = delta.get("tool_calls", [])

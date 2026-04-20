@@ -434,11 +434,15 @@ class ArgumentNormalizer:
                             if not python_obj:  # Empty list [] or dict {}
                                 normalized[key] = python_obj
                             else:
-                                # Complex structure - convert to JSON and verify it's parseable
-                                json_str = json.dumps(python_obj)
-                                # Verify the JSON string can be parsed back
-                                json.loads(json_str)
-                                normalized[key] = json_str
+                                # Complex structure - keep as Python object, don't convert to string
+                                # Verify it's JSON-serializable for provider compatibility
+                                try:
+                                    json.dumps(python_obj)  # Verify serializable (will raise if not)
+                                    normalized[key] = python_obj  # Keep as dict/list
+                                except (TypeError, ValueError) as e:
+                                    # Not serializable - convert to string as fallback
+                                    logger.warning(f"Parameter {key} contains non-serializable value: {e}")
+                                    normalized[key] = json.dumps(python_obj, default=str)
                         else:
                             # Primitive value - keep as-is
                             normalized[key] = value

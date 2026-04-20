@@ -67,11 +67,17 @@ logger = logging.getLogger(__name__)
 
 
 class ChatCoordinator:
-    """[DEPRECATED] Coordinator for chat and streaming chat operations.
+    """[DEPRECATED - Use ChatService] Adapter for backward compatibility.
 
-    This class is being superseded by ChatService as part of the
-    state-passed architectural migration. It remains for backward
-    compatibility with facade-driven components.
+    **WARNING**: This class is deprecated and will be removed in a future release.
+    All new code should use ``victor.agent.services.ChatService`` instead.
+
+    Migration guide:
+    - Old: ``ChatCoordinator(orchestrator)``
+    - New: ``ChatService(config, provider_service, tool_service, ...)``
+
+    This coordinator now acts as an adapter that delegates to ChatService
+    internally while maintaining the old interface for backward compatibility.
 
     The coordinator depends on ``ChatOrchestratorProtocol`` (defined in
     ``chat_protocols.py``) rather than the concrete ``AgentOrchestrator``.
@@ -86,7 +92,7 @@ class ChatCoordinator:
         orchestrator: "ChatOrchestratorProtocol",
         token_tracker: Optional["TokenTracker"] = None,
     ) -> None:
-        """Initialize the ChatCoordinator.
+        """Initialize the ChatCoordinator with deprecation warning.
 
         Args:
             orchestrator: Object satisfying ChatOrchestratorProtocol
@@ -94,10 +100,21 @@ class ChatCoordinator:
                 streaming token usage is accumulated through the tracker
                 instead of direct dict mutation on the orchestrator.
         """
+        import warnings
+
+        warnings.warn(
+            "ChatCoordinator is deprecated. Use ChatService from "
+            "victor.agent.services.chat_service instead. "
+            "This adapter will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         self._orchestrator = orchestrator
         self._token_tracker = token_tracker
+        self._chat_service: Optional[Any] = None  # Lazy-loaded ChatService
 
-        # Lazy-initialized handlers
+        # Lazy-initialized handlers (deprecated, kept for compatibility)
         self._intent_classification_handler: Optional["IntentClassificationHandler"] = None
         self._continuation_handler: Optional["ContinuationHandler"] = None
         self._tool_execution_handler: Optional["ToolExecutionHandler"] = None
