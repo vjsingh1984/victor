@@ -69,6 +69,9 @@ from victor.integrations.api.routes.mcp_routes import create_router as create_mc
 from victor.integrations.api.routes.websocket_routes import (
     create_router as create_websocket_router,
 )
+from victor.integrations.api.routes.observability_routes import (
+    router as observability_router,
+)
 
 _ROUTER_FACTORIES = [
     create_system_router,
@@ -89,10 +92,18 @@ _ROUTER_FACTORIES = [
     create_websocket_router,
 ]
 
+# Direct routers (not factory functions)
+_DIRECT_ROUTERS = [
+    observability_router,
+]
+
 
 def create_all_routers(server: "VictorFastAPIServer") -> List[APIRouter]:
     """Create all route routers bound to the given server instance."""
-    return [factory(server) for factory in _ROUTER_FACTORIES]
+    routers = [factory(server) for factory in _ROUTER_FACTORIES]
+    # Add direct routers (not factory functions)
+    routers.extend(_DIRECT_ROUTERS)
+    return routers
 
 
 __all__ = [

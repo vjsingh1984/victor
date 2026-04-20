@@ -1,3 +1,31 @@
+/* Navigation for Victor UI */
+.app-nav {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+}
+
+.nav-link {
+  padding: 0.5rem 1rem;
+  color: #c9d1d9;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-weight: 500;
+}
+
+.nav-link:hover {
+  background: #21262d;
+  color: #58a6ff;
+}
+
+.nav-link.active {
+  background: #21262d;
+  color: #58a6ff;
+}
+
 .app-shell {
   max-width: 1380px;
   margin: 0 auto;

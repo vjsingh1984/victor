@@ -224,6 +224,94 @@ class DoctorChecks:
                 message=f"Could not check Ollama status: {e}",
             )
 
+    def check_default_model(self) -> None:
+        """Check if default model is available in Ollama."""
+        try:
+            from victor.config.settings import load_settings
+
+            settings = load_settings()
+
+            # Only check if Ollama is the default provider
+            if settings.provider.default_provider.lower() != "ollama":
+                self.add_check(
+                    name="Default Model",
+                    severity=Severity.INFO,
+                    message=f"Default provider is {settings.provider.default_provider} (skipping Ollama model check)",
+                )
+                return
+
+            default_model = settings.provider.default_model
+
+            # Check if Ollama is running
+            result = subprocess.run(
+                ["ollama", "list"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            if result.returncode != 0:
+                self.add_check(
+                    name="Default Model",
+                    severity=Severity.WARNING,
+                    message=f"Cannot check model '{default_model}' - Ollama not running",
+                    suggestion="Start Ollama: 'ollama serve'",
+                )
+                return
+
+            # Parse available models
+            models = result.stdout.strip().split("\n")[1:]  # Skip header
+            available_models = [line.split()[0] for line in models if line.strip()]
+
+            # Check if default model is available
+            if default_model in available_models:
+                self.add_check(
+                    name="Default Model",
+                    severity=Severity.SUCCESS,
+                    message=f"Default model '{default_model}' is available",
+                )
+            else:
+                # Model not found
+                if available_models:
+                    model_list = ", ".join(available_models[:5])
+                    if len(available_models) > 5:
+                        model_list += f", ... ({len(available_models)} total)"
+                    self.add_check(
+                        name="Default Model",
+                        severity=Severity.WARNING,
+                        message=f"Default model '{default_model}' is not installed",
+                        suggestion=f"Available: {model_list}\n"
+                        f"Pull default: 'ollama pull {default_model}'\n"
+                        f"Or change default in: ~/.victor/profiles.yaml",
+                    )
+                else:
+                    self.add_check(
+                        name="Default Model",
+                        severity=Severity.WARNING,
+                        message=f"Default model '{default_model}' is not installed (no models found)",
+                        suggestion=f"Pull default: 'ollama pull {default_model}'",
+                    )
+
+        except ImportError:
+            self.add_check(
+                name="Default Model",
+                severity=Severity.INFO,
+                message="Could not import settings to check default model",
+            )
+        except subprocess.TimeoutExpired:
+            self.add_check(
+                name="Default Model",
+                severity=Severity.WARNING,
+                message="Ollama command timed out",
+                suggestion="Check if Ollama is running: 'ollama serve'",
+            )
+        except Exception as e:
+            self.add_check(
+                name="Default Model",
+                severity=Severity.INFO,
+                message=f"Could not check default model: {e}",
+            )
+
     def check_config_directory(self) -> None:
         """Check Victor configuration directory."""
         victor_config = os.getenv("VICTOR_CONFIG_DIR")
@@ -355,6 +443,7 @@ class DoctorChecks:
         self.check_dependencies()
         self.check_api_keys()
         self.check_local_providers()
+        self.check_default_model()  # Phase 6: Check model existence
         self.check_config_directory()
         self.check_performance_settings()
         self.check_file_permissions()
