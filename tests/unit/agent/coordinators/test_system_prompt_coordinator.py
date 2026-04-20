@@ -102,10 +102,10 @@ class TestSystemPromptCoordinator:
         """Shell variant resolution delegates to shell_resolver module."""
         with patch(
             "victor.agent.shell_resolver.resolve_shell_variant",
-            return_value="shell_readonly",
+            return_value="shell",
         ) as mock_resolve:
             result = coordinator.resolve_shell_variant("bash")
-            assert result == "shell_readonly"
+            assert result == "shell"
             mock_resolve.assert_called_once_with("bash", mock_tools, None)
 
     def test_classify_task_keywords(self, coordinator, mock_task_analyzer):

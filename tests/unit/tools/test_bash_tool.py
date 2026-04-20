@@ -101,7 +101,8 @@ async def test_shell_working_dir_not_found():
 @pytest.mark.asyncio
 async def test_shell_general_exception():
     """Test bash command general exception handling."""
-    with patch("asyncio.create_subprocess_shell") as mock_subprocess:
+    with patch("asyncio.create_subprocess_shell") as mock_subprocess, \
+         patch("victor.tools.bash._is_readonly_command", return_value=False):
         mock_subprocess.side_effect = RuntimeError("Unexpected error")
 
         result = await shell(cmd="echo test")
