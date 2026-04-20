@@ -67,3 +67,48 @@ class ToolSettings(BaseModel):
     # Enable cross-turn tool result deduplication (session-scoped cache)
     cross_turn_dedup_enabled: bool = True
     cross_turn_dedup_ttl: int = 300  # seconds
+
+    # Tool output preview configuration (accuracy-first defaults)
+    tool_output_preview_enabled: bool = Field(
+        default=True,
+        description="Show tool output preview to user (default: yes for transparency)",
+    )
+    tool_output_preview_lines: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Number of lines to show in tool output preview (default: 3)",
+    )
+    tool_output_pruning_enabled: bool = Field(
+        default=False,
+        description="Enable tool output pruning to save tokens (default: no - accuracy-first)",
+    )
+    tool_output_show_transparency: bool = Field(
+        default=True,
+        description="Show pruning status to user when output was pruned (default: yes)",
+    )
+    tool_output_expand_hotkey: str = Field(
+        default="^O",
+        description="Hotkey to expand tool output (default: Ctrl+O, format: ^X for Ctrl+X)",
+    )
+
+
+def get_tool_settings() -> ToolSettings:
+    """Get the current tool settings from the global settings singleton.
+
+    Returns:
+        ToolSettings instance with current configuration
+
+    Example:
+        >>> from victor.config.tool_settings import get_tool_settings
+        >>> settings = get_tool_settings()
+        >>> if settings.tool_output_preview_enabled:
+        ...     show_preview()
+    """
+    from victor.config.settings import get_settings
+
+    global_settings = get_settings()
+    if global_settings.tool_settings is None:
+        # Return default ToolSettings if not configured
+        return ToolSettings()
+    return global_settings.tool_settings

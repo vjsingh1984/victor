@@ -757,6 +757,9 @@ class Settings(BaseSettings):
     credit_assignment: Optional[CreditAssignmentSettings] = Field(
         default=None, exclude=True, repr=False
     )
+    tool_settings: Optional[ToolSettings] = Field(
+        default_factory=ToolSettings, exclude=True, repr=False
+    )
 
     # Default provider settings (Ollama for local privacy and cost savings)
     default_provider: str = "ollama"

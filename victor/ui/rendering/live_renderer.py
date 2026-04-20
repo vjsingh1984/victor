@@ -46,6 +46,7 @@ class LiveDisplayRenderer:
         self._is_paused = False  # Track pause state to avoid redundant operations
         self._thinking_buffer = ""  # Accumulate thinking text for clean display
         self._pending_tool: dict | None = None  # Track tool waiting for result
+        self._last_tool_result: dict | None = None  # Store for expansion
         self._last_thinking_rendered = ""  # Track last rendered thinking to avoid dupes
         self._thinking_indicator_shown = False  # Track if we've shown the indicator
         self._in_thinking_mode = False  # Track if we're in thinking mode to avoid content pollution
@@ -103,8 +104,12 @@ class LiveDisplayRenderer:
         arguments: dict[str, Any],
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
+        # New parameters for preview
+        original_result: str | None = None,
+        preview_lines: int = 3,
+        was_pruned: bool = False,
     ) -> None:
-        """Handle tool execution result - print consolidated single line.
+        """Handle tool execution result - print consolidated single line with preview.
 
         Args:
             name: Tool name
@@ -112,14 +117,51 @@ class LiveDisplayRenderer:
             elapsed: Execution time in seconds
             arguments: Tool arguments
             error: Error message if failed
+            original_result: Unmodified tool output (before pruning)
+            preview_lines: Number of lines to show in preview
+            was_pruned: Whether output was pruned before sending to LLM
         """
+        from victor.config.tool_settings import get_tool_settings
+
+        tool_settings = get_tool_settings()
+        show_preview = tool_settings.tool_output_preview_enabled
+
         self.pause()
+
+        # Print status line
         args_display = format_tool_args(arguments)
         args_str = f"({args_display})" if args_display else ""
         icon = "✓" if success else "✗"
         color = "green" if success else "red"
         # Single consolidated line: icon + name + args + time
         self.console.print(f"[{color}]{icon}[/] {name}{args_str} [dim]({elapsed:.1f}s)[/]")
+
+        # Show preview if enabled
+        if show_preview and success and original_result:
+            preview_text = self._generate_preview(original_result, preview_lines)
+            if preview_text:
+                self.console.print(f"[dim]↳ {preview_text}[/]")
+
+                # Show expand hint if output is longer than preview
+                num_lines = len(original_result.split("\n"))
+                if num_lines > preview_lines:
+                    hotkey = tool_settings.tool_output_expand_hotkey
+                    self.console.print(f"[dim italic]Press {hotkey} to see all {num_lines} lines[/]")
+
+        # Show pruning transparency
+        if was_pruned and tool_settings.tool_output_show_transparency:
+            self.console.print("[dim yellow]⚠ Output was pruned before sending to LLM[/]")
+
+        # Store result for potential expansion
+        self._last_tool_result = {
+            "name": name,
+            "success": success,
+            "result": original_result or "",
+            "arguments": arguments,
+            "elapsed": elapsed,
+        }
+
+        # Show follow-up suggestions
         if success and follow_up_suggestions:
             for suggestion in follow_up_suggestions[:2]:
                 if not isinstance(suggestion, dict):
@@ -128,6 +170,7 @@ class LiveDisplayRenderer:
                 if not isinstance(command, str) or not command.strip():
                     continue
                 self.console.print(f"[dim]  next: {command}[/]")
+
         self._pending_tool = None
         self.resume()
 
@@ -235,6 +278,74 @@ class LiveDisplayRenderer:
         self.cleanup()
         return self._content_buffer
 
+    def _generate_preview(self, text: str, num_lines: int = 3) -> str:
+        """Generate a preview of the first few lines of output.
+
+        Args:
+            text: Full text to generate preview from
+            num_lines: Number of lines to include in preview
+
+        Returns:
+            Preview text with ellipsis if truncated
+        """
+        if not text:
+            return ""
+        lines = text.split("\n")
+        preview = "\n".join(lines[:num_lines])
+        if len(lines) > num_lines:
+            preview += "..."
+        # Truncate long lines
+        max_line_length = 120
+        preview = "\n".join(
+            line[:max_line_length] + "..." if len(line) > max_line_length else line
+            for line in preview.split("\n")
+        )
+        return preview
+
+    def expand_last_output(self) -> None:
+        """Expand the last tool output to show full content.
+
+        Displays the full output in a Rich Panel with syntax highlighting if possible.
+        """
+        if not self._last_tool_result:
+            self.console.print("[dim]No tool output to expand[/]")
+            return
+
+        data = self._last_tool_result
+        if not data["success"]:
+            return
+
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        content = data["result"]
+        tool_name = data["name"]
+
+        self.pause()
+        try:
+            # Try syntax highlighting for code-like content
+            ext = tool_name.split("_")[-1] if "_" in tool_name else "txt"
+            syntax = Syntax(
+                content, ext, theme="monokai", line_numbers=True, word_wrap=True
+            )
+            self.console.print(
+                Panel(
+                    syntax,
+                    title=f"[bold]{tool_name}[/] - Full Output",
+                    border_style="blue",
+                )
+            )
+        except Exception:
+            # Fallback to plain panel
+            self.console.print(
+                Panel(
+                    content,
+                    title=f"[bold]{tool_name}[/] - Full Output",
+                    border_style="blue",
+                )
+            )
+        self.resume()
+
     def cleanup(self) -> None:
         """Clean up the Live display."""
         if self._live:
@@ -247,3 +358,4 @@ class LiveDisplayRenderer:
         self._thinking_indicator_shown = False
         self._in_thinking_mode = False
         self._content_shown_before_pause = ""
+        self._last_tool_result = None

@@ -124,6 +124,11 @@ class ToolExecutionResult:
         normalization_strategy: Optional[NormalizationStrategy] = None,
         correlation_id: Optional[str] = None,
         error_info: Optional[ErrorInfo] = None,
+        # New fields for preview support
+        original_result: Optional[Any] = None,
+        preview_lines: int = 3,
+        was_pruned: bool = False,
+        pruning_info: Any = None,
     ):
         """Initialize tool execution result.
 
@@ -138,6 +143,10 @@ class ToolExecutionResult:
             normalization_strategy: Strategy used for argument normalization
             correlation_id: Unique ID for tracking this execution across logs
             error_info: Structured error information if execution failed
+            original_result: Unmodified tool output (before pruning)
+            preview_lines: Number of lines to show in preview
+            was_pruned: Whether output was pruned before sending to LLM
+            pruning_info: Pruning metadata (PruningInfo object)
         """
         self.tool_name = tool_name
         self.success = success
@@ -150,6 +159,11 @@ class ToolExecutionResult:
         self.correlation_id = correlation_id
         self.error_info = error_info
         self.truncation_info: Any = None
+        # New fields for preview support
+        self.original_result = original_result if original_result is not None else result
+        self.preview_lines = preview_lines
+        self.was_pruned = was_pruned
+        self.pruning_info = pruning_info
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization/logging.
@@ -877,34 +891,48 @@ class ToolExecutor:
                     f"Use offset={truncation_info.lines_returned} to read remaining content.]"
                 )
 
-        # Apply task-aware output pruning for token reduction (arXiv:2604.04979)
-        # This reduces tokens by 40-60% while preserving essential information
+        # Apply task-aware output pruning ONLY if enabled (accuracy-first default)
+        # This reduces tokens by 40-60% but may reduce accuracy
+        # Store original_result for user preview regardless of pruning
+        original_result = result if isinstance(result, str) else str(result)
+
         if success and isinstance(result, str):
-            from victor.tools.output_pruner import get_output_pruner
+            from victor.config.tool_settings import get_tool_settings
 
-            task_type = context.get("task_type", "unknown") if context else "unknown"
-            pruner = get_output_pruner()
+            tool_settings = get_tool_settings()
+            should_prune = tool_settings.tool_output_pruning_enabled
 
-            pruned_result, pruning_info = pruner.prune(
-                tool_output=result,
-                task_type=task_type,
-                tool_name=tool_name,
-                context=context,
-            )
+            if should_prune:
+                from victor.tools.output_pruner import get_output_pruner
 
-            if pruning_info.was_pruned:
-                logger.info(
-                    "Tool %s output pruned: %s",
-                    tool_name,
-                    pruning_info,
+                task_type = context.get("task_type", "unknown") if context else "unknown"
+                pruner = get_output_pruner()
+
+                pruned_result, pruning_info = pruner.prune(
+                    tool_output=result,
+                    task_type=task_type,
+                    tool_name=tool_name,
+                    context=context,
                 )
-                result = pruned_result
 
-                # Merge truncation and pruning info for observability
-                if truncation_info:
-                    truncation_info.pruning_info = pruning_info
-                else:
-                    truncation_info = pruning_info
+                if pruning_info.was_pruned:
+                    logger.info(
+                        "Tool %s output pruned: %s",
+                        tool_name,
+                        pruning_info,
+                    )
+                    result = pruned_result
+
+                    # Merge truncation and pruning info for observability
+                    if truncation_info:
+                        truncation_info.pruning_info = pruning_info
+                    else:
+                        truncation_info = pruning_info
+
+        # Prepare pruning metadata for ToolExecutionResult
+        pruning_metadata = None
+        if should_prune and success and isinstance(result, str):
+            pruning_metadata = truncation_info  # Contains pruning_info if pruning was applied
 
         exec_result = ToolExecutionResult(
             tool_name=tool_name,
@@ -916,6 +944,11 @@ class ToolExecutor:
             normalization_strategy=strategy,
             correlation_id=correlation_id,
             error_info=error_info,
+            # New fields for preview support
+            original_result=original_result,
+            preview_lines=3,  # Will be overridden by formatter settings
+            was_pruned=should_prune and (pruning_metadata is not None),
+            pruning_info=pruning_metadata,
         )
         exec_result.truncation_info = truncation_info
         return exec_result

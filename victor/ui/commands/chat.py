@@ -359,6 +359,19 @@ def chat(
         help="Custom fallback chain (comma-separated provider names, e.g., 'ollama,anthropic,openai').",
         rich_help_panel="Smart Routing",
     ),
+    # Tool Output Preview options (Accuracy-first defaults)
+    tool_preview: bool = typer.Option(
+        True,
+        "--tool-preview/--no-tool-preview",
+        help="Show tool output preview (default: yes). Disable to show only status line.",
+        rich_help_panel="Tool Output",
+    ),
+    enable_pruning: bool = typer.Option(
+        False,
+        "--enable-pruning",
+        help="Enable tool output pruning to save tokens (default: no - accuracy-first).",
+        rich_help_panel="Tool Output",
+    ),
 ):
     """Start interactive chat or send a one-shot message.
 
@@ -744,6 +757,9 @@ victor chat --sessionid abc123            # Resume session
                     enable_smart_routing=enable_smart_routing,
                     routing_profile=routing_profile,
                     fallback_chain=fallback_chain,
+                    # Tool output preview
+                    tool_preview=tool_preview,
+                    enable_pruning=enable_pruning,
                 )
             )
         elif stdin or input_file:
@@ -773,6 +789,9 @@ victor chat --sessionid abc123            # Resume session
                     enable_smart_routing=enable_smart_routing,
                     routing_profile=routing_profile,
                     fallback_chain=fallback_chain,
+                    # Tool output preview
+                    tool_preview=tool_preview,
+                    enable_pruning=enable_pruning,
                 )
             )
             return
@@ -810,6 +829,9 @@ async def run_oneshot(
     enable_smart_routing: bool = False,
     routing_profile: str = "balanced",
     fallback_chain: Optional[str] = None,
+    # Tool output preview parameters
+    tool_preview: bool = True,
+    enable_pruning: bool = False,
 ) -> None:
     """Run a single message and exit.
 
@@ -835,6 +857,23 @@ async def run_oneshot(
         if fallback_chain:
             settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
         console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+
+    # Configure tool output preview (accuracy-first defaults)
+    from victor.config.tool_settings import ToolSettings
+
+    # Apply tool output preview settings from flags
+    if not tool_preview:
+        settings.tool_settings.tool_output_preview_enabled = False
+    if enable_pruning:
+        settings.tool_settings.tool_output_pruning_enabled = True
+
+    # Show status message if non-default
+    tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
+    if enable_pruning:
+        console.print(f"[yellow]⚠ Tool output: pruning enabled (cost optimization)[/]")
+    else:
+        # Default: accuracy-first
+        console.print("[green]✓[/] Tool output: full context to LLM, preview enabled")
 
     try:
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
@@ -1105,6 +1144,9 @@ async def run_interactive(
     enable_smart_routing: bool = False,
     routing_profile: str = "balanced",
     fallback_chain: Optional[str] = None,
+    # Tool output preview parameters
+    tool_preview: bool = True,
+    enable_pruning: bool = False,
 ) -> None:
     """Run interactive CLI mode.
 
@@ -1144,6 +1186,23 @@ async def run_interactive(
         if fallback_chain:
             settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
         console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+
+    # Configure tool output preview (accuracy-first defaults)
+    from victor.config.tool_settings import ToolSettings
+
+    # Apply tool output preview settings from flags
+    if not tool_preview:
+        settings.tool_settings.tool_output_preview_enabled = False
+    if enable_pruning:
+        settings.tool_settings.tool_output_pruning_enabled = True
+
+    # Show status message if non-default
+    tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
+    if enable_pruning:
+        console.print(f"[yellow]⚠ Tool output: pruning enabled (cost optimization)[/]")
+    else:
+        # Default: accuracy-first
+        console.print("[green]✓[/] Tool output: full context to LLM, preview enabled")
 
     try:
         profiles = settings.load_profiles()
@@ -1418,6 +1477,19 @@ async def _run_cli_repl(
     # Set up prompt_toolkit with persistent history for Up/Down arrow navigation
     prompt_session = _create_cli_prompt_session()
 
+    # Add Ctrl+O hotkey to expand last tool output
+    from prompt_toolkit.keys import Keys
+
+    @prompt_session.key_bindings.add(Keys.ControlO)
+    def _expand_output(event):
+        """Expand last tool output to show full content."""
+        # We need to access the formatter from the renderer
+        # This will be set when renderer is created below
+        pass
+
+    # Store formatter reference for hotkey access
+    renderer_with_formatter = None
+
     while True:
         try:
             # Use prompt_async() — prompt_toolkit's native async input.
@@ -1455,11 +1527,33 @@ async def _run_cli_repl(
                 )
 
                 use_live = renderer_choice in {"rich", "auto"}
-                renderer = (
-                    LiveDisplayRenderer(console)
-                    if use_live
-                    else FormatterRenderer(create_formatter(), console)
+                if use_live:
+                    renderer = LiveDisplayRenderer(console)
+                    # LiveDisplayRenderer doesn't wrap formatter, so we can't expand
+                    renderer_with_formatter = None
+                else:
+                    # FormatterRenderer wraps OutputFormatter
+                    formatter = create_formatter()
+                    renderer = FormatterRenderer(formatter, console)
+                    # Store reference for hotkey access
+                    renderer_with_formatter = renderer
+
+                # Update hotkey handler with formatter reference
+                @prompt_session.key_bindings.add(Keys.ControlO)
+                def _expand_output_with_formatter(event):
+                    """Expand last tool output to show full content."""
+                    if renderer_with_formatter and hasattr(
+                        renderer_with_formatter, "formatter"
+                    ):
+                        renderer_with_formatter.formatter.expand_last_tool_output()
+
+                content_buffer = await stream_response(
+                    agent,
+                    user_input,
+                    renderer,
+                    suppress_thinking=not show_reasoning,
                 )
+                content_buffer = sanitize_response(content_buffer)
                 content_buffer = await stream_response(
                     agent,
                     user_input,

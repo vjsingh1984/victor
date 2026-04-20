@@ -100,6 +100,8 @@ class OutputFormatter:
         self._stream_buffer: str = ""
         # Tool timing tracking for compact output
         self._pending_tool: Optional[Tuple[str, Dict[str, Any], float]] = None
+        # Tool result storage for expansion
+        self._last_tool_result: Optional[Dict[str, Any]] = None
 
     @property
     def mode(self) -> OutputMode:
@@ -233,14 +235,23 @@ class OutputFormatter:
         result: Optional[str] = None,
         error: Optional[str] = None,
         follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
+        # New parameters for preview
+        original_result: Optional[str] = None,
+        preview_lines: int = 3,
+        was_pruned: bool = False,
+        show_preview: bool = True,
     ) -> None:
-        """Record tool execution result and output compact single-line format.
+        """Record tool execution result and output compact single-line format with preview.
 
         Args:
             tool_name: Name of the tool
             success: Whether tool succeeded
             result: Tool result (if success)
             error: Error message (if failed)
+            original_result: Unmodified tool output (before pruning)
+            preview_lines: Number of lines to show in preview
+            was_pruned: Whether output was pruned before sending to LLM
+            show_preview: Whether to show preview (controlled by settings)
         """
         tool_record = {
             "tool": tool_name,
@@ -295,6 +306,46 @@ class OutputFormatter:
             time_display = f"({duration_str.strip('()')})" if duration_str else ""
             error_display = f" [red]{error[:30]}[/]" if error else ""
             self._console.print(f"{status_icon} [bold]{base}[/] {time_display}{error_display}")
+
+            # Show preview if enabled and result is successful
+            preview_text = ""
+            if show_preview and success and original_result:
+                preview_text = self._generate_preview(original_result, preview_lines)
+                if preview_text:
+                    self._console.print(f"[dim]↳ {preview_text}[/]")
+                    # Show expand hint if output is longer than preview
+                    if original_result and len(original_result.split("\n")) > preview_lines:
+                        try:
+                            from victor.config.tool_settings import get_tool_settings
+                            tool_settings = get_tool_settings()
+                            hotkey = tool_settings.tool_output_expand_hotkey
+                            self._console.print(f"[dim italic]Press {hotkey} to see full output[/]")
+                        except Exception:
+                            # Fallback if settings not available
+                            self._console.print("[dim italic]Press ^O to see full output[/]")
+
+            # Show pruning transparency if enabled
+            if was_pruned and self.config.show_tools:
+                try:
+                    from victor.config.tool_settings import get_tool_settings
+                    tool_settings = get_tool_settings()
+                    if tool_settings.tool_output_show_transparency:
+                        self._console.print("[dim yellow]⚠ Output was pruned before sending to LLM[/]")
+                except Exception:
+                    # Fallback if settings not available
+                    self._console.print("[dim yellow]⚠ Output was pruned before sending to LLM[/]")
+
+            # Store full result for potential expansion
+            self._last_tool_result = {
+                "tool_name": tool_name,
+                "success": success,
+                "result": original_result or result,  # Store original for expansion
+                "pruned_result": result,  # What was actually sent to LLM
+                "was_pruned": was_pruned,
+                "error": error,
+                "follow_up_suggestions": follow_up_suggestions,
+            }
+
             if success and follow_up_suggestions:
                 for suggestion in follow_up_suggestions[:2]:
                     if not isinstance(suggestion, dict):
@@ -321,6 +372,78 @@ class OutputFormatter:
                         print(f"  next: {command}", file=self.config.stderr)
             # Flush stderr immediately to ensure tool output appears before next content
             self.config.stderr.flush()
+
+    def _generate_preview(self, text: str, num_lines: int = 3) -> str:
+        """Generate a preview of the first few lines of output.
+
+        Args:
+            text: Full tool output
+            num_lines: Number of lines to include in preview
+
+        Returns:
+            Preview string with first N lines
+        """
+        if not text:
+            return ""
+        lines = text.split("\n")
+        preview = "\n".join(lines[:num_lines])
+        if len(lines) > num_lines:
+            preview += "..."
+        # Truncate long lines
+        max_line_length = 120
+        preview = "\n".join(
+            line[:max_line_length] + "..." if len(line) > max_line_length else line
+            for line in preview.split("\n")
+        )
+        return preview
+
+    def expand_last_tool_output(self) -> None:
+        """Expand the last tool output to show full content.
+
+        Displays the full tool output in a Rich panel with syntax highlighting.
+        """
+        if not hasattr(self, "_last_tool_result") or not self._last_tool_result:
+            self._console.print("[dim]No tool output to expand[/]")
+            return
+
+        data = self._last_tool_result
+        if not data["success"]:
+            return
+
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        content = data["result"]
+        tool_name = data["tool_name"]
+
+        # Try syntax highlighting for code-like content
+        if self.config.mode == OutputMode.RICH:
+            try:
+                # Extract file extension from tool name if possible
+                ext = tool_name.split("_")[-1] if "_" in tool_name else "txt"
+                # Map common tool names to extensions
+                ext_map = {
+                    "read": "py",
+                    "grep": "txt",
+                    "code_search": "py",
+                    "cat": "txt",
+                }
+                ext = ext_map.get(tool_name, ext)
+
+                syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
+                self._console.print(
+                    Panel(syntax, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+                )
+            except Exception:
+                # Fallback to plain panel
+                self._console.print(
+                    Panel(content, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+                )
+        else:
+            # Plain mode
+            print(f"\n--- Full Output: {tool_name} ---")
+            print(content)
+            print("--- End of Output ---\n")
 
     def thinking(self, content: str) -> None:
         """Output thinking/reasoning content.
