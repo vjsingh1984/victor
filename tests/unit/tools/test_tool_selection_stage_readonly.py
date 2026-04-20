@@ -26,9 +26,9 @@ from victor.tools.base import (
     ExecutionCategory,
     Priority,
     ToolMetadata,
-    ToolRegistry,
     ToolResult,
 )
+from victor.tools.registry import ToolRegistry
 from victor.tools.semantic_selector import SemanticToolSelector
 from victor.tools import metadata_registry
 

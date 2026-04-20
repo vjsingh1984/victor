@@ -116,6 +116,7 @@ from victor.framework.config import (
     InterruptConfig,
     PerformanceConfig,
     ObservabilityConfig,
+    ValidationConfig,
 )
 
 # Type variables for generic state
@@ -175,6 +176,210 @@ class AgentStateModel(BaseModel):
     def __setitem__(self, key: str, value: Any) -> None:
         """Set item by key (dict-like subscript access)."""
         setattr(self, key, value)
+
+
+class StateValidationError(Exception):
+    """Raised when state validation fails."""
+
+    def __init__(self, errors: List[str], state: Dict[str, Any]):
+        self.errors = errors
+        self.state = state
+        message = f"State validation failed with {len(errors)} error(s):\n" + "\n".join(f"  - {e}" for e in errors)
+        super().__init__(message)
+
+
+class StateValidator:
+    """Validates state objects against their schema.
+
+    Supports both Pydantic models and TypedDict for backward compatibility.
+    Provides clear error messages for invalid state.
+
+    Example:
+        validator = StateValidator(AgentState, strict=True)
+        errors = validator.validate({"messages": [], "task": "test"})
+        if errors:
+            raise StateValidationError(errors, state)
+    """
+
+    def __init__(self, schema: Optional[Type], strict: bool = False):
+        """Initialize state validator.
+
+        Args:
+            schema: Optional type schema for validation (Pydantic model or TypedDict)
+            strict: If True, raise immediately on validation errors
+        """
+        self._schema = schema
+        self._strict = strict
+        self._is_pydantic = self._check_pydantic()
+        self._is_typeddict = self._check_typeddict()
+
+    def _check_pydantic(self) -> bool:
+        """Check if schema is a Pydantic BaseModel."""
+        if self._schema is None:
+            return False
+        try:
+            from pydantic import BaseModel
+            return isinstance(self._schema, type) and issubclass(self._schema, BaseModel)
+        except (ImportError, TypeError):
+            return False
+
+    def _check_typeddict(self) -> bool:
+        """Check if schema is a TypedDict."""
+        if self._schema is None:
+            return False
+        try:
+            from typing_extensions import TypedDict
+            return isinstance(self._schema, type) and issubclass(self._schema, TypedDict)
+        except (ImportError, TypeError):
+            return False
+
+    def validate(self, state: Dict[str, Any]) -> List[str]:
+        """Validate state against schema.
+
+        Args:
+            state: State dictionary to validate
+
+        Returns:
+            List of error messages (empty if valid)
+        """
+        if self._schema is None:
+            return []
+
+        # Pydantic model validation
+        if self._is_pydantic:
+            return self._validate_pydantic(state)
+
+        # TypedDict validation (basic)
+        if self._is_typeddict:
+            return self._validate_typeddict(state)
+
+        # Unknown schema type
+        return []
+
+    def _validate_pydantic(self, state: Dict[str, Any]) -> List[str]:
+        """Validate using Pydantic model.
+
+        Args:
+            state: State dictionary to validate
+
+        Returns:
+            List of error messages
+        """
+        try:
+            from pydantic import ValidationError
+
+            self._schema.model_validate(state)
+            return []
+        except ValidationError as e:
+            # Format Pydantic errors into readable messages
+            errors = []
+            for error in e.errors():
+                loc = " -> ".join(str(x) for x in error["loc"])
+                msg = error["msg"]
+                errors.append(f"{loc}: {msg}")
+            return errors
+        except Exception as e:
+            return [f"Validation error: {str(e)}"]
+
+    def _validate_typeddict(self, state: Dict[str, Any]) -> List[str]:
+        """Basic validation for TypedDict.
+
+        Args:
+            state: State dictionary to validate
+
+        Returns:
+            List of error messages
+        """
+        try:
+            from typing_extensions import TypedDict, get_type_hints
+            import inspect
+
+            errors = []
+
+            # Get required and optional fields
+            hints = get_type_hints(self._schema)
+            if hasattr(self._schema, "__required_keys__"):
+                required = self._schema.__required_keys__
+                optional = set(hints.keys()) - required
+            else:
+                required = set(hints.keys())
+                optional = set()
+
+            # Check required fields
+            for key in required:
+                if key not in state:
+                    errors.append(f"Missing required field: '{key}'")
+
+            # Type checking for present fields
+            for key, value in state.items():
+                if key not in hints:
+                    errors.append(f"Unexpected field: '{key}'")
+                    continue
+
+                expected_type = hints[key]
+                if not self._check_type(value, expected_type):
+                    errors.append(
+                        f"Type mismatch for '{key}': expected {expected_type}, got {type(value).__name__}"
+                    )
+
+            return errors
+        except Exception as e:
+            # TypedDict validation failed, return error
+            return [f"TypedDict validation error: {str(e)}"]
+
+    def _check_type(self, value: Any, expected_type: Type) -> bool:
+        """Check if value matches expected type.
+
+        Args:
+            value: Value to check
+            expected_type: Expected type
+
+        Returns:
+            True if type matches
+        """
+        import typing
+        from typing import get_origin, get_args
+
+        # Handle generic types (List, Dict, Optional, etc.)
+        origin = get_origin(expected_type)
+
+        if origin is not None:
+            # List[T]
+            if origin is list:
+                if not isinstance(value, list):
+                    return False
+                if get_args(expected_type):
+                    item_type = get_args(expected_type)[0]
+                    return all(self._check_type(item, item_type) for item in value)
+                return True
+
+            # Dict[K, V]
+            if origin is dict:
+                if not isinstance(value, dict):
+                    return False
+                if get_args(expected_type):
+                    key_type, value_type = get_args(expected_type)
+                    return all(
+                        self._check_type(k, key_type) and self._check_type(v, value_type)
+                        for k, v in value.items()
+                    )
+                return True
+
+            # Optional[T] or Union[T, None]
+            if origin is typing.Union:
+                args = get_args(expected_type)
+                if len(args) == 2 and type(None) in args:
+                    # Optional[T]
+                    other_type = args[0] if args[1] is type(None) else args[1]
+                    return value is None or self._check_type(value, other_type)
+                return any(self._check_type(value, arg) for arg in args)
+
+        # Direct type check
+        try:
+            return isinstance(value, expected_type)
+        except TypeError:
+            # Type annotation isn't a runtime type (e.g., NewType, TypeVar)
+            return True
 
 
 class CopyOnWriteState(Generic[StateType]):
@@ -1423,6 +1628,17 @@ class CompiledGraph(Generic[StateType]):
             default_state_merger
         )
 
+        # Initialize state validator
+        validation_config = self._config.validation
+        self._validator: Optional[StateValidator] = None
+        if validation_config.enabled and state_schema is not None:
+            self._validator = StateValidator(
+                schema=state_schema,
+                strict=validation_config.strict
+            )
+        else:
+            self._validator = None
+
     def set_debug_hook(self, hook: Optional[Any]) -> None:
         """Set debug hook for execution.
 
@@ -1532,6 +1748,16 @@ class CompiledGraph(Generic[StateType]):
             GraphExecutionResult with final state
         """
         exec_config = config or self._config
+
+        # Validate input state if enabled
+        if self._validator and exec_config.validation.validate_on_entry:
+            state_dict = input_state if isinstance(input_state, dict) else dict(input_state)
+            errors = self._validator.validate(state_dict)
+            if errors:
+                if exec_config.validation.strict:
+                    raise StateValidationError(errors, state_dict)
+                elif exec_config.validation.log_errors:
+                    logger.warning(f"State validation failed on entry: {errors}")
         thread_id = thread_id or uuid.uuid4().hex
         use_cow = self._should_use_cow(exec_config)
         graph_id = exec_config.observability.graph_id or thread_id
@@ -1637,6 +1863,23 @@ class CompiledGraph(Generic[StateType]):
                         duration=timeout_manager.get_elapsed(),
                         node_history=node_history,
                     )
+
+                # Validate state after node execution if enabled
+                if self._validator and exec_config.validation.validate_after_nodes:
+                    state_dict = state if isinstance(state, dict) else dict(state)
+                    errors = self._validator.validate(state_dict)
+                    if errors:
+                        if exec_config.validation.strict:
+                            return GraphExecutionResult(
+                                state=state,
+                                success=False,
+                                error=f"State validation failed after node '{current_node}': {errors}",
+                                iterations=iteration_controller.iterations,
+                                duration=timeout_manager.get_elapsed(),
+                                node_history=node_history,
+                            )
+                        elif exec_config.validation.log_errors:
+                            logger.warning(f"State validation failed after node '{current_node}': {errors}")
 
                 # Track execution
                 logger.debug(f"Executed node: {current_node}")

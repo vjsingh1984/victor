@@ -12,6 +12,7 @@ from typing import Dict, Type
 from pydantic import BaseModel
 
 from victor.agent.decisions.schemas import (
+    CompactionDecision,
     ContinuationDecision,
     DecisionType,
     ErrorClassDecision,
@@ -227,5 +228,21 @@ DECISION_PROMPTS: Dict[DecisionType, DecisionPrompt] = {
         ),
         schema=ToolNecessityDecision,
         max_tokens=30,
+    ),
+    DecisionType.COMPACTION: DecisionPrompt(
+        system="You classify conversation complexity for context compaction. Respond JSON only.",
+        user_template=(
+            "Classify this conversation for compaction routing.\n\n"
+            "Message count: {message_count}\n"
+            "Estimated tokens: {estimated_tokens}\n"
+            "Task complexity: {task_complexity}\n\n"
+            "Complexity: simple (≤8 messages) or complex (>8 messages)\n"
+            "Tiers: edge (fast), balanced (normal), performance (quality)\n\n"
+            'JSON: {{"complexity": "simple"|"complex", '
+            '"recommended_tier": "edge"|"balanced"|"performance", '
+            '"estimated_tokens": int, "confidence": 0.0-1.0, "reason": "brief explanation"}}'
+        ),
+        schema=CompactionDecision,
+        max_tokens=50,
     ),
 }

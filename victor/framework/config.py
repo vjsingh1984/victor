@@ -308,6 +308,44 @@ class ObservabilityConfig:
 
 
 @dataclass
+class ValidationConfig:
+    """State validation configuration for StateGraph.
+
+    Controls runtime validation of state objects against their schema.
+    Provides LangGraph-compatible validation behavior.
+
+    Attributes:
+        enabled: Whether to validate state at runtime
+        strict: Raise exception immediately on validation errors (vs. collect and continue)
+        validate_on_entry: Validate input state before graph execution
+        validate_after_nodes: Validate state after each node execution
+        log_errors: Log validation errors even when not raising
+
+    Example:
+        # Strict validation for production
+        config = ValidationConfig(
+            enabled=True,
+            strict=True,
+            validate_on_entry=True,
+            validate_after_nodes=True
+        )
+
+        # Lenient validation for development
+        config = ValidationConfig(
+            enabled=True,
+            strict=False,
+            validate_after_nodes=False
+        )
+    """
+
+    enabled: bool = False  # Validation disabled by default (backward compatibility)
+    strict: bool = False  # Don't raise on errors (log only)
+    validate_on_entry: bool = True  # Validate input state
+    validate_after_nodes: bool = True  # Validate after each node
+    log_errors: bool = True  # Log errors even when not raising
+
+
+@dataclass
 class GraphConfig:
     """Facade config that composes focused configs.
 
@@ -320,12 +358,14 @@ class GraphConfig:
         interrupt: Interrupt behavior configuration
         performance: Performance optimization configuration
         observability: Observability and eventing configuration
+        validation: State validation configuration
 
     Example:
         # Use focused configs (ISP compliant)
         config = GraphConfig(
             execution=ExecutionConfig(max_iterations=50),
-            observability=ObservabilityConfig(emit_events=True)
+            observability=ObservabilityConfig(emit_events=True),
+            validation=ValidationConfig(enabled=True)
         )
 
         # Migrate from legacy format
@@ -337,6 +377,7 @@ class GraphConfig:
     interrupt: InterruptConfig = field(default_factory=InterruptConfig)
     performance: PerformanceConfig = field(default_factory=PerformanceConfig)
     observability: ObservabilityConfig = field(default_factory=ObservabilityConfig)
+    validation: ValidationConfig = field(default_factory=ValidationConfig)
 
     @classmethod
     def from_legacy(cls, **kwargs) -> "GraphConfig":

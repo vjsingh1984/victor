@@ -27,7 +27,8 @@ import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set
 
 from victor.providers.base import ToolDefinition
-from victor.tools.base import AccessMode, ExecutionCategory, ToolRegistry
+from victor.tools.base import AccessMode, ExecutionCategory
+from victor.tools.registry import ToolRegistry
 from victor.tools.selection_common import get_tools_from_message
 from victor.tools.selection_filters import is_small_model
 

@@ -15,10 +15,10 @@ from victor.tools.base import (
     BaseTool,
     ToolResult,
     ToolParameter,
-    ToolRegistry,
     CostTier,
     Priority,
 )
+from victor.tools.registry import ToolRegistry
 
 
 class TestToolParameter:

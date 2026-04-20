@@ -16,9 +16,21 @@
 
 import logging
 import os
+import sys
 from pathlib import Path
 
 import pytest
+
+# Pre-import victor.agent submodules that tests import dynamically (e.g. inside
+# setup_method or test bodies). The tests/unit/agent/ directory mirrors the
+# victor/agent/ layout and has its own __init__.py; if Python sees tests/unit/ in
+# sys.path before victor/ is resolved it can bind 'agent' to the wrong package,
+# causing "cannot import name X from 'agent'" errors. Importing these modules here
+# at conftest load-time (before any test runs) ensures sys.modules is populated
+# with the correct victor.agent.* entries and subsequent in-body imports hit the
+# cache instead of doing a fresh lookup against the stale sys.path.
+import victor.agent.presentation  # noqa: F401 — populates sys.modules early
+import victor.agent.safety  # noqa: F401 — populates sys.modules early
 
 _UNIT_TEST_REPO_ROOT = Path(__file__).resolve().parents[2]
 

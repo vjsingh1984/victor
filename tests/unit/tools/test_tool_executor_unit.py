@@ -21,7 +21,8 @@ from victor.agent.tool_executor import (
     ToolExecutionResult,
     ToolExecutor,
 )
-from victor.tools.base import ToolRegistry, BaseTool, ToolResult
+from victor.tools.base import BaseTool, ToolResult
+from victor.tools.registry import ToolRegistry
 
 
 class TestToolExecutionResult:
