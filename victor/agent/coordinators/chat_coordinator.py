@@ -894,11 +894,25 @@ class ChatCoordinator:
                 last_exception = e
                 if attempt < max_retries:
                     wait_time = self._get_rate_limit_wait_time(e, attempt)
+
+                    # User-friendly rate limit message
+                    endpoint_info = f"{self.provider_name}:{self.model}" if hasattr(self, 'provider_name') else "API"
                     logger.warning(
-                        f"Rate limit hit (attempt {attempt + 1}/{max_retries + 1}). "
-                        f"Waiting {wait_time:.1f}s before retry..."
+                        f"[yellow]⚠ Rate limit hit for {endpoint_info}[/] "
+                        f"(attempt {attempt + 1}/{max_retries + 1}). "
+                        f"Waiting {wait_time:.0f}s before retry..."
                     )
                     logger.debug(f"Rate limit detail: {str(e)[:300]}")
+
+                    # Suggest how to avoid rate limits
+                    if attempt == 0:  # Only show suggestion on first attempt
+                        logger.info(
+                            f"[dim]Tip: To avoid rate limits, consider:[/]\n"
+                            f"[dim]  • Using an API key instead of free tier[/]\n"
+                            f"[dim]  • Adding a small delay between requests[/]\n"
+                            f"[dim]  • Reducing request frequency[/]"
+                        )
+
                     await asyncio.sleep(wait_time)
                 else:
                     logger.error(f"Rate limit persisted after {max_retries + 1} attempts")
