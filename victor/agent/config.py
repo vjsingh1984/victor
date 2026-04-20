@@ -73,6 +73,20 @@ class AgentMode(str, Enum):
     TEAM_MEMBER = "team_member"
 
 
+class ExecutionModeType(str, Enum):
+    """Execution mode type for background agents.
+
+    Defines the execution strategy for background tasks:
+    - BUILD: Direct code generation and modification
+    - PLAN: Create implementation plans without executing
+    - EXPLORE: Understand and analyze codebase
+    """
+
+    BUILD = "build"  # Direct code generation and modification
+    PLAN = "plan"  # Create implementation plans without executing
+    EXPLORE = "explore"  # Understand and analyze codebase
+
+
 @dataclass
 class UnifiedAgentConfig:
     """Unified configuration for ALL agent types.
@@ -131,7 +145,7 @@ class UnifiedAgentConfig:
     # Mode Selection
     # ==========================================================================
 
-    mode: Literal["foreground", "background", "team_member"] = "foreground"
+    mode: AgentMode = AgentMode.FOREGROUND
 
     # ==========================================================================
     # Common Configuration (All Modes)
