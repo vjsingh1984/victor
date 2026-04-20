@@ -12,6 +12,158 @@ config_app = typer.Typer(name="config", help="Validate configuration files and p
 console = Console()
 
 
+@config_app.command("show")
+def config_show(
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed configuration including all sources",
+    ),
+) -> None:
+    """Show effective configuration with source annotations.
+
+    Displays the currently active configuration, showing:
+    - Default provider and model
+    - Active profile (if any)
+    - Configuration sources (files, env vars)
+    - Tool settings and limits
+    """
+    from pathlib import Path
+    from rich.table import Table
+    from rich.panel import Panel
+
+    try:
+        settings = load_settings()
+    except Exception as e:
+        console.print(f"[red]✗ Failed to load configuration:[/] {e}")
+        raise typer.Exit(1)
+
+    console.print("\n[bold cyan]Victor Configuration[/]\n")
+
+    # Provider and Model
+    provider_table = Table(show_header=False, box=None, padding=(0, 2))
+    provider_table.add_column("Setting", style="cyan")
+    provider_table.add_column("Value", style="white")
+    provider_table.add_column("Source", style="dim")
+
+    provider_table.add_row(
+        "Default Provider",
+        settings.provider.default_provider,
+        "settings.yaml" if (Path.home() / ".victor" / "settings.yaml").exists() else "default"
+    )
+    provider_table.add_row(
+        "Default Model",
+        settings.provider.default_model,
+        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default"
+    )
+    provider_table.add_row(
+        "Temperature",
+        str(settings.provider.default_temperature),
+        "default"
+    )
+    provider_table.add_row(
+        "Max Tokens",
+        str(settings.provider.default_max_tokens),
+        "default"
+    )
+
+    console.print("[bold]Provider Configuration[/]")
+    console.print(provider_table)
+    console.print()
+
+    # Tool Settings
+    tools_table = Table(show_header=False, box=None, padding=(0, 2))
+    tools_table.add_column("Setting", style="cyan")
+    tools_table.add_column("Value", style="white")
+    tools_table.add_column("Source", style="dim")
+
+    tools_table.add_row(
+        "Tool Budget",
+        str(settings.tools.fallback_max_tools),
+        "profiles.yaml" if (Path.home() / ".victor" / "profiles.yaml").exists() else "default"
+    )
+    tools_table.add_row(
+        "Cache Enabled",
+        "Yes" if settings.tools.tool_selection_cache_enabled else "No",
+        "default"
+    )
+    tools_table.add_row(
+        "Deduplication",
+        "Yes" if settings.tools.enable_tool_deduplication else "No",
+        "default"
+    )
+
+    console.print("[bold]Tool Settings[/]")
+    console.print(tools_table)
+    console.print()
+
+    # Configuration Files
+    config_dir = Path.home() / ".victor"
+    files_table = Table(show_header=False, box=None, padding=(0, 2))
+    files_table.add_column("File", style="cyan")
+    files_table.add_column("Status", style="white")
+
+    files_table.add_row(
+        "profiles.yaml",
+        "[green]Exists[/]" if (config_dir / "profiles.yaml").exists() else "[dim]Not found[/]"
+    )
+    files_table.add_row(
+        "settings.yaml",
+        "[green]Exists[/]" if (config_dir / "settings.yaml").exists() else "[dim]Not found[/]"
+    )
+    files_table.add_row(
+        "api_keys.yaml",
+        "[yellow]Deprecated[/]" if (config_dir / "api_keys.yaml").exists() else "[dim]Not found[/]"
+    )
+
+    console.print("[bold]Configuration Files[/]")
+    console.print(files_table)
+    console.print()
+
+    # Environment Variables
+    import os
+    env_vars = {
+        "VICTOR_LOG_LEVEL": os.getenv("VICTOR_LOG_LEVEL"),
+        "ANTHROPIC_API_KEY": "[red]***SET***[/]" if os.getenv("ANTHROPIC_API_KEY") else None,
+        "OPENAI_API_KEY": "[red]***SET***[/]" if os.getenv("OPENAI_API_KEY") else None,
+        "GOOGLE_API_KEY": "[red]***SET***[/]" if os.getenv("GOOGLE_API_KEY") else None,
+    }
+
+    # Filter to only set env vars
+    set_env_vars = {k: v for k, v in env_vars.items() if v is not None}
+
+    if set_env_vars or verbose:
+        env_table = Table(show_header=False, box=None, padding=(0, 2))
+        env_table.add_column("Variable", style="cyan")
+        env_table.add_column("Value", style="white")
+
+        for var, val in set_env_vars.items():
+            env_table.add_row(var, val)
+
+        console.print("[bold]Environment Variables[/]")
+        if set_env_vars:
+            console.print(env_table)
+        else:
+            console.print("[dim]No relevant environment variables set[/]")
+        console.print()
+
+    # Help text
+    console.print("[dim]Configuration precedence:[/]")
+    console.print("[dim]1. Command-line flags (highest priority)[/]")
+    console.print("[dim]2. Environment variables[/]")
+    console.print("[dim]3. profiles.yaml (active profile)[/]")
+    console.print("[dim]4. settings.yaml (global settings)[/]")
+    console.print("[dim]5. Default values (lowest priority)[/]")
+    console.print()
+
+    console.print("[dim]Edit configuration:[/]")
+    console.print("[dim]  victor profile list[/]  - List available profiles")
+    console.print("[dim]  victor profile set-default <name>[/]  - Change default profile")
+    console.print("[dim]  Edit ~/.victor/profiles.yaml[/]  - Manual configuration")
+    console.print()
+
+
 @config_app.command("validate")
 def config_validate(
     verbose: bool = typer.Option(
