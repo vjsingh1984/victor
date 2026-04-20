@@ -218,8 +218,7 @@ class TestTaskDecorator:
         """@task wraps a function in TaskDefinition."""
 
         @task(description="Generate tests", expected_output="pytest file")
-async def gen_tests(agent, path: str):
-            pass  # Framework handles implementation
+        async def gen_tests(agent, path: str):
             pass  # Framework handles implementation
 
         assert isinstance(gen_tests, TaskDefinition)
@@ -228,8 +227,7 @@ async def gen_tests(agent, path: str):
         """description is stored as attribute."""
 
         @task(description="Write docs", expected_output="Markdown file")
-async def write_docs(agent, module: str):
-            pass  # Framework handles implementation
+        async def write_docs(agent, module: str):
             pass  # Framework handles implementation
 
         assert write_docs.description == "Write docs"
@@ -238,8 +236,7 @@ async def write_docs(agent, module: str):
         """expected_output is stored as attribute."""
 
         @task(description="Analyse", expected_output="JSON report")
-async def analyse(agent, src: str):
-            pass  # Framework handles implementation
+        async def analyse(agent, src: str):
             pass  # Framework handles implementation
 
         assert analyse.expected_output == "JSON report"
@@ -248,8 +245,7 @@ async def analyse(agent, src: str):
         """tools defaults to empty list when not provided."""
 
         @task(description="Simple task")
-async def simple(agent):
-            pass  # Framework handles implementation
+        async def simple(agent):
             pass  # Framework handles implementation
 
         assert simple.tools == []
@@ -258,8 +254,7 @@ async def simple(agent):
         """tools list is stored on TaskDefinition."""
 
         @task(description="FS task", tools=["filesystem", "git"])
-async def fs_task(agent):
-            pass  # Framework handles implementation
+        async def fs_task(agent):
             pass  # Framework handles implementation
 
         assert fs_task.tools == ["filesystem", "git"]
@@ -268,8 +263,7 @@ async def fs_task(agent):
         """__name__ matches the decorated function."""
 
         @task(description="Named task")
-async def named_fn(agent):
-            pass  # Framework handles implementation
+        async def named_fn(agent):
             pass  # Framework handles implementation
 
         assert named_fn.__name__ == "named_fn"
@@ -291,8 +285,7 @@ async def named_fn(agent):
         """async_execution flag is stored."""
 
         @task(description="Concurrent task", async_execution=True)
-async def concurrent(agent):
-            pass  # Framework handles implementation
+        async def concurrent(agent):
             pass  # Framework handles implementation
 
         assert concurrent.async_execution is True
@@ -308,8 +301,7 @@ async def concurrent(agent):
         """repr shows function name and description."""
 
         @task(description="My important task")
-async def my_task(agent):
-            pass  # Framework handles implementation
+        async def my_task(agent):
             pass  # Framework handles implementation
 
         r = repr(my_task)
