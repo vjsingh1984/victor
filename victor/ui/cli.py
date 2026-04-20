@@ -405,7 +405,9 @@ def _register_plugin_commands():
                 app.add_typer(_analyze_fallback, name="analyze")
             except (ImportError, Exception):
                 pass  # Neither plugin nor contrib available
-    except Exception:
+    except Exception as e:
+        # Surface plugin loading failures as warnings (Phase 4 UX improvement)
+        console.print(f"[yellow]Warning:[/] Failed to load plugin commands: {e}\n")
         pass
 
 

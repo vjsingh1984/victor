@@ -840,6 +840,7 @@ async def run_oneshot(
 
         # Show initialization progress for first-time setup (can take 20-30s)
         with console.status("[bold green]Initializing Victor...[/]", spinner="dots") as status:
+            # Step 1: Load and validate configuration
             status.update("Loading configuration...")
 
             # Validate default model existence (Phase 1 UX improvement)
@@ -862,19 +863,38 @@ async def run_oneshot(
                     console.print("Fix the issue above and run 'victor chat' again.\n")
                     raise typer.Exit(code=1)
 
-            factory = AgentFactory(
-                settings=settings,
-                profile=profile,
-                vertical=vertical_param,
-                thinking=thinking,
-                session_id=session_id,
-                enable_observability=enable_observability,
-                tool_budget=tool_budget,
-                max_iterations=max_iterations if "max_iterations" in dir() else None,
-            )
+            # Step 2: Initialize factory
+            status.update("Initializing agent factory...")
+            try:
+                factory = AgentFactory(
+                    settings=settings,
+                    profile=profile,
+                    vertical=vertical_param,
+                    thinking=thinking,
+                    session_id=session_id,
+                    enable_observability=enable_observability,
+                    tool_budget=tool_budget,
+                    max_iterations=max_iterations if "max_iterations" in dir() else None,
+                )
+            except Exception as e:
+                console.print(f"\n[red]✗[/] Failed to initialize agent factory: {e}")
+                console.print("\n[yellow]Suggestions:[/]")
+                console.print("  • Run 'victor doctor' to diagnose configuration issues")
+                console.print("  • Check your profile configuration: victor profile list")
+                console.print("  • Try default profile: victor chat --profile default\n")
+                raise typer.Exit(code=1)
 
+            # Step 3: Create agent
             status.update("Creating agent...")
-            agent = await factory.create()
+            try:
+                agent = await factory.create()
+            except Exception as e:
+                console.print(f"\n[red]✗[/] Failed to create agent: {e}")
+                console.print("\n[yellow]Suggestions:[/]")
+                console.print("  • Check if provider is configured: victor doctor --providers")
+                console.print("  • Verify API keys or local model availability")
+                console.print("  • Try a different profile: victor profile list\n")
+                raise typer.Exit(code=1)
 
             # Set planning model override if provided (for planning coordinator)
             if planning_model:
@@ -883,6 +903,8 @@ async def run_oneshot(
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
 
+            # Step 4: Configure agent settings
+            status.update("Configuring agent settings...")
             if tool_budget is not None:
                 agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
             if max_iterations is not None:
@@ -894,14 +916,26 @@ async def run_oneshot(
                 controller = get_mode_controller()
                 try:
                     controller.switch_mode(AgentMode(mode))
-                except Exception:
-                    # Fallback: ignore invalid mode silently (validated earlier)
-                    pass
+                except Exception as e:
+                    console.print(f"\n[yellow]Warning:[/] Failed to set mode '{mode}': {e}")
+                    console.print("  Continuing with default mode.\n")
 
+            # Step 5: Preload semantic index if requested
             if preindex:
-                await preload_semantic_index(os.getcwd(), settings, console)
+                status.update("Preloading semantic index...")
+                try:
+                    await preload_semantic_index(os.getcwd(), settings, console)
+                except Exception as e:
+                    console.print(f"\n[yellow]Warning:[/] Failed to preload semantic index: {e}")
+                    console.print("  Continuing without preindex (first search will be slower).\n")
 
-            agent.start_embedding_preload()
+            # Step 6: Start embedding preload
+            status.update("Starting embedding preload...")
+            try:
+                agent.start_embedding_preload()
+            except Exception as e:
+                console.print(f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}")
+                console.print("  Continuing without embeddings (some features may be slower).\n")
 
             # Planning mode requires non-streaming (plan generation → step execution → summary)
             use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
