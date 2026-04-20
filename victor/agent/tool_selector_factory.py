@@ -27,7 +27,7 @@ Supports three strategies:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, Set
+from typing import TYPE_CHECKING, Literal, Optional, Set
 
 from victor.agent.protocols import IToolSelector
 from victor.tools.registry import ToolRegistry
@@ -38,6 +38,9 @@ if TYPE_CHECKING:
     from victor.storage.embeddings.service import EmbeddingService
 
 logger = logging.getLogger(__name__)
+
+# Type alias for auto-select strategy
+AutoSelectStrategy = Literal["keyword", "semantic"]
 
 
 def create_tool_selector_strategy(
@@ -143,7 +146,7 @@ def _auto_select_strategy(
     settings: Optional["Settings"],
     provider_name: str,
     embedding_service: Optional["EmbeddingService"],
-) -> str:
+) -> AutoSelectStrategy:
     """Automatically select best strategy based on environment.
 
     Selection logic:
@@ -157,7 +160,7 @@ def _auto_select_strategy(
         embedding_service: Optional embedding service
 
     Returns:
-        Strategy name: "keyword" or "semantic"
+        AutoSelectStrategy Literal value
     """
     # Check air-gapped mode
     if settings and settings.security.airgapped_mode:

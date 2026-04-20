@@ -31,7 +31,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,10 @@ class SearchType(Enum):
     KEYWORD = "keyword"
     SEMANTIC = "semantic"
     HYBRID = "hybrid"  # Use both and merge results
+
+
+# Type alias for suggested search tools
+SuggestedTool = Literal["code_search", "semantic_code_search"]
 
 
 @dataclass
@@ -1185,18 +1189,18 @@ class SearchRouter:
             return max(minimum, min(maximum, requested))
         return default
 
-    def suggest_tool(self, query: str) -> str:
+    def suggest_tool(self, query: str) -> SuggestedTool:
         """Suggest the best search tool for a query.
 
         Args:
             query: The search query
 
         Returns:
-            Tool name: "code_search", "semantic_code_search", or "graph"
+            SuggestedTool Literal value
         """
         route = self.route(query)
         if route.tool_name:
-            return route.tool_name
+            return route.tool_name  # type: ignore
         if route.search_type == SearchType.SEMANTIC:
             return "semantic_code_search"
         return "code_search"
@@ -1215,14 +1219,14 @@ def route_query(query: str) -> SearchRoute:
     return router.route(query)
 
 
-def suggest_search_tool(query: str) -> str:
+def suggest_search_tool(query: str) -> SuggestedTool:
     """Convenience function to get recommended tool.
 
     Args:
         query: Search query
 
     Returns:
-        Tool name: "code_search", "semantic_code_search", or "graph"
+        SuggestedTool Literal value
     """
     router = SearchRouter()
     return router.suggest_tool(query)
