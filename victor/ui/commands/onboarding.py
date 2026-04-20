@@ -342,7 +342,8 @@ class OnboardingWizard:
         models = self._get_models_for_provider(provider)
 
         if models:
-            default_model = models[0]["id"]
+            # Default to qwen3.5:27b-q4_K_M if available (first in list)
+            default_model = "qwen3.5:27b-q4_K_M"
             for i, model in enumerate(models[:5], 1):  # Show first 5
                 desc = model.get("description", "")
                 self.console.print(f"  {i}. [cyan]{model['id']}[/] - {desc}")
@@ -395,6 +396,7 @@ class OnboardingWizard:
         """
         models = {
             "ollama": [
+                {"id": "qwen3.5:27b-q4_K_M", "description": "MoE model, fast + knowledgeable (recommended)"},
                 {"id": "qwen2.5-coder:7b", "description": "Coding-focused, 7B params"},
                 {
                     "id": "qwen2.5-coder:14b",
@@ -445,13 +447,13 @@ class OnboardingWizard:
             Default model identifier
         """
         defaults = {
-            "ollama": "qwen2.5-coder:7b",
+            "ollama": "qwen3.5:27b-q4_K_M",  # Fast MoE model
             "anthropic": "claude-sonnet-4-5-20250514",
             "openai": "gpt-4o",
             "google": "gemini-2.0-flash-exp",
             "lmstudio": "local-model",
         }
-        return defaults.get(provider, "qwen2.5-coder:7b")
+        return defaults.get(provider, "qwen3.5:27b-q4_K_M")
 
     def _apply_configuration(self) -> None:
         """Step 4: Apply configuration."""

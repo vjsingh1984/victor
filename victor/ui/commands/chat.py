@@ -832,6 +832,27 @@ async def run_oneshot(
         # Show initialization progress for first-time setup (can take 20-30s)
         with console.status("[bold green]Initializing Victor...[/]", spinner="dots") as status:
             status.update("Loading configuration...")
+
+            # Validate default model existence (Phase 1 UX improvement)
+            from victor.config.settings import validate_default_model
+
+            model_valid, model_warning = validate_default_model(settings)
+            if not model_valid and model_warning:
+                # Model validation failed - show warning and offer to continue
+                console.print(f"\n[yellow]⚠ Configuration Warning:[/]")
+                console.print(model_warning)
+                console.print()
+
+                # Ask user if they want to continue
+                from rich.prompt import Confirm
+
+                if not Confirm.ask(
+                    "Continue anyway?", default=False, show_default=True
+                ):
+                    console.print("\n[yellow]Setup cancelled.[/]")
+                    console.print("Fix the issue above and run 'victor chat' again.\n")
+                    raise typer.Exit(code=1)
+
             factory = AgentFactory(
                 settings=settings,
                 profile=profile,

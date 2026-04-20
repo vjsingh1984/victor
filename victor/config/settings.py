@@ -758,9 +758,9 @@ class Settings(BaseSettings):
         default=None, exclude=True, repr=False
     )
 
-    # Default provider settings (LMStudio by default for local observability)
+    # Default provider settings (Ollama for local privacy and cost savings)
     default_provider: str = "ollama"
-    default_model: str = "qwen3-coder:30b"
+    default_model: str = "qwen3.5:27b-q4_K_M"  # MoE model: fast + knowledgeable
     default_temperature: float = Field(
         default=0.7, ge=0.0, le=2.0, description="Default temperature for generation"
     )
@@ -2325,3 +2325,76 @@ def is_first_time_user() -> bool:
 
     # If no keys and no Ollama, consider it first-time
     return not has_ollama
+
+
+def validate_default_model(settings: "Settings") -> tuple[bool, str | None]:
+    """Check if default model exists in Ollama.
+
+    Args:
+        settings: Settings object with provider and model configuration
+
+    Returns:
+        Tuple of (is_valid, warning_message)
+        - is_valid: True if model exists or provider is not Ollama
+        - warning_message: User-friendly message if model not found, None otherwise
+    """
+    # Only validate for Ollama provider
+    if settings.provider.default_provider.lower() != "ollama":
+        return True, None
+
+    model = settings.provider.default_model
+
+    try:
+        import subprocess
+
+        # Check if Ollama is running and get available models
+        result = subprocess.run(
+            ["ollama", "list"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+        if result.returncode != 0:
+            # Ollama not running
+            return False, (
+                "Ollama is not running. Start it with:\n"
+                "  [cyan]ollama serve[/]\n\n"
+                f"Then pull the default model:\n"
+                f"  [cyan]ollama pull {model}[/]"
+            )
+
+        # Parse model list (skip header line)
+        models = result.stdout.strip().split("\n")[1:]
+        available_models = [line.split()[0] for line in models if line.strip()]
+
+        # Check if default model is available
+        if model not in available_models:
+            # Model not installed
+            return False, (
+                f"Default model '[yellow]{model}[/]' is not installed.\n\n"
+                f"Available models on your system:\n"
+                f"  [dim]{', '.join(available_models[:5])}{'...' if len(available_models) > 5 else ''}[/]\n\n"
+                f"Pull the default model:\n"
+                f"  [cyan]ollama pull {model}[/]\n\n"
+                f"Or use a available model with:\n"
+                f"  [cyan]victor chat --model {available_models[0] if available_models else 'qwen2.5-coder:7b'}[/]"
+            )
+
+        return True, None
+
+    except FileNotFoundError:
+        return False, (
+            "Ollama binary not found. Install from https://ollama.com\n\n"
+            "After installation, start Ollama and pull the default model:\n"
+            f"  [cyan]ollama serve[/]\n"
+            f"  [cyan]ollama pull {model}[/]"
+        )
+    except subprocess.TimeoutExpired:
+        return False, (
+            "Ollama command timed out. Check if Ollama is running:\n"
+            "  [cyan]ollama serve[/]"
+        )
+    except Exception as e:
+        # Unexpected error - don't block startup
+        return True, None

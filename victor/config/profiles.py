@@ -87,7 +87,7 @@ BASIC_PROFILE = ProfileTemplate(
     settings={
         # Use Ollama by default (local, free)
         "default_provider": "ollama",
-        "default_model": "qwen2.5-coder:7b",
+        "default_model": "qwen3.5:27b-q4_K_M",  # Fast MoE model with good knowledge
         "default_temperature": 0.7,
         "default_max_tokens": 4096,
         # Conservative tool budget
