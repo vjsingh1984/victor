@@ -16,14 +16,17 @@
 """Observability API routes for web UI.
 
 Provides REST endpoints for querying events, sessions, and metrics.
+Includes web-based dashboard UI with real-time updates.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from pathlib import Path
+from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, Query, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel, Field
 
 from victor.observability.query_service import (
@@ -284,3 +287,120 @@ async def export_events(
     """
     # TODO: Implement in Phase 5 with ExportService
     raise HTTPException(status_code=501, detail="Not implemented yet - Phase 5")
+
+
+# =============================================================================
+# Web UI Endpoints
+# =============================================================================
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+async def get_dashboard() -> HTMLResponse:
+    """Serve the web-based observability dashboard.
+
+    Returns:
+        HTML page for the dashboard
+    """
+    static_dir = Path(__file__).parent.parent / "static"
+    html_file = static_dir / "observability.html"
+
+    if not html_file.exists():
+        return HTMLResponse(
+            content="<h1>Dashboard not found</h1><p>Static files not available.</p>",
+            status_code=404,
+        )
+
+    return HTMLResponse(content=html_file.read_text())
+
+
+@router.get("/static/{file_path:path}")
+async def serve_static(file_path: str) -> FileResponse:
+    """Serve static files (CSS, JS) for the dashboard.
+
+    Args:
+        file_path: Path to the static file
+
+    Returns:
+        Static file response
+    """
+    static_dir = Path(__file__).parent.parent / "static"
+    file_path = file_path.lstrip("/")
+    file_location = static_dir / file_path
+
+    if not file_location.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(file_location)
+
+
+# =============================================================================
+# Additional Endpoints for Web UI
+# =============================================================================
+
+
+class ToolStatsResponse(BaseModel):
+    """Tool execution statistics response."""
+
+    tool_name: str
+    total_calls: int
+    successful_calls: int
+    failed_calls: int
+    avg_duration_ms: float
+    last_called: Optional[str] = None
+
+
+class TokenUsageResponse(BaseModel):
+    """Token usage response."""
+
+    total_tokens: int
+    prompt_tokens: int
+    completion_tokens: int
+    by_session: Dict[str, int] = Field(default_factory=dict)
+    by_model: Dict[str, int] = Field(default_factory=dict)
+
+
+@router.get("/tools/stats", response_model=List[ToolStatsResponse])
+async def get_tool_statistics(
+    limit: int = Query(20, ge=1, le=100),
+) -> List[ToolStatsResponse]:
+    """Get tool execution statistics.
+
+    Args:
+        limit: Maximum number of tools to return
+
+    Returns:
+        List of tool statistics
+    """
+    service = get_query_service()
+    stats = await service.get_tool_statistics(limit=limit)
+
+    return [
+        ToolStatsResponse(
+            tool_name=stat["tool_name"],
+            total_calls=stat["total_calls"],
+            successful_calls=stat["successful_calls"],
+            failed_calls=stat["failed_calls"],
+            avg_duration_ms=stat["avg_duration_ms"],
+            last_called=stat.get("last_called"),
+        )
+        for stat in stats
+    ]
+
+
+@router.get("/tokens/usage", response_model=TokenUsageResponse)
+async def get_token_usage() -> TokenUsageResponse:
+    """Get token usage statistics.
+
+    Returns:
+        Token usage breakdown
+    """
+    service = get_query_service()
+    usage = await service.get_token_usage()
+
+    return TokenUsageResponse(
+        total_tokens=usage.get("total_tokens", 0),
+        prompt_tokens=usage.get("prompt_tokens", 0),
+        completion_tokens=usage.get("completion_tokens", 0),
+        by_session=usage.get("by_session", {}),
+        by_model=usage.get("by_model", {}),
+    )

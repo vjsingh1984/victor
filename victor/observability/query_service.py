@@ -491,3 +491,95 @@ class QueryService:
 
         except Exception:
             return 0
+
+    async def get_session(self, session_id: str) -> Optional[SessionInfo]:
+        """Get session by ID.
+
+        Args:
+            session_id: Session UUID
+
+        Returns:
+            Session info or None if not found
+        """
+        try:
+            sessions = await self.get_sessions(limit=1, offset=0)
+            for session in sessions:
+                if session.id == session_id:
+                    return session
+            return None
+
+        except Exception:
+            return None
+
+    async def get_metrics(self) -> MetricsSnapshot:
+        """Get current metrics snapshot.
+
+        Returns:
+            Current metrics
+        """
+        return await self.get_metrics_summary()
+
+    async def get_tool_statistics(self, limit: int = 20) -> List[Dict[str, Any]]:
+        """Get tool execution statistics.
+
+        Args:
+            limit: Maximum number of tools to return
+
+        Returns:
+            List of tool statistics
+        """
+        try:
+            # For now, return placeholder data
+            # In production, this would query actual tool execution logs
+            return [
+                {
+                    "tool_name": "read",
+                    "total_calls": 150,
+                    "successful_calls": 145,
+                    "failed_calls": 5,
+                    "avg_duration_ms": 45.2,
+                    "last_called": datetime.now().isoformat(),
+                },
+                {
+                    "tool_name": "code_search",
+                    "total_calls": 89,
+                    "successful_calls": 85,
+                    "failed_calls": 4,
+                    "avg_duration_ms": 234.5,
+                    "last_called": datetime.now().isoformat(),
+                },
+            ]
+
+        except Exception:
+            return []
+
+    async def get_token_usage(self) -> Dict[str, Any]:
+        """Get token usage breakdown.
+
+        Returns:
+            Token usage by session and model
+        """
+        try:
+            # For now, return placeholder data
+            # In production, this would query actual token usage
+            return {
+                "total_tokens": 125000,
+                "prompt_tokens": 75000,
+                "completion_tokens": 50000,
+                "by_session": {
+                    "session-1": 45000,
+                    "session-2": 80000,
+                },
+                "by_model": {
+                    "claude-3-5-sonnet-20241022": 125000,
+                },
+            }
+
+        except Exception:
+            return {
+                "total_tokens": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "by_session": {},
+                "by_model": {},
+            }
