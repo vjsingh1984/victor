@@ -432,7 +432,9 @@ class PortMapping:
 
         if isinstance(spec, dict):
             protocol_str = spec.get("protocol", "tcp")
-            protocol = NetworkProtocol(protocol_str) if isinstance(protocol_str, str) else protocol_str
+            protocol = (
+                NetworkProtocol(protocol_str) if isinstance(protocol_str, str) else protocol_str
+            )
 
             return cls(
                 container_port=spec["container_port"],

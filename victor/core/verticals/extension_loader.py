@@ -324,7 +324,9 @@ class ExtensionLoaderPressureMonitor:
     # Pressure event emission
     # ------------------------------------------------------------------
 
-    def emit_pressure_event(self, level: PressureLevel, snapshot: Dict[str, Any], reason: str) -> None:
+    def emit_pressure_event(
+        self, level: PressureLevel, snapshot: Dict[str, Any], reason: str
+    ) -> None:
         """Emit queue-pressure signal for extension loader saturation."""
         try:
             from victor.core.events import get_observability_bus

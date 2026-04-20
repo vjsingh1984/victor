@@ -12,7 +12,6 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-
 # =============================================================================
 # Enums for LLM Decisions
 # =============================================================================
@@ -221,26 +220,21 @@ class TaskCompletionDecision(BaseModel):
     is_complete: bool = Field(description="Whether the task appears complete")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the assessment")
     phase: TaskPhase = Field(
-        default=TaskPhase.WORKING,
-        description="Current phase of task execution"
+        default=TaskPhase.WORKING, description="Current phase of task execution"
     )
 
 
 class IntentDecision(BaseModel):
     """What is the model doing?"""
 
-    intent: IntentType = Field(
-        description="Classified intent of the model's response"
-    )
+    intent: IntentType = Field(description="Classified intent of the model's response")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
 class TaskTypeDecision(BaseModel):
     """What kind of task is this, and what deliverables are expected?"""
 
-    task_type: TaskCategoryType = Field(
-        description="Classified type of the task"
-    )
+    task_type: TaskCategoryType = Field(description="Classified type of the task")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
     deliverables: list[DeliverableType] = Field(
         default_factory=list,
@@ -251,9 +245,7 @@ class TaskTypeDecision(BaseModel):
 class QuestionTypeDecision(BaseModel):
     """Should we auto-continue past this question?"""
 
-    question_type: QuestionType = Field(
-        description="Type of question being asked"
-    )
+    question_type: QuestionType = Field(description="Type of question being asked")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
 
@@ -261,18 +253,14 @@ class LoopDetection(BaseModel):
     """Is the model stuck in a loop?"""
 
     is_loop: bool = Field(description="Whether a loop is detected")
-    loop_type: LoopType = Field(
-        default=LoopType.NONE,
-        description="Type of loop detected"
-    )
+    loop_type: LoopType = Field(default=LoopType.NONE, description="Type of loop detected")
 
 
 class ErrorClassDecision(BaseModel):
     """Can we retry this error?"""
 
     error_type: ErrorType = Field(
-        default=ErrorType.TRANSIENT,
-        description="Classification of the error"
+        default=ErrorType.TRANSIENT, description="Classification of the error"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
 
@@ -295,8 +283,7 @@ class StageDetectionDecision(BaseModel):
     """What conversation stage is this?"""
 
     stage: ConversationStage = Field(
-        default=ConversationStage.INITIAL,
-        description="Detected conversation stage"
+        default=ConversationStage.INITIAL, description="Detected conversation stage"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in detection")
 
@@ -311,9 +298,7 @@ class ToolNecessityDecision(BaseModel):
 class ContinuationDecision(BaseModel):
     """What action should we take next?"""
 
-    action: ContinuationAction = Field(
-        description="Recommended next action"
-    )
+    action: ContinuationAction = Field(description="Recommended next action")
     reason: str = Field(max_length=100, description="Brief reason for the recommendation")
 
 
@@ -348,12 +333,10 @@ class CompactionDecision(BaseModel):
     """
 
     complexity: ComplexityLevel = Field(
-        default=ComplexityLevel.SIMPLE,
-        description="simple (≤8 messages) or complex (>8 messages)"
+        default=ComplexityLevel.SIMPLE, description="simple (≤8 messages) or complex (>8 messages)"
     )
     recommended_tier: TierType = Field(
-        default=TierType.BALANCED,
-        description="Recommended tier for compaction"
+        default=TierType.BALANCED, description="Recommended tier for compaction"
     )
     estimated_tokens: int = Field(description="Estimated token count of content to compact")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the decision")

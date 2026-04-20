@@ -93,6 +93,7 @@ class NodeCategory(str, Enum):
     TRANSFORM = "transform"
     UNKNOWN = "unknown"
 
+
 if TYPE_CHECKING:
     from victor.workflows.graph_dsl import (
         WorkflowGraph,

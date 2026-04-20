@@ -465,6 +465,22 @@ class RemoteTarget(str, Enum):
     API = "api"  # Generic REST API
 
 
+class NetworkProtocol(str, Enum):
+    """Network protocol for connecting to execution targets.
+
+    Determines how to communicate with remote infrastructure:
+    - LOCAL: No network connection needed (inline, subprocess)
+    - DOCKER: Docker daemon socket/API
+    - K8S: Kubernetes API server
+    - HTTP: Generic HTTP/HTTPS REST API
+    """
+
+    LOCAL = "local"  # No network connection
+    DOCKER = "docker"  # Docker daemon socket/API
+    K8S = "k8s"  # Kubernetes API server
+    HTTP = "http"  # Generic HTTP/HTTPS REST API
+
+
 @dataclass
 class ResourceLimits:
     """Resource limits for sandboxed execution.
@@ -730,7 +746,9 @@ class DeploymentConfig:
         return cls(
             locality=ExecutionLocality.REMOTE,
             target=RemoteTarget.EKS,
-            connection=ConnectionConfig(protocol=NetworkProtocol.K8S, auth_method="iam", region=region),
+            connection=ConnectionConfig(
+                protocol=NetworkProtocol.K8S, auth_method="iam", region=region
+            ),
             cluster_name=cluster_name,
             namespace=namespace,
             gpu_required=gpu,

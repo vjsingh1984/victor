@@ -14,7 +14,6 @@ from victor.tools.code_search_tool import _get_or_build_index
 from victor.tools.context import ToolExecutionContext
 from victor.tools.decorators import tool
 
-
 # =============================================================================
 # Enums for Graph Operations
 # =============================================================================

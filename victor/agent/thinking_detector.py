@@ -56,6 +56,7 @@ class ThinkingCategory(str, Enum):
     IMPLEMENTATION = "implementation"  # Implementing solutions
     GENERAL = "general"  # General thinking
 
+
 # Try to import native extensions for faster pattern detection
 _NATIVE_AVAILABLE = False
 _native = None
