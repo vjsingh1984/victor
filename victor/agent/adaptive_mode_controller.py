@@ -106,6 +106,24 @@ class AdaptiveAgentMode(Enum):
 AgentMode = AdaptiveAgentMode
 
 
+class RatioLevel(str, Enum):
+    """Discretized ratio bucket for adaptive mode state."""
+
+    LOW = "low"  # < 0.25
+    MID_LOW = "mid_low"  # 0.25-0.5
+    MID_HIGH = "mid_high"  # 0.5-0.75
+    HIGH = "high"  # > 0.75
+
+
+class QualityLevel(str, Enum):
+    """Discretized quality score bucket."""
+
+    POOR = "poor"  # < 0.4
+    FAIR = "fair"  # 0.4-0.6
+    GOOD = "good"  # 0.6-0.8
+    EXCELLENT = "excellent"  # > 0.8
+
+
 class TransitionTrigger(Enum):
     """Triggers for mode transitions."""
 
@@ -141,29 +159,29 @@ class ModeState:
         quality_bucket = self._discretize_quality(self.quality_score)
         grounding_bucket = self._discretize_quality(self.grounding_score)
 
-        return f"{self.mode.value}:{self.task_type}:{tool_ratio}:{iter_ratio}:{quality_bucket}:{grounding_bucket}"
+        return f"{self.mode.value}:{self.task_type}:{tool_ratio.value}:{iter_ratio.value}:{quality_bucket.value}:{grounding_bucket.value}"
 
-    def _discretize_ratio(self, ratio: float) -> str:
+    def _discretize_ratio(self, ratio: float) -> RatioLevel:
         """Discretize a ratio to buckets."""
         if ratio < 0.25:
-            return "low"
+            return RatioLevel.LOW
         elif ratio < 0.5:
-            return "mid_low"
+            return RatioLevel.MID_LOW
         elif ratio < 0.75:
-            return "mid_high"
+            return RatioLevel.MID_HIGH
         else:
-            return "high"
+            return RatioLevel.HIGH
 
-    def _discretize_quality(self, score: float) -> str:
+    def _discretize_quality(self, score: float) -> QualityLevel:
         """Discretize quality score."""
         if score < 0.4:
-            return "poor"
+            return QualityLevel.POOR
         elif score < 0.6:
-            return "fair"
+            return QualityLevel.FAIR
         elif score < 0.8:
-            return "good"
+            return QualityLevel.GOOD
         else:
-            return "excellent"
+            return QualityLevel.EXCELLENT
 
 
 @dataclass

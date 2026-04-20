@@ -51,6 +51,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Type
 
 if TYPE_CHECKING:
@@ -389,7 +390,19 @@ SandboxType = Literal["none", "process", "docker"]
 #   - airflow: Airflow DAG trigger (orchestration API)
 #   - api: Generic REST API endpoint
 
-ExecutionLocality = Literal["local", "remote"]
+
+class ExecutionLocality(str, Enum):
+    """Execution locality for workflow nodes.
+
+    Determines whether execution happens locally or on remote infrastructure.
+    """
+
+    LOCAL = "local"  # Execute on local machine
+    REMOTE = "remote"  # Execute on remote infrastructure
+
+
+# Backward compatibility
+_ExecutionLocalityLiteral = Literal["local", "remote"]
 
 LocalTarget = Literal[
     "inline",  # Direct process execution (fastest)

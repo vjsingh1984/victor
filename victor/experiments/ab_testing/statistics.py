@@ -18,10 +18,31 @@ This module provides statistical tests and analysis methods for comparing
 experiment variants.
 """
 
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 import numpy as np
 from scipy import stats
+
+
+# =============================================================================
+# Enums for A/B Testing Optimization
+# =============================================================================
+
+
+class OptimizationGoal(str, Enum):
+    """Optimization goal for A/B testing metrics.
+
+    Determines whether higher or lower values are better for the metric
+    being optimized.
+    """
+
+    MINIMIZE = "minimize"  # Lower values are better (e.g., error rate, latency)
+    MAXIMIZE = "maximize"  # Higher values are better (e.g., conversion, revenue)
+
+
+# Backward compatibility
+_OptimizationGoalLiteral = Literal["minimize", "maximize"]
 
 
 class StatisticalAnalyzer:
@@ -430,7 +451,7 @@ class StatisticalAnalyzer:
     def determine_winner(
         self,
         variant_metrics: Dict[str, List[float]],
-        optimization_goal: Literal["minimize", "maximize"] = "maximize",
+        optimization_goal: OptimizationGoal = OptimizationGoal.MAXIMIZE,
         alpha: float = 0.05,
     ) -> Dict[str, Any]:
         """Determine winning variant using statistical tests.
@@ -473,7 +494,7 @@ class StatisticalAnalyzer:
             improvements[treatment_id] = result["mean_difference"]
 
         # Find best variant
-        if optimization_goal == "maximize":
+        if optimization_goal == OptimizationGoal.MAXIMIZE:
             # Higher is better
             best_id = max(variant_ids, key=lambda k: np.mean(variant_metrics[k]))
         else:

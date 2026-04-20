@@ -39,8 +39,30 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Type alias for auto-select strategy
-AutoSelectStrategy = Literal["keyword", "semantic"]
+
+# =============================================================================
+# Enums for Tool Selection Strategies
+# =============================================================================
+
+
+class AutoSelectStrategy(str, Enum):
+    """Automatic tool selection strategy.
+
+    Strategies for automatically selecting the best tool selector
+    based on environment capabilities.
+
+    Selection logic:
+    1. If airgapped_mode → KEYWORD (no embeddings available)
+    2. If embedding service available → SEMANTIC (best quality)
+    3. Fallback → KEYWORD (always works)
+    """
+
+    KEYWORD = "keyword"  # Fast registry-based keyword matching (<1ms)
+    SEMANTIC = "semantic"  # ML-based embedding similarity (10-50ms)
+
+
+# Backward compatibility
+_AutoSelectStrategyLiteral = Literal["keyword", "semantic"]
 
 
 def create_tool_selector_strategy(
@@ -150,9 +172,9 @@ def _auto_select_strategy(
     """Automatically select best strategy based on environment.
 
     Selection logic:
-    1. If airgapped_mode → keyword (no embeddings available)
-    2. If embedding service available → semantic (best quality)
-    3. Fallback → keyword (always works)
+    1. If airgapped_mode → KEYWORD (no embeddings available)
+    2. If embedding service available → SEMANTIC (best quality)
+    3. Fallback → KEYWORD (always works)
 
     Args:
         settings: Optional settings for configuration
@@ -160,21 +182,21 @@ def _auto_select_strategy(
         embedding_service: Optional embedding service
 
     Returns:
-        AutoSelectStrategy Literal value
+        AutoSelectStrategy enum value
     """
     # Check air-gapped mode
     if settings and settings.security.airgapped_mode:
         logger.info("Air-gapped mode detected: using keyword strategy")
-        return "keyword"
+        return AutoSelectStrategy.KEYWORD
 
     # Prefer semantic if embedding service available
     if embedding_service is not None:
         logger.info("Embedding service available: using semantic strategy")
-        return "semantic"
+        return AutoSelectStrategy.SEMANTIC
 
     # Fallback to keyword (always works, no dependencies)
     logger.info("No embedding service: using keyword strategy")
-    return "keyword"
+    return AutoSelectStrategy.KEYWORD
 
 
 def _create_semantic_selector(

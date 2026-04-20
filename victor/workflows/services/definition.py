@@ -102,6 +102,13 @@ class HealthCheckType(Enum):
     GRPC = "grpc"  # gRPC health check
 
 
+class NetworkProtocol(str, Enum):
+    """Network protocol for port mappings."""
+
+    TCP = "tcp"  # TCP protocol (reliable, connection-based)
+    UDP = "udp"  # UDP protocol (unreliable, connectionless)
+
+
 # Provider types for different backends
 ServiceProviderType = Literal[
     "docker",  # Local Docker container
@@ -351,7 +358,7 @@ class PortMapping:
 
     container_port: int
     host_port: int = 0  # 0 = auto-assign
-    protocol: Literal["tcp", "udp"] = "tcp"
+    protocol: NetworkProtocol = NetworkProtocol.TCP
     host_ip: str = "0.0.0.0"
 
     @classmethod
@@ -377,10 +384,13 @@ class PortMapping:
             return cls(container_port=int(spec))
 
         if isinstance(spec, dict):
+            protocol_str = spec.get("protocol", "tcp")
+            protocol = NetworkProtocol(protocol_str) if isinstance(protocol_str, str) else protocol_str
+
             return cls(
                 container_port=spec["container_port"],
                 host_port=spec.get("host_port", 0),
-                protocol=spec.get("protocol", "tcp"),
+                protocol=protocol,
                 host_ip=spec.get("host_ip", "0.0.0.0"),
             )
 

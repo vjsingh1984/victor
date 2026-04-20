@@ -27,6 +27,7 @@ import logging
 import re
 from collections import deque
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -44,6 +45,16 @@ if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
 
 logger = logging.getLogger(__name__)
+
+
+class ThinkingCategory(str, Enum):
+    """Thinking pattern category for loop detection."""
+
+    FILE_READ = "file_read"  # Reading files
+    SEARCH = "search"  # Searching for information
+    ANALYSIS = "analysis"  # Analyzing code/problems
+    IMPLEMENTATION = "implementation"  # Implementing solutions
+    GENERAL = "general"  # General thinking
 
 # Try to import native extensions for faster pattern detection
 _NATIVE_AVAILABLE = False
@@ -366,27 +377,27 @@ class ThinkingPatternDetector:
                 return True
         return False
 
-    def _categorize_thinking(self, text: str) -> str:
+    def _categorize_thinking(self, text: str) -> ThinkingCategory:
         """Categorize the thinking block.
 
         Args:
             text: Thinking block text
 
         Returns:
-            Category string
+            ThinkingCategory enum value
         """
         text_lower = text.lower()
 
         if any(kw in text_lower for kw in ["read", "file", "content"]):
-            return "file_read"
+            return ThinkingCategory.FILE_READ
         elif any(kw in text_lower for kw in ["search", "find", "look for"]):
-            return "search"
+            return ThinkingCategory.SEARCH
         elif any(kw in text_lower for kw in ["understand", "analyze", "examine"]):
-            return "analysis"
+            return ThinkingCategory.ANALYSIS
         elif any(kw in text_lower for kw in ["implement", "create", "write"]):
-            return "implementation"
+            return ThinkingCategory.IMPLEMENTATION
         else:
-            return "general"
+            return ThinkingCategory.GENERAL
 
     def record_thinking(self, content: str) -> Tuple[bool, str]:
         """Record thinking block and detect loops.

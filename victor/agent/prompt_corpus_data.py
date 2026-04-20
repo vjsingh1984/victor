@@ -38,6 +38,24 @@ Sources:
 """
 
 from typing import List, Tuple
+from enum import Enum
+
+# =============================================================================
+# Enums for Type-Safe Prompt Classification
+# =============================================================================
+
+
+class TaskCategory(str, Enum):
+    """Programming task category for prompt classification."""
+
+    ALGORITHM_IMPLEMENTATION = "algorithm_implementation"
+    DATA_STRUCTURE = "data_structure"
+    FILE_IO = "file_io"
+    FUNCTION_COMPLETION = "function_completion"
+    MATHEMATICAL = "mathematical"
+    STRING_MANIPULATION = "string_manipulation"
+    TESTING = "testing"
+
 
 # =============================================================================
 # FUNCTION COMPLETION PROMPTS (~250 entries)
@@ -1501,40 +1519,40 @@ def load_mbpp_prompts() -> List[Tuple[str, str, str]]:
         raise ImportError("datasets library required. Install with: pip install datasets")
 
 
-def _classify_humaneval_prompt(prompt: str) -> str:
+def _classify_humaneval_prompt(prompt: str) -> TaskCategory:
     """Classify a HumanEval prompt into a category.
 
     Args:
         prompt: The function signature and docstring
 
     Returns:
-        Category name as string (matches PromptCategory enum values)
+        TaskCategory enum value
     """
     prompt_lower = prompt.lower()
 
     # Classify based on keywords in the prompt
     if any(kw in prompt_lower for kw in ["sort", "sorted", "order", "arrange"]):
-        return "algorithm_implementation"
+        return TaskCategory.ALGORITHM_IMPLEMENTATION
     elif any(kw in prompt_lower for kw in ["list", "array", "tuple", "dict", "stack", "queue"]):
-        return "data_structure"
+        return TaskCategory.DATA_STRUCTURE
     elif any(kw in prompt_lower for kw in ["string", "char", "substr", "concat", "split"]):
-        return "string_manipulation"
+        return TaskCategory.STRING_MANIPULATION
     elif any(kw in prompt_lower for kw in ["math", "sum", "product", "prime", "factor", "gcd"]):
-        return "mathematical"
+        return TaskCategory.MATHEMATICAL
     elif any(kw in prompt_lower for kw in ["file", "read", "write", "path"]):
-        return "file_io"
+        return TaskCategory.FILE_IO
     else:
-        return "function_completion"
+        return TaskCategory.FUNCTION_COMPLETION
 
 
-def _classify_mbpp_prompt(prompt: str) -> str:
+def _classify_mbpp_prompt(prompt: str) -> TaskCategory:
     """Classify an MBPP prompt into a category.
 
     Args:
         prompt: The natural language problem description
 
     Returns:
-        Category name as string (matches PromptCategory enum values)
+        TaskCategory enum value
     """
     prompt_lower = prompt.lower()
 
@@ -1544,13 +1562,13 @@ def _classify_mbpp_prompt(prompt: str) -> str:
         kw in prompt_lower
         for kw in ["read file", "write file", "open file", "file path", "directory"]
     ):
-        return "file_io"
+        return TaskCategory.FILE_IO
     # Algorithm patterns
     elif any(
         kw in prompt_lower
         for kw in ["sort", "search", "binary", "merge", "quick", "heap", "permut"]
     ):
-        return "algorithm_implementation"
+        return TaskCategory.ALGORITHM_IMPLEMENTATION
     # Mathematical patterns
     elif any(
         kw in prompt_lower
@@ -1567,7 +1585,7 @@ def _classify_mbpp_prompt(prompt: str) -> str:
             "square",
         ]
     ):
-        return "mathematical"
+        return TaskCategory.MATHEMATICAL
     # String patterns
     elif any(
         kw in prompt_lower
@@ -1582,7 +1600,7 @@ def _classify_mbpp_prompt(prompt: str) -> str:
             "consonant",
         ]
     ):
-        return "string_manipulation"
+        return TaskCategory.STRING_MANIPULATION
     # Data structure patterns
     elif any(
         kw in prompt_lower
@@ -1598,12 +1616,12 @@ def _classify_mbpp_prompt(prompt: str) -> str:
             "element",
         ]
     ):
-        return "data_structure"
+        return TaskCategory.DATA_STRUCTURE
     # Testing patterns
     elif any(kw in prompt_lower for kw in ["test", "assert", "unit test"]):
-        return "testing"
+        return TaskCategory.TESTING
     else:
-        return "function_completion"
+        return TaskCategory.FUNCTION_COMPLETION
 
 
 def build_extended_corpus_with_benchmarks(

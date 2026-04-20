@@ -79,8 +79,25 @@ from victor.framework.perception_integration import Perception, PerceptionIntegr
 
 logger = logging.getLogger(__name__)
 
-# Type aliases for agentic loop decisions
-AdaptiveTerminationDecision = Literal["plateau", "extend"]
+# =============================================================================
+# Enums for Agentic Loop Decisions
+# =============================================================================
+
+
+class AdaptiveTerminationDecision(str, Enum):
+    """Decision for adaptive termination in agentic loop.
+
+    Inspired by Fast-Slow Architecture (arXiv:2604.01681):
+    - "Fast" exit on detected plateau (no progress)
+    - "Slow" extension when near completion
+    """
+
+    PLATEAU = "plateau"  # Exit early, no progress detected
+    EXTEND = "extend"  # Grant more iterations, near completion
+
+
+# Type alias for backward compatibility
+_AdaptiveTerminationDecisionLiteral = Literal["plateau", "extend"]
 
 if TYPE_CHECKING:
     from victor.agent.coordinators.turn_executor import (
@@ -957,8 +974,8 @@ class AgenticLoop:
         - "Slow" extension when near completion
 
         Returns:
-            "plateau" if should exit early,
-            "extend" if should grant more iterations,
+            AdaptiveTerminationDecision.PLATEAU if should exit early,
+            AdaptiveTerminationDecision.EXTEND if should grant more iterations,
             None otherwise
         """
         scores = self._progress_scores
@@ -968,13 +985,13 @@ class AgenticLoop:
             recent = scores[-self.plateau_window :]
             improvement = max(recent) - min(recent)
             if improvement < self.plateau_tolerance:
-                return "plateau"
+                return AdaptiveTerminationDecision.PLATEAU
 
         # Check near-completion: score > 0.7 and still improving
         if len(scores) >= 2 and scores[-1] >= 0.7:
             delta = scores[-1] - scores[-2]
             if delta > 0:
-                return "extend"
+                return AdaptiveTerminationDecision.EXTEND
 
         return None
 
