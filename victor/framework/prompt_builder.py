@@ -51,6 +51,7 @@ import asyncio
 import logging
 import sys
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -75,8 +76,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Type aliases for prompt builder
-PromptScope = Literal["workspace", "project", "user"]
+
+# =============================================================================
+# Enums for Prompt Building
+# =============================================================================
+
+
+class PromptScope(str, Enum):
+    """Scope level for prompt sections.
+
+    Determines where prompt sections are visible:
+    - WORKSPACE: All agents in the workspace
+    - PROJECT: All agents in the project
+    - USER: User-specific configuration
+    """
+
+    WORKSPACE = "workspace"  # All agents in the workspace
+    PROJECT = "project"  # All agents in the project
+    USER = "user"  # User-specific configuration
+
+
+# Backward compatibility
+_PromptScopeLiteral = Literal["workspace", "project", "user"]
 
 
 @dataclass

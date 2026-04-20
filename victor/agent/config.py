@@ -196,7 +196,7 @@ class UnifiedAgentConfig:
     # ==========================================================================
 
     task: Optional[str] = None
-    mode_type: Literal["build", "plan", "explore"] = "build"
+    mode_type: ExecutionModeType = ExecutionModeType.BUILD
     websocket: bool = False
     timeout_seconds: int = 300
 
@@ -367,7 +367,7 @@ class UnifiedAgentConfig:
     def background(
         cls,
         task: str,
-        mode_type: Literal["build", "plan", "explore"] = "build",
+        mode_type: ExecutionModeType = ExecutionModeType.BUILD,
         tool_budget: int = 100,
         websocket: bool = False,
         **kwargs: Any,
