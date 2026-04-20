@@ -1819,17 +1819,36 @@ class ToolPipeline:
         except asyncio.TimeoutError:
             effective_timeout = self._get_tool_timeout(tool_name)
             tb_str = traceback.format_exc()
+
+            # Build user-friendly error message with command details
+            if tool_name == "shell" and "cmd" in normalized_args:
+                cmd = normalized_args.get("cmd", "unknown command")
+                error_msg = f"Command timed out after {effective_timeout}s: {cmd}"
+                suggestion = (
+                    f"The command may be hung or waiting for input.\n"
+                    f"Try: Run the command manually to check if it's interactive, "
+                    f"increase timeout with --tool-budget, or use a non-interactive alternative."
+                )
+            else:
+                error_msg = f"Tool '{tool_name}' timed out after {effective_timeout}s"
+                suggestion = (
+                    f"The tool execution exceeded the time limit of {effective_timeout}s.\n"
+                    f"Try: Increase timeout with --tool-budget or check if the operation is valid."
+                )
+
+            # Log technical details for debugging (hidden from user)
             logger.warning(
                 f"[Pipeline] Tool '{tool_name}' timed out after {effective_timeout}s",
-                exc_info=True
+                exc_info=False  # Don't log full traceback to reduce noise
             )
+
             exec_result = ToolExecutionResult(
                 tool_name=tool_name,
                 success=False,
                 result=None,
-                error=f"Tool execution timed out after {effective_timeout}s",
+                error=error_msg,
                 error_info=ErrorInfo(
-                    message=f"Tool '{tool_name}' timed out after {effective_timeout}s",
+                    message=error_msg,
                     category=ErrorCategory.TOOL_TIMEOUT,
                     severity=ErrorSeverity.WARNING,
                     correlation_id=f"timeout_{tool_name}_{int(time.time())}",
@@ -1838,6 +1857,7 @@ class ToolPipeline:
                         "tool_name": tool_name,
                         "timeout_seconds": effective_timeout,
                         "arguments": normalized_args,
+                        "suggestion": suggestion,
                     },
                 ),
             )
