@@ -340,6 +340,25 @@ def chat(
         help="Use modern TUI interface. Use --no-tui for simple CLI mode (default).",
         rich_help_panel="Expert Interface",
     ),
+    # Smart Routing options (Phase 11 - Intelligent Provider Selection)
+    enable_smart_routing: bool = typer.Option(
+        False,
+        "--enable-smart-routing",
+        help="Enable automatic provider routing based on health, resources, cost, latency, and performance.",
+        rich_help_panel="Smart Routing",
+    ),
+    routing_profile: str = typer.Option(
+        "balanced",
+        "--routing-profile",
+        help="Routing profile to use (balanced, cost-optimized, performance, local-first).",
+        rich_help_panel="Smart Routing",
+    ),
+    fallback_chain: Optional[str] = typer.Option(
+        None,
+        "--fallback-chain",
+        help="Custom fallback chain (comma-separated provider names, e.g., 'ollama,anthropic,openai').",
+        rich_help_panel="Smart Routing",
+    ),
 ):
     """Start interactive chat or send a one-shot message.
 
@@ -721,6 +740,10 @@ victor chat --sessionid abc123            # Resume session
                     planning_model=planning_model,
                     legacy_mode=legacy_mode,
                     show_reasoning=show_reasoning,
+                    # Smart routing
+                    enable_smart_routing=enable_smart_routing,
+                    routing_profile=routing_profile,
+                    fallback_chain=fallback_chain,
                 )
             )
         elif stdin or input_file:
@@ -746,6 +769,10 @@ victor chat --sessionid abc123            # Resume session
                     use_tui=use_tui,
                     resume_session_id=session_id,
                     show_reasoning=show_reasoning,
+                    # Smart routing
+                    enable_smart_routing=enable_smart_routing,
+                    routing_profile=routing_profile,
+                    fallback_chain=fallback_chain,
                 )
             )
             return
@@ -779,6 +806,10 @@ async def run_oneshot(
     planning_model: Optional[str] = None,
     legacy_mode: bool = False,
     show_reasoning: bool = False,
+    # Smart routing parameters
+    enable_smart_routing: bool = False,
+    routing_profile: str = "balanced",
+    fallback_chain: Optional[str] = None,
 ) -> None:
     """Run a single message and exit.
 
@@ -796,6 +827,16 @@ async def run_oneshot(
     session_id = str(uuid.uuid4())
     success = False
     tool_calls_made = 0
+
+    # Configure smart routing if enabled
+    if enable_smart_routing:
+        settings.smart_routing_enabled = True
+        settings.smart_routing_profile = routing_profile
+        if fallback_chain:
+            settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
+        console.print(
+            f"[green]✓[/] Smart routing enabled (profile={routing_profile})"
+        )
 
     try:
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
@@ -1056,6 +1097,10 @@ async def run_interactive(
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
     show_reasoning: bool = False,
+    # Smart routing parameters
+    enable_smart_routing: bool = False,
+    routing_profile: str = "balanced",
+    fallback_chain: Optional[str] = None,
 ) -> None:
     """Run interactive CLI mode.
 
@@ -1087,6 +1132,16 @@ async def run_interactive(
     session_id = str(uuid.uuid4())
     success = False
     tool_calls_made = 0
+
+    # Configure smart routing if enabled
+    if enable_smart_routing:
+        settings.smart_routing_enabled = True
+        settings.smart_routing_profile = routing_profile
+        if fallback_chain:
+            settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
+        console.print(
+            f"[green]✓[/] Smart routing enabled (profile={routing_profile})"
+        )
 
     try:
         profiles = settings.load_profiles()

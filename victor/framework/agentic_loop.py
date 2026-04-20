@@ -77,6 +77,7 @@ from victor.framework.evaluation_nodes import (
 from victor.framework.fulfillment import FulfillmentDetector, TaskType
 from victor.framework.perception_integration import Perception, PerceptionIntegration
 from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
+from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
 
 logger = logging.getLogger(__name__)
 
@@ -411,6 +412,10 @@ class AgenticLoop:
         # Initialize task hint provider for enhanced task type hints
         self._task_hint_provider = TaskTypeHintCapabilityProvider()
 
+        # Initialize paradigm router for model selection (arXiv:2604.06753)
+        self.paradigm_router = get_paradigm_router()
+        self.paradigm_router.enabled = self.config.get("enable_paradigm_router", True)
+
         # Try to extract turn_executor from orchestrator if not provided
         if self.turn_executor is None and hasattr(orchestrator, "turn_executor"):
             self.turn_executor = orchestrator.turn_executor
@@ -489,8 +494,34 @@ class AgenticLoop:
                         skip_planning=skip_planning,  # Pass TaskTypeHint skip flag
                     )
 
+                    # Get routing decision from paradigm router (arXiv:2604.06753)
+                    routing_decision = self.paradigm_router.route(
+                        task_type=task_type,
+                        query=query,
+                        history_length=len(conversation_history) if conversation_history else 0,
+                        query_complexity=query_complexity,
+                        tool_budget=tool_budget,
+                        context=context,
+                    )
+
+                    # Store routing decision in state for execution
+                    state["routing_decision"] = routing_decision.to_dict()
+
+                    # Update execution parameters based on routing decision
+                    if routing_decision.skip_planning:
+                        use_llm_planning = False  # Override planning gate
+                        skip_reason = "paradigm_router"
+
+                    logger.info(
+                        f"[Iteration {i}/{effective_max}] ROUTING: "
+                        f"paradigm={routing_decision.paradigm.value}, "
+                        f"model_tier={routing_decision.model_tier.value}, "
+                        f"max_tokens={routing_decision.max_tokens}, "
+                        f"confidence={routing_decision.confidence:.2f}"
+                    )
+
                     if not use_llm_planning:
-                        skip_reason = "fast_path"
+                        skip_reason = skip_reason or "fast_path"
                         logger.info(
                             f"[Iteration {i}/{effective_max}] FAST-PATH DETECTED: "
                             f"Skipping LLM planning, proceeding directly to execution"

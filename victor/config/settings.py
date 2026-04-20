@@ -1104,6 +1104,26 @@ class Settings(BaseSettings):
     use_strategy_based_tool_registration: bool = False  # Use strategy pattern for tool registration
 
     # ==========================================================================
+    # Smart Routing Settings (Phase 11 - Intelligent Provider Selection)
+    # ==========================================================================
+    # Automatic provider routing based on health, resources, cost, latency, and performance.
+    # Enables local→cloud fallback, cost optimization, and adaptive learning.
+    #
+    # When enabled:
+    # - Automatically selects best provider for each request
+    # - Falls back to alternative providers on failures
+    # - Learns from provider performance over time
+    # - Respects user's explicit --provider choice (never overrides)
+    #
+    # Enable via: victor chat --enable-smart-routing --routing-profile balanced
+    smart_routing_enabled: bool = False  # Master switch for smart routing
+    smart_routing_profile: str = "balanced"  # Routing profile (balanced, cost-optimized, performance, local-first)
+    smart_routing_fallback_chain: Optional[List[str]] = None  # Custom fallback chain (overrides profile)
+    smart_routing_performance_window: int = 100  # Number of requests for learning
+    smart_routing_learning_enabled: bool = True  # Enable adaptive learning
+    smart_routing_resource_awareness: bool = True  # Enable GPU/API quota detection
+
+    # ==========================================================================
     # Prompt Enrichment Settings (Auto Optimization)
     # ==========================================================================
     # Controls automatic prompt enrichment with contextual information.

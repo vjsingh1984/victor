@@ -98,12 +98,20 @@ class TaskTypeHintData:
         hint: Prompt hint text to include in system prompt
         tool_budget: Recommended tool budget for this task type
         priority_tools: Tools to prioritize for this task
+        token_budget: Token budget for responses (optimization hint)
+        context_budget: Context window budget for this task
+        skip_planning: Skip planning phase for this task type
+        skip_evaluation: Skip evaluation phase for this task type
     """
 
     task_type: str
     hint: str
     tool_budget: Optional[int] = None
     priority_tools: List[str] = field(default_factory=list)
+    token_budget: Optional[int] = None
+    context_budget: Optional[int] = None
+    skip_planning: bool = False
+    skip_evaluation: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the hint to the legacy serializable mapping."""
@@ -113,6 +121,10 @@ class TaskTypeHintData:
             "hint": self.hint,
             "tool_budget": self.tool_budget,
             "priority_tools": self.priority_tools.copy(),
+            "token_budget": self.token_budget,
+            "context_budget": self.context_budget,
+            "skip_planning": self.skip_planning,
+            "skip_evaluation": self.skip_evaluation,
         }
 
 
