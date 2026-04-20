@@ -115,6 +115,9 @@ class FeatureFlag(Enum):
     # Phase 10 - Agentic Loop (single-turn execution with perception/evaluation)
     USE_AGENTIC_LOOP = "use_agentic_loop"
 
+    # Phase 11 - Smart Model Routing (automatic local→cloud fallback)
+    USE_SMART_ROUTING = "use_smart_routing"
+
     # Priority 4 - Learning from Execution (meta-learning, user feedback, explainability)
     USE_LEARNING_FROM_EXECUTION = "use_learning_from_execution"
 
