@@ -546,6 +546,20 @@ class AgenticLoop:
                 if hasattr(perception, "task_analysis") and perception.task_analysis:
                     state["task_type"] = getattr(perception.task_analysis, "task_type", "unknown")
 
+                # RESEARCH TASK PROGRESS REPORTING
+                # Report progress every 10 iterations for research tasks
+                if state.get("task_type") == "research" and i % 10 == 0:
+                    progress = self._calculate_research_progress(i, effective_max)
+                    phase = self._get_current_research_phase(state)
+                    papers_found = self._count_papers_found(conversation_history)
+
+                    logger.info(
+                        f"📊 RESEARCH PROGRESS: {progress}% | "
+                        f"Phase: {phase} | "
+                        f"Papers found: {papers_found} | "
+                        f"Iteration: {i}/{effective_max}"
+                    )
+
                 # Skip planning stage if in fast-path
                 if not use_llm_planning and skip_reason == "fast_path":
                     logger.info(f"[Iteration {i}/{effective_max}] SKIP PLAN (fast-path)")
@@ -563,6 +577,39 @@ class AgenticLoop:
                 current_phase = self._detect_phase(i, state, perception)
                 state["task_phase"] = current_phase
                 logger.debug(f"[Iteration {i}/{effective_max}] Phase: {current_phase.value}")
+
+                # RESEARCH TASK STAGE ENFORCEMENT
+                # For research tasks, enforce stage transitions based on research phase
+                if state.get("task_type") == "research":
+                    from victor.core.shared_types import ConversationStage
+
+                    research_phase = self._get_current_research_phase(state)
+                    research_stages = {
+                        "discover": (ConversationStage.INITIAL, ConversationStage.PLANNING),
+                        "search": (ConversationStage.READING,),
+                        "analyze": (ConversationStage.ANALYSIS,),
+                        "synthesize": (ConversationStage.EXECUTION, ConversationStage.VERIFICATION),
+                    }
+
+                    target_stages = research_stages.get(research_phase, ())
+
+                    # Get current stage from perception
+                    current_stage = None
+                    if hasattr(perception, "action_intent") and hasattr(perception.action_intent, "stage"):
+                        current_stage = perception.action_intent.stage
+
+                    # Enforce stage transition if needed
+                    if target_stages and current_stage not in target_stages:
+                        target_stage = target_stages[0]
+                        logger.info(
+                            f"[Iteration {i}/{effective_max}] RESEARCH PHASE TRANSITION: "
+                            f"{research_phase} → {target_stage.value}"
+                        )
+                        # Update stage in state (will be picked up by next iteration's perception)
+                        state["target_stage"] = target_stage
+                        # Update perception's action intent stage for this iteration
+                        if hasattr(perception, "action_intent"):
+                            perception.action_intent.stage = target_stage
 
                 # PLAN (use existing PlanningCoordinator if available)
                 logger.info(f"[Iteration {i}/{effective_max}] PLAN")
@@ -807,6 +854,87 @@ class AgenticLoop:
         else:
             # Default to EXECUTION for middle iterations
             return TaskPhase.EXECUTION if iteration > 1 else TaskPhase.EXPLORATION
+
+    def _calculate_research_progress(self, iteration: int, max_iterations: int) -> int:
+        """Calculate research progress percentage.
+
+        Research has 4 phases: discover(25%), search(25%), analyze(25%), synthesize(25%)
+        Each phase gets roughly equal iterations.
+
+        Args:
+            iteration: Current iteration number
+            max_iterations: Maximum iterations for this task
+
+        Returns:
+            Progress percentage (0-100)
+        """
+        # Calculate which phase we're in (4 phases)
+        phase_size = max_iterations // 4
+        phase_num = min(3, (iteration - 1) // phase_size)  # 0-3
+        base_progress = phase_num * 25  # 0, 25, 50, 75
+
+        # Calculate progress within current phase
+        iteration_in_phase = (iteration - 1) % phase_size
+        phase_progress = int((iteration_in_phase / phase_size) * 25) if phase_size > 0 else 0
+
+        return base_progress + phase_progress
+
+    def _get_current_research_phase(self, state: Dict[str, Any]) -> str:
+        """Get current research phase based on task phase.
+
+        Args:
+            state: Current loop state
+
+        Returns:
+            Research phase name (discover, search, analyze, synthesize)
+        """
+        from victor.core.shared_types import TaskPhase
+
+        task_phase = state.get("task_phase", TaskPhase.EXPLORATION)
+
+        # Map task phases to research phases
+        phase_map = {
+            TaskPhase.EXPLORATION: "discover",
+            TaskPhase.PLANNING: "discover",
+            TaskPhase.EXECUTION: "search",  # or "analyze" depending on iteration
+            TaskPhase.REVIEW: "synthesize",
+        }
+
+        # Refine EXECUTION phase detection
+        if task_phase == TaskPhase.EXECUTION:
+            iteration = state.get("iteration", 1)
+            if iteration > (self.max_iterations // 2):
+                return "analyze"  # Second half of execution is analysis
+
+        return phase_map.get(task_phase, "discover")
+
+    def _count_papers_found(self, conversation_history: Optional[List[Dict[str, Any]]] = None) -> int:
+        """Count unique arXiv papers mentioned in conversation.
+
+        Args:
+            conversation_history: Conversation history to search
+
+        Returns:
+            Number of unique papers found
+        """
+        import re
+        from collections import defaultdict
+
+        papers = set()
+
+        # Search in conversation history
+        if conversation_history:
+            for msg in conversation_history:
+                content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
+                # Match arXiv IDs like 1234.56789 or arXiv:1234.56789
+                arxiv_pattern = r'\b(\d{4}\.\d{5,})\b'
+                for match in re.findall(arxiv_pattern, content):
+                    papers.add(match)
+
+        # Also search in tool results if available
+        # (This would require accessing the tool results from state)
+
+        return len(papers)
 
     async def _plan(
         self,

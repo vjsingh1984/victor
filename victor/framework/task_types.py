@@ -565,18 +565,19 @@ class TaskTypeRegistry:
             TaskTypeDefinition(
                 name="research",
                 category=TaskCategory.ANALYSIS,
-                hint="[RESEARCH] Web research task. Search and fetch information from the web.",
-                tool_budget=20,
-                max_iterations=10,
-                priority_tools=["web_search", "web_fetch"],
+                hint="[RESEARCH] Web research task. Search and fetch information from the web. Use 4-phase approach: discover → search → analyze → synthesize.",
+                tool_budget=45,  # Increased from 20 - allow comprehensive research
+                max_iterations=25,  # Increased from 10 - allow multi-phase analysis
+                priority_tools=["web_search", "web_fetch", "read", "grep"],
                 aliases={"web_search", "internet"},
                 stage_tools={
-                    "initial": ["web_search"],
-                    "reading": ["web_fetch", "web_search"],
-                    "executing": ["web_fetch"],
+                    "initial": ["web_search"],  # Phase 1: Discover
+                    "reading": ["web_fetch", "read"],  # Phase 2: Gather
+                    "analysis": ["read", "grep"],  # Phase 3: Analyze
+                    "executing": ["write"],  # Phase 4: Synthesize
                 },
                 force_action_hints={
-                    "max_iterations": "Please summarize your research findings.",
+                    "max_iterations": "Please summarize your research findings with specific paper IDs and key insights.",
                 },
             )
         )

@@ -177,6 +177,25 @@ class CompactionConfig:
     chars_per_token: float = 3.0
 
 
+# Task-specific compaction configurations
+# Research tasks need more context preservation than other tasks
+TASK_COMPACTION_CONFIGS: Dict[str, CompactionConfig] = {
+    "research": CompactionConfig(
+        min_messages_after_compact=100,  # Keep 100+ messages (vs 6 default)
+        tool_result_retention_weight=3.0,  # High priority on tool results (vs 1.2)
+        recent_message_weight=1.5,  # Lower priority on recency (vs 2.0)
+        tool_result_max_chars=10240,  # Allow larger tool results (vs 5120)
+        tool_result_max_lines=300,  # Allow more lines (vs 150)
+        output_reserve_pct=0.4,  # Reserve less for output, more for context
+        parallel_read_target_files=20,  # Optimize for more parallel reads
+        chars_per_token=3.0,
+    ),
+    # Add other task types as needed
+    # "coding": CompactionConfig(...),
+    # "analysis": CompactionConfig(...),
+}
+
+
 @dataclass(frozen=True)
 class ToolSelectionPresets:
     """Presets for adaptive tool selection by model size.
