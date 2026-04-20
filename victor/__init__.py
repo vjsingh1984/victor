@@ -68,6 +68,7 @@ if not _LIGHT_IMPORT:
     from victor.framework import (
         Agent,
         AgentConfig,
+        UnifiedAgentConfig,
         AgentError,
         AgentExecutionEvent,
         BudgetExhaustedError,
@@ -118,6 +119,7 @@ if not _LIGHT_IMPORT:
         "StateHooks",
         "EventType",
         "AgentConfig",
+        "UnifiedAgentConfig",
         # Errors
         "AgentError",
         "ProviderError",

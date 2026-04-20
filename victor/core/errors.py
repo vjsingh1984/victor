@@ -328,10 +328,12 @@ class ToolError(AgentError):
         self,
         message: str,
         tool_name: Optional[str] = None,
+        arguments: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ):
         super().__init__(message, **kwargs)
         self.tool_name = tool_name
+        self.arguments = arguments or {}
         self.details["tool_name"] = tool_name
 
 
@@ -418,6 +420,7 @@ class ConfigurationError(AgentError):
         self,
         message: str,
         config_key: Optional[str] = None,
+        invalid_fields: Optional[List[str]] = None,
         **kwargs: Any,
     ):
         super().__init__(
@@ -426,7 +429,10 @@ class ConfigurationError(AgentError):
             **kwargs,
         )
         self.config_key = config_key
+        self.invalid_fields = invalid_fields or []
         self.details["config_key"] = config_key
+        if self.invalid_fields:
+            self.details["invalid_fields"] = self.invalid_fields
 
 
 class ValidationError(VictorError):
@@ -562,6 +568,67 @@ class ExtensionLoadError(VictorError):
         if original_error:
             self.details["original_error_type"] = type(original_error).__name__
             self.details["original_error_message"] = str(original_error)
+
+
+class BudgetExhaustedError(AgentError):
+    """Tool call budget has been exhausted."""
+
+    def __init__(
+        self,
+        message: str = "Tool call budget exhausted",
+        *,
+        budget: int,
+        used: int,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(
+            message,
+            recoverable=False,
+            category=ErrorCategory.RESOURCE_EXHAUSTED,
+            **kwargs,
+        )
+        self.budget = budget
+        self.used = used
+        self.details["budget"] = budget
+        self.details["used"] = used
+
+    def __str__(self) -> str:
+        return f"{self.message} ({self.used}/{self.budget} calls used)"
+
+
+class CancellationError(AgentError):
+    """Operation was cancelled by the user or timeout."""
+
+    def __init__(self, message: str = "Operation cancelled", **kwargs: Any) -> None:
+        super().__init__(message, recoverable=False, **kwargs)
+
+
+class StateTransitionError(AgentError):
+    """Invalid state transition attempted in a state machine."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        from_state: str,
+        to_state: str,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(message, recoverable=False, **kwargs)
+        self.from_state = from_state
+        self.to_state = to_state
+        self.details["from_state"] = from_state
+        self.details["to_state"] = to_state
+
+    def __str__(self) -> str:
+        return f"{self.message} ({self.from_state} -> {self.to_state})"
+
+
+class EdgeResolutionError(AgentError):
+    """No conditional edge matched the current StateGraph state."""
+
+    def __init__(self, message: str, **kwargs: Any) -> None:
+        super().__init__(message, recoverable=False, **kwargs)
 
 
 # =============================================================================

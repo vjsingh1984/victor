@@ -276,24 +276,6 @@ class TestNodeExecutorFactory:
 
 @pytest.mark.integration
 @pytest.mark.workflows
-class TestAdapterLayer:
-    """Test that adapter layer raises ImportError after removal (E5 M3)."""
-
-    def test_adapter_import_raises(self):
-        """Importing removed adapter classes should raise ImportError."""
-        with pytest.raises(ImportError, match="removed in E5 M3"):
-            from victor.workflows.adapter import (
-                UnifiedWorkflowCompilerAdapter,
-            )  # noqa: F401
-
-    def test_compiled_graph_adapter_import_raises(self):
-        """Importing removed CompiledGraphAdapter should raise ImportError."""
-        with pytest.raises(ImportError, match="removed in E5 M3"):
-            from victor.workflows.adapter import CompiledGraphAdapter  # noqa: F401
-
-
-@pytest.mark.integration
-@pytest.mark.workflows
 class TestExecutionResult:
     """Test execution result protocol."""
 

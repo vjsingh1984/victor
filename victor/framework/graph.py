@@ -1756,7 +1756,7 @@ class CompiledGraph(Generic[StateType]):
 
         # No conditional edge matched
         if self._strict_edges:
-            from victor.framework.errors import EdgeResolutionError
+            from victor.core.errors import EdgeResolutionError
 
             raise EdgeResolutionError(
                 f"No conditional edge from '{current_node}' matched the "

@@ -38,7 +38,8 @@ from contextlib import asynccontextmanager
 import uuid
 
 from victor.framework.config import AgentConfig
-from victor.framework.errors import AgentError, ConfigurationError
+from victor.agent.config import UnifiedAgentConfig
+from victor.core.errors import AgentError, ConfigurationError
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.state import State
 from victor.framework.task import TaskResult
@@ -150,7 +151,7 @@ class AgentBuildOptions:
     airgapped: bool = False
     profile: Optional[str] = None
     workspace: Optional[str] = None
-    config: Optional[AgentConfig] = None
+    config: Optional[Union[AgentConfig, UnifiedAgentConfig]] = None
     vertical: Optional[Type["VerticalBase"]] = None
     enable_observability: bool = True
     session_id: Optional[str] = None
@@ -542,11 +543,11 @@ class AgentBuilder:
         self._options.workspace = path
         return self
 
-    def config(self, config: AgentConfig) -> "AgentBuilder":
+    def config(self, config: Union[AgentConfig, UnifiedAgentConfig]) -> "AgentBuilder":
         """Set advanced configuration.
 
         Args:
-            config: AgentConfig instance
+            config: AgentConfig (deprecated) or UnifiedAgentConfig instance.
 
         Returns:
             Self for chaining

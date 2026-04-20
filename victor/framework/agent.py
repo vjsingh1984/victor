@@ -36,7 +36,8 @@ from typing import (
 logger = logging.getLogger(__name__)
 
 from victor.framework.config import AgentConfig
-from victor.framework.errors import AgentError, CancellationError, ProviderError
+from victor.agent.config import UnifiedAgentConfig
+from victor.core.errors import AgentError, CancellationError, ProviderError
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.state import State, StateObserver
 from victor.framework.task import TaskResult
@@ -149,7 +150,7 @@ class Agent:
         airgapped: bool = False,
         profile: Optional[str] = None,
         workspace: Optional[str] = None,
-        config: Optional[AgentConfig] = None,
+        config: Optional[Union[AgentConfig, UnifiedAgentConfig]] = None,
         vertical: Optional[Type["VerticalBase"]] = None,
         enable_observability: bool = True,
         session_id: Optional[str] = None,
@@ -169,7 +170,8 @@ class Agent:
             airgapped: Disable network-dependent tools
             profile: Profile name from ~/.victor/profiles.yaml
             workspace: Working directory for file operations
-            config: Advanced configuration (overrides other options)
+            config: Advanced configuration. Accepts AgentConfig (deprecated) or
+                UnifiedAgentConfig (preferred). Overrides individual options.
             vertical: Optional vertical class or name (e.g., 'coding', 'research').
                 When provided, the vertical's configuration (tools, system_prompt,
                 stages) is automatically applied.
@@ -194,19 +196,12 @@ class Agent:
             # With tools
             agent = await Agent.create(tools=ToolSet.coding())
 
+            # With UnifiedAgentConfig (preferred)
+            from victor.agent.config import UnifiedAgentConfig
+            agent = await Agent.create(config=UnifiedAgentConfig.high_budget())
+
             # With vertical (domain-specific assistant)
-            # Note: External vertical packages must be installed separately
-            # pip install victor-coding  # or victor-ai[coding]
             agent = await Agent.create(vertical="coding")
-
-            # With observability events
-            agent = await Agent.create(session_id="my-session")
-            agent.subscribe_to_events("TOOL", lambda e: print(f"Tool: {e.name}"))
-
-            # Advanced
-            agent = await Agent.create(
-                config=AgentConfig(tool_budget=100, enable_semantic_search=True)
-            )
         """
         from victor.config.settings import Settings, load_settings
         from victor.framework.agent_factory import AgentFactory, InitializationError
@@ -215,6 +210,12 @@ class Agent:
         settings = load_settings()
         if workspace:
             settings.working_directory = workspace
+
+        # Overlay config settings — both AgentConfig and UnifiedAgentConfig expose to_settings_dict()
+        if config is not None:
+            for key, value in config.to_settings_dict().items():
+                if hasattr(settings, key):
+                    setattr(settings, key, value)
 
         # Extract vertical config for backward compat return value
         vertical_config: Optional["VerticalConfig"] = None

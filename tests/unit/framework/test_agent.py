@@ -31,6 +31,14 @@ from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 from victor_sdk.core.types import VerticalDefinition
 
+
+# Agent.__init__ validates type(orchestrator).__name__ == "AgentOrchestrator".
+# Defining this class at module level gives inline tests a lightweight mock that
+# passes the check without importing the real orchestrator (which has heavy deps).
+class AgentOrchestrator(MagicMock):
+    """MagicMock subclass whose type name satisfies Agent.__init__ validation."""
+
+
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -39,7 +47,8 @@ from victor_sdk.core.types import VerticalDefinition
 @pytest.fixture
 def mock_orchestrator():
     """Create a mock AgentOrchestrator for testing."""
-    orchestrator = MagicMock()
+
+    orchestrator = AgentOrchestrator()
     orchestrator.provider = MagicMock()
     orchestrator.provider.name = "test_provider"
     orchestrator.model = "test-model"
@@ -196,7 +205,7 @@ class TestAgentFromOrchestrator:
         """from_orchestrator should handle missing provider name."""
         from victor.framework.agent import Agent
 
-        orchestrator = MagicMock()
+        orchestrator = AgentOrchestrator()
         orchestrator.provider = MagicMock(spec=[])  # No 'name' attribute
         orchestrator.model = None
 
@@ -268,7 +277,7 @@ class TestAgentRun:
     async def test_run_with_cancellation_error(self, mock_orchestrator):
         """run should handle CancellationError."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import CancellationError
+        from victor.core.errors import CancellationError
 
         # Make chat raise CancellationError
         mock_orchestrator.chat.side_effect = CancellationError("User cancelled")
@@ -916,7 +925,7 @@ class TestAgentWorkflows:
     async def test_run_workflow_no_vertical(self, mock_orchestrator):
         """run_workflow should raise AgentError when no vertical."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         agent = Agent(mock_orchestrator)
 
@@ -927,7 +936,7 @@ class TestAgentWorkflows:
     async def test_run_workflow_no_provider(self, mock_orchestrator, mock_vertical):
         """run_workflow should raise AgentError when vertical has no workflow provider."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_vertical.get_workflow_provider = MagicMock(return_value=None)
 
@@ -940,7 +949,7 @@ class TestAgentWorkflows:
     async def test_run_workflow_not_found(self, mock_orchestrator, mock_vertical):
         """run_workflow should raise AgentError when workflow not found."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock()
         # Mock run_compiled_workflow to raise error for not found workflow
@@ -1011,7 +1020,7 @@ class TestAgentTeams:
     async def test_run_team_no_vertical(self, mock_orchestrator):
         """run_team should raise AgentError when no vertical."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         agent = Agent(mock_orchestrator)
 
@@ -1022,7 +1031,7 @@ class TestAgentTeams:
     async def test_run_team_no_team_provider(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when vertical has no team spec provider."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         # Remove get_team_spec_provider method
         del mock_vertical.get_team_spec_provider
@@ -1036,7 +1045,7 @@ class TestAgentTeams:
     async def test_run_team_no_specs(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when team specs are empty."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock()
         mock_provider.get_team_specs = MagicMock(return_value={})
@@ -1051,7 +1060,7 @@ class TestAgentTeams:
     async def test_run_team_not_found(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when team not found."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock()
         mock_provider.get_team_specs = MagicMock(
@@ -1186,7 +1195,7 @@ class TestAgentTeams:
     async def test_run_team_no_get_team_specs_method(self, mock_orchestrator, mock_vertical):
         """run_team should raise AgentError when team provider has no get_team_specs."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         mock_provider = MagicMock(spec=[])  # No get_team_specs method
         mock_vertical.get_team_spec_provider = MagicMock(return_value=mock_provider)
@@ -1300,7 +1309,7 @@ class TestAgentCreate:
         """create should create Agent with orchestrator."""
         from victor.framework.agent import Agent
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
         with (
             patch("victor.config.settings.load_settings", return_value=MagicMock()),
@@ -1319,7 +1328,7 @@ class TestAgentCreate:
         """create should apply vertical configuration."""
         from victor.framework.agent import Agent
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
         with (
             patch("victor.config.settings.load_settings", return_value=MagicMock()),
@@ -1341,7 +1350,7 @@ class TestAgentCreate:
         """create should respect provider hints from vertical config."""
         from victor.framework.agent import Agent
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
         mock_vertical.get_definition = MagicMock(
             return_value=VerticalDefinition(
@@ -1388,7 +1397,7 @@ class TestAgentCreate:
             def get_system_prompt(cls):
                 return "Use direct config path."
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
 
         with (
             patch("victor.config.settings.load_settings", return_value=MagicMock()),
@@ -1410,7 +1419,7 @@ class TestAgentCreate:
     async def test_create_provider_error(self):
         """create should raise ProviderError for provider issues."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import ProviderError
+        from victor.core.errors import ProviderError
 
         with (
             patch("victor.config.settings.load_settings", return_value=MagicMock()),
@@ -1426,7 +1435,7 @@ class TestAgentCreate:
     async def test_create_agent_error(self):
         """create should raise AgentError for other errors."""
         from victor.framework.agent import Agent
-        from victor.framework.errors import AgentError
+        from victor.core.errors import AgentError
 
         with (
             patch("victor.config.settings.load_settings", return_value=MagicMock()),
@@ -1453,7 +1462,7 @@ class TestAgentCreateTeam:
         from victor.framework.agent import Agent
         from victor.framework.teams import TeamMemberSpec
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
         mock_team = MagicMock()
 
         with (
@@ -1485,7 +1494,7 @@ class TestAgentCreateTeam:
         from victor.framework.teams import TeamMemberSpec
         from victor.teams import TeamFormation
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
         mock_team = MagicMock()
 
         with (
@@ -1516,7 +1525,7 @@ class TestAgentCreateTeam:
         from victor.framework.teams import TeamMemberSpec
         from victor.teams import TeamFormation
 
-        mock_orchestrator = MagicMock()
+        mock_orchestrator = AgentOrchestrator()
         mock_team = MagicMock()
 
         with (

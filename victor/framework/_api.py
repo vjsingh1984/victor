@@ -7,6 +7,7 @@ for maintainability.
 
 from victor.framework.agent import Agent, ChatSession
 from victor.framework.config import AgentConfig
+from victor.agent.config import UnifiedAgentConfig
 from victor.framework.protocols import (
     ChunkType,
     ConversationStateProtocol,
@@ -22,11 +23,12 @@ from victor.framework.protocols import (
 
 # Backward compatibility alias
 OrchestratorProtocol = FrameworkOrchestratorProtocol
-from victor.framework.errors import (
+from victor.core.errors import (
     AgentError,
     BudgetExhaustedError,
     CancellationError,
     ConfigurationError,
+    EdgeResolutionError,
     ProviderError,
     StateTransitionError,
     ToolError,
@@ -104,6 +106,7 @@ PUBLIC_API_NAMES = [
     "milestone_event",
     # Config
     "AgentConfig",
+    "UnifiedAgentConfig",
     # Shim
     "FrameworkShim",
     "get_vertical",

@@ -12,15 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Framework-level middleware implementations.
+"""Tool execution middleware implementing ``MiddlewareProtocol``.
 
-This module provides common middleware that all verticals can use:
+This module provides ready-made tool-pipeline middlewares for verticals:
 
-1. LoggingMiddleware - Log all tool calls for audit/debugging
+1. LoggingMiddleware - Audit log for every tool call
 2. SecretMaskingMiddleware - Mask secrets in tool results
-3. MetricsMiddleware - Record tool execution metrics
+3. MetricsMiddleware - Per-tool execution metrics + Prometheus export
 4. GitSafetyMiddleware - Block dangerous git operations
 5. OutputValidationMiddleware - Validate and optionally fix tool outputs
+
+All classes implement ``MiddlewareProtocol`` (from
+``victor.core.verticals.protocols.middleware``) and are processed by
+``victor.agent.middleware_chain.MiddlewareChain`` during tool execution.
+
+**Do NOT inherit from** ``victor.core.middleware.Middleware`` here. That ABC is
+for HTTP/provider pipelines. Use ``MiddlewareProtocol`` structural typing only.
 
 Example usage:
     from victor.framework.middleware import (

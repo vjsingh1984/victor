@@ -23,7 +23,7 @@ from victor.framework.agent_components import (
     create_session,
 )
 from victor.framework.config import AgentConfig
-from victor.framework.errors import AgentError, ConfigurationError
+from victor.core.errors import AgentError, ConfigurationError
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.task import TaskResult
 from victor.framework.tools import ToolSet

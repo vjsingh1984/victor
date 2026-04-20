@@ -12,15 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Core middleware pipeline using inheritance from ``Middleware`` base class.
+"""Generic request/response pipeline middleware (internal use only).
 
-This middleware layer handles pipeline cross-cutting concerns (logging,
-metrics, error handling). It uses an inheritance-based pattern with a
-``Middleware`` abstract base class.
+This module implements cross-cutting concerns (logging, metrics, error
+handling, retry, timeout) for **HTTP/provider/workflow pipelines** using an
+inheritance-based ``Middleware[TRequest, TResponse]`` ABC.
 
-Note: ``victor.framework.middleware`` uses ``MiddlewareProtocol`` instead
-(structural typing, no shared base) for tool-call audit events. The two
-middleware layers serve different purposes and are intentionally separate.
+**Do NOT use this for tool execution middleware.** For tool-call interception,
+implement ``MiddlewareProtocol`` from
+``victor.core.verticals.protocols.middleware`` and register via a vertical's
+``get_middleware()`` hook. Those middlewares are processed by
+``victor.agent.middleware_chain.MiddlewareChain``, not by this pipeline.
+
+The two systems are intentionally separate:
+- This module: internal HTTP/provider pipelines (inheritance-based)
+- ``victor.framework.middleware``: tool-call pipeline (protocol-based, SDK-blessed)
 
 Design Patterns:
 - Chain of Responsibility: Middleware chain for request processing
