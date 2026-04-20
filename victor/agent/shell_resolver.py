@@ -14,7 +14,7 @@ from victor.tools.alias_resolver import get_alias_resolver
 from victor.tools.tool_names import ToolNames
 
 if TYPE_CHECKING:
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

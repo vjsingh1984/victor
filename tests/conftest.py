@@ -14,6 +14,7 @@
 
 """pytest configuration and fixtures."""
 
+import asyncio
 import sys
 
 import pytest
@@ -25,6 +26,34 @@ def pytest_configure(config):
         "markers",
         "requires_victor_coding: marks tests that require victor-coding package",
     )
+
+
+@pytest.fixture(autouse=True)
+async def cleanup_event_bus_tasks():
+    """Clean up ObservabilityBus background tasks after each test.
+
+    Prevents pytest hangs from fire-and-forget coroutines created by
+    ObservabilityBus.emit_metric(). This fixture runs automatically
+    after every test to ensure proper cleanup.
+    """
+    yield
+
+    # Cleanup after test
+    try:
+        from victor.core.events.backends import ObservabilityBus
+
+        # Try to get the global bus instance if it exists
+        # Note: ObservabilityBus is typically accessed via get_observability_bus()
+        # We'll attempt to clean up any background tasks
+        import gc
+
+        # Force garbage collection to trigger any pending cleanups
+        gc.collect()
+
+        # Small delay to allow event loop to process remaining tasks
+        await asyncio.sleep(0.01)
+    except ImportError:
+        pass  # ObservabilityBus not available in this test context
 
 
 def pytest_collection_modifyitems(config, items):

@@ -1045,6 +1045,9 @@ class ObservabilityBus:
             []
         )  # (exporter, handler) awaiting subscription
 
+        # Track background tasks for proper cleanup (prevents pytest hangs)
+        self._background_tasks: Set[asyncio.Task] = set()
+
     @property
     def backend(self) -> IEventBackend:
         """Get underlying backend."""
@@ -1279,7 +1282,8 @@ class ObservabilityBus:
         """
         import asyncio
 
-        asyncio.create_task(
+        # Create and track the background task for proper cleanup
+        task = asyncio.create_task(
             self.emit(
                 topic=f"metric.{metric_name}",
                 data={
@@ -1291,6 +1295,20 @@ class ObservabilityBus:
                 source="observability",
             )
         )
+        # Track task for cleanup (prevents pytest hangs)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def cleanup_background_tasks(self) -> None:
+        """Clean up all pending background tasks.
+
+        Waits for all fire-and-forget tasks to complete.
+        Call this before shutting down the bus to prevent task leaks.
+        """
+        if self._background_tasks:
+            # Wait for all tasks with timeout to prevent hanging
+            await asyncio.wait(self._background_tasks, timeout=5.0)
+            self._background_tasks.clear()
 
 
 class AgentMessageBus:

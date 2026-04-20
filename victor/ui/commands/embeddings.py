@@ -203,7 +203,7 @@ def _rebuild_embeddings(targets: list[CacheType], progress_callback):
 
 
 def _build_tool_registry():
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
     registry = ToolRegistry()
     tools_dir = Path(__file__).resolve().parents[2] / "tools"

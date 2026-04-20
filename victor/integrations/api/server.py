@@ -600,7 +600,7 @@ class VictorAPIServer:
     async def _list_tools(self, request: Request) -> Response:
         """List available tools with their metadata."""
         try:
-            from victor.tools.base import CostTier, ToolRegistry
+            from victor.tools.registry import CostTier, ToolRegistry
 
             # ToolRegistry is not a singleton; instantiate to list registered tools
             registry = ToolRegistry()

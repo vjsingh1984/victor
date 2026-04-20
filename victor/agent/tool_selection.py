@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from victor.agent.unified_task_tracker import UnifiedTaskTracker
     from victor.agent.vertical_context import VerticalContext
     from victor.providers.base import ToolDefinition
-    from victor.tools.base import ToolRegistry
+    from victor.tools.registry import ToolRegistry
     from victor.tools.semantic_selector import SemanticToolSelector
     from victor.storage.cache.generic_result_cache import GenericResultCache
 
