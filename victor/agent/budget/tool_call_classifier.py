@@ -22,11 +22,20 @@ Part of SOLID-based refactoring to eliminate god class anti-pattern.
 """
 
 import logging
+from enum import Enum
 from typing import Optional, Set
 
 from victor.agent.protocols import IToolCallClassifier
 
 logger = logging.getLogger(__name__)
+
+
+class OperationType(str, Enum):
+    """Tool operation type classification."""
+
+    WRITE = "write"  # Write/modify operations
+    READ = "read"  # Read-only operations
+    UNKNOWN = "unknown"  # Unclassified operations
 
 
 # Default set of write tools (can be extended via OCP)
@@ -87,23 +96,23 @@ class ToolCallClassifier(IToolCallClassifier):
         """
         return tool_name.lower() in self._write_tools
 
-    def classify_operation(self, tool_name: str) -> str:
+    def classify_operation(self, tool_name: str) -> OperationType:
         """Classify tool operation type.
 
         Args:
             tool_name: Name of the tool
 
         Returns:
-            Operation type: "write", "read", or "unknown"
+            Operation type enum value
         """
         tool_lower = tool_name.lower()
 
         if tool_lower in self._write_tools:
-            return "write"
+            return OperationType.WRITE
         elif tool_lower in {"read", "read_file", "grep", "search"}:
-            return "read"
+            return OperationType.READ
         else:
-            return "unknown"
+            return OperationType.UNKNOWN
 
     def add_write_tool(self, tool_name: str) -> None:
         """Add a tool to the write operations set (OCP compliance).

@@ -229,6 +229,47 @@ def complexity_check(ctx: Dict[str, Any]) -> ComplexityLevel:
     return ComplexityLevel.SIMPLE
 
 
+class TestExecutionStatus(str, Enum):
+    """Test execution outcome status."""
+
+    ALL_PASS = "all_pass"  # All tests passed
+    PARTIAL_PASS = "partial_pass"  # Some tests passed
+    ALL_FAIL = "all_fail"  # All tests failed
+    ERROR = "error"  # Test execution error
+
+
+class FixingDecision(str, Enum):
+    """Decision on whether to continue fixing."""
+
+    CONTINUE_FIXING = "continue_fixing"  # Continue attempting fixes
+    ESCALATE = "escalate"  # Escalate to human intervention
+    SUBMIT_BEST_EFFORT = "submit_best_effort"  # Submit current best solution
+
+
+class VerificationStatus(str, Enum):
+    """Solution verification status."""
+
+    VERIFIED = "verified"  # Solution fully verified
+    PARTIAL = "partial"  # Partially verified
+    FAILED = "failed"  # Verification failed
+
+
+class EscalationDecision(str, Enum):
+    """Human-in-the-loop escalation decision."""
+
+    CONTINUE = "continue"  # Continue with automation
+    SUBMIT = "submit"  # Submit current solution
+    ABORT = "abort"  # Abort the task
+
+
+class PasskProgress(str, Enum):
+    """Pass@k generation progress status."""
+
+    SUFFICIENT = "sufficient"  # Generated sufficient solutions
+    NEED_MORE = "need_more"  # Need more solutions
+    MAX_REACHED = "max_reached"  # Reached max iterations
+
+
 # =============================================================================
 # Transform Functions
 # =============================================================================
@@ -702,7 +743,7 @@ class ValidatePatchHandler:
 # =============================================================================
 
 
-def test_execution_status(ctx: Dict[str, Any]) -> str:
+def test_execution_status(ctx: Dict[str, Any]) -> TestExecutionStatus:
     """Determine test execution outcome.
 
     Args:
@@ -712,14 +753,14 @@ def test_execution_status(ctx: Dict[str, Any]) -> str:
             - error_message (str): Any error message
 
     Returns:
-        "all_pass", "partial_pass", "all_fail", or "error"
+        TestExecutionStatus enum value
     """
     exit_code = ctx.get("exit_code", 0)
     error_message = ctx.get("error_message", "")
     test_results = ctx.get("test_results", {})
 
     if error_message or exit_code < 0:
-        return "error"
+        return TestExecutionStatus.ERROR
 
     passed = test_results.get("passed", 0)
     failed = test_results.get("failed", 0)
@@ -727,18 +768,18 @@ def test_execution_status(ctx: Dict[str, Any]) -> str:
 
     if total == 0:
         # No tests found - treat as error
-        return "error"
+        return TestExecutionStatus.ERROR
 
     if failed == 0 and passed > 0:
-        return "all_pass"
+        return TestExecutionStatus.ALL_PASS
 
     if passed > 0:
-        return "partial_pass"
+        return TestExecutionStatus.PARTIAL_PASS
 
-    return "all_fail"
+    return TestExecutionStatus.ALL_FAIL
 
 
-def should_continue_fixing(ctx: Dict[str, Any]) -> str:
+def should_continue_fixing(ctx: Dict[str, Any]) -> FixingDecision:
     """Determine if agent should continue attempting fixes.
 
     Multi-factor decision based on iteration count, error patterns, and progress.
@@ -751,7 +792,7 @@ def should_continue_fixing(ctx: Dict[str, Any]) -> str:
             - pass_rate (float): Current test pass rate
 
     Returns:
-        "continue_fixing", "escalate", or "submit_best_effort"
+        FixingDecision enum value
     """
     iterations = ctx.get("fix_iterations", 0)
     max_iter = ctx.get("max_iterations", 5)
@@ -761,21 +802,21 @@ def should_continue_fixing(ctx: Dict[str, Any]) -> str:
     # Max iterations reached
     if iterations >= max_iter:
         logger.info(f"Max fix iterations ({max_iter}) reached, submitting best effort")
-        return "submit_best_effort"
+        return FixingDecision.SUBMIT_BEST_EFFORT
 
     # High pass rate achieved
     if pass_rate >= 0.95:
-        return "submit_best_effort"
+        return FixingDecision.SUBMIT_BEST_EFFORT
 
     # Still making progress
     if progress_made and iterations < max_iter:
-        return "continue_fixing"
+        return FixingDecision.CONTINUE_FIXING
 
     # No progress after several attempts
     if iterations >= 3 and not progress_made:
-        return "escalate"
+        return FixingDecision.ESCALATE
 
-    return "continue_fixing"
+    return FixingDecision.CONTINUE_FIXING
 
 
 def code_complexity_check(ctx: Dict[str, Any]) -> str:
@@ -795,7 +836,7 @@ def code_complexity_check(ctx: Dict[str, Any]) -> str:
     return result
 
 
-def verification_status(ctx: Dict[str, Any]) -> str:
+def verification_status(ctx: Dict[str, Any]) -> VerificationStatus:
     """Check verification results for solution.
 
     Args:
@@ -805,25 +846,25 @@ def verification_status(ctx: Dict[str, Any]) -> str:
             - lint_clean (bool): Linting passes
 
     Returns:
-        "verified", "partial", or "failed"
+        VerificationStatus enum value
     """
     syntax_valid = ctx.get("syntax_valid", False)
     tests_pass = ctx.get("tests_pass", False)
     lint_clean = ctx.get("lint_clean", True)
 
     if not syntax_valid:
-        return "failed"
+        return VerificationStatus.FAILED
 
     if tests_pass and lint_clean:
-        return "verified"
+        return VerificationStatus.VERIFIED
 
     if tests_pass or syntax_valid:
-        return "partial"
+        return VerificationStatus.PARTIAL
 
-    return "failed"
+    return VerificationStatus.FAILED
 
 
-def escalation_decision(ctx: Dict[str, Any]) -> str:
+def escalation_decision(ctx: Dict[str, Any]) -> EscalationDecision:
     """Handle escalation decision from HITL node.
 
     Args:
@@ -831,22 +872,22 @@ def escalation_decision(ctx: Dict[str, Any]) -> str:
             - hitl_response (str): User response from HITL
 
     Returns:
-        "continue", "submit", or "abort"
+        EscalationDecision enum value
     """
     response = ctx.get("hitl_response", "").lower().strip()
 
     if "continue" in response or response == "1":
-        return "continue"
+        return EscalationDecision.CONTINUE
     if "submit" in response or response == "2":
-        return "submit"
+        return EscalationDecision.SUBMIT
     if "abort" in response or response == "3":
-        return "abort"
+        return EscalationDecision.ABORT
 
     # Default to submit on timeout/fallback
-    return "submit"
+    return EscalationDecision.SUBMIT
 
 
-def passk_progress_check(ctx: Dict[str, Any]) -> str:
+def passk_progress_check(ctx: Dict[str, Any]) -> PasskProgress:
     """Check pass@k generation progress.
 
     Determines if enough solutions have been generated or if more are needed.
@@ -860,7 +901,7 @@ def passk_progress_check(ctx: Dict[str, Any]) -> str:
             - passed_solutions (int): Number of solutions that pass tests
 
     Returns:
-        "sufficient", "need_more", or "max_reached"
+        PasskProgress enum value
     """
     solutions = ctx.get("valid_solutions", [])
     target_k = ctx.get("target_k", 10)
@@ -873,18 +914,18 @@ def passk_progress_check(ctx: Dict[str, Any]) -> str:
     # Max iterations reached
     if iterations >= max_iter:
         logger.info(f"Max generation iterations ({max_iter}) reached")
-        return "max_reached"
+        return PasskProgress.MAX_REACHED
 
     # Have enough passing solutions for high confidence
     if passed >= target_k * 0.5:
-        return "sufficient"
+        return PasskProgress.SUFFICIENT
 
     # Have target number of solutions
     if solution_count >= target_k:
-        return "sufficient"
+        return PasskProgress.SUFFICIENT
 
     # Need more solutions
-    return "need_more"
+    return PasskProgress.NEED_MORE
 
 
 # =============================================================================
