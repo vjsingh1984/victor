@@ -1128,31 +1128,51 @@ async def code_search(
                     "error": f"Search root '{search_root}' not found. Please provide a valid directory path.",
                 }
 
-        # Check if path is a subdirectory of project root to avoid duplicate embeddings
+        # Check if path is a subdirectory to provide smart hints
+        # This helps avoid duplicate embeddings while supporting cross-repo analysis
         try:
             from victor.config.settings import get_project_paths
 
             project_root = Path(get_project_paths().project_root).resolve()
-            # Check if root_path is a subdirectory of project_root
-            try:
-                root_path.relative_to(project_root)
-                is_subdirectory = True
-            except ValueError:
-                # root_path is not relative to project_root
-                is_subdirectory = False
 
-            if is_subdirectory and root_path != project_root:
-                # Path is a subdirectory of project root
-                rel_path = root_path.relative_to(project_root)
-                logger.warning(
-                    f"[code_search] Searching in subdirectory '{rel_path}' instead of project root. "
-                    f"This may reduce visibility and duplicate embedding storage. "
-                    f"Consider using path='.' for full project coverage."
+            # Check if root_path is within the same git repository as project root
+            # If they're in different repos, no warning needed (cross-repo analysis)
+            def get_git_repo_root(path: Path) -> Optional[Path]:
+                """Find the git repository root for a given path."""
+                current = path
+                while current != current.parent:  # Stop at filesystem root
+                    git_dir = current / ".git"
+                    if git_dir.exists():
+                        return current
+                    current = current.parent
+                return None
+
+            root_repo = get_git_repo_root(root_path)
+            project_repo = get_git_repo_root(project_root)
+
+            # Only warn if they're in the same repo and root_path is a subdirectory
+            if root_repo and project_repo and root_repo == project_repo:
+                try:
+                    root_path.relative_to(project_root)
+                    is_subdirectory = True
+                except ValueError:
+                    is_subdirectory = False
+
+                if is_subdirectory and root_path != project_root:
+                    # Path is a subdirectory within the same repo
+                    rel_path = root_path.relative_to(project_root)
+                    logger.info(
+                        f"[code_search] Searching in subdirectory '{rel_path}' (same repo as project root). "
+                        f"Consider using path='.' for full repository coverage if broader context is needed."
+                    )
+                    # Proceed with subdirectory search - user may have specific intent
+            elif root_repo and project_repo and root_repo != project_repo:
+                # Different repos - cross-repo analysis, no warning needed
+                logger.debug(
+                    f"[code_search] Cross-repo analysis: searching in separate repo at {root_repo}"
                 )
-                # For now, still proceed with subdirectory search but log warning
-                # TODO: In future, could automatically use project root with subdirectory filter
         except Exception:
-            # If we can't determine project root, proceed with provided path
+            # If we can't determine repo boundaries, proceed with provided path
             pass
 
         settings = _exec_ctx.get("settings") if _exec_ctx else None

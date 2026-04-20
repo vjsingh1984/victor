@@ -2221,8 +2221,8 @@ async def ls(
                 )
         if not dir_path.is_dir():
             if dir_path.is_file():
-                # ls() on a file returns comprehensive filesystem metadata
-                logger.info(f"ls() called on file '{path}', returning file metadata")
+                # ls() on a file returns comprehensive filesystem metadata with content preview
+                logger.info(f"ls() called on file '{path}', returning file metadata with preview")
                 try:
                     stat_info = dir_path.stat()
                     import pwd
@@ -2249,6 +2249,23 @@ async def ls(
                     modified = datetime.datetime.fromtimestamp(stat_info.st_mtime)
                     accessed = datetime.datetime.fromtimestamp(stat_info.st_atime)
 
+                    # Try to get a content preview (first 500 chars or 10 lines, whichever is less)
+                    content_preview = None
+                    try:
+                        if stat_info.st_size < 100_000:  # Only preview files smaller than 100KB
+                            with open(dir_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                lines = []
+                                for i, line in enumerate(f):
+                                    if i >= 10:
+                                        break
+                                    lines.append(line.rstrip('\n'))
+                                preview_text = '\n'.join(lines)
+                                if len(preview_text) > 500:
+                                    preview_text = preview_text[:500] + '...'
+                                content_preview = preview_text
+                    except Exception as preview_error:
+                        logger.debug(f"Failed to generate content preview: {preview_error}")
+
                     # Build file metadata item
                     item = {
                         "name": dir_path.name,
@@ -2270,8 +2287,12 @@ async def ls(
                         "inode": stat_info.st_ino,
                         "nlinks": stat_info.st_nlink,
                         "auto_converted": True,
-                        "hint": f"Note: '{path}' is a file. Use read() to see contents.",
+                        "hint": f"Note: '{path}' is a file. Use read() to see full contents.",
                     }
+
+                    # Add content preview if available
+                    if content_preview:
+                        item["content_preview"] = content_preview
 
                     # Return in same format as directory listing
                     cwd = str(Path.cwd())
