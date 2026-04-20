@@ -1558,13 +1558,10 @@ async def _run_cli_repl(
                     suppress_thinking=not show_reasoning,
                 )
                 content_buffer = sanitize_response(content_buffer)
-                content_buffer = await stream_response(
-                    agent,
-                    user_input,
-                    renderer,
-                    suppress_thinking=not show_reasoning,
-                )
-                content_buffer = sanitize_response(content_buffer)
+
+                # Print the assistant's response to the console
+                if content_buffer:
+                    console.print(Markdown(content_buffer))
             else:
                 response = await agent.chat(user_input, use_planning=enable_planning)
                 console.print(Markdown(response.content))
