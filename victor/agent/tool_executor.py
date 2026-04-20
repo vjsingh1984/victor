@@ -896,6 +896,9 @@ class ToolExecutor:
         # Store original_result for user preview regardless of pruning
         original_result = result if isinstance(result, str) else str(result)
 
+        # Initialize pruning flag (accuracy-first default: disabled)
+        should_prune = False
+
         if success and isinstance(result, str):
             from victor.config.tool_settings import get_tool_settings
 

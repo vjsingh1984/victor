@@ -1871,7 +1871,7 @@ class ToolPipeline:
                 error=str(e),
                 error_info=ErrorInfo(
                     message=f"Tool '{tool_name}' execution failed: {str(e)}",
-                    category=ErrorCategory.EXECUTION_ERROR,
+                    category=ErrorCategory.TOOL_EXECUTION,
                     severity=ErrorSeverity.ERROR,
                     correlation_id=f"error_{tool_name}_{int(time.time())}",
                     traceback=tb_str[-2000:],  # Last 2000 chars
