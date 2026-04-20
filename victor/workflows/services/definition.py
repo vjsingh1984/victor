@@ -109,22 +109,66 @@ class NetworkProtocol(str, Enum):
     UDP = "udp"  # UDP protocol (unreliable, connectionless)
 
 
-# Provider types for different backends
-ServiceProviderType = Literal[
-    "docker",  # Local Docker container
-    "kubernetes",  # Kubernetes deployment
-    "local",  # Local OS process
-    "external",  # External service (verify only)
-    "aws_rds",  # AWS RDS instance
-    "aws_elasticache",  # AWS ElastiCache
-    "aws_msk",  # AWS MSK (Kafka)
-    "aws_sqs",  # AWS SQS
-    "aws_dynamodb",  # AWS DynamoDB
-    "gcp_cloudsql",  # GCP Cloud SQL
-    "gcp_memorystore",  # GCP Memorystore
-    "azure_postgres",  # Azure Database for PostgreSQL
-    "azure_redis",  # Azure Cache for Redis
-]
+class RestartPolicy(str, Enum):
+    """Container restart policy.
+
+    Determines when to restart containers:
+    - NO: Never restart
+    - ON_FAILURE: Restart only on failure
+    - ALWAYS: Always restart
+    """
+
+    NO = "no"  # Never restart
+    ON_FAILURE = "on-failure"  # Restart on failure
+    ALWAYS = "always"  # Always restart
+
+
+class VolumeType(str, Enum):
+    """Volume mount type.
+
+    Type of volume mount:
+    - BIND: Bind mount host path
+    - VOLUME: Named volume
+    - TMPFS: Temporary filesystem
+    """
+
+    BIND = "bind"  # Bind mount host path
+    VOLUME = "volume"  # Named volume
+    TMPFS = "tmpfs"  # Temporary filesystem
+
+
+class ServiceProviderType(str, Enum):
+    """Service provider backend type.
+
+    Determines which backend infrastructure to use:
+    - docker: Local Docker container
+    - kubernetes: Kubernetes deployment
+    - local: Local OS process
+    - external: External service (verify only)
+    - aws_rds: AWS RDS instance
+    - aws_elasticache: AWS ElastiCache
+    - aws_msk: AWS MSK (Kafka)
+    - aws_sqs: AWS SQS
+    - aws_dynamodb: AWS DynamoDB
+    - gcp_cloudsql: GCP Cloud SQL
+    - gcp_memorystore: GCP Memorystore
+    - azure_postgres: Azure Database for PostgreSQL
+    - azure_redis: Azure Cache for Redis
+    """
+
+    DOCKER = "docker"  # Local Docker container
+    KUBERNETES = "kubernetes"  # Kubernetes deployment
+    LOCAL = "local"  # Local OS process
+    EXTERNAL = "external"  # External service (verify only)
+    AWS_RDS = "aws_rds"  # AWS RDS instance
+    AWS_ELASTICACHE = "aws_elasticache"  # AWS ElastiCache
+    AWS_MSK = "aws_msk"  # AWS MSK (Kafka)
+    AWS_SQS = "aws_sqs"  # AWS SQS
+    AWS_DYNAMODB = "aws_dynamodb"  # AWS DynamoDB
+    GCP_CLOUDSQL = "gcp_cloudsql"  # GCP Cloud SQL
+    GCP_MEMORYSTORE = "gcp_memorystore"  # GCP Memorystore
+    AZURE_POSTGRES = "azure_postgres"  # Azure Database for PostgreSQL
+    AZURE_REDIS = "azure_redis"  # Azure Cache for Redis
 
 
 # =============================================================================
@@ -311,7 +355,7 @@ class LifecycleConfig:
     startup_timeout: float = 120.0  # Max wait for healthy
     shutdown_grace: float = 30.0  # Grace period for stop
     cleanup_on_failure: bool = True  # Cleanup even on workflow failure
-    restart_policy: Literal["no", "on-failure", "always"] = "no"
+    restart_policy: RestartPolicy = RestartPolicy.NO
     max_restarts: int = 3
 
     def to_dict(self) -> Dict[str, Any]:
@@ -321,19 +365,22 @@ class LifecycleConfig:
             "startup_timeout": self.startup_timeout,
             "shutdown_grace": self.shutdown_grace,
             "cleanup_on_failure": self.cleanup_on_failure,
-            "restart_policy": self.restart_policy,
+            "restart_policy": self.restart_policy.value,
             "max_restarts": self.max_restarts,
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "LifecycleConfig":
+        restart_str = data.get("restart_policy", "no")
+        restart_policy = RestartPolicy(restart_str) if isinstance(restart_str, str) else restart_str
+
         return cls(
             startup_order=data.get("startup_order", 100),
             shutdown_order=data.get("shutdown_order"),
             startup_timeout=data.get("startup_timeout", 120.0),
             shutdown_grace=data.get("shutdown_grace", 30.0),
             cleanup_on_failure=data.get("cleanup_on_failure", True),
-            restart_policy=data.get("restart_policy", "no"),
+            restart_policy=restart_policy,
             max_restarts=data.get("max_restarts", 3),
         )
 
@@ -416,7 +463,7 @@ class VolumeMount:
     source: str
     target: str
     read_only: bool = False
-    type: Literal["bind", "volume", "tmpfs"] = "bind"
+    type: VolumeType = VolumeType.BIND
 
     @classmethod
     def parse(cls, spec: Union[str, Dict, "VolumeMount"]) -> "VolumeMount":
@@ -443,11 +490,14 @@ class VolumeMount:
             raise ValueError(f"Invalid volume spec: {spec}")
 
         if isinstance(spec, dict):
+            type_str = spec.get("type", "bind")
+            volume_type = VolumeType(type_str) if isinstance(type_str, str) else type_str
+
             return cls(
                 source=spec["source"],
                 target=spec["target"],
                 read_only=spec.get("read_only", False),
-                type=spec.get("type", "bind"),
+                type=volume_type,
             )
 
         raise ValueError(f"Invalid volume spec: {spec}")
@@ -497,7 +547,7 @@ class ServiceConfig:
     Example:
         ServiceConfig(
             name="postgres",
-            provider="docker",
+            provider=ServiceProviderType.DOCKER,
             image="postgres:15",
             ports=[PortMapping(5432)],
             environment={"POSTGRES_PASSWORD": "secret"},
@@ -507,7 +557,7 @@ class ServiceConfig:
     """
 
     name: str
-    provider: ServiceProviderType = "docker"
+    provider: ServiceProviderType = ServiceProviderType.DOCKER
 
     # Container settings
     image: Optional[str] = None

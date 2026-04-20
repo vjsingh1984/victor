@@ -13,6 +13,11 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+# =============================================================================
+# Enums for LLM Decisions
+# =============================================================================
+
+
 class DecisionType(str, Enum):
     """Types of decisions the LLM decision service can make."""
 
@@ -32,12 +37,191 @@ class DecisionType(str, Enum):
     COMPACTION = "compaction"
 
 
+class ErrorType(str, Enum):
+    """Classification of errors for retry decisions.
+
+    Determines whether an error is retryable:
+    - PERMANENT: Never retry (auth failures, invalid input)
+    - TRANSIENT: Retry after delay (rate limits, timeouts)
+    - RETRYABLE: Retry immediately (network blips)
+    """
+
+    PERMANENT = "permanent"  # Never retry (auth, invalid input)
+    TRANSIENT = "transient"  # Retry after delay (rate limits, timeouts)
+    RETRYABLE = "retryable"  # Retry immediately (network blips)
+
+
+class TaskPhase(str, Enum):
+    """Current phase of task execution.
+
+    Progress tracking for task completion:
+    - WORKING: Actively working on the task
+    - FINALIZING: Wrapping up, last steps
+    - DONE: Task complete
+    - STUCK: Blocked or needs input
+    """
+
+    WORKING = "working"  # Actively working
+    FINALIZING = "finalizing"  # Wrapping up
+    DONE = "done"  # Task complete
+    STUCK = "stuck"  # Blocked or needs input
+
+
+class IntentType(str, Enum):
+    """Intent classification for model responses.
+
+    Determines what the model is trying to do:
+    - CONTINUATION: Continue working on current task
+    - COMPLETION: Task is complete, wrapping up
+    - ASKING_INPUT: Requesting input from user
+    - STUCK_LOOP: Stuck in repetitive loop
+    """
+
+    CONTINUATION = "continuation"  # Continue working
+    COMPLETION = "completion"  # Task complete
+    ASKING_INPUT = "asking_input"  # Requesting input
+    STUCK_LOOP = "stuck_loop"  # Stuck in loop
+
+
+class TaskCategoryType(str, Enum):
+    """Category of task being performed.
+
+    High-level task classification:
+    - ANALYSIS: Analyzing code or data
+    - ACTION: Executing commands or actions
+    - GENERATION: Creating new content
+    - SEARCH: Finding information
+    - EDIT: Modifying existing content
+    """
+
+    ANALYSIS = "analysis"  # Analyzing code/data
+    ACTION = "action"  # Executing commands
+    GENERATION = "generation"  # Creating content
+    SEARCH = "search"  # Finding information
+    EDIT = "edit"  # Modifying content
+
+
+class QuestionType(str, Enum):
+    """Type of question being asked.
+
+    Determines how to handle questions:
+    - RHETORICAL: Not a real question, continue
+    - CONTINUATION: Question about continuing work
+    - CLARIFICATION: Needs clarification
+    - INFO: Informational question
+    """
+
+    RHETORICAL = "rhetorical"  # Not a real question
+    CONTINUATION = "continuation"  # About continuing work
+    CLARIFICATION = "clarification"  # Needs clarification
+    INFO = "info"  # Informational
+
+
+class LoopType(str, Enum):
+    """Type of loop detected.
+
+    Classification of repetitive patterns:
+    - STALLING: Intent without action
+    - CIRCULAR: Circular reasoning
+    - REPETITION: Exact repetition
+    - NONE: No loop detected
+    """
+
+    STALLING = "stalling"  # Intent without action
+    CIRCULAR = "circular"  # Circular reasoning
+    REPETITION = "repetition"  # Exact repetition
+    NONE = "none"  # No loop
+
+
+class ContinuationAction(str, Enum):
+    """Action to take for continuation decisions.
+
+    Determines how to proceed:
+    - FINISH: Task is complete
+    - PROMPT_TOOL_CALL: Prompt to use tools
+    - REQUEST_SUMMARY: Request summary
+    - RETURN_TO_USER: Return control to user
+    """
+
+    FINISH = "finish"  # Task complete
+    PROMPT_TOOL_CALL = "prompt_tool_call"  # Prompt to use tools
+    REQUEST_SUMMARY = "request_summary"  # Request summary
+    RETURN_TO_USER = "return_to_user"  # Return control
+
+
+class DeliverableType(str, Enum):
+    """Types of deliverables a task can produce.
+
+    Expected outputs from task execution:
+    - FILE_CREATED: New file created
+    - FILE_MODIFIED: Existing file modified
+    - ANALYSIS_PROVIDED: Analysis output provided
+    - ANSWER_PROVIDED: Answer to question
+    - PLAN_PROVIDED: Plan created
+    - CODE_EXECUTED: Code was executed
+    """
+
+    FILE_CREATED = "file_created"  # New file created
+    FILE_MODIFIED = "file_modified"  # File modified
+    ANALYSIS_PROVIDED = "analysis_provided"  # Analysis output
+    ANSWER_PROVIDED = "answer_provided"  # Answer provided
+    PLAN_PROVIDED = "plan_provided"  # Plan created
+    CODE_EXECUTED = "code_executed"  # Code executed
+
+
+class ConversationStage(str, Enum):
+    """Stage in conversation execution.
+
+    Progress tracking through conversation lifecycle:
+    - INITIAL: Starting point
+    - PLANNING: Creating plan
+    - READING: Reading files
+    - ANALYSIS: Analyzing information
+    - EXECUTION: Executing actions
+    - VERIFICATION: Verifying results
+    """
+
+    INITIAL = "initial"  # Starting point
+    PLANNING = "planning"  # Creating plan
+    READING = "reading"  # Reading files
+    ANALYSIS = "analysis"  # Analyzing information
+    EXECUTION = "execution"  # Executing actions
+    VERIFICATION = "verification"  # Verifying results
+
+
+class ComplexityLevel(str, Enum):
+    """Task complexity level.
+
+    Based on conversation length:
+    - SIMPLE: ≤8 messages
+    - COMPLEX: >8 messages
+    """
+
+    SIMPLE = "simple"  # ≤8 messages
+    COMPLEX = "complex"  # >8 messages
+
+
+class TierType(str, Enum):
+    """Recommended tier for handling.
+
+    Which tier should handle the request:
+    - EDGE: Fast tier for simple requests
+    - BALANCED: Balanced tier for normal requests
+    - PERFORMANCE: Powerful tier for complex requests
+    """
+
+    EDGE = "edge"  # Fast tier
+    BALANCED = "balanced"  # Balanced tier
+    PERFORMANCE = "performance"  # Powerful tier
+
+
 class TaskCompletionDecision(BaseModel):
     """Is the task done?"""
 
     is_complete: bool = Field(description="Whether the task appears complete")
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the assessment")
-    phase: Literal["working", "finalizing", "done", "stuck"] = Field(
+    phase: TaskPhase = Field(
+        default=TaskPhase.WORKING,
         description="Current phase of task execution"
     )
 
@@ -45,7 +229,7 @@ class TaskCompletionDecision(BaseModel):
 class IntentDecision(BaseModel):
     """What is the model doing?"""
 
-    intent: Literal["continuation", "completion", "asking_input", "stuck_loop"] = Field(
+    intent: IntentType = Field(
         description="Classified intent of the model's response"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
@@ -54,20 +238,11 @@ class IntentDecision(BaseModel):
 class TaskTypeDecision(BaseModel):
     """What kind of task is this, and what deliverables are expected?"""
 
-    task_type: Literal["analysis", "action", "generation", "search", "edit"] = Field(
+    task_type: TaskCategoryType = Field(
         description="Classified type of the task"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
-    deliverables: list[
-        Literal[
-            "file_created",
-            "file_modified",
-            "analysis_provided",
-            "answer_provided",
-            "plan_provided",
-            "code_executed",
-        ]
-    ] = Field(
+    deliverables: list[DeliverableType] = Field(
         default_factory=list,
         description="Expected deliverable types (empty = infer from task_type)",
     )
@@ -76,7 +251,7 @@ class TaskTypeDecision(BaseModel):
 class QuestionTypeDecision(BaseModel):
     """Should we auto-continue past this question?"""
 
-    question_type: Literal["rhetorical", "continuation", "clarification", "info"] = Field(
+    question_type: QuestionType = Field(
         description="Type of question being asked"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
@@ -86,7 +261,8 @@ class LoopDetection(BaseModel):
     """Is the model stuck in a loop?"""
 
     is_loop: bool = Field(description="Whether a loop is detected")
-    loop_type: Literal["stalling", "circular", "repetition", "none"] = Field(
+    loop_type: LoopType = Field(
+        default=LoopType.NONE,
         description="Type of loop detected"
     )
 
@@ -94,7 +270,8 @@ class LoopDetection(BaseModel):
 class ErrorClassDecision(BaseModel):
     """Can we retry this error?"""
 
-    error_type: Literal["permanent", "transient", "retryable"] = Field(
+    error_type: ErrorType = Field(
+        default=ErrorType.TRANSIENT,
         description="Classification of the error"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in the classification")
@@ -117,8 +294,9 @@ class PromptFocusDecision(BaseModel):
 class StageDetectionDecision(BaseModel):
     """What conversation stage is this?"""
 
-    stage: Literal["initial", "planning", "reading", "analysis", "execution", "verification"] = (
-        Field(description="Detected conversation stage")
+    stage: ConversationStage = Field(
+        default=ConversationStage.INITIAL,
+        description="Detected conversation stage"
     )
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence in detection")
 
@@ -133,7 +311,7 @@ class ToolNecessityDecision(BaseModel):
 class ContinuationDecision(BaseModel):
     """What action should we take next?"""
 
-    action: Literal["finish", "prompt_tool_call", "request_summary", "return_to_user"] = Field(
+    action: ContinuationAction = Field(
         description="Recommended next action"
     )
     reason: str = Field(max_length=100, description="Brief reason for the recommendation")
@@ -169,10 +347,12 @@ class CompactionDecision(BaseModel):
         reason: Brief explanation of the decision
     """
 
-    complexity: Literal["simple", "complex"] = Field(
+    complexity: ComplexityLevel = Field(
+        default=ComplexityLevel.SIMPLE,
         description="simple (≤8 messages) or complex (>8 messages)"
     )
-    recommended_tier: Literal["edge", "balanced", "performance"] = Field(
+    recommended_tier: TierType = Field(
+        default=TierType.BALANCED,
         description="Recommended tier for compaction"
     )
     estimated_tokens: int = Field(description="Estimated token count of content to compact")
