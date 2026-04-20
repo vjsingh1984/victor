@@ -528,6 +528,7 @@ async def _get_or_build_index(
     1. In-memory cache for same session (DI-aware)
     2. Persistent disk storage in {root}/.victor/embeddings/
     3. Incremental updates for changed files only (not full rebuild)
+    4. Per-path locking to prevent concurrent indexing (NEW)
 
     Args:
         root: Root path for the codebase
@@ -537,6 +538,7 @@ async def _get_or_build_index(
     """
     from victor.core.capability_registry import CapabilityRegistry
     from victor.framework.vertical_protocols import CodebaseIndexFactoryProtocol
+    from victor.core.indexing.index_lock import IndexLockRegistry
 
     registry = CapabilityRegistry.get_instance()
     # Ensure plugins are bootstrapped so victor-coding registers its factory
@@ -660,60 +662,89 @@ async def _get_or_build_index(
             index_cache[str(root)]["latest_mtime"] = latest
             return cached_index, False  # Not a full rebuild
 
-    # Default persist directory is {root}/.victor/embeddings/ for project-local storage
-    from victor.config.settings import get_project_paths
+    # Acquire lock for this path to prevent concurrent indexing
+    lock_registry = IndexLockRegistry.get_instance()
+    path_lock = await lock_registry.acquire_lock(root)
 
-    default_persist_dir = str(get_project_paths(root).embeddings_dir)
+    async with path_lock:
+        # Double-check cache inside lock (another task may have built it while we waited)
+        cache_entry = index_cache.get(str(root))
+        cached_index = cache_entry["index"] if cache_entry else None
+        last_mtime = cache_entry["latest_mtime"] if cache_entry else 0.0
 
-    embedding_config = {
-        "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
-        "embedding_model_type": getattr(
-            settings, "codebase_embedding_provider", "sentence-transformers"
-        ),
-        "embedding_model_name": getattr(
-            settings,
-            "codebase_embedding_model",
-            getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
-        ),
-        "persist_directory": getattr(settings, "codebase_persist_directory", None)
-        or default_persist_dir,
-        "extra_config": {},
-    }
+        latest = _latest_mtime(root)
 
-    graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
-    graph_path = getattr(settings, "codebase_graph_path", None)
+        # Check if we have a valid cached index (double-check)
+        if cached_index and not force_reindex:
+            if latest <= last_mtime:
+                # Another task built it while we waited for lock
+                logger.info(f"[code_search] Cache hit for {root} (inside lock)")
+                return cached_index, False
 
-    # Create new index - it will load from disk if available
-    index = _index_factory.create(
-        root_path=str(root),
-        use_embeddings=True,
-        embedding_config=embedding_config,
-        graph_store_name=graph_store_name,
-        graph_path=Path(graph_path) if graph_path else None,
-    )
+        # Build index with exclusive access to this path
+        logger.info(f"[code_search] Building index for {root} (exclusive lock acquired)")
 
-    # Only do full index if forced or no persistent data exists
-    persist_path = Path(default_persist_dir)
-    has_persistent_data = persist_path.exists() and any(persist_path.iterdir())
-    if force_reindex or not has_persistent_data:
-        # First time or forced - full index
-        await index.index_codebase()
-        rebuilt = True
-    else:
-        # Persistent embeddings exist on disk (LanceDB tables).
-        # Mark as indexed so semantic_search() works directly against
-        # the persisted data without triggering a full rebuild.
-        if hasattr(index, "_is_indexed"):
-            index._is_indexed = True
-        logger.info("Using persistent embeddings from %s (skip full rebuild)", persist_path)
-        # Validate integrity — corrupt LanceDB data will fail silently
-        rebuilt = await _probe_index_integrity(index)
+        # Default persist directory is {root}/.victor/embeddings/ for project-local storage
+        from victor.config.settings import get_project_paths
 
-    index_cache[str(root)] = {
-        "index": index,
-        "latest_mtime": latest,
-        "indexed_at": time.time(),
-    }
+        default_persist_dir = str(get_project_paths(root).embeddings_dir)
+
+        embedding_config = {
+            "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
+            "embedding_model_type": getattr(
+                settings, "codebase_embedding_provider", "sentence-transformers"
+            ),
+            "embedding_model_name": getattr(
+                settings,
+                "codebase_embedding_model",
+                getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
+            ),
+            "persist_directory": getattr(settings, "codebase_persist_directory", None)
+            or default_persist_dir,
+            "extra_config": {},
+        }
+
+        graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
+        graph_path = getattr(settings, "codebase_graph_path", None)
+
+        # Create new index - it will load from disk if available
+        index = _index_factory.create(
+            root_path=str(root),
+            use_embeddings=True,
+            embedding_config=embedding_config,
+            graph_store_name=graph_store_name,
+            graph_path=Path(graph_path) if graph_path else None,
+        )
+
+        logger.info(f"[code_search] Index creation complete for {root}")
+
+        # Only do full index if forced or no persistent data exists
+        persist_path = Path(default_persist_dir)
+        has_persistent_data = persist_path.exists() and any(persist_path.iterdir())
+        if force_reindex or not has_persistent_data:
+            # First time or forced - full index
+            await index.index_codebase()
+            rebuilt = True
+        else:
+            # Persistent embeddings exist on disk (LanceDB tables).
+            # Mark as indexed so semantic_search() works directly against
+            # the persisted data without triggering a full rebuild.
+            if hasattr(index, "_is_indexed"):
+                index._is_indexed = True
+            logger.info("Using persistent embeddings from %s (skip full rebuild)", persist_path)
+            # Validate integrity — corrupt LanceDB data will fail silently
+            rebuilt = await _probe_index_integrity(index)
+
+        index_cache[str(root)] = {
+            "index": index,
+            "latest_mtime": latest,
+            "indexed_at": time.time(),
+        }
+
+        # Mark lock as used
+        lock_registry.mark_lock_used(root)
+
+        logger.info(f"[code_search] Index build complete for {root} (releasing lock)")
 
     # Clear failure cache on successful build
     try:
