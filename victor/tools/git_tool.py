@@ -672,6 +672,3 @@ DESCRIPTION:
             "output": "",
             "error": f"Failed to create PR: {result.stderr}",
         }
-
-
-    return await git(operation="conflicts", context=context)
