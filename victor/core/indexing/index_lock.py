@@ -18,20 +18,148 @@ This module provides per-path async locking to prevent multiple concurrent
 indexing operations on the same codebase path. Uses singleton pattern with
 double-checked locking for thread-safe access.
 
-Pattern: Singleton + Per-Resource Locking + Double-Checked Locking
+Provides two levels of locking:
+1. In-process locking (asyncio.Lock) - prevents concurrent indexing in same process
+2. Cross-process locking (file-based) - prevents concurrent indexing across processes
+
+Pattern: Singleton + Per-Resource Locking + Double-Checked Locking + File Locking
 """
 
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["IndexLockRegistry"]
+__all__ = ["IndexLockRegistry", "FileLock"]
+
+
+class FileLock:
+    """Cross-process file-based lock using fcntl.
+
+    Prevents multiple processes from indexing the same path concurrently.
+    Uses exclusive file locking with automatic cleanup on process exit.
+
+    Pattern: RAII (Resource Acquisition Is Initialization)
+
+    Example:
+        >>> lock = FileLock(Path("/my/project/.victor/index.lock"))
+        >>> lock.acquire()
+        >>> try:
+        ...     # Exclusive access to index this path
+        ...     await build_index()
+        ... finally:
+        ...     lock.release()
+    """
+
+    def __init__(self, lock_file: Path):
+        """Initialize file lock.
+
+        Args:
+            lock_file: Path to lock file (will be created if needed)
+        """
+        self.lock_file = lock_file
+        self.lock_file.parent.mkdir(parents=True, exist_ok=True)
+        self._lock_fd: Optional[int] = None
+
+    def acquire(self, timeout: float = 300.0) -> bool:
+        """Acquire exclusive lock on file.
+
+        Args:
+            timeout: Maximum time to wait for lock (default: 5 minutes)
+
+        Returns:
+            True if lock acquired, False if timeout
+
+        Raises:
+            IOError: If lock cannot be acquired due to system errors
+        """
+        start_time = time.time()
+
+        while True:
+            try:
+                # Open file (create if needed)
+                self._lock_fd = os.open(
+                    self.lock_file,
+                    os.O_CREAT | os.O_WRONLY | os.O_TRUNC,
+                    0o644,
+                )
+
+                # Try to acquire exclusive lock (non-blocking)
+                fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+                # Write PID to lock file for debugging
+                os.write(self._lock_fd, str(os.getpid()).encode())
+
+                logger.debug(
+                    f"[FileLock] Acquired lock {self.lock_file} (PID: {os.getpid()})"
+                )
+                return True
+
+            except IOError as e:
+                # Lock is held by another process
+                if e.errno == errno.EWOULDBLOCK:
+                    # Check timeout
+                    if time.time() - start_time >= timeout:
+                        logger.warning(
+                            f"[FileLock] Timeout waiting for lock {self.lock_file}"
+                        )
+                        if self._lock_fd is not None:
+                            os.close(self._lock_fd)
+                            self._lock_fd = None
+                        return False
+
+                    # Wait a bit and retry
+                    time.sleep(0.1)
+                    continue
+
+                # Other error
+                if self._lock_fd is not None:
+                    os.close(self._lock_fd)
+                    self._lock_fd = None
+                raise IOError(f"Failed to acquire lock: {e}")
+
+    def release(self) -> None:
+        """Release the lock and close file descriptor."""
+        if self._lock_fd is not None:
+            try:
+                fcntl.flock(self._lock_fd, fcntl.LOCK_UN)
+                os.close(self._lock_fd)
+                logger.debug(f"[FileLock] Released lock {self.lock_file}")
+            except Exception as e:
+                logger.warning(f"[FileLock] Error releasing lock: {e}")
+            finally:
+                self._lock_fd = None
+
+                # Try to remove lock file
+                try:
+                    if self.lock_file.exists():
+                        self.lock_file.unlink()
+                except Exception:
+                    pass  # Lock file may be in use by another process
+
+    def __enter__(self):
+        """Context manager entry."""
+        self.acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.release()
+
+    def __del__(self):
+        """Destructor - ensure lock is released."""
+        self.release()
+
+
+# Import errno for EWOULDBLOCK
+import errno
 
 
 class IndexLockRegistry:
@@ -64,6 +192,7 @@ class IndexLockRegistry:
     def __init__(self):
         """Initialize IndexLockRegistry."""
         self._path_locks: Dict[str, asyncio.Lock] = {}
+        self._file_locks: Dict[str, FileLock] = {}
         self._registry_lock = asyncio.Lock()
         self._lock_stats: Dict[str, Dict] = {}  # Track lock usage stats
 
@@ -78,18 +207,23 @@ class IndexLockRegistry:
             cls._instance = cls()
         return cls._instance
 
-    async def acquire_lock(self, path: Path) -> asyncio.Lock:
+    async def acquire_lock(self, path: Path, use_file_lock: bool = True) -> asyncio.Lock:
         """Acquire or create lock for specific path.
 
         Uses double-checked locking pattern for performance:
         - Fast path: Check cache without registry lock
         - Slow path: Acquire registry lock and create if needed
+        - Cross-process: Also acquires file lock for multi-process safety
 
         Args:
             path: File system path to lock
+            use_file_lock: Whether to use file-based locking for cross-process safety
 
         Returns:
             asyncio.Lock for this specific path
+
+        Raises:
+            TimeoutError: If file lock cannot be acquired within timeout
         """
         path_str = str(path.resolve())
 
@@ -108,7 +242,32 @@ class IndexLockRegistry:
                 # Another task created it while we waited
                 return self._path_locks[path_str]
 
-            # Create new lock
+            # Create file lock for cross-process protection
+            if use_file_lock:
+                from victor.config.settings import get_project_paths
+
+                project_paths = get_project_paths(path)
+                lock_file = project_paths.project_victor_dir / "index.lock"
+
+                file_lock = FileLock(lock_file)
+                # Acquire file lock in thread pool to avoid blocking event loop
+                loop = asyncio.get_event_loop()
+                acquired = await loop.run_in_executor(
+                    None, lambda: file_lock.acquire(timeout=300.0)
+                )
+
+                if not acquired:
+                    raise TimeoutError(
+                        f"Failed to acquire index lock for {path_str} "
+                        f"after 300 seconds (another process may be indexing)"
+                    )
+
+                self._file_locks[path_str] = file_lock
+                logger.info(
+                    f"[IndexLockRegistry] Acquired cross-process lock for {path_str}"
+                )
+
+            # Create new in-process lock
             self._path_locks[path_str] = asyncio.Lock()
 
             # Initialize stats
@@ -117,6 +276,7 @@ class IndexLockRegistry:
                 "cache_hits": 0,
                 "waits": 0,
                 "total_wait_time_ms": 0,
+                "has_file_lock": use_file_lock,
             }
 
             logger.info(
@@ -137,6 +297,8 @@ class IndexLockRegistry:
     ) -> int:
         """Remove locks that haven't been used recently.
 
+        Also releases file locks for cleaned up paths.
+
         Args:
             max_idle_seconds: Remove locks idle longer than this (default: 1 hour)
 
@@ -154,11 +316,17 @@ class IndexLockRegistry:
             idle_paths = [
                 path_str
                 for path_str, stats in self._lock_stats.items()
-                if current_time - stats.get("last_used", stats["created_at"]) > max_idle_seconds
+                if current_time - stats.get("last_used", stats["created_at"])
+                > max_idle_seconds
             ]
 
             # Remove idle locks
             for path_str in idle_paths:
+                # Release file lock if present
+                if path_str in self._file_locks:
+                    self._file_locks[path_str].release()
+                    del self._file_locks[path_str]
+
                 del self._path_locks[path_str]
                 del self._lock_stats[path_str]
                 removed += 1
@@ -202,6 +370,14 @@ class IndexLockRegistry:
         Use with caution in production.
         """
         async with self._registry_lock:
+            # Release all file locks
+            for file_lock in self._file_locks.values():
+                try:
+                    file_lock.release()
+                except Exception as e:
+                    logger.warning(f"[IndexLockRegistry] Error releasing file lock: {e}")
+
+            self._file_locks.clear()
             self._path_locks.clear()
             self._lock_stats.clear()
             logger.warning("[IndexLockRegistry] All locks cleared")

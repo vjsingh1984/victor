@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
@@ -13,6 +14,8 @@ from victor.tools.base import AccessMode, DangerLevel, ExecutionCategory, Priori
 from victor.tools.code_search_tool import _get_or_build_index
 from victor.tools.context import ToolExecutionContext
 from victor.tools.decorators import tool
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Enums for Graph Operations
@@ -802,7 +805,25 @@ async def graph(
     max_callsites: int = 3,
     _exec_ctx: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Analyze the indexed code graph using the active SQLite + LanceDB code index."""
+    """Analyze the indexed code graph using the active SQLite + LanceDB code index.
+
+    Enhanced with file watching for automatic cache invalidation.
+    """
+    # Subscribe to file watcher for automatic cache invalidation (only once per root)
+    from pathlib import Path as PathlibPath
+    from victor.core.indexing.file_watcher import FileWatcherRegistry
+    from victor.core.indexing.graph_manager import GraphManager
+
+    root_path = _resolve_root_path(path)
+
+    # Subscribe GraphManager to file watcher for this root
+    if not reindex:
+        try:
+            manager = GraphManager.get_instance()
+            await manager._ensure_file_watcher(root_path, _exec_ctx)
+        except Exception as e:
+            # Non-fatal: log warning but continue
+            logger.warning(f"[graph] Failed to subscribe to file watcher: {e}")
 
     try:
         loaded = await _load_graph(path, reindex=reindex, exec_ctx=_exec_ctx)
@@ -971,13 +992,15 @@ async def graph(
         else:
             raise ValueError(f"Unsupported graph mode: {mode}")
 
-        return {
+        graph_result = {
             "success": True,
             "mode": mode,
             "root_path": str(loaded.root_path),
             "rebuilt": loaded.rebuilt,
             "result": result,
         }
+
+        return graph_result
     except (ImportError, RuntimeError) as exc:
         # CodebaseIndex provider not installed or not bootstrapped —
         # return helpful guidance instead of a confusing error the LLM retries.

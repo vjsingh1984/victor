@@ -1274,6 +1274,26 @@ async def run_interactive(
 
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
+
+            # Initialize file watchers for automatic cache invalidation
+            import os
+
+            from victor.core.indexing.watcher_initializer import initialize_from_context
+
+            # Build execution context for file watcher initialization
+            exec_ctx = {
+                "cwd": os.getcwd(),
+                "settings": settings,
+            }
+
+            try:
+                await initialize_from_context(exec_ctx)
+            except Exception as e:
+                # Non-fatal: log warning but continue
+                console.print(
+                    f"[yellow]Warning:[/] Failed to initialize file watchers: {e}"
+                )
+                console.print("  Continuing without automatic file watching.\n")
         except InitializationError as e:
             console.print(f"[red]Error ({e.stage}):[/] {e.message}")
             for s in e.suggestions:
@@ -1386,6 +1406,15 @@ async def run_interactive(
             )
         if agent:
             await graceful_shutdown(agent)
+
+        # Cleanup file watchers
+        try:
+            from victor.core.indexing.watcher_initializer import cleanup_session
+
+            await cleanup_session()
+        except Exception as e:
+            # Non-fatal: log warning but don't fail shutdown
+            console.print(f"[dim]Note: Failed to cleanup file watchers: {e}[/]")
 
 
 def _create_cli_prompt_session():

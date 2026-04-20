@@ -22,4 +22,22 @@ This module provides:
 
 from __future__ import annotations
 
-__all__ = []
+__all__ = [
+    "IndexLockRegistry",
+    "FileWatcherService",
+    "FileWatcherRegistry",
+    "GraphManager",
+    "initialize_file_watchers",
+    "stop_file_watchers",
+    "cleanup_session",
+]
+
+# Import classes and functions for export
+from victor.core.indexing.index_lock import IndexLockRegistry
+from victor.core.indexing.file_watcher import FileWatcherService, FileWatcherRegistry
+from victor.core.indexing.graph_manager import GraphManager
+from victor.core.indexing.watcher_initializer import (
+    initialize_file_watchers,
+    stop_file_watchers,
+    cleanup_session,
+)

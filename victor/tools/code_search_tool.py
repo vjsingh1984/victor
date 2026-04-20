@@ -14,6 +14,9 @@ from victor.tools.decorators import tool
 if TYPE_CHECKING:
     from victor.tools.cache_manager import CacheNamespace
 
+    # File watching types
+    from victor.core.indexing.file_watcher import FileChangeEvent
+
 logger = logging.getLogger(__name__)
 
 
@@ -295,6 +298,89 @@ def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = Non
 def _latest_mtime(root: Path) -> float:
     """Find latest modification time under root, respecting EXCLUDE_DIRS."""
     return latest_mtime(root)
+
+
+async def _subscribe_to_file_watcher(
+    root: Path,
+    exec_ctx: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Subscribe to file watcher for automatic index invalidation.
+
+    Args:
+        root: Root path of codebase
+        exec_ctx: Execution context
+    """
+    from victor.core.indexing.file_watcher import FileWatcherRegistry
+
+    try:
+        # Get or create file watcher for this path
+        watcher_registry = FileWatcherRegistry.get_instance()
+        file_watcher = await watcher_registry.get_watcher(root)
+
+        # Subscribe to file changes (synchronous method)
+        file_watcher.subscribe(
+            lambda e: asyncio.create_task(_on_file_change(e, root, exec_ctx))
+        )
+
+        logger.info(f"[code_search] Subscribed to file watcher for {root}")
+    except Exception as e:
+        logger.error(f"[code_search] Failed to subscribe to file watcher: {e}")
+
+
+async def _on_file_change(
+    event: "FileChangeEvent",
+    root: Path,
+    exec_ctx: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Handle file change event for codebase index auto-update.
+
+    Invalidates cache and triggers incremental update if index exists.
+
+    Args:
+        event: File change event from FileWatcherService
+        root: Root path of codebase
+        exec_ctx: Execution context for cache access
+    """
+    from victor.core.indexing.file_watcher import FileChangeType
+
+    index_cache = _get_index_cache(exec_ctx)
+    index_key = str(root)
+    cache_entry = index_cache.get(index_key)
+
+    if not cache_entry:
+        return  # No index exists, nothing to update
+
+    if event.change_type == FileChangeType.DELETED:
+        # File deleted - mark cache as stale (next search will rebuild)
+        logger.info(f"[code_search] File deleted, marking cache stale: {event.path}")
+        cache_entry["stale"] = True
+
+    elif event.change_type in (FileChangeType.MODIFIED, FileChangeType.CREATED):
+        # File modified or created - trigger incremental update
+        logger.info(f"[code_search] File changed, triggering incremental update: {event.path}")
+
+        try:
+            index = cache_entry["index"]
+            # Check if index supports incremental updates
+            if hasattr(index, "incremental_reindex"):
+                await index.incremental_reindex()
+
+                # Update mtime
+                latest = _latest_mtime(root)
+                cache_entry["latest_mtime"] = latest
+                cache_entry["stale"] = False
+
+                logger.info(f"[code_search] Incremental update complete for {root}")
+            else:
+                # Index doesn't support incremental updates - mark as stale
+                logger.warning(
+                    f"[code_search] Index doesn't support incremental updates, "
+                    f"marking stale: {root}"
+                )
+                cache_entry["stale"] = True
+        except Exception as e:
+            logger.error(f"[code_search] Incremental update failed: {e}")
+            cache_entry["stale"] = True
 
 
 def _normalize_extensions(exts: Optional[List[str]]) -> Set[str]:
@@ -653,13 +739,28 @@ async def _get_or_build_index(
 
     # Check if we have a valid cached index
     if cached_index and not force_reindex:
-        if latest <= last_mtime:
+        # Check if cache is marked as stale from file watcher
+        if cache_entry.get("stale", False):
+            logger.info(f"[code_search] Cache marked stale for {root}, will rebuild")
+            # Fall through to rebuild below
+        elif latest <= last_mtime:
             # No files changed, use cache directly
+            # Subscribe to file watcher for auto-invalidation (only once per index)
+            if not cache_entry.get("watcher_subscribed", False):
+                await _subscribe_to_file_watcher(root, exec_ctx)
+                cache_entry["watcher_subscribed"] = True
+
             return cached_index, False
         else:
             # Files changed - do incremental update instead of full rebuild
             await cached_index.incremental_reindex()
             index_cache[str(root)]["latest_mtime"] = latest
+
+            # Subscribe to file watcher for auto-invalidation (only once per index)
+            if not cache_entry.get("watcher_subscribed", False):
+                await _subscribe_to_file_watcher(root, exec_ctx)
+                cache_entry["watcher_subscribed"] = True
+
             return cached_index, False  # Not a full rebuild
 
     # Acquire lock for this path to prevent concurrent indexing
@@ -679,6 +780,12 @@ async def _get_or_build_index(
             if latest <= last_mtime:
                 # Another task built it while we waited for lock
                 logger.info(f"[code_search] Cache hit for {root} (inside lock)")
+
+                # Subscribe to file watcher if not already subscribed
+                if not cache_entry.get("watcher_subscribed", False):
+                    await _subscribe_to_file_watcher(root, exec_ctx)
+                    cache_entry["watcher_subscribed"] = True
+
                 return cached_index, False
 
         # Build index with exclusive access to this path
@@ -739,6 +846,7 @@ async def _get_or_build_index(
             "index": index,
             "latest_mtime": latest,
             "indexed_at": time.time(),
+            "watcher_subscribed": False,  # Will be subscribed on next access
         }
 
         # Mark lock as used
