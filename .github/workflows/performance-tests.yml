@@ -40,8 +40,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,benchmark]"
-          pip install pytest-benchmark pytest-benchmark-autosave
+          pip install -e ".[dev,benchmark,checkpoints]"
+          pip install pytest-benchmark
 
       - name: Run performance tests
         run: |
@@ -131,7 +131,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev,benchmark]"
+          pip install -e ".[dev,benchmark,checkpoints]"
 
       - name: Run baseline tests
         run: |
