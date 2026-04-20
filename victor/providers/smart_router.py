@@ -251,8 +251,11 @@ class RoutingDecisionEngine:
                 logger.debug(f"Using user-specified providers: {candidates}")
                 return candidates
 
-        # Get fallback chain from profile
-        fallback_chain = self.profile.get_fallback_chain(task_type)
+        # Use custom fallback chain if specified, otherwise use profile
+        if self.config.custom_fallback_chain:
+            fallback_chain = self.config.custom_fallback_chain
+        else:
+            fallback_chain = self.profile.get_fallback_chain(task_type)
 
         # Filter to available providers
         candidates = [p for p in fallback_chain if p in self.available_providers]
