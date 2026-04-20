@@ -39,6 +39,150 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Constants for LangChain tool safeguards
+MAX_LANGCHAIN_TOOLS = 10
+
+# Whitelist of allowed LangChain tools (unique functionality not available in Victor)
+ALLOWED_LANGCHAIN_TOOLS = {
+    "wikipedia",  # Unique functionality
+    "wolfram_alpha",  # Unique functionality
+    "tmdb",  # Movie database - unique
+    "pubmed",  # Medical research - unique
+    "arxiv",  # Academic papers - unique
+}
+
+# Blacklist of banned LangChain tools (duplicates of Victor built-in tools)
+BANNED_LANGCHAIN_TOOLS = {
+    "duckduckgo",  # Duplicate: web_search
+    "google_search",  # Duplicate: web_search
+    "requests",  # Duplicate: http
+    "shell",  # Duplicate: shell
+    "python_repl",  # Duplicate: sandbox
+    "terminal",  # Duplicate: shell
+    "file",  # Duplicate: read/write/edit
+    "directory",  # Duplicate: ls
+    "grep",  # Duplicate: code_search
+}
+
+
+def _are_tools_semantically_similar(name1: str, name2: str) -> bool:
+    """Check if two tool names are semantically similar (potential duplicates).
+
+    Uses simple heuristics:
+    - Same base name (ignoring prefixes/suffixes)
+    - Same functional keywords (search, fetch, request, etc.)
+
+    Args:
+        name1: First tool name
+        name2: Second tool name
+
+    Returns:
+        True if tools are semantically similar, False otherwise
+    """
+    # Normalize names: lowercase, remove prefixes/suffixes
+    norm1 = name1.lower().replace("_", " ")
+    norm2 = name2.lower().replace("_", " ")
+
+    # Extract base names (remove common prefixes)
+    for prefix in ["lc", "langchain", "tool"]:
+        norm1 = norm1.replace(prefix, "").strip()
+        norm2 = norm2.replace(prefix, "").strip()
+
+    # Check for exact match after normalization
+    if norm1 == norm2:
+        return True
+
+    # Check for functional keyword overlap
+    search_keywords = {"search", "find", "lookup", "query"}
+    fetch_keywords = {"fetch", "get", "request", "http", "curl"}
+    shell_keywords = {"shell", "terminal", "command", "exec", "run"}
+    file_keywords = {"file", "read", "write", "edit", "directory"}
+
+    # Both are search tools
+    if (any(kw in norm1 for kw in search_keywords) and
+        any(kw in norm2 for kw in search_keywords)):
+        return True
+
+    # Both are fetch tools
+    if (any(kw in norm1 for kw in fetch_keywords) and
+        any(kw in norm2 for kw in fetch_keywords)):
+        return True
+
+    # Both are shell tools
+    if (any(kw in norm1 for kw in shell_keywords) and
+        any(kw in norm2 for kw in shell_keywords)):
+        return True
+
+    # Both are file tools
+    if (any(kw in norm1 for kw in file_keywords) and
+        any(kw in norm2 for kw in file_keywords)):
+        return True
+
+    return False
+
+
+def _check_langchain_tool_allowed(
+    tool_name: str,
+    existing_tools: List[str],
+    langchain_count: int,
+) -> tuple[bool, str]:
+    """Check if a LangChain tool should be allowed to register.
+
+    Enforces:
+    1. Blacklist check (blocked duplicates)
+    2. Whitelist check (if configured to be restrictive)
+    3. Count limit (max MAX_LANGCHAIN_TOOLS)
+    4. Duplicate detection (exact name)
+    5. Semantic similarity detection
+
+    Args:
+        tool_name: Name of the LangChain tool to check
+        existing_tools: List of already registered tool names
+        langchain_count: Current number of registered LangChain tools
+
+    Returns:
+        Tuple of (allowed: bool, reason: str)
+        - If allowed=True, tool can be registered
+        - If allowed=False, reason explains why it was blocked
+    """
+    # Check blacklist (exact match)
+    if tool_name.lower() in BANNED_LANGCHAIN_TOOLS:
+        return False, f"Tool '{tool_name}' is blacklisted (duplicate of built-in Victor tool)"
+
+    # Check whitelist (if configured to be restrictive)
+    # Note: We're not enforcing whitelist strictly by default, only logging
+    if ALLOWED_LANGCHAIN_TOOLS and tool_name.lower() not in ALLOWED_LANGCHAIN_TOOLS:
+        logger.warning(
+            "LangChain tool '%s' is not in whitelist. "
+            "Consider using built-in Victor tools for better integration.",
+            tool_name
+        )
+        # Still allow, but log warning
+
+    # Check count limit
+    if langchain_count >= MAX_LANGCHAIN_TOOLS:
+        return False, (
+            f"Maximum LangChain tools ({MAX_LANGCHAIN_TOOLS}) reached. "
+            f"Cannot register '{tool_name}'. "
+            f"Consider removing unused LangChain tools or using built-in Victor tools."
+        )
+
+    # Check for exact duplicate
+    if tool_name in existing_tools:
+        return False, f"Tool '{tool_name}' already exists in tool registry"
+
+    # Check for semantic similarity
+    for existing_name in existing_tools:
+        if _are_tools_semantically_similar(tool_name, existing_name):
+            return False, (
+                f"Tool '{tool_name}' is semantically similar to existing tool '{existing_name}'. "
+                f"Skipping to avoid proliferation."
+            )
+
+    # All checks passed
+    return True, "Tool allowed"
+
+
 def _pydantic_to_json_schema(args_schema: Any) -> Dict[str, Any]:
     """Convert LangChain args_schema to JSON Schema dict.
 
@@ -155,10 +299,10 @@ class LangChainAdapterTool(BaseTool):
 
 
 class LangChainToolProjector:
-    """Factory for batch-adapting LangChain tools with collision handling.
+    """Factory for batch-adapting LangChain tools with collision handling and safeguards.
 
     Same pattern as MCPToolProjector — iterates tools, creates adapters,
-    handles name collisions.
+    handles name collisions, and enforces safeguards.
     """
 
     @staticmethod
@@ -166,8 +310,10 @@ class LangChainToolProjector:
         tools: List["LCBaseTool"],
         prefix: str = "",
         conflict_strategy: str = "prefix_source",
+        existing_tool_names: Optional[List[str]] = None,
+        enable_safeguards: bool = True,
     ) -> List[LangChainAdapterTool]:
-        """Create adapter tools for a list of LangChain tools.
+        """Create adapter tools for a list of LangChain tools with safeguards.
 
         Args:
             tools: List of LangChain BaseTool instances
@@ -175,20 +321,55 @@ class LangChainToolProjector:
             conflict_strategy: How to handle name collisions:
                 "prefix_source" — prepend source index (default)
                 "skip" — skip duplicates, keep first
+            existing_tool_names: List of already registered tool names (for duplicate detection)
+            enable_safeguards: Whether to enforce LangChain safeguards (default: True)
 
         Returns:
             List of LangChainAdapterTool instances ready for registration
+
+        Raises:
+            ValueError: If count limit is exceeded and safeguards are enabled
         """
         adapted: List[LangChainAdapterTool] = []
         seen_names: Dict[str, int] = {}
+        blocked_count = 0
+
+        # Initialize existing tools list
+        if existing_tool_names is None:
+            existing_tool_names = []
 
         for tool in tools:
             adapter = LangChainAdapterTool(tool, name_prefix=prefix)
             tool_name = adapter.name
 
+            # Apply safeguards if enabled
+            if enable_safeguards:
+                # Check against existing tools + already adapted tools
+                all_existing = existing_tool_names + [a.name for a in adapted]
+                allowed, reason = _check_langchain_tool_allowed(
+                    tool_name,
+                    all_existing,
+                    len(adapted),
+                )
+
+                if not allowed:
+                    logger.warning("Skipping LangChain tool '%s': %s", tool_name, reason)
+                    blocked_count += 1
+                    continue
+
+                # Log successful registration
+                logger.info(
+                    "Registering LangChain tool '%s' (via LangChain). "
+                    "LangChain tools registered: %d/%d",
+                    tool_name,
+                    len(adapted) + 1,
+                    MAX_LANGCHAIN_TOOLS,
+                )
+
             if tool_name in seen_names:
                 if conflict_strategy == "skip":
                     logger.debug("Skipping duplicate LangChain tool: %s", tool_name)
+                    blocked_count += 1
                     continue
                 # prefix_source: add index suffix
                 idx = seen_names[tool_name]
@@ -198,14 +379,107 @@ class LangChainToolProjector:
                 )
                 tool_name = adapter.name
 
+                # Re-check safeguards with new name
+                if enable_safeguards:
+                    all_existing = existing_tool_names + [a.name for a in adapted]
+                    allowed, reason = _check_langchain_tool_allowed(
+                        tool_name,
+                        all_existing,
+                        len(adapted),
+                    )
+
+                    if not allowed:
+                        logger.warning("Skipping renamed LangChain tool '%s': %s", tool_name, reason)
+                        blocked_count += 1
+                        continue
+
             seen_names[tool_name] = seen_names.get(tool_name, 0) + 1
             adapted.append(adapter)
 
-        logger.info("Projected %d LangChain tools", len(adapted))
+        if blocked_count > 0:
+            logger.warning(
+                "Blocked %d LangChain tool(s) due to safeguards (duplicates, limits, or blacklist)",
+                blocked_count,
+            )
+
+        logger.info("Projected %d LangChain tools (blocked: %d)", len(adapted), blocked_count)
         return adapted
+
+
+def register_langchain_tools(
+    tools: List["LCBaseTool"],
+    tool_registry: Any,
+    prefix: str = "",
+    conflict_strategy: str = "prefix_source",
+    enable_safeguards: bool = True,
+) -> int:
+    """Register LangChain tools with automatic safeguards.
+
+    Convenience function that projects tools and registers them,
+    applying all safeguards by default.
+
+    Args:
+        tools: List of LangChain BaseTool instances
+        tool_registry: Victor tool registry instance
+        prefix: Optional prefix for all tool names
+        conflict_strategy: How to handle name collisions
+        enable_safeguards: Whether to enforce LangChain safeguards (default: True)
+
+    Returns:
+        Number of tools successfully registered
+
+    Raises:
+        ValueError: If count limit is exceeded and safeguards are enabled
+
+    Example:
+        from langchain_community.tools import WikipediaQueryRun
+        from victor.tools.langchain_adapter_tool import register_langchain_tools
+        from victor.framework.tools import get_tool_registry
+
+        wiki = WikipediaQueryRun()
+        registry = get_tool_registry()
+        count = register_langchain_tools([wiki], registry)
+    """
+    # Get existing tool names from registry
+    existing_names = []
+    if hasattr(tool_registry, "get_tool_names"):
+        existing_names = list(tool_registry.get_tool_names())
+    elif hasattr(tool_registry, "tools"):
+        existing_names = [t.name for t in tool_registry.tools]
+
+    # Project tools with safeguards
+    adapters = LangChainToolProjector.project(
+        tools,
+        prefix=prefix,
+        conflict_strategy=conflict_strategy,
+        existing_tool_names=existing_names,
+        enable_safeguards=enable_safeguards,
+    )
+
+    # Register adapters
+    registered_count = 0
+    for adapter in adapters:
+        try:
+            tool_registry.register(adapter)
+            registered_count += 1
+            logger.info("Registered LangChain tool: %s", adapter.name)
+        except Exception as e:
+            logger.error("Failed to register LangChain tool %s: %s", adapter.name, e)
+
+    logger.info(
+        "LangChain tool registration complete: %d registered, %d blocked",
+        registered_count,
+        len(adapters) - registered_count,
+    )
+
+    return registered_count
 
 
 __all__ = [
     "LangChainAdapterTool",
     "LangChainToolProjector",
+    "register_langchain_tools",
+    "MAX_LANGCHAIN_TOOLS",
+    "ALLOWED_LANGCHAIN_TOOLS",
+    "BANNED_LANGCHAIN_TOOLS",
 ]

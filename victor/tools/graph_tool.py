@@ -1014,6 +1014,254 @@ async def graph(
         }
 
 
+# =============================================================================
+# Focused Graph Tools (Split from monolithic graph function)
+# =============================================================================
+
+@tool(
+    category="search",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "search", "find", "query"],
+    timeout=60.0,
+)
+async def graph_search(
+    query: str,
+    path: str = ".",
+    top_k: int = 10,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Find nodes by query in code graph.
+
+    Fast search for symbols, files, and modules by name or pattern.
+    Use for: Quick lookups when you know what you're looking for.
+
+    Args:
+        query: Search query (symbol name, file path, or pattern)
+        path: Path to codebase root (default: ".")
+        top_k: Maximum number of results to return
+
+    Returns:
+        Dict with matches list containing node IDs and metadata
+    """
+    return await graph(
+        mode="search",
+        query=query,
+        path=path,
+        top_k=top_k,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+@tool(
+    category="search",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "neighbors", "callers", "callees", "relationships"],
+    timeout=60.0,
+)
+async def graph_neighbors(
+    node: str,
+    path: str = ".",
+    depth: int = 2,
+    direction: GraphDirection = "out",
+    edge_types: Optional[List[str]] = None,
+    include_callsites: int = 3,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Get neighboring nodes in code graph.
+
+    Explore relationships: callers, callees, references, etc.
+    Use for: Understanding what calls or is called by a symbol.
+
+    Args:
+        node: Node identifier (symbol, file, or module)
+        path: Path to codebase root (default: ".")
+        depth: How many hops to explore (default: 2)
+        direction: "out" (callees), "in" (callers), or "both"
+        edge_types: Filter to specific edge types (None = all)
+        include_callsites: Number of call sites to include (default: 3)
+
+    Returns:
+        Dict with neighbors list and relationship details
+    """
+    return await graph(
+        mode="neighbors",
+        node=node,
+        path=path,
+        depth=depth,
+        direction=direction,
+        edge_types=edge_types,
+        include_callsites=include_callsites,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+@tool(
+    category="analysis",
+    priority=Priority.MEDIUM,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "analytics", "metrics", "pagerank", "centrality", "stats"],
+    timeout=60.0,
+)
+async def graph_analytics(
+    path: str = ".",
+    reindex: bool = False,
+    only_runtime: bool = False,
+    files_only: bool = False,
+    modules_only: bool = False,
+    top_k: int = 10,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Calculate graph metrics and analytics.
+
+    PageRank, centrality, stats, clusters, etc.
+    Use for: Understanding codebase structure and importance.
+
+    Args:
+        path: Path to codebase root (default: ".")
+        reindex: Force rebuild of graph index
+        only_runtime: Only include runtime dependencies
+        files_only: Analyze files only (not symbols)
+        modules_only: Analyze modules only (not files/symbols)
+        top_k: Top K results to return
+
+    Returns:
+        Dict with metrics: pagerank, centrality, stats, etc.
+    """
+    return await graph(
+        mode="stats",
+        path=path,
+        reindex=reindex,
+        only_runtime=only_runtime,
+        files_only=files_only,
+        modules_only=modules_only,
+        top_k=top_k,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+@tool(
+    category="search",
+    priority=Priority.MEDIUM,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "path", "trace", "flow", "dependencies"],
+    timeout=60.0,
+)
+async def graph_path(
+    source: str,
+    target: str,
+    path: str = ".",
+    max_depth: int = 5,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Find paths between nodes in code graph.
+
+    Discover how code connects: call chains, data flow, etc.
+    Use for: Tracing execution paths or data flow.
+
+    Args:
+        source: Source node identifier
+        target: Target node identifier
+        path: Path to codebase root (default: ".")
+        max_depth: Maximum path length to search
+
+    Returns:
+        Dict with paths list and path details
+    """
+    return await graph(
+        mode="path",
+        source=source,
+        target=target,
+        path=path,
+        depth=max_depth,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+@tool(
+    category="analysis",
+    priority=Priority.MEDIUM,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "dependencies", "file", "imports", "impact"],
+    timeout=60.0,
+)
+async def graph_dependencies(
+    path: str = ".",
+    reindex: bool = False,
+    top_k: int = 10,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Analyze file dependencies in codebase.
+
+    Understand import relationships and file dependencies.
+    Use for: Impact analysis, dependency mapping.
+
+    Args:
+        path: Path to codebase root (default: ".")
+        reindex: Force rebuild of graph index
+        top_k: Top K files to return
+
+    Returns:
+        Dict with dependency information for each file
+    """
+    return await graph(
+        mode="file_deps",
+        path=path,
+        reindex=reindex,
+        top_k=top_k,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+@tool(
+    category="search",
+    priority=Priority.LOW,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "patterns", "anti-patterns", "structure"],
+    timeout=60.0,
+)
+async def graph_patterns(
+    query: str,
+    path: str = ".",
+    top_k: int = 10,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Find code patterns in graph.
+
+    Discover structural patterns, anti-patterns, and code smells.
+    Use for: Finding design patterns, architectural patterns.
+
+    Args:
+        query: Pattern description or query
+        path: Path to codebase root (default: ".")
+        top_k: Top K patterns to return
+
+    Returns:
+        Dict with pattern matches and analysis
+    """
+    return await graph(
+        mode="patterns",
+        query=query,
+        path=path,
+        top_k=top_k,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+# Legacy alias for backward compatibility
 graph_tool = graph
 
 __all__ = [
@@ -1022,5 +1270,11 @@ __all__ = [
     "GraphMode",
     "_load_graph",
     "graph",
+    "graph_search",
+    "graph_neighbors",
+    "graph_analytics",
+    "graph_path",
+    "graph_dependencies",
+    "graph_patterns",
     "graph_tool",
 ]
