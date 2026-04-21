@@ -52,11 +52,14 @@ class FormatterRenderer:
 
     def pause(self) -> None:
         """End streaming to allow status output."""
-        self.formatter.end_streaming()
+        # Use finalize=False to pause Live display without destroying it
+        # This allows resume() to continue streaming properly
+        self.formatter.end_streaming(finalize=False)
 
     def resume(self) -> None:
         """Resume streaming mode in the formatter."""
-        self.formatter.start_streaming()
+        # Resume with preserve_buffer=True to maintain content buffer
+        self.formatter.start_streaming(preserve_buffer=True)
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
         """Handle tool execution start.
