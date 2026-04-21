@@ -50,8 +50,8 @@ def initialize_conversation_embedding_store(
     memory_manager: Any,
 ) -> Tuple[Optional[Any], Optional[Any]]:
     """Create conversation embedding store and semantic cache handle."""
-    from victor.agent.coordinators.session_coordinator import SessionCoordinator
+    from victor.agent.services.session_service import SessionService
 
-    return SessionCoordinator.init_conversation_embedding_store(
+    return SessionService.init_conversation_embedding_store(
         memory_manager=memory_manager,
     )

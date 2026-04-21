@@ -186,6 +186,20 @@ class ComponentAssembler:
             search_router=orchestrator.search_router,
         )
 
+        # Register the live ToolPipeline in DI so prompt-time guidance paths
+        # can read online tool reputation from the same runtime instance.
+        try:
+            from victor.agent.tool_pipeline import ToolPipeline
+            from victor.core.container import ServiceLifetime
+
+            orchestrator._container.register_or_replace(
+                ToolPipeline,
+                lambda c: orchestrator._tool_pipeline,
+                ServiceLifetime.SINGLETON,
+            )
+        except Exception as exc:
+            logger.debug("ToolPipeline DI registration skipped: %s", exc)
+
         # Wire pending semantic cache
         if (
             hasattr(orchestrator, "_pending_semantic_cache")

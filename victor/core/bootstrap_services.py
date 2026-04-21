@@ -96,46 +96,68 @@ def bootstrap_new_services(
     # Create service dependencies first (lower-level services)
     services_created: Dict[str, Any] = {}
 
-    # Bootstrap ContextService (always create, used conditionally by orchestrator)
-    context_service = _create_context_service(container)
+    # Bootstrap ContextService (reuse existing instance if already registered)
+    context_service = container.get_optional(ContextServiceProtocol)
+    if context_service is None:
+        context_service = _create_context_service(container)
     services_created["context"] = context_service
-    container.register(ContextServiceProtocol, lambda c: context_service, ServiceLifetime.SINGLETON)
+    container.register_or_replace(
+        ContextServiceProtocol,
+        lambda c: context_service,
+        ServiceLifetime.SINGLETON,
+    )
     logger.info("Bootstrapped ContextService")
 
-    # Bootstrap ProviderService (always create)
-    provider_service = _create_provider_service(container)
+    # Bootstrap ProviderService (reuse canonical runtime instance when present)
+    provider_service = container.get_optional(ProviderServiceProtocol)
+    if provider_service is None:
+        provider_service = _create_provider_service(container)
     services_created["provider"] = provider_service
-    container.register(
+    container.register_or_replace(
         ProviderServiceProtocol,
         lambda c: provider_service,
         ServiceLifetime.SINGLETON,
     )
     logger.info("Bootstrapped ProviderService")
 
-    # Bootstrap RecoveryService (always create)
-    recovery_service = _create_recovery_service(container)
+    # Bootstrap RecoveryService (reuse existing instance if already registered)
+    recovery_service = container.get_optional(RecoveryServiceProtocol)
+    if recovery_service is None:
+        recovery_service = _create_recovery_service(container)
     services_created["recovery"] = recovery_service
-    container.register(
+    container.register_or_replace(
         RecoveryServiceProtocol,
         lambda c: recovery_service,
         ServiceLifetime.SINGLETON,
     )
     logger.info("Bootstrapped RecoveryService")
 
-    # Bootstrap ToolService (always create)
-    tool_service = _create_tool_service(
-        container,
-        tool_selector=tool_selector,
-        tool_executor=tool_executor,
-    )
+    # Bootstrap ToolService (reuse existing instance if already registered)
+    tool_service = container.get_optional(ToolServiceProtocol)
+    if tool_service is None:
+        tool_service = _create_tool_service(
+            container,
+            tool_selector=tool_selector,
+            tool_executor=tool_executor,
+        )
     services_created["tool"] = tool_service
-    container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
+    container.register_or_replace(
+        ToolServiceProtocol,
+        lambda c: tool_service,
+        ServiceLifetime.SINGLETON,
+    )
     logger.info("Bootstrapped ToolService")
 
-    # Bootstrap SessionService (always create)
-    session_service = _create_session_service(container)
+    # Bootstrap SessionService (reuse canonical runtime instance when present)
+    session_service = container.get_optional(SessionServiceProtocol)
+    if session_service is None:
+        session_service = _create_session_service(container)
     services_created["session"] = session_service
-    container.register(SessionServiceProtocol, lambda c: session_service, ServiceLifetime.SINGLETON)
+    container.register_or_replace(
+        SessionServiceProtocol,
+        lambda c: session_service,
+        ServiceLifetime.SINGLETON,
+    )
     logger.info("Bootstrapped SessionService")
 
     # Bootstrap decision service — prefer tiered (edge+balanced+performance),
@@ -164,23 +186,29 @@ def bootstrap_new_services(
         )
 
         services_created["llm_decision"] = decision_service
-        container.register(
+        container.register_or_replace(
             LLMDecisionServiceProtocol,
             lambda c: decision_service,
             ServiceLifetime.SINGLETON,
         )
 
-    # Bootstrap ChatService (always create - depends on other services)
-    chat_service = _create_chat_service(
-        container,
-        conversation_controller=conversation_controller,
-        streaming_coordinator=streaming_coordinator,
-        provider_service=services_created.get("provider"),
-        tool_service=services_created.get("tool"),
-        context_service=services_created.get("context"),
-        recovery_service=services_created.get("recovery"),
+    # Bootstrap ChatService (reuse existing instance if already registered)
+    chat_service = container.get_optional(ChatServiceProtocol)
+    if chat_service is None:
+        chat_service = _create_chat_service(
+            container,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
+            provider_service=services_created.get("provider"),
+            tool_service=services_created.get("tool"),
+            context_service=services_created.get("context"),
+            recovery_service=services_created.get("recovery"),
+        )
+    container.register_or_replace(
+        ChatServiceProtocol,
+        lambda c: chat_service,
+        ServiceLifetime.SINGLETON,
     )
-    container.register(ChatServiceProtocol, lambda c: chat_service, ServiceLifetime.SINGLETON)
     logger.info("Bootstrapped ChatService")
 
 

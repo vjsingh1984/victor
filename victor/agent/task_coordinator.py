@@ -165,7 +165,7 @@ class TaskCoordinator:
                 hint_source = unified_task_type.value
 
         if task_hint:
-            conversation_controller.add_message("system", task_hint.strip())
+            conversation_controller.add_message("user", f"[TASK-HINT: {task_hint.strip()}]")
             logger.debug(f"Injected task hint for task type: {hint_source}")
 
         # Classify task complexity and adjust tool budget
@@ -246,7 +246,7 @@ class TaskCoordinator:
 
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
             if intent_result.prompt_guard:
-                conversation_controller.add_message("system", intent_result.prompt_guard.strip())
+                conversation_controller.add_message("user", f"[INTENT-GUARD: {intent_result.prompt_guard.strip()}]")
                 logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
         elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
             logger.info("Intent: write_allowed, no prompt guard needed")
@@ -288,10 +288,10 @@ class TaskCoordinator:
             self._temperature = analysis_temp
 
             conversation_controller.add_message(
-                "system",
-                "ANALYSIS APPROACH: Work through the codebase one module at a time. "
+                "user",
+                "[ANALYSIS-APPROACH: Work through the codebase one module at a time. "
                 "For each module: 1) List its files, 2) Read 2-3 key files, 3) Note observations. "
-                "After examining 3-4 modules, provide your summary. Keep responses concise.",
+                "After examining 3-4 modules, provide your summary. Keep responses concise.]",
             )
 
             # Increase tool budget for comprehensive analysis,
@@ -307,14 +307,14 @@ class TaskCoordinator:
                 logger.info(f"Analysis task: respecting user-set tool_budget={self._tool_budget}")
 
             conversation_controller.add_message(
-                "system",
-                "This is an ANALYSIS task requiring thorough exploration of the codebase. "
+                "user",
+                "[ANALYSIS-GUIDANCE: This is an ANALYSIS task requiring thorough exploration of the codebase. "
                 "You MUST systematically examine multiple modules and files using tools like "
                 "read_file, list_directory, and code_search. "
                 "DO NOT stop after examining just a few files. "
                 "Continue using tools until you have gathered comprehensive information about "
                 "all major components of the codebase. "
-                "Only provide your final analysis AFTER you have examined all relevant modules.",
+                "Only provide your final analysis AFTER you have examined all relevant modules.]",
             )
 
         if is_action_task:
@@ -324,21 +324,22 @@ class TaskCoordinator:
 
             if needs_execution:
                 conversation_controller.add_message(
-                    "system",
-                    "This is an action-oriented task requiring execution. "
+                    "user",
+                    "[ACTION-GUIDANCE: This is an action-oriented task requiring execution. "
                     "Follow this workflow: "
                     "1. CREATE the file/script with write_file or edit_files "
                     "2. EXECUTE it immediately with execute_bash (don't skip this step!) "
                     "3. SHOW the output to the user. "
-                    "Minimize exploration and proceed directly to create→execute→show results.",
+                    "Minimize exploration and proceed directly to create→execute→show results.]",
                 )
             else:
                 conversation_controller.add_message(
-                    "system",
-                    "This is an action-oriented task (create/write/build). "
+                    "user",
+                    "[ACTION-GUIDANCE: This is an action-oriented task (create/write/build). "
                     "Minimize exploration and proceed directly to creating what was requested. "
-                    "Only explore if absolutely necessary to complete the task.",
+                    "Only explore if absolutely necessary to complete the task.]",
                 )
+
 
     # =====================================================================
     # Property Accessors

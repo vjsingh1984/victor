@@ -232,7 +232,7 @@ class NudgePolicy:
                     "tool or different arguments. If you've made your fix, "
                     "provide your final answer."
                 ),
-                role="system",
+                role="user",
             )
 
         # Agent not using tools
@@ -288,7 +288,7 @@ class NudgePolicy:
                     f"WARNING: {remaining} turns remaining out of "
                     f"{max_iterations}. Make your edits NOW."
                 ),
-                role="system",
+                role="user",
             )
         return NudgeDecision()
 
