@@ -754,7 +754,7 @@ class StreamingChatHandler:
         warning_chunk, system_message = self.get_force_completion_chunks(ctx, is_research)
 
         # Add system message to force summary
-        self.message_adder.add_message("system", system_message)
+        self.message_adder.add_message("user", f"[SYSTEM: {system_message}]")
 
         result = IterationResult(action=IterationAction.YIELD_AND_BREAK)
         result.add_chunk(warning_chunk)
@@ -1019,6 +1019,7 @@ class StreamingChatHandler:
         success: bool,
         error: Optional[str] = None,
         follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
+        was_pruned: bool = False,
         result: Any = None,  # Tool output for preview
     ) -> StreamChunk:
         """Generate a StreamChunk for a tool result.
@@ -1047,6 +1048,8 @@ class StreamingChatHandler:
             metadata["tool_result"]["error"] = error
         if follow_up_suggestions:
             metadata["tool_result"]["follow_up_suggestions"] = follow_up_suggestions
+        if was_pruned:
+            metadata["tool_result"]["was_pruned"] = True
         if result is not None:
             # Include tool output for preview (will be truncated by formatter)
             metadata["tool_result"]["result"] = str(result)[:2000]  # Limit to 2000 chars
@@ -1144,9 +1147,10 @@ class StreamingChatHandler:
         success = result.get("success", False)
         error = result.get("error") if not success else None
         follow_up_suggestions = result.get("follow_up_suggestions")
+        was_pruned = bool(result.get("was_pruned", False))
 
         # Main tool result chunk
-        tool_output = result.get("result")  # Get result for preview
+        tool_output = result.get("result") or result.get("content")
         chunks.append(
             self.generate_tool_result_chunk(
                 tool_name,
@@ -1155,6 +1159,7 @@ class StreamingChatHandler:
                 success,
                 error,
                 follow_up_suggestions=follow_up_suggestions,
+                was_pruned=was_pruned,
                 result=tool_output,  # Pass result for preview
             )
         )
@@ -1227,7 +1232,7 @@ class StreamingChatHandler:
             return None
 
         warning_chunk, system_message = self.get_loop_warning_chunks(warning_message)
-        self.message_adder.add_message("system", system_message)
+        self.message_adder.add_message("user", f"[SYSTEM: {system_message}]")
         return warning_chunk
 
     def generate_thinking_status_chunk(self) -> StreamChunk:

@@ -443,7 +443,7 @@ class ToolExecutionHandler:
         # Get and inject consolidated reminder
         reminder = self._reminder_manager.get_consolidated_reminder()
         if reminder:
-            self._message_adder.add_message("system", reminder)
+            self._message_adder.add_message("user", f"[SYSTEM-REMINDER: {reminder}]")
 
 
 # =============================================================================

@@ -161,20 +161,20 @@ class StreamingChatPipeline:
 
             if stream_ctx.needs_execution:
                 orch.add_message(
-                    "system",
-                    "This is an action-oriented task requiring execution. "
+                    "user",
+                    "[ACTION-GUIDANCE: This is an action-oriented task requiring execution. "
                     "Follow this workflow: "
                     "1. CREATE the file/script with write_file or edit_files "
                     "2. EXECUTE it immediately with execute_bash (don't skip this step!) "
                     "3. SHOW the output to the user. "
-                    "Minimize exploration and proceed directly to create->execute->show results.",
+                    "Minimize exploration and proceed directly to create→execute→show results.]",
                 )
             else:
                 orch.add_message(
-                    "system",
-                    "This is an action-oriented task (create/write/build). "
+                    "user",
+                    "[ACTION-GUIDANCE: This is an action-oriented task (create/write/build). "
                     "Minimize exploration and proceed directly to creating what was requested. "
-                    "Only explore if absolutely necessary to complete the task.",
+                    "Only explore if absolutely necessary to complete the task.]",
                 )
 
         goals = orch._tool_planner.infer_goals_from_message(user_message)
@@ -379,10 +379,10 @@ class StreamingChatPipeline:
                         f"(state={_spin.state.value}). Injecting format hint."
                     )
                     orch.add_message(
-                        "system",
-                        f"You described wanting to use '{tool_hint}' but didn't call it. "
+                        "user",
+                        f"[TOOL-FORMAT-HINT: You described wanting to use '{tool_hint}' but didn't call it. "
                         f"Call the tool directly — don't describe what you want to do, execute it. "
-                        f"If you've already modified the file successfully, say _DONE_.",
+                        f"If you've already modified the file successfully, say _DONE_.]",
                     )
 
             # Use recovery integration to detect and handle failures
