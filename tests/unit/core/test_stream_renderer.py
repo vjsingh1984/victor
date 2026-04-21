@@ -900,6 +900,104 @@ class TestProtocolCompliance:
             assert hasattr(StreamRenderer, method)
 
 
+class TestStreamingMetrics:
+    """Tests for StreamingMetrics dataclass and renderer metric collection."""
+
+    def test_initial_state_all_zero(self):
+        from victor.ui.rendering.metrics import StreamingMetrics
+        m = StreamingMetrics()
+        assert m.pause_count == 0
+        assert m.resume_count == 0
+        assert m.content_chunks == 0
+        assert m.tool_results == 0
+        assert m.total_pause_ms == 0.0
+        assert m.total_content_ms == 0.0
+        assert m.slow_renders == 0
+
+    def test_avg_content_ms_no_chunks(self):
+        from victor.ui.rendering.metrics import StreamingMetrics
+        assert StreamingMetrics().avg_content_ms == 0.0
+
+    def test_avg_content_ms_multiple_chunks(self):
+        from victor.ui.rendering.metrics import StreamingMetrics
+        m = StreamingMetrics()
+        m.record_content_chunk(10.0)
+        m.record_content_chunk(30.0)
+        assert m.avg_content_ms == 20.0
+
+    def test_slow_render_counted_above_threshold(self):
+        from victor.ui.rendering.metrics import StreamingMetrics
+        m = StreamingMetrics()
+        m.record_content_chunk(50.0)   # fast
+        m.record_content_chunk(150.0)  # slow
+        assert m.slow_renders == 1
+
+    def test_record_pause_accumulates_time(self):
+        from victor.ui.rendering.metrics import StreamingMetrics
+        m = StreamingMetrics()
+        m.record_pause(20.0)
+        m.record_pause(30.0)
+        assert m.pause_count == 2
+        assert m.total_pause_ms == 50.0
+
+    def test_formatter_renderer_get_metrics(self):
+        """FormatterRenderer.get_metrics() returns a StreamingMetrics instance."""
+        from victor.ui.rendering.metrics import StreamingMetrics
+        mock_formatter = MagicMock()
+        mock_console = MagicMock(spec=Console)
+        renderer = FormatterRenderer(mock_formatter, mock_console)
+        assert isinstance(renderer.get_metrics(), StreamingMetrics)
+
+    def test_formatter_renderer_counts_tool_results(self):
+        """on_tool_result() increments tool_results counter."""
+        mock_formatter = MagicMock()
+        mock_console = MagicMock(spec=Console)
+        renderer = FormatterRenderer(mock_formatter, mock_console)
+        renderer.on_tool_result("grep", True, 0.1, {})
+        renderer.on_tool_result("read", True, 0.2, {})
+        assert renderer.get_metrics().tool_results == 2
+
+    def test_formatter_renderer_counts_content_chunks(self):
+        """on_content() increments content_chunks counter."""
+        mock_formatter = MagicMock()
+        mock_console = MagicMock(spec=Console)
+        renderer = FormatterRenderer(mock_formatter, mock_console)
+        renderer.on_content("hello ")
+        renderer.on_content("world")
+        assert renderer.get_metrics().content_chunks == 2
+
+    def test_formatter_renderer_counts_pause_resume_cycles(self):
+        """Balanced pause/resume increments both counters once."""
+        mock_formatter = MagicMock()
+        mock_console = MagicMock(spec=Console)
+        renderer = FormatterRenderer(mock_formatter, mock_console)
+        renderer.pause()
+        renderer.resume()
+        m = renderer.get_metrics()
+        assert m.pause_count == 1
+        assert m.resume_count == 1
+
+    def test_live_display_renderer_get_metrics(self):
+        """LiveDisplayRenderer.get_metrics() returns a StreamingMetrics instance."""
+        from victor.ui.rendering.metrics import StreamingMetrics
+        mock_console = MagicMock(spec=Console)
+        renderer = LiveDisplayRenderer(mock_console)
+        assert isinstance(renderer.get_metrics(), StreamingMetrics)
+
+    def test_live_display_renderer_counts_tool_results(self):
+        """on_tool_result() increments tool_results counter in LiveDisplayRenderer."""
+        mock_console = MagicMock(spec=Console)
+        renderer = LiveDisplayRenderer(mock_console)
+        with patch("victor.ui.rendering.live_renderer.Live"), \
+             patch("victor.config.tool_settings.get_tool_settings") as mock_ts:
+            mock_ts.return_value = MagicMock(
+                tool_output_preview_enabled=False,
+                tool_output_show_transparency=False,
+            )
+            renderer.on_tool_result("bash", True, 0.5, {})
+        assert renderer.get_metrics().tool_results == 1
+
+
 class TestFormatterRendererPauseDepth:
     """Tests for pause depth counting in FormatterRenderer."""
 

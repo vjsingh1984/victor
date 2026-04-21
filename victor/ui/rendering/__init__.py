@@ -37,6 +37,7 @@ from victor.ui.rendering.buffered import BufferedRenderer
 from victor.ui.rendering.formatter_renderer import FormatterRenderer
 from victor.ui.rendering.handler import stream_response
 from victor.ui.rendering.live_renderer import LiveDisplayRenderer
+from victor.ui.rendering.metrics import StreamingMetrics
 from victor.ui.rendering.protocol import StreamRenderer
 from victor.ui.rendering.utils import (
     format_tool_args,
@@ -53,6 +54,8 @@ __all__ = [
     "BufferedRenderer",
     "FormatterRenderer",
     "LiveDisplayRenderer",
+    # Metrics
+    "StreamingMetrics",
     # Handler
     "stream_response",
     # Utilities

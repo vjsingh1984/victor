@@ -7,11 +7,14 @@ suitable for interactive CLI usage.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
+
+from victor.ui.rendering.metrics import StreamingMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +51,8 @@ class LiveDisplayRenderer:
         self._content_buffer = ""
         self._is_paused = False
         self._pause_count = 0  # Depth counter for nested pause/resume
+        self._pause_start_ms: float | None = None
+        self._metrics = StreamingMetrics()
         self._thinking_buffer = ""
         self._pending_tool: dict | None = None
         self._last_tool_result: dict | None = None
@@ -63,6 +68,10 @@ class LiveDisplayRenderer:
         self._is_paused = False
         self._pause_count = 0
 
+    def get_metrics(self) -> StreamingMetrics:
+        """Return accumulated streaming metrics for this session."""
+        return self._metrics
+
     def pause(self) -> None:
         """Pause the Live display to show status output.
 
@@ -71,6 +80,7 @@ class LiveDisplayRenderer:
         """
         self._pause_count += 1
         if self._pause_count == 1 and self._live and not self._is_paused:
+            self._pause_start_ms = time.monotonic() * 1000
             self._live.stop()
             self._is_paused = True
             self._content_shown_before_pause = self._content_buffer
@@ -88,6 +98,11 @@ class LiveDisplayRenderer:
             return
         self._pause_count -= 1
         if self._pause_count == 0 and self._is_paused:
+            if self._pause_start_ms is not None:
+                duration_ms = time.monotonic() * 1000 - self._pause_start_ms
+                self._metrics.record_pause(duration_ms)
+                self._pause_start_ms = None
+            self._metrics.record_resume()
             new_content = self._content_buffer[len(self._content_shown_before_pause) :]
             self._live = Live(
                 Markdown(new_content),
@@ -189,6 +204,7 @@ class LiveDisplayRenderer:
                 self.console.print(f"[dim]  next: {command}[/]")
 
         self._pending_tool = None
+        self._metrics.record_tool_result()
         self.resume()
 
     def on_status(self, message: str) -> None:
@@ -233,12 +249,15 @@ class LiveDisplayRenderer:
         # is handled separately by on_thinking_content() to avoid duplication
         if self._in_thinking_mode:
             return
+        t0 = time.monotonic() * 1000
         self._content_buffer += text
         if self._live:
-            # Only show content added AFTER last pause to avoid re-displaying old content
-            # This handles the case where we've had pause/resume cycles
             new_content = self._content_buffer[len(self._content_shown_before_pause) :]
             self._live.update(Markdown(new_content))
+        duration_ms = time.monotonic() * 1000 - t0
+        self._metrics.record_content_chunk(duration_ms)
+        if duration_ms > 100:
+            logger.debug("LiveDisplayRenderer: slow render %.1fms", duration_ms)
 
     def on_thinking_content(self, text: str) -> None:
         """Display thinking content immediately during streaming.

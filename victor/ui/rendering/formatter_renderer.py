@@ -7,9 +7,12 @@ suitable for non-interactive CLI usage.
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
+
+from victor.ui.rendering.metrics import StreamingMetrics
 
 logger = logging.getLogger(__name__)
 
@@ -50,10 +53,16 @@ class FormatterRenderer:
         self._content_buffer = ""
         self._pause_count = 0  # Depth counter for nested pause/resume
         self._last_tool_result: dict | None = None
+        self._metrics = StreamingMetrics()
+        self._pause_start_ms: float | None = None  # Wall time when outermost pause began
 
     def start(self) -> None:
         """Start streaming mode in the formatter."""
         self.formatter.start_streaming()
+
+    def get_metrics(self) -> StreamingMetrics:
+        """Return accumulated streaming metrics for this session."""
+        return self._metrics
 
     def pause(self) -> None:
         """End streaming to allow status output.
@@ -63,6 +72,7 @@ class FormatterRenderer:
         """
         self._pause_count += 1
         if self._pause_count == 1:
+            self._pause_start_ms = time.monotonic() * 1000
             self.formatter.end_streaming(finalize=False)
             logger.debug("FormatterRenderer: paused (depth=1)")
 
@@ -77,6 +87,11 @@ class FormatterRenderer:
             return
         self._pause_count -= 1
         if self._pause_count == 0:
+            if self._pause_start_ms is not None:
+                duration_ms = time.monotonic() * 1000 - self._pause_start_ms
+                self._metrics.record_pause(duration_ms)
+                self._pause_start_ms = None
+            self._metrics.record_resume()
             self.formatter.start_streaming(preserve_buffer=True)
             logger.debug("FormatterRenderer: resumed (depth=0)")
 
@@ -121,6 +136,7 @@ class FormatterRenderer:
             "arguments": arguments,
             "elapsed": elapsed,
         }
+        self._metrics.record_tool_result()
         self.pause()
         self.formatter.tool_result(
             tool_name=name,
@@ -169,8 +185,13 @@ class FormatterRenderer:
         Args:
             text: Content text to append
         """
+        t0 = time.monotonic() * 1000
         self._content_buffer += text
         self.formatter.stream_chunk(text)
+        duration_ms = time.monotonic() * 1000 - t0
+        self._metrics.record_content_chunk(duration_ms)
+        if duration_ms > 100:
+            logger.debug("FormatterRenderer: slow render %.1fms", duration_ms)
 
     def on_thinking_content(self, text: str) -> None:
         """Render thinking content as dimmed/italic text.
