@@ -40,6 +40,10 @@ from typing import (
 
 from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
 from victor.agent.coordinators.tool_retry import ToolRetryExecutor
+from victor.agent.services.tool_service import (
+    ToolResultContext,
+    process_tool_results_with_context,
+)
 from victor.tools.budget_controller import BudgetController
 from victor.tools.tool_call_parser import ToolCallParser
 from victor.tools.tool_call_validator import ToolCallValidator
@@ -88,34 +92,6 @@ class TaskContext:
     conversation_depth: int = 0
     conversation_history: Optional[List[Dict[str, Any]]] = None
     additional_context: Dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass
-class ToolResultContext:
-    """Context for post-processing tool results.
-
-    Carries references the orchestrator would otherwise access via ``self``,
-    enabling the ToolCoordinator to handle result post-processing without
-    a back-reference to the orchestrator.
-    """
-
-    executed_tools: List[str]
-    observed_files: Set[str]
-    failed_tool_signatures: Set[str]
-    shown_tool_errors: Set[str]
-    continuation_prompts: int = 0
-    asking_input_prompts: int = 0
-    tool_calls_used: int = 0
-    # Callbacks
-    record_tool_execution: Optional[Callable[..., None]] = None
-    conversation_state: Optional[Any] = None
-    unified_tracker: Optional[Any] = None
-    usage_logger: Optional[Any] = None
-    add_message: Optional[Callable[..., None]] = None  # (role, content, **kwargs)
-    format_tool_output: Optional[Callable[..., str]] = None
-    console: Optional[Any] = None
-    presentation: Optional[Any] = None
-    stream_context: Optional[Any] = None
 
 
 @dataclass
@@ -1175,143 +1151,10 @@ class ToolCoordinator:
         Returns:
             List of result dicts suitable for the agentic loop.
         """
-        results: List[Dict[str, Any]] = []
-
-        for call_result in pipeline_result.results:
-            # Skip only if genuinely skipped AND has no tool_call_id.
-            # Invalid tools with tool_call_id must produce a response per OpenAI spec.
-            if call_result.skipped and not call_result.tool_call_id:
-                continue
-
-            tool_name = call_result.tool_name
-            normalized_args = call_result.arguments or {}
-            output = call_result.result
-            success = call_result.success
-            error_msg = call_result.error
-            elapsed_ms = call_result.execution_time_ms
-
-            # --- State mutations ---
-            ctx.executed_tools.append(tool_name)
-            if tool_name == "read" and "path" in normalized_args:
-                ctx.observed_files.add(str(normalized_args.get("path")))
-
-            if ctx.stream_context is not None:
-                ctx.stream_context.reset_activity_timer()
-
-            if success:
-                if ctx.continuation_prompts > 0:
-                    ctx.continuation_prompts = 0
-                if ctx.asking_input_prompts > 0:
-                    ctx.asking_input_prompts = 0
-
-            # --- Analytics ---
-            error_type = type(error_msg).__name__ if error_msg and not success else None
-            if ctx.record_tool_execution:
-                ctx.record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
-            if ctx.conversation_state:
-                ctx.conversation_state.record_tool_execution(tool_name, normalized_args)
-
-            result_dict: Dict[str, Any] = {"success": success}
-            if output is not None:
-                result_dict["result"] = output
-            if ctx.unified_tracker:
-                ctx.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
-
-            # --- Semantic failure detection ---
-            follow_up_suggestions = None
-            semantic_success = success
-            if success and isinstance(output, dict) and output.get("success") is False:
-                semantic_success = False
-                error_msg = output.get("error", "Operation returned success=False")
-            elif success and isinstance(output, dict):
-                metadata = output.get("metadata")
-                if isinstance(metadata, dict):
-                    suggestions = metadata.get("follow_up_suggestions")
-                    if isinstance(suggestions, list) and suggestions:
-                        follow_up_suggestions = suggestions
-
-            error_display = None if semantic_success else (error_msg or "Unknown error")
-
-            # --- GEPA ASI trace enrichment ---
-            if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
-                ctx.usage_logger.set_duration_context(elapsed_ms)
-            if ctx.usage_logger:
-                ctx.usage_logger.log_event(
-                    "tool_result",
-                    {
-                        "tool_name": tool_name,
-                        "success": semantic_success,
-                        "result": output,
-                        "error": error_display,
-                    },
-                )
-
-            # --- Conversation injection ---
-            if semantic_success:
-                formatted_output = (
-                    ctx.format_tool_output(tool_name, normalized_args, output)
-                    if ctx.format_tool_output
-                    else str(output)
-                )
-                if ctx.add_message:
-                    ctx.add_message(
-                        "tool",
-                        formatted_output,
-                        name=tool_name,
-                        tool_call_id=call_result.tool_call_id,
-                    )
-                results.append(
-                    {
-                        "name": tool_name,
-                        "success": True,
-                        "elapsed": elapsed_ms / 1000,
-                        "args": normalized_args,
-                        "follow_up_suggestions": follow_up_suggestions,
-                        "tool_call_id": call_result.tool_call_id,  # Include for OpenAI spec compliance
-                        "content": formatted_output,  # Include for streaming chat coordinator
-                    }
-                )
-            else:
-                sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
-                ctx.failed_tool_signatures.add(sig)
-
-                _not_found = "not found" in str(error_display).lower()
-                _shown_key = f"notfound:{tool_name}" if _not_found else None
-                if not (_shown_key and _shown_key in ctx.shown_tool_errors):
-                    if _shown_key and len(ctx.shown_tool_errors) < 500:
-                        ctx.shown_tool_errors.add(_shown_key)
-                    if ctx.console and ctx.presentation:
-                        ctx.console.print(
-                            f"[red]{ctx.presentation.icon('error', with_color=False)} "
-                            f"Tool execution failed: {error_display}[/] "
-                            f"[dim]({elapsed_ms:.0f}ms)[/dim]"
-                        )
-
-                error_output = output if isinstance(output, dict) else {"error": error_display}
-                formatted_error = (
-                    ctx.format_tool_output(tool_name, normalized_args, error_output)
-                    if ctx.format_tool_output
-                    else str(error_output)
-                )
-                if ctx.add_message:
-                    ctx.add_message(
-                        "tool",
-                        formatted_error,
-                        name=tool_name,
-                        tool_call_id=call_result.tool_call_id,
-                    )
-                results.append(
-                    {
-                        "name": tool_name,
-                        "success": False,
-                        "elapsed": elapsed_ms / 1000,
-                        "error": error_display,
-                        "tool_call_id": call_result.tool_call_id,  # Include for OpenAI spec compliance
-                        "content": formatted_error,  # Include for streaming chat coordinator
-                    }
-                )
-
-        return results
+        logger.debug(
+            "ToolCoordinator.process_tool_results is deprecated; delegating to ToolService"
+        )
+        return process_tool_results_with_context(pipeline_result, ctx)
 
 
 @dataclass

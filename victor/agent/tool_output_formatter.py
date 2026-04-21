@@ -192,6 +192,24 @@ class ToolOutputFormatter:
         Returns:
             Formatted string with clear TOOL_OUTPUT boundaries
         """
+        # CRITICAL GUARD: Check if output is a coroutine (indicates tool not awaited)
+        import inspect as _inspect
+        if _inspect.iscoroutine(output):
+            logger.error(
+                f"[FORMATTER] ❌ COROUTINE OBJECT RECEIVED: tool={tool_name}, "
+                f"output={output}, type={type(output)}"
+            )
+            logger.error(
+                f"[FORMATTER] This indicates the tool function was called directly "
+                f"instead of being awaited through the executor."
+            )
+            raise RuntimeError(
+                f"Tool '{tool_name}' returned coroutine object. "
+                f"This indicates the tool was called directly (e.g., ls(path='.')) "
+                f"instead of through the executor (await tool.execute(path='.')). "
+                f"Raw output: {repr(output)}"
+            )
+
         context = context or FormattingContext()
 
         # Use adaptive serialization for structured outputs

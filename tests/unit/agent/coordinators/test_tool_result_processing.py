@@ -47,6 +47,7 @@ def _make_ctx(**overrides) -> ToolResultContext:
         "format_tool_output": MagicMock(return_value="formatted"),
         "console": MagicMock(),
         "presentation": MagicMock(),
+        "task_type": "analysis",
     }
     defaults.update(overrides)
     return ToolResultContext(**defaults)
@@ -227,3 +228,84 @@ class TestProcessToolResults:
 
         # Second "not found" for same tool should be deduped
         assert ctx.console.print.call_count == 1
+
+    def test_safe_default_pruning_runs_on_formatted_read_output(self):
+        coord = self._make_coordinator()
+        formatted = "\n".join(
+            [
+                '<TOOL_OUTPUT tool="read" path="src/main.py">',
+                "═══ ACTUAL FILE CONTENT: src/main.py ═══",
+                "[File: src/main.py]",
+                "[Lines 1-219 of 219]",
+                "[Size: 4096 bytes]",
+            ]
+            + [f"{i}\tline {i}" for i in range(1, 220)]
+            + [
+                "═══ END OF FILE: src/main.py ═══",
+                "</TOOL_OUTPUT>",
+            ]
+        )
+        pipeline_result = FakePipelineResult(
+            results=[
+                FakeCallResult(
+                    tool_name="read",
+                    success=True,
+                    result="raw result",
+                    arguments={"path": "src/main.py"},
+                    execution_time_ms=50.0,
+                )
+            ]
+        )
+        ctx = _make_ctx(format_tool_output=MagicMock(return_value=formatted))
+
+        with patch("victor.config.tool_settings.get_tool_settings") as mock_settings:
+            from victor.config.tool_settings import ToolSettings
+
+            mock_settings.return_value = ToolSettings(
+                tool_output_pruning_enabled=True,
+                tool_output_pruning_safe_only=True,
+            )
+            results = coord.process_tool_results(pipeline_result, ctx)
+
+        assert results[0]["was_pruned"] is True
+        assert results[0]["result"] == formatted
+        assert "[PRUNED FOR LLM:" in results[0]["content"]
+        added_content = ctx.add_message.call_args.args[1]
+        assert added_content == results[0]["content"]
+        assert results[0]["pruning_info"].recovery_hint.startswith("Use read(")
+
+    def test_no_regression_for_safety_critical_diff_like_output(self):
+        coord = self._make_coordinator()
+        diff_like_output = "\n".join(
+            [
+                '<TOOL_OUTPUT tool="read" path="artifacts/pytest.diff">',
+                "diff --git a/foo.py b/foo.py",
+                "--- a/foo.py",
+                "+++ b/foo.py",
+                "@@ -1,3 +1,3 @@",
+                "</TOOL_OUTPUT>",
+            ]
+        )
+        pipeline_result = FakePipelineResult(
+            results=[
+                FakeCallResult(
+                    tool_name="read",
+                    success=True,
+                    result="raw result",
+                    arguments={"path": "artifacts/pytest.diff"},
+                )
+            ]
+        )
+        ctx = _make_ctx(format_tool_output=MagicMock(return_value=diff_like_output))
+
+        with patch("victor.config.tool_settings.get_tool_settings") as mock_settings:
+            from victor.config.tool_settings import ToolSettings
+
+            mock_settings.return_value = ToolSettings(
+                tool_output_pruning_enabled=True,
+                tool_output_pruning_safe_only=True,
+            )
+            results = coord.process_tool_results(pipeline_result, ctx)
+
+        assert results[0]["was_pruned"] is False
+        assert results[0]["content"] == diff_like_output

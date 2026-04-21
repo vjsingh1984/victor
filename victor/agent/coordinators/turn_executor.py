@@ -621,6 +621,12 @@ class TurnExecutor:
     def _is_question_only(message: str) -> bool:
         """Detect messages that are pure Q&A and unlikely to need tools.
 
+        Enhanced to detect more Q&A patterns:
+        - Direct questions
+        - Explanation requests
+        - Definition requests
+        - Concept explanations
+
         Returns True for conversational/knowledge questions like:
         - "What is 2+2?"
         - "Explain Python decorators"
@@ -631,6 +637,8 @@ class TurnExecutor:
         - "Create a new file"
         - "Refactor the database module"
         """
+        import re
+
         msg = message.strip().lower()
 
         # Short messages ending with ? are almost always Q&A
@@ -691,6 +699,31 @@ class TurnExecutor:
         )
         if any(msg.startswith(p) for p in qa_prefixes):
             return True
+
+        # NEW: Add more Q&A patterns with regex
+        qa_patterns = [
+            r"^(what|how|why|when|where|who|which|whose|explain|describe|define)",
+            r"tell me (about|how|why)",
+            r"what('s| is| are) the (difference|definition)",
+            r"how do (you|you think|I)",
+            r"can you (explain|describe|tell me)",
+            r"^(pros and cons|advantages|disadvantages)",
+        ]
+
+        combined_pattern = "|".join(qa_patterns)
+        if re.match(combined_pattern, msg):
+            # Additional check: exclude if it contains implementation keywords
+            implementation_keywords = ["implement", "code", "write", "create", "build"]
+            if not any(kw in msg for kw in implementation_keywords):
+                return True
+
+        # Check for explanation/definition keywords
+        explanation_keywords = ["explain", "describe", "define", "what is", "how does"]
+        if any(keyword in msg for keyword in explanation_keywords):
+            # But exclude if it also includes implementation keywords
+            implementation_keywords = ["implement", "code", "write", "create", "build"]
+            if not any(kw in msg for kw in implementation_keywords):
+                return True
 
         return False
 

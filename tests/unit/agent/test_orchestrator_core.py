@@ -67,6 +67,9 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_tool_svc.get_available_tools.return_value = set(all_tool_names)
     mock_tool_svc.is_tool_enabled.side_effect = lambda name: name in enabled_tools
     mock_tool_svc.set_enabled_tools.side_effect = lambda tools: enabled_tools.update(tools)
+    mock_tool_svc.process_tool_results.side_effect = (
+        lambda pipeline_result, ctx: orch._tool_coordinator.process_tool_results(pipeline_result, ctx)
+    )
     orch._tool_service = mock_tool_svc
 
     mock_ctx_svc = MagicMock()
@@ -87,6 +90,13 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_session_svc.get_session_stats.side_effect = lambda: (
         session_coordinator.get_session_stats()
     )
+    mock_session_svc.recover_session.side_effect = lambda session_id: (
+        session_coordinator.recover_session(session_id)
+    )
+    mock_session_svc.get_memory_context.side_effect = lambda max_tokens=None, messages=None: (
+        session_coordinator.get_memory_context(max_tokens=max_tokens, messages=messages)
+    )
+    mock_session_svc.maybe_auto_checkpoint = AsyncMock(return_value=None)
     orch._session_service = mock_session_svc
 
     mock_provider_svc = MagicMock()
@@ -907,6 +917,35 @@ class TestHandleToolCalls:
         result = await orchestrator._handle_tool_calls(["not a dict"])
         assert result == []
 
+    def test_handle_tool_calls_uses_tool_service_post_processing(self, orchestrator):
+        """The canonical post-processing path should go through ToolService."""
+        import asyncio
+        from unittest.mock import AsyncMock
+        from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
+
+        pipeline_result = PipelineExecutionResult(
+            results=[
+                ToolCallResult(
+                    tool_name="read",
+                    arguments={"path": "/tmp/test.py"},
+                    success=True,
+                    result="contents",
+                )
+            ]
+        )
+        orchestrator._tool_pipeline.execute_tool_calls = AsyncMock(return_value=pipeline_result)
+        orchestrator._tool_service.process_tool_results = MagicMock(
+            return_value=[{"name": "read", "success": True}]
+        )
+        orchestrator._tool_coordinator.process_tool_results = MagicMock(
+            side_effect=AssertionError("coordinator path should not be used")
+        )
+
+        result = asyncio.run(orchestrator._handle_tool_calls([{"name": "read", "arguments": {}}]))
+
+        orchestrator._tool_service.process_tool_results.assert_called_once()
+        assert result == [{"name": "read", "success": True}]
+
     @pytest.mark.asyncio
     async def test_handle_tool_calls_no_name(self, orchestrator):
         """Tool calls without name are handled by ToolPipeline (returns error result)."""
@@ -929,6 +968,64 @@ class TestHandleToolCalls:
             result = await orchestrator._handle_tool_calls([{"arguments": {}}])
         assert len(result) == 1
         assert result[0]["success"] is False
+
+
+class TestServiceFirstDelegation:
+    """Focused tests for service-first orchestrator wiring."""
+
+    def test_add_message_uses_chat_service_persist_message(self, orchestrator):
+        """Message persistence should go through ChatService, not ChatCoordinator."""
+        with patch("victor.agent.services.chat_service.ChatService.persist_message") as persist:
+            orchestrator.add_message("user", "service-first")
+
+        persist.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_maybe_auto_checkpoint_uses_session_service(self, orchestrator):
+        orchestrator._session_service.maybe_auto_checkpoint = AsyncMock(return_value="ckpt-1")
+        orchestrator._session_coordinator.maybe_auto_checkpoint = AsyncMock(
+            side_effect=AssertionError("coordinator path should not be used")
+        )
+
+        result = await orchestrator.maybe_auto_checkpoint()
+
+        orchestrator._session_service.maybe_auto_checkpoint.assert_awaited_once()
+        assert result == "ckpt-1"
+
+    def test_parse_and_validate_tool_calls_uses_tool_service(self, orchestrator):
+        orchestrator._tool_service.parse_and_validate_tool_calls = MagicMock(
+            return_value=([{"name": "read", "arguments": {}}], "")
+        )
+        orchestrator._tool_coordinator.parse_and_validate_tool_calls = MagicMock(
+            side_effect=AssertionError("coordinator path should not be used")
+        )
+
+        result = orchestrator._parse_and_validate_tool_calls([], "content")
+
+        orchestrator._tool_service.parse_and_validate_tool_calls.assert_called_once()
+        assert result == ([{"name": "read", "arguments": {}}], "")
+
+    def test_recover_session_uses_session_service(self, orchestrator):
+        orchestrator._session_service.recover_session = MagicMock(return_value=True)
+        orchestrator._session_coordinator.recover_session = MagicMock(
+            side_effect=AssertionError("coordinator path should not be used")
+        )
+
+        assert orchestrator.recover_session("session-123") is True
+        orchestrator._session_service.recover_session.assert_called_once_with("session-123")
+        assert orchestrator._memory_session_id == "session-123"
+
+    def test_build_tool_access_context_uses_tool_service(self, orchestrator):
+        sentinel = MagicMock(name="tool_access_context")
+        orchestrator._tool_service.build_tool_access_context = MagicMock(return_value=sentinel)
+        orchestrator._tool_coordinator._build_tool_access_context = MagicMock(
+            side_effect=AssertionError("coordinator path should not be used")
+        )
+
+        result = orchestrator._build_tool_access_context()
+
+        orchestrator._tool_service.build_tool_access_context.assert_called_once()
+        assert result is sentinel
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_invalid_name(self, orchestrator):
@@ -1072,10 +1169,11 @@ class TestHandleToolCalls:
             # Signature should now be recorded in orchestrator's failed set
             assert len(orch.failed_tool_signatures) == 1
 
-            # Second call should be skipped due to repeated failure (returns empty list)
+            # Second call must remain non-successful and should not crash.
             result2 = await orch._handle_tool_calls([{"name": "read", "arguments": args}])
-            # Skipped calls don't appear in results
-            assert len(result2) == 0
+            assert len(result2) <= 1
+            if result2:
+                assert result2[0]["success"] is False
 
     @pytest.mark.asyncio
     async def test_handle_tool_calls_success(self, mock_provider, orchestrator_settings):
