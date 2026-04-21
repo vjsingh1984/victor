@@ -229,8 +229,20 @@ class ConversationStore:
         - Lookup tables with INTEGER PKs for categorical values
         - Sessions table uses INTEGER FKs for efficient joins
         - Indexes on all FK columns for fast aggregation queries
+
+        Migration Strategy:
+        - Run pending migrations before schema initialization
+        - Handle both legacy conversation.db and new project.db schemas
         """
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Run database migrations first (before schema version check)
+        try:
+            from victor.agent.conversation.migrations import migrate_database
+            migrate_database(str(self.db_path))
+            logger.debug(f"Database migrations completed for {self.db_path}")
+        except Exception as e:
+            logger.warning(f"Database migration failed (will continue with existing schema): {e}")
 
         with sqlite3.connect(self.db_path) as conn:
             # SQLite performance optimizations
@@ -244,12 +256,8 @@ class ConversationStore:
             conn.execute("PRAGMA foreign_keys = ON")
 
             # Create schema version tracking table (stores semver strings)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS schema_version (
-                    version TEXT PRIMARY KEY,
-                    applied_at TIMESTAMP NOT NULL
-                )
-                """)
+            from victor.agent.conversation.migrations import ensure_schema_version_table
+            ensure_schema_version_table(conn)
 
             # Check if current schema version is applied
             cursor = conn.execute(
