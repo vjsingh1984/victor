@@ -525,7 +525,7 @@ class ChatCoordinator:
         intelligent_context = await intelligent_task
         if intelligent_context:
             if intelligent_context.get("system_prompt_addition"):
-                orch.add_message("system", intelligent_context["system_prompt_addition"])
+                orch.add_message("user", f"[SYSTEM-REMINDER: {intelligent_context['system_prompt_addition']}]")
                 logger.debug("Injected intelligent pipeline optimized prompt")
 
         return (
@@ -728,7 +728,7 @@ class ChatCoordinator:
         # 5. Inject grounding feedback if pending
         if stream_ctx.pending_grounding_feedback:
             logger.info("Injecting pending grounding feedback as system message")
-            orch.add_message("system", stream_ctx.pending_grounding_feedback)
+            orch.add_message("user", f"[GROUNDING-FEEDBACK: {stream_ctx.pending_grounding_feedback}]")
             stream_ctx.pending_grounding_feedback = ""
 
     # =====================================================================
@@ -1058,10 +1058,77 @@ class ChatCoordinator:
                 )
 
             if tool_calls:
+                # Don't break immediately - process remaining chunks to ensure we get:
+                # - Final status/usage information
+                # - Any content after tool calls
+                # - Proper is_final signal
+                logger.debug(f"Tool calls received, processing remaining chunks before break")
+
+                # CRITICAL FIX: Track content during final chunk processing
+                final_content_received = False
+
+                # Continue streaming briefly to capture any final chunks
+                # (most providers send tool calls first, then content)
+                # We'll break after a short timeout or when we receive a final chunk
+                try:
+                    async for final_chunk in orch.provider.stream(
+                        messages=assembled,
+                        model=orch.model,
+                        temperature=orch.temperature,
+                        max_tokens=orch.max_tokens,
+                        tools=tools,
+                        **provider_kwargs,
+                    ):
+                        # Accumulate any additional content
+                        if final_chunk.content:
+                            full_content += final_chunk.content
+                            final_content_received = True
+
+                            # CRITICAL FIX: Always forward to renderer immediately
+                            # This ensures content is displayed even at tool call boundaries
+                            if hasattr(stream_ctx, 'renderer') and stream_ctx.renderer:
+                                stream_ctx.renderer.on_content(final_chunk.content)
+
+                        # Check if this is a final chunk
+                        if getattr(final_chunk, 'is_final', False):
+                            logger.debug("Received final chunk after tool calls")
+                            break
+
+                        # Safety: don't wait too long for final chunks
+                        # (some providers don't send anything after tool calls)
+                        if hasattr(final_chunk, 'finish_reason') and final_chunk.finish_reason:
+                            break
+
+                    # CRITICAL FIX: Log if no content received after tool calls
+                    if not final_content_received:
+                        logger.debug("No content received after tool calls - this is expected")
+
+                except Exception as e:
+                    logger.warning(f"Error processing final chunks after tool calls: {e}")
+                    # CRITICAL FIX: Don't lose content on error - still forward what we have
+                    if full_content and hasattr(stream_ctx, 'renderer') and stream_ctx.renderer:
+                        stream_ctx.renderer.on_content(full_content)
+
+                # Now break from the main loop
                 break
 
         if garbage_detected and not tool_calls:
             logger.info("Setting force_completion due to garbage detection")
+
+        # Validate that we received meaningful content or tool calls
+        if not tool_calls and not stream_ctx.force_completion:
+            content_length = len(full_content.strip()) if full_content else 0
+
+            if content_length == 0:
+                logger.warning("Stream completed without content or tool calls")
+                # Ensure we have at least some indication of completion
+                full_content = "[No content received from provider - stream may have failed]"
+            elif content_length < 50:
+                logger.warning(f"Stream completed with very short content ({content_length} chars)")
+                # Log for debugging but don't modify
+                logger.debug(f"Short content: {full_content}")
+
+        logger.debug(f"Stream completion summary - content: {len(full_content) if full_content else 0} chars, tool_calls: {len(tool_calls) if tool_calls else 0}")
 
         stream_ctx.total_tokens = total_tokens
         return full_content, tool_calls, total_tokens, garbage_detected

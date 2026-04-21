@@ -146,20 +146,30 @@ async def stream_response(
             else:
                 renderer.on_content(flush_result.content)
 
-        # End thinking state if still active
+        # CRITICAL FIX: Ensure thinking state is properly closed
         if was_thinking:
             renderer.on_thinking_end()
+            was_thinking = False
 
-        # Add debug logging before finalize
-        logger.debug(f"Stream completion - content buffer length: {len(getattr(renderer, '_content_buffer', ''))}")
-        logger.debug(f"Final thinking state: {getattr(renderer, '_in_thinking_mode', False)}")
-        logger.debug(f"Thinking buffer length: {len(getattr(renderer, '_thinking_buffer', ''))}")
+        # CRITICAL FIX: Add comprehensive logging before finalize
+        logger.debug(
+            f"stream_response completion - "
+            f"content_buffer_len={len(getattr(renderer, '_content_buffer', ''))}, "
+            f"thinking_buffer_len={len(getattr(renderer, '_thinking_buffer', ''))}, "
+            f"in_thinking_mode={getattr(renderer, '_in_thinking_mode', False)}, "
+            f"live_active={getattr(renderer, '_live', None) is not None}"
+        )
 
         # Log first 100 chars of content buffer for verification
         content_preview = getattr(renderer, '_content_buffer', '')[:100]
-        logger.debug(f"Content buffer preview: {content_preview}...")
+        logger.debug(f"Content buffer preview: {repr(content_preview)}...")
 
-        return renderer.finalize()
+        # FAIL-SAFE: Verify content was displayed
+        final_content = renderer.finalize()
+        if not final_content:
+            logger.warning("stream_response returned empty content - this may indicate a bug")
+
+        return final_content
 
     finally:
         renderer.cleanup()

@@ -246,18 +246,23 @@ class LiveDisplayRenderer:
         Args:
             text: Content text to append
         """
-        # During thinking mode, add to both thinking buffer and content buffer
+        # CRITICAL FIX: Always add to content buffer first (preserve for final display)
+        self._content_buffer += text
+
+        # During thinking mode, also add to thinking buffer for styled rendering
         # This ensures content is preserved for final display if stream ends in thinking mode
         if self._in_thinking_mode:
             # Add to thinking buffer for display
             self._thinking_buffer += text
-            # ALSO add to content buffer to prevent loss on stream end
-            # This ensures that if the stream ends while in thinking mode,
-            # the content is preserved for final display
-            self._content_buffer += text
+            # CRITICAL FIX: Don't early return - still update Live display
+            # This ensures content is visible even in thinking mode
+            if self._live:
+                new_content = self._content_buffer[len(self._content_shown_before_pause) :]
+                self._live.update(Markdown(new_content))
             return
+
+        # Normal content flow
         t0 = time.monotonic() * 1000
-        self._content_buffer += text
         if self._live:
             new_content = self._content_buffer[len(self._content_shown_before_pause) :]
             self._live.update(Markdown(new_content))
@@ -327,7 +332,16 @@ class LiveDisplayRenderer:
 
             self._last_thinking_rendered = self._thinking_buffer
             self._thinking_buffer = ""
-        self.resume()
+
+        # CRITICAL FIX: Ensure Live display shows all content after thinking ends
+        self.resume()  # This updates Live with any content buffered during thinking
+
+        # Double-check: If Live display was never updated with thinking content,
+        # force an update now to ensure nothing is lost
+        if self._live and self._content_buffer:
+            new_content = self._content_buffer[len(self._content_shown_before_pause) :]
+            if new_content.strip():
+                self._live.update(Markdown(new_content))
 
     def finalize(self) -> str:
         """Finalize response and return accumulated content.
@@ -335,11 +349,36 @@ class LiveDisplayRenderer:
         Returns:
             Accumulated response content
         """
-        # Render any remaining thinking content
+        from rich.markdown import Markdown
+        import time
+
+        # CRITICAL FIX: Flush any remaining thinking content first
         if self._thinking_buffer:
             render_thinking_text(self.console, self._thinking_buffer)
             self._thinking_buffer = ""
             self.console.print()
+
+        # FAIL-SAFE: Ensure content buffer is displayed to user
+        # This catches any edge cases where content wasn't shown during streaming
+        if self._content_buffer and not self._live:
+            # Live display was never started, render content directly
+            self.console.print(Markdown(self._content_buffer))
+        elif self._live and self._content_buffer:
+            # Live display exists - ensure final update
+            final_content = self._content_buffer[len(self._content_shown_before_pause) :]
+            if final_content.strip():
+                self._live.update(Markdown(final_content))
+                # Small delay to ensure user sees final content
+                time.sleep(0.1)
+
+        # Log for debugging
+        logger.debug(
+            f"LiveDisplayRenderer.finalize(): "
+            f"content_buffer_len={len(self._content_buffer)}, "
+            f"thinking_buffer_len={len(self._thinking_buffer)}, "
+            f"in_thinking_mode={self._in_thinking_mode}"
+        )
+
         self.cleanup()
         return self._content_buffer
 
