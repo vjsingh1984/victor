@@ -1092,6 +1092,91 @@ class AgenticLoop:
 
         return {"plan_executed": True, "plan": plan}
 
+    def _is_complete_response(self, response: str) -> bool:
+        """Check if response appears to be a complete answer.
+
+        Heuristics for completion:
+        - Contains complete code blocks
+        - Contains summary/conclusion phrases
+        - Direct answer format ("Here is...", "The answer is...")
+        - Sufficient length (>150 chars)
+        - NOT a continuation request ("Would you like...", "Should I...")
+
+        Args:
+            response: The model's response text
+
+        Returns:
+            True if response appears complete, False otherwise
+        """
+        if not response or len(response.strip()) < 150:
+            return False
+
+        response_lower = response.lower()
+
+        # Continuation indicators (NOT complete)
+        continuation_patterns = [
+            "would you like",
+            "should i",
+            "do you want",
+            "shall i",
+            "would you prefer",
+            "let me know if",
+            "would you like me to continue",
+        ]
+
+        for pattern in continuation_patterns:
+            if pattern in response_lower:
+                return False
+
+        # Completion indicators
+        completion_patterns = [
+            "here is", "here's", "the answer is", "the solution is",
+            "in conclusion", "to summarize", "in summary",
+            "the code above", "the following code", "as shown",
+        ]
+
+        has_completion_indicator = any(
+            pattern in response_lower for pattern in completion_patterns
+        )
+
+        # Check for complete code blocks
+        has_complete_code = "```" in response and response.count("```") >= 2
+
+        # Check for structured response (headings, lists)
+        has_structure = any(marker in response for marker in ["## ", "1.", "-", "*"])
+
+        # Complete if: has indicators OR (has code/structure + sufficient length)
+        return (
+            has_completion_indicator or
+            (has_complete_code and len(response) > 300) or
+            (has_structure and len(response) > 400)
+        )
+
+    def _is_continuation_request(self, response: str) -> bool:
+        """Check if response is asking for continuation direction.
+
+        Args:
+            response: The model's response text
+
+        Returns:
+            True if response is asking for continuation, False otherwise
+        """
+        if not response:
+            return False
+
+        response_lower = response.lower()
+
+        continuation_patterns = [
+            "would you like me to",
+            "should i continue",
+            "do you want me to",
+            "shall i proceed",
+            "let me know if you'd like",
+            "would you prefer i",
+        ]
+
+        return any(pattern in response_lower for pattern in continuation_patterns)
+
     async def _evaluate(
         self,
         perception: Perception,
@@ -1179,19 +1264,34 @@ class AgenticLoop:
                     f"{turn.failed_tool_count} failed",
                 )
 
-            # No tools + has content + previously used tools = likely done
-            # Refine with edge model to validate completion
+            # Detect final answers - both after tools AND direct answers
+            # Removed requirement for prior tool usage to detect direct answers
             if (
                 not turn.has_tool_calls
                 and turn.has_content
-                and self.spin_detector.total_tool_calls > 0
+                # Check for sufficient content length instead of requiring prior tool usage
+                and len(turn.response.strip()) > 100  # Heuristic: substantial answer
             ):
-                heuristic = EvaluationResult(
-                    decision=EvaluationDecision.COMPLETE,
-                    score=0.8,
-                    reason="Model provided final answer after using tools",
-                )
-                return await self._refine_with_llm(heuristic, action_result, state)
+                # Model provided a substantial response without requesting tools
+                # This is likely a complete answer
+
+                # Additional check: is this a continuation request?
+                is_continuation = self._is_continuation_request(turn.response)
+
+                if not is_continuation:
+                    heuristic = EvaluationResult(
+                        decision=EvaluationDecision.COMPLETE,
+                        score=0.8,
+                        reason=f"Model provided substantial response ({len(turn.response)} chars) without requesting tools",
+                    )
+                    return await self._refine_with_llm(heuristic, action_result, state)
+                else:
+                    # Model wants to continue (e.g., "Would you like me to...")
+                    return EvaluationResult(
+                        decision=EvaluationDecision.CONTINUE,
+                        score=0.6,
+                        reason="Model offered continuation - awaiting user direction",
+                    )
 
             # No tools, no previous tools = needs nudge (continue to retry)
             if not turn.has_tool_calls and spin_state == SpinState.NORMAL:
