@@ -219,7 +219,11 @@ class TurnBoundaryContextAssembler:
                     result.append(ledger_msg)
                     chars_used += len(ledger_text)
 
-        remaining = messages[start_idx:]
+        # Filter remaining messages to exclude additional system messages.
+        # This ensures byte-identical system prompts for provider KV caching.
+        # Additional system-role nudges should have been redirected to the
+        # user prefix or converted to 'user' role by the policy.
+        remaining = [m for m in messages[start_idx:] if m.role != "system"]
         if not remaining:
             return result
 

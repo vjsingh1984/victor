@@ -190,10 +190,20 @@ class ConversationStore:
         """
         from victor.config.settings import get_project_paths
 
-        self.db_path = db_path or get_project_paths().conversation_db
+        paths = get_project_paths()
+        self.db_path = db_path or paths.project_db
         self.max_context_tokens = max_context_tokens
         self.response_reserve = response_reserve
         self.chars_per_token = chars_per_token
+
+        # Migration check: rename conversation.db to project.db if it exists
+        legacy_db = paths.project_victor_dir / "conversation.db"
+        if not db_path and legacy_db.exists() and not self.db_path.exists():
+            try:
+                legacy_db.rename(self.db_path)
+                logger.info(f"Migrated legacy database {legacy_db} to {self.db_path}")
+            except Exception as e:
+                logger.warning(f"Failed to migrate legacy database: {e}")
 
         # In-memory session cache
         self._sessions: Dict[str, ConversationSession] = {}
