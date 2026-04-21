@@ -403,24 +403,46 @@ class ToolSelectorLearner(BaseLearner):
     def _get_blended_q_value(self, tool_name: str, task_type: str) -> float:
         """Get blended Q-value (70% task-specific + 30% global).
 
+        Applies tool-specific exploration boosts if configured in settings.
+        Use this after significant tool improvements to accelerate relearning.
+
         Args:
             tool_name: Name of the tool
             task_type: Task type
 
         Returns:
-            Blended Q-value
+            Blended Q-value with exploration boost applied (if configured)
         """
         global_q = self._tool_q_values.get(tool_name, self.DEFAULT_Q_VALUE)
 
         if tool_name not in self._tool_task_q_values:
-            return global_q
+            base_q = global_q
+        else:
+            task_q = self._tool_task_q_values[tool_name].get(task_type)
+            if task_q is None:
+                base_q = global_q
+            else:
+                # Blend: 70% task-specific, 30% global
+                base_q = 0.7 * task_q + 0.3 * global_q
 
-        task_q = self._tool_task_q_values[tool_name].get(task_type)
-        if task_q is None:
-            return global_q
+        # Apply tool-specific exploration boost if configured
+        try:
+            from victor.config.settings import load_settings
 
-        # Blend: 70% task-specific, 30% global
-        return 0.7 * task_q + 0.3 * global_q
+            settings = load_settings()
+            boost = settings.tool_exploration_boosts.get(tool_name, 1.0)
+
+            if boost != 1.0:
+                logger.debug(
+                    f"[tool_selector] Applied {boost:.1f}x exploration boost for '{tool_name}' "
+                    f"(Q: {base_q:.3f} -> {base_q * boost:.3f})"
+                )
+                return min(1.0, base_q * boost)  # Cap at 1.0
+
+        except Exception as e:
+            logger.debug(f"[tool_selector] Failed to apply exploration boost: {e}")
+
+        return base_q
 
     def _compute_reward(self, outcome: RLOutcome) -> float:
         """Compute reward from implicit signals.

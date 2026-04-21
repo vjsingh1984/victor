@@ -3772,7 +3772,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Stream a chat response (public entrypoint).
 
         When USE_AGENTIC_LOOP is enabled, streams through AgenticLoop
-        with perception/evaluation lifecycle. Falls back to ChatCoordinator.
+        with perception/evaluation lifecycle. Falls back to ChatCoordinator
+        while preserving conversation state.
 
         Args:
             user_message: User's input message
@@ -3782,6 +3783,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Skill auto-selection
         self._apply_skill_for_turn(user_message)
+
+        # Get current iteration count BEFORE attempting AgenticLoop
+        # This allows us to preserve state in case of fallback
+        current_iteration = self.get_iteration_count()
 
         # Phase 10: Route through AgenticLoop for perception/evaluation
         try:
@@ -3813,10 +3818,21 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     yield chunk
                 return
         except Exception as e:
-            logger.warning(f"AgenticLoop streaming failed, falling back: {e}")
+            logger.warning(
+                f"AgenticLoop streaming failed at iteration {current_iteration}, falling back: {e}"
+            )
+            logger.info(
+                f"[Fallback] Preserving conversation state: {current_iteration} iterations, "
+                f"{len(self.conversation.messages)} messages in history"
+            )
 
-        # Fallback: ChatCoordinator streaming
-        async for chunk in self._chat_service.stream_chat(user_message):
+        # Fallback: ChatCoordinator streaming WITH preserved state
+        # IMPORTANT: We pass the current iteration count to prevent reset
+        async for chunk in self._chat_service.stream_chat(
+            user_message,
+            _preserve_iteration=True,
+            _current_iteration=current_iteration,
+        ):
             yield chunk
 
     async def _execute_tool_with_retry(

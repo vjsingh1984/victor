@@ -79,13 +79,15 @@ class StreamingChatPipeline:
             self._last_tools = tools
         return tools
 
-    async def run(self, user_message: str) -> AsyncIterator[StreamChunk]:
+    async def run(
+        self, user_message: str, **kwargs: Any
+    ) -> AsyncIterator[StreamChunk]:
         """Run the streaming pipeline for the provided message."""
         coord = self._coordinator
         orch = coord._orchestrator
 
         # Initialize and prepare using StreamingChatContext
-        stream_ctx = await coord._create_stream_context(user_message)
+        stream_ctx = await coord._create_stream_context(user_message, **kwargs)
 
         # Store context reference for handler delegation methods
         orch._current_stream_context = stream_ctx

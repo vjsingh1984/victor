@@ -214,7 +214,9 @@ class ChatService:
 
         Args:
             user_message: The user's input message
-            **kwargs: Additional options for the chat
+            **kwargs: Additional options for the chat, including:
+                - _preserve_iteration: If True, preserve iteration count from failed attempt
+                - _current_iteration: Current iteration count to preserve
 
         Yields:
             StreamChunk objects with incremental response content
@@ -223,11 +225,22 @@ class ChatService:
             ProviderError: If the provider fails during streaming
             ToolExecutionError: If tool execution fails critically
         """
+        # Check if this is a fallback from AgenticLoop failure
+        preserve_iteration = kwargs.pop("_preserve_iteration", False)
+        current_iteration = kwargs.pop("_current_iteration", 0)
+
+        if preserve_iteration and current_iteration > 0:
+            self._logger.info(
+                f"[Fallback mode] Preserving state: continuing from iteration {current_iteration}"
+            )
+            # Store current iteration for ChatCoordinator to use
+            kwargs["_fallback_iteration"] = current_iteration
+
         self._logger.debug(f"Starting stream chat for: {user_message[:50]}...")
 
         try:
             # Run agentic loop with streaming
-            async for chunk in self._run_agentic_loop_streaming(user_message, **kwargs):
+            async for chunk in self._run_agentic_loop(user_message, **kwargs):
                 yield chunk
 
         except Exception as e:
@@ -236,8 +249,12 @@ class ChatService:
             # Attempt recovery
             recovery_context = self._create_recovery_context(e)
             if await self._recovery.execute_recovery(recovery_context):
-                # Retry after recovery
-                async for chunk in self.stream_chat(user_message, **kwargs):
+                # Retry after recovery (preserving iteration if we were preserving)
+                async for chunk in self.stream_chat(
+                    user_message,
+                    _preserve_iteration=preserve_iteration,
+                    _current_iteration=current_iteration,
+                ):
                     yield chunk
                 return
 

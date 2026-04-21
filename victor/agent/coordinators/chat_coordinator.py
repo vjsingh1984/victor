@@ -299,7 +299,9 @@ class ChatCoordinator:
 
         return response
 
-    async def stream_chat(self, user_message: str) -> AsyncIterator[StreamChunk]:
+    async def stream_chat(
+        self, user_message: str, **kwargs: Any
+    ) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
         Delegates to the canonical StreamingChatPipeline that coordinates the
@@ -308,10 +310,24 @@ class ChatCoordinator:
 
         Args:
             user_message: User's input message
+            **kwargs: Additional options, including internal parameters:
+                - _preserve_iteration: If True, preserve iteration from failed attempt
+                - _current_iteration: Current iteration count to preserve
+                - _fallback_iteration: Iteration number from previous attempt
 
         Returns:
             AsyncIterator yielding StreamChunk objects with incremental response
         """
+        # Filter out internal fallback parameters before passing to pipeline
+        _ = kwargs.pop("_preserve_iteration", None)
+        fallback_iteration = kwargs.pop("_fallback_iteration", 0)
+
+        if fallback_iteration > 0:
+            logger.info(
+                f"[ChatCoordinator] Using fallback iteration: {fallback_iteration}"
+            )
+            # Store for _handle_context_and_iteration_limits to use
+            kwargs["_fallback_iteration"] = fallback_iteration
         orch = self._orchestrator
         if self._streaming_pipeline is None:
             from victor.agent.streaming import create_streaming_chat_pipeline
@@ -336,7 +352,7 @@ class ChatCoordinator:
 
         pipeline = self._streaming_pipeline
         try:
-            async for chunk in pipeline.run(user_message):
+            async for chunk in pipeline.run(user_message, **kwargs):
                 yield chunk
         finally:
             # Update cumulative token usage after stream completes
@@ -374,7 +390,9 @@ class ChatCoordinator:
     # Stream Preparation and Context
     # =====================================================================
 
-    async def _prepare_stream(self, user_message: str) -> tuple[
+    async def _prepare_stream(
+        self, user_message: str, **kwargs: Any
+    ) -> tuple[
         Any,
         float,
         float,
@@ -435,8 +453,20 @@ class ChatCoordinator:
             await orch._context_manager.start_background_compaction(interval_seconds=15.0)
 
         # Local aliases for frequently-used values
-        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 100)
-        total_iterations = 0
+        max_total_iterations = orch.unified_tracker.config.get("max_total_iterations", 50)
+
+        # Check if we're preserving iteration count from a failed AgenticLoop attempt
+        # This prevents state loss when falling back from streaming failures
+        fallback_iteration = kwargs.get("_fallback_iteration", 0)
+        if fallback_iteration > 0:
+            total_iterations = fallback_iteration
+            logger.info(
+                f"[Fallback] Preserving iteration count: continuing from iteration {total_iterations} "
+                f"(preserved {total_iterations} iterations of progress)"
+            )
+        else:
+            total_iterations = 0
+
         force_completion = False
 
         # Add user message to history
@@ -512,11 +542,14 @@ class ChatCoordinator:
             complexity_tool_budget,
         )
 
-    async def _create_stream_context(self, user_message: str) -> "StreamingChatContext":
+    async def _create_stream_context(
+        self, user_message: str, **kwargs: Any
+    ) -> "StreamingChatContext":
         """Create a StreamingChatContext with all prepared data.
 
         Args:
             user_message: The user's message
+            **kwargs: Additional options (e.g., _fallback_iteration)
 
         Returns:
             Populated StreamingChatContext ready for the streaming loop
@@ -538,7 +571,7 @@ class ChatCoordinator:
             unified_task_type,
             task_classification,
             complexity_tool_budget,
-        ) = await self._prepare_stream(user_message)
+        ) = await self._prepare_stream(user_message, **kwargs)
 
         # Classify task type based on keywords
         task_keywords = orch._classify_task_keywords(user_message)

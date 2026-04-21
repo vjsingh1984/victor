@@ -69,7 +69,10 @@ class FileLock:
         self._lock_fd: Optional[int] = None
 
     def acquire(self, timeout: float = 300.0) -> bool:
-        """Acquire exclusive lock on file.
+        """Acquire exclusive lock on file (reentrant for same process).
+
+        If the lock is already held by the current process (same PID),
+        this method succeeds immediately without blocking.
 
         Args:
             timeout: Maximum time to wait for lock (default: 5 minutes)
@@ -81,9 +84,25 @@ class FileLock:
             IOError: If lock cannot be acquired due to system errors
         """
         start_time = time.time()
+        current_pid = os.getpid()
 
         while True:
             try:
+                # Check if lock file exists and is held by same process (reentrant)
+                if self.lock_file.exists():
+                    try:
+                        with open(self.lock_file, "r") as f:
+                            lock_pid = f.read().strip()
+                            if lock_pid and int(lock_pid) == current_pid:
+                                logger.debug(
+                                    f"[FileLock] Lock already held by same process {self.lock_file} (PID: {current_pid})"
+                                )
+                                # Reentrant: same process already holds the lock
+                                self._lock_fd = None  # No FD needed for reentrant case
+                                return True
+                    except (ValueError, IOError):
+                        pass  # Lock file corrupt or unreadable, continue to acquire
+
                 # Open file (create if needed)
                 self._lock_fd = os.open(
                     self.lock_file,
@@ -95,10 +114,10 @@ class FileLock:
                 fcntl.flock(self._lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
                 # Write PID to lock file for debugging
-                os.write(self._lock_fd, str(os.getpid()).encode())
+                os.write(self._lock_fd, str(current_pid).encode())
 
                 logger.debug(
-                    f"[FileLock] Acquired lock {self.lock_file} (PID: {os.getpid()})"
+                    f"[FileLock] Acquired lock {self.lock_file} (PID: {current_pid})"
                 )
                 return True
 
@@ -126,7 +145,11 @@ class FileLock:
                 raise IOError(f"Failed to acquire lock: {e}")
 
     def release(self) -> None:
-        """Release the lock and close file descriptor."""
+        """Release the lock and close file descriptor.
+
+        For reentrant locks (same process), this is a no-op since the
+        lock will be released when the outermost acquire is released.
+        """
         if self._lock_fd is not None:
             try:
                 fcntl.flock(self._lock_fd, fcntl.LOCK_UN)

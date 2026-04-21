@@ -798,6 +798,128 @@ def _build_stats(loaded: LoadedGraph) -> Dict[str, Any]:
     aliases=["graph_tool"],
     timeout=60.0,
 )
+
+
+async def _handle_multi_mode(
+    loaded: Any,
+    mode_str: str,
+    path: str,
+    node: Optional[str],
+    source: Optional[str],
+    target: Optional[str],
+    file: Optional[str],
+    query: Optional[str],
+    depth: int,
+    top_k: int,
+    direction: GraphDirection,
+    edge_types: Optional[List[str]],
+    only_runtime: bool,
+    files_only: bool,
+    modules_only: bool,
+    structured: bool,
+    include_modules: bool,
+    include_symbols: bool,
+    include_calls: bool,
+    include_refs: bool,
+    include_callsites: bool,
+    max_callsites: int,
+    _exec_ctx: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Handle pipe-separated modes by expanding and combining results.
+
+    Example: mode="callers|callees" executes both modes and merges results.
+
+    Returns:
+        Combined results with mode-specific sections
+    """
+    modes = [m.strip() for m in mode_str.split("|")]
+    logger.info(f"[graph] Expanding multi-mode request: {mode_str} -> {modes}")
+
+    combined_results = {}
+
+    for single_mode in modes:
+        try:
+            # Execute each mode directly without recursion
+            # We replicate the graph function logic here for single modes
+            default_edge_types = _default_edge_types(single_mode, only_runtime=only_runtime)
+            effective_edge_types = edge_types or default_edge_types
+            node_types = _node_type_filter(single_mode, files_only=files_only, modules_only=modules_only)
+
+            if single_mode in {"callers", "callees", "trace", "call_flow", "neighbors", "impact", "subgraph"}:
+                target_ref = node or source
+                if not target_ref:
+                    raise ValueError(f"{single_mode} mode requires node")
+
+                preferred_types = (
+                    {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+                )
+                resolved_id = loaded.analyzer.resolve_node_id(
+                    target_ref, preferred_types=preferred_types
+                )
+                if resolved_id is None:
+                    suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
+                    error_msg = f"Could not resolve graph node '{target_ref}'"
+                    if suggestions:
+                        error_msg += f"\n\nDid you mean one of these?\n  - " + "\n  - ".join(suggestions[:5])
+                    raise ValueError(error_msg)
+
+                effective_direction = direction
+                if single_mode == "callers":
+                    effective_direction = "in"
+                elif single_mode in {"callees", "trace", "call_flow"}:
+                    effective_direction = "out"
+                elif single_mode in {"impact", "subgraph"}:
+                    effective_direction = "both"
+
+                base_result = loaded.analyzer.get_neighbors(
+                    resolved_id,
+                    direction=effective_direction,
+                    edge_types=effective_edge_types,
+                    max_depth=max(1, depth),
+                    node_types=node_types,
+                )
+
+                if structured:
+                    result = _build_structured_neighbors(
+                        loaded.analyzer,
+                        resolved_id,
+                        base_result,
+                        include_modules=include_modules,
+                        include_symbols=include_symbols,
+                        include_calls=include_calls,
+                        include_refs=include_refs,
+                        include_callsites=include_callsites,
+                        max_callsites=max_callsites,
+                    )
+                else:
+                    result = base_result
+
+                combined_results[single_mode] = result
+
+            else:
+                # For other modes, set error (not implemented in multi-mode yet)
+                combined_results[single_mode] = {
+                    "error": f"Mode '{single_mode}' not supported in multi-mode queries",
+                    "mode": single_mode,
+                }
+
+        except Exception as e:
+            logger.warning(f"[graph] Mode {single_mode} failed: {e}")
+            combined_results[single_mode] = {
+                "error": str(e),
+                "mode": single_mode,
+            }
+
+    # Return combined results with metadata
+    return {
+        "success": True,
+        "mode": mode_str,
+        "modes_expanded": modes,
+        "results": combined_results,
+        "node": node,
+    }
+
+
 async def graph(
     mode: GraphMode = GraphMode.NEIGHBORS,
     path: str = ".",
@@ -845,6 +967,36 @@ async def graph(
 
     try:
         loaded = await _load_graph(path, reindex=reindex, exec_ctx=_exec_ctx)
+
+        # Handle pipe-separated modes (e.g., "callers|callees")
+        # Expand into multiple results combined
+        if "|" in str(mode):
+            return await _handle_multi_mode(
+                loaded=loaded,
+                mode_str=str(mode),
+                path=path,
+                node=node,
+                source=source,
+                target=target,
+                file=file,
+                query=query,
+                depth=depth,
+                top_k=top_k,
+                direction=direction,
+                edge_types=edge_types,
+                only_runtime=only_runtime,
+                files_only=files_only,
+                modules_only=modules_only,
+                structured=structured,
+                include_modules=include_modules,
+                include_symbols=include_symbols,
+                include_calls=include_calls,
+                include_refs=include_refs,
+                include_callsites=include_callsites,
+                max_callsites=max_callsites,
+                _exec_ctx=_exec_ctx,
+            )
+
         default_edge_types = _default_edge_types(mode, only_runtime=only_runtime)
         effective_edge_types = edge_types or default_edge_types
         node_types = _node_type_filter(mode, files_only=files_only, modules_only=modules_only)

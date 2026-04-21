@@ -509,7 +509,13 @@ def _extract_graph_follow_up_symbol(result: Dict[str, Any]) -> Optional[Dict[str
 def _build_graph_follow_up_suggestions(
     results: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Build graph-tool follow-up suggestions from ranked search results."""
+    """Build graph-tool follow-up suggestions from ranked search results.
+
+    Optimized to avoid duplication:
+    - Combines multiple modes into single suggestion using pipe separator
+    - Truncates long node definitions to save tokens
+    - Shows unique variations only (no duplicate node values)
+    """
     for result in results:
         symbol = _extract_graph_follow_up_symbol(result)
         if symbol is None:
@@ -519,30 +525,35 @@ def _build_graph_follow_up_suggestions(
         symbol_name_lower = symbol_name.lower()
         suggestions: List[Dict[str, Any]] = []
 
+        # Truncate long definitions to save tokens (keep first 100 chars)
+        if len(symbol_name) > 100:
+            display_name = symbol_name[:97] + "..."
+        else:
+            display_name = symbol_name
+
         if symbol_name_lower in ENTRYPOINT_SYMBOL_NAMES:
-            trace_args = {"mode": "trace", "node": symbol_name, "depth": 3}
+            # Entry point gets separate trace suggestion
             suggestions.append(
                 {
                     "tool": "graph",
-                    "command": f'graph(mode="trace", node="{symbol_name}", depth=3)',
-                    "arguments": trace_args,
-                    "reason": f"Trace execution starting from {symbol_name}.",
+                    "command": f'graph(mode="trace", node="{display_name}", depth=3)',
+                    "arguments": {"mode": "trace", "node": symbol_name, "depth": 3},
+                    "reason": f"Trace execution starting from {display_name}.",
                 }
             )
 
-        for mode, reason in (
-            ("callers", f"Find who calls {symbol_name}."),
-            ("callees", f"Find what {symbol_name} calls."),
-        ):
-            depth = 2
-            suggestions.append(
-                {
-                    "tool": "graph",
-                    "command": f'graph(mode="{mode}", node="{symbol_name}", depth={depth})',
-                    "arguments": {"mode": mode, "node": symbol_name, "depth": depth},
-                    "reason": reason,
-                }
-            )
+        # Combine callers and callees into single suggestion with pipe separator
+        # Instead of duplicating the entire node definition
+        combined_modes = "callers|callees"
+        depth = 2
+        suggestions.append(
+            {
+                "tool": "graph",
+                "command": f'graph(mode="{combined_modes}", node="{display_name}", depth={depth})',
+                "arguments": {"mode": combined_modes, "node": symbol_name, "depth": depth},
+                "reason": f"Explore call relationships for {display_name} (who calls it and what it calls).",
+            }
+        )
 
         return suggestions
 

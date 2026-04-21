@@ -404,7 +404,7 @@ class UnifiedTaskConfigLoader:
             },
         },
         "global": {
-            "max_total_iterations": 100,
+            "max_total_iterations": 50,
             "min_content_threshold": 150,
             "signature_history_size": 10,
             "max_overlapping_reads_per_file": 3,
@@ -443,7 +443,7 @@ class UnifiedTaskConfigLoader:
                 self._config = {
                     "task_types": task_config.get("task_types", {}),
                     "global": {
-                        "max_total_iterations": 100,
+                        "max_total_iterations": 50,
                         "min_content_threshold": 150,
                         "signature_history_size": 10,
                         "max_overlapping_reads_per_file": 3,
@@ -564,7 +564,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Global settings
         global_config = self._config_loader.get_global_config()
-        self._max_total_iterations = global_config.get("max_total_iterations", 100)
+        self._max_total_iterations = global_config.get("max_total_iterations", 50)
         self._min_content_threshold = global_config.get("min_content_threshold", 150)
         self._base_max_overlapping_reads = global_config.get("max_overlapping_reads_per_file", 3)
         self._base_max_searches_per_prefix = global_config.get("max_searches_per_query_prefix", 2)

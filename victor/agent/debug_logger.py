@@ -236,19 +236,57 @@ class DebugLogger:
         args: Dict[str, Any],
         iteration: int,
     ) -> None:
-        """Log tool call (one line)."""
+        """Log tool call with full parameters for visibility."""
         if not self.enabled:
             return
 
         self.stats.tool_calls_made += 1
 
-        # Compact args preview
-        args_str = ", ".join(f"{k}={self._truncate(str(v), 30)}" for k, v in list(args.items())[:3])
-        if len(args) > 3:
-            args_str += f", +{len(args)-3} more"
+        # Format all arguments with full visibility (no truncation)
+        # Use truncation only for extremely long values (>200 chars)
+        args_str = ", ".join(
+            f"{k}={self._format_value(v)}"
+            for k, v in args.items()
+            if k != "_exec_ctx"  # Skip internal context parameter
+        )
 
         running_icon = self._presentation.icon("running", with_color=False)
         self.logger.info(f"   {running_icon} {tool_name}({args_str})")
+
+    def _format_value(self, value: Any, max_len: int = 200) -> str:
+        """Format a value for logging, with smart truncation only for very long values.
+
+        Args:
+            value: The value to format
+            max_len: Maximum length before truncating (default 200 chars)
+
+        Returns:
+            Formatted string representation
+        """
+        value_str = str(value)
+
+        # For short values, return as-is
+        if len(value_str) <= max_len:
+            # Escape newlines for one-line output
+            return value_str.replace("\n", "\\n").replace("\r", "\\r")
+
+        # For long values, truncate but show structure
+        if isinstance(value, (list, tuple)):
+            # Show first few items
+            items_preview = ", ".join(repr(v)[:50] for v in value[:3])
+            more = f", ... (+{len(value)-3} more)" if len(value) > 3 else ""
+            return f"[{items_preview}{more}]"
+        elif isinstance(value, dict):
+            # Show first few keys
+            items_preview = ", ".join(
+                f"{k!r}: {repr(v)[:50]}" for k, v in list(value.items())[:2]
+            )
+            more = f", ... (+{len(value)-2} more)" if len(value) > 2 else ""
+            return f"{{{items_preview}{more}}}"
+        else:
+            # Truncate string with indicator
+            truncated = value_str[: max_len - 10].replace("\n", "\\n")
+            return f"{truncated}... [+{len(value_str)-max_len+10} chars]"
 
     def log_tool_result(
         self,

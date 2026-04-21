@@ -1310,6 +1310,13 @@ class Settings(BaseSettings):
     intelligent_exploration_rate: float = 0.3  # Initial exploration vs exploitation
     intelligent_learning_rate: float = 0.1  # Q-learning alpha parameter
     intelligent_discount_factor: float = 0.9  # Q-learning gamma parameter
+
+    # Tool-specific exploration boosts (for rebuilding reputation after fixes)
+    # Maps tool names to exploration boost multipliers (e.g., {"graph": 5.0})
+    # Higher values = more likely to explore this tool despite low Q-value
+    # Use after significant tool improvements to accelerate relearning
+    tool_exploration_boosts: Dict[str, float] = Field(default_factory=dict)
+
     serialization_include_format_hint: bool = True  # Include format description in output
     serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
     serialization_debug_mode: bool = False  # Include data characteristics in output
