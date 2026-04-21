@@ -47,16 +47,21 @@ class PruningInfo:
     pruned_lines: int
     pruning_reason: str
     task_type: str
+    omitted_lines: int = 0
+    recovery_hint: str = ""
 
     def __str__(self) -> str:
         if not self.was_pruned:
             return f"No pruning applied (task_type={self.task_type})"
         reduction_pct = ((self.original_lines - self.pruned_lines) / self.original_lines) * 100
-        return (
+        detail = (
             f"Pruned {self.original_lines}→{self.pruned_lines} lines "
             f"({reduction_pct:.1f}% reduction, task_type={self.task_type}, "
             f"reason={self.pruning_reason})"
         )
+        if self.omitted_lines > 0:
+            detail += f", omitted_lines={self.omitted_lines}"
+        return detail
 
 
 class ToolOutputPruner:
@@ -145,6 +150,52 @@ class ToolOutputPruner:
         },
     }
 
+    FORMATTED_SAFE_DEFAULT_TOOLS = {
+        "read",
+        "grep",
+        "ls",
+        "list_directory",
+        "overview",
+        "code_search",
+        "semantic_code_search",
+    }
+
+    FORMATTED_NEVER_PRUNE_TOOLS = {
+        "diff",
+        "git_diff",
+        "write",
+        "edit",
+        "patch",
+        "apply_patch",
+        "shell",
+        "execute_bash",
+        "pytest",
+    }
+
+    FORMATTED_RULES: Dict[str, Dict[str, int]] = {
+        "read": {"max_body_lines": 140},
+        "grep": {"max_body_lines": 120},
+        "code_search": {"max_body_lines": 140},
+        "semantic_code_search": {"max_body_lines": 140},
+        "ls": {"max_body_lines": 160},
+        "list_directory": {"max_body_lines": 160},
+        "overview": {"max_body_lines": 180},
+        "default": {"max_body_lines": 140},
+    }
+
+    FORMATTED_SAFETY_CRITICAL_PATTERNS = (
+        re.compile(r"^\s*diff --git ", re.MULTILINE),
+        re.compile(r"^\s*@@ ", re.MULTILINE),
+        re.compile(r"^\s*--- [^\n]+", re.MULTILINE),
+        re.compile(r"^\s*\+\+\+ [^\n]+", re.MULTILINE),
+        re.compile(r"Traceback \(most recent call last\):"),
+        re.compile(r"^\s*[A-Za-z0-9_./\\-]+:\d+:\d+:\s+(error|warning):", re.MULTILINE),
+        re.compile(r"^\s*(error|fatal error|syntaxerror|typeerror|nameerror|referenceerror)\b", re.MULTILINE | re.IGNORECASE),
+        re.compile(r"^\s*=+ FAILURES =+\s*$", re.MULTILINE),
+        re.compile(r"^\s*FAILED\b", re.MULTILINE),
+        re.compile(r"AssertionError"),
+    )
+
     def __init__(self, enabled: bool = True):
         """Initialize the output pruner.
 
@@ -179,6 +230,14 @@ class ToolOutputPruner:
                 pruned_lines=0,
                 pruning_reason="Pruning disabled",
                 task_type=task_type,
+            )
+
+        if context and context.get("formatted_output"):
+            return self._prune_formatted_output(
+                tool_output=tool_output,
+                task_type=task_type,
+                tool_name=tool_name,
+                context=context,
             )
 
         original_lines = tool_output.count("\n") + 1
@@ -260,6 +319,209 @@ class ToolOutputPruner:
             logger.debug(f"[ToolOutputPruner] {pruning_info}")
 
         return pruned_output, pruning_info
+
+    def _prune_formatted_output(
+        self,
+        tool_output: str,
+        task_type: str,
+        tool_name: str,
+        context: Dict[str, Any],
+    ) -> Tuple[str, PruningInfo]:
+        """Conservatively prune already-formatted tool output for LLM injection."""
+        original_lines = tool_output.count("\n") + 1
+        safe_only = bool(context.get("safe_only", True))
+
+        if tool_name in self.FORMATTED_NEVER_PRUNE_TOOLS:
+            return self._no_prune(
+                tool_output,
+                original_lines,
+                task_type,
+                "safety_critical_tool",
+            )
+
+        if safe_only and tool_name not in self.FORMATTED_SAFE_DEFAULT_TOOLS:
+            return self._no_prune(
+                tool_output,
+                original_lines,
+                task_type,
+                "safe_default_scope",
+            )
+
+        if self._contains_safety_critical_content(tool_output):
+            return self._no_prune(
+                tool_output,
+                original_lines,
+                task_type,
+                "safety_critical_content",
+            )
+
+        rules = self.FORMATTED_RULES.get(tool_name, self.FORMATTED_RULES["default"])
+        prefix, body, suffix = self._split_formatted_sections(tool_output)
+        max_body_lines = rules["max_body_lines"]
+
+        if len(body) <= max_body_lines:
+            return self._no_prune(
+                tool_output,
+                original_lines,
+                task_type,
+                "within_safe_budget",
+            )
+
+        kept_body = body[:max_body_lines]
+        omitted_lines = len(body) - len(kept_body)
+        recovery_hint = self._build_recovery_hint(tool_name, kept_body, context)
+        omission_note = self._build_omission_note(omitted_lines, recovery_hint)
+
+        pruned_lines = prefix + kept_body + [omission_note] + suffix
+        pruned_output = "\n".join(pruned_lines)
+        pruning_info = PruningInfo(
+            was_pruned=True,
+            original_lines=original_lines,
+            pruned_lines=pruned_output.count("\n") + 1,
+            pruning_reason=f"formatted_max_body_lines={max_body_lines}",
+            task_type=task_type,
+            omitted_lines=omitted_lines,
+            recovery_hint=recovery_hint,
+        )
+        logger.debug("[ToolOutputPruner] %s", pruning_info)
+        return pruned_output, pruning_info
+
+    def _no_prune(
+        self,
+        tool_output: str,
+        original_lines: int,
+        task_type: str,
+        reason: str,
+    ) -> Tuple[str, PruningInfo]:
+        """Return unmodified output with a structured no-prune reason."""
+        return tool_output, PruningInfo(
+            was_pruned=False,
+            original_lines=original_lines,
+            pruned_lines=original_lines,
+            pruning_reason=reason,
+            task_type=task_type,
+        )
+
+    def _contains_safety_critical_content(self, output: str) -> bool:
+        """Detect content that should remain exact and unpruned."""
+        return any(pattern.search(output) for pattern in self.FORMATTED_SAFETY_CRITICAL_PATTERNS)
+
+    def _split_formatted_sections(self, output: str) -> Tuple[List[str], List[str], List[str]]:
+        """Split formatted tool output into prefix, body, and suffix sections."""
+        lines = output.split("\n")
+        start = 0
+        end = len(lines)
+
+        while start < end:
+            stripped = lines[start].strip()
+            if not stripped or self._is_formatted_prefix_line(stripped):
+                start += 1
+                continue
+            break
+
+        note_block_started = False
+        while end > start:
+            stripped = lines[end - 1].strip()
+            if not stripped:
+                end -= 1
+                continue
+            if self._is_formatted_suffix_line(stripped):
+                if stripped.startswith(("IMPORTANT:", "NOTE:", "ACTION REQUIRED:")):
+                    note_block_started = True
+                end -= 1
+                continue
+            if note_block_started and re.match(r"^(- |\d+\. )", stripped):
+                end -= 1
+                continue
+            break
+
+        prefix = lines[:start]
+        body = lines[start:end]
+        suffix = lines[end:]
+        return prefix, body, suffix
+
+    def _is_formatted_prefix_line(self, stripped: str) -> bool:
+        return (
+            stripped.startswith("<TOOL_OUTPUT")
+            or stripped.startswith("═══")
+            or stripped.startswith("[File:")
+            or stripped.startswith("[Lines ")
+            or stripped.startswith("[Size:")
+            or stripped.startswith("[TRUNCATED:")
+        )
+
+    def _is_formatted_suffix_line(self, stripped: str) -> bool:
+        return (
+            stripped == "</TOOL_OUTPUT>"
+            or stripped.startswith("═══ END")
+            or stripped.startswith("IMPORTANT:")
+            or stripped.startswith("NOTE:")
+            or stripped.startswith("ACTION REQUIRED:")
+            or stripped.startswith("Use only ")
+            or stripped.startswith("These are the actual ")
+            or stripped.startswith("To continue:")
+        )
+
+    def _build_omission_note(self, omitted_lines: int, recovery_hint: str) -> str:
+        note = f"[PRUNED FOR LLM: omitted {omitted_lines} lines."
+        if recovery_hint:
+            note += f" {recovery_hint}"
+        return note + "]"
+
+    def _build_recovery_hint(
+        self,
+        tool_name: str,
+        kept_body: List[str],
+        context: Dict[str, Any],
+    ) -> str:
+        tool_args = context.get("tool_args") or {}
+        if not isinstance(tool_args, dict):
+            tool_args = {}
+
+        if tool_name == "read":
+            path = tool_args.get("path")
+            next_offset = self._extract_next_read_offset(kept_body)
+            if isinstance(path, str) and next_offset is not None:
+                return (
+                    f"Use read(path={path!r}, offset={next_offset}, limit=200) "
+                    "to continue from the omitted section."
+                )
+            if isinstance(path, str):
+                return f"Use read(path={path!r}, offset=..., limit=200) to continue."
+
+        if tool_name in {"ls", "list_directory"}:
+            path = tool_args.get("path", ".")
+            return (
+                f"Rerun ls(path={path!r}, pattern='...', limit=...) "
+                "or read a specific listed file to recover omitted entries."
+            )
+
+        if tool_name == "overview":
+            path = tool_args.get("path", ".")
+            return (
+                f"Rerun overview(path={path!r}, max_depth=1) "
+                "or inspect specific files with read()."
+            )
+
+        if tool_name in {"grep", "code_search", "semantic_code_search"}:
+            path = tool_args.get("path", ".")
+            query = tool_args.get("query") or tool_args.get("pattern")
+            if isinstance(query, str) and query:
+                return (
+                    f"Rerun {tool_name}(path={path!r}, query={query!r}) "
+                    "with a narrower path or query to recover omitted matches."
+                )
+            return f"Rerun {tool_name}(path={path!r}) with narrower scope to recover omitted matches."
+
+        return "Rerun the tool with narrower scope to recover omitted content."
+
+    def _extract_next_read_offset(self, kept_body: List[str]) -> Optional[int]:
+        """Extract the next read offset from the last numbered read line."""
+        for line in reversed(kept_body):
+            match = re.match(r"^\s*(\d+)\t", line)
+            if match:
+                return int(match.group(1))
+        return None
 
     def _apply_line_limit(
         self, output: str, max_lines: int, tool_name: str, rules: Dict[str, Any]

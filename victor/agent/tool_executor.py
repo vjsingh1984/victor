@@ -143,10 +143,10 @@ class ToolExecutionResult:
             normalization_strategy: Strategy used for argument normalization
             correlation_id: Unique ID for tracking this execution across logs
             error_info: Structured error information if execution failed
-            original_result: Unmodified tool output (before pruning)
-            preview_lines: Number of lines to show in preview
-            was_pruned: Whether output was pruned before sending to LLM
-            pruning_info: Pruning metadata (PruningInfo object)
+            original_result: Unmodified tool output (before truncation)
+            preview_lines: Number of lines to show in user preview
+            was_pruned: Whether user preview was truncated (LLM always receives full output)
+            pruning_info: Pruning metadata for user preview (PruningInfo object)
         """
         self.tool_name = tool_name
         self.success = success
@@ -870,16 +870,21 @@ class ToolExecutor:
         # Complete tool call in tracer
         self._complete_tool_call(call_id, success, result=result, error=error)
 
-        # Enforce output size bounds to prevent context window blowout
+        # Hard safety cap — only fires for extreme outliers (binary data, runaway output).
+        # Normal tool outputs (code files, grep, shell) stay well below 500 KB.
+        # LLM accuracy depends on receiving complete output; context budget management is
+        # handled upstream by TurnBoundaryContextAssembler, not here.
+        _HARD_OUTPUT_BYTE_LIMIT = 500_000
         truncation_info = None
-        if success and isinstance(result, str) and len(result) > 25600:
+        if success and isinstance(result, str) and len(result) > _HARD_OUTPUT_BYTE_LIMIT:
             from victor.tools.output_utils import truncate_by_lines
 
             result, truncation_info = truncate_by_lines(result)
             if truncation_info.was_truncated:
                 logger.warning(
-                    "Tool %s output truncated: %d→%d lines (%s)",
+                    "Tool %s output exceeded hard safety limit (%d bytes): %d→%d lines (%s)",
                     tool_name,
+                    _HARD_OUTPUT_BYTE_LIMIT,
                     truncation_info.total_lines,
                     truncation_info.lines_returned,
                     truncation_info.truncation_reason,
@@ -887,55 +892,15 @@ class ToolExecutor:
                 remaining = truncation_info.total_lines - truncation_info.lines_returned
                 result = (
                     result
-                    + f"\n[OUTPUT TRUNCATED: {remaining} lines omitted to fit context window. "
+                    + f"\n[OUTPUT TRUNCATED: {remaining} lines omitted (output exceeded 500 KB hard limit). "
                     f"Use offset={truncation_info.lines_returned} to read remaining content.]"
                 )
 
-        # Apply task-aware output pruning ONLY if enabled (accuracy-first default)
-        # This reduces tokens by 40-60% but may reduce accuracy
-        # Store original_result for user preview regardless of pruning
+        # Store original_result for user preview regardless of later formatting-stage pruning.
+        # Pruning now happens in the tool-result post-processing path after structured outputs
+        # have been serialized for LLM injection, which avoids collapsing dict/list tool results
+        # into strings too early.
         original_result = result if isinstance(result, str) else str(result)
-
-        # Initialize pruning flag (accuracy-first default: disabled)
-        should_prune = False
-
-        if success and isinstance(result, str):
-            from victor.config.tool_settings import get_tool_settings
-
-            tool_settings = get_tool_settings()
-            should_prune = tool_settings.tool_output_pruning_enabled
-
-            if should_prune:
-                from victor.tools.output_pruner import get_output_pruner
-
-                task_type = context.get("task_type", "unknown") if context else "unknown"
-                pruner = get_output_pruner()
-
-                pruned_result, pruning_info = pruner.prune(
-                    tool_output=result,
-                    task_type=task_type,
-                    tool_name=tool_name,
-                    context=context,
-                )
-
-                if pruning_info.was_pruned:
-                    logger.info(
-                        "Tool %s output pruned: %s",
-                        tool_name,
-                        pruning_info,
-                    )
-                    result = pruned_result
-
-                    # Merge truncation and pruning info for observability
-                    if truncation_info:
-                        truncation_info.pruning_info = pruning_info
-                    else:
-                        truncation_info = pruning_info
-
-        # Prepare pruning metadata for ToolExecutionResult
-        pruning_metadata = None
-        if should_prune and success and isinstance(result, str):
-            pruning_metadata = truncation_info  # Contains pruning_info if pruning was applied
 
         exec_result = ToolExecutionResult(
             tool_name=tool_name,
@@ -950,8 +915,8 @@ class ToolExecutor:
             # New fields for preview support
             original_result=original_result,
             preview_lines=3,  # Will be overridden by formatter settings
-            was_pruned=should_prune and (pruning_metadata is not None),
-            pruning_info=pruning_metadata,
+            was_pruned=False,
+            pruning_info=None,
         )
         exec_result.truncation_info = truncation_info
         return exec_result

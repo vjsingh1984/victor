@@ -69,7 +69,7 @@ class ToolSettings(BaseModel):
     cross_turn_dedup_enabled: bool = True
     cross_turn_dedup_ttl: int = 300  # seconds
 
-    # Tool output preview configuration (accuracy-first defaults)
+    # Tool output preview configuration (user display only, does NOT affect LLM)
     tool_output_preview_enabled: bool = Field(
         default=True,
         description="Show tool output preview to user (default: yes for transparency)",
@@ -81,16 +81,20 @@ class ToolSettings(BaseModel):
         description="Number of lines to show in tool output preview (default: 3)",
     )
     tool_output_pruning_enabled: bool = Field(
-        default=False,
-        description="Enable tool output pruning to save tokens (default: no - accuracy-first)",
+        default=True,
+        description="[DEPRECATED - Now only affects user preview, NOT LLM input] Enable tool output pruning for user display",
+    )
+    tool_output_pruning_safe_only: bool = Field(
+        default=True,
+        description="Prune only safe verbose read-heavy tool outputs by default; set false for broader opt-in pruning",
     )
     tool_output_show_transparency: bool = Field(
         default=True,
-        description="Show pruning status to user when output was pruned (default: yes)",
+        description="Show preview status to user when output was truncated for display (default: yes)",
     )
     tool_output_expand_hotkey: str = Field(
         default="^O",
-        description="Hotkey to expand tool output (default: Ctrl+O, format: ^X for Ctrl+X)",
+        description="Hotkey to expand tool output preview (default: Ctrl+O, format: ^X for Ctrl+X)",
     )
 
     # Tool output byte limit for display

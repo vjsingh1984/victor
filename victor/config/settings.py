@@ -139,9 +139,14 @@ class ProjectPaths:
         return self.project_victor_dir / VICTOR_CONTEXT_FILE
 
     @property
+    def project_db(self) -> Path:
+        """Get project-local database path (conversations, state)."""
+        return self.project_victor_dir / "project.db"
+
+    @property
     def conversation_db(self) -> Path:
-        """Get project-local conversation database path."""
-        return self.project_victor_dir / "conversation.db"
+        """Alias for project_db (backward compatibility)."""
+        return self.project_db
 
     @property
     def embeddings_dir(self) -> Path:

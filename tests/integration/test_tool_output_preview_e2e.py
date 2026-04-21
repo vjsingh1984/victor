@@ -132,17 +132,18 @@ async def test_preview_disabled_via_settings():
 
 @pytest.mark.asyncio
 async def test_accuracy_first_default_behavior():
-    """Test that accuracy-first defaults are correct."""
+    """Test that safe-default pruning defaults are correct."""
     settings = ToolSettings()  # Use defaults
 
-    # Verify accuracy-first defaults
-    assert settings.tool_output_pruning_enabled is False  # No pruning by default (full to LLM)
+    # Verify safe-default pruning
+    assert settings.tool_output_pruning_enabled is True
+    assert settings.tool_output_pruning_safe_only is True
     assert settings.tool_output_preview_enabled is True  # Show preview to user
 
 
 @pytest.mark.asyncio
 async def test_backward_compatibility_mode():
-    """Test that old cost-optimized behavior can be restored."""
+    """Test that broader pruning mode can still be enabled explicitly."""
     console = Console()
     renderer = LiveDisplayRenderer(console)
     renderer.start()
@@ -151,6 +152,7 @@ async def test_backward_compatibility_mode():
         # Restore old behavior: cost-optimized
         mock_settings.return_value = ToolSettings(
             tool_output_pruning_enabled=True,  # Enable pruning (sends pruned to LLM)
+            tool_output_pruning_safe_only=False,  # Broaden beyond safe-default scope
             tool_output_preview_enabled=False,  # No preview
             tool_output_show_transparency=False,  # No transparency
         )

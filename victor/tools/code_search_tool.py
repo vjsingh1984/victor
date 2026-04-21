@@ -138,13 +138,17 @@ def clear_index_cache() -> None:
 async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
     """Validate persistent index integrity with a lightweight check.
 
-    Returns True if index was corrupt and rebuilt, False if healthy.
+    Returns True if corruption was detected (rebuild triggered in background),
+    False if index is healthy.
+
+    When corruption is found, the rebuild fires as an asyncio background task so
+    the calling code is never blocked — the stale/corrupt index is returned
+    immediately and the rebuilt one will be available on the next tool call.
     """
     try:
         # Quick check: does the vector store have data?
         store = getattr(index, "_vector_store", None) or getattr(index, "vector_store", None)
         if store:
-            # Check if table has rows (faster than running a full semantic query)
             table = getattr(store, "_table", None)
             if table is not None:
                 row_count = table.count_rows() if hasattr(table, "count_rows") else -1
@@ -159,14 +163,28 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
         )
         return False  # Healthy — no rebuild needed
     except Exception as e:
-        logger.warning("Persistent index corrupt (%s), forcing rebuild", e)
+        logger.warning("Persistent index corrupt (%s); scheduling background rebuild", e)
         if hasattr(index, "_is_indexed"):
             index._is_indexed = False
-        try:
-            await index.index_codebase()
-        except Exception as rebuild_err:
-            logger.warning("Index rebuild failed: %s", rebuild_err)
-        return True  # Rebuilt (or attempted)
+        # Fire rebuild as a non-blocking background task — callers are never blocked.
+        # The freshly rebuilt index will be available on the next tool invocation.
+        asyncio.create_task(_background_index_rebuild(index))
+        return True  # Corruption detected, rebuild in flight
+
+
+async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> None:
+    """Rebuild a corrupt index in the background without blocking callers."""
+    try:
+        logger.info("Background index rebuild started (timeout=%ds)", rebuild_timeout)
+        await asyncio.wait_for(index.index_codebase(), timeout=rebuild_timeout)
+        logger.info("Background index rebuild completed successfully")
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Background index rebuild timed out after %ds; index remains stale",
+            rebuild_timeout,
+        )
+    except Exception as err:
+        logger.warning("Background index rebuild failed: %s", err)
 
 
 def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

@@ -637,6 +637,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         try:
             from victor.framework.rl.credit_tracking_service import CreditTrackingService
+            from victor.core.container import ServiceLifetime
 
             obs_bus = getattr(self, "_observability_bus", None)
             self._credit_tracking_service = CreditTrackingService.from_settings(
@@ -646,6 +647,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             # Attach to ToolPipeline
             if hasattr(self, "_tool_pipeline") and self._tool_pipeline is not None:
                 self._tool_pipeline._credit_tracking_service = self._credit_tracking_service
+
+            # Register the runtime service in DI so prompt-time and learner-time
+            # consumers see the same live credit history instance.
+            self._container.register_or_replace(
+                CreditTrackingService,
+                lambda c: self._credit_tracking_service,
+                ServiceLifetime.SINGLETON,
+            )
 
             logger.info("Credit tracking service initialized")
         except Exception as e:
@@ -665,13 +674,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if not hasattr(self, "_container"):
             raise RuntimeError("ServiceContainer required for orchestrator operation")
 
-        # Register coordinators in container for service dependencies
-        self._register_coordinators_for_services()
-
-        # Bootstrap services using the registered coordinators
-        self._bootstrap_service_layer()
-
-        # Resolve service instances from container
         from victor.agent.services.protocols import (
             ChatServiceProtocol,
             ContextServiceProtocol,
@@ -680,19 +682,68 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             SessionServiceProtocol,
             ToolServiceProtocol,
         )
+        from victor.core.container import ServiceLifetime
 
-        # Wire orchestrator directly to ChatCoordinator (no adapter passthrough).
-        # ChatCoordinator provides .chat(), .stream_chat(), .chat_with_planning().
-        if hasattr(self, "_chat_coordinator"):
-            self._chat_service = self._chat_coordinator
-        else:
-            self._chat_service = self._container.get_optional(ChatServiceProtocol)
+        # Preserve canonical runtime-backed service instances that were already
+        # created earlier in orchestrator initialization.
+        if getattr(self, "_provider_service", None) is not None:
+            self._container.register_or_replace(
+                ProviderServiceProtocol,
+                lambda c: self._provider_service,
+                ServiceLifetime.SINGLETON,
+            )
+        if getattr(self, "_session_service", None) is not None:
+            self._container.register_or_replace(
+                SessionServiceProtocol,
+                lambda c: self._session_service,
+                ServiceLifetime.SINGLETON,
+            )
 
+        # Register coordinators in container for service dependencies
+        self._register_coordinators_for_services()
+
+        # Bootstrap services using the registered coordinators
+        self._bootstrap_service_layer()
+
+        # Resolve service instances from container
+        self._chat_service = self._container.get_optional(ChatServiceProtocol)
         self._tool_service = self._container.get_optional(ToolServiceProtocol)
         self._session_service = self._container.get_optional(SessionServiceProtocol)
         self._context_service = self._container.get_optional(ContextServiceProtocol)
         self._provider_service = self._container.get_optional(ProviderServiceProtocol)
         self._recovery_service = self._container.get_optional(RecoveryServiceProtocol)
+
+        if self._tool_service is None:
+            from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+
+            self._tool_service = ToolService(
+                config=ToolServiceConfig(default_tool_budget=getattr(self, "tool_budget", 100)),
+                tool_selector=(self.tool_selector if hasattr(self, "tool_selector") else None),
+                tool_executor=getattr(self, "tool_executor", None),
+                tool_registrar=self.tools,
+            )
+
+        if self._tool_service and hasattr(self._tool_service, "bind_runtime_components"):
+            self._tool_service.bind_runtime_components(
+                tool_registry=self.tools,
+                mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
+                tool_planner=getattr(self, "_tool_planner", None),
+                argument_normalizer=getattr(self, "argument_normalizer", None),
+                retry_executor=getattr(self._tool_coordinator, "_retry_executor", None),
+                tool_call_parser=getattr(self._tool_coordinator, "_tool_call_parser", None),
+            )
+
+        if self._chat_service and hasattr(self._chat_service, "bind_runtime_components"):
+            self._chat_service.bind_runtime_components(
+                turn_executor=getattr(self._chat_coordinator, "turn_executor", None),
+                planning_handler=getattr(self._chat_coordinator, "_chat_with_planning", None),
+                stream_chat_handler=getattr(self._chat_coordinator, "stream_chat", None),
+                context_limit_handler=getattr(
+                    self._chat_coordinator,
+                    "_handle_context_and_iteration_limits",
+                    None,
+                ),
+            )
 
         # Inject the current provider into ProviderService so it knows the
         # active provider from orchestrator construction (not just from registry).
@@ -1362,12 +1413,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def maybe_auto_checkpoint(self) -> Optional[str]:
         """Trigger auto-checkpoint if interval threshold is met.
 
-        Delegates to SessionCoordinator.
+        Delegates to SessionService.
 
         Returns:
             Checkpoint ID if auto-checkpoint was created, None otherwise
         """
-        return await self._session_coordinator.maybe_auto_checkpoint()
+        return await self._session_service.maybe_auto_checkpoint()
 
     async def _prepare_intelligent_request(
         self, task: str, task_type: str
@@ -2154,9 +2205,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self, coro: Any, name: str = "background_task"
     ) -> Optional[asyncio.Task]:
         """Create and track a background task for graceful shutdown."""
-        from victor.agent.coordinators.session_coordinator import SessionCoordinator
+        from victor.agent.services.session_service import SessionService
 
-        return SessionCoordinator.create_background_task(
+        return SessionService.create_background_task(
             coro, name, self._background_tasks, self._bg_task_lock
         )
 
@@ -3089,26 +3140,46 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return False
 
     def add_message(self, role: str, content: str, **kwargs: Any) -> None:
-        """Add a message to conversation history.
+        """Add a message to conversation history with smart system handling.
+
+        When role="system":
+        - If cache_optimization_enabled=True and a root system prompt exists,
+          intercepts the message and passes it to reminder_manager for per-turn
+          injection into the user prefix instead of appending a new system message.
+        - This preserves byte-identical system prompts for provider KV caching.
 
         Enforces max_conversation_history ceiling by removing oldest
-        non-system messages when the limit is reached.  Persistence
-        and usage logging are delegated to ``ChatCoordinator.persist_message``.
+        non-system messages when the limit is reached. Persistence
+        and usage logging are delegated to ``ChatService.persist_message``.
 
         Args:
             role: Message role (user, assistant, system, tool)
             content: Message content
             **kwargs: Additional fields (name, tool_call_id, tool_calls)
         """
+        # Intercept dynamic system nudges for cache-friendly injection
+        if role == "system" and getattr(self, "_cache_optimization_enabled", False):
+            # Check if history already contains a system message (the root prompt)
+            has_root_system = any(m.role == "system" for m in self.conversation._messages)
+            if has_root_system and hasattr(self, "reminder_manager") and self.reminder_manager:
+                # If content looks like a nudge (e.g. "[FILES: ...]" or budget warning),
+                # update reminder_manager state instead of appending.
+                if content.startswith("[") and content.endswith("]"):
+                    logger.debug("[cache] Intercepted system nudge for reminder_manager injection")
+                    # Note: Caller usually updates manager state before this;
+                    # if not, we simply skip appending to keep prefix stable.
+                    return
+
         max_history = getattr(self.settings, "max_conversation_history", 100)
         # Trim oldest non-system message when history exceeds limit.
-        # Note: conversation.messages returns a copy, so we must modify
-        # the internal list via the MessageHistory API.
+        # Note: Only protect the root system message (index 0).
         if len(self.conversation._messages) >= max_history:
             for i, msg in enumerate(self.conversation._messages):
-                if getattr(msg, "role", None) != "system":
-                    self.conversation._messages.pop(i)
-                    break
+                # Don't pop the root system prompt (index 0)
+                if i == 0 and getattr(msg, "role", None) == "system":
+                    continue
+                self.conversation._messages.pop(i)
+                break
 
         if role == "tool":
             logger.info(
@@ -3119,10 +3190,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
         self.conversation.add_message(role, content, **kwargs)
 
-        # Delegate persistence + usage logging to ChatCoordinator
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+        from victor.agent.services.chat_service import ChatService
 
-        ChatCoordinator.persist_message(
+        ChatService.persist_message(
             role=role,
             content=content,
             memory_manager=self.memory_manager,
@@ -3173,6 +3243,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Get or create turn executor
         turn_executor = getattr(self, "_turn_executor", None)
+        if turn_executor is None and hasattr(self._chat_service, "turn_executor"):
+            turn_executor = self._chat_service.turn_executor
         if turn_executor is None and hasattr(self, "_chat_coordinator"):
             turn_executor = self._chat_coordinator.turn_executor
 
@@ -3279,9 +3351,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> tuple[bool, Optional[StreamChunk]]:
         """Handle context overflow and hard iteration limits.
 
-        Delegates to ChatCoordinator which owns the full implementation.
+        Delegates to ChatService.
         """
-        return await self._chat_coordinator._handle_context_and_iteration_limits(
+        return await self._chat_service.handle_context_and_iteration_limits(
             user_message,
             max_total_iterations,
             max_context,
@@ -3762,9 +3834,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     ) -> tuple[Optional[List[Dict[str, Any]]], str]:
         """Parse, validate, and normalize tool calls from provider response.
 
-        Delegates to ToolCoordinator which consolidates all tool-call processing.
+        Delegates to ToolService which consolidates all tool-call processing.
         """
-        return self._tool_coordinator.parse_and_validate_tool_calls(
+        return self._tool_service.parse_and_validate_tool_calls(
             tool_calls, full_content, self.tool_adapter
         )
 
@@ -3783,10 +3855,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         # Skill auto-selection
         self._apply_skill_for_turn(user_message)
-
-        # Get current iteration count BEFORE attempting AgenticLoop
-        # This allows us to preserve state in case of fallback
-        current_iteration = self.get_iteration_count()
 
         # Phase 10: Route through AgenticLoop for perception/evaluation
         try:
@@ -3818,20 +3886,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     yield chunk
                 return
         except Exception as e:
-            logger.warning(
-                f"AgenticLoop streaming failed at iteration {current_iteration}, falling back: {e}"
-            )
+            logger.warning("AgenticLoop streaming failed, falling back to ChatCoordinator: %s", e)
             logger.info(
-                f"[Fallback] Preserving conversation state: {current_iteration} iterations, "
-                f"{len(self.conversation.messages)} messages in history"
+                "[Fallback] Conversation history preserved (%d messages)",
+                len(self.conversation.messages),
             )
 
-        # Fallback: ChatCoordinator streaming WITH preserved state
-        # IMPORTANT: We pass the current iteration count to prevent reset
+        # Fallback: ChatCoordinator streaming with conversation state preserved.
+        # _preserve_iteration=True signals chat_service to maintain context continuity
+        # regardless of how many tool-call iterations had completed before the failure.
         async for chunk in self._chat_service.stream_chat(
             user_message,
             _preserve_iteration=True,
-            _current_iteration=current_iteration,
+            _current_iteration=0,
         ):
             yield chunk
 
@@ -3856,10 +3923,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """[LEGACY/BRIDGE] Handle tool calls from the model.
 
         This method is a legacy integration point. Prefer using
-        IToolCoordinator.execute_tool_calls() in new code.
+        ToolService.process_tool_results() in new code.
 
         Delegates execution to ToolPipeline, then post-processes results
-        via ToolCoordinator.process_tool_results().
+        via the canonical tool service path.
 
         Args:
             tool_calls: List of tool call requests
@@ -3868,6 +3935,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             List of result dicts with keys: name, success, elapsed, args,
             error, follow_up_suggestions.
         """
+        if not tool_calls:
+            return []
+
+        tool_calls = [tool_call for tool_call in tool_calls if isinstance(tool_call, dict)]
         if not tool_calls:
             return []
 
@@ -3880,8 +3951,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Sync budget from pipeline
         self.tool_calls_used = self._tool_pipeline.calls_used
 
-        # Delegate post-processing to ToolCoordinator
-        from victor.agent.coordinators.tool_coordinator import ToolResultContext
+        # Delegate post-processing to the canonical ToolService path
+        from victor.agent.services.tool_service import ToolResultContext
 
         ctx = ToolResultContext(
             executed_tools=self.executed_tools,
@@ -3902,9 +3973,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             stream_context=(
                 self._current_stream_context if hasattr(self, "_current_stream_context") else None
             ),
+            task_type=getattr(self, "_current_task_type", getattr(self, "_task_type", "unknown")),
         )
 
-        results = self._tool_coordinator.process_tool_results(pipeline_result, ctx)
+        results = self._tool_service.process_tool_results(pipeline_result, ctx)
 
         # Sync mutable state back from context
         self._continuation_prompts = ctx.continuation_prompts
@@ -4019,7 +4091,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def recover_session(self, session_id: str) -> bool:
         """Recover a previous conversation session.
 
-        Delegates to SessionCoordinator.
+        Delegates to SessionService.
 
         Args:
             session_id: ID of the session to recover
@@ -4027,7 +4099,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if session was recovered successfully
         """
-        success = self._session_coordinator.recover_session(session_id)
+        success = self._session_service.recover_session(session_id)
         if success:
             self._memory_session_id = session_id
         return success
@@ -4035,7 +4107,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_memory_context(self, max_tokens: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get token-aware context messages from memory manager.
 
-        Delegates to SessionCoordinator.
+        Delegates to SessionService.
 
         Args:
             max_tokens: Override max tokens for this retrieval.
@@ -4043,7 +4115,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of messages in provider format.
         """
-        return self._session_coordinator.get_memory_context(
+        return self._session_service.get_memory_context(
             max_tokens=max_tokens,
             messages=self.messages,
         )
@@ -4238,12 +4310,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _build_tool_access_context(self) -> "ToolAccessContext":
         """Build ToolAccessContext for unified access control checks.
 
-        Delegates to ToolCoordinator.
+        Delegates to ToolService.
 
         Returns:
             ToolAccessContext with session tools and current mode
         """
-        return self._tool_coordinator._build_tool_access_context()
+        return self._tool_service.build_tool_access_context()
 
     def get_enabled_tools(self) -> Set[str]:
         """Get currently enabled tool names (protocol method).

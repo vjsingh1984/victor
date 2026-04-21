@@ -111,22 +111,25 @@ def test_expand_failed_tool():
 
 
 def test_settings_defaults():
-    """Test that new settings have correct accuracy-first defaults."""
+    """Test that new settings have correct safe-default pruning behavior."""
     settings = ToolSettings()
     assert settings.tool_output_preview_enabled is True  # Show preview by default
-    assert settings.tool_output_pruning_enabled is False  # Pruning opt-in (full output to LLM)
+    assert settings.tool_output_pruning_enabled is True  # Safe-default pruning enabled
+    assert settings.tool_output_pruning_safe_only is True  # Limited to safe verbose tools
     assert settings.tool_output_show_transparency is True
     assert settings.tool_output_preview_lines == 3
     assert settings.tool_output_expand_hotkey == "^O"
 
 
 def test_backward_compatibility_settings():
-    """Test that old behavior can be restored via settings."""
+    """Test that broader pruning can be enabled explicitly via settings."""
     settings = ToolSettings(
-        tool_output_pruning_enabled=True,  # Enable pruning (also means pruned to LLM)
+        tool_output_pruning_enabled=True,
+        tool_output_pruning_safe_only=False,
         tool_output_preview_enabled=False,  # No preview
     )
     assert settings.tool_output_pruning_enabled is True
+    assert settings.tool_output_pruning_safe_only is False
     assert settings.tool_output_preview_enabled is False
 
 

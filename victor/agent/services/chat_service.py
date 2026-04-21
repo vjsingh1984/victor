@@ -122,6 +122,10 @@ class ChatService:
         self._conversation = conversation_controller
         self._streaming = streaming_coordinator
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
+        self._turn_executor: Optional[Any] = None
+        self._planning_handler: Optional[Callable[[str], Any]] = None
+        self._stream_chat_handler: Optional[Callable[..., AsyncIterator[Any]]] = None
+        self._context_limit_handler: Optional[Callable[..., Any]] = None
 
         # Initialize metrics tracking
         self._metrics: Dict[str, Any] = {
@@ -139,6 +143,24 @@ class ChatService:
             "chunks_per_second": 0,
             "total_chunks": 0,
         }
+
+    def bind_runtime_components(
+        self,
+        *,
+        turn_executor: Optional[Any] = None,
+        planning_handler: Optional[Callable[[str], Any]] = None,
+        stream_chat_handler: Optional[Callable[..., AsyncIterator[Any]]] = None,
+        context_limit_handler: Optional[Callable[..., Any]] = None,
+    ) -> None:
+        """Bind live runtime collaborators after bootstrap."""
+        if turn_executor is not None:
+            self._turn_executor = turn_executor
+        if planning_handler is not None:
+            self._planning_handler = planning_handler
+        if stream_chat_handler is not None:
+            self._stream_chat_handler = stream_chat_handler
+        if context_limit_handler is not None:
+            self._context_limit_handler = context_limit_handler
 
     async def chat(
         self, user_message: str, *, stream: bool = False, **kwargs
@@ -166,6 +188,17 @@ class ChatService:
             ToolExecutionError: If tool execution fails critically
             ContextOverflowError: If context exceeds limits
         """
+        use_planning = kwargs.pop("use_planning", False)
+
+        if self._turn_executor is not None and not stream:
+            if use_planning is False:
+                return await self._turn_executor.execute_agentic_loop(user_message)
+            if self._planning_handler is not None and (
+                use_planning is True or use_planning is None
+            ):
+                return await self._planning_handler(user_message)
+            return await self._turn_executor.execute_agentic_loop(user_message)
+
         self._logger.debug(f"Starting chat for message: {user_message[:50]}...")
 
         try:
@@ -225,13 +258,21 @@ class ChatService:
             ProviderError: If the provider fails during streaming
             ToolExecutionError: If tool execution fails critically
         """
+        if self._stream_chat_handler is not None:
+            async for chunk in self._stream_chat_handler(user_message, **kwargs):
+                yield chunk
+            return
+
         # Check if this is a fallback from AgenticLoop failure
         preserve_iteration = kwargs.pop("_preserve_iteration", False)
         current_iteration = kwargs.pop("_current_iteration", 0)
 
-        if preserve_iteration and current_iteration > 0:
+        # Guard was previously `current_iteration > 0` which is always False because
+        # unified_tracker.iteration_count (productive tool calls) is 0 at the first loop
+        # iteration — before any tools complete. The boolean flag is the correct signal.
+        if preserve_iteration:
             self._logger.info(
-                f"[Fallback mode] Preserving state: continuing from iteration {current_iteration}"
+                "[Fallback mode] Preserving conversation state after AgenticLoop failure"
             )
             # Store current iteration for ChatCoordinator to use
             kwargs["_fallback_iteration"] = current_iteration
@@ -260,6 +301,26 @@ class ChatService:
 
             # Recovery failed, re-raise
             raise
+
+    async def chat_with_planning(
+        self,
+        user_message: str,
+        use_planning: Optional[bool] = None,
+    ) -> "CompletionResponse":
+        """Process chat with planning enabled or auto-detected."""
+        if use_planning is False:
+            return await self.chat(user_message, use_planning=False)
+
+        if self._planning_handler is not None and (use_planning is True or use_planning is None):
+            return await self._planning_handler(user_message)
+
+        return await self.chat(user_message, use_planning=use_planning)
+
+    async def handle_context_and_iteration_limits(self, *args, **kwargs) -> Any:
+        """Delegate context/iteration limit handling to the bound runtime helper."""
+        if self._context_limit_handler is None:
+            return False, None
+        return await self._context_limit_handler(*args, **kwargs)
 
     def reset_conversation(self) -> None:
         """Reset the conversation history and state.
@@ -528,9 +589,27 @@ class ChatService:
             tool_call_id = getattr(tool_call, "id", None)
 
             result = await self._tools.execute_tool(tool_name, arguments)
+            formatted_content = None
+
+            if getattr(result, "success", False):
+                try:
+                    from victor.agent.services.tool_service import format_and_prune_tool_output
+
+                    _, formatted_content, _, _ = format_and_prune_tool_output(
+                        tool_name=tool_name,
+                        arguments=arguments,
+                        output=result.output,
+                    )
+                except Exception:
+                    formatted_content = None
 
             # Add tool result to context with proper tool_call_id
-            self._add_tool_result_to_context(tool_name, result, tool_call_id=tool_call_id)
+            self._add_tool_result_to_context(
+                tool_name,
+                result,
+                tool_call_id=tool_call_id,
+                formatted_content=formatted_content,
+            )
 
     async def _create_continuation_prompt(self, response: "CompletionResponse") -> str:
         """Create continuation prompt for incomplete response.
@@ -571,6 +650,7 @@ class ChatService:
         tool_name: str,
         result: Any,
         tool_call_id: Optional[str] = None,
+        formatted_content: Optional[str] = None,
     ) -> None:
         """Add tool result to context.
 
@@ -578,10 +658,13 @@ class ChatService:
             tool_name: Name of tool that was executed
             result: Tool result
             tool_call_id: ID of the tool call (required for OpenAI API compatibility)
+            formatted_content: Optional preformatted tool content for LLM injection
         """
         # Handle output/error with proper string conversion
         # Use output if available and not None, otherwise use error
-        if result.output is not None:
+        if formatted_content is not None:
+            content = formatted_content
+        elif result.output is not None:
             content = str(result.output)
         elif result.error:
             content = str(result.error)
@@ -1449,4 +1532,4 @@ class ChatService:
             executor = service.turn_executor
             response = await executor.chat("Hello")
         """
-        return self
+        return self._turn_executor or self

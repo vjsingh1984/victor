@@ -315,3 +315,79 @@ class TestPruningIntegration:
         # Should achieve meaningful reduction
         assert info.was_pruned is True
         assert info.pruned_lines < info.original_lines
+
+
+class TestFormattedOutputPruning:
+    """Tests for the conservative formatted-output pruning path used in runtime."""
+
+    def test_formatted_read_output_preserves_headers_and_line_numbers(self):
+        pruner = ToolOutputPruner(enabled=True)
+        body = "\n".join(f"{i}\tline {i}" for i in range(1, 260))
+        formatted = (
+            '<TOOL_OUTPUT tool="read" path="src/main.py">\n'
+            "═══ ACTUAL FILE CONTENT: src/main.py ═══\n"
+            "[File: src/main.py]\n"
+            "[Lines 1-259 of 259]\n"
+            "[Size: 4096 bytes]\n"
+            f"{body}\n"
+            "═══ END OF FILE: src/main.py ═══\n"
+            "</TOOL_OUTPUT>\n"
+            "\n"
+            "IMPORTANT: The content above is authoritative."
+        )
+
+        pruned, info = pruner.prune(
+            tool_output=formatted,
+            task_type="analysis",
+            tool_name="read",
+            context={
+                "formatted_output": True,
+                "safe_only": True,
+                "tool_args": {"path": "src/main.py"},
+            },
+        )
+
+        assert info.was_pruned is True
+        assert "[File: src/main.py]" in pruned
+        assert "1\tline 1" in pruned
+        assert "140\tline 140" in pruned
+        assert "141\tline 141" not in pruned
+        assert "offset=140" in pruned
+        assert "</TOOL_OUTPUT>" in pruned
+        assert "IMPORTANT: The content above is authoritative." in pruned
+
+    def test_formatted_output_skips_safety_critical_error_signatures(self):
+        pruner = ToolOutputPruner(enabled=True)
+        formatted = (
+            '<TOOL_OUTPUT tool="read" path="artifacts/test.log">\n'
+            "Traceback (most recent call last):\n"
+            "  File \"runner.py\", line 10, in <module>\n"
+            "AssertionError: expected 1 == 2\n"
+            "</TOOL_OUTPUT>"
+        )
+
+        pruned, info = pruner.prune(
+            tool_output=formatted,
+            task_type="analysis",
+            tool_name="read",
+            context={"formatted_output": True, "safe_only": True},
+        )
+
+        assert pruned == formatted
+        assert info.was_pruned is False
+        assert info.pruning_reason == "safety_critical_content"
+
+    def test_formatted_output_respects_safe_default_scope(self):
+        pruner = ToolOutputPruner(enabled=True)
+        formatted = '<TOOL_OUTPUT tool="write">verbose write result</TOOL_OUTPUT>'
+
+        pruned, info = pruner.prune(
+            tool_output=formatted,
+            task_type="edit",
+            tool_name="write",
+            context={"formatted_output": True, "safe_only": True},
+        )
+
+        assert pruned == formatted
+        assert info.was_pruned is False
+        assert info.pruning_reason == "safety_critical_tool"

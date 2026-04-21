@@ -373,25 +373,46 @@ def tool(
     _explicit_aliases = aliases or []
 
     def decorator(fn: Callable) -> Callable:
-        @wraps(fn)
-        def wrapper(*args, **kwargs) -> Any:
-            # This wrapper is what gets called if the decorated function is called directly
-            return fn(*args, **kwargs)
+        # CRITICAL FIX: Check if function is async and create appropriate wrapper
+        # If the wrapped function is async, the wrapper MUST be async to properly await it
+        if inspect.iscoroutinefunction(fn):
+            @wraps(fn)
+            async def async_wrapper(*args, **kwargs) -> Any:  # type: ignore[misc]
+                # This async wrapper properly awaits the underlying async function
+                return await fn(*args, **kwargs)
 
-        # Mark as tool for dynamic discovery
-        wrapper._is_tool = True  # type: ignore[attr-defined]
-        wrapper._tool_timeout = timeout  # type: ignore[attr-defined]
-        # We will attach a class to the wrapper that is the actual tool
-        wrapper.Tool = _create_tool_class(
-            fn,
-            cost_tier=cost_tier,
-            metadata_params=metadata_params,
-            selection_params=selection_params,
-            explicit_name=_explicit_name,
-            explicit_aliases=_explicit_aliases,
-        )
+            # Mark as tool for dynamic discovery
+            async_wrapper._is_tool = True  # type: ignore[attr-defined]
+            async_wrapper._tool_timeout = timeout  # type: ignore[attr-defined]
+            async_wrapper.Tool = _create_tool_class(
+                fn,
+                cost_tier=cost_tier,
+                metadata_params=metadata_params,
+                selection_params=selection_params,
+                explicit_name=_explicit_name,
+                explicit_aliases=_explicit_aliases,
+            )
 
-        return wrapper
+            return async_wrapper
+        else:
+            @wraps(fn)
+            def sync_wrapper(*args, **kwargs) -> Any:
+                # Sync wrapper for sync functions
+                return fn(*args, **kwargs)
+
+            # Mark as tool for dynamic discovery
+            sync_wrapper._is_tool = True  # type: ignore[attr-defined]
+            sync_wrapper._tool_timeout = timeout  # type: ignore[attr-defined]
+            sync_wrapper.Tool = _create_tool_class(
+                fn,
+                cost_tier=cost_tier,
+                metadata_params=metadata_params,
+                selection_params=selection_params,
+                explicit_name=_explicit_name,
+                explicit_aliases=_explicit_aliases,
+            )
+
+            return sync_wrapper
 
     # Support both @tool and @tool(cost_tier=...) syntax
     if func is not None:
@@ -466,6 +487,62 @@ def _create_tool_class(
 
     properties = {}
     required = []
+
+    def sanitize_schema_for_llm(schema: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove Python-specific annotations from JSON schema before sending to LLM.
+
+        LLMs get confused by Python-specific types like Path, tuple[str, ...], etc.
+        Convert these to standard JSON Schema types.
+
+        Args:
+            schema: Raw JSON schema with potential Python annotations
+
+        Returns:
+            Sanitized schema using only standard JSON Schema types
+        """
+        import hashlib
+
+        sanitized = schema.copy()
+
+        # Sanitize properties
+        if "properties" in sanitized:
+            for prop_name, prop_schema in sanitized["properties"].items():
+                # Remove example/default if they contain Python types
+                prop_schema.pop("example", None)
+                prop_schema.pop("default", None)
+
+                # Convert Python-specific types to JSON Schema types
+                prop_type = prop_schema.get("type", "string")
+
+                # Path -> string
+                if "Path" in str(prop_type) or (hasattr(prop_type, "__name__") and prop_type.__name__ == "Path"):
+                    prop_schema["type"] = "string"
+                    prop_schema["description"] = prop_schema.get("description", "") + " (file path)"
+
+                # tuple[T, ...] or list[T] -> array
+                if "tuple" in str(prop_type) or "list" in str(prop_type):
+                    prop_schema["type"] = "array"
+                    # Extract item type if possible
+                    if "items" in prop_schema:
+                        items_schema = prop_schema["items"]
+                        # Recursively sanitize items
+                        if isinstance(items_schema, dict):
+                            prop_schema["items"] = sanitize_schema_for_llm({"type": "object", "properties": items_schema})
+
+                # Remove Python-specific annotations
+                for key in list(prop_schema.keys()):
+                    if key.startswith("_") or key in ["python_type", "annotation"]:
+                        del prop_schema[key]
+
+        # Clean up required list
+        if "required" in sanitized:
+            # Remove 'self' from required parameters (LLM sometimes includes it)
+            sanitized["required"] = [
+                r for r in sanitized["required"] if r != "self"
+            ]
+
+        return sanitized
+
     for name, param in sig.parameters.items():
         if name == "_exec_ctx":
             continue  # Framework-internal, not exposed to LLM
@@ -479,11 +556,14 @@ def _create_tool_class(
         # Use the enhanced type handler for proper JSON Schema generation
         type_schema = _get_json_schema_type(param.annotation)
 
-        # Merge type schema with description
-        properties[name] = {
+        # Merge type schema with description, then sanitize for LLM
+        raw_schema = {
             **type_schema,
             "description": param_docs.get(name, "No description."),
         }
+
+        # Sanitize to remove Python-specific annotations that confuse LLMs
+        properties[name] = sanitize_schema_for_llm(raw_schema)
 
         # Add default value if present (helps LLMs understand optional params)
         if param.default != inspect.Parameter.empty and param.default is not None:
@@ -779,6 +859,13 @@ def _create_tool_class(
 
         async def execute(self, _exec_ctx: Dict[str, Any], **kwargs: Any) -> ToolResult:
             try:
+                # DEBUG: Log tool execution start
+                import logging as _logging
+                _logger = _logging.getLogger(__name__)
+                _logger.debug(f"[TOOL_EXEC] 🔧 Executing {self._fn.__name__}")
+                _logger.debug(f"[TOOL_EXEC] Is coroutine: {inspect.iscoroutinefunction(self._fn)}")
+                _logger.debug(f"[TOOL_EXEC] Tool: {self.name}, Args: {list(kwargs.keys())}")
+
                 # Check if the target function wants the framework execution context
                 # Note: We use _exec_ctx to avoid collision with tool parameters named 'context'
                 sig = inspect.signature(self._fn)
@@ -786,11 +873,24 @@ def _create_tool_class(
                     kwargs["_exec_ctx"] = _exec_ctx
 
                 if inspect.iscoroutinefunction(self._fn):
+                    _logger.debug(f"[TOOL_EXEC] ⏳ Awaiting coroutine...")
                     result = await self._fn(**kwargs)
+                    _logger.debug(f"[TOOL_EXEC] ✓ Coroutine awaited, result type: {type(result)}")
                 else:
                     # Offload sync functions to a thread to avoid blocking
                     # the event loop during CPU-bound or I/O-bound operations.
+                    _logger.debug(f"[TOOL_EXEC] 🔄 Running in thread...")
                     result = await asyncio.to_thread(self._fn, **kwargs)
+                    _logger.debug(f"[TOOL_EXEC] ✓ Thread completed, result type: {type(result)}")
+
+                # CRITICAL: Check if result is a coroutine (should never happen)
+                if inspect.iscoroutine(result):
+                    _logger.error(f"[TOOL_EXEC] ❌ RESULT IS COROUTINE: {result}")
+                    _logger.error(f"[TOOL_EXEC] Tool: {self._fn.__name__}, Result: {repr(result)}")
+                    raise RuntimeError(
+                        f"Tool '{self.name}' returned coroutine object instead of result. "
+                        f"This indicates the tool function was not properly awaited."
+                    )
 
                 # Handle dict-based error returns for backwards compatibility
                 # Tools returning {"success": False, "error": "..."} should be converted
