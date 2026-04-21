@@ -407,9 +407,10 @@ class UnifiedPromptPipeline:
         """Get credit-driven tool effectiveness guidance if available."""
         try:
             from victor.core import get_container
+            from victor.framework.rl.credit_tracking_service import CreditTrackingService
 
             container = get_container()
-            service = container.get_optional("credit_tracking_service")
+            service = container.get_optional(CreditTrackingService)
             if service is None:
                 return None
             return service.generate_tool_guidance()
@@ -424,10 +425,10 @@ class UnifiedPromptPipeline:
         """
         try:
             from victor.core import get_container
+            from victor.agent.tool_pipeline import ToolPipeline
 
             container = get_container()
-            # Try to find tool pipeline via the container or orchestrator
-            pipeline = container.get_optional("tool_pipeline")
+            pipeline = container.get_optional(ToolPipeline)
             if pipeline is None:
                 return None
             tracker = getattr(pipeline, "_tool_reputation", None)

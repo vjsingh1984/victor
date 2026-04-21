@@ -535,23 +535,20 @@ class IntelligentPromptBuilder:
     }
     LOCAL_PROVIDERS = {"ollama", "lmstudio", "vllm"}
 
-    # Grounding rules
-    GROUNDING_RULES_MINIMAL = """
-GROUNDING: Base ALL responses on tool output only. Never invent file paths or content.
-Quote code exactly from tool output. If more info needed, call another tool.
-""".strip()
+    # Grounding rules (thrifty & performant)
+    GROUNDING_RULES_MINIMAL = (
+        "GROUNDING: Base responses ONLY on tool output. Never fabricate paths or content. "
+        "Quote code exactly. If more info is needed, call another tool."
+    ).strip()
 
     GROUNDING_RULES_STRICT = """
-CRITICAL - TOOL OUTPUT GROUNDING:
-When you receive tool output in <TOOL_OUTPUT> tags:
-1. The content between ═══ markers is ACTUAL file/command output - NEVER ignore it
-2. You MUST base your analysis ONLY on this actual content
-3. NEVER fabricate, invent, or imagine file contents that differ from tool output
-4. If you need more information, call another tool - do NOT guess
-5. When citing code, quote EXACTLY from the tool output
-6. If tool output is empty or truncated, acknowledge this limitation
-
-VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
+GROUNDING:
+- Use ONLY content in <TOOL_OUTPUT> ═══ markers.
+- Base analysis SOLELY on actual content provided.
+- NEVER fabricate or guess file contents.
+- If info is missing, call another tool.
+- Quote code EXACTLY as shown in output.
+- Acknowledge if output is empty or truncated.
 """.strip()
 
     def __init__(
@@ -860,30 +857,28 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
             )
 
     def _get_task_hint(self, task_type: str) -> str:
-        """Get task-specific hint."""
+        """Get task-specific hint (concise)."""
         hints = {
-            "code_generation": "[GENERATE] Write code directly. No exploration needed. Complete implementation.",
-            "create_simple": "[CREATE] Write file immediately. Skip codebase exploration. One tool call max.",
-            "create": "[CREATE+CONTEXT] Read 1-2 relevant files, then create. Follow existing patterns.",
-            "edit": "[EDIT] Read target file first, then modify. Focused changes only.",
+            "code_generation": "[GENERATE] Write code directly. Full implementation.",
+            "create_simple": "[CREATE] Write file immediately. One tool call max.",
+            "create": "[CREATE+CONTEXT] Read relevant files, then create.",
+            "edit": "[EDIT] Read target file first, then modify.",
             "search": "[SEARCH] Use code_search/list_directory. Summarize after 2-4 calls.",
-            "action": "[ACTION] Execute git/test/build operations. Continue until complete.",
-            "analysis_deep": "[ANALYSIS] Thorough codebase exploration. Read all relevant modules.",
-            "analyze": "[ANALYZE] Examine code carefully. Read related files. Structured findings.",
-            "general": "[GENERAL] Moderate exploration. 3-6 tool calls. Answer concisely.",
+            "action": "[ACTION] Execute git/test/build. Continue until complete.",
+            "analysis_deep": "[ANALYSIS] Thorough exploration. Read all modules.",
+            "analyze": "[ANALYZE] Examine code carefully. Structured findings.",
+            "general": "[GENERAL] Moderate exploration. Answer concisely.",
         }
-        # Defensive: ensure task_type is a string before calling .lower()
         task_type_str = str(task_type).lower() if task_type else "general"
         return hints.get(task_type_str, "")
 
     def _get_mode_hint(self, mode: str, iteration_budget: int) -> str:
-        """Get mode-specific hint."""
+        """Get mode-specific hint (concise)."""
         mode_hints = {
-            "explore": f"MODE: Explore - Focus on understanding code. Budget: {iteration_budget} iterations.",
-            "build": f"MODE: Build - Focus on implementation. Budget: {iteration_budget} iterations.",
-            "plan": f"MODE: Plan - Create detailed plan before implementing. Budget: {iteration_budget} iterations.",
+            "explore": f"MODE: Explore - Understand code. Budget: {iteration_budget} turns.",
+            "build": f"MODE: Build - Implement. Budget: {iteration_budget} turns.",
+            "plan": f"MODE: Plan - Draft plan first. Budget: {iteration_budget} turns.",
         }
-        # Defensive: ensure mode is a string before calling .lower()
         mode_str = str(mode).lower() if mode else "explore"
         return mode_hints.get(mode_str, "")
 
@@ -892,36 +887,30 @@ VIOLATION OF THESE RULES WILL RESULT IN INCORRECT ANALYSIS.
         context: PromptContext,
         strategy: PromptStrategy,
     ) -> str:
-        """Get tool usage guidance based on strategy and learned patterns."""
+        """Get tool usage guidance based on strategy (concise)."""
         if strategy == PromptStrategy.MINIMAL:
             return (
-                "Tool usage:\n"
-                "- Call tools when needed for information\n"
-                "- Parallel calls allowed for independent operations\n"
-                f"- Tool budget: {context.recommended_tool_budget}"
+                "TOOLS:\n- Use for information gathering\n"
+                f"- Budget: {context.recommended_tool_budget} calls"
             )
 
         elif strategy == PromptStrategy.STRUCTURED:
             return (
-                "TOOL USAGE:\n"
-                "- Use list_directory and read_file to inspect code\n"
-                "- Call tools one at a time, waiting for results\n"
-                f"- Budget: {context.recommended_tool_budget} tool calls\n"
-                "- After gathering info, provide a clear answer\n"
-                "- Do NOT repeat identical tool calls"
+                "TOOL RULES:\n"
+                "- Use list_directory/read_file to inspect code\n"
+                "- Call tools sequentially, waiting for results\n"
+                f"- Budget: {context.recommended_tool_budget} calls\n"
+                "- Ensure each call provides NEW information"
             )
 
         else:  # STRICT
             return (
-                "CRITICAL TOOL RULES:\n"
-                "1. Call tools ONE AT A TIME. Wait for each result.\n"
-                f"2. Budget: {context.recommended_tool_budget} tool calls maximum.\n"
-                "3. After reading 2-3 files, STOP and provide your answer.\n"
-                "4. Do NOT repeat the same tool call.\n\n"
-                "OUTPUT FORMAT:\n"
-                "1. Write your answer in plain English text.\n"
-                "2. Do NOT output JSON objects in your response.\n"
-                "3. Do NOT output XML tags or function call syntax."
+                "TOOL RULES:\n"
+                "1. Call tools sequentially; wait for each result.\n"
+                f"2. Budget: {context.recommended_tool_budget} calls max.\n"
+                "3. Gather sufficient info before answering.\n"
+                "4. Provide plain English text responses only.\n"
+                "5. Ensure calls are unique and purposeful."
             )
 
     def _format_context_fragments(self, fragments: List[ContextFragment]) -> str:

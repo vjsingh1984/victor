@@ -6,10 +6,13 @@
 """Tests for GEPA-inspired prompt optimizer."""
 
 import sqlite3
+from types import SimpleNamespace
 
 import pytest
 
+from victor.core.container import ServiceContainer, reset_container, set_container
 from victor.framework.rl.base import RLOutcome
+from victor.framework.rl.credit_tracking_service import CreditTrackingService
 from victor.framework.rl.learners.prompt_optimizer import (
     ExecutionTrace,
     GEPAStrategy,
@@ -256,3 +259,32 @@ class TestPromptOptimizerLearner:
         """Verify candidate key uses section::provider format."""
         key = learner._candidate_key("COMPLETION_GUIDANCE", "ollama")
         assert key == "COMPLETION_GUIDANCE::ollama"
+
+    def test_enrich_traces_with_credit_uses_registered_service(self, learner):
+        """Recent credit summary should enrich traces when service is in DI."""
+        service = CreditTrackingService()
+        service.get_tool_credit_summary = lambda: {
+            "grep": {"avg_credit": 0.8, "total_credit": 1.6, "call_count": 2}
+        }
+
+        container = ServiceContainer()
+        container.register_instance(CreditTrackingService, service)
+        set_container(container)
+        try:
+            trace = ExecutionTrace(
+                session_id="s1",
+                provider="ollama",
+                model="qwen",
+                task_type="search",
+                tool_calls=1,
+                tool_failures={},
+                completion_score=0.9,
+                success=True,
+                tokens_used=120,
+                tool_call_details=[SimpleNamespace(tool_name="grep")],
+            )
+            learner._enrich_traces_with_credit([trace])
+            assert trace.credit_signals[0]["tool_name"] == "grep"
+            assert trace.credit_signals[0]["credit"] == 0.8
+        finally:
+            reset_container()

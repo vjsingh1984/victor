@@ -248,6 +248,45 @@ class TestComposeTurnPrefix:
         assert "</system-reminder>" in prefix
 
 
+class TestRuntimeGuidanceLookups:
+    """Verify prompt-time guidance resolves live runtime services from DI."""
+
+    def test_credit_guidance_resolves_registered_service(self):
+        from victor.core.container import ServiceContainer, reset_container, set_container
+        from victor.framework.rl.credit_tracking_service import CreditTrackingService
+
+        pipeline = _make_pipeline()
+        service = CreditTrackingService()
+        service.generate_tool_guidance = MagicMock(return_value="Tool effectiveness: use read")
+
+        container = ServiceContainer()
+        container.register_instance(CreditTrackingService, service)
+        set_container(container)
+        try:
+            assert pipeline._get_credit_guidance() == "Tool effectiveness: use read"
+        finally:
+            reset_container()
+
+    def test_tool_reputation_guidance_resolves_registered_pipeline(self):
+        from victor.agent.tool_pipeline import ToolPipeline
+        from victor.core.container import ServiceContainer, reset_container, set_container
+
+        pipeline = _make_pipeline()
+        tracker = MagicMock()
+        tracker.get_selection_guidance.return_value = "Prefer grep before broad read"
+
+        live_pipeline = MagicMock(spec=ToolPipeline)
+        live_pipeline._tool_reputation = tracker
+
+        container = ServiceContainer()
+        container.register_instance(ToolPipeline, live_pipeline)
+        set_container(container)
+        try:
+            assert pipeline._get_tool_reputation_guidance() == "Prefer grep before broad read"
+        finally:
+            reset_container()
+
+
 # ============================================================================
 # 4. Frozen Prompt State (3 tests)
 # ============================================================================

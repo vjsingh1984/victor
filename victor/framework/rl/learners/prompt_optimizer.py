@@ -1487,10 +1487,10 @@ class PromptOptimizerLearner(BaseLearner):
         """
         try:
             from victor.core import get_container
+            from victor.framework.rl.credit_tracking_service import CreditTrackingService
 
             container = get_container()
-            # Try to resolve credit tracking service
-            service = container.get_optional("credit_tracking_service")
+            service = container.get_optional(CreditTrackingService)
             if service is None:
                 return
 
