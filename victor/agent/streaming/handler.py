@@ -262,6 +262,7 @@ class StreamingChatHandler:
             tool_args = result.get("args", {})
             success = result.get("success", False)
             error_msg = result.get("error", "failed") if not success else None
+            tool_output = result.get("result")  # Get actual tool output for preview
             chunks.append(
                 self.generate_tool_result_chunk(
                     tool_name=tool_name,
@@ -270,6 +271,7 @@ class StreamingChatHandler:
                     success=success,
                     error=error_msg,
                     follow_up_suggestions=result.get("follow_up_suggestions"),
+                    result=tool_output,  # Pass result for preview
                 )
             )
 
@@ -1017,6 +1019,7 @@ class StreamingChatHandler:
         success: bool,
         error: Optional[str] = None,
         follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
+        result: Any = None,  # Tool output for preview
     ) -> StreamChunk:
         """Generate a StreamChunk for a tool result.
 
@@ -1026,6 +1029,8 @@ class StreamingChatHandler:
             elapsed: Time elapsed for tool execution
             success: Whether the tool succeeded
             error: Optional error message if failed
+            follow_up_suggestions: Optional follow-up suggestions
+            result: Tool output (for preview display)
 
         Returns:
             StreamChunk with tool_result metadata
@@ -1042,6 +1047,9 @@ class StreamingChatHandler:
             metadata["tool_result"]["error"] = error
         if follow_up_suggestions:
             metadata["tool_result"]["follow_up_suggestions"] = follow_up_suggestions
+        if result is not None:
+            # Include tool output for preview (will be truncated by formatter)
+            metadata["tool_result"]["result"] = str(result)[:2000]  # Limit to 2000 chars
         return StreamChunk(content="", metadata=metadata)
 
     def generate_file_preview_chunk(
@@ -1138,6 +1146,7 @@ class StreamingChatHandler:
         follow_up_suggestions = result.get("follow_up_suggestions")
 
         # Main tool result chunk
+        tool_output = result.get("result")  # Get result for preview
         chunks.append(
             self.generate_tool_result_chunk(
                 tool_name,
@@ -1146,6 +1155,7 @@ class StreamingChatHandler:
                 success,
                 error,
                 follow_up_suggestions=follow_up_suggestions,
+                result=tool_output,  # Pass result for preview
             )
         )
 

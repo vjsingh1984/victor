@@ -108,6 +108,7 @@ class LiveDisplayRenderer:
         original_result: str | None = None,
         preview_lines: int = 3,
         was_pruned: bool = False,
+        result: Any = None,  # Alias for original_result (for compatibility)
     ) -> None:
         """Handle tool execution result - print consolidated single line with preview.
 
@@ -120,11 +121,15 @@ class LiveDisplayRenderer:
             original_result: Unmodified tool output (before pruning)
             preview_lines: Number of lines to show in preview
             was_pruned: Whether output was pruned before sending to LLM
+            result: Tool output (alias for original_result)
         """
         from victor.config.tool_settings import get_tool_settings
 
         tool_settings = get_tool_settings()
         show_preview = tool_settings.tool_output_preview_enabled
+
+        # Use result parameter if original_result not provided
+        tool_output = original_result or (str(result) if result is not None else None)
 
         self.pause()
 
@@ -137,13 +142,13 @@ class LiveDisplayRenderer:
         self.console.print(f"[{color}]{icon}[/] {name}{args_str} [dim]({elapsed:.1f}s)[/]")
 
         # Show preview if enabled
-        if show_preview and success and original_result:
-            preview_text = self._generate_preview(original_result, preview_lines)
+        if show_preview and success and tool_output:
+            preview_text = self._generate_preview(tool_output, preview_lines)
             if preview_text:
                 self.console.print(f"[dim]↳ {preview_text}[/]")
 
                 # Show expand hint if output is longer than preview
-                num_lines = len(original_result.split("\n"))
+                num_lines = len(tool_output.split("\n"))
                 if num_lines > preview_lines:
                     hotkey = tool_settings.tool_output_expand_hotkey
                     self.console.print(f"[dim italic]Press {hotkey} to see all {num_lines} lines[/]")
@@ -156,7 +161,7 @@ class LiveDisplayRenderer:
         self._last_tool_result = {
             "name": name,
             "success": success,
-            "result": original_result or "",
+            "result": tool_output or "",
             "arguments": arguments,
             "elapsed": elapsed,
         }

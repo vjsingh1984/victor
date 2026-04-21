@@ -78,6 +78,7 @@ class FormatterRenderer:
         arguments: dict[str, Any],
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
+        result: Any = None,  # Tool output for preview
     ) -> None:
         """Handle tool execution result.
 
@@ -87,6 +88,8 @@ class FormatterRenderer:
             elapsed: Execution time in seconds
             arguments: Tool arguments
             error: Error message if failed
+            follow_up_suggestions: Optional follow-up suggestions
+            result: Tool output (for preview display)
         """
         self.pause()
         self.formatter.tool_result(
@@ -94,6 +97,7 @@ class FormatterRenderer:
             success=success,
             error=error,
             follow_up_suggestions=follow_up_suggestions,
+            original_result=str(result) if result is not None else None,  # Pass result for preview
         )
         self.resume()
 
