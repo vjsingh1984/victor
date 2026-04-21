@@ -24,15 +24,19 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Awaitable,
+    Callable,
     Dict,
     List,
     Optional,
     Protocol,
+    Set,
+    Tuple,
     runtime_checkable,
 )
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.tool_coordinator import ToolResultContext
+    from victor.agent.services.tool_service import ToolResultContext
     from victor.tools.base import ToolResult
 
 
@@ -247,6 +251,60 @@ class ToolServiceProtocol(Protocol):
         Returns:
             List of result dicts with name, success, elapsed, error, etc.
         """
+        ...
+
+    def get_available_tools(self) -> Set[str]:
+        """Get all registered tool names."""
+        ...
+
+    def get_enabled_tools(self) -> Set[str]:
+        """Get currently enabled tool names for the session."""
+        ...
+
+    def set_enabled_tools(self, tools: Set[str]) -> None:
+        """Set which tools are enabled for the session."""
+        ...
+
+    def is_tool_enabled(self, tool_name: str) -> bool:
+        """Check whether a tool is enabled for the current session."""
+        ...
+
+    def resolve_tool_alias(self, tool_name: str) -> str:
+        """Resolve a tool alias to its canonical runtime name."""
+        ...
+
+    def parse_and_validate_tool_calls(
+        self,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        full_content: str,
+        tool_adapter: Any,
+    ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
+        """Parse, validate, normalize, and filter tool calls from model output."""
+        ...
+
+    async def execute_tool_with_retry(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        context: Dict[str, Any],
+        tool_executor: Optional[Callable[..., Awaitable[Any]]] = None,
+        cache: Optional[Any] = None,
+        on_success: Optional[Callable[[str, Dict[str, Any], Any], None]] = None,
+        retry_config: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Optional[Any], bool, Optional[str]]:
+        """Execute a tool with retry logic and exponential backoff."""
+        ...
+
+    def normalize_tool_arguments(
+        self,
+        tool_args: Dict[str, Any],
+        tool_name: str,
+    ) -> Tuple[Dict[str, Any], Any]:
+        """Normalize raw tool arguments before execution."""
+        ...
+
+    def build_tool_access_context(self) -> Any:
+        """Build access-control context for tool gating decisions."""
         ...
 
     def is_healthy(self) -> bool:

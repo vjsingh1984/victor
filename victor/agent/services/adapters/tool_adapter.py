@@ -20,7 +20,8 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.tool_coordinator import ToolCoordinator, ToolResultContext
+    from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+    from victor.agent.services.tool_service import ToolResultContext
     from victor.agent.protocols import ToolAccessContext
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,10 @@ class ToolServiceAdapter:
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled."""
         return self._tool_coordinator.is_tool_enabled(tool_name)
+
+    def resolve_tool_alias(self, tool_name: str) -> str:
+        """Resolve a tool alias to its canonical name."""
+        return self._tool_coordinator.resolve_tool_alias(tool_name)
 
     def parse_and_validate_tool_calls(
         self,
@@ -115,6 +120,10 @@ class ToolServiceAdapter:
             failed_signatures=failed_signatures,
         )
 
+    def normalize_tool_arguments(self, tool_args: Dict[str, Any], tool_name: str) -> Any:
+        """Normalize tool arguments before execution."""
+        return self._tool_coordinator.normalize_tool_arguments(tool_args, tool_name)
+
     def process_tool_results(
         self,
         pipeline_result: Any,
@@ -128,6 +137,10 @@ class ToolServiceAdapter:
         return self._tool_coordinator.process_tool_results(pipeline_result, ctx)
 
     def _build_tool_access_context(self) -> "ToolAccessContext":
+        """Build tool access context."""
+        return self._tool_coordinator._build_tool_access_context()
+
+    def build_tool_access_context(self) -> "ToolAccessContext":
         """Build tool access context."""
         return self._tool_coordinator._build_tool_access_context()
 

@@ -82,6 +82,19 @@ class TestProtocolImplementation:
 
                 yield StreamChunk(content=f"Chunk for: {user_message}")
 
+            async def chat_with_planning(self, user_message: str, use_planning=None):
+                return await self.chat(user_message, use_planning=use_planning)
+
+            async def handle_context_and_iteration_limits(
+                self,
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            ):
+                return False, None
+
             def reset_conversation(self) -> None:
                 self.reset_count += 1
 
@@ -138,6 +151,37 @@ class TestProtocolImplementation:
 
             def reset_tool_budget(self):
                 self.budget = 100
+
+            def process_tool_results(self, pipeline_result, ctx):
+                return []
+
+            def get_available_tools(self):
+                return {"tool1", "tool2"}
+
+            def get_enabled_tools(self):
+                return {"tool1", "tool2"}
+
+            def set_enabled_tools(self, tools):
+                self.enabled_tools = set(tools)
+
+            def is_tool_enabled(self, tool_name):
+                return tool_name in {"tool1", "tool2"}
+
+            def resolve_tool_alias(self, tool_name):
+                return tool_name
+
+            def parse_and_validate_tool_calls(self, tool_calls, full_content, tool_adapter):
+                return tool_calls, full_content
+
+            async def execute_tool_with_retry(self, tool_name, tool_args, context, **kwargs):
+                result = await self.execute_tool(tool_name, tool_args)
+                return result, True, None
+
+            def normalize_tool_arguments(self, tool_args, tool_name):
+                return tool_args, "direct"
+
+            def build_tool_access_context(self):
+                return {"tools": self.get_enabled_tools()}
 
             def is_healthy(self):
                 return self.budget > 0
@@ -268,11 +312,20 @@ class TestProtocolImplementation:
             async def get_provider_capabilities(self, provider=None):
                 return {"streaming": True, "tools": True}
 
+            async def start_health_monitoring(self):
+                return None
+
+            async def stop_health_monitoring(self):
+                return None
+
             def get_current_provider(self):
                 return self  # Mock provider
 
             async def test_provider(self, provider, model=None):
                 return provider in self.get_available_providers()
+
+            def get_rate_limit_wait_time(self, error):
+                return 1.0
 
             def is_healthy(self):
                 return self.current is not None
@@ -415,6 +468,28 @@ class TestProtocolImplementation:
                     return {"message_count": session.message_count}
                 return {}
 
+            def recover_session(self, session_id):
+                self.current_id = session_id if session_id in self.sessions else None
+                return self.current_id is not None
+
+            async def maybe_auto_checkpoint(self):
+                return None
+
+            async def save_checkpoint(self, description=None, tags=None):
+                return "checkpoint-1"
+
+            async def restore_checkpoint(self, checkpoint_id):
+                return checkpoint_id == "checkpoint-1"
+
+            def get_memory_context(self, max_tokens=None, messages=None):
+                return messages or []
+
+            def get_recent_sessions(self, limit=10):
+                return [{"session_id": sid} for sid in list(self.sessions)[:limit]]
+
+            def get_session_stats(self):
+                return {"session_id": self.current_id}
+
             def is_healthy(self):
                 return True
 
@@ -488,6 +563,19 @@ class TestProtocolCompliance:
 
                 return chunks()
 
+            async def chat_with_planning(self, user_message, use_planning=None):
+                return await self.chat(user_message, use_planning=use_planning)
+
+            async def handle_context_and_iteration_limits(
+                self,
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            ):
+                return False, None
+
             def reset_conversation(self):
                 pass
 
@@ -522,6 +610,37 @@ class TestProtocolCompliance:
             def reset_tool_budget(self):
                 pass
 
+            def process_tool_results(self, pipeline_result, ctx):
+                return []
+
+            def get_available_tools(self):
+                return set()
+
+            def get_enabled_tools(self):
+                return set()
+
+            def set_enabled_tools(self, tools):
+                pass
+
+            def is_tool_enabled(self, tool_name):
+                return True
+
+            def resolve_tool_alias(self, tool_name):
+                return tool_name
+
+            def parse_and_validate_tool_calls(self, tool_calls, full_content, tool_adapter):
+                return tool_calls, full_content
+
+            async def execute_tool_with_retry(self, tool_name, tool_args, context, **kwargs):
+                result = await self.execute_tool(tool_name, tool_args)
+                return result, True, None
+
+            def normalize_tool_arguments(self, tool_args, tool_name):
+                return tool_args, "direct"
+
+            def build_tool_access_context(self):
+                return {}
+
         service = MultiService()
         assert isinstance(service, ChatServiceProtocol)
         assert isinstance(service, ToolServiceProtocol)
@@ -540,6 +659,19 @@ class TestProtocolTypeChecking:
             async def stream_chat(self, user_message, **kwargs):
                 pass
 
+            async def chat_with_planning(self, user_message, use_planning=None):
+                pass
+
+            async def handle_context_and_iteration_limits(
+                self,
+                user_message,
+                max_total_iterations,
+                max_context,
+                total_iterations,
+                last_quality_score,
+            ):
+                return False, None
+
             def reset_conversation(self):
                 pass
 
@@ -555,5 +687,7 @@ class TestProtocolTypeChecking:
         # but we can verify the protocol has the expected structure
         assert hasattr(ChatServiceProtocol, "chat")
         assert hasattr(ChatServiceProtocol, "stream_chat")
+        assert hasattr(ChatServiceProtocol, "chat_with_planning")
+        assert hasattr(ChatServiceProtocol, "handle_context_and_iteration_limits")
         assert hasattr(ChatServiceProtocol, "reset_conversation")
         assert hasattr(ChatServiceProtocol, "is_healthy")

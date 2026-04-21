@@ -271,6 +271,42 @@ class SessionServiceProtocol(Protocol):
         """
         ...
 
+    def recover_session(self, session_id: str) -> bool:
+        """Recover a previous session from persistent memory."""
+        ...
+
+    async def maybe_auto_checkpoint(self) -> Optional[str]:
+        """Create an automatic checkpoint if configured thresholds are met."""
+        ...
+
+    async def save_checkpoint(
+        self,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> Optional[str]:
+        """Save a checkpoint of the current session state."""
+        ...
+
+    async def restore_checkpoint(self, checkpoint_id: str) -> bool:
+        """Restore the current session state from a checkpoint."""
+        ...
+
+    def get_memory_context(
+        self,
+        max_tokens: Optional[int] = None,
+        messages: Optional[List[Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get token-aware memory context for the active session."""
+        ...
+
+    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """List recent sessions for recovery UX."""
+        ...
+
+    def get_session_stats(self) -> Dict[str, Any]:
+        """Get summary statistics for the current session."""
+        ...
+
     def is_healthy(self) -> bool:
         """Check if the session service is healthy.
 

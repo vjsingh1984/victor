@@ -102,6 +102,9 @@ class TestServiceProtocolImports:
             "get_current_provider_info",
             "check_provider_health",
             "get_available_providers",
+            "start_health_monitoring",
+            "stop_health_monitoring",
+            "get_rate_limit_wait_time",
             "is_healthy",
         }
         actual = {name for name in dir(ProviderServiceProtocol) if not name.startswith("_")}
@@ -146,8 +149,11 @@ class TestAdapterProtocolConformance:
         assert callable(getattr(adapter, "get_enabled_tools", None))
         assert callable(getattr(adapter, "set_enabled_tools", None))
         assert callable(getattr(adapter, "is_tool_enabled", None))
+        assert callable(getattr(adapter, "resolve_tool_alias", None))
         assert callable(getattr(adapter, "execute_tool_with_retry", None))
         assert callable(getattr(adapter, "parse_and_validate_tool_calls", None))
+        assert callable(getattr(adapter, "normalize_tool_arguments", None))
+        assert callable(getattr(adapter, "build_tool_access_context", None))
         assert callable(getattr(adapter, "is_healthy", None))
 
     def test_session_adapter_has_required_methods(self):

@@ -26,13 +26,296 @@ This service handles:
 from __future__ import annotations
 
 import asyncio
+import ast
+import json
 import logging
-from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Set, Union
+from dataclasses import dataclass
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 if TYPE_CHECKING:
     from victor.agent.services.protocols.tool_service import ToolSelectionContext
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolResultContext:
+    """State-passed context for post-processing tool pipeline results.
+
+    This is the canonical service-layer carrier for mutable state and callbacks
+    needed by ``ToolService.process_tool_results``.
+    """
+
+    executed_tools: List[str]
+    observed_files: Set[str]
+    failed_tool_signatures: Set[str]
+    shown_tool_errors: Set[str]
+    continuation_prompts: int = 0
+    asking_input_prompts: int = 0
+    tool_calls_used: int = 0
+    record_tool_execution: Optional[Any] = None
+    conversation_state: Optional[Any] = None
+    unified_tracker: Optional[Any] = None
+    usage_logger: Optional[Any] = None
+    add_message: Optional[Any] = None
+    format_tool_output: Optional[Any] = None
+    console: Optional[Any] = None
+    presentation: Optional[Any] = None
+    stream_context: Optional[Any] = None
+    task_type: str = "unknown"
+
+
+def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
+    """Normalize tool arguments for formatting/pruning decisions."""
+    if isinstance(arguments, dict):
+        return arguments
+    if isinstance(arguments, str):
+        try:
+            parsed = json.loads(arguments)
+        except Exception:
+            return {}
+        if isinstance(parsed, dict):
+            return parsed
+    return {}
+
+
+def format_and_prune_tool_output(
+    tool_name: str,
+    arguments: Any,
+    output: Any,
+    *,
+    task_type: str = "unknown",
+    formatter: Optional[Any] = None,
+) -> tuple[str, str, bool, Optional[Any]]:
+    """Format tool output for display and LLM injection.
+
+    CRITICAL: LLM receives FULL output for accuracy. Pruning only affects user preview.
+    """
+    normalized_args = normalize_tool_result_arguments(arguments)
+
+    if formatter is not None:
+        formatted_output = formatter(tool_name, normalized_args, output)
+    else:
+        from victor.agent.tool_output_formatter import format_tool_output as default_formatter
+        from victor.agent.tool_output_formatter import ToolOutputFormatterConfig
+
+        # CRITICAL: Use very high max_output_chars for LLM input (no truncation)
+        # This ensures LLM receives complete tool output for accurate decisions
+        llm_formatter_config = ToolOutputFormatterConfig(
+            max_output_chars=1_000_000,  # 1MB - effectively no truncation for LLM
+            file_structure_threshold=30000,
+            min_savings_threshold=0.15,
+            max_classes_shown=15,
+            max_functions_shown=20,
+            sample_lines_start=20,
+            sample_lines_end=15,
+        )
+
+        # Format with NO truncation for LLM input
+        formatted_output = default_formatter(
+            tool_name,
+            normalized_args,
+            output,
+            config=llm_formatter_config,
+        )
+
+    if not isinstance(formatted_output, str):
+        formatted_output = str(formatted_output)
+
+    # LLM receives FULL output - no pruning for accuracy
+    llm_output = formatted_output
+
+    # Generate preview for user display only (does not affect LLM)
+    preview_output = formatted_output
+    was_pruned = False
+    pruning_info = None
+
+    from victor.config.tool_settings import get_tool_settings
+    from victor.tools.output_pruner import get_output_pruner
+
+    tool_settings = get_tool_settings()
+    if tool_settings.tool_output_preview_enabled:
+        pruner = get_output_pruner()
+        # Prune only for user preview, NOT for LLM input
+        preview_output, pruning_info = pruner.prune(
+            tool_output=formatted_output,
+            task_type=task_type,
+            tool_name=tool_name,
+            context={
+                "formatted_output": True,
+                "safe_only": tool_settings.tool_output_pruning_safe_only,
+                "tool_args": normalized_args,
+            },
+        )
+        was_pruned = pruning_info.was_pruned
+
+    # Return: formatted (full), llm_output (full), was_pruned (preview status), pruning_info
+    # Note: was_pruned now indicates whether user preview was truncated (NOT LLM input)
+    return formatted_output, llm_output, was_pruned, pruning_info
+
+
+def process_tool_results_with_context(
+    pipeline_result: Any,
+    ctx: ToolResultContext,
+) -> List[Dict[str, Any]]:
+    """Canonical service-layer implementation for tool result post-processing."""
+    results: List[Dict[str, Any]] = []
+
+    for call_result in pipeline_result.results:
+        # Invalid tools with tool_call_id must still produce a response per OpenAI spec.
+        if call_result.skipped and not call_result.tool_call_id:
+            continue
+
+        tool_name = call_result.tool_name
+        normalized_args = call_result.arguments or {}
+        output = call_result.result
+        success = call_result.success
+        error_msg = call_result.error
+        elapsed_ms = call_result.execution_time_ms
+
+        ctx.executed_tools.append(tool_name)
+        if tool_name == "read" and "path" in normalized_args:
+            ctx.observed_files.add(str(normalized_args.get("path")))
+
+        if ctx.stream_context is not None:
+            ctx.stream_context.reset_activity_timer()
+
+        if success:
+            if ctx.continuation_prompts > 0:
+                ctx.continuation_prompts = 0
+            if ctx.asking_input_prompts > 0:
+                ctx.asking_input_prompts = 0
+
+        error_type = type(error_msg).__name__ if error_msg and not success else None
+        if ctx.record_tool_execution:
+            ctx.record_tool_execution(tool_name, success, elapsed_ms, error_type=error_type)
+        if ctx.conversation_state:
+            ctx.conversation_state.record_tool_execution(tool_name, normalized_args)
+
+        result_dict: Dict[str, Any] = {"success": success}
+        if output is not None:
+            result_dict["result"] = output
+        if ctx.unified_tracker:
+            ctx.unified_tracker.update_from_tool_call(tool_name, normalized_args, result_dict)
+
+        follow_up_suggestions = None
+        semantic_success = success
+        if success and isinstance(output, dict) and output.get("success") is False:
+            semantic_success = False
+            error_msg = output.get("error", "Operation returned success=False")
+        elif success and isinstance(output, dict):
+            metadata = output.get("metadata")
+            if isinstance(metadata, dict):
+                suggestions = metadata.get("follow_up_suggestions")
+                if isinstance(suggestions, list) and suggestions:
+                    follow_up_suggestions = suggestions
+
+        error_display = None if semantic_success else (error_msg or "Unknown error")
+
+        if ctx.usage_logger and hasattr(ctx.usage_logger, "set_duration_context"):
+            ctx.usage_logger.set_duration_context(elapsed_ms)
+        if ctx.usage_logger:
+            ctx.usage_logger.log_event(
+                "tool_result",
+                {
+                    "tool_name": tool_name,
+                    "success": semantic_success,
+                    "result": output,
+                    "error": error_display,
+                },
+            )
+
+        if semantic_success:
+            formatted_output, llm_output, was_pruned, pruning_info = format_and_prune_tool_output(
+                tool_name=tool_name,
+                arguments=normalized_args,
+                output=output,
+                task_type=ctx.task_type,
+                formatter=ctx.format_tool_output,
+            )
+            if ctx.add_message:
+                # CRITICAL: Send FULL output to LLM for accuracy
+                # llm_output is always the full formatted output (not pruned)
+                ctx.add_message(
+                    "tool",
+                    llm_output,  # Full output - LLM needs complete context
+                    name=tool_name,
+                    tool_call_id=call_result.tool_call_id,
+                )
+            results.append(
+                {
+                    "name": tool_name,
+                    "success": True,
+                    "elapsed": elapsed_ms / 1000,
+                    "args": normalized_args,
+                    "result": formatted_output,  # Full output for display
+                    "follow_up_suggestions": follow_up_suggestions,
+                    "was_pruned": was_pruned,  # Indicates user preview was truncated (not LLM input)
+                    "pruning_info": pruning_info,
+                    "tool_call_id": call_result.tool_call_id,
+                    "content": llm_output,  # Full output sent to LLM
+                }
+            )
+            continue
+
+        sig = f"{tool_name}:{hash(str(sorted(normalized_args.items())))}"
+        ctx.failed_tool_signatures.add(sig)
+
+        _not_found = "not found" in str(error_display).lower()
+        _shown_key = f"notfound:{tool_name}" if _not_found else None
+        if not (_shown_key and _shown_key in ctx.shown_tool_errors):
+            if _shown_key and len(ctx.shown_tool_errors) < 500:
+                ctx.shown_tool_errors.add(_shown_key)
+            if ctx.console and ctx.presentation:
+                ctx.console.print(
+                    f"[red]{ctx.presentation.icon('error', with_color=False)} "
+                    f"Tool execution failed: {error_display}[/] "
+                    f"[dim]({elapsed_ms:.0f}ms)[/dim]"
+                )
+
+        error_output = output if isinstance(output, dict) else {"error": error_display}
+        if ctx.format_tool_output:
+            formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
+        else:
+            formatted_error, _, _, _ = format_and_prune_tool_output(
+                tool_name=tool_name,
+                arguments=normalized_args,
+                output=error_output,
+                task_type=ctx.task_type,
+            )
+        if ctx.add_message:
+            ctx.add_message(
+                "tool",
+                formatted_error,
+                name=tool_name,
+                tool_call_id=call_result.tool_call_id,
+            )
+        results.append(
+            {
+                "name": tool_name,
+                "success": False,
+                "elapsed": elapsed_ms / 1000,
+                "error": error_display,
+                "result": formatted_error,
+                "was_pruned": False,
+                "tool_call_id": call_result.tool_call_id,
+                "content": formatted_error,
+            }
+        )
+
+    return results
 
 
 class ToolServiceConfig:
@@ -156,6 +439,8 @@ class ToolService:
         self._mode_controller: Optional[Any] = None
         self._tool_planner: Optional[Any] = None
         self._argument_normalizer: Optional[Any] = None
+        self._retry_executor: Optional[Any] = None
+        self._tool_call_parser: Optional[Any] = None
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
 
     async def select_tools(
@@ -346,6 +631,43 @@ class ToolService:
         self._usage_stats.clear()
         self._logger.info("Tool budget reset")
 
+    def process_tool_results(
+        self,
+        pipeline_result: Any,
+        ctx: ToolResultContext,
+    ) -> List[Dict[str, Any]]:
+        """Post-process tool pipeline results using the canonical service path."""
+        return process_tool_results_with_context(pipeline_result, ctx)
+
+    def bind_runtime_components(
+        self,
+        *,
+        tool_registry: Optional[Any] = None,
+        mode_controller: Optional[Any] = None,
+        tool_planner: Optional[Any] = None,
+        argument_normalizer: Optional[Any] = None,
+        retry_executor: Optional[Any] = None,
+        tool_call_parser: Optional[Any] = None,
+    ) -> None:
+        """Bind live runtime collaborators after bootstrap.
+
+        The service bootstrap path creates the canonical ToolService before
+        the full orchestrator runtime is assembled. This hook upgrades the
+        service with the real runtime collaborators once they exist.
+        """
+        if tool_registry is not None:
+            self._registrar = tool_registry
+        if mode_controller is not None:
+            self._mode_controller = mode_controller
+        if tool_planner is not None:
+            self._tool_planner = tool_planner
+        if argument_normalizer is not None:
+            self._argument_normalizer = argument_normalizer
+        if retry_executor is not None:
+            self._retry_executor = retry_executor
+        if tool_call_parser is not None:
+            self._tool_call_parser = tool_call_parser
+
     # ==========================================================================
     # Budget Properties (for parity with ToolCoordinator)
     # ==========================================================================
@@ -497,15 +819,7 @@ class ToolService:
         if self._enabled_tools is not None:
             return self._enabled_tools.copy()
 
-        # If no explicit filter, query registrar for available tools
-        if self._registrar and hasattr(self._registrar, "get_registered_tools"):
-            try:
-                return set(self._registrar.get_registered_tools())
-            except Exception as e:
-                self._logger.warning(f"Failed to get registered tools: {e}")
-
-        # Fall back to empty set (meaning all tools enabled)
-        return set()
+        return self.get_available_tools()
 
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a specific tool is enabled.
@@ -687,12 +1001,36 @@ class ToolService:
             tools = service.get_available_tools()
             # {"read", "write", "search", "shell", ...}
         """
-        if self._registrar and hasattr(self._registrar, "get_registered_tools"):
-            try:
+        if not self._registrar:
+            return set()
+
+        try:
+            if hasattr(self._registrar, "get_registered_tools"):
                 return set(self._registrar.get_registered_tools())
-            except Exception as e:
-                self._logger.warning(f"Failed to get available tools: {e}")
+            if hasattr(self._registrar, "get_tool_names"):
+                return set(self._registrar.get_tool_names())
+            if hasattr(self._registrar, "list_tools"):
+                names: set[str] = set()
+                for tool in self._registrar.list_tools():
+                    if isinstance(tool, str):
+                        names.add(tool)
+                        continue
+                    tool_name = getattr(tool, "name", None)
+                    if isinstance(tool_name, str) and tool_name:
+                        names.add(tool_name)
+                return names
+        except Exception as e:
+            self._logger.warning(f"Failed to get available tools: {e}")
         return set()
+
+    def build_tool_access_context(self) -> Any:
+        """Build the canonical access-control context for tool gating."""
+        from victor.agent.protocols import ToolAccessContext
+
+        return ToolAccessContext(
+            session_enabled_tools=self._enabled_tools,
+            current_mode=(self._mode_controller.config.name if self._mode_controller else None),
+        )
 
     # ==========================================================================
     # Tool Call Validation
@@ -835,6 +1173,7 @@ class ToolService:
         self,
         tool_name: str,
         arguments: Dict[str, Any],
+        schema: Optional[Dict[str, Any]] = None,
     ) -> tuple[bool, Optional[str]]:
         """Check if tool arguments are valid.
 
@@ -867,8 +1206,10 @@ class ToolService:
             if isinstance(value, str) and not value.strip():
                 return False, f"Argument '{key}' is empty"
 
-        # Could extend with schema validation if tool schema available
-        # For now, just do basic checks
+        # Schema-aware validation can be layered in later. For now we keep
+        # validation intentionally conservative to avoid rejecting valid calls.
+        _ = tool_name
+        _ = schema
 
         return True, None
 
@@ -973,57 +1314,87 @@ class ToolService:
 
     def parse_and_validate_tool_calls(
         self,
-        response_content: str,
-        available_tools: Optional[Set[str]] = None,
-        tool_call_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
-        """Parse and validate tool calls from response content.
-
-        Extracts tool calls from LLM response and validates them against
-        available tools and their schemas.
-
-        Args:
-            response_content: Response text containing tool calls
-            available_tools: Set of available tool names (optional)
-            tool_call_id: Optional tool call ID for association
-
-        Returns:
-            List of validated and normalized tool call dictionaries
-
-        Example:
-            tool_calls = service.parse_and_validate_tool_calls(
-                response_content,
-                available_tools={"read", "write", "search"}
+        tool_calls: Optional[List[Dict[str, Any]]],
+        full_content: str,
+        tool_adapter: Any,
+    ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
+        """Parse, validate, normalize, and filter tool calls from provider output."""
+        if not tool_calls and full_content:
+            self._logger.debug(
+                "No native tool_calls, attempting fallback parsing on content len=%s",
+                len(full_content),
             )
-        """
-        # Parse tool calls
-        tool_calls = self.parse_tool_calls(response_content, tool_call_id)
-
-        # Filter to available tools if specified
-        if available_tools is not None:
-            tool_calls = [tc for tc in tool_calls if tc.get("name", "") in available_tools]
-
-        # Validate each tool call
-        validated_calls = []
-        for tool_call in tool_calls:
-            # Normalize the tool call
-            normalized = self.normalize_tool_call(tool_call)
-
-            # Validate arguments if schema available
-            tool_name = normalized.get("name", "")
-            schema = self.get_tool_schema(tool_name)
-
-            if schema:
-                is_valid, error = self.check_tool_arguments(
-                    tool_name, normalized.get("arguments", {}), schema
+            parse_result = tool_adapter.parse_tool_calls(full_content, tool_calls)
+            for warning in parse_result.warnings:
+                self._logger.warning(f"Tool call parse warning: {warning}")
+            if parse_result.tool_calls:
+                tool_calls = [tc.to_dict() for tc in parse_result.tool_calls]
+                self._logger.debug(
+                    "Fallback parser found %s tool calls: %s",
+                    len(tool_calls),
+                    [tc.get("name") for tc in tool_calls],
                 )
-                if not is_valid:
-                    self._logger.warning(f"Tool call validation failed for {tool_name}: {error}")
-                    continue
+                full_content = parse_result.remaining_content
+            else:
+                self._logger.debug("Fallback parser found no tool calls")
 
-            validated_calls.append(normalized)
+        if tool_calls:
+            normalized_tool_calls = [tc for tc in tool_calls if isinstance(tc, dict)]
+            if len(normalized_tool_calls) != len(tool_calls):
+                self._logger.warning(f"Dropped non-dict tool_calls: {tool_calls}")
+            tool_calls = normalized_tool_calls or None
+            self._logger.debug("After normalization: %s tool_calls", len(tool_calls or []))
 
-        return validated_calls
+        if tool_calls:
+            valid_tool_calls = []
+            invalid_count = 0
+            for tc in tool_calls:
+                name = tc.get("name", "")
+                resolved_name = self.resolve_tool_alias(name)
+                if resolved_name != name:
+                    tc["name"] = resolved_name
+                    name = resolved_name
+                is_enabled = self.is_tool_enabled(name)
+                self._logger.debug("Tool '%s' enabled=%s", name, is_enabled)
+                if is_enabled:
+                    valid_tool_calls.append(tc)
+                else:
+                    invalid_count += 1
+                    tc["_invalid"] = True
+                    tc["_error"] = f"Unknown tool '{name}'. Use one of the available tools."
+                    valid_tool_calls.append(tc)
+                    self._logger.debug("Marked invalid tool for error response: %s", name)
+            if invalid_count:
+                self._logger.warning("Marked %s invalid tool calls for error responses", invalid_count)
+            tool_calls = valid_tool_calls or None
+            self._logger.debug("After filtering: %s valid tool_calls", len(tool_calls or []))
+
+        parser = self._tool_call_parser
+        if parser is None:
+            from victor.tools.tool_call_parser import ToolCallParser
+
+            parser = ToolCallParser()
+            self._tool_call_parser = parser
+
+        if tool_calls:
+            for tc in tool_calls:
+                args = tc.get("arguments")
+                if isinstance(args, str):
+                    try:
+                        tc["arguments"] = json.loads(args)
+                    except Exception:
+                        try:
+                            tc["arguments"] = ast.literal_eval(args)
+                        except Exception:
+                            tc["arguments"] = {"value": args}
+                elif args is None:
+                    tc["arguments"] = {}
+
+                parsed_args = tc.get("arguments")
+                if isinstance(parsed_args, dict):
+                    tc["arguments"] = parser.normalize_args(tc.get("name", ""), parsed_args)
+
+        return tool_calls, full_content
 
     def normalize_tool_call(
         self,
@@ -1161,9 +1532,16 @@ class ToolService:
             if hasattr(self._registrar, "get_all_tools"):
                 all_tools = self._registrar.get_all_tools()
                 return {tool.name for tool in all_tools if hasattr(tool, "name")}
+            if hasattr(self._registrar, "get_tool_names"):
+                return set(self._registrar.get_tool_names())
             elif hasattr(self._registrar, "list_tools"):
-                tool_names = self._registrar.list_tools()
-                return set(tool_names)
+                tool_names = set()
+                for tool in self._registrar.list_tools():
+                    if isinstance(tool, str):
+                        tool_names.add(tool)
+                    elif hasattr(tool, "name"):
+                        tool_names.add(tool.name)
+                return tool_names
             else:
                 return set()
         except Exception as e:
@@ -1213,6 +1591,52 @@ class ToolService:
         except Exception as e:
             self._logger.debug(f"Argument normalization failed: {e}")
             return tool_args, "direct"
+
+    async def execute_tool_with_retry(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        context: Dict[str, Any],
+        tool_executor: Optional[Callable[..., Awaitable[Any]]] = None,
+        cache: Optional[Any] = None,
+        on_success: Optional[Callable[[str, Dict[str, Any], Any], None]] = None,
+        retry_config: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Optional[Any], bool, Optional[str]]:
+        """Execute a tool with retry logic and exponential backoff."""
+        if self._retry_executor is not None:
+            return await self._retry_executor.execute_tool_with_retry(
+                tool_name=tool_name,
+                tool_args=tool_args,
+                context=context,
+                tool_executor=tool_executor,
+                cache=cache,
+                on_success=on_success,
+                retry_config=retry_config,
+            )
+
+        try:
+            effective_executor = tool_executor
+            if effective_executor is None and hasattr(self._executor, "execute"):
+                async def _default_execute(
+                    name: str,
+                    arguments: Dict[str, Any],
+                    _context: Dict[str, Any],
+                ) -> Any:
+                    return await self._executor.execute(name, arguments)
+
+                effective_executor = _default_execute
+
+            if effective_executor is None:
+                raise RuntimeError("Tool retry execution requires a bound executor")
+
+            result = await effective_executor(tool_name, tool_args, context)
+            success = bool(getattr(result, "success", False))
+            error = None if success else str(getattr(result, "error", "Unknown error"))
+            if success and on_success is not None:
+                on_success(tool_name, tool_args, result)
+            return result, success, error
+        except Exception as exc:
+            return None, False, str(exc)
 
     # ==========================================================================
     # Tool Selection Convenience Methods

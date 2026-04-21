@@ -39,6 +39,7 @@ from victor.agent.services.recovery_service import RecoveryService, RecoveryCont
 from victor.agent.services.session_service import SessionService, SessionInfoImpl
 from victor.agent.services.tool_service import (
     ToolBudgetExceededError,
+    ToolResultContext,
     ToolService,
     ToolServiceConfig,
 )
@@ -56,6 +57,7 @@ __all__ = [
     "SessionService",
     "SessionInfoImpl",
     "ToolBudgetExceededError",
+    "ToolResultContext",
     "ToolService",
     "ToolServiceConfig",
 ]

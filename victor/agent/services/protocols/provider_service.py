@@ -215,6 +215,14 @@ class ProviderServiceProtocol(Protocol):
         """
         ...
 
+    async def start_health_monitoring(self) -> None:
+        """Start background provider health monitoring."""
+        ...
+
+    async def stop_health_monitoring(self) -> None:
+        """Stop background provider health monitoring."""
+        ...
+
     def get_current_provider(self) -> "BaseProvider":
         """Get the current provider instance.
 
@@ -249,6 +257,10 @@ class ProviderServiceProtocol(Protocol):
             if await provider_service.test_provider('openai'):
                 await provider_service.switch_provider('openai')
         """
+        ...
+
+    def get_rate_limit_wait_time(self, error: Exception) -> float:
+        """Extract retry wait time from a provider rate-limit error."""
         ...
 
     def is_healthy(self) -> bool:

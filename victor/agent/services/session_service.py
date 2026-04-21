@@ -139,6 +139,62 @@ class SessionService:
         self._logger.info(f"Created session: {session_id}")
         return session_id
 
+    async def get_session(self, session_id: str) -> Optional[SessionInfoImpl]:
+        """Get the active session info if it matches the requested ID."""
+        current = self._current_session
+        if current is None or current.session_id != session_id:
+            return None
+        return current
+
+    async def update_session(self, session_id: str, metadata: Dict[str, Any]) -> bool:
+        """Update metadata for the active session."""
+        current = self._current_session
+        if current is None or current.session_id != session_id:
+            return False
+        current.metadata.update(metadata)
+        self.update_activity()
+        return True
+
+    async def close_session(self, session_id: str) -> bool:
+        """Close the active session if it matches the requested ID."""
+        current = self._current_session
+        if current is None or current.session_id != session_id:
+            return False
+        await self.end_session()
+        return True
+
+    async def list_sessions(
+        self,
+        state: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[SessionInfoImpl]:
+        """List active sessions currently loaded in-memory."""
+        if limit <= 0:
+            return []
+        current = self._current_session
+        if current is None:
+            return []
+        if state and state != "active":
+            return []
+        return [current]
+
+    async def delete_session(self, session_id: str) -> bool:
+        """Delete the active session state."""
+        return await self.close_session(session_id)
+
+    async def get_session_metrics(self, session_id: str) -> Dict[str, Any]:
+        """Get detailed metrics for the active session."""
+        current = self._current_session
+        if current is None or current.session_id != session_id:
+            return {}
+        return {
+            "message_count": current.message_count,
+            "tool_calls": current.tool_calls,
+            "tool_calls_used": self._session_state.tool_calls_used,
+            "token_usage": self._session_state.get_token_usage(),
+            "metadata": dict(current.metadata),
+        }
+
     def recover_session(self, session_id: str) -> bool:
         """Recover a previous session."""
         if not self._memory_manager:
@@ -174,6 +230,43 @@ class SessionService:
         except Exception as e:
             self._logger.debug(f"Auto-checkpoint failed: {e}")
             return None
+
+    async def save_checkpoint(
+        self,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> Optional[str]:
+        """Save a checkpoint of the current session state."""
+        if not self._checkpoint_manager:
+            self._logger.debug("Checkpoint save skipped - manager not initialized")
+            return None
+
+        state = self._get_checkpoint_state()
+        try:
+            checkpoint_id = await self._checkpoint_manager.save_checkpoint(
+                session_id=self._memory_session_id or "default",
+                state=state,
+                description=description,
+                tags=tags,
+            )
+            self._logger.info(f"Checkpoint saved: {checkpoint_id[:20]}...")
+            return checkpoint_id
+        except Exception as e:
+            self._logger.warning(f"Failed to save checkpoint: {e}")
+            return None
+
+    async def restore_checkpoint(self, checkpoint_id: str) -> bool:
+        """Restore session state from a checkpoint."""
+        if not self._checkpoint_manager:
+            self._logger.warning("Cannot restore - checkpoint manager not initialized")
+            return False
+
+        try:
+            state = await self._checkpoint_manager.restore_checkpoint(checkpoint_id)
+            return self._apply_checkpoint_state(state)
+        except Exception as e:
+            self._logger.warning(f"Failed to restore checkpoint: {e}")
+            return False
 
     def get_memory_context(
         self,
@@ -1065,6 +1158,15 @@ class SessionService:
             else:
                 background_tasks.add(task)
 
+            def _discard_task(t: Any) -> None:
+                if bg_task_lock:
+                    with bg_task_lock:
+                        background_tasks.discard(t)
+                else:
+                    background_tasks.discard(t)
+
+            task.add_done_callback(_discard_task)
+
             logger = logging.getLogger(__name__)
             logger.debug(f"Created background task: {name}")
 
@@ -1072,6 +1174,8 @@ class SessionService:
 
         except RuntimeError:
             # No event loop running
+            if asyncio.iscoroutine(coro):
+                coro.close()
             logger = logging.getLogger(__name__)
             logger.warning(f"Failed to create background task '{name}': no event loop")
             return None
