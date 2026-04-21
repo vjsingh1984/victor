@@ -1182,5 +1182,38 @@ class TestIntegrationScenarios:
         assert strategy == NormalizationStrategy.PYTHON_AST
 
 
+class TestMalformedPatternHandling:
+    """Test handling of malformed tool call patterns from LLMs.
+
+    Tests for patterns that occur when LLMs generate tool calls with
+    Python-specific syntax or type hints.
+    """
+
+    def test_normalize_python_type_hints(self):
+        """Test that Python type hints don't crash normalization."""
+        from victor.agent.argument_normalizer import ArgumentNormalizer
+
+        normalizer = ArgumentNormalizer()
+
+        # Test type annotation removal
+        args = {"query": "tuple[str, ...]"}
+        # Should not crash
+        result, _ = normalizer.normalize_arguments(args, "code_search")
+        assert "query" in result
+
+    def test_empty_string_after_cleaning(self):
+        """Test that empty strings after type hint cleaning are handled."""
+        from victor.agent.argument_normalizer import ArgumentNormalizer
+
+        normalizer = ArgumentNormalizer()
+
+        # Empty result from cleaning should be handled
+        args = {"query": ""}
+        result, _ = normalizer.normalize_arguments(args, "code_search")
+
+        # Should handle empty string
+        assert "query" in result
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

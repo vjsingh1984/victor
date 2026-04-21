@@ -459,7 +459,12 @@ class ArgumentNormalizer:
 
     def _normalize_via_regex(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Simple quote replacement via regex.
+        Enhanced regex-based normalization with fallback for malformed patterns.
+
+        Handles common malformed tool call patterns:
+        - YAML-style: key: value
+        - Python type hints: key: tuple[str, ...]
+        - Path objects: pdf_path: Path(...)
 
         Uses native Rust implementation when available for ~5-10x speedup.
 
@@ -474,11 +479,32 @@ class ArgumentNormalizer:
             arguments: Raw arguments to normalize
 
         Returns:
-            Normalized arguments with replaced quotes
+            Normalized arguments with replaced quotes and cleaned patterns
         """
+        import re
+
         normalized = {}
         for key, value in arguments.items():
             if isinstance(value, str):
+                # Handle Python type hints in values
+                # Example: "tuple[str, ...]" → "" (remove)
+                # Example: "Path(...)" → string value
+                value = self._clean_python_type_hints(value)
+
+                # Handle Path(...) syntax
+                if "Path(" in value:
+                    # Extract path from Path(...) wrapper
+                    # Example: Path('/path/to/file') → '/path/to/file'
+                    path_match = re.search(r"Path\(['\"]([^'\"]+)['\"]\)", value)
+                    if path_match:
+                        value = path_match.group(1)
+
+                # Handle tuple[str, ...] or list[str] syntax
+                if "tuple[" in value or "list[" in value:
+                    # Remove type annotation, use empty list as default
+                    value = []
+
+                # Now do the normal quote replacement
                 if _NATIVE_AVAILABLE:
                     # Use native Rust JSON repair (handles more edge cases)
                     repaired = native_repair_json(value)
@@ -486,7 +512,7 @@ class ArgumentNormalizer:
                     # Python fallback
                     # Replace escaped single quotes with double quotes
                     # Pattern: \' → "  and standalone ' → "
-                    repaired = value.replace("\\'", '"')
+                    repaired = str(value).replace("\\'", '"')
                     # Also try replacing unescaped single quotes
                     # (careful not to replace quotes in strings)
                     if "'" in repaired:
@@ -495,6 +521,28 @@ class ArgumentNormalizer:
             else:
                 normalized[key] = value
         return normalized
+
+    def _clean_python_type_hints(self, value: str) -> str:
+        """Remove Python type hints from string values.
+
+        Args:
+            value: String potentially containing type hints
+
+        Returns:
+            Cleaned string without type hints
+        """
+        import re
+
+        # Remove standalone type annotations
+        # Example: "tuple[str, ...]" → ""
+        if re.match(r'^[a-z_]+\[[^\]]+\]$', value.strip()):
+            return ""
+
+        # Remove type annotations at end of value
+        # Example: "'file.txt' : str" → "'file.txt'"
+        value = re.sub(r'\s*:\s*[a-z_]+\[[^\]]*\]', '', value)
+
+        return value
 
     def _normalize_via_manual_repair(
         self, arguments: Dict[str, Any], tool_name: str
