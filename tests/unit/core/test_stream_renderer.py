@@ -898,3 +898,284 @@ class TestProtocolCompliance:
         ]
         for method in required_methods:
             assert hasattr(StreamRenderer, method)
+
+
+class TestFormatterRendererPauseDepth:
+    """Tests for pause depth counting in FormatterRenderer."""
+
+    @pytest.fixture
+    def mock_formatter(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_console(self):
+        return MagicMock(spec=Console)
+
+    @pytest.fixture
+    def renderer(self, mock_formatter, mock_console):
+        return FormatterRenderer(mock_formatter, mock_console)
+
+    def test_double_pause_calls_end_streaming_once(self, renderer, mock_formatter):
+        """Two consecutive pause() calls must only end streaming once."""
+        renderer.pause()
+        renderer.pause()
+        mock_formatter.end_streaming.assert_called_once()
+
+    def test_nested_resume_only_restarts_at_depth_zero(self, renderer, mock_formatter):
+        """start_streaming is only called after the outermost resume()."""
+        renderer.pause()
+        renderer.pause()
+        renderer.resume()  # depth → 1, still paused
+        mock_formatter.start_streaming.assert_not_called()
+        renderer.resume()  # depth → 0, now resume
+        mock_formatter.start_streaming.assert_called_once()
+
+    def test_resume_without_pause_is_noop(self, renderer, mock_formatter, caplog):
+        """resume() with no prior pause() logs a warning and is a no-op."""
+        import logging
+        with caplog.at_level(logging.WARNING, logger="victor.ui.rendering.formatter_renderer"):
+            renderer.resume()
+        mock_formatter.start_streaming.assert_not_called()
+        assert "no matching pause" in caplog.text
+
+    def test_pause_count_resets_after_balanced_cycle(self, renderer):
+        """_pause_count returns to 0 after a balanced pause/resume cycle."""
+        renderer.pause()
+        renderer.resume()
+        assert renderer._pause_count == 0
+
+    def test_cleanup_clears_last_tool_result(self, renderer):
+        """cleanup() clears the stored tool result."""
+        renderer._last_tool_result = {"name": "tool", "result": "data"}
+        renderer.cleanup()
+        assert renderer._last_tool_result is None
+
+    def test_on_tool_result_stores_last_result(self, renderer, mock_formatter):
+        """on_tool_result() stores the result for later expansion."""
+        renderer.on_tool_result(
+            name="grep",
+            success=True,
+            elapsed=0.1,
+            arguments={"pattern": "foo"},
+            result="line1\nline2",
+        )
+        assert renderer._last_tool_result is not None
+        assert renderer._last_tool_result["name"] == "grep"
+        assert renderer._last_tool_result["result"] == "line1\nline2"
+        assert renderer._last_tool_result["success"] is True
+
+    def test_on_tool_result_none_result_stored_as_empty(self, renderer, mock_formatter):
+        """on_tool_result() with no result stores empty string."""
+        renderer.on_tool_result(
+            name="bash",
+            success=True,
+            elapsed=0.2,
+            arguments={},
+        )
+        assert renderer._last_tool_result["result"] == ""
+
+
+class TestFormatterRendererExpandLastOutput:
+    """Tests for FormatterRenderer.expand_last_output()."""
+
+    @pytest.fixture
+    def mock_formatter(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def mock_console(self):
+        return MagicMock(spec=Console)
+
+    @pytest.fixture
+    def renderer(self, mock_formatter, mock_console):
+        return FormatterRenderer(mock_formatter, mock_console)
+
+    def test_expand_with_no_result_prints_message(self, renderer, mock_console):
+        """expand_last_output() with nothing stored prints a notice."""
+        renderer.expand_last_output()
+        mock_console.print.assert_called_once()
+        text = str(mock_console.print.call_args[0][0])
+        assert "No tool output" in text
+
+    def test_expand_with_failed_tool_does_nothing(self, renderer, mock_console):
+        """expand_last_output() skips display for failed tools."""
+        renderer._last_tool_result = {
+            "name": "bash",
+            "success": False,
+            "result": "error text",
+            "arguments": {},
+            "elapsed": 0.1,
+        }
+        renderer.expand_last_output()
+        mock_console.print.assert_not_called()
+
+    def test_expand_with_empty_result_does_nothing(self, renderer, mock_console):
+        """expand_last_output() skips display when result is empty."""
+        renderer._last_tool_result = {
+            "name": "bash",
+            "success": True,
+            "result": "",
+            "arguments": {},
+            "elapsed": 0.1,
+        }
+        renderer.expand_last_output()
+        mock_console.print.assert_not_called()
+
+    def test_expand_shows_rich_panel(self, renderer, mock_console):
+        """expand_last_output() calls console.print with a Rich Panel."""
+        from rich.panel import Panel
+        renderer._last_tool_result = {
+            "name": "code_search",
+            "success": True,
+            "result": "def main():\n    pass",
+            "arguments": {},
+            "elapsed": 0.3,
+        }
+        renderer.expand_last_output()
+        mock_console.print.assert_called_once()
+        args = mock_console.print.call_args[0]
+        assert isinstance(args[0], Panel)
+
+    def test_expand_large_output_truncated(self, renderer, mock_console):
+        """expand_last_output() truncates output exceeding 10 000 chars."""
+        large = "x" * 15000
+        renderer._last_tool_result = {
+            "name": "read",
+            "success": True,
+            "result": large,
+            "arguments": {},
+            "elapsed": 0.1,
+        }
+        renderer.expand_last_output()
+        # First print should be the truncation warning
+        first_call = str(mock_console.print.call_args_list[0][0][0])
+        assert "10000" in first_call or "chars" in first_call
+
+
+class TestLiveDisplayRendererPauseDepth:
+    """Tests for pause depth counting in LiveDisplayRenderer."""
+
+    @pytest.fixture
+    def mock_console(self):
+        return MagicMock(spec=Console)
+
+    @pytest.fixture
+    def renderer(self, mock_console):
+        return LiveDisplayRenderer(mock_console)
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_double_pause_stops_live_only_once(self, mock_live_class, renderer):
+        """Two consecutive pause() calls must only stop the Live once."""
+        mock_live = MagicMock()
+        mock_live_class.return_value = mock_live
+        renderer.start()
+        renderer.pause()
+        renderer.pause()
+        mock_live.stop.assert_called_once()
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_nested_resume_only_restarts_at_depth_zero(self, mock_live_class, renderer):
+        """Live is only restarted when the depth counter returns to zero."""
+        mock_live = MagicMock()
+        mock_live_class.return_value = mock_live
+        renderer.start()
+        renderer.pause()
+        renderer.pause()
+        renderer.resume()  # depth → 1, still paused
+        # Live was stopped once; not yet restarted
+        assert renderer._is_paused is True
+        renderer.resume()  # depth → 0, now resume
+        assert renderer._is_paused is False
+
+    def test_resume_without_pause_is_noop(self, renderer, caplog):
+        """resume() with no prior pause() logs a warning and is a no-op."""
+        import logging
+        with caplog.at_level(logging.WARNING, logger="victor.ui.rendering.live_renderer"):
+            renderer.resume()
+        assert "no matching pause" in caplog.text
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_start_resets_pause_count(self, mock_live_class, renderer):
+        """start() resets _pause_count to 0."""
+        renderer._pause_count = 3
+        mock_live_class.return_value = MagicMock()
+        renderer.start()
+        assert renderer._pause_count == 0
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_cleanup_resets_pause_count(self, mock_live_class, renderer):
+        """cleanup() resets _pause_count to 0."""
+        mock_live_class.return_value = MagicMock()
+        renderer.start()
+        renderer.pause()
+        renderer.cleanup()
+        assert renderer._pause_count == 0
+
+
+class TestLiveDisplayRendererExpandLastOutput:
+    """Tests for LiveDisplayRenderer.expand_last_output()."""
+
+    @pytest.fixture
+    def mock_console(self):
+        return MagicMock(spec=Console)
+
+    @pytest.fixture
+    def renderer(self, mock_console):
+        return LiveDisplayRenderer(mock_console)
+
+    def test_expand_with_no_result_prints_message(self, renderer, mock_console):
+        """expand_last_output() with nothing stored prints a notice."""
+        renderer.expand_last_output()
+        mock_console.print.assert_called_once()
+        text = str(mock_console.print.call_args[0][0])
+        assert "No tool output" in text
+
+    def test_expand_with_failed_tool_does_nothing(self, renderer, mock_console):
+        """expand_last_output() skips display for failed tools."""
+        renderer._last_tool_result = {
+            "name": "bash",
+            "success": False,
+            "result": "error text",
+            "arguments": {},
+            "elapsed": 0.1,
+        }
+        renderer.expand_last_output()
+        mock_console.print.assert_not_called()
+
+    def test_expand_shows_rich_panel(self, renderer, mock_console):
+        """expand_last_output() calls console.print with a Rich Panel."""
+        from rich.panel import Panel
+        renderer._last_tool_result = {
+            "name": "code_search",
+            "success": True,
+            "result": "def main():\n    pass",
+            "arguments": {},
+            "elapsed": 0.3,
+        }
+        # expand_last_output calls pause/resume — mock the Live so it doesn't crash
+        with patch("victor.ui.rendering.live_renderer.Live"):
+            renderer.expand_last_output()
+        # Console.print should have been called with a Panel
+        panel_calls = [
+            c for c in mock_console.print.call_args_list
+            if c[0] and isinstance(c[0][0], Panel)
+        ]
+        assert len(panel_calls) == 1
+
+    def test_expand_large_output_truncated(self, renderer, mock_console):
+        """expand_last_output() truncates output exceeding 10 000 chars."""
+        large = "x" * 15000
+        renderer._last_tool_result = {
+            "name": "read",
+            "success": True,
+            "result": large,
+            "arguments": {},
+            "elapsed": 0.1,
+        }
+        with patch("victor.ui.rendering.live_renderer.Live"):
+            renderer.expand_last_output()
+        warning_calls = [
+            c for c in mock_console.print.call_args_list
+            if "chars" in str(c[0][0]) or "10000" in str(c[0][0])
+        ]
+        assert len(warning_calls) == 1

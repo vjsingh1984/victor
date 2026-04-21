@@ -361,6 +361,11 @@ class LiveDisplayRenderer:
         tool_name = data["name"]
 
         self.pause()
+        if len(content) > 10000:
+            self.console.print(
+                f"[dim yellow]⚠ Output is {len(content)} chars, showing first 10000[/]"
+            )
+            content = content[:10000]
         try:
             # Try syntax highlighting for code-like content
             ext = tool_name.split("_")[-1] if "_" in tool_name else "txt"
