@@ -1510,18 +1510,18 @@ async def _run_cli_repl(
     # Set up prompt_toolkit with persistent history for Up/Down arrow navigation
     prompt_session = _create_cli_prompt_session()
 
-    # Add Ctrl+O hotkey to expand last tool output
+    # Add Ctrl+O hotkey to expand last tool output.
+    # _active_renderer is updated each turn so the binding always refers to
+    # the most recent renderer instance.
     from prompt_toolkit.keys import Keys
+
+    _active_renderer = None
 
     @prompt_session.key_bindings.add(Keys.ControlO)
     def _expand_output(event):
         """Expand last tool output to show full content."""
-        # We need to access the formatter from the renderer
-        # This will be set when renderer is created below
-        pass
-
-    # Store formatter reference for hotkey access
-    renderer_with_formatter = None
+        if _active_renderer is not None and hasattr(_active_renderer, "expand_last_output"):
+            _active_renderer.expand_last_output()
 
     while True:
         try:
@@ -1562,23 +1562,12 @@ async def _run_cli_repl(
                 use_live = renderer_choice in {"rich", "auto"}
                 if use_live:
                     renderer = LiveDisplayRenderer(console)
-                    # LiveDisplayRenderer doesn't wrap formatter, so we can't expand
-                    renderer_with_formatter = None
                 else:
-                    # FormatterRenderer wraps OutputFormatter
                     formatter = create_formatter()
                     renderer = FormatterRenderer(formatter, console)
-                    # Store reference for hotkey access
-                    renderer_with_formatter = renderer
 
-                # Update hotkey handler with formatter reference
-                @prompt_session.key_bindings.add(Keys.ControlO)
-                def _expand_output_with_formatter(event):
-                    """Expand last tool output to show full content."""
-                    if renderer_with_formatter and hasattr(
-                        renderer_with_formatter, "formatter"
-                    ):
-                        renderer_with_formatter.formatter.expand_last_tool_output()
+                # Update binding target so Ctrl+O always refers to the current renderer
+                _active_renderer = renderer
 
                 content_buffer = await stream_response(
                     agent,

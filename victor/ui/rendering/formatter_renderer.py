@@ -49,6 +49,7 @@ class FormatterRenderer:
         self.console = console
         self._content_buffer = ""
         self._pause_count = 0  # Depth counter for nested pause/resume
+        self._last_tool_result: dict | None = None
 
     def start(self) -> None:
         """Start streaming mode in the formatter."""
@@ -112,13 +113,21 @@ class FormatterRenderer:
             follow_up_suggestions: Optional follow-up suggestions
             result: Tool output (for preview display)
         """
+        tool_output = str(result) if result is not None else None
+        self._last_tool_result = {
+            "name": name,
+            "success": success,
+            "result": tool_output or "",
+            "arguments": arguments,
+            "elapsed": elapsed,
+        }
         self.pause()
         self.formatter.tool_result(
             tool_name=name,
             success=success,
             error=error,
             follow_up_suggestions=follow_up_suggestions,
-            original_result=str(result) if result is not None else None,  # Pass result for preview
+            original_result=tool_output,
         )
         self.resume()
 
@@ -191,6 +200,39 @@ class FormatterRenderer:
         self.formatter.response(content=self._content_buffer)
         return self._content_buffer
 
+    def expand_last_output(self) -> None:
+        """Expand the last tool output to show full content."""
+        if not self._last_tool_result:
+            self.console.print("[dim]No tool output to expand[/]")
+            return
+
+        data = self._last_tool_result
+        if not data["success"] or not data["result"]:
+            return
+
+        from rich.panel import Panel
+        from rich.syntax import Syntax
+
+        content = data["result"]
+        tool_name = data["name"]
+
+        if len(content) > 10000:
+            self.console.print(
+                f"[dim yellow]⚠ Output is {len(content)} chars, showing first 10000[/]"
+            )
+            content = content[:10000]
+
+        try:
+            ext = tool_name.split("_")[-1] if "_" in tool_name else "txt"
+            syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
+            self.console.print(
+                Panel(syntax, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+            )
+        except Exception:
+            self.console.print(
+                Panel(content, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+            )
+
     def cleanup(self) -> None:
-        """Clean up resources (no-op for FormatterRenderer)."""
-        pass
+        """Clean up resources."""
+        self._last_tool_result = None
