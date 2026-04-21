@@ -19,6 +19,7 @@ from victor.ui.rendering.metrics import StreamingMetrics
 logger = logging.getLogger(__name__)
 
 from victor.ui.rendering.utils import (
+    expand_tool_output,
     format_tool_args,
     render_edit_preview,
     render_file_preview,
@@ -245,9 +246,15 @@ class LiveDisplayRenderer:
         Args:
             text: Content text to append
         """
-        # Don't add to content buffer during thinking mode - thinking content
-        # is handled separately by on_thinking_content() to avoid duplication
+        # During thinking mode, add to both thinking buffer and content buffer
+        # This ensures content is preserved for final display if stream ends in thinking mode
         if self._in_thinking_mode:
+            # Add to thinking buffer for display
+            self._thinking_buffer += text
+            # ALSO add to content buffer to prevent loss on stream end
+            # This ensures that if the stream ends while in thinking mode,
+            # the content is preserved for final display
+            self._content_buffer += text
             return
         t0 = time.monotonic() * 1000
         self._content_buffer += text
@@ -361,53 +368,22 @@ class LiveDisplayRenderer:
         return preview
 
     def expand_last_output(self) -> None:
-        """Expand the last tool output to show full content.
-
-        Displays the full output in a Rich Panel with syntax highlighting if possible.
-        """
+        """Expand the last tool output to show full content."""
         if not self._last_tool_result:
             self.console.print("[dim]No tool output to expand[/]")
             return
 
         data = self._last_tool_result
-        if not data["success"]:
+        if not data["success"] or not data["result"]:
             return
 
-        from rich.panel import Panel
-        from rich.syntax import Syntax
-
-        content = data["result"]
-        tool_name = data["name"]
-
-        self.pause()
-        if len(content) > 10000:
-            self.console.print(
-                f"[dim yellow]⚠ Output is {len(content)} chars, showing first 10000[/]"
-            )
-            content = content[:10000]
-        try:
-            # Try syntax highlighting for code-like content
-            ext = tool_name.split("_")[-1] if "_" in tool_name else "txt"
-            syntax = Syntax(
-                content, ext, theme="monokai", line_numbers=True, word_wrap=True
-            )
-            self.console.print(
-                Panel(
-                    syntax,
-                    title=f"[bold]{tool_name}[/] - Full Output",
-                    border_style="blue",
-                )
-            )
-        except Exception:
-            # Fallback to plain panel
-            self.console.print(
-                Panel(
-                    content,
-                    title=f"[bold]{tool_name}[/] - Full Output",
-                    border_style="blue",
-                )
-            )
-        self.resume()
+        expand_tool_output(
+            self.console,
+            data["name"],
+            data["result"],
+            pause_fn=self.pause,
+            resume_fn=lambda: self.resume(),
+        )
 
     def cleanup(self) -> None:
         """Clean up the Live display."""

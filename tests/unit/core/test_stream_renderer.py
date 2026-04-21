@@ -46,10 +46,11 @@ class TestFormatterRenderer:
         renderer.start()
         mock_formatter.start_streaming.assert_called_once()
 
-    def test_pause_calls_formatter_end_streaming(self, renderer, mock_formatter):
-        """Test pause() delegates to formatter.end_streaming()."""
+    def test_pause_increments_depth_without_end_streaming(self, renderer, mock_formatter):
+        """pause() increments depth counter but does not call end_streaming (no-op removed)."""
         renderer.pause()
-        mock_formatter.end_streaming.assert_called_once()
+        assert renderer._pause_count == 1
+        mock_formatter.end_streaming.assert_not_called()
 
     def test_resume_calls_formatter_start_streaming(self, renderer, mock_formatter):
         """Test resume() delegates to formatter.start_streaming() after a pause."""
@@ -62,7 +63,6 @@ class TestFormatterRenderer:
         renderer.on_tool_start("read", {"path": "/test.py"})
 
         # Should pause, call tool_start, status, then resume
-        mock_formatter.end_streaming.assert_called_once()
         mock_formatter.tool_start.assert_called_once_with("read", {"path": "/test.py"})
         mock_formatter.status.assert_called_once()
         assert "read" in mock_formatter.status.call_args[0][0]
@@ -77,7 +77,6 @@ class TestFormatterRenderer:
             arguments={"path": "/out.py"},
         )
 
-        mock_formatter.end_streaming.assert_called_once()
         mock_formatter.tool_result.assert_called_once_with(
             tool_name="write",
             success=True,
@@ -134,7 +133,6 @@ class TestFormatterRenderer:
         """Test on_status() shows status message."""
         renderer.on_status("Thinking...")
 
-        mock_formatter.end_streaming.assert_called_once()
         mock_formatter.status.assert_called_once_with("Thinking...")
         mock_formatter.start_streaming.assert_called_once()
 
@@ -142,7 +140,6 @@ class TestFormatterRenderer:
         """Test on_file_preview() displays syntax-highlighted content."""
         renderer.on_file_preview("/test.py", "print('hello')")
 
-        mock_formatter.end_streaming.assert_called_once()
         mock_console.print.assert_called_once()
         # Check Panel was printed
         call_args = mock_console.print.call_args[0][0]
@@ -160,7 +157,6 @@ class TestFormatterRenderer:
         diff = "-old line\n+new line\n context"
         renderer.on_edit_preview("/test.py", diff)
 
-        mock_formatter.end_streaming.assert_called_once()
         # Should print path header and 3 diff lines
         assert mock_console.print.call_count == 4
         mock_formatter.start_streaming.assert_called_once()
@@ -200,7 +196,6 @@ class TestFormatterRenderer:
         renderer.on_thinking_start()
 
         # Should pause streaming and show indicator
-        mock_formatter.end_streaming.assert_called_once()
         mock_console.print.assert_called_once()
         call_text = str(mock_console.print.call_args[0][0])
         assert "Thinking" in call_text
@@ -1013,11 +1008,12 @@ class TestFormatterRendererPauseDepth:
     def renderer(self, mock_formatter, mock_console):
         return FormatterRenderer(mock_formatter, mock_console)
 
-    def test_double_pause_calls_end_streaming_once(self, renderer, mock_formatter):
-        """Two consecutive pause() calls must only end streaming once."""
+    def test_double_pause_increments_depth_twice(self, renderer, mock_formatter):
+        """Two consecutive pause() calls increment depth without calling end_streaming."""
         renderer.pause()
         renderer.pause()
-        mock_formatter.end_streaming.assert_called_once()
+        assert renderer._pause_count == 2
+        mock_formatter.end_streaming.assert_not_called()
 
     def test_nested_resume_only_restarts_at_depth_zero(self, renderer, mock_formatter):
         """start_streaming is only called after the outermost resume()."""

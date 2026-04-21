@@ -6,10 +6,13 @@ source of truth for streaming response handling across all CLI modes.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from victor.agent.response_sanitizer import StreamingContentFilter
 from victor.ui.rendering.protocol import StreamRenderer
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -66,14 +69,19 @@ async def stream_response(
                 )
             elif chunk.metadata and "tool_result" in chunk.metadata:
                 tool_data = chunk.metadata["tool_result"]
+                tool_result_kwargs = {
+                    "name": tool_data["name"],
+                    "success": tool_data.get("success", True),
+                    "elapsed": tool_data.get("elapsed", 0),
+                    "arguments": tool_data.get("arguments", {}),
+                    "error": tool_data.get("error"),
+                    "follow_up_suggestions": tool_data.get("follow_up_suggestions"),
+                    "result": tool_data.get("result"),
+                }
+                if tool_data.get("was_pruned"):
+                    tool_result_kwargs["was_pruned"] = True
                 renderer.on_tool_result(
-                    name=tool_data["name"],
-                    success=tool_data.get("success", True),
-                    elapsed=tool_data.get("elapsed", 0),
-                    arguments=tool_data.get("arguments", {}),
-                    error=tool_data.get("error"),
-                    follow_up_suggestions=tool_data.get("follow_up_suggestions"),
-                    result=tool_data.get("result"),  # Pass result for preview
+                    **tool_result_kwargs,
                 )
             # Handle status messages (thinking indicator, etc.)
             elif chunk.metadata and "status" in chunk.metadata:
@@ -141,6 +149,15 @@ async def stream_response(
         # End thinking state if still active
         if was_thinking:
             renderer.on_thinking_end()
+
+        # Add debug logging before finalize
+        logger.debug(f"Stream completion - content buffer length: {len(getattr(renderer, '_content_buffer', ''))}")
+        logger.debug(f"Final thinking state: {getattr(renderer, '_in_thinking_mode', False)}")
+        logger.debug(f"Thinking buffer length: {len(getattr(renderer, '_thinking_buffer', ''))}")
+
+        # Log first 100 chars of content buffer for verification
+        content_preview = getattr(renderer, '_content_buffer', '')[:100]
+        logger.debug(f"Content buffer preview: {content_preview}...")
 
         return renderer.finalize()
 

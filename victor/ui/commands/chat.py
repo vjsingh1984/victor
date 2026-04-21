@@ -359,7 +359,7 @@ def chat(
         help="Custom fallback chain (comma-separated provider names, e.g., 'ollama,anthropic,openai').",
         rich_help_panel="Smart Routing",
     ),
-    # Tool Output Preview options (Accuracy-first defaults)
+    # Tool Output Preview options (safe-default pruning)
     tool_preview: bool = typer.Option(
         True,
         "--tool-preview/--no-tool-preview",
@@ -369,7 +369,7 @@ def chat(
     enable_pruning: bool = typer.Option(
         False,
         "--enable-pruning",
-        help="Enable tool output pruning to save tokens (default: no - accuracy-first).",
+        help="Broaden tool output pruning beyond the safe default read-heavy scope.",
         rich_help_panel="Tool Output",
     ),
 ):
@@ -797,6 +797,35 @@ victor chat --sessionid abc123            # Resume session
             return
 
 
+def _configure_smart_routing(
+    settings: Any,
+    console: Console,
+    enable_smart_routing: bool,
+    routing_profile: str,
+    fallback_chain: Optional[str],
+) -> None:
+    """Apply smart-routing settings when the feature flag permits."""
+    if not enable_smart_routing:
+        return
+    from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+    feature_manager = get_feature_flag_manager()
+    if feature_manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
+        settings.smart_routing_enabled = True
+        settings.smart_routing_profile = routing_profile
+        if fallback_chain:
+            settings.smart_routing_fallback_chain = [
+                p.strip() for p in fallback_chain.split(",")
+            ]
+        console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+    else:
+        console.print("[yellow]Smart routing is currently disabled via feature flag.[/]")
+        console.print(
+            "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
+            "[cyan]--enable-smart-routing[/] flag in beta period"
+        )
+
+
 def _run_default_interactive() -> None:
     """Run the default interactive CLI mode with default options."""
     # Use centralized logging config (respects ~/.victor/config.yaml and env vars)
@@ -850,29 +879,9 @@ async def run_oneshot(
     success = False
     tool_calls_made = 0
 
-    # Configure smart routing if enabled and feature flag allows
-    if enable_smart_routing:
-        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+    _configure_smart_routing(settings, console, enable_smart_routing, routing_profile, fallback_chain)
 
-        feature_manager = get_feature_flag_manager()
-        if feature_manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
-            settings.smart_routing_enabled = True
-            settings.smart_routing_profile = routing_profile
-            if fallback_chain:
-                settings.smart_routing_fallback_chain = [
-                    p.strip() for p in fallback_chain.split(",")
-                ]
-            console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
-        else:
-            console.print(
-                "[yellow]Smart routing is currently disabled via feature flag.[/]"
-            )
-            console.print(
-                "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
-                "[cyan]--enable-smart-routing[/] flag in beta period"
-            )
-
-    # Configure tool output preview (accuracy-first defaults)
+    # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
 
     # Apply tool output preview settings from flags
@@ -880,14 +889,16 @@ async def run_oneshot(
         settings.tool_settings.tool_output_preview_enabled = False
     if enable_pruning:
         settings.tool_settings.tool_output_pruning_enabled = True
+        settings.tool_settings.tool_output_pruning_safe_only = False
 
     # Show status message if non-default
     tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
     if enable_pruning:
-        console.print(f"[yellow]⚠ Tool output: pruning enabled (cost optimization)[/]")
+        console.print("[yellow]⚠ Tool output: broader pruning enabled (cost optimization)[/]")
     else:
-        # Default: accuracy-first
-        console.print("[green]✓[/] Tool output: full context to LLM, preview enabled")
+        console.print(
+            "[green]✓[/] Tool output: safe read-heavy pruning active, preview enabled"
+        )
 
     try:
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
@@ -1193,29 +1204,9 @@ async def run_interactive(
     success = False
     tool_calls_made = 0
 
-    # Configure smart routing if enabled and feature flag allows
-    if enable_smart_routing:
-        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+    _configure_smart_routing(settings, console, enable_smart_routing, routing_profile, fallback_chain)
 
-        feature_manager = get_feature_flag_manager()
-        if feature_manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
-            settings.smart_routing_enabled = True
-            settings.smart_routing_profile = routing_profile
-            if fallback_chain:
-                settings.smart_routing_fallback_chain = [
-                    p.strip() for p in fallback_chain.split(",")
-                ]
-            console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
-        else:
-            console.print(
-                "[yellow]Smart routing is currently disabled via feature flag.[/]"
-            )
-            console.print(
-                "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
-                "[cyan]--enable-smart-routing[/] flag in beta period"
-            )
-
-    # Configure tool output preview (accuracy-first defaults)
+    # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
 
     # Apply tool output preview settings from flags
@@ -1223,14 +1214,16 @@ async def run_interactive(
         settings.tool_settings.tool_output_preview_enabled = False
     if enable_pruning:
         settings.tool_settings.tool_output_pruning_enabled = True
+        settings.tool_settings.tool_output_pruning_safe_only = False
 
     # Show status message if non-default
     tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
     if enable_pruning:
-        console.print(f"[yellow]⚠ Tool output: pruning enabled (cost optimization)[/]")
+        console.print("[yellow]⚠ Tool output: broader pruning enabled (cost optimization)[/]")
     else:
-        # Default: accuracy-first
-        console.print("[green]✓[/] Tool output: full context to LLM, preview enabled")
+        console.print(
+            "[green]✓[/] Tool output: safe read-heavy pruning active, preview enabled"
+        )
 
     try:
         profiles = settings.load_profiles()
@@ -1594,6 +1587,9 @@ async def _run_cli_repl(
                     formatter = create_formatter()
                     renderer = FormatterRenderer(formatter, console)
 
+                # Release previous renderer before swapping to prevent Live display leaks.
+                if _active_renderer is not None and hasattr(_active_renderer, "cleanup"):
+                    _active_renderer.cleanup()
                 # Update binding target so Ctrl+O always refers to the current renderer
                 _active_renderer = renderer
 

@@ -101,3 +101,74 @@ def render_thinking_text(console: Console, text: str) -> None:
     """
     styled = Text(text, style="dim italic")
     console.print(styled, end="")
+
+
+# Tools whose names map to valid Pygments lexer identifiers.
+_SYNTAX_TOOL_WHITELIST: frozenset[str] = frozenset(
+    {
+        "python",
+        "javascript",
+        "typescript",
+        "json",
+        "yaml",
+        "bash",
+        "shell",
+        "sql",
+        "html",
+        "css",
+        "xml",
+        "markdown",
+        "toml",
+        "go",
+        "rust",
+        "java",
+        "cpp",
+        "c",
+    }
+)
+
+
+def expand_tool_output(
+    console: Console,
+    tool_name: str,
+    content: str,
+    *,
+    pause_fn=None,
+    resume_fn=None,
+    max_chars: int = 10000,
+) -> None:
+    """Render full tool output in a syntax-highlighted panel.
+
+    Shared implementation used by both FormatterRenderer and LiveDisplayRenderer.
+
+    Args:
+        console: Rich Console to render to
+        tool_name: Name of the tool (used for panel title)
+        content: Full tool output text
+        pause_fn: Optional callable to pause the renderer before printing
+        resume_fn: Optional callable to resume the renderer after printing
+        max_chars: Truncate content beyond this many characters
+    """
+    if pause_fn is not None:
+        pause_fn()
+
+    if len(content) > max_chars:
+        console.print(f"[dim yellow]⚠ Output is {len(content)} chars, showing first {max_chars}[/]")
+        content = content[:max_chars]
+
+    # Derive a lexer only from the whitelisted set; fall back to plain text.
+    last_segment = tool_name.split("_")[-1] if "_" in tool_name else tool_name
+    lexer = last_segment if last_segment in _SYNTAX_TOOL_WHITELIST else "text"
+
+    try:
+        syntax = Syntax(content, lexer, theme="monokai", line_numbers=True, word_wrap=True)
+        console.print(
+            Panel(syntax, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+        )
+    except Exception:
+        console.print(
+            Panel(content, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
+        )
+
+    if resume_fn is not None:
+        resume_fn()

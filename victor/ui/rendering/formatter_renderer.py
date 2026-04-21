@@ -17,6 +17,7 @@ from victor.ui.rendering.metrics import StreamingMetrics
 logger = logging.getLogger(__name__)
 
 from victor.ui.rendering.utils import (
+    expand_tool_output,
     render_edit_preview,
     render_file_preview,
     render_thinking_indicator,
@@ -73,7 +74,6 @@ class FormatterRenderer:
         self._pause_count += 1
         if self._pause_count == 1:
             self._pause_start_ms = time.monotonic() * 1000
-            self.formatter.end_streaming(finalize=False)
             logger.debug("FormatterRenderer: paused (depth=1)")
 
     def resume(self) -> None:
@@ -115,6 +115,7 @@ class FormatterRenderer:
         arguments: dict[str, Any],
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
+        was_pruned: bool = False,
         result: Any = None,  # Tool output for preview
     ) -> None:
         """Handle tool execution result.
@@ -138,13 +139,16 @@ class FormatterRenderer:
         }
         self._metrics.record_tool_result()
         self.pause()
-        self.formatter.tool_result(
-            tool_name=name,
-            success=success,
-            error=error,
-            follow_up_suggestions=follow_up_suggestions,
-            original_result=tool_output,
-        )
+        formatter_kwargs = {
+            "tool_name": name,
+            "success": success,
+            "error": error,
+            "follow_up_suggestions": follow_up_suggestions,
+            "original_result": tool_output,
+        }
+        if was_pruned:
+            formatter_kwargs["was_pruned"] = True
+        self.formatter.tool_result(**formatter_kwargs)
         self.resume()
 
     def on_status(self, message: str) -> None:
@@ -231,28 +235,7 @@ class FormatterRenderer:
         if not data["success"] or not data["result"]:
             return
 
-        from rich.panel import Panel
-        from rich.syntax import Syntax
-
-        content = data["result"]
-        tool_name = data["name"]
-
-        if len(content) > 10000:
-            self.console.print(
-                f"[dim yellow]⚠ Output is {len(content)} chars, showing first 10000[/]"
-            )
-            content = content[:10000]
-
-        try:
-            ext = tool_name.split("_")[-1] if "_" in tool_name else "txt"
-            syntax = Syntax(content, ext, theme="monokai", line_numbers=True, word_wrap=True)
-            self.console.print(
-                Panel(syntax, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
-            )
-        except Exception:
-            self.console.print(
-                Panel(content, title=f"[bold]{tool_name}[/] - Full Output", border_style="blue")
-            )
+        expand_tool_output(self.console, data["name"], data["result"])
 
     def cleanup(self) -> None:
         """Clean up resources."""
