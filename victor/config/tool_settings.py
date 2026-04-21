@@ -93,6 +93,16 @@ class ToolSettings(BaseModel):
         description="Hotkey to expand tool output (default: Ctrl+O, format: ^X for Ctrl+X)",
     )
 
+    # Tool output byte limit for display
+    # This is separate from pruning and affects what users see in terminal/UI
+    # When pruning is disabled (accuracy-first), byte limit should be higher
+    tool_output_byte_limit_mb: float = Field(
+        default=10.0,  # 10MB default (much higher when accuracy matters)
+        ge=1.0,  # Minimum 1MB
+        le=100.0,  # Maximum 100MB
+        description="Maximum tool output size in MB for display (default: 10MB, higher when pruning disabled)",
+    )
+
     # Embedding-intensive tool concurrency configuration
     # These tools use embedding models and need lower concurrency limits
     # to prevent resource exhaustion (memory, CPU, embedding model contention)

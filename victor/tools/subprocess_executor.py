@@ -170,15 +170,25 @@ def _truncate_output_by_lines(
     Args:
         text: Text to truncate
         max_lines: Maximum lines to keep (None=unlimited)
-        max_bytes: Maximum bytes to keep (None=1MB default)
+        max_bytes: Maximum bytes to keep (None=use tool settings default ONLY in unlimited mode)
         stream_name: Name of stream (for error messages)
 
     Returns:
         Tuple of (truncated_text, was_truncated, line_count)
     """
     # Default byte limit if not specified
+    # Priority: use tool settings in unlimited mode, otherwise use 1MB safety default
     if max_bytes is None:
-        max_bytes = 1024 * 1024  # 1MB default
+        if max_lines is None:
+            # True unlimited mode - use tool settings (higher limit for accuracy-first)
+            from victor.config.tool_settings import get_tool_settings
+
+            tool_settings = get_tool_settings()
+            # Convert MB to bytes
+            max_bytes = int(tool_settings.tool_output_byte_limit_mb * 1024 * 1024)
+        else:
+            # Line limit is set, but no byte limit - use 1MB safety default
+            max_bytes = 1024 * 1024  # 1MB safety default when line-limited
 
     # Handle unlimited
     if max_lines is None or max_lines <= 0:
@@ -195,27 +205,29 @@ def _truncate_output_by_lines(
 
     # Check if truncation needed
     if line_count <= max_lines:
-        # Within line limit, but check byte limit
-        text_bytes = len(text.encode("utf-8", errors="replace"))
-        if text_bytes > max_bytes:
-            truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
-            # Recount lines after byte truncation
-            new_line_count = truncated.count('\n') + 1
-            return truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]", True, new_line_count
+        # Within line limit, but check byte limit (if specified)
+        if max_bytes is not None:
+            text_bytes = len(text.encode("utf-8", errors="replace"))
+            if text_bytes > max_bytes:
+                truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
+                # Recount lines after byte truncation
+                new_line_count = truncated.count('\n') + 1
+                return truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]", True, new_line_count
         return text, False, line_count
 
     # Truncate by lines
     truncated_lines = lines[:max_lines]
     truncated = ''.join(truncated_lines)
 
-    # Enforce byte limit on truncated text
-    truncated_bytes = len(truncated.encode("utf-8", errors="replace"))
-    if truncated_bytes > max_bytes:
-        # Byte limit exceeded, truncate further
-        truncated = truncated.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
-        # Recount lines after byte truncation
-        new_line_count = truncated.count('\n') + 1
-        return truncated + f"\n... [{stream_name} truncated: {line_count}→{new_line_count} lines, {truncated_bytes}→{max_bytes} bytes]", True, new_line_count
+    # Enforce byte limit on truncated text (if specified)
+    if max_bytes is not None:
+        truncated_bytes = len(truncated.encode("utf-8", errors="replace"))
+        if truncated_bytes > max_bytes:
+            # Byte limit exceeded, truncate further
+            truncated = truncated.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
+            # Recount lines after byte truncation
+            new_line_count = truncated.count('\n') + 1
+            return truncated + f"\n... [{stream_name} truncated: {line_count}→{new_line_count} lines, {truncated_bytes}→{max_bytes} bytes]", True, new_line_count
 
     return truncated + f"\n... [{stream_name} truncated: {line_count}→{max_lines} lines]", True, max_lines
 
@@ -381,14 +393,13 @@ def run_command(
 
         # Truncate output with separate limits for stdout and stderr
         if max_output_bytes > 0:
-            # Legacy behavior: single limit for both streams
-            stdout_text, t1, stdout_lines = _truncate_output_by_lines(
-                stdout_text, max_output_bytes, max_bytes=None, stream_name="stdout"
-            )
-            stderr_text, t2, stderr_lines = _truncate_output_by_lines(
-                stderr_text, max_output_bytes, max_bytes=None, stream_name="stderr"
-            )
+            # Use the simpler _truncate_output for byte-based truncation
+            # (matches test expectations)
+            stdout_text, t1 = _truncate_output(stdout_text, max_output_bytes)
+            stderr_text, t2 = _truncate_output(stderr_text, max_output_bytes)
             was_truncated = t1 or t2
+            stdout_lines = stdout_text.count('\n') + 1
+            stderr_lines = stderr_text.count('\n') + 1
         elif max_output_bytes == 0:
             # No limit (unlimited output)
             stdout_lines = stdout_text.count('\n') + 1
