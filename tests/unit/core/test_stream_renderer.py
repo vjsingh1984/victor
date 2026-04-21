@@ -52,7 +52,8 @@ class TestFormatterRenderer:
         mock_formatter.end_streaming.assert_called_once()
 
     def test_resume_calls_formatter_start_streaming(self, renderer, mock_formatter):
-        """Test resume() delegates to formatter.start_streaming()."""
+        """Test resume() delegates to formatter.start_streaming() after a pause."""
+        renderer.pause()
         renderer.resume()
         mock_formatter.start_streaming.assert_called_once()
 
@@ -82,6 +83,7 @@ class TestFormatterRenderer:
             success=True,
             error=None,
             follow_up_suggestions=None,
+            original_result=None,
         )
         mock_formatter.start_streaming.assert_called_once()
 
@@ -100,6 +102,7 @@ class TestFormatterRenderer:
             success=False,
             error="Permission denied",
             follow_up_suggestions=None,
+            original_result=None,
         )
 
     def test_on_tool_result_forwards_follow_up_suggestions(self, renderer, mock_formatter):
@@ -124,6 +127,7 @@ class TestFormatterRenderer:
             success=True,
             error=None,
             follow_up_suggestions=follow_ups,
+            original_result=None,
         )
 
     def test_on_status(self, renderer, mock_formatter):
@@ -202,7 +206,10 @@ class TestFormatterRenderer:
         assert "Thinking" in call_text
 
     def test_on_thinking_end_resumes_streaming(self, renderer, mock_formatter, mock_console):
-        """Test on_thinking_end() resumes streaming."""
+        """Test on_thinking_end() resumes streaming after thinking_start."""
+        renderer.on_thinking_start()
+        mock_formatter.reset_mock()
+        mock_console.reset_mock()
         renderer.on_thinking_end()
 
         # Should print newline and resume streaming
@@ -566,6 +573,7 @@ class TestStreamResponse:
             arguments={"path": "/out.py"},
             error=None,
             follow_up_suggestions=None,
+            result=None,
         )
 
     @pytest.mark.asyncio
@@ -607,6 +615,7 @@ class TestStreamResponse:
                     "description": "Trace execution starting from main.",
                 }
             ],
+            result=None,
         )
 
     @pytest.mark.asyncio
@@ -638,6 +647,7 @@ class TestStreamResponse:
             arguments={"cmd": "rm -rf /"},
             error="Permission denied",
             follow_up_suggestions=None,
+            result=None,
         )
 
     @pytest.mark.asyncio

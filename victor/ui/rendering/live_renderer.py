@@ -6,11 +6,14 @@ suitable for interactive CLI usage.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from rich.console import Console
 from rich.live import Live
 from rich.markdown import Markdown
+
+logger = logging.getLogger(__name__)
 
 from victor.ui.rendering.utils import (
     format_tool_args,
@@ -43,40 +46,48 @@ class LiveDisplayRenderer:
         self.console = console
         self._live: Live | None = None
         self._content_buffer = ""
-        self._is_paused = False  # Track pause state to avoid redundant operations
-        self._thinking_buffer = ""  # Accumulate thinking text for clean display
-        self._pending_tool: dict | None = None  # Track tool waiting for result
-        self._last_tool_result: dict | None = None  # Store for expansion
-        self._last_thinking_rendered = ""  # Track last rendered thinking to avoid dupes
-        self._thinking_indicator_shown = False  # Track if we've shown the indicator
-        self._in_thinking_mode = False  # Track if we're in thinking mode to avoid content pollution
-        self._content_shown_before_pause = (
-            ""  # Track content shown before pause to avoid re-display
-        )
+        self._is_paused = False
+        self._pause_count = 0  # Depth counter for nested pause/resume
+        self._thinking_buffer = ""
+        self._pending_tool: dict | None = None
+        self._last_tool_result: dict | None = None
+        self._last_thinking_rendered = ""
+        self._thinking_indicator_shown = False
+        self._in_thinking_mode = False
+        self._content_shown_before_pause = ""
 
     def start(self) -> None:
         """Start the Live display."""
         self._live = Live(Markdown(""), console=self.console, refresh_per_second=10)
         self._live.start()
         self._is_paused = False
+        self._pause_count = 0
 
     def pause(self) -> None:
-        """Pause the Live display to show status output."""
-        if self._live and not self._is_paused:
+        """Pause the Live display to show status output.
+
+        Supports nested calls via depth counting — the Live display is only
+        stopped on the first call, preventing unnecessary stop/restart cycles.
+        """
+        self._pause_count += 1
+        if self._pause_count == 1 and self._live and not self._is_paused:
             self._live.stop()
             self._is_paused = True
-            # Remember what content was shown before pause to avoid re-display on resume
             self._content_shown_before_pause = self._content_buffer
+            logger.debug("LiveDisplayRenderer: paused (depth=1)")
 
     def resume(self) -> None:
-        """Resume the Live display with only NEW content since pause.
+        """Resume the Live display with only NEW content since the outermost pause.
 
-        This prevents content duplication when pause/resume cycles occur
-        (e.g., around tool calls or thinking blocks).
+        Only restarts the Live display when the depth counter reaches zero,
+        preventing duplication from nested pause/resume callers (e.g., thinking
+        blocks that contain tool calls).
         """
-        if self._is_paused:
-            # Only show content that was added AFTER the pause, not the full buffer
-            # This prevents re-displaying content that was already shown before pause
+        if self._pause_count <= 0:
+            logger.warning("LiveDisplayRenderer: resume() called with no matching pause — ignoring")
+            return
+        self._pause_count -= 1
+        if self._pause_count == 0 and self._is_paused:
             new_content = self._content_buffer[len(self._content_shown_before_pause) :]
             self._live = Live(
                 Markdown(new_content),
@@ -85,6 +96,7 @@ class LiveDisplayRenderer:
             )
             self._live.start()
             self._is_paused = False
+            logger.debug("LiveDisplayRenderer: resumed (depth=0)")
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
         """Handle tool execution start - store for later consolidation.
@@ -379,6 +391,7 @@ class LiveDisplayRenderer:
             self._live.stop()
             self._live = None
         self._is_paused = False
+        self._pause_count = 0
         self._thinking_buffer = ""
         self._last_thinking_rendered = ""
         self._pending_tool = None

@@ -6,9 +6,12 @@ suitable for non-interactive CLI usage.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from rich.console import Console
+
+logger = logging.getLogger(__name__)
 
 from victor.ui.rendering.utils import (
     render_edit_preview,
@@ -45,21 +48,36 @@ class FormatterRenderer:
         self.formatter = formatter
         self.console = console
         self._content_buffer = ""
+        self._pause_count = 0  # Depth counter for nested pause/resume
 
     def start(self) -> None:
         """Start streaming mode in the formatter."""
         self.formatter.start_streaming()
 
     def pause(self) -> None:
-        """End streaming to allow status output."""
-        # Use finalize=False to pause Live display without destroying it
-        # This allows resume() to continue streaming properly
-        self.formatter.end_streaming(finalize=False)
+        """End streaming to allow status output.
+
+        Supports nested calls via depth counting — the underlying formatter
+        is only paused on the first call, preventing redundant end/start cycles.
+        """
+        self._pause_count += 1
+        if self._pause_count == 1:
+            self.formatter.end_streaming(finalize=False)
+            logger.debug("FormatterRenderer: paused (depth=1)")
 
     def resume(self) -> None:
-        """Resume streaming mode in the formatter."""
-        # Resume with preserve_buffer=True to maintain content buffer
-        self.formatter.start_streaming(preserve_buffer=True)
+        """Resume streaming mode in the formatter.
+
+        Only resumes the underlying formatter when the depth counter reaches zero,
+        allowing nested pause/resume callers to unwind correctly.
+        """
+        if self._pause_count <= 0:
+            logger.warning("FormatterRenderer: resume() called with no matching pause — ignoring")
+            return
+        self._pause_count -= 1
+        if self._pause_count == 0:
+            self.formatter.start_streaming(preserve_buffer=True)
+            logger.debug("FormatterRenderer: resumed (depth=0)")
 
     def on_tool_start(self, name: str, arguments: dict[str, Any]) -> None:
         """Handle tool execution start.
