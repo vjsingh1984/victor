@@ -52,10 +52,11 @@ You are evaluated on:
 - Efficiency: Did you find and fix the bug quickly?""",
         tool_budget=20,
         priority_tools=["read", "code_search", "edit", "test", "git"],
-        token_budget=2000,  # Complex debugging requires detailed responses
-        context_budget=4000,  # Need more context for bug fixing
-        skip_planning=False,  # Complex task needs planning
-        skip_evaluation=False,  # Must verify fix
+        token_budget=2000,
+        context_budget=4000,
+        skip_planning=False,
+        skip_evaluation=False,
+        temperature_override=0.1,  # Precise bug analysis
     ),
     "code_generation": TaskTypeHint(
         task_type="code_generation",
@@ -79,10 +80,11 @@ You are evaluated on:
 - Efficiency: Does your code run within time limits?""",
         tool_budget=5,
         priority_tools=["write", "read", "shell"],
-        token_budget=800,  # Code generation doesn't need long responses
-        context_budget=2000,  # Minimal context needed
-        skip_planning=True,  # Direct code generation, no planning needed
-        skip_evaluation=True,  # Tests will verify correctness
+        token_budget=800,
+        context_budget=2000,
+        skip_planning=True,
+        skip_evaluation=True,
+        temperature_override=0.2,  # Low variance for correct code
     ),
     "function_completion": TaskTypeHint(
         task_type="function_completion",

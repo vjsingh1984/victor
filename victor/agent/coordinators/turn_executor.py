@@ -410,6 +410,7 @@ class TurnExecutor:
         is_qa_task: bool = False,
         enable_thinking: bool = False,
         intent: Optional[str] = None,
+        temperature_override: Optional[float] = None,
     ) -> TurnResult:
         """Execute a single complete turn: LLM call + tool execution.
 
@@ -450,6 +451,10 @@ class TurnExecutor:
         if task_classification:
             await self._check_context_compaction(user_message, task_classification)
 
+        # Apply task-aware temperature from TaskTypeHint (None = provider default)
+        if temperature_override is not None:
+            provider_kwargs["temperature_override"] = temperature_override
+
         # Execute model turn
         response = await self._execute_model_turn(tools=tools, **provider_kwargs)
 
@@ -466,14 +471,59 @@ class TurnExecutor:
         tool_results: List[Dict[str, Any]] = []
         all_blocked = False
         if response.tool_calls:
+            # Resolve orchestrator/container once for all per-turn services
+            _orch = getattr(self, "_orchestrator", None) or getattr(
+                self._chat_context, "_orchestrator", None
+            )
+
+            # Sort tool calls by dependency order when multiple tools are requested
+            if len(response.tool_calls) > 1:
+                try:
+                    from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
+
+                    _container = getattr(_orch, "_container", None)
+                    _dep_graph = (
+                        _container.get_optional(ToolDependencyGraphProtocol)
+                        if _container
+                        else None
+                    )
+                    if _dep_graph:
+                        _names = [tc.get("name", "") for tc in response.tool_calls]
+                        _ordered = _dep_graph.get_execution_order(_names)
+                        _name_rank = {n: i for i, n in enumerate(_ordered)}
+                        response.tool_calls.sort(
+                            key=lambda tc: _name_rank.get(tc.get("name", ""), 999)
+                        )
+                except Exception:
+                    pass  # Never block execution on ordering failure
+
             tool_results = await self._tool_context._handle_tool_calls(response.tool_calls)
+
+            # Record tool→tool transitions for trajectory learning
+            try:
+                from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
+
+                _container = getattr(_orch, "_container", None)
+                _dep_graph = (
+                    _container.get_optional(ToolDependencyGraphProtocol)
+                    if _container
+                    else None
+                )
+                if _dep_graph and len(tool_results) > 1:
+                    _task_type = (
+                        getattr(task_classification, "task_type", "general")
+                        if task_classification
+                        else "general"
+                    )
+                    _tool_names = [r.get("tool_name", "") for r in tool_results if r.get("tool_name")]
+                    for i in range(len(_tool_names) - 1):
+                        _dep_graph.record_transition(_tool_names[i], _tool_names[i + 1], _task_type)
+            except Exception:
+                pass  # Trajectory learning is best-effort
 
             # Check for dedup-blocked spin
             _pipeline = getattr(self._tool_context, "_tool_pipeline", None)
             if _pipeline is None:
-                _orch = getattr(self, "_orchestrator", None) or getattr(
-                    self._chat_context, "_orchestrator", None
-                )
                 if _orch:
                     _pipeline = getattr(_orch, "_tool_pipeline", None)
             all_blocked = bool(_pipeline and getattr(_pipeline, "last_batch_all_skipped", False))
@@ -481,9 +531,6 @@ class TurnExecutor:
             # Record failures for optimization hints
             for result in tool_results:
                 if not result.get("success"):
-                    _orch = getattr(self, "_orchestrator", None) or getattr(
-                        self._chat_context, "_orchestrator", None
-                    )
                     _injector = getattr(_orch, "_optimization_injector", None) if _orch else None
                     if _injector and result.get("error"):
                         _injector.record_failure(
@@ -832,15 +879,17 @@ class TurnExecutor:
 
         Args:
             tools: Optional tool definitions
-            **kwargs: Additional provider parameters
+            **kwargs: Additional provider parameters; temperature_override overrides
+                the provider-default temperature for this task type.
 
         Returns:
             CompletionResponse from model
         """
+        temperature = kwargs.pop("temperature_override", None) or self._provider_context.temperature
         return await self._execution_provider.execute_turn(
             messages=self._chat_context.messages,
             model=self._provider_context.model,
-            temperature=self._provider_context.temperature,
+            temperature=temperature,
             max_tokens=self._provider_context.max_tokens,
             tools=tools,
             **kwargs,

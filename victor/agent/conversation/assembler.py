@@ -50,11 +50,13 @@ class TurnBoundaryContextAssembler:
         session_ledger: Optional[object] = None,
         score_fn: Optional[Callable] = None,
         conversation_controller: Optional[object] = None,
+        temperature_classifier: Optional[object] = None,
     ):
         self._config = config or CONTEXT_ASSEMBLER_CONFIG
         self._session_ledger = session_ledger
         self._score_fn = score_fn
         self._conversation_controller = conversation_controller
+        self._temperature_classifier = temperature_classifier
 
     @property
     def config(self) -> ContextAssemblerConfig:
@@ -251,6 +253,23 @@ class TurnBoundaryContextAssembler:
             scored = self._score_fn(older_messages, current_query)
             # scored should be list of (message, score) or similar
             if scored and isinstance(scored[0], tuple):
+                # Apply temperature multipliers if classifier is available
+                if self._temperature_classifier is not None:
+                    try:
+                        recent_tool_names: frozenset = frozenset()
+                        classified = self._temperature_classifier.classify(
+                            older_messages,
+                            current_turn=len(turn_boundaries) - full_turn_count,
+                            recent_tool_names=recent_tool_names,
+                        )
+                        multipliers = self._temperature_classifier.get_score_multipliers(classified)
+                        if multipliers:
+                            scored = [
+                                (msg, score * multipliers.get(id(msg), 1.0))
+                                for msg, score in scored
+                            ]
+                    except Exception as _te:
+                        logger.debug(f"Context temperature classification skipped: {_te}")
                 scored.sort(key=lambda x: x[1], reverse=True)
                 selected_older = []
                 older_chars = 0

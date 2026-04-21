@@ -439,6 +439,31 @@ class ToolDependencyGraphProtocol(Protocol):
         """
         ...
 
+    def record_transition(self, from_tool: str, to_tool: str, task_type: str) -> None:
+        """Record a tool→tool transition for trajectory learning.
+
+        Args:
+            from_tool: Tool that just executed
+            to_tool: Tool that executed next
+            task_type: Task type context for the transition
+        """
+        ...
+
+    def predict_next(
+        self, current_tool: str, task_type: str, top_k: int = 3
+    ) -> List[tuple]:
+        """Predict the most likely next tools from transition history.
+
+        Args:
+            current_tool: Tool that just ran
+            task_type: Current task type
+            top_k: Maximum number of predictions to return
+
+        Returns:
+            List of (tool_name, probability) tuples sorted by probability desc
+        """
+        ...
+
 
 @runtime_checkable
 class ToolPluginRegistryProtocol(Protocol):

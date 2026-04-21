@@ -102,6 +102,7 @@ class TaskTypeHintData:
         context_budget: Context window budget for this task
         skip_planning: Skip planning phase for this task type
         skip_evaluation: Skip evaluation phase for this task type
+        temperature_override: LLM temperature for this task type; None = provider default
     """
 
     task_type: str
@@ -112,6 +113,7 @@ class TaskTypeHintData:
     context_budget: Optional[int] = None
     skip_planning: bool = False
     skip_evaluation: bool = False
+    temperature_override: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert the hint to the legacy serializable mapping."""
@@ -125,6 +127,7 @@ class TaskTypeHintData:
             "context_budget": self.context_budget,
             "skip_planning": self.skip_planning,
             "skip_evaluation": self.skip_evaluation,
+            "temperature_override": self.temperature_override,
         }
 
 

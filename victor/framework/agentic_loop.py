@@ -460,6 +460,33 @@ class AgenticLoop:
         self.criteria_builder.reset()
         effective_max = self.max_iterations
 
+        # Semantic response cache check (arXiv:2508.07675)
+        # Only on first query of a loop — multi-turn queries are session-specific
+        _sem_cache = None
+        from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+        if is_feature_enabled(FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE):
+            try:
+                from victor.agent.semantic_response_cache import get_semantic_cache
+
+                _sem_cache = get_semantic_cache()
+                _cached = _sem_cache.get(query)
+                if _cached:
+                    logger.info("[SemanticResponseCache] HIT — skipping LLM call")
+                    return LoopResult(
+                        success=True,
+                        iterations=[],
+                        final_state={"query": query, "response": _cached["response"]},
+                        total_duration=time.time() - start_time,
+                        metadata={
+                            "source": "semantic_cache",
+                            "similarity": _cached.get("similarity", 1.0),
+                        },
+                    )
+            except Exception as _ce:
+                logger.debug(f"Semantic cache check skipped: {_ce}")
+                _sem_cache = None
+
         try:
             for i in range(1, effective_max + 1):
                 # FAST-SLOW PLANNING GATE (arXiv:2604.01681)
@@ -482,13 +509,16 @@ class AgenticLoop:
                         last_perc = self._last_perception
                         query_complexity = getattr(last_perc, "query_complexity", None)
 
-                    # Extract skip_planning flag from TaskTypeHint if available
+                    # Extract execution parameters from TaskTypeHint if available
                     skip_planning = False
                     task_hint = None
                     if hasattr(self, "_task_hint_provider"):
                         task_hint = self._task_hint_provider.get_hint(task_type)
-                        if task_hint and hasattr(task_hint, "skip_planning"):
-                            skip_planning = task_hint.skip_planning
+                        if task_hint:
+                            skip_planning = getattr(task_hint, "skip_planning", False)
+                            temp_override = getattr(task_hint, "temperature_override", None)
+                            if temp_override is not None:
+                                state["temperature_override"] = temp_override
 
                     # Check with planning gate
                     use_llm_planning = self.planning_gate.should_use_llm_planning(
@@ -692,6 +722,24 @@ class AgenticLoop:
 
             # Determine success
             success = self._determine_success(iterations)
+
+            # Store cacheable responses in semantic cache for future queries
+            if success and _sem_cache is not None:
+                try:
+                    from victor.agent.semantic_response_cache import SemanticResponseCache
+
+                    _final_action = state.get("action_result")
+                    _final_response: Optional[str] = None
+                    if isinstance(_final_action, str):
+                        _final_response = _final_action
+                    elif _final_action is not None and hasattr(_final_action, "response"):
+                        if not getattr(_final_action, "has_tool_calls", False):
+                            _final_response = _final_action.response
+                    if _final_response and SemanticResponseCache.is_cacheable(_final_response):
+                        _sem_cache.set(query, _final_response)
+                        logger.debug("[SemanticResponseCache] Stored new response")
+                except Exception as _se:
+                    logger.debug(f"Semantic cache store skipped: {_se}")
 
             duration = time.time() - start_time
 
@@ -1011,6 +1059,7 @@ class AgenticLoop:
                 task_classification=task_classification,
                 is_qa_task=is_qa,
                 intent=state.get("perception", {}).get("intent"),
+                temperature_override=state.get("temperature_override"),
             )
 
             # Update shared spin detector

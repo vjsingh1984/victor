@@ -72,6 +72,7 @@ class TaskTypeHint:
         context_budget: Max context tokens to include (NEW)
         skip_planning: Skip planning phase for direct execution (NEW)
         skip_evaluation: Skip evaluation/verification steps (NEW)
+        temperature_override: LLM temperature for this task type; None = provider default (NEW)
     """
 
     task_type: str
@@ -85,6 +86,7 @@ class TaskTypeHint:
     context_budget: Optional[int] = None  # NEW: Max context tokens
     skip_planning: bool = False  # NEW: Skip planning phase
     skip_evaluation: bool = False  # NEW: Skip LLM evaluation
+    temperature_override: Optional[float] = None  # NEW: Task-specific LLM temperature
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary."""
@@ -96,10 +98,11 @@ class TaskTypeHint:
             "tool_budget": self.tool_budget,
             "priority_tools": self.priority_tools,
             "keywords": self.keywords,
-            "token_budget": self.token_budget,  # NEW
-            "context_budget": self.context_budget,  # NEW
-            "skip_planning": self.skip_planning,  # NEW
-            "skip_evaluation": self.skip_evaluation,  # NEW
+            "token_budget": self.token_budget,
+            "context_budget": self.context_budget,
+            "skip_planning": self.skip_planning,
+            "skip_evaluation": self.skip_evaluation,
+            "temperature_override": self.temperature_override,
         }
 
 
@@ -139,8 +142,9 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=6,
             priority_tools=["grep", "ls", "read"],
             keywords=["find", "search", "where", "locate", "look for"],
-            token_budget=500,  # NEW: Concise search results
-            skip_planning=True,  # NEW: Direct execution
+            token_budget=500,
+            skip_planning=True,
+            temperature_override=0.3,  # Focused retrieval
         ),
         "create": TaskTypeHint(
             task_type="create",
@@ -150,10 +154,11 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=5,
             priority_tools=["read", "write", "ls"],
             keywords=["create", "new", "add", "generate", "make"],
-            token_budget=800,  # NEW: Constrain response length
-            context_budget=2000,  # NEW: Limit context tokens
-            skip_planning=True,  # NEW: Direct execution for simple creation
-            skip_evaluation=True,  # NEW: Skip LLM evaluation
+            token_budget=800,
+            context_budget=2000,
+            skip_planning=True,
+            skip_evaluation=True,
+            temperature_override=0.2,  # Low variance for correct generation
         ),
         "edit": TaskTypeHint(
             task_type="edit",
@@ -163,9 +168,10 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=5,
             priority_tools=["read", "edit", "write"],
             keywords=["edit", "modify", "change", "update", "fix"],
-            token_budget=600,  # NEW: Focused edits
-            context_budget=1500,  # NEW: Limited context
-            skip_evaluation=True,  # NEW: Skip LLM evaluation
+            token_budget=600,
+            context_budget=1500,
+            skip_evaluation=True,
+            temperature_override=0.4,  # Balance precision with natural edits
         ),
         "debug": TaskTypeHint(
             task_type="debug",
@@ -175,6 +181,7 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=12,
             priority_tools=["read", "grep", "shell", "test"],
             keywords=["debug", "fix", "error", "bug", "broken", "fail"],
+            temperature_override=0.1,  # Precise error analysis
         ),
         "refactor": TaskTypeHint(
             task_type="refactor",
@@ -184,6 +191,7 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=10,
             priority_tools=["read", "grep", "edit"],
             keywords=["refactor", "improve", "restructure", "clean up"],
+            temperature_override=0.4,
         ),
         "test": TaskTypeHint(
             task_type="test",
@@ -193,6 +201,7 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=8,
             priority_tools=["read", "write", "shell", "test"],
             keywords=["test", "verify", "validate", "check"],
+            temperature_override=0.2,  # Deterministic test generation
         ),
         "analyze": TaskTypeHint(
             task_type="analyze",
@@ -202,6 +211,7 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=12,
             priority_tools=["read", "grep", "search"],
             keywords=["analyze", "understand", "explain", "review"],
+            temperature_override=0.6,  # Broader reasoning for analysis
         ),
         "deploy": TaskTypeHint(
             task_type="deploy",
@@ -211,6 +221,7 @@ class TaskTypeHintCapabilityProvider:
             tool_budget=8,
             priority_tools=["read", "shell", "docker"],
             keywords=["deploy", "ship", "release", "provision"],
+            temperature_override=0.3,  # Focused execution
         ),
         "document": TaskTypeHint(
             task_type="document",

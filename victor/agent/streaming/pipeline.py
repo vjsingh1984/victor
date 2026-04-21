@@ -53,11 +53,13 @@ class StreamingChatPipeline:
         coordinator: "ChatCoordinator",
         perception: Optional[Any] = None,
         fulfillment: Optional[Any] = None,
+        confidence_monitor: Optional[Any] = None,
     ) -> None:
         self._coordinator = coordinator
         # AgenticLoop component integration (streaming parity)
         self._perception = perception  # PerceptionIntegration instance
         self._fulfillment = fulfillment  # FulfillmentDetector instance
+        self._confidence_monitor = confidence_monitor  # StreamingConfidenceMonitor instance
         self._progress_scores: List[float] = []  # For adaptive iteration
         # Tool selection cache — avoids redundant selection within same turn
         self._last_tool_context: Optional[str] = None
@@ -304,6 +306,21 @@ class StreamingChatPipeline:
                 provider_kwargs=provider_kwargs,
                 stream_ctx=stream_ctx,
             )
+
+            # Confidence monitor: check if generation should stop early (ATCC, arXiv 2603.13906)
+            if self._confidence_monitor is not None and not tool_calls:
+                try:
+                    from victor.core.feature_flags import FeatureFlag, is_feature_enabled
+
+                    if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
+                        self._confidence_monitor.record(
+                            full_content or "", stream_ctx.total_tokens
+                        )
+                        if self._confidence_monitor.should_stop():
+                            logger.info("[ConfidenceMonitor] Stopping iteration early — confidence threshold met")
+                            break
+                except Exception:
+                    pass
 
             # Debug: Log response details
             content_preview = full_content[:200] if full_content else "(empty)"

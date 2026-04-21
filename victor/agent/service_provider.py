@@ -782,6 +782,12 @@ class OrchestratorServiceProvider:
 
         return ToolPluginRegistry()
 
+    def _create_context_temperature_classifier(self) -> "ContextTemperatureClassifierProtocol":
+        """Create ContextTemperatureClassifier — active when USE_CONTEXT_TEMPERATURE is enabled."""
+        from victor.agent.context_temperature import ContextTemperatureClassifier
+
+        return ContextTemperatureClassifier()
+
     def _create_semantic_tool_selector(self) -> "SemanticToolSelectorProtocol":
         """Create SemanticToolSelector instance."""
         from victor.tools.semantic_selector import SemanticToolSelector
@@ -1075,6 +1081,12 @@ class OrchestratorServiceProvider:
             message_adder=message_adder,
             session_idle_timeout=session_idle_timeout,
         )
+
+    def _create_confidence_monitor(self) -> "StreamingConfidenceMonitorProtocol":
+        """Create StreamingConfidenceMonitor — active when USE_CONFIDENCE_MONITOR is enabled."""
+        from victor.agent.streaming.confidence_monitor import StreamingConfidenceMonitor
+
+        return StreamingConfidenceMonitor()
 
     def _create_recovery_coordinator(self) -> "StreamingRecoveryCoordinatorProtocol":
         """Create RecoveryCoordinator instance.

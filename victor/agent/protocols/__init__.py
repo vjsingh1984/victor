@@ -68,6 +68,7 @@ _MODULE_MEMBERS = {
         "ChunkGeneratorProtocol",
         "StreamingHandlerProtocol",
         "StreamingMetricsCollectorProtocol",
+        "StreamingConfidenceMonitorProtocol",
     ],
     "provider_protocols": [
         "ProviderManagerProtocol",
@@ -136,6 +137,9 @@ _MODULE_MEMBERS = {
         "IBudgetTracker",
         "IMultiplierCalculator",
         "IModeCompletionChecker",
+    ],
+    "context_protocols": [
+        "ContextTemperatureClassifierProtocol",
     ],
 }
 
