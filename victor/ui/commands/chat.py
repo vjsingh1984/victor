@@ -850,13 +850,27 @@ async def run_oneshot(
     success = False
     tool_calls_made = 0
 
-    # Configure smart routing if enabled
+    # Configure smart routing if enabled and feature flag allows
     if enable_smart_routing:
-        settings.smart_routing_enabled = True
-        settings.smart_routing_profile = routing_profile
-        if fallback_chain:
-            settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
-        console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        feature_manager = get_feature_flag_manager()
+        if feature_manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
+            settings.smart_routing_enabled = True
+            settings.smart_routing_profile = routing_profile
+            if fallback_chain:
+                settings.smart_routing_fallback_chain = [
+                    p.strip() for p in fallback_chain.split(",")
+                ]
+            console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+        else:
+            console.print(
+                "[yellow]Smart routing is currently disabled via feature flag.[/]"
+            )
+            console.print(
+                "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
+                "[cyan]--enable-smart-routing[/] flag in beta period"
+            )
 
     # Configure tool output preview (accuracy-first defaults)
     from victor.config.tool_settings import ToolSettings
@@ -1179,13 +1193,27 @@ async def run_interactive(
     success = False
     tool_calls_made = 0
 
-    # Configure smart routing if enabled
+    # Configure smart routing if enabled and feature flag allows
     if enable_smart_routing:
-        settings.smart_routing_enabled = True
-        settings.smart_routing_profile = routing_profile
-        if fallback_chain:
-            settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
-        console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+        from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+        feature_manager = get_feature_flag_manager()
+        if feature_manager.is_enabled(FeatureFlag.USE_SMART_ROUTING):
+            settings.smart_routing_enabled = True
+            settings.smart_routing_profile = routing_profile
+            if fallback_chain:
+                settings.smart_routing_fallback_chain = [
+                    p.strip() for p in fallback_chain.split(",")
+                ]
+            console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+        else:
+            console.print(
+                "[yellow]Smart routing is currently disabled via feature flag.[/]"
+            )
+            console.print(
+                "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
+                "[cyan]--enable-smart-routing[/] flag in beta period"
+            )
 
     # Configure tool output preview (accuracy-first defaults)
     from victor.config.tool_settings import ToolSettings

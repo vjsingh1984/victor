@@ -115,6 +115,11 @@ class FeatureFlag(Enum):
     # Phase 10 - Agentic Loop (single-turn execution with perception/evaluation)
     USE_AGENTIC_LOOP = "use_agentic_loop"
 
+    # Optimization flags (default: False — opt-in only)
+    USE_SEMANTIC_RESPONSE_CACHE = "use_semantic_response_cache"
+    USE_CONTEXT_TEMPERATURE = "use_context_temperature"
+    USE_CONFIDENCE_MONITOR = "use_confidence_monitor"
+
     # Phase 11 - Smart Model Routing (automatic local→cloud fallback)
     USE_SMART_ROUTING = "use_smart_routing"
 
