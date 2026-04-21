@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import platform
 import re
 import shlex
@@ -548,8 +549,6 @@ async def shell(
 
     # Validate working directory exists before execution
     if cwd:
-        import os
-
         if not os.path.isdir(cwd):
             return {
                 "success": False,

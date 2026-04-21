@@ -49,6 +49,7 @@ class BufferedRenderer:
         arguments: dict[str, Any],
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
+        was_pruned: bool = False,
     ) -> None:
         """Record tool execution result."""
         # Update last matching tool call with result
@@ -58,6 +59,7 @@ class BufferedRenderer:
                     "success": success,
                     "elapsed": elapsed,
                     "error": error,
+                    "was_pruned": was_pruned,
                 }
                 break
 
