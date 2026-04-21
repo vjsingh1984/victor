@@ -183,7 +183,7 @@ class ConversationStore:
         """Initialize the conversation memory manager.
 
         Args:
-            db_path: Path to SQLite database. Defaults to {project}/.victor/conversation.db
+            db_path: Path to SQLite database. Defaults to {project}/.victor/project.db
             max_context_tokens: Maximum tokens in context window
             response_reserve: Tokens reserved for response
             chars_per_token: Approximate characters per token for estimation
@@ -230,9 +230,14 @@ class ConversationStore:
         - Sessions table uses INTEGER FKs for efficient joins
         - Indexes on all FK columns for fast aggregation queries
 
+        Database Architecture:
+        - Primary: .victor/project.db (all project-specific data)
+        - Legacy: Auto-migrate conversation.db → project.db if exists
+        - Global: ~/.victor/victor.db (providers, models, cross-project settings)
+
         Migration Strategy:
         - Run pending migrations before schema initialization
-        - Handle both legacy conversation.db and new project.db schemas
+        - Support legacy conversation.db → project.db migration
         """
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
 
