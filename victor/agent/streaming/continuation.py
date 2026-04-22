@@ -475,7 +475,7 @@ class ContinuationHandler:
                     else time.time() - stream_ctx.start_time
                 )
                 cost_str = None
-                if self._settings.show_cost_metrics and final_metrics:
+                if self._settings.analytics.show_cost_metrics and final_metrics:
                     cost_str = final_metrics.format_cost()
                 metrics_line = self._chunk_generator.format_completion_metrics(
                     stream_ctx, elapsed_time, cost_str
@@ -603,7 +603,7 @@ class ContinuationHandler:
                 else time.time() - stream_ctx.start_time
             )
             cost_str = None
-            if self._settings.show_cost_metrics and final_metrics:
+            if self._settings.analytics.show_cost_metrics and final_metrics:
                 cost_str = final_metrics.format_cost()
             metrics_line = self._chunk_generator.format_completion_metrics(
                 stream_ctx, elapsed_time, cost_str
