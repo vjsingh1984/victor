@@ -778,6 +778,22 @@ class Settings(BaseSettings):
             # Response Configuration
             "response_completion_retries": "response.response_completion_retries",
             "response_token_reserve": "response.response_token_reserve",
+            # Server Configuration
+            "server_api_key": "server.server_api_key",
+            "server_session_secret": "server.server_session_secret",
+            "server_max_sessions": "server.server_max_sessions",
+            "server_max_message_bytes": "server.server_max_message_bytes",
+            "server_session_ttl_seconds": "server.server_session_ttl_seconds",
+            "render_max_payload_bytes": "server.render_max_payload_bytes",
+            "render_timeout_seconds": "server.render_timeout_seconds",
+            "render_max_concurrency": "server.render_max_concurrency",
+            # Subprocess Configuration
+            "code_executor_network_disabled": "subprocess.code_executor_network_disabled",
+            "code_executor_memory_limit": "subprocess.code_executor_memory_limit",
+            "code_executor_cpu_shares": "subprocess.code_executor_cpu_shares",
+            "subprocess_resource_limits_enabled": "subprocess.subprocess_resource_limits_enabled",
+            # Usage Configuration
+            "usage_sampling_enabled": "usage.usage_sampling_enabled",
             # Workflow Configuration
             "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
             "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",
@@ -1045,33 +1061,22 @@ class Settings(BaseSettings):
     auto_detect_vertical: bool = False  # Auto-detect vertical from project context (experimental)
 
     # Server Security (FastAPI/WebSocket layer)
-    # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
-    server_api_key: Optional[SecretStr] = None
-    # HMAC secret for issuing/verifying session tokens (defaults to random per-process secret)
-    server_session_secret: Optional[SecretStr] = None
-    # Hard cap on simultaneous sessions to avoid resource exhaustion
-    server_max_sessions: int = 100
-    # Maximum inbound message payload size (bytes) for WebSocket messages
-    server_max_message_bytes: int = 32768
-    # Session token time-to-live in seconds
-    server_session_ttl_seconds: int = 86400
+    # NOTE: server_* fields now in server nested group
+
     # Diagram rendering limits
-    render_max_payload_bytes: int = 20000
-    render_timeout_seconds: int = 10
-    render_max_concurrency: int = 2
+    # NOTE: render_* fields now in server nested group
 
     # Code execution sandbox defaults (used by code_executor_tool)
-    code_executor_network_disabled: bool = True
-    code_executor_memory_limit: Optional[str] = "512m"
-    code_executor_cpu_shares: Optional[int] = 256
+    # NOTE: code_executor_* fields now in subprocess nested group
 
     # Subprocess resource limits (POSIX rlimit for tool subprocesses)
     # When enabled, applies memory/CPU/FD limits via preexec_fn.
     # Defaults to False — opt-in to avoid breaking existing workflows.
-    subprocess_resource_limits_enabled: bool = False
+    # NOTE: subprocess_resource_limits_enabled now in subprocess nested group
 
     # Usage log semantic sampling (reduces disk I/O for noisy events)
-    usage_sampling_enabled: bool = True
+    # NOTE: usage_sampling_enabled now in usage nested group
+
     usage_content_sample_rate: int = 10  # Emit 1 in N content-chunk events
     usage_dedup_window_seconds: float = 5.0  # Dedup window for progress events
 
@@ -1924,18 +1929,7 @@ class Settings(BaseSettings):
     # Validators ported from VictorSettings
     # ==========================================================================
 
-    @field_validator("server_session_secret", mode="before")
-    @classmethod
-    def _autogenerate_session_secret(
-        cls,
-        v: Optional[SecretStr],
-    ) -> SecretStr:
-        """Auto-generate a cryptographically secure session secret when None."""
-        if v is None:
-            import secrets as _secrets
-
-            return SecretStr(_secrets.token_urlsafe(32))
-        return v
+    # NOTE: _autogenerate_session_secret validator moved to ServerSettings
 
     @field_validator("write_approval_mode")
     @classmethod

@@ -105,3 +105,23 @@ class ServerSettings(BaseModel):
         if v <= 0:
             raise ValueError("server_session_ttl_seconds must be positive")
         return v
+
+    @field_validator("server_session_secret", mode="before")
+    @classmethod
+    def _autogenerate_session_secret(
+        cls,
+        v: Optional[SecretStr],
+    ) -> Optional[SecretStr]:
+        """Auto-generate a cryptographically secure session secret when None.
+
+        Args:
+            v: Session secret value (may be None)
+
+        Returns:
+            SecretStr with generated secret if input was None, otherwise original value
+
+        """
+        if v is None:
+            import secrets as _secrets
+            return SecretStr(_secrets.token_urlsafe(32))
+        return v
