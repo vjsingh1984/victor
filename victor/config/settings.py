@@ -778,6 +778,37 @@ class Settings(BaseSettings):
             # Response Configuration
             "response_completion_retries": "response.response_completion_retries",
             "response_token_reserve": "response.response_token_reserve",
+            # Workflow Configuration
+            "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
+            "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",
+            "workflow_definition_cache_max_entries": "workflow.workflow_definition_cache_max_entries",
+            "stategraph_copy_on_write_enabled": "workflow.stategraph_copy_on_write_enabled",
+            # Pipeline Configuration
+            "max_exploration_iterations": "pipeline.max_exploration_iterations",
+            "max_exploration_iterations_action": "pipeline.max_exploration_iterations_action",
+            "max_exploration_iterations_analysis": "pipeline.max_exploration_iterations_analysis",
+            "min_content_threshold": "pipeline.min_content_threshold",
+            "max_research_iterations": "pipeline.max_research_iterations",
+            "recovery_empty_response_threshold": "pipeline.recovery_empty_response_threshold",
+            "recovery_blocked_consecutive_threshold": "pipeline.recovery_blocked_consecutive_threshold",
+            "recovery_blocked_total_threshold": "pipeline.recovery_blocked_total_threshold",
+            "max_continuation_prompts_analysis": "pipeline.max_continuation_prompts_analysis",
+            "max_continuation_prompts_action": "pipeline.max_continuation_prompts_action",
+            "max_continuation_prompts_default": "pipeline.max_continuation_prompts_default",
+            "intelligent_pipeline_enabled": "pipeline.intelligent_pipeline_enabled",
+            "intelligent_quality_scoring": "pipeline.intelligent_quality_scoring",
+            "intelligent_mode_learning": "pipeline.intelligent_mode_learning",
+            "intelligent_prompt_optimization": "pipeline.intelligent_prompt_optimization",
+            "intelligent_grounding_verification": "pipeline.intelligent_grounding_verification",
+            "intelligent_min_quality_threshold": "pipeline.intelligent_min_quality_threshold",
+            "intelligent_grounding_threshold": "pipeline.intelligent_grounding_threshold",
+            "intelligent_exploration_rate": "pipeline.intelligent_exploration_rate",
+            "intelligent_learning_rate": "pipeline.intelligent_learning_rate",
+            "intelligent_discount_factor": "pipeline.intelligent_discount_factor",
+            "tool_exploration_boosts": "tools.tool_exploration_boosts",
+            "serialization_include_format_hint": "pipeline.serialization_include_format_hint",
+            "serialization_min_rows_for_tabular": "pipeline.serialization_min_rows_for_tabular",
+            "serialization_debug_mode": "pipeline.serialization_debug_mode",
         }
 
         # Transform legacy flat env vars to nested structure
@@ -1199,11 +1230,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Workflow Definition Cache (P1 Scalability)
     # ==========================================================================
-    # Caches parsed YAML workflow definitions to avoid redundant parsing.
-    # Uses TTL + file mtime invalidation for freshness.
-    workflow_definition_cache_enabled: bool = True
-    workflow_definition_cache_ttl: int = 3600  # seconds
-    workflow_definition_cache_max_entries: int = 100
+    # NOTE: These fields are now in workflow nested group
 
     # ==========================================================================
     # StateGraph Copy-on-Write (P2 Scalability)
@@ -1220,7 +1247,7 @@ class Settings(BaseSettings):
     # Trade-offs:
     # - Slightly more complex debugging (state may be shared until mutation)
     # - First mutation incurs full deep copy cost
-    stategraph_copy_on_write_enabled: bool = True
+    # NOTE: stategraph_copy_on_write_enabled now in workflow nested group
 
     # ==========================================================================
     # Feature Flags (SOLID Refactoring)
@@ -1333,15 +1360,7 @@ class Settings(BaseSettings):
     # Higher values = more thorough exploration, slower responses
     # Significantly increased to match Claude Code's unlimited exploration approach
     # Mode multipliers further increase these (PLAN: 10x, EXPLORE: 20x)
-    max_exploration_iterations: int = 200  # Base limit - multiplied by mode (was 25)
-    max_exploration_iterations_action: int = (
-        500  # Very lenient for action tasks - let task completion detect finish (was 35)
-    )
-    max_exploration_iterations_analysis: int = (
-        1000  # Effectively unlimited for analysis - rely on task completion (was 75)
-    )
-    min_content_threshold: int = 50  # Minimum chars to consider "substantial" output (was 100)
-    max_research_iterations: int = 50  # Allow thorough web research (was 15)
+    # NOTE: max_exploration_iterations* fields now in pipeline nested group
 
     # ==========================================================================
     # Recovery & Loop Detection Thresholds
@@ -1349,26 +1368,11 @@ class Settings(BaseSettings):
     # These control when Victor forces completion after detecting stuck behavior.
     # Lower values = faster recovery but may cut off legitimate long operations.
     # Higher values = more patience but may waste tokens on stuck loops.
-
-    # Empty response recovery: Force after N consecutive empty responses from model
-    recovery_empty_response_threshold: int = (
-        5  # Default: force after 5 empty responses (3 * 1.5 = 4.5 → 5)
-    )
-
-    # Loop detection patience: How many consecutive blocked attempts before forcing completion
-    # This is separate from the per-task loop_repeat_threshold (which controls when to warn/block)
-    recovery_blocked_consecutive_threshold: int = (
-        6  # Default: force after 6 consecutive blocks (4 * 1.5 = 6)
-    )
-    recovery_blocked_total_threshold: int = (
-        9  # Default: force after 9 total blocked attempts (6 * 1.5 = 9)
-    )
+    # NOTE: recovery_* fields now in pipeline nested group
 
     # Continuation prompts: How many times to prompt model to continue before forcing
     # These are global defaults - can be overridden per provider/model via RL learning
-    max_continuation_prompts_analysis: int = 6  # For analysis tasks (4 * 1.5 = 6)
-    max_continuation_prompts_action: int = 5  # For action tasks (3 * 1.5 = 4.5 → 5)
-    max_continuation_prompts_default: int = 3  # For other tasks (2 * 1.5 = 3)
+    # NOTE: max_continuation_prompts_* fields now in pipeline nested group
 
     # Provider/model-specific continuation prompt overrides (learned via RL)
     # Format: {"provider:model": {"analysis": N, "action": N, "default": N}}
@@ -1449,30 +1453,22 @@ class Settings(BaseSettings):
     # - Response quality scoring (coherence, completeness, relevance, grounding)
     # - Provider resilience integration (circuit breaker, retries)
     # - Embedding-based prompt optimization
-    intelligent_pipeline_enabled: bool = True  # Master switch for intelligent features
-    intelligent_quality_scoring: bool = True  # Enable multi-dimensional quality scoring
-    intelligent_mode_learning: bool = True  # Enable Q-learning for mode transitions
-    intelligent_prompt_optimization: bool = True  # Enable embedding-based prompt selection
-    intelligent_grounding_verification: bool = True  # Enable hallucination detection
+    # NOTE: intelligent_* fields now in pipeline nested group
 
     # Quality thresholds
-    intelligent_min_quality_threshold: float = 0.5  # Minimum quality to accept response
-    intelligent_grounding_threshold: float = 0.7  # Confidence threshold for grounding
+    # NOTE: intelligent_*_threshold fields now in pipeline nested group
 
     # Learning rate for Q-learning (default exploration rate = 0.3, decay = 0.995)
-    intelligent_exploration_rate: float = 0.3  # Initial exploration vs exploitation
-    intelligent_learning_rate: float = 0.1  # Q-learning alpha parameter
-    intelligent_discount_factor: float = 0.9  # Q-learning gamma parameter
+    # NOTE: intelligent_*_rate, *_learning, *_discount_factor now in pipeline nested group
 
     # Tool-specific exploration boosts (for rebuilding reputation after fixes)
     # Maps tool names to exploration boost multipliers (e.g., {"graph": 5.0})
     # Higher values = more likely to explore this tool despite low Q-value
     # Use after significant tool improvements to accelerate relearning
-    tool_exploration_boosts: Dict[str, float] = Field(default_factory=dict)
+    # NOTE: tool_exploration_boosts now in tools nested group
 
-    serialization_include_format_hint: bool = True  # Include format description in output
-    serialization_min_rows_for_tabular: int = 3  # Min rows to consider tabular formats
-    serialization_debug_mode: bool = False  # Include data characteristics in output
+    # Serialization settings
+    # NOTE: serialization_* fields now in pipeline nested group
 
     # ==========================================================================
     # Skill Auto-Selection
