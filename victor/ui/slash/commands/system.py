@@ -263,7 +263,7 @@ class ThemeCommand(BaseSlashCommand):
         )
 
     def execute(self, ctx: CommandContext) -> None:
-        current_theme = getattr(ctx.settings, "theme", "dark")
+        current_theme = ctx.settings.ui.theme if ctx.settings.ui else "dark"
 
         if ctx.args:
             new_theme = ctx.args[0].lower()
@@ -275,7 +275,7 @@ class ThemeCommand(BaseSlashCommand):
             # Toggle
             new_theme = "light" if current_theme == "dark" else "dark"
 
-        ctx.settings.theme = new_theme
+        ctx.settings.ui.theme = new_theme
         ctx.console.print(f"[green]Theme set to:[/] {new_theme}")
 
 
