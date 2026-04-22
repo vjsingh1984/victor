@@ -1681,7 +1681,7 @@ class CompiledGraph(Generic[StateType]):
             from victor.config.settings import load_settings
 
             settings = load_settings()
-            return settings.stategraph_copy_on_write_enabled
+            return settings.workflow.stategraph_copy_on_write_enabled
         except Exception:
             # Default to True if settings can't be loaded
             return True

@@ -408,20 +408,20 @@ def config_from_settings() -> SerializationConfig:
 
         # Parse default format if specified
         preferred_format = None
-        if settings.serialization_default_format:
+        if settings.pipeline.serialization_default_format:
             try:
-                preferred_format = SerializationFormat(settings.serialization_default_format)
+                preferred_format = SerializationFormat(settings.pipeline.serialization_default_format)
             except ValueError:
                 logger.warning(
-                    f"Unknown serialization format: {settings.serialization_default_format}"
+                    f"Unknown serialization format: {settings.pipeline.serialization_default_format}"
                 )
 
         return SerializationConfig(
             preferred_format=preferred_format,
-            min_savings_threshold=settings.serialization_min_savings_threshold,
-            include_format_hint=settings.serialization_include_format_hint,
-            min_array_size_for_tabular=settings.serialization_min_rows_for_tabular,
-            debug_mode=settings.serialization_debug_mode,
+            min_savings_threshold=settings.pipeline.serialization_min_savings_threshold,
+            include_format_hint=settings.pipeline.serialization_include_format_hint,
+            min_array_size_for_tabular=settings.pipeline.serialization_min_rows_for_tabular,
+            debug_mode=settings.pipeline.serialization_debug_mode,
         )
 
     except ImportError:
@@ -438,6 +438,6 @@ def is_serialization_enabled() -> bool:
     try:
         from victor.config.settings import Settings
 
-        return Settings().serialization_enabled
+        return Settings().serialization.serialization_enabled
     except ImportError:
         return True  # Default to enabled

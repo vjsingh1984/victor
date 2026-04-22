@@ -921,7 +921,7 @@ class ToolSelector(ModeAwareMixin):
 
             settings = get_settings()
 
-            if not settings.tool_selection_cache_enabled:
+            if not settings.cache.tool_selection_cache_enabled:
                 logger.debug("Tool selection cache disabled in settings")
                 self._tool_selection_cache_enabled = False
                 return None
@@ -929,7 +929,7 @@ class ToolSelector(ModeAwareMixin):
             # Initialize cache with tool selection TTL
             self._tool_selection_cache = GenericResultCache()
             self._tool_selection_cache_enabled = True
-            self._tool_selection_cache_ttl = settings.tool_selection_cache_ttl
+            self._tool_selection_cache_ttl = settings.cache.tool_selection_cache_ttl
 
             logger.debug(
                 f"Tool selection cache initialized with TTL={self._tool_selection_cache_ttl}s"
