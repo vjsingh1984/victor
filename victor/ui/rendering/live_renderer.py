@@ -49,15 +49,15 @@ class LiveDisplayRenderer:
         """
         self.console = console
         self._live: Live | None = None
-        self._content_buffer = ""
+        self._content_buffer = ""  # Single source of truth for all content
         self._is_paused = False
         self._pause_count = 0  # Depth counter for nested pause/resume
         self._pause_start_ms: float | None = None
         self._metrics = StreamingMetrics()
-        self._thinking_buffer = ""
+        # REMOVED: self._thinking_buffer = ""  # No longer needed - caused duplication
         self._pending_tool: dict | None = None
         self._last_tool_result: dict | None = None
-        self._last_thinking_rendered = ""
+        # REMOVED: self._last_thinking_rendered = ""  # No longer needed
         self._thinking_indicator_shown = False
         self._in_thinking_mode = False
         self._content_shown_before_pause = ""
@@ -241,31 +241,52 @@ class LiveDisplayRenderer:
         self.resume()
 
     def on_content(self, text: str) -> None:
-        """Handle content chunk - update Live display.
+        """Handle content chunk - route to appropriate handler based on state.
 
         Args:
             text: Content text to append
         """
-        # CRITICAL FIX: Always add to content buffer first (preserve for final display)
+        # CRITICAL: Always preserve content for final display
         self._content_buffer += text
 
-        # During thinking mode, also add to thinking buffer for styled rendering
-        # This ensures content is preserved for final display if stream ends in thinking mode
+        # State-based routing (State Pattern)
         if self._in_thinking_mode:
-            # Add to thinking buffer for display
-            self._thinking_buffer += text
-            # CRITICAL FIX: Don't early return - still update Live display
-            # This ensures content is visible even in thinking mode
-            if self._live:
-                new_content = self._content_buffer[len(self._content_shown_before_pause) :]
-                self._live.update(Markdown(new_content))
-            return
+            self._handle_thinking_content(text)
+        else:
+            self._handle_normal_content(text)
 
-        # Normal content flow
+    def _handle_thinking_content(self, text: str) -> None:
+        """Handle content during thinking mode - print immediately.
+
+        Key design decisions:
+        - Print directly to console (NOT Live display which is paused)
+        - Don't buffer to _thinking_buffer (eliminates duplication)
+        - Don't call _live.update() (wasted cycles, display is paused)
+
+        Args:
+            text: Content text to display
+        """
+        from rich.text import Text
+
+        # Print thinking content immediately with distinct styling
+        thinking_text = Text(text, style="dim italic")
+        self.console.print(thinking_text)
+
+    def _handle_normal_content(self, text: str) -> None:
+        """Handle content during normal mode - stream to Live display.
+
+        Key design decisions:
+        - Update Live display with full buffer (Rich handles delta internally)
+        - Track metrics for performance monitoring
+        - No delta calculation needed (Rich is efficient)
+
+        Args:
+            text: Content text to append
+        """
         t0 = time.monotonic() * 1000
         if self._live:
-            new_content = self._content_buffer[len(self._content_shown_before_pause) :]
-            self._live.update(Markdown(new_content))
+            # Rich Live display is smart - it only re-renders changed portions
+            self._live.update(Markdown(self._content_buffer))
         duration_ms = time.monotonic() * 1000 - t0
         self._metrics.record_content_chunk(duration_ms)
         if duration_ms > 100:
@@ -273,6 +294,12 @@ class LiveDisplayRenderer:
 
     def on_thinking_content(self, text: str) -> None:
         """Display thinking content immediately during streaming.
+
+        Design principle:
+        - Thinking content from API (DeepSeek) is different from inline markers
+        - API reasoning: print immediately, don't buffer
+        - Inline markers: handled by StreamingContentFilter
+        - Single responsibility: just display, don't accumulate
 
         Args:
             text: Thinking text to display
@@ -283,29 +310,21 @@ class LiveDisplayRenderer:
         # Pause live display to show thinking content
         self.pause()
 
-        # Render thinking content with a distinct style
-        # Use a panel or styled text to make it stand out
-        from rich.panel import Panel
-        from rich.markdown import Markdown
+        # Render thinking content immediately (no buffering)
         from rich.text import Text
-
-        # Create a styled thinking indicator
         thinking_text = Text(text, style="dim italic")
         self.console.print(thinking_text)
-
-        # Also accumulate for final content
-        self._thinking_buffer += text
-
-        # Mark that we've shown this thinking content
-        self._last_thinking_rendered = text
 
         # Resume live display
         self.resume()
 
+        # REMOVED: self._thinking_buffer += text  # Eliminates duplication
+        # REMOVED: self._last_thinking_rendered = text  # No longer needed
+
     def on_thinking_start(self) -> None:
         """Show thinking indicator and pause Live display."""
         self.pause()
-        self._thinking_buffer = ""  # Reset thinking buffer
+        # REMOVED: self._thinking_buffer = ""  # No longer needed
         # Only show indicator once per response (reset in cleanup)
         if not self._thinking_indicator_shown:
             render_thinking_indicator(self.console)
@@ -314,34 +333,20 @@ class LiveDisplayRenderer:
         self._in_thinking_mode = True
 
     def on_thinking_end(self) -> None:
-        """End thinking - render accumulated content and resume Live display."""
+        """Exit thinking state and resume Live display.
+
+        Simplified approach:
+        - Just exit thinking mode and resume
+        - No manual rendering (resume() handles delta correctly)
+        - No buffer duplication (single source of truth)
+        """
         # Exit thinking mode first
         self._in_thinking_mode = False
 
-        # Render only the NEW content (not already rendered) to avoid duplication
-        if self._thinking_buffer:
-            # Only render the portion we haven't already shown
-            if self._thinking_buffer.startswith(self._last_thinking_rendered):
-                new_content = self._thinking_buffer[len(self._last_thinking_rendered) :]
-            else:
-                new_content = self._thinking_buffer
+        # Resume Live display (shows all content buffered during thinking)
+        self.resume()
 
-            if new_content.strip():
-                render_thinking_text(self.console, new_content)
-                self.console.print()  # Newline after thinking content
-
-            self._last_thinking_rendered = self._thinking_buffer
-            self._thinking_buffer = ""
-
-        # CRITICAL FIX: Ensure Live display shows all content after thinking ends
-        self.resume()  # This updates Live with any content buffered during thinking
-
-        # Double-check: If Live display was never updated with thinking content,
-        # force an update now to ensure nothing is lost
-        if self._live and self._content_buffer:
-            new_content = self._content_buffer[len(self._content_shown_before_pause) :]
-            if new_content.strip():
-                self._live.update(Markdown(new_content))
+        # Note: _thinking_buffer is now unused - removed in __init__
 
     def finalize(self) -> str:
         """Finalize response and return accumulated content.
@@ -352,11 +357,7 @@ class LiveDisplayRenderer:
         from rich.markdown import Markdown
         import time
 
-        # CRITICAL FIX: Flush any remaining thinking content first
-        if self._thinking_buffer:
-            render_thinking_text(self.console, self._thinking_buffer)
-            self._thinking_buffer = ""
-            self.console.print()
+        # REMOVED: Flush thinking buffer (no longer exists - caused duplication)
 
         # FAIL-SAFE: Ensure content buffer is displayed to user
         # This catches any edge cases where content wasn't shown during streaming
@@ -375,7 +376,6 @@ class LiveDisplayRenderer:
         logger.debug(
             f"LiveDisplayRenderer.finalize(): "
             f"content_buffer_len={len(self._content_buffer)}, "
-            f"thinking_buffer_len={len(self._thinking_buffer)}, "
             f"in_thinking_mode={self._in_thinking_mode}"
         )
 
@@ -431,8 +431,8 @@ class LiveDisplayRenderer:
             self._live = None
         self._is_paused = False
         self._pause_count = 0
-        self._thinking_buffer = ""
-        self._last_thinking_rendered = ""
+        # REMOVED: self._thinking_buffer = ""  # No longer needed
+        # REMOVED: self._last_thinking_rendered = ""  # No longer needed
         self._pending_tool = None
         self._thinking_indicator_shown = False
         self._in_thinking_mode = False

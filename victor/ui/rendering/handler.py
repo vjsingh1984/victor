@@ -58,8 +58,24 @@ async def stream_response(
     content_filter = StreamingContentFilter(suppress_thinking=suppress_thinking)
     was_thinking = False
 
+    # ENHANCEMENT: Log chunk boundaries for debugging streaming issues
+    chunk_count = 0
+
     try:
         async for chunk in stream_gen:
+            chunk_count += 1
+
+            # Log every 100th chunk to diagnose duplication/buffering issues
+            if chunk_count % 100 == 0:
+                content_len = len(chunk.content) if chunk.content else 0
+                metadata_keys = list(chunk.metadata.keys()) if chunk.metadata else []
+                logger.debug(
+                    f"Stream chunk #{chunk_count}: "
+                    f"content_len={content_len}, "
+                    f"metadata_keys={metadata_keys}, "
+                    f"is_thinking={content_filter.is_thinking}"
+                )
+
             # Handle structured tool events
             if chunk.metadata and "tool_start" in chunk.metadata:
                 tool_data = chunk.metadata["tool_start"]
@@ -103,8 +119,9 @@ async def stream_response(
             elif chunk.metadata and "reasoning_content" in chunk.metadata:
                 reasoning = chunk.metadata["reasoning_content"]
                 if reasoning and not suppress_thinking:
-                    # Start thinking state if not already active
+                    # Log state transition for debugging
                     if not was_thinking:
+                        logger.debug("→ Entering thinking mode (API reasoning)")
                         renderer.on_thinking_start()
                         was_thinking = True
                     renderer.on_thinking_content(reasoning)
@@ -113,12 +130,14 @@ async def stream_response(
                 # End API-based thinking state when regular content arrives
                 # This handles the transition from DeepSeek reasoning to regular output
                 if was_thinking and not content_filter.is_thinking:
+                    logger.debug("← Exiting thinking mode (API reasoning ended)")
                     renderer.on_thinking_end()
                     was_thinking = False
                 result = content_filter.process_chunk(chunk.content)
 
-                # Handle state transitions
+                # Log inline thinking state transitions for debugging
                 if result.entering_thinking and not was_thinking:
+                    logger.debug("→ Entering thinking mode (inline markers)")
                     renderer.on_thinking_start()
                     was_thinking = True
 
@@ -130,6 +149,7 @@ async def stream_response(
                         renderer.on_content(result.content)
 
                 if result.exiting_thinking and was_thinking:
+                    logger.debug("← Exiting thinking mode (inline markers ended)")
                     renderer.on_thinking_end()
                     was_thinking = False
 
@@ -155,7 +175,6 @@ async def stream_response(
         logger.debug(
             f"stream_response completion - "
             f"content_buffer_len={len(getattr(renderer, '_content_buffer', ''))}, "
-            f"thinking_buffer_len={len(getattr(renderer, '_thinking_buffer', ''))}, "
             f"in_thinking_mode={getattr(renderer, '_in_thinking_mode', False)}, "
             f"live_active={getattr(renderer, '_live', None) is not None}"
         )

@@ -635,28 +635,6 @@ victor chat --sessionid abc123            # Resume session
 
         settings = load_settings()
 
-        # Early configuration validation (P0: catch errors at startup, not runtime)
-        try:
-            from victor.config.validation import (
-                validate_configuration,
-                format_validation_result,
-            )
-
-            validation_result = validate_configuration(settings)
-            if not validation_result.is_valid():
-                # Configuration has errors - display and exit
-                console.print("[bold red]Configuration Validation Failed:[/]")
-                console.print(format_validation_result(validation_result))
-                console.print("")
-                console.print("[yellow]Run 'victor config validate' for detailed diagnostics[/]")
-                raise typer.Exit(1)
-        except Exception as e:
-            # If validation itself fails, log it but don't block startup
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Configuration validation skipped due to error: {e}")
-
         # Apply CLI flags to settings
         if log_events:
             settings.observability.enable_observability_logging = True
@@ -954,13 +932,43 @@ async def run_oneshot(
             # Step 1: Load and validate configuration
             status.update("Loading configuration...")
 
+            # Configuration validation (P1-6: Display configuration validation status)
+            try:
+                from victor.config.validation import validate_configuration, format_validation_result
+
+                status.update("Validating configuration...")
+                validation_result = validate_configuration(settings)
+
+                if not validation_result.is_valid():
+                    # Configuration has errors - display and exit
+                    status.stop()  # Stop the spinner to show errors clearly
+                    console.print("[bold red]Configuration Validation Failed:[/]")
+                    console.print(format_validation_result(validation_result))
+                    console.print("")
+                    console.print("[yellow]Run 'victor config validate' for detailed diagnostics[/]")
+                    raise typer.Exit(1)
+                elif validation_result.has_warnings():
+                    # Configuration has warnings but is valid - show summary
+                    warning_count = len(validation_result.warnings)
+                    if warning_count > 0:
+                        console.print(f"[dim]✓ Configuration valid with {warning_count} warning(s)[/]")
+                else:
+                    # Configuration is completely valid
+                    console.print("[dim]✓ Configuration valid[/]")
+            except Exception as e:
+                # If validation itself fails, log it but don't block startup
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Configuration validation skipped due to error: {e}")
+                console.print("[dim yellow]⚠ Configuration validation skipped[/]")
+
             # Validate default model existence (Phase 1 UX improvement)
             from victor.config.settings import validate_default_model
 
             model_valid, model_warning = validate_default_model(settings)
             if not model_valid and model_warning:
                 # Model validation failed - show warning and offer to continue
-                console.print(f"\n[yellow]⚠ Configuration Warning:[/]")
+                console.print("\n[yellow]⚠ Configuration Warning:[/]")
                 console.print(model_warning)
                 console.print()
 
@@ -1700,7 +1708,7 @@ async def _run_cli_repl(
                     console.print(
                         f"\n[dim]💾 Conversation auto-saved. Resume with: victor chat --resume {session_id}[/]"
                     )
-            except Exception as save_error:
+            except Exception:
                 # Silently fail if save doesn't work — error message is more important
                 pass
 
@@ -1721,14 +1729,14 @@ async def _run_cli_repl(
             if is_provider_error and provider != "ollama":
                 console.print(
                     "\n[yellow]💡 Try switching to a different provider:[/]"
-                    f"\n  [dim]victor chat -p ollama[/]  # Local models (free)[/]"
-                    f"\n  [dim]victor chat -p openai[/]  # GPT models[/]"
+                    "\n  [dim]victor chat -p ollama[/]  # Local models (free)[/]"
+                    "\n  [dim]victor chat -p openai[/]  # GPT models[/]"
                 )
             elif is_provider_error:
                 console.print(
                     "\n[yellow]💡 Try switching to a cloud provider:[/]"
-                    f"\n  [dim]victor chat -p anthropic[/]  # Claude models[/]"
-                    f"\n  [dim]victor chat -p openai[/]  # GPT models[/]"
+                    "\n  [dim]victor chat -p anthropic[/]  # Claude models[/]"
+                    "\n  [dim]victor chat -p openai[/]  # GPT models[/]"
                 )
 
             console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
