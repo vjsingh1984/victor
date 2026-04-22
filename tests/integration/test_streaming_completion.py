@@ -113,10 +113,7 @@ class TestStreamingCompletion:
         test_content = "This is thinking content that should be preserved."
         renderer.on_content(test_content)
 
-        # Verify: Content is in thinking_buffer BEFORE finalize
-        assert test_content in renderer._thinking_buffer
-
-        # Verify: Content is also in content_buffer (both buffers)
+        # Verify: Content is in content_buffer (single source of truth)
         assert test_content in renderer._content_buffer
 
         # End stream while still in thinking mode
@@ -124,8 +121,6 @@ class TestStreamingCompletion:
 
         # Verify: After finalize, content_buffer still has the content (not lost)
         assert test_content in renderer._content_buffer
-
-        # Note: thinking_buffer is cleared by finalize(), so we don't check it after
 
     @pytest.mark.asyncio
     async def test_multiple_chunks_after_tool_calls(self):
@@ -261,8 +256,8 @@ class TestThinkingModeTransitions:
         renderer.on_content("Thinking: Let me analyze this...")
         renderer.on_content("This is the actual analysis content.")
 
-        # Verify content is in thinking_buffer while in thinking mode
-        assert "Thinking:" in renderer._thinking_buffer
+        # Verify content is in content_buffer (single source of truth)
+        assert "Thinking:" in renderer._content_buffer
         assert "actual analysis content" in renderer._content_buffer
 
         # End thinking mode
@@ -276,9 +271,10 @@ class TestThinkingModeTransitions:
         assert "More content after thinking" in renderer._content_buffer
 
     def test_content_buffer_during_thinking(self):
-        """Verify content goes to both buffers during thinking mode.
+        """Verify content goes to content_buffer during thinking mode.
 
-        This is the fix for the bug where content was lost if stream ended in thinking mode.
+        With the single-buffer design, content is preserved in _content_buffer
+        even when stream ends in thinking mode.
         """
         console = Console()
         renderer = LiveDisplayRenderer(console=console)
@@ -290,9 +286,8 @@ class TestThinkingModeTransitions:
         test_content = "Important response content"
         renderer.on_content(test_content)
 
-        # Verify: Content is in BOTH buffers
-        assert test_content in renderer._thinking_buffer, "Content should be in thinking_buffer"
-        assert test_content in renderer._content_buffer, "Content should ALSO be in content_buffer"
+        # Verify: Content is in content_buffer (single source of truth)
+        assert test_content in renderer._content_buffer, "Content should be in content_buffer"
 
         # Finalize (simulates stream end)
         renderer.finalize()

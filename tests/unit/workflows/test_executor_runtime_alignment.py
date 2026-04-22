@@ -6,6 +6,9 @@ from unittest.mock import patch
 
 import pytest
 
+# Import subagents module to ensure it's loaded before monkeypatching
+from victor.agent.subagents import orchestrator as subagents_orchestrator_module
+
 from victor.workflows.adapters import (
     AdapterWorkflowState,
     WorkflowState as AdapterWorkflowStateAlias,
@@ -124,43 +127,47 @@ async def test_parallel_executor_records_failure_with_runtime_graph_node_result(
 
 
 @pytest.mark.asyncio
-async def test_agent_executor_uses_output_key_and_runtime_graph_node_result(
-    monkeypatch,
-) -> None:
+async def test_agent_executor_uses_output_key_and_runtime_graph_node_result() -> None:
+    from unittest.mock import patch, AsyncMock
+
     executor = AgentNodeExecutor(context=None)
     fake_result = SimpleNamespace(summary="done", success=True, tool_calls_used=2, error=None)
 
-    class FakeSubAgentOrchestrator:
+    # Create a mock orchestrator to be returned by _get_orchestrator
+    mock_orchestrator = SimpleNamespace()
+
+    # Patch SubAgentOrchestrator at the source module
+    # The execute() method imports it from victor.agent.subagents.orchestrator
+    class MockSubAgentOrchestrator:
         def __init__(self, orchestrator):
             self.orchestrator = orchestrator
+            # Add _context attribute needed for provider-aware context sizing (added April 2026)
+            self._context = None
 
         async def spawn(self, **kwargs):
             return fake_result
 
-    monkeypatch.setattr(
-        "victor.agent.subagents.orchestrator.SubAgentOrchestrator",
-        FakeSubAgentOrchestrator,
-    )
-    monkeypatch.setattr(executor, "_get_orchestrator", lambda profile: object())
-    monkeypatch.setattr(executor, "_map_role_to_enum", lambda role: "researcher")
+    # Use patch context manager for cleaner setup/teardown
+    with patch("victor.agent.subagents.orchestrator.SubAgentOrchestrator", MockSubAgentOrchestrator):
+        # Also patch _get_orchestrator to return the mock orchestrator
+        with patch.object(executor, "_get_orchestrator", return_value=mock_orchestrator):
+            node = AgentNode(
+                id="analyze",
+                name="Analyze",
+                role="researcher",
+                goal="Review {{task}}",
+                input_mapping={"task": "task"},
+                output_key="agent_output",
+            )
 
-    node = AgentNode(
-        id="analyze",
-        name="Analyze",
-        role="researcher",
-        goal="Review {{task}}",
-        input_mapping={"task": "task"},
-        output_key="agent_output",
-    )
+            result = await executor.execute(node, {"task": "repo"})
 
-    result = await executor.execute(node, {"task": "repo"})
-
-    assert result["agent_output"] is fake_result
-    node_result = result["_node_results"]["analyze"]
-    assert isinstance(node_result, GraphNodeResult)
-    assert node_result.success is True
-    assert node_result.output is fake_result
-    assert node_result.tool_calls_used == 2
+            assert result["agent_output"] is fake_result
+            node_result = result["_node_results"]["analyze"]
+            assert isinstance(node_result, GraphNodeResult)
+            assert node_result.success is True
+            assert node_result.output is fake_result
+            assert node_result.tool_calls_used == 2
 
 
 @pytest.mark.asyncio

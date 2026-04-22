@@ -434,8 +434,8 @@ class TestLiveDisplayRenderer:
         renderer.cleanup()  # Should not raise
 
     @patch("victor.ui.rendering.live_renderer.Live")
-    def test_on_thinking_content_buffers_text(self, mock_live_class, renderer, mock_console):
-        """Test on_thinking_content() accumulates text to buffer for later rendering."""
+    def test_on_thinking_content_prints_immediately(self, mock_live_class, renderer, mock_console):
+        """Test on_thinking_content() prints text immediately without buffering."""
         mock_live = MagicMock()
         mock_live_class.return_value = mock_live
 
@@ -444,13 +444,8 @@ class TestLiveDisplayRenderer:
         renderer.on_thinking_content("Reasoning about the problem...")
         renderer.on_thinking_content(" More reasoning...")
 
-        # Should accumulate to buffer, not print each chunk
-        assert renderer._thinking_buffer == "Reasoning about the problem... More reasoning..."
-
-        # Content prints on thinking_end
-        renderer.on_thinking_end()
-        # Now the complete thinking text should have been printed
-        assert mock_console.print.call_count >= 2  # At least indicator + content
+        # Should print immediately, not buffer
+        assert mock_console.print.call_count >= 2  # Each chunk prints immediately
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_thinking_start_shows_indicator(self, mock_live_class, renderer, mock_console):
@@ -475,11 +470,11 @@ class TestLiveDisplayRenderer:
         renderer.start()
         # Add thinking content first
         renderer.on_thinking_start()
-        renderer._thinking_buffer = "Some thinking content"
+        renderer.on_content("Some thinking content")
         renderer.on_thinking_end()
 
-        # Should print thinking content and newline
-        mock_console.print.assert_called()
+        # Should resume live display
+        mock_live.start.assert_called()
 
     @patch("victor.ui.rendering.live_renderer.Live")
     def test_on_thinking_end_without_content_just_resumes(

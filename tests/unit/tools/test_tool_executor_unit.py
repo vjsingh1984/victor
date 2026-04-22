@@ -14,6 +14,7 @@
 
 """Tests for tool_executor module."""
 
+import importlib
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
@@ -23,6 +24,10 @@ from victor.agent.tool_executor import (
 )
 from victor.tools.base import BaseTool, ToolResult
 from victor.tools.registry import ToolRegistry
+
+# Import safety module at collection time so it is cached in sys.modules before
+# victor.__init__ can shadow victor.agent with the @victor.agent decorator function.
+_safety_module = importlib.import_module("victor.agent.safety")
 
 
 class TestToolExecutionResult:
@@ -617,7 +622,7 @@ class TestToolExecutorErrorHandling:
     def reset_globals(self):
         """Reset global singletons before each test for isolation."""
         from victor.core.errors import get_error_handler
-        import victor.agent.safety as safety_module
+        safety_module = _safety_module
 
         # Clear error history to ensure test isolation
         handler = get_error_handler()
@@ -785,7 +790,7 @@ class TestToolExecutorWithErrorHandler:
     def reset_globals(self):
         """Reset global singletons before each test for isolation."""
         from victor.core.errors import get_error_handler
-        import victor.agent.safety as safety_module
+        safety_module = _safety_module
 
         # Clear error history to ensure test isolation
         handler = get_error_handler()
@@ -1664,7 +1669,7 @@ class TestToolExecutorTimeoutHandling:
     def reset_globals(self):
         """Reset global singletons before each test."""
         from victor.core.errors import get_error_handler
-        import victor.agent.safety as safety_module
+        safety_module = _safety_module
 
         handler = get_error_handler()
         handler.clear_history()
@@ -1736,7 +1741,7 @@ class TestExecCtxDoublePassing:
 
     def setup_method(self):
         """Reset safety checker before each test."""
-        import victor.agent.safety as safety_module
+        safety_module = _safety_module
 
         safety_module._default_checker = None
 
@@ -1768,7 +1773,7 @@ class TestSessionDisabledTools:
     """Tests for Issue 3: session-scoped circuit breaker for unavailable tools."""
 
     def setup_method(self):
-        import victor.agent.safety as safety_module
+        safety_module = _safety_module
 
         safety_module._default_checker = None
 
@@ -1832,7 +1837,7 @@ class TestFailedPathRedirects:
     """Tests for Issue 1: session-scoped path redirect cache."""
 
     def setup_method(self):
-        import victor.agent.safety as safety_module
+        safety_module = _safety_module
 
         safety_module._default_checker = None
 

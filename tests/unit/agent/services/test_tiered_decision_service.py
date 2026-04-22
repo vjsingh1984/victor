@@ -222,10 +222,13 @@ class TestProviderAgnosticTiers:
         config = DecisionServiceSettings()
         service = TieredDecisionService(config)
 
-        # Mock settings to have default_provider
+        # Mock settings to have default_provider (nested structure after config migration)
         with patch("victor.config.settings.Settings") as mock_settings_class:
             mock_settings = MagicMock()
-            mock_settings.default_provider = "anthropic"
+            # Mock the nested provider config group
+            mock_provider_config = MagicMock()
+            mock_provider_config.default_provider = "anthropic"
+            mock_settings.provider = mock_provider_config
             mock_settings_class.return_value = mock_settings
 
             provider = service._detect_active_provider()
