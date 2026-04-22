@@ -223,6 +223,13 @@ class InitSynthesizer:
         # feature flags, dev commands) that static graph analysis alone can't surface.
         base_content = self._enrich_with_project_docs(base_content)
 
+        # Pre-synthesis discovery: use graph tool for structural and semantic insights
+        # This fills the "0 patterns" gap by finding loosely coupled relationships
+        # and hotspots (coupling, centrality) before the LLM sees the data.
+        discovery_data = await self._pre_synthesis_discovery(agent)
+        if discovery_data:
+            base_content = f"## Architectural Discovery (Heuristic + Semantic)\n\n{discovery_data}\n\n---\n\n{base_content}"
+
         # Check for GEPA-evolved RULES section (not the full prompt)
         evolved_rules = self._get_evolved_rules(provider)
         if evolved_rules:
@@ -523,6 +530,88 @@ class InitSynthesizer:
             lines = lines[:-1] if lines and lines[-1].strip() == "```" else lines
             content = "\n".join(lines)
         return content
+
+    async def _pre_synthesis_discovery(
+        self, agent: Optional["AgentOrchestrator"] = None
+    ) -> Optional[str]:
+        """Perform automated discovery of architectural patterns and hotspots.
+
+        Uses the graph tool (victor.tools.graph_tool) to:
+        1. Find coupling hotspots via SQL-powered aggregate analysis.
+        2. Find loosely coupled patterns (registries, decorators) via semantic edges.
+        """
+        try:
+            from victor.tools.graph_tool import graph, GraphMode
+
+            discovery_lines = []
+
+            # 1. Structural Hotspots (SQL-Powered)
+            # Find the most-imported modules — reliable indicator of "Hub" classes.
+            coupling_sql = (
+                "SELECT count(*) as count, dst "
+                "FROM graph_edge "
+                "WHERE type='IMPORTS' "
+                "GROUP BY dst "
+                "ORDER BY count DESC "
+                "LIMIT 5"
+            )
+            try:
+                coupling_result = await graph(mode=GraphMode.QUERY, query=coupling_sql)
+                if coupling_result["success"] and coupling_result["result"]["results"]:
+                    discovery_lines.append("### Highly Coupled Modules (Fan-in)")
+                    for row in coupling_result["result"]["results"]:
+                        discovery_lines.append(f"- {row['dst']} ({row['count']} importers)")
+                    discovery_lines.append("")
+            except Exception:
+                pass
+
+            # 2. Key Components Identification
+            # Find modules with the most symbols — indicates core implementation depth.
+            size_sql = (
+                "SELECT file, count(*) as count "
+                "FROM graph_node "
+                "WHERE type IN ('class', 'function') "
+                "GROUP BY file "
+                "ORDER BY count DESC "
+                "LIMIT 5"
+            )
+            try:
+                size_result = await graph(mode=GraphMode.QUERY, query=size_sql)
+                if size_result["success"] and size_result["result"]["results"]:
+                    discovery_lines.append("### Module Implementation Depth")
+                    for row in size_result["result"]["results"]:
+                        discovery_lines.append(f"- {row['file']} ({row['count']} symbols)")
+                    discovery_lines.append("")
+            except Exception:
+                pass
+
+            # 3. Semantic Pattern Discovery
+            # Attempt to find relationships for the top hub (from step 1).
+            # This identifies registries, providers, etc.
+            try:
+                if coupling_result["success"] and coupling_result["result"]["results"]:
+                    top_hub = coupling_result["result"]["results"][0]["dst"]
+                    semantic_result = await graph(
+                        mode=GraphMode.SEMANTIC, node=top_hub, threshold=0.6, top_k=5
+                    )
+                    if (
+                        semantic_result["success"]
+                        and semantic_result["result"]["potential_relationships"]
+                    ):
+                        discovery_lines.append(f"### Semantic Relationships for '{top_hub}'")
+                        for rel in semantic_result["result"]["potential_relationships"]:
+                            discovery_lines.append(
+                                f"- {rel['name']} ({rel['file']}) - score: {rel['similarity']}"
+                            )
+                        discovery_lines.append("")
+            except Exception:
+                pass
+
+            return "\n".join(discovery_lines) if discovery_lines else None
+
+        except Exception as e:
+            logger.debug(f"Pre-synthesis discovery failed: {e}")
+            return None
 
     @staticmethod
     def _log_init_quality(usage: Any, result: str) -> None:
