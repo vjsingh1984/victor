@@ -38,7 +38,10 @@ def mock_session_coordinator():
 
 @pytest.fixture
 def session_adapter(mock_session_service, mock_session_coordinator):
-    return SessionServiceAdapter(mock_session_service, session_coordinator=mock_session_coordinator)
+    return SessionServiceAdapter(
+        mock_session_service,
+        deprecated_session_coordinator=mock_session_coordinator,
+    )
 
 
 def test_get_recent_sessions_prefers_service(
@@ -141,10 +144,41 @@ def test_explicit_coordinator_fallback_warns(mock_session_coordinator):
         DeprecationWarning,
         match="coordinator fallback only",
     ):
-        adapter = SessionServiceAdapter(None, session_coordinator=mock_session_coordinator)
+        adapter = SessionServiceAdapter(
+            None,
+            deprecated_session_coordinator=mock_session_coordinator,
+        )
 
     assert adapter.get_session_stats() == {"messages": 1}
     mock_session_coordinator.get_session_stats.assert_called_once()
+
+
+def test_old_session_coordinator_kwarg_warns(mock_session_service, mock_session_coordinator):
+    with pytest.warns(
+        DeprecationWarning,
+        match="SessionServiceAdapter\\(session_coordinator=...\\) is deprecated",
+    ):
+        adapter = SessionServiceAdapter(
+            mock_session_service,
+            session_coordinator=mock_session_coordinator,
+        )
+
+    assert adapter.get_session_stats() == {"messages": 10, "tool_calls": 5}
+
+
+def test_old_and_new_session_coordinator_kwargs_conflict(
+    mock_session_service,
+    mock_session_coordinator,
+):
+    with pytest.raises(
+        TypeError,
+        match="Use only one of session_coordinator or deprecated_session_coordinator",
+    ):
+        SessionServiceAdapter(
+            mock_session_service,
+            session_coordinator=mock_session_coordinator,
+            deprecated_session_coordinator=mock_session_coordinator,
+        )
 
 
 def test_legacy_positional_coordinator_is_still_supported(mock_session_coordinator):

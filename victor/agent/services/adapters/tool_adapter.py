@@ -35,8 +35,26 @@ class ToolServiceAdapter:
         self,
         tool_service: Optional[Any] = None,
         tool_coordinator: Optional["ToolCoordinator"] = None,
+        *,
+        deprecated_tool_coordinator: Optional["ToolCoordinator"] = None,
     ) -> None:
-        if tool_service is None and tool_coordinator is not None:
+        if tool_coordinator is not None and deprecated_tool_coordinator is not None:
+            raise TypeError(
+                "Use only one of tool_coordinator or deprecated_tool_coordinator."
+            )
+
+        resolved_deprecated_tool_coordinator = deprecated_tool_coordinator
+        if tool_coordinator is not None:
+            warnings.warn(
+                "ToolServiceAdapter(tool_coordinator=...) is deprecated. "
+                "Use deprecated_tool_coordinator=... for explicit compatibility "
+                "mode or prefer ToolService.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            resolved_deprecated_tool_coordinator = tool_coordinator
+
+        if tool_service is None and resolved_deprecated_tool_coordinator is not None:
             warnings.warn(
                 "ToolServiceAdapter configured with a coordinator fallback only. "
                 "This compatibility path is deprecated; prefer ToolService.",
@@ -44,7 +62,7 @@ class ToolServiceAdapter:
                 stacklevel=2,
             )
         self._tool_service = tool_service
-        self._tool_coordinator = tool_coordinator
+        self._deprecated_tool_coordinator = resolved_deprecated_tool_coordinator
 
     def _delegate(self, method_name: str) -> Callable[..., Any]:
         service = self._tool_service
@@ -53,7 +71,7 @@ class ToolServiceAdapter:
             if callable(method):
                 return method
 
-        coordinator = self._tool_coordinator
+        coordinator = self._deprecated_tool_coordinator
         if coordinator is not None:
             method = getattr(coordinator, method_name, None)
             if callable(method):
@@ -194,7 +212,7 @@ class ToolServiceAdapter:
             method = getattr(service, "build_tool_access_context", None)
             if callable(method):
                 return method()
-        coordinator = self._tool_coordinator
+        coordinator = self._deprecated_tool_coordinator
         if coordinator is not None:
             method = getattr(coordinator, "build_tool_access_context", None)
             if callable(method):
@@ -207,4 +225,4 @@ class ToolServiceAdapter:
 
     def is_healthy(self) -> bool:
         """Check if the tool service is healthy."""
-        return self._tool_service is not None or self._tool_coordinator is not None
+        return self._tool_service is not None or self._deprecated_tool_coordinator is not None

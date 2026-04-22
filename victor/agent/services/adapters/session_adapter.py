@@ -23,8 +23,26 @@ class SessionServiceAdapter:
         self,
         session_service: Optional[Any] = None,
         session_coordinator: Optional["SessionCoordinator"] = None,
+        *,
+        deprecated_session_coordinator: Optional["SessionCoordinator"] = None,
     ) -> None:
-        if session_service is None and session_coordinator is not None:
+        if session_coordinator is not None and deprecated_session_coordinator is not None:
+            raise TypeError(
+                "Use only one of session_coordinator or deprecated_session_coordinator."
+            )
+
+        resolved_deprecated_session_coordinator = deprecated_session_coordinator
+        if session_coordinator is not None:
+            warnings.warn(
+                "SessionServiceAdapter(session_coordinator=...) is deprecated. "
+                "Use deprecated_session_coordinator=... for explicit compatibility "
+                "mode or prefer SessionService.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            resolved_deprecated_session_coordinator = session_coordinator
+
+        if session_service is None and resolved_deprecated_session_coordinator is not None:
             warnings.warn(
                 "SessionServiceAdapter configured with a coordinator fallback only. "
                 "This compatibility path is deprecated; prefer SessionService.",
@@ -32,7 +50,7 @@ class SessionServiceAdapter:
                 stacklevel=2,
             )
         self._session_service = session_service
-        self._session_coordinator = session_coordinator
+        self._deprecated_session_coordinator = resolved_deprecated_session_coordinator
 
     def _delegate(self, method_name: str) -> Any:
         service = self._session_service
@@ -41,7 +59,7 @@ class SessionServiceAdapter:
             if callable(method):
                 return method
 
-        coordinator = self._session_coordinator
+        coordinator = self._deprecated_session_coordinator
         if coordinator is not None:
             method = getattr(coordinator, method_name, None)
             if callable(method):
@@ -90,4 +108,4 @@ class SessionServiceAdapter:
 
     def is_healthy(self) -> bool:
         """Check if the session service is healthy."""
-        return self._session_service is not None or self._session_coordinator is not None
+        return self._session_service is not None or self._deprecated_session_coordinator is not None

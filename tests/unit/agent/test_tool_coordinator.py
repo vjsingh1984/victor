@@ -23,7 +23,7 @@ Tests the tool coordination functionality including:
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.coordinators import (
+from victor.agent.coordinators.tool_coordinator import (
     ToolCoordinator,
     ToolCoordinatorConfig,
     TaskContext,
@@ -333,6 +333,28 @@ class TestToolCoordinator:
 
 class TestCreateToolCoordinator:
     """Tests for create_tool_coordinator factory function."""
+
+    def test_package_export_warns(self):
+        """Package-root ToolCoordinator exports are compatibility-only."""
+        with pytest.warns(
+            DeprecationWarning,
+            match="victor.agent.coordinators.ToolCoordinator is deprecated compatibility surface",
+        ):
+            from victor.agent.coordinators import ToolCoordinator as package_tool_coordinator
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "victor.agent.coordinators.create_tool_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            from victor.agent.coordinators import (
+                create_tool_coordinator as package_create_tool_coordinator,
+            )
+
+        assert package_tool_coordinator is ToolCoordinator
+        assert package_create_tool_coordinator is create_tool_coordinator
 
     def test_create_basic(self):
         """Test basic factory creation."""

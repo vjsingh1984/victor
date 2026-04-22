@@ -82,8 +82,10 @@ class OrchestrationFacade:
         recovery_service: Optional[Any] = None,
         chat_coordinator: Optional[Any] = None,
         tool_coordinator: Optional[Any] = None,
+        deprecated_tool_coordinator: Optional[Any] = None,
         get_tool_coordinator: Optional[Callable[[], Optional[Any]]] = None,
         session_coordinator: Optional[Any] = None,
+        deprecated_session_coordinator: Optional[Any] = None,
         turn_executor: Optional[Any] = None,
         sync_chat_coordinator: Optional[Any] = None,
         streaming_chat_coordinator: Optional[Any] = None,
@@ -103,6 +105,35 @@ class OrchestrationFacade:
         intelligent_integration: Optional[Any] = None,
         subagent_orchestrator: Optional[Any] = None,
     ) -> None:
+        if tool_coordinator is not None and deprecated_tool_coordinator is not None:
+            raise TypeError(
+                "Use only one of tool_coordinator or deprecated_tool_coordinator."
+            )
+        if session_coordinator is not None and deprecated_session_coordinator is not None:
+            raise TypeError(
+                "Use only one of session_coordinator or deprecated_session_coordinator."
+            )
+
+        resolved_deprecated_tool_coordinator = deprecated_tool_coordinator
+        if tool_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade(tool_coordinator=...) is deprecated. "
+                "Use deprecated_tool_coordinator=... or tool_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            resolved_deprecated_tool_coordinator = tool_coordinator
+
+        resolved_deprecated_session_coordinator = deprecated_session_coordinator
+        if session_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade(session_coordinator=...) is deprecated. "
+                "Use deprecated_session_coordinator=... or session_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            resolved_deprecated_session_coordinator = session_coordinator
+
         self._interaction_runtime = interaction_runtime
         self._chat_service = chat_service
         self._tool_service = tool_service
@@ -111,9 +142,9 @@ class OrchestrationFacade:
         self._provider_service = provider_service
         self._recovery_service = recovery_service
         self._chat_coordinator = chat_coordinator
-        self._deprecated_tool_coordinator = tool_coordinator
+        self._deprecated_tool_coordinator = resolved_deprecated_tool_coordinator
         self._get_tool_coordinator = get_tool_coordinator
-        self._session_coordinator = session_coordinator
+        self._deprecated_session_coordinator = resolved_deprecated_session_coordinator
         self._turn_executor = turn_executor
         self._sync_chat_coordinator = sync_chat_coordinator
         self._streaming_chat_coordinator = streaming_chat_coordinator
@@ -201,8 +232,15 @@ class OrchestrationFacade:
 
     @property
     def session_coordinator(self) -> Optional[Any]:
-        """Session coordinator for session operations."""
-        return self._session_coordinator
+        """Deprecated session coordinator compatibility shim."""
+        if self._deprecated_session_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade.session_coordinator is deprecated. "
+                "Use OrchestrationFacade.session_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self._deprecated_session_coordinator
 
     @property
     def turn_executor(self) -> Optional[Any]:

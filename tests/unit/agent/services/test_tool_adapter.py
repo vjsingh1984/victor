@@ -48,7 +48,10 @@ def mock_tool_coordinator():
 
 @pytest.fixture
 def tool_adapter(mock_tool_service, mock_tool_coordinator):
-    return ToolServiceAdapter(mock_tool_service, tool_coordinator=mock_tool_coordinator)
+    return ToolServiceAdapter(
+        mock_tool_service,
+        deprecated_tool_coordinator=mock_tool_coordinator,
+    )
 
 
 def test_get_available_tools_prefers_service(tool_adapter, mock_tool_service, mock_tool_coordinator):
@@ -199,12 +202,40 @@ def test_build_tool_access_context_falls_back_to_public_coordinator_method(mock_
         DeprecationWarning,
         match="coordinator fallback only",
     ):
-        adapter = ToolServiceAdapter(None, tool_coordinator=mock_tool_coordinator)
+        adapter = ToolServiceAdapter(
+            None,
+            deprecated_tool_coordinator=mock_tool_coordinator,
+        )
 
     result = adapter.build_tool_access_context()
 
     mock_tool_coordinator.build_tool_access_context.assert_called_once()
     assert result is mock_tool_coordinator.build_tool_access_context.return_value
+
+
+def test_old_tool_coordinator_kwarg_warns(mock_tool_service, mock_tool_coordinator):
+    with pytest.warns(
+        DeprecationWarning,
+        match="ToolServiceAdapter\\(tool_coordinator=...\\) is deprecated",
+    ):
+        adapter = ToolServiceAdapter(
+            mock_tool_service,
+            tool_coordinator=mock_tool_coordinator,
+        )
+
+    assert adapter.get_available_tools() == {"read", "write", "grep"}
+
+
+def test_old_and_new_tool_coordinator_kwargs_conflict(mock_tool_service, mock_tool_coordinator):
+    with pytest.raises(
+        TypeError,
+        match="Use only one of tool_coordinator or deprecated_tool_coordinator",
+    ):
+        ToolServiceAdapter(
+            mock_tool_service,
+            tool_coordinator=mock_tool_coordinator,
+            deprecated_tool_coordinator=mock_tool_coordinator,
+        )
 
 
 def test_is_healthy(tool_adapter):

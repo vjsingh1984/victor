@@ -27,6 +27,7 @@ Groups:
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -477,10 +478,22 @@ def _cumulative_token_usage_set(self: "AgentOrchestrator", value: dict) -> None:
 
 def _tool_coordinator_get(self: "AgentOrchestrator") -> Any:
     """Get the deprecated ToolCoordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator._tool_coordinator is deprecated compatibility surface. "
+        "Use AgentOrchestrator._get_deprecated_tool_coordinator() or ToolService instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     return getattr(self, "_deprecated_tool_coordinator", None)
 
 
 def _tool_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
+    warnings.warn(
+        "AgentOrchestrator._tool_coordinator is deprecated compatibility surface. "
+        "Store the shim on _deprecated_tool_coordinator instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     self._deprecated_tool_coordinator = value
 
 

@@ -68,7 +68,9 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_tool_svc.is_tool_enabled.side_effect = lambda name: name in enabled_tools
     mock_tool_svc.set_enabled_tools.side_effect = lambda tools: enabled_tools.update(tools)
     mock_tool_svc.process_tool_results.side_effect = (
-        lambda pipeline_result, ctx: orch._tool_coordinator.process_tool_results(pipeline_result, ctx)
+        lambda pipeline_result, ctx: orch._get_deprecated_tool_coordinator().process_tool_results(
+            pipeline_result, ctx
+        )
     )
     orch._tool_service = mock_tool_svc
 
@@ -923,6 +925,7 @@ class TestHandleToolCalls:
         from unittest.mock import AsyncMock
         from victor.agent.tool_pipeline import PipelineExecutionResult, ToolCallResult
 
+        deprecated_tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
         pipeline_result = PipelineExecutionResult(
             results=[
                 ToolCallResult(
@@ -937,7 +940,7 @@ class TestHandleToolCalls:
         orchestrator._tool_service.process_tool_results = MagicMock(
             return_value=[{"name": "read", "success": True}]
         )
-        orchestrator._tool_coordinator.process_tool_results = MagicMock(
+        deprecated_tool_coordinator.process_tool_results = MagicMock(
             side_effect=AssertionError("coordinator path should not be used")
         )
 
@@ -993,10 +996,11 @@ class TestServiceFirstDelegation:
         assert result == "ckpt-1"
 
     def test_parse_and_validate_tool_calls_uses_tool_service(self, orchestrator):
+        deprecated_tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
         orchestrator._tool_service.parse_and_validate_tool_calls = MagicMock(
             return_value=([{"name": "read", "arguments": {}}], "")
         )
-        orchestrator._tool_coordinator.parse_and_validate_tool_calls = MagicMock(
+        deprecated_tool_coordinator.parse_and_validate_tool_calls = MagicMock(
             side_effect=AssertionError("coordinator path should not be used")
         )
 
@@ -1016,9 +1020,10 @@ class TestServiceFirstDelegation:
         assert orchestrator._memory_session_id == "session-123"
 
     def test_build_tool_access_context_uses_tool_service(self, orchestrator):
+        deprecated_tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
         sentinel = MagicMock(name="tool_access_context")
         orchestrator._tool_service.build_tool_access_context = MagicMock(return_value=sentinel)
-        orchestrator._tool_coordinator.build_tool_access_context = MagicMock(
+        deprecated_tool_coordinator.build_tool_access_context = MagicMock(
             side_effect=AssertionError("coordinator path should not be used")
         )
 

@@ -295,7 +295,7 @@ class TestChatServiceBootstrapLaziness:
                 raise AssertionError(f"tool coordinator should remain lazy during bootstrap: {name}")
 
         trap_tool = TrapToolCoordinator()
-        obj._tool_coordinator = LazyRuntimeProxy(
+        obj._deprecated_tool_coordinator = LazyRuntimeProxy(
             factory=lambda: trap_tool,
             name="tool_coordinator",
         )
@@ -316,7 +316,7 @@ class TestChatServiceBootstrapLaziness:
         assert tool_kwargs["argument_normalizer"] is obj.argument_normalizer
         assert "retry_executor" not in tool_kwargs
         assert "tool_call_parser" not in tool_kwargs
-        assert obj._tool_coordinator.initialized is False
+        assert obj._get_deprecated_tool_coordinator().initialized is False
         assert trap_tool.touched is False
 
         chat_service.bind_runtime_components.assert_called_once()

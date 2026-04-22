@@ -4,6 +4,7 @@ Verifies that install_properties() correctly installs property
 definitions onto the AgentOrchestrator class.
 """
 
+import pytest
 from unittest.mock import MagicMock
 
 
@@ -76,3 +77,34 @@ class TestOrchestratorPropertyInstallation:
 
         assert isinstance(_PROPERTY_REGISTRY, dict)
         assert len(_PROPERTY_REGISTRY) >= 20  # At least 20 properties
+
+    def test_tool_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
+        """The legacy _tool_coordinator alias should warn and proxy the shim."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="tool_shim")
+        orchestrator._deprecated_tool_coordinator = shim
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._tool_coordinator is deprecated compatibility surface",
+        ):
+            result = orchestrator._tool_coordinator
+
+        assert result is shim
+
+    def test_tool_coordinator_alias_setter_warns(self):
+        """The legacy _tool_coordinator setter should warn and update the shim slot."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="tool_shim")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._tool_coordinator is deprecated compatibility surface",
+        ):
+            orchestrator._tool_coordinator = shim
+
+        assert orchestrator._deprecated_tool_coordinator is shim
