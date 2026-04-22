@@ -775,7 +775,7 @@ class Settings(BaseSettings):
 
         # Transform legacy flat env vars to nested structure
         # Process in order of precedence:
-        # 1. Direct initialization (flat_key in data) - keep as-is for sync validator
+        # 1. Direct initialization (flat_key in data) - map to nested structure
         # 2. Environment variables (VICTOR_FLAT_KEY) - map to nested structure
         # 3. New-style nested env vars (VICTOR_GROUP__FIELD) - already processed above
 
@@ -784,47 +784,57 @@ class Settings(BaseSettings):
             if nested_path in new_style_values:
                 continue
 
+            value = None
+            source = None  # 'direct' or 'env'
+
             # Check if this flat field is in the data dict (direct initialization)
-            # Don't remove it - let it be processed by sync validator
-            if flat_key not in data:
+            if flat_key in data:
+                value = data[flat_key]
+                source = 'direct'
+                # Remove flat key from data - it will be replaced with nested structure
+                del data[flat_key]
+            else:
                 # Check if this flat field is in environment variables
                 # Environment variables take precedence over direct initialization
                 full_env_key = f"VICTOR_{flat_key.upper()}"
                 if full_env_key in os.environ:
                     # Get value from environment
                     value = os.environ[full_env_key]
+                    source = 'env'
 
-                    # Type conversion for boolean and numeric values
-                    value_lower = value.lower() if isinstance(value, str) else value
-                    if value_lower in ("true", "false"):
-                        value = value_lower == "true"
-                    elif value_lower == "none":
-                        value = None
-                    elif isinstance(value, str):
-                        # Try to convert to int or float
-                        try:
-                            if "." in value:
-                                value = float(value)
-                            else:
-                                value = int(value)
-                        except ValueError:
-                            pass  # Keep as string
+            # If we have a value from either source, map it to nested structure
+            if value is not None:
+                # Type conversion for boolean and numeric values
+                value_lower = value.lower() if isinstance(value, str) else value
+                if value_lower in ("true", "false"):
+                    value = value_lower == "true"
+                elif value_lower == "none":
+                    value = None
+                elif isinstance(value, str):
+                    # Try to convert to int or float
+                    try:
+                        if "." in value:
+                            value = float(value)
+                        else:
+                            value = int(value)
+                    except ValueError:
+                        pass  # Keep as string
 
-                    # Set nested value from environment variable
-                    parts = nested_path.split(".")
-                    current = data
+                # Set nested value from direct initialization or environment variable
+                parts = nested_path.split(".")
+                current = data
 
-                    for i, part in enumerate(parts[:-1]):
-                        if part not in current:
-                            current[part] = {}
-                        elif not isinstance(current[part], dict):
-                            # Already set to non-dict value, skip
-                            break
-                        current = current[part]
-                    else:
-                        # Only set if we didn't break out of the loop
-                        if isinstance(current, dict):
-                            current[parts[-1]] = value
+                for i, part in enumerate(parts[:-1]):
+                    if part not in current:
+                        current[part] = {}
+                    elif not isinstance(current[part], dict):
+                        # Already set to non-dict value, skip
+                        break
+                    current = current[part]
+                else:
+                    # Only set if we didn't break out of the loop
+                    if isinstance(current, dict):
+                        current[parts[-1]] = value
 
         # Now add new-style values (these take precedence)
         for nested_path, env_value in new_style_values.items():
@@ -973,35 +983,6 @@ class Settings(BaseSettings):
     tool_settings: Optional[ToolSettings] = Field(
         default_factory=ToolSettings, exclude=True, repr=False
     )
-
-    # Default provider settings (Ollama for local privacy and cost savings)
-    default_provider: str = "ollama"
-    default_model: str = "qwen3.5:27b-q4_K_M"  # MoE model: fast + knowledgeable
-    default_temperature: float = Field(
-        default=0.7, ge=0.0, le=2.0, description="Default temperature for generation"
-    )
-    default_max_tokens: int = Field(
-        default=4096, gt=0, description="Default maximum tokens for generation"
-    )
-
-    # API Keys
-    anthropic_api_key: Optional[SecretStr] = None
-    openai_api_key: Optional[SecretStr] = None
-    google_api_key: Optional[SecretStr] = None
-    moonshot_api_key: Optional[SecretStr] = None  # Moonshot AI for Kimi K2 models
-    deepseek_api_key: Optional[SecretStr] = None  # DeepSeek for DeepSeek-V3 models
-
-    # Local server URLs
-    # Can be overridden via environment variables:
-    #   OLLAMA_BASE_URL, LMSTUDIO_BASE_URLS (comma-separated), VLLM_BASE_URL
-    # For LAN servers, set: LMSTUDIO_BASE_URLS="http://<your-server>:1234,http://localhost:1234"
-    ollama_base_url: str = "http://localhost:11434"
-    # LMStudio tiered endpoints (try in order) - defaults to localhost only
-    # Set LMSTUDIO_BASE_URLS env var to add LAN servers
-    lmstudio_base_urls: List[str] = [
-        "http://127.0.0.1:1234",
-    ]
-    vllm_base_url: str = "http://localhost:8000"
 
     # Logging
     log_level: str = "INFO"
@@ -2010,26 +1991,6 @@ class Settings(BaseSettings):
 
             return SecretStr(_secrets.token_urlsafe(32))
         return v
-
-    @field_validator("default_provider")
-    @classmethod
-    def validate_provider(cls, v: str) -> str:
-        """Validate provider name."""
-        valid_providers = [
-            "ollama",
-            "anthropic",
-            "openai",
-            "google",
-            "groq",
-            "lmstudio",
-            "vllm",
-            "deepseek",
-            "moonshot",
-            "xai",
-        ]
-        if v.lower() not in valid_providers:
-            raise ValueError(f"Invalid provider: {v}. Must be one of {valid_providers}")
-        return v.lower()
 
     @field_validator("write_approval_mode")
     @classmethod
