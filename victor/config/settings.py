@@ -848,6 +848,13 @@ class Settings(BaseSettings):
             "prompt_policy_guidelines": "prompt_policy.prompt_policy_guidelines",
             "prompt_policy_operating_template": "prompt_policy.prompt_policy_operating_template",
             "prompt_policy_fallback_template": "prompt_policy.prompt_policy_fallback_template",
+            # Conversation Configuration
+            "conversation_memory_enabled": "conversation.conversation_memory_enabled",
+            "conversation_embeddings_enabled": "conversation.conversation_embeddings_enabled",
+            # Context Configuration
+            "max_context_tokens": "context.max_context_tokens",
+            # Agent Configuration (additional)
+            "planning_show_plan": "agent.planning_show_plan",
             # Workflow Configuration
             "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
             "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",
@@ -1205,9 +1212,7 @@ class Settings(BaseSettings):
         default="moderate",
         description="Minimum complexity to trigger planning: simple, moderate, complex",
     )
-    planning_show_plan: bool = Field(
-        default=True, description="Show plan before execution (for transparency)"
-    )
+    # NOTE: planning_show_plan now in agent nested group
 
     # Tool result caching (opt-in per tool)
     # NOTE: These fields are now in cache nested group
@@ -1431,12 +1436,8 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Conversation Memory (Multi-turn Context Retention)
     # ==========================================================================
-    conversation_memory_enabled: bool = True  # Enable SQLite-backed conversation persistence
-    conversation_embeddings_enabled: bool = True  # Enable LanceDB embeddings for semantic retrieval
-    # Note: conversation_db now uses get_project_paths().conversation_db (project-local)
-    # Embeddings stored at get_project_paths().embeddings_dir / "conversations"
-    max_context_tokens: int = 200000  # Maximum tokens in context window (modern models: 128K–200K)
-    # NOTE: response_token_reserve now in response nested group
+    # NOTE: conversation_memory_enabled, conversation_embeddings_enabled now in conversation nested group
+    # NOTE: max_context_tokens now in context nested group
 
     # ==========================================================================
     # Provider Resilience (Circuit Breaker, Retry, Fallback)
