@@ -802,6 +802,52 @@ class Settings(BaseSettings):
             "one_shot_mode": "headless.one_shot_mode",
             # Security Configuration
             "docker_allow_dangerous_operations": "security.docker_allow_dangerous_operations",
+            # Resilience Configuration
+            "resilience_enabled": "resilience.resilience_enabled",
+            "circuit_breaker_failure_threshold": "resilience.circuit_breaker_failure_threshold",
+            "circuit_breaker_success_threshold": "resilience.circuit_breaker_success_threshold",
+            "circuit_breaker_timeout": "resilience.circuit_breaker_timeout",
+            "circuit_breaker_half_open_max": "resilience.circuit_breaker_half_open_max",
+            "retry_max_attempts": "resilience.retry_max_attempts",
+            "retry_base_delay": "resilience.retry_base_delay",
+            "retry_max_delay": "resilience.retry_max_delay",
+            "retry_exponential_base": "resilience.retry_exponential_base",
+            "rate_limiting_enabled": "resilience.rate_limiting_enabled",
+            "rate_limit_requests_per_minute": "resilience.rate_limit_requests_per_minute",
+            "rate_limit_tokens_per_minute": "resilience.rate_limit_tokens_per_minute",
+            "rate_limit_max_concurrent": "resilience.rate_limit_max_concurrent",
+            "rate_limit_queue_size": "resilience.rate_limit_queue_size",
+            "rate_limit_num_workers": "resilience.rate_limit_num_workers",
+            # UI Configuration
+            "theme": "ui.theme",
+            "stream_responses": "ui.stream_responses",
+            # Checkpoint Configuration
+            "checkpoint_enabled": "checkpoint.checkpoint_enabled",
+            "checkpoint_auto_interval": "checkpoint.checkpoint_auto_interval",
+            "checkpoint_max_per_session": "checkpoint.checkpoint_max_per_session",
+            "checkpoint_compression_enabled": "checkpoint.checkpoint_compression_enabled",
+            "checkpoint_compression_threshold": "checkpoint.checkpoint_compression_threshold",
+            # HITL Configuration
+            "hitl_default_timeout": "hitl.hitl_default_timeout",
+            "hitl_default_fallback": "hitl.hitl_default_fallback",
+            "hitl_auto_approve_low_risk": "hitl.hitl_auto_approve_low_risk",
+            "hitl_keyboard_shortcuts_enabled": "hitl.hitl_keyboard_shortcuts_enabled",
+            # Observability Configuration
+            "enable_observability_logging": "observability.enable_observability_logging",
+            "observability_log_path": "observability.observability_log_path",
+            "log_level": "observability.log_level",
+            "log_file": "observability.log_file",
+            # Prompt Policy Configuration
+            "prompt_policy_enforce_identity": "prompt_policy.prompt_policy_enforce_identity",
+            "prompt_policy_enforce_guidelines": "prompt_policy.prompt_policy_enforce_guidelines",
+            "prompt_policy_enforce_operating_preamble": "prompt_policy.prompt_policy_enforce_operating_preamble",
+            "prompt_policy_enforce_unique_sections": "prompt_policy.prompt_policy_enforce_unique_sections",
+            "prompt_policy_protected_sections": "prompt_policy.prompt_policy_protected_sections",
+            "prompt_policy_max_section_chars": "prompt_policy.prompt_policy_max_section_chars",
+            "prompt_policy_identity": "prompt_policy.prompt_policy_identity",
+            "prompt_policy_guidelines": "prompt_policy.prompt_policy_guidelines",
+            "prompt_policy_operating_template": "prompt_policy.prompt_policy_operating_template",
+            "prompt_policy_fallback_template": "prompt_policy.prompt_policy_fallback_template",
             # Workflow Configuration
             "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
             "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",
@@ -1054,8 +1100,7 @@ class Settings(BaseSettings):
     # When enabled, writes all EventBus events to ~/.victor/metrics/victor.jsonl
     # This allows the dashboard to show events from agent runs
     # Off by default for performance - enable with: victor chat --log-events
-    enable_observability_logging: bool = False
-    observability_log_path: Optional[str] = None  # Defaults to ~/.victor/metrics/victor.jsonl
+    # NOTE: enable_observability_logging, observability_log_path now in observability nested group
 
     # Privacy and Security
     airgapped_mode: bool = False
@@ -1127,14 +1172,7 @@ class Settings(BaseSettings):
     # NOTE: These fields are now in tool_selection nested group
 
     # UI
-    theme: str = "monokai"
-    show_token_count: bool = True
-    show_cost_metrics: bool = False  # Show cost in metrics display (e.g., "$0.015")
-    stream_responses: bool = True
-    use_emojis: bool = Field(
-        default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
-        description="Enable emoji indicators in output (✓, ✗, etc.). Automatically disabled in CI environments via VICTOR_USE_EMOJIS env var.",
-    )
+    # NOTE: theme, show_token_count, show_cost_metrics, stream_responses, use_emojis now in ui nested group
 
     # MCP
     use_mcp_tools: bool = False
@@ -1216,21 +1254,14 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Controls state checkpointing for conversation replay, forking, and debugging.
     # Inspired by LangGraph's checkpoint system.
-    checkpoint_enabled: bool = True  # Enable checkpoint system
-    checkpoint_auto_interval: int = 5  # Tool calls between auto-checkpoints
-    checkpoint_max_per_session: int = 50  # Maximum checkpoints to keep per session
-    checkpoint_compression_enabled: bool = True  # Compress checkpoint state data
-    checkpoint_compression_threshold: int = 1024  # Min bytes before compression
+    # NOTE: checkpoint_* fields now in checkpoint nested group
 
     # ==========================================================================
     # HITL Settings (Human-in-the-Loop)
     # ==========================================================================
     # Controls human-in-the-loop workflow interrupts for approval/review/choice.
     # Integrates with SafetyChecker for high-risk action approval.
-    hitl_default_timeout: float = 300.0  # Default timeout in seconds (5 minutes)
-    hitl_default_fallback: str = "abort"  # Default on timeout: abort, continue, or skip
-    hitl_auto_approve_low_risk: bool = False  # Auto-approve LOW risk actions
-    hitl_keyboard_shortcuts_enabled: bool = True  # Enable y/n shortcuts in TUI
+    # NOTE: hitl_* fields now in hitl nested group
 
     # ==========================================================================
     # Workflow Definition Cache (P1 Scalability)
@@ -1410,35 +1441,23 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Provider Resilience (Circuit Breaker, Retry, Fallback)
     # ==========================================================================
-    resilience_enabled: bool = True  # Enable circuit breaker and retry logic
+    # NOTE: resilience_* fields now in resilience nested group
 
     # Circuit Breaker Settings
-    circuit_breaker_failure_threshold: int = 5  # Failures before circuit opens
-    circuit_breaker_success_threshold: int = 2  # Successes before circuit closes
-    circuit_breaker_timeout: float = 60.0  # Seconds before half-open state
-    circuit_breaker_half_open_max: int = 3  # Max requests in half-open state
+    # NOTE: circuit_breaker_* fields now in resilience nested group
 
     # Retry Settings
-    retry_max_attempts: int = 3  # Maximum retry attempts
-    retry_base_delay: float = 1.0  # Base delay in seconds
-    retry_max_delay: float = 60.0  # Maximum delay between retries
-    retry_exponential_base: float = 2.0  # Exponential backoff multiplier
+    # NOTE: retry_* fields now in resilience nested group
 
     # ==========================================================================
     # Rate Limiting (Request Throttling)
     # ==========================================================================
-    rate_limiting_enabled: bool = True  # Enable rate limiting
-    rate_limit_requests_per_minute: int = 50  # Requests per minute limit
-    rate_limit_tokens_per_minute: int = 50000  # Tokens per minute limit
-    rate_limit_max_concurrent: int = 5  # Maximum concurrent requests
-    rate_limit_queue_size: int = 100  # Maximum pending requests in queue
-    rate_limit_num_workers: int = 3  # Number of queue worker tasks
+    # NOTE: rate_limiting_* fields now in resilience nested group
 
     # ==========================================================================
     # Streaming Metrics (Performance Monitoring)
     # ==========================================================================
-    streaming_metrics_enabled: bool = True  # Enable streaming performance metrics
-    streaming_metrics_history_size: int = 1000  # Number of metrics samples to retain
+    # NOTE: streaming_metrics_* fields now in analytics nested group
 
     # ==========================================================================
     # Serialization (Token Optimization for Tool Output)
@@ -1446,7 +1465,7 @@ class Settings(BaseSettings):
     # Controls how tool outputs are serialized for token efficiency.
     # Formats: json, json_minified, toon, csv, markdown_table, reference_encoded
     # TOON (Token-Oriented Object Notation) provides 30-60% savings for tabular data.
-    serialization_enabled: bool = True  # Enable token-optimized serialization
+    # NOTE: serialization_* fields now in pipeline nested group
     serialization_default_format: Optional[str] = None  # None = auto-select best format
     serialization_min_savings_threshold: float = 0.15  # Min savings to use alternative format
 
@@ -1715,9 +1734,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Observability (from VictorSettings merge)
     # ==========================================================================
-    enable_observability: bool = Field(
-        default=True, description="Enable observability integration (Langfuse, etc.)"
-    )
+    # NOTE: enable_observability - not in nested groups, keeping for now
 
     # ==========================================================================
     # Debug Settings (from VictorSettings merge)
@@ -1727,47 +1744,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # System Prompt Policy (from VictorSettings merge)
     # ==========================================================================
-    prompt_policy_enforce_identity: bool = Field(
-        default=True,
-        description="Ensure the system prompt always includes an identity section",
-    )
-    prompt_policy_enforce_guidelines: bool = Field(
-        default=True,
-        description="Ensure the system prompt always includes a guidelines section",
-    )
-    prompt_policy_enforce_operating_preamble: bool = Field(
-        default=True,
-        description="Ensure the system prompt includes operating mode metadata",
-    )
-    prompt_policy_enforce_unique_sections: bool = Field(
-        default=True,
-        description="Deduplicate sections with identical content",
-    )
-    prompt_policy_protected_sections: List[str] = Field(
-        default_factory=lambda: ["identity", "guidelines", "operating_mode"],
-        description="Sections that should never be trimmed",
-    )
-    prompt_policy_max_section_chars: int = Field(
-        default=18000,
-        ge=1000,
-        description="Maximum characters allocated to structured sections",
-    )
-    prompt_policy_identity: Optional[str] = Field(
-        default=None,
-        description="Custom fallback identity content",
-    )
-    prompt_policy_guidelines: Optional[str] = Field(
-        default=None,
-        description="Custom fallback guidelines",
-    )
-    prompt_policy_operating_template: Optional[str] = Field(
-        default=None,
-        description="Template for the operating-mode preamble",
-    )
-    prompt_policy_fallback_template: Optional[str] = Field(
-        default=None,
-        description="Template used when prompt assembly fails",
-    )
+    # NOTE: All prompt_policy_* fields now in prompt_policy nested group
 
     @field_validator("event_queue_overflow_policy")
     @classmethod
