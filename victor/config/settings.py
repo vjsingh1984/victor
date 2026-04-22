@@ -671,6 +671,200 @@ class Settings(BaseSettings):
 
     @model_validator(mode="before")
     @classmethod
+    def _map_legacy_environment_variables(cls, data: Any) -> Any:
+        """Map legacy flat environment variables to nested structure.
+
+        Supports both legacy and new environment variable styles:
+        - Legacy: VICTOR_DEFAULT_PROVIDER -> provider.default_provider
+        - New: VICTOR_PROVIDER__DEFAULT_PROVIDER -> provider.default_provider
+
+        New style takes precedence when both are set.
+
+        Args:
+            data: Input data (dict or other)
+
+        Returns:
+            Transformed data with legacy env vars mapped to nested structure
+        """
+        if not isinstance(data, dict):
+            return data
+
+        import os
+
+        # First, extract new-style nested env vars from os.environ
+        # These take precedence over old-style flat env vars
+        # Format: VICTOR_PROVIDER__DEFAULT_PROVIDER -> provider.default_provider
+        new_style_values = {}
+        for env_key, env_value in os.environ.items():
+            if env_key.startswith("VICTOR_") and "__" in env_key:
+                # Convert VICTOR_PROVIDER__DEFAULT_PROVIDER -> provider.default_provider
+                parts = env_key.replace("VICTOR_", "", 1).split("__")  # Remove VICTOR_ prefix
+                if len(parts) >= 2:
+                    # This is a nested env var like PROVIDER__DEFAULT_PROVIDER
+                    nested_path = ".".join([p.lower() for p in parts])
+                    new_style_values[nested_path] = env_value
+
+        # Legacy flat -> nested environment variable mappings
+        LEGACY_ENV_MAPPINGS = {
+            # Provider Configuration
+            "default_provider": "provider.default_provider",
+            "default_model": "provider.default_model",
+            "default_temperature": "provider.default_temperature",
+            "default_max_tokens": "provider.default_max_tokens",
+            "anthropic_api_key": "provider.anthropic_api_key",
+            "openai_api_key": "provider.openai_api_key",
+            "google_api_key": "provider.google_api_key",
+            "moonshot_api_key": "provider.moonshot_api_key",
+            "deepseek_api_key": "provider.deepseek_api_key",
+            "ollama_base_url": "provider.ollama_base_url",
+            "lmstudio_base_urls": "provider.lmstudio_base_urls",
+            "vllm_base_url": "provider.vllm_base_url",
+            "lmstudio_max_vram_gb": "provider.lmstudio_max_vram_gb",
+            # Agent Configuration
+            "enable_planning": "agent.enable_planning",
+            "planning_min_complexity": "agent.planning_min_complexity",
+            "planning_show_plan": "agent.planning_show_plan",
+            # Tool Selection Configuration
+            "use_semantic_tool_selection": "tool_selection.use_semantic_tool_selection",
+            "preload_embeddings": "tool_selection.preload_embeddings",
+            "enable_tool_deduplication": "tool_selection.enable_tool_deduplication",
+            "tool_deduplication_window_size": "tool_selection.tool_deduplication_window_size",
+            "fallback_max_tools": "tool_selection.fallback_max_tools",
+            # Tool Configuration
+            "tool_cache_enabled": "tools.tool_cache_enabled",
+            "tool_cache_ttl": "tools.tool_cache_ttl",
+            "tool_cache_allowlist": "tools.tool_cache_allowlist",
+            "tool_cache_dir": "tools.tool_cache_dir",
+            "generic_result_cache_enabled": "tools.generic_result_cache_enabled",
+            "generic_result_cache_ttl": "tools.generic_result_cache_ttl",
+            "tool_selection_cache_enabled": "tools.tool_selection_cache_enabled",
+            "tool_selection_cache_ttl": "tools.tool_selection_cache_ttl",
+            "tool_call_budget": "tools.tool_call_budget",
+            "tool_call_budget_warning_threshold": "tools.tool_call_budget_warning_threshold",
+            "tool_calling_models": "tools.tool_calling_models",
+            "tool_exploration_boosts": "tools.tool_exploration_boosts",
+            "tool_result_truncation": "tools.tool_result_truncation",
+            "tool_retry_enabled": "tools.tool_retry_enabled",
+            "tool_retry_max_attempts": "tools.tool_retry_max_attempts",
+            "tool_retry_base_delay": "tools.tool_retry_base_delay",
+            "tool_retry_max_delay": "tools.tool_retry_max_delay",
+            "tool_validation_mode": "tools.tool_validation_mode",
+            # Embedding Configuration
+            "unified_embedding_model": "embedding.unified_embedding_model",
+            "embedding_provider": "embedding.embedding_provider",
+            "embedding_model": "embedding.embedding_model",
+            # Search Configuration
+            "codebase_vector_store": "search.codebase_vector_store",
+            "codebase_embedding_provider": "search.codebase_embedding_provider",
+            "codebase_embedding_model": "search.codebase_embedding_model",
+            "codebase_persist_directory": "search.codebase_persist_directory",
+            "codebase_dimension": "search.codebase_dimension",
+            "codebase_batch_size": "search.codebase_batch_size",
+            "codebase_graph_store": "search.codebase_graph_store",
+            "codebase_graph_path": "search.codebase_graph_path",
+            "semantic_similarity_threshold": "search.semantic_similarity_threshold",
+            "semantic_query_expansion_enabled": "search.semantic_query_expansion_enabled",
+            "semantic_max_query_expansions": "search.semantic_max_query_expansions",
+            "enable_hybrid_search": "search.enable_hybrid_search",
+            "hybrid_search_semantic_weight": "search.hybrid_search_semantic_weight",
+            "hybrid_search_keyword_weight": "search.hybrid_search_keyword_weight",
+            # Analytics Configuration
+            "analytics_enabled": "analytics.analytics_enabled",
+            "streaming_metrics_enabled": "analytics.streaming_metrics_enabled",
+            "streaming_metrics_history_size": "analytics.streaming_metrics_history_size",
+            "show_token_count": "analytics.show_token_count",
+            "show_cost_metrics": "analytics.show_cost_metrics",
+        }
+
+        # Transform legacy flat env vars to nested structure
+        # Process in order of precedence:
+        # 1. Direct initialization (flat_key in data) - keep as-is for sync validator
+        # 2. Environment variables (VICTOR_FLAT_KEY) - map to nested structure
+        # 3. New-style nested env vars (VICTOR_GROUP__FIELD) - already processed above
+
+        for flat_key, nested_path in LEGACY_ENV_MAPPINGS.items():
+            # Skip if already set by new-style env var
+            if nested_path in new_style_values:
+                continue
+
+            # Check if this flat field is in the data dict (direct initialization)
+            # Don't remove it - let it be processed by sync validator
+            if flat_key not in data:
+                # Check if this flat field is in environment variables
+                # Environment variables take precedence over direct initialization
+                full_env_key = f"VICTOR_{flat_key.upper()}"
+                if full_env_key in os.environ:
+                    # Get value from environment
+                    value = os.environ[full_env_key]
+
+                    # Type conversion for boolean and numeric values
+                    value_lower = value.lower() if isinstance(value, str) else value
+                    if value_lower in ("true", "false"):
+                        value = value_lower == "true"
+                    elif value_lower == "none":
+                        value = None
+                    elif isinstance(value, str):
+                        # Try to convert to int or float
+                        try:
+                            if "." in value:
+                                value = float(value)
+                            else:
+                                value = int(value)
+                        except ValueError:
+                            pass  # Keep as string
+
+                    # Set nested value from environment variable
+                    parts = nested_path.split(".")
+                    current = data
+
+                    for i, part in enumerate(parts[:-1]):
+                        if part not in current:
+                            current[part] = {}
+                        elif not isinstance(current[part], dict):
+                            # Already set to non-dict value, skip
+                            break
+                        current = current[part]
+                    else:
+                        # Only set if we didn't break out of the loop
+                        if isinstance(current, dict):
+                            current[parts[-1]] = value
+
+        # Now add new-style values (these take precedence)
+        for nested_path, env_value in new_style_values.items():
+            # Type conversion
+            value = env_value
+            value_lower = env_value.lower() if isinstance(env_value, str) else env_value
+            if value_lower in ("true", "false"):
+                value = value_lower == "true"
+            elif value_lower == "none":
+                value = None
+            elif isinstance(env_value, str):
+                # Try to convert to int or float
+                try:
+                    if "." in env_value:
+                        value = float(env_value)
+                    else:
+                        value = int(env_value)
+                except ValueError:
+                    pass  # Keep as string
+
+            parts = nested_path.split(".")
+            current = data
+
+            for i, part in enumerate(parts[:-1]):
+                if part not in current:
+                    current[part] = {}
+                elif not isinstance(current[part], dict):
+                    break
+                current = current[part]
+            else:
+                if isinstance(current, dict):
+                    current[parts[-1]] = value
+
+        return data
+
+    @model_validator(mode="before")
+    @classmethod
     def _handle_legacy_field_names(cls, data: Any) -> Any:
         """Handle legacy field names for backward compatibility.
 
