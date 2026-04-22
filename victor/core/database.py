@@ -133,14 +133,47 @@ class _DatabaseManagerBase:
 
         Returns:
             Thread-local SQLite connection with Row factory
+
+        ENHANCEMENT: Added retry logic for concurrent access during init.
         """
         if not hasattr(self._local, "conn") or self._local.conn is None:
-            self._local.conn = sqlite3.connect(
-                str(self.db_path),
-                check_same_thread=False,
-                timeout=30.0,
-            )
-            self._local.conn.row_factory = sqlite3.Row
+            import time
+
+            max_retries = 3
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    self._local.conn = sqlite3.connect(
+                        str(self.db_path),
+                        check_same_thread=False,
+                        timeout=30.0,  # 30 second timeout for SQLite locks
+                    )
+                    self._local.conn.row_factory = sqlite3.Row
+                    break  # Success
+                except sqlite3.OperationalError as e:
+                    last_error = e
+                    if "locked" in str(e).lower() and attempt < max_retries - 1:
+                        # Brief wait before retry (exponential backoff)
+                        wait_time = 0.1 * (2 ** attempt)
+                        logger.debug(
+                            "Database locked (attempt %d/%d), retrying in %.2fs",
+                            attempt + 1,
+                            max_retries,
+                            wait_time
+                        )
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        # Re-raise if not a lock error or out of retries
+                        raise
+
+            # Should not reach here, but handle it
+            if not hasattr(self._local, "conn") or self._local.conn is None:
+                raise sqlite3.OperationalError(
+                    f"Failed to open database after {max_retries} attempts: {last_error}"
+                )
+
         return self._local.conn
 
     def close(self) -> None:
