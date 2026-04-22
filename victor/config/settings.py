@@ -1136,32 +1136,18 @@ class Settings(BaseSettings):
     )
 
     # Tool result caching (opt-in per tool)
-    tool_cache_enabled: bool = True
-    tool_cache_ttl: int = 600  # seconds
-    # Note: tool_cache_dir now uses get_project_paths().global_cache_dir
-    tool_cache_allowlist: List[str] = [
-        "code_search",
-        "semantic_code_search",
-        "list_directory",
-        "plan_files",
-    ]
+    # NOTE: These fields are now in cache nested group
 
     # Generic runtime cache for non-tool payloads (feature-flagged integration path)
-    generic_result_cache_enabled: bool = False
-    generic_result_cache_ttl: int = 300  # seconds
+    # NOTE: These fields are now in cache nested group
 
     # Tool selection result cache for embedding-based selection
     # Caches semantic tool selection results to avoid repeated embedding computation
     # Typical 20-40% latency reduction for conversational agents
-    tool_selection_cache_enabled: bool = True  # Enable by default for performance
-    tool_selection_cache_ttl: int = 300  # 5 minutes TTL (short TTL ensures fresh selections)
+    # NOTE: These fields are now in cache nested group
 
     # Shared HTTP connection pool for network tools (feature-flagged integration path)
-    http_connection_pool_enabled: bool = False
-    http_connection_pool_max_connections: int = 100
-    http_connection_pool_max_connections_per_host: int = 10
-    http_connection_pool_connection_timeout: int = 30  # seconds
-    http_connection_pool_total_timeout: int = 60  # seconds
+    # NOTE: These fields are now in cache nested group
 
     # Startup/runtime preloading coordinator for warm-path dependencies.
     framework_preload_enabled: bool = (
@@ -1716,9 +1702,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Tool Cache Storage (from VictorSettings merge)
     # ==========================================================================
-    tool_cache_dir: Optional[str] = Field(
-        default=None, description="Custom directory for tool result cache"
-    )
+    # NOTE: tool_cache_dir now in cache nested group
 
     # ==========================================================================
     # Subagent Orchestration (from VictorSettings merge)
@@ -1913,17 +1897,18 @@ class Settings(BaseSettings):
                 "extension_loader_error_in_flight_threshold must be >= "
                 "extension_loader_warn_in_flight_threshold"
             )
-        if self.generic_result_cache_ttl < 0:
+        # Cache-related validations (now in nested cache group)
+        if self.cache and self.cache.generic_result_cache_ttl is not None and self.cache.generic_result_cache_ttl < 0:
             raise ValueError("generic_result_cache_ttl must be >= 0")
-        if self.tool_selection_cache_ttl < 0:
+        if self.cache and self.cache.tool_selection_cache_ttl is not None and self.cache.tool_selection_cache_ttl < 0:
             raise ValueError("tool_selection_cache_ttl must be >= 0")
-        if self.http_connection_pool_max_connections < 1:
+        if self.cache and self.cache.http_connection_pool_max_connections is not None and self.cache.http_connection_pool_max_connections < 1:
             raise ValueError("http_connection_pool_max_connections must be >= 1")
-        if self.http_connection_pool_max_connections_per_host < 1:
+        if self.cache and self.cache.http_connection_pool_max_connections_per_host is not None and self.cache.http_connection_pool_max_connections_per_host < 1:
             raise ValueError("http_connection_pool_max_connections_per_host must be >= 1")
-        if self.http_connection_pool_connection_timeout <= 0:
+        if self.cache and self.cache.http_connection_pool_connection_timeout is not None and self.cache.http_connection_pool_connection_timeout <= 0:
             raise ValueError("http_connection_pool_connection_timeout must be > 0")
-        if self.http_connection_pool_total_timeout <= 0:
+        if self.cache and self.cache.http_connection_pool_total_timeout is not None and self.cache.http_connection_pool_total_timeout <= 0:
             raise ValueError("http_connection_pool_total_timeout must be > 0")
         return self
 
