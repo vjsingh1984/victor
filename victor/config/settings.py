@@ -771,6 +771,13 @@ class Settings(BaseSettings):
             "streaming_metrics_history_size": "analytics.streaming_metrics_history_size",
             "show_token_count": "analytics.show_token_count",
             "show_cost_metrics": "analytics.show_cost_metrics",
+            # Recovery Configuration
+            "chat_max_iterations": "recovery.chat_max_iterations",
+            "max_consecutive_tool_calls": "recovery.max_consecutive_tool_calls",
+            "session_idle_timeout": "recovery.session_idle_timeout",
+            # Response Configuration
+            "response_completion_retries": "response.response_completion_retries",
+            "response_token_reserve": "response.response_token_reserve",
         }
 
         # Transform legacy flat env vars to nested structure
@@ -1390,7 +1397,7 @@ class Settings(BaseSettings):
     # Timer resets on each provider response or tool execution
     # Set below provider timeout (300s default) to provide graceful completion
     # Can be overridden per profile in profiles.yaml
-    session_idle_timeout: int = 180  # 3 minutes idle time, leaves 120s buffer for summary
+    # NOTE: session_idle_timeout now in recovery nested group
 
     # Future: session_time_limit will be separate config for total session duration
     # regardless of activity (for sub-task agents, resource limits, etc.)
@@ -1403,7 +1410,7 @@ class Settings(BaseSettings):
     # Note: conversation_db now uses get_project_paths().conversation_db (project-local)
     # Embeddings stored at get_project_paths().embeddings_dir / "conversations"
     max_context_tokens: int = 200000  # Maximum tokens in context window (modern models: 128K–200K)
-    response_token_reserve: int = 4096  # Tokens reserved for model response
+    # NOTE: response_token_reserve now in response nested group
 
     # ==========================================================================
     # Provider Resilience (Circuit Breaker, Retry, Fallback)
@@ -1600,14 +1607,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Exploration Loop Extended (from VictorSettings merge)
     # ==========================================================================
-    chat_max_iterations: int = Field(
-        default=50, ge=1, description="Maximum chat iterations per session"
-    )
-    max_consecutive_tool_calls: int = Field(
-        default=20,
-        ge=1,
-        description="Maximum consecutive tool calls before forcing synthesis",
-    )
+    # NOTE: chat_max_iterations and max_consecutive_tool_calls now in recovery nested group
 
     # ==========================================================================
     # Context Compaction Advanced (from VictorSettings merge)
@@ -1673,9 +1673,7 @@ class Settings(BaseSettings):
     # ==========================================================================
     # Response Completion (from VictorSettings merge)
     # ==========================================================================
-    response_completion_retries: int = Field(
-        default=3, ge=1, description="Max retries for incomplete responses"
-    )
+    # NOTE: response_completion_retries now in response nested group
     force_response_on_error: bool = Field(
         default=True, description="Force synthesis even if errors occurred"
     )
