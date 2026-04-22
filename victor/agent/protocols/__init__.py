@@ -18,6 +18,7 @@ Submodules:
 from __future__ import annotations
 
 import importlib
+import warnings
 from typing import Any
 
 # Map every exported name to its submodule
@@ -150,12 +151,27 @@ for _mod, _names in _MODULE_MEMBERS.items():
 
 __all__ = list(_SUBMODULE_MAP.keys())
 
+_DEPRECATED_EXPORTS = {
+    "ToolCoordinatorProtocol": (
+        "victor.agent.protocols.ToolCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer ToolServiceProtocol."
+    ),
+}
+
 
 def __getattr__(name: str) -> Any:
     """Lazy import: resolve protocol names on first access."""
     if name in _SUBMODULE_MAP:
         mod = importlib.import_module(f"victor.agent.protocols.{_SUBMODULE_MAP[name]}")
         value = getattr(mod, name)
+        if name in _DEPRECATED_EXPORTS:
+            warnings.warn(
+                _DEPRECATED_EXPORTS[name],
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            return value
+
         # Cache on the module for subsequent access
         globals()[name] = value
         return value

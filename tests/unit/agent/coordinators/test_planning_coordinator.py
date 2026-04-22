@@ -238,12 +238,13 @@ class TestPlanningCoordinatorIntegration:
 
         settings = Settings()
 
-        # Check that planning settings are available
-        assert hasattr(settings, "enable_planning")
-        assert hasattr(settings, "planning_min_complexity")
-        assert hasattr(settings, "planning_show_plan")
+        # Check that planning settings are available in nested group
+        assert hasattr(settings, "agent")
+        assert hasattr(settings.agent, "enable_planning")
+        assert hasattr(settings.agent, "planning_min_complexity")
+        assert hasattr(settings.agent, "planning_show_plan")
 
         # Check defaults
-        assert settings.enable_planning is False
+        assert settings.agent.enable_planning is False
         assert settings.agent.planning_min_complexity == "moderate"
         assert settings.agent.planning_show_plan is True

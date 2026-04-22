@@ -221,7 +221,12 @@ class TestOrchestratorServiceProvider:
     def test_tool_coordinator_protocol_is_not_registered_by_default(self, mock_settings):
         """ToolCoordinatorProtocol is compatibility-only, not a primary DI service."""
         from victor.agent.service_provider import OrchestratorServiceProvider
-        from victor.agent.protocols import ToolCoordinatorProtocol
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="ToolCoordinatorProtocol is deprecated compatibility surface",
+        ):
+            from victor.agent.protocols import ToolCoordinatorProtocol
 
         container = ServiceContainer()
         provider = OrchestratorServiceProvider(mock_settings)

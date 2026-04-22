@@ -165,7 +165,11 @@ class TestCoordinatorIntegration:
 
     def test_tool_coordinator_protocol_importable(self):
         """Test ToolCoordinatorProtocol can be imported."""
-        from victor.agent.protocols import ToolCoordinatorProtocol
+        with pytest.warns(
+            DeprecationWarning,
+            match="ToolCoordinatorProtocol is deprecated compatibility surface",
+        ):
+            from victor.agent.protocols import ToolCoordinatorProtocol
 
         assert ToolCoordinatorProtocol is not None
 
