@@ -226,7 +226,7 @@ class AgentNodeExecutor:
         Raises:
             ValueError: If role is not recognized
         """
-        from victor.agent.subagents.roles import SubAgentRole
+        from victor.core.shared_types import SubAgentRole
 
         role_map = {
             "researcher": SubAgentRole.RESEARCHER,

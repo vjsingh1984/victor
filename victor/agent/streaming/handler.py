@@ -275,9 +275,10 @@ class StreamingChatHandler:
                 )
             )
 
-        # Add thinking status
-        thinking_icon = self._presentation.icon("thinking", with_color=False)
-        chunks.append(StreamChunk(content="", metadata={"status": f"{thinking_icon} Thinking..."}))
+        # NOTE: We no longer add a "Thinking..." status chunk here because:
+        # 1. The main pipeline iteration logic already handles status updates.
+        # 2. Providers like z.ai/Anthropic yield their own reasoning/thinking content.
+        # 3. Adding it here often causes duplication in the UI.
         return chunks
 
     def generate_tool_start_chunk(

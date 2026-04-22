@@ -260,11 +260,17 @@ class TieredDecisionService:
             # Detect active provider from orchestrator
             active_provider = self._detect_active_provider()
             if active_provider is None:
-                logger.warning(f"Could not detect active provider for tier '{tier}'")
-                self._failed_tiers.add(tier)
-                return None
-
-            provider = active_provider
+                # Fallback for 'edge' tier to ensure stability even when auto-detection fails
+                if tier == "edge":
+                    logger.info("Using hardcoded fallback for 'edge' tier: ollama/qwen2.5-coder:1.5b")
+                    provider = "ollama"
+                    model = "qwen2.5-coder:1.5b"
+                else:
+                    logger.warning(f"Could not detect active provider for tier '{tier}'")
+                    self._failed_tiers.add(tier)
+                    return None
+            else:
+                provider = active_provider
 
         # Resolve model="auto" from provider's tier mapping
         if model == "auto":

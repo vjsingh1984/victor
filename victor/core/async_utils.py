@@ -83,16 +83,32 @@ def run_sync(coro: Awaitable[T]) -> T:
         result = run_sync(async_fetch())
     """
     try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        # No running loop - safe to use asyncio.run()
+        # Check if an event loop is already running
+        loop = None
+        try:
+            loop = asyncio.get_running_loop()
+        except (RuntimeError, AttributeError):
+            # No running loop - safe to use asyncio.run()
+            pass
+
+        if loop is not None and loop.is_running():
+            # We're in an async context - close bare coroutines to avoid leak warnings.
+            if inspect.iscoroutine(coro):
+                coro.close()
+
+            raise RuntimeError(
+                "Cannot use run_sync() from within an async context. Use 'await' instead."
+            )
+
         return asyncio.run(coro)
 
-    # We're in an async context - close bare coroutines to avoid leak warnings.
-    if inspect.iscoroutine(coro):
-        coro.close()
-
-    raise RuntimeError("Cannot use run_sync() from within an async context. Use 'await' instead.")
+    except Exception as e:
+        # Re-raise runtime errors as they are likely configuration/logic issues
+        if isinstance(e, RuntimeError):
+            raise
+        # For others, log and re-raise
+        logger.debug(f"run_sync failed: {e}")
+        raise
 
 
 def run_sync_in_thread(coro: Awaitable[T], timeout: float | None = None) -> T:
