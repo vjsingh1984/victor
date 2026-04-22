@@ -108,3 +108,16 @@ class TestOrchestratorPropertyInstallation:
             orchestrator._tool_coordinator = shim
 
         assert orchestrator._deprecated_tool_coordinator is shim
+
+    def test_specialized_chat_coordinators_use_deprecated_backing_slots(self):
+        """Lazy chat coordinator properties should store instances in deprecated slots."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        orchestrator._deprecated_sync_chat_coordinator = MagicMock(name="sync")
+        orchestrator._deprecated_streaming_chat_coordinator = MagicMock(name="streaming")
+        orchestrator._deprecated_unified_chat_coordinator = MagicMock(name="unified")
+
+        assert orchestrator.sync_chat_coordinator._mock_name == "sync"
+        assert orchestrator.streaming_chat_coordinator._mock_name == "streaming"
+        assert orchestrator.unified_chat_coordinator._mock_name == "unified"

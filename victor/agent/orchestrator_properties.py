@@ -218,12 +218,12 @@ def _turn_executor(self: "AgentOrchestrator") -> Any:
 
 def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
     """Get the sync chat coordinator for non-streaming execution (lazy init)."""
-    if self._sync_chat_coordinator is None:
+    if getattr(self, "_deprecated_sync_chat_coordinator", None) is None:
         from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
 
         from victor.agent.query_classifier import QueryClassifier
 
-        self._sync_chat_coordinator = SyncChatCoordinator(
+        self._deprecated_sync_chat_coordinator = SyncChatCoordinator(
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
@@ -232,41 +232,41 @@ def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
             query_classifier=QueryClassifier(),
             chat_service=getattr(self, "_chat_service", None),
         )
-    return self._sync_chat_coordinator
+    return self._deprecated_sync_chat_coordinator
 
 
 def _streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
     """Get the streaming chat coordinator for streaming execution (lazy init)."""
-    if self._streaming_chat_coordinator is None:
+    if getattr(self, "_deprecated_streaming_chat_coordinator", None) is None:
         from victor.agent.coordinators.streaming_chat_coordinator import (
             StreamingChatCoordinator,
         )
 
-        self._streaming_chat_coordinator = StreamingChatCoordinator(
+        self._deprecated_streaming_chat_coordinator = StreamingChatCoordinator(
             chat_context=self.protocol_adapter,
             tool_context=self.protocol_adapter,
             provider_context=self.protocol_adapter,
             event_emitter=self.observability,
             chat_service=getattr(self, "_chat_service", None),
         )
-    return self._streaming_chat_coordinator
+    return self._deprecated_streaming_chat_coordinator
 
 
 def _unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
     """Get the unified chat coordinator facade (lazy init)."""
-    if self._unified_chat_coordinator is None:
+    if getattr(self, "_deprecated_unified_chat_coordinator", None) is None:
         from victor.agent.coordinators.unified_chat_coordinator import (
             UnifiedChatCoordinator,
         )
         from victor.agent.coordinators.protocols import ExecutionMode
 
-        self._unified_chat_coordinator = UnifiedChatCoordinator(
+        self._deprecated_unified_chat_coordinator = UnifiedChatCoordinator(
             sync_coordinator=self.sync_chat_coordinator,
             streaming_coordinator=self.streaming_chat_coordinator,
             default_mode=ExecutionMode.SYNC,
             chat_service=getattr(self, "_chat_service", None),
         )
-    return self._unified_chat_coordinator
+    return self._deprecated_unified_chat_coordinator
 
 
 def _intelligent_integration(

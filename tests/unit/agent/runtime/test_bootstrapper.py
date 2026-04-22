@@ -42,13 +42,25 @@ class TestAgentRuntimeBootstrapper:
             context_service=getattr(orch, "_context_service", None),
             provider_service=getattr(orch, "_provider_service", None),
             recovery_service=getattr(orch, "_recovery_service", None),
-            chat_coordinator=orch._chat_coordinator,
+            deprecated_chat_coordinator=orch._chat_coordinator,
             get_tool_coordinator=orch._get_deprecated_tool_coordinator,
-            session_coordinator=orch._session_coordinator,
+            deprecated_session_coordinator=orch._session_coordinator,
             turn_executor=orch._turn_executor,
-            sync_chat_coordinator=orch._sync_chat_coordinator,
-            streaming_chat_coordinator=orch._streaming_chat_coordinator,
-            unified_chat_coordinator=orch._unified_chat_coordinator,
+            deprecated_sync_chat_coordinator=getattr(
+                orch,
+                "_deprecated_sync_chat_coordinator",
+                None,
+            ),
+            deprecated_streaming_chat_coordinator=getattr(
+                orch,
+                "_deprecated_streaming_chat_coordinator",
+                None,
+            ),
+            deprecated_unified_chat_coordinator=getattr(
+                orch,
+                "_deprecated_unified_chat_coordinator",
+                None,
+            ),
             protocol_adapter=orch._protocol_adapter,
             streaming_handler=orch._streaming_handler,
             streaming_controller=orch._streaming_controller,
@@ -118,7 +130,7 @@ class TestAgentRuntimeBootstrapper:
         # Verify lazy placeholders are None
         assert orch._mode_workflow_team_coordinator is None
         assert orch._turn_executor is None
-        assert orch._sync_chat_coordinator is None
-        assert orch._streaming_chat_coordinator is None
-        assert orch._unified_chat_coordinator is None
+        assert orch._deprecated_sync_chat_coordinator is None
+        assert orch._deprecated_streaming_chat_coordinator is None
+        assert orch._deprecated_unified_chat_coordinator is None
         assert orch._protocol_adapter is None

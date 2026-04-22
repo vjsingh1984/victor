@@ -145,13 +145,25 @@ class AgentRuntimeBootstrapper:
             context_service=getattr(orchestrator, "_context_service", None),
             provider_service=getattr(orchestrator, "_provider_service", None),
             recovery_service=getattr(orchestrator, "_recovery_service", None),
-            chat_coordinator=orchestrator._chat_coordinator,
+            deprecated_chat_coordinator=orchestrator._chat_coordinator,
             get_tool_coordinator=orchestrator._get_deprecated_tool_coordinator,
             deprecated_session_coordinator=orchestrator._session_coordinator,
             turn_executor=orchestrator._turn_executor,
-            sync_chat_coordinator=orchestrator._sync_chat_coordinator,
-            streaming_chat_coordinator=(orchestrator._streaming_chat_coordinator),
-            unified_chat_coordinator=(orchestrator._unified_chat_coordinator),
+            deprecated_sync_chat_coordinator=getattr(
+                orchestrator,
+                "_deprecated_sync_chat_coordinator",
+                None,
+            ),
+            deprecated_streaming_chat_coordinator=getattr(
+                orchestrator,
+                "_deprecated_streaming_chat_coordinator",
+                None,
+            ),
+            deprecated_unified_chat_coordinator=getattr(
+                orchestrator,
+                "_deprecated_unified_chat_coordinator",
+                None,
+            ),
             protocol_adapter=orchestrator._protocol_adapter,
             streaming_handler=orchestrator._streaming_handler,
             streaming_controller=orchestrator._streaming_controller,
@@ -266,9 +278,9 @@ class AgentRuntimeBootstrapper:
 
         # Sync/Streaming coordinators (lazy initialization)
         orchestrator._turn_executor = None
-        orchestrator._sync_chat_coordinator = None
-        orchestrator._streaming_chat_coordinator = None
-        orchestrator._unified_chat_coordinator = None
+        orchestrator._deprecated_sync_chat_coordinator = None
+        orchestrator._deprecated_streaming_chat_coordinator = None
+        orchestrator._deprecated_unified_chat_coordinator = None
         orchestrator._protocol_adapter = None
 
         # Capability registry
