@@ -1067,50 +1067,21 @@ class Settings(BaseSettings):
     # - Excellent for code search (trained on code-related tasks)
     # - CPU-optimized, works great on consumer-grade hardware
     # - Native sentence-transformers support (no API needed)
-    unified_embedding_model: str = "BAAI/bge-small-en-v1.5"
-
     # Tool Selection Strategy
-    use_semantic_tool_selection: bool = True  # Use embeddings instead of keywords (DEFAULT)
-    preload_embeddings: bool = False  # Defer embedding model load to first semantic query
-    embedding_provider: str = (
-        "sentence-transformers"  # sentence-transformers (local), ollama, vllm, lmstudio
-    )
-    embedding_model: str = unified_embedding_model  # Shared with codebase search
+    # NOTE: These fields are now in tool_selection and embedding nested groups
 
     # Codebase Semantic Search (Air-gapped by Default)
-    codebase_vector_store: str = "lancedb"  # lancedb (recommended), chromadb
-    codebase_embedding_provider: str = "sentence-transformers"  # Local, offline, fast
-    codebase_embedding_model: str = unified_embedding_model  # Shared with tool selection
-    codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
-    codebase_dimension: int = 384  # Embedding dimension
-    codebase_batch_size: int = 32  # Batch size for embedding generation
-    codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
-    codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
-    core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
+    # NOTE: These fields are now in search nested group
 
     # Semantic Search Quality Improvements (P4.X - Multi-Provider Excellence)
-    semantic_similarity_threshold: float = (
-        0.25  # Min score [0.1-0.9], lowered from 0.5 for better recall on technical queries
-    )
-    semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
-    semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
-
-    # Hybrid Search (Semantic + Keyword with RRF)
-    enable_hybrid_search: bool = False  # Enable hybrid search combining semantic + keyword
-    hybrid_search_semantic_weight: float = 0.6  # Weight for semantic search (0.0-1.0)
-    hybrid_search_keyword_weight: float = 0.4  # Weight for keyword search (0.0-1.0)
+    # NOTE: These fields are now in search nested group
 
     # RL-based threshold learning per (embedding_model, task_type, tool_context)
     enable_semantic_threshold_rl_learning: bool = False  # Enable automatic threshold learning
     semantic_threshold_overrides: dict = {}  # Format: {"model:task:tool": threshold}
 
     # Tool call deduplication
-    enable_tool_deduplication: bool = (
-        True  # Enable deduplication tracker to prevent redundant calls
-    )
-    tool_deduplication_window_size: int = (
-        20  # Number of recent calls to track (increased for better coverage)
-    )
+    # NOTE: These fields are now in tool_selection nested group
 
     # UI
     theme: str = "monokai"
@@ -1128,10 +1099,7 @@ class Settings(BaseSettings):
     mcp_prefix: str = "mcp"
 
     # Tool Execution Settings
-    tool_call_budget: int = BUDGET_LIMITS.max_session_budget  # Maximum tool calls per session
-    tool_call_budget_warning_threshold: int = int(
-        BUDGET_LIMITS.max_session_budget * BUDGET_LIMITS.warning_threshold_pct
-    )  # Warn when approaching budget limit
+    # NOTE: These fields are now in tools nested group
 
     # Models known to support structured tool calls per provider
     # Loaded from model_capabilities.yaml, can be extended in profiles.yaml
@@ -1140,16 +1108,14 @@ class Settings(BaseSettings):
     )
 
     # Tool Retry Settings
-    tool_retry_enabled: bool = True  # Enable automatic retry for failed tool executions
-    tool_retry_max_attempts: int = 3  # Maximum retry attempts per tool call
-    tool_retry_base_delay: float = 1.0  # Base delay in seconds for exponential backoff
-    tool_retry_max_delay: float = 10.0  # Maximum delay in seconds between retries
+    # NOTE: These fields are now in tools nested group
 
     # Tool selection fallback
-    fallback_max_tools: int = 8  # Cap tool list when stage pruning removes everything
+    # NOTE: These fields are now in tool_selection nested group
 
     # Autonomous Planning Settings
     # When enabled, complex multi-step tasks use structured planning instead of direct chat
+    # NOTE: These fields are now in agent nested group
     enable_planning: bool = Field(
         default=False,
         description="Auto-detect and use planning for complex tasks (default: off)",
@@ -2024,8 +1990,8 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_hybrid_search_weights(self) -> "Settings":
         """Validate that hybrid search weights sum to 1.0."""
-        if self.enable_hybrid_search:
-            total_weight = self.hybrid_search_semantic_weight + self.hybrid_search_keyword_weight
+        if self.search and self.search.enable_hybrid_search:
+            total_weight = self.search.hybrid_search_semantic_weight + self.search.hybrid_search_keyword_weight
             if abs(total_weight - 1.0) > 0.01:
                 raise ValueError(f"Hybrid search weights must sum to 1.0, got {total_weight}")
         return self
@@ -2040,11 +2006,20 @@ class Settings(BaseSettings):
             "huggingface",
             "cohere",
         }
-        for field_name in ("embedding_provider", "codebase_embedding_provider"):
-            val = getattr(self, field_name, "")
-            if val and val not in known_providers:
+        # Check nested groups
+        if self.embedding and self.embedding.embedding_provider not in known_providers:
+            val = self.embedding.embedding_provider
+            if val:
                 warnings.warn(
-                    f"Unknown {field_name}='{val}'. " f"Known providers: {sorted(known_providers)}",
+                    f"Unknown embedding_provider='{val}'. Known providers: {sorted(known_providers)}",
+                    UserWarning,
+                    stacklevel=2,
+                )
+        if self.search and self.search.codebase_embedding_provider not in known_providers:
+            val = self.search.codebase_embedding_provider
+            if val:
+                warnings.warn(
+                    f"Unknown codebase_embedding_provider='{val}'. Known providers: {sorted(known_providers)}",
                     UserWarning,
                     stacklevel=2,
                 )
