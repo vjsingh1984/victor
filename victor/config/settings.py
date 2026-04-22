@@ -1212,17 +1212,7 @@ class Settings(BaseSettings):
     # NOTE: These fields are now in tool_selection nested group
 
     # Autonomous Planning Settings
-    # When enabled, complex multi-step tasks use structured planning instead of direct chat
-    # NOTE: These fields are now in agent nested group
-    enable_planning: bool = Field(
-        default=False,
-        description="Auto-detect and use planning for complex tasks (default: off)",
-    )
-    planning_min_complexity: str = Field(
-        default="moderate",
-        description="Minimum complexity to trigger planning: simple, moderate, complex",
-    )
-    # NOTE: planning_show_plan now in agent nested group
+    # NOTE: All planning fields now in agent nested group (enable_planning, planning_min_complexity, planning_show_plan)
 
     # Tool result caching (opt-in per tool)
     # NOTE: These fields are now in cache nested group
