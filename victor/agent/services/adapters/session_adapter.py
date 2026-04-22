@@ -7,6 +7,7 @@ SessionService when available and falls back to the deprecated SessionCoordinato
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -23,6 +24,13 @@ class SessionServiceAdapter:
         session_service: Optional[Any] = None,
         session_coordinator: Optional["SessionCoordinator"] = None,
     ) -> None:
+        if session_service is None and session_coordinator is not None:
+            warnings.warn(
+                "SessionServiceAdapter configured with a coordinator fallback only. "
+                "This compatibility path is deprecated; prefer SessionService.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self._session_service = session_service
         self._session_coordinator = session_coordinator
 

@@ -33,6 +33,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from victor.agent.coordinators.protocol_dependencies import OrchestratorProtocolAdapter
@@ -89,7 +90,7 @@ class CoordinatorFactory:
 
     def create_tool_coordinator(self) -> Any:
         """
-        Create tool coordinator with protocol dependencies.
+        Create the deprecated tool coordinator compatibility shim.
 
         Returns:
             ToolCoordinator instance with injected dependencies
@@ -98,19 +99,49 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+            from victor.agent.coordinators.tool_coordinator import create_tool_coordinator
+            from victor.agent.protocols import (
+                IBudgetManager,
+                IToolAccessController,
+                ModeControllerProtocol,
+                ToolCacheProtocol,
+                ToolPipelineProtocol,
+                ToolRegistryProtocol,
+                ToolSelectorProtocol,
+            )
+            from victor.agent.services.protocols import ToolServiceProtocol
 
-            # Resolve dependencies from container or create adapter
-            tool_executor = self._resolve_tool_executor()
-            message_store = self._resolve_message_store()
-
-            # Create coordinator with protocol-based dependencies
-            coordinator = ToolCoordinator(
-                tool_executor=tool_executor,
-                message_store=message_store,
+            warnings.warn(
+                "CoordinatorFactory.create_tool_coordinator() returns a deprecated "
+                "ToolCoordinator shim. Prefer ToolService.",
+                DeprecationWarning,
+                stacklevel=2,
             )
 
-            logger.debug("CoordinatorFactory: Created ToolCoordinator")
+            tool_pipeline = self._container.get_optional(ToolPipelineProtocol)
+            tool_registry = self._container.get_optional(ToolRegistryProtocol)
+            tool_selector = self._container.get_optional(ToolSelectorProtocol)
+            budget_manager = self._container.get_optional(IBudgetManager)
+            tool_cache = self._container.get_optional(ToolCacheProtocol)
+            mode_controller = self._container.get_optional(ModeControllerProtocol)
+            tool_access_controller = self._container.get_optional(IToolAccessController)
+            tool_service = self._container.get_optional(ToolServiceProtocol)
+
+            if tool_pipeline is None or tool_registry is None:
+                raise RuntimeError("ToolPipeline and ToolRegistry are required")
+
+            coordinator = create_tool_coordinator(
+                tool_pipeline=tool_pipeline,
+                tool_registry=tool_registry,
+                tool_selector=tool_selector,
+                budget_manager=budget_manager,
+                tool_cache=tool_cache,
+                tool_access_controller=tool_access_controller,
+                mode_controller=mode_controller,
+                tool_service=tool_service,
+            )
+
+            logger.debug("CoordinatorFactory: Created deprecated ToolCoordinator shim")
             return coordinator
 
         except Exception as e:

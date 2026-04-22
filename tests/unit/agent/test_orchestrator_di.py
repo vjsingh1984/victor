@@ -280,22 +280,25 @@ class TestOrchestratorServiceProvider:
                 DeprecationWarning,
                 match="creates a deprecated ToolCoordinator shim",
             ),
-            patch("victor.agent.coordinators.ToolCoordinator", return_value=coordinator) as ctor,
+            patch(
+                "victor.agent.coordinators.create_tool_coordinator",
+                return_value=coordinator,
+            ) as create_tool_coordinator,
         ):
             result = provider._create_tool_coordinator()
 
         assert result is coordinator
-        ctor.assert_called_once_with(
+        create_tool_coordinator.assert_called_once_with(
             tool_pipeline=tool_pipeline,
             tool_registry=tool_registry,
             tool_selector=tool_selector,
             budget_manager=budget_manager,
             tool_cache=tool_cache,
             tool_access_controller=tool_access_controller,
+            mode_controller=mode_controller,
+            tool_service=tool_service,
             config=ANY,
         )
-        coordinator.set_mode_controller.assert_called_once_with(mode_controller)
-        coordinator.bind_tool_service.assert_called_once_with(tool_service)
 
 
 # =============================================================================

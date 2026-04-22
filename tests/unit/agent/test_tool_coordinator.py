@@ -338,10 +338,14 @@ class TestCreateToolCoordinator:
         """Test basic factory creation."""
         mock_pipeline = MagicMock()
         mock_registry = MagicMock()
-        coordinator = create_tool_coordinator(
-            tool_pipeline=mock_pipeline,
-            tool_registry=mock_registry,
-        )
+        with pytest.warns(
+            DeprecationWarning,
+            match="deprecated ToolCoordinator shim",
+        ):
+            coordinator = create_tool_coordinator(
+                tool_pipeline=mock_pipeline,
+                tool_registry=mock_registry,
+            )
 
         assert isinstance(coordinator, ToolCoordinator)
         assert coordinator.budget == 25
@@ -352,10 +356,35 @@ class TestCreateToolCoordinator:
         mock_registry = MagicMock()
         config = ToolCoordinatorConfig(default_budget=100)
 
-        coordinator = create_tool_coordinator(
-            tool_pipeline=mock_pipeline,
-            tool_registry=mock_registry,
-            config=config,
-        )
+        with pytest.warns(
+            DeprecationWarning,
+            match="deprecated ToolCoordinator shim",
+        ):
+            coordinator = create_tool_coordinator(
+                tool_pipeline=mock_pipeline,
+                tool_registry=mock_registry,
+                config=config,
+            )
 
         assert coordinator.budget == 100
+
+    def test_create_binds_mode_controller_and_tool_service(self):
+        """Deprecated factory still binds runtime collaborators for compatibility."""
+        mock_pipeline = MagicMock()
+        mock_registry = MagicMock()
+        mode_controller = MagicMock()
+        tool_service = MagicMock()
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="deprecated ToolCoordinator shim",
+        ):
+            coordinator = create_tool_coordinator(
+                tool_pipeline=mock_pipeline,
+                tool_registry=mock_registry,
+                mode_controller=mode_controller,
+                tool_service=tool_service,
+            )
+
+        assert coordinator._mode_controller is mode_controller
+        assert coordinator._tool_service is tool_service

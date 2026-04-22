@@ -96,7 +96,6 @@ if TYPE_CHECKING:
         TaskTrackerProtocol,
         TaskTypeHinterProtocol,
         ToolCacheProtocol,
-        ToolCoordinatorProtocol,
         ToolDeduplicationTrackerProtocol,
         ToolDependencyGraphProtocol,
         ToolExecutorProtocol,
@@ -1207,7 +1206,7 @@ class OrchestratorServiceProvider:
     # New Coordinator Factory Methods (WS-D: Orchestrator SOLID Fixes)
     # =========================================================================
 
-    def _create_tool_coordinator(self) -> "ToolCoordinatorProtocol | None":
+    def _create_tool_coordinator(self) -> "Any | None":
         """Create the deprecated ToolCoordinator compatibility shim.
 
         The main runtime should resolve ToolService instead. This factory is
@@ -1217,8 +1216,8 @@ class OrchestratorServiceProvider:
             ToolCoordinator instance
         """
         from victor.agent.coordinators import (
-            ToolCoordinator,
             ToolCoordinatorConfig,
+            create_tool_coordinator,
         )
         from victor.agent.protocols import (
             IToolAccessController,
@@ -1260,20 +1259,17 @@ class OrchestratorServiceProvider:
             logger.debug("ToolPipeline or ToolRegistry not available for ToolCoordinator")
             return None
 
-        coordinator = ToolCoordinator(
+        return create_tool_coordinator(
             tool_pipeline=tool_pipeline,
             tool_registry=tool_registry,
             tool_selector=tool_selector,
             budget_manager=budget_manager,
             tool_cache=tool_cache,
             tool_access_controller=tool_access_controller,
+            mode_controller=mode_controller,
+            tool_service=tool_service,
             config=config,
         )
-        if mode_controller is not None:
-            coordinator.set_mode_controller(mode_controller)
-        if tool_service is not None:
-            coordinator.bind_tool_service(tool_service)
-        return coordinator
 
     def _create_state_coordinator(self) -> "StateCoordinatorProtocol | None":
         """Create StateCoordinator instance.

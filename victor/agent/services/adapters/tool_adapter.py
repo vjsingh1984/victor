@@ -7,6 +7,7 @@ ToolService when available and falls back to the deprecated ToolCoordinator.
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,6 +36,13 @@ class ToolServiceAdapter:
         tool_service: Optional[Any] = None,
         tool_coordinator: Optional["ToolCoordinator"] = None,
     ) -> None:
+        if tool_service is None and tool_coordinator is not None:
+            warnings.warn(
+                "ToolServiceAdapter configured with a coordinator fallback only. "
+                "This compatibility path is deprecated; prefer ToolService.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self._tool_service = tool_service
         self._tool_coordinator = tool_coordinator
 

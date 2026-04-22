@@ -136,6 +136,17 @@ def test_is_healthy_with_none():
     assert adapter.is_healthy() is False
 
 
+def test_explicit_coordinator_fallback_warns(mock_session_coordinator):
+    with pytest.warns(
+        DeprecationWarning,
+        match="coordinator fallback only",
+    ):
+        adapter = SessionServiceAdapter(None, session_coordinator=mock_session_coordinator)
+
+    assert adapter.get_session_stats() == {"messages": 1}
+    mock_session_coordinator.get_session_stats.assert_called_once()
+
+
 def test_legacy_positional_coordinator_is_still_supported(mock_session_coordinator):
     adapter = SessionServiceAdapter(mock_session_coordinator)
 

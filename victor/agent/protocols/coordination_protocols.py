@@ -162,10 +162,10 @@ class TaskCoordinatorProtocol(Protocol):
 
 @runtime_checkable
 class ToolCoordinatorProtocol(Protocol):
-    """Protocol for tool coordination operations.
+    """[DEPRECATED] Compatibility protocol for legacy tool coordination.
 
-    Coordinates tool selection, budgeting, and execution through a unified
-    interface. Consolidates tool-related operations from AgentOrchestrator.
+    This protocol remains importable for backward compatibility, but the
+    canonical runtime path should depend on ToolService instead.
     """
 
     async def select_tools(self, context: Any) -> List[Any]:

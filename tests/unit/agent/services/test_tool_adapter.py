@@ -195,7 +195,11 @@ def test_build_tool_access_context_prefers_service(
 
 
 def test_build_tool_access_context_falls_back_to_public_coordinator_method(mock_tool_coordinator):
-    adapter = ToolServiceAdapter(None, tool_coordinator=mock_tool_coordinator)
+    with pytest.warns(
+        DeprecationWarning,
+        match="coordinator fallback only",
+    ):
+        adapter = ToolServiceAdapter(None, tool_coordinator=mock_tool_coordinator)
 
     result = adapter.build_tool_access_context()
 

@@ -1288,27 +1288,57 @@ def create_tool_coordinator(
     tool_registry: "ToolRegistry",
     tool_selector: Optional["ToolSelector"] = None,
     budget_manager: Optional["BudgetManager"] = None,
+    tool_cache: Optional["ToolCache"] = None,
+    argument_normalizer: Optional["ArgumentNormalizer"] = None,
+    tool_adapter: Optional["ToolCallingAdapter"] = None,
+    tool_access_controller: Optional[Any] = None,
+    mode_controller: Optional[Any] = None,
+    tool_service: Optional[Any] = None,
     config: Optional[ToolCoordinatorConfig] = None,
 ) -> ToolCoordinator:
-    """Factory function to create a ToolCoordinator.
+    """Factory function to create a deprecated ToolCoordinator shim.
 
     Args:
         tool_pipeline: Pipeline for tool execution
         tool_registry: Tool registry for tool access
         tool_selector: Optional selector for tool selection
         budget_manager: Optional manager for budget tracking
+        tool_cache: Optional cache for tool results
+        argument_normalizer: Optional argument normalizer
+        tool_adapter: Optional tool-calling adapter
+        tool_access_controller: Optional layered access controller
+        mode_controller: Optional mode controller to bind after creation
+        tool_service: Optional canonical ToolService to bind after creation
         config: Configuration options
 
     Returns:
         Configured ToolCoordinator instance
     """
-    return ToolCoordinator(
+    import warnings
+
+    warnings.warn(
+        "create_tool_coordinator() builds a deprecated ToolCoordinator shim. "
+        "Prefer ToolService or create_tool_coordinator_shim() for runtime wiring.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    coordinator = ToolCoordinator(
         tool_pipeline=tool_pipeline,
         tool_registry=tool_registry,
         tool_selector=tool_selector,
         budget_manager=budget_manager,
+        tool_cache=tool_cache,
+        argument_normalizer=argument_normalizer,
+        tool_adapter=tool_adapter,
+        tool_access_controller=tool_access_controller,
         config=config,
     )
+    if mode_controller is not None:
+        coordinator.set_mode_controller(mode_controller)
+    if tool_service is not None:
+        coordinator.bind_tool_service(tool_service)
+    return coordinator
 
 
 __all__ = [
