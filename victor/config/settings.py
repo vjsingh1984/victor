@@ -855,6 +855,16 @@ class Settings(BaseSettings):
             "max_context_tokens": "context.max_context_tokens",
             # Agent Configuration (additional)
             "planning_show_plan": "agent.planning_show_plan",
+            # Feature Flags Configuration
+            "use_new_chat_service": "feature_flags.use_new_chat_service",
+            "use_new_tool_service": "feature_flags.use_new_tool_service",
+            "use_new_context_service": "feature_flags.use_new_context_service",
+            "use_new_provider_service": "feature_flags.use_new_provider_service",
+            "use_new_recovery_service": "feature_flags.use_new_recovery_service",
+            "use_new_session_service": "feature_flags.use_new_session_service",
+            "use_composition_over_inheritance": "feature_flags.use_composition_over_inheritance",
+            "use_strategy_based_tool_registration": "feature_flags.use_strategy_based_tool_registration",
+            "use_provider_pooling": "feature_flags.use_provider_pooling",
             # Workflow Configuration
             "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
             "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",
@@ -1314,18 +1324,13 @@ class Settings(BaseSettings):
     #   - Enables OCP compliance (add tool types without modifying registry)
 
     # Phase 3 - Service Implementation flags
-    use_new_chat_service: bool = False  # Use ChatService instead of orchestrator methods
-    use_new_tool_service: bool = False  # Use ToolService instead of orchestrator methods
-    use_new_context_service: bool = False  # Use ContextService for context management
-    use_new_provider_service: bool = False  # Use ProviderService for provider management
-    use_new_recovery_service: bool = False  # Use RecoveryService for error recovery
-    use_new_session_service: bool = False  # Use SessionService for session management
+    # NOTE: use_new_* service flags now in feature_flags nested group
 
     # Phase 4 - Vertical Composition flag
-    use_composition_over_inheritance: bool = False  # Use composition-based verticals
+    # NOTE: use_composition_over_inheritance now in feature_flags nested group
 
     # Phase 5 - Tool Registration Strategy flag
-    use_strategy_based_tool_registration: bool = False  # Use strategy pattern for tool registration
+    # NOTE: use_strategy_based_tool_registration now in feature_flags nested group
 
     # ==========================================================================
     # Smart Routing Settings (Phase 11 - Intelligent Provider Selection)
