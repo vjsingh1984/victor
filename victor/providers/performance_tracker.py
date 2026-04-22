@@ -19,12 +19,18 @@ This module provides performance tracking and learning for smart routing:
 - RequestMetric: Individual request metrics
 - ProviderPerformanceTracker: Tracks success rate, latency, trends
 
+Persistence:
+    Metrics are written through to the global database (~/.victor/victor.db)
+    in the rl_provider_stat table so that routing decisions benefit from
+    cross-session history. On initialization the tracker hydrates its
+    in-memory window from the last `window_size` rows per provider.
+
 Usage:
     from victor.providers.performance_tracker import ProviderPerformanceTracker, RequestMetric
 
     tracker = ProviderPerformanceTracker(window_size=100)
 
-    # Record successful request
+    # Record successful request (persisted to global DB)
     tracker.record_request(
         RequestMetric(
             provider="ollama",
@@ -35,17 +41,21 @@ Usage:
         )
     )
 
-    # Get provider score for routing decisions
+    # Get provider score for routing decisions (uses cross-session history)
     score = tracker.get_provider_score("ollama")  # 0.0 to 1.0
 """
 
 from __future__ import annotations
 
 import logging
+import sqlite3
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Deque, Dict, List, Optional
+from typing import Deque, Dict, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from victor.core.database import DatabaseManager
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +71,7 @@ class RequestMetric:
         latency_ms: Request latency in milliseconds
         timestamp: When the request occurred
         error_type: Type of error if request failed
+        task_type: Task type hint for per-task routing analytics
     """
 
     provider: str
@@ -69,6 +80,7 @@ class RequestMetric:
     latency_ms: float
     timestamp: datetime
     error_type: Optional[str] = None
+    task_type: str = "default"
 
     def to_dict(self) -> Dict:
         """Convert to dictionary for serialization."""
@@ -79,6 +91,7 @@ class RequestMetric:
             "latency_ms": self.latency_ms,
             "timestamp": self.timestamp.isoformat(),
             "error_type": self.error_type,
+            "task_type": self.task_type,
         }
 
 
@@ -92,17 +105,166 @@ class ProviderPerformanceTracker:
     - Latency trend: Improving, stable, or degrading
 
     Composite score = 40% success_rate + 30% (1/normalized_latency) + 30% trend_score
+
+    Persistence:
+        Writes through to rl_provider_stat in the global DB on every
+        record_request() call.  On first access to a provider's metrics,
+        hydrates the in-memory deque from the DB if it is empty (cold start).
+        This means routing benefits from history across restarts.
     """
 
-    def __init__(self, window_size: int = 100):
+    def __init__(
+        self,
+        window_size: int = 100,
+        db: Optional["DatabaseManager"] = None,
+    ):
         """Initialize performance tracker.
 
         Args:
-            window_size: Number of recent requests to track per provider
+            window_size: Number of recent requests to track per provider.
+            db: DatabaseManager to persist metrics. Defaults to the global
+                singleton (DatabaseManager()). Pass None to disable persistence
+                (useful in tests that don't want DB side-effects).
         """
         self.window_size = window_size
         self.metrics: Dict[str, Deque[RequestMetric]] = {}
-        logger.debug(f"ProviderPerformanceTracker initialized with window_size={window_size}")
+        # Track which providers have been hydrated from DB this session
+        self._hydrated: set[str] = set()
+
+        if db is None:
+            try:
+                from victor.core.database import DatabaseManager
+                self._db: Optional["DatabaseManager"] = DatabaseManager()
+                self._ensure_table()
+            except Exception:
+                logger.debug("Global DB unavailable; performance tracker will be in-memory only")
+                self._db = None
+        else:
+            self._db = db
+            if self._db is not None:
+                self._ensure_table()
+
+        logger.debug(
+            "ProviderPerformanceTracker initialized (window_size=%d, db=%s)",
+            window_size,
+            "enabled" if self._db else "disabled",
+        )
+
+    # ------------------------------------------------------------------
+    # Schema bootstrap
+    # ------------------------------------------------------------------
+
+    def _ensure_table(self) -> None:
+        """Create rl_provider_stat table if it doesn't exist."""
+        if self._db is None:
+            return
+        try:
+            from victor.core.schema import Schema
+            conn = self._db.get_connection()
+            conn.executescript(Schema.RL_PROVIDER_STAT)
+            for stmt in Schema.RL_PROVIDER_STAT_INDEXES.strip().split(";"):
+                stmt = stmt.strip()
+                if stmt:
+                    conn.execute(stmt)
+            conn.commit()
+        except Exception as exc:
+            logger.warning("Failed to ensure rl_provider_stat table: %s", exc)
+            self._db = None  # Degrade gracefully to in-memory
+
+    # ------------------------------------------------------------------
+    # Persistence helpers
+    # ------------------------------------------------------------------
+
+    def _persist(self, metric: RequestMetric) -> None:
+        """Write a metric to the global DB (fire-and-forget, non-fatal)."""
+        if self._db is None:
+            return
+        try:
+            self._db.execute(
+                """
+                INSERT INTO rl_provider_stat
+                    (provider, model, task_type, success, latency_ms, error_type, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    metric.provider.lower(),
+                    metric.model,
+                    metric.task_type,
+                    1 if metric.success else 0,
+                    metric.latency_ms,
+                    metric.error_type,
+                    metric.timestamp.isoformat(),
+                ),
+            )
+            # Trim old rows for this provider beyond 10× window_size to bound table growth.
+            # We keep 10× so that multiple concurrent sessions don't see an artificially small
+            # pool when they each hold a separate in-memory window.
+            self._db.execute(
+                """
+                DELETE FROM rl_provider_stat
+                WHERE provider = ?
+                  AND id NOT IN (
+                      SELECT id FROM rl_provider_stat
+                      WHERE provider = ?
+                      ORDER BY id DESC
+                      LIMIT ?
+                  )
+                """,
+                (metric.provider.lower(), metric.provider.lower(), self.window_size * 10),
+            )
+        except Exception as exc:
+            logger.debug("rl_provider_stat write failed (non-fatal): %s", exc)
+
+    def _hydrate(self, provider: str) -> None:
+        """Populate the in-memory deque for a provider from the DB (once per session)."""
+        if self._db is None or provider in self._hydrated:
+            return
+        self._hydrated.add(provider)
+        try:
+            rows = self._db.query(
+                """
+                SELECT provider, model, task_type, success, latency_ms, error_type, created_at
+                FROM rl_provider_stat
+                WHERE provider = ?
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (provider, self.window_size),
+            )
+            if not rows:
+                return
+            if provider not in self.metrics:
+                self.metrics[provider] = deque(maxlen=self.window_size)
+            deq = self.metrics[provider]
+            # Rows come back newest-first; insert oldest-first so the deque is in
+            # chronological order for trend analysis.
+            for row in reversed(rows):
+                try:
+                    ts = datetime.fromisoformat(row["created_at"])
+                except (ValueError, TypeError):
+                    ts = datetime.now()
+                deq.append(
+                    RequestMetric(
+                        provider=row["provider"],
+                        model=row["model"],
+                        task_type=row["task_type"] or "default",
+                        success=bool(row["success"]),
+                        latency_ms=float(row["latency_ms"]),
+                        error_type=row["error_type"],
+                        timestamp=ts,
+                    )
+                )
+            logger.debug(
+                "Hydrated %d historical metrics for provider '%s' from DB",
+                len(rows),
+                provider,
+            )
+        except Exception as exc:
+            logger.debug("rl_provider_stat hydration failed (non-fatal): %s", exc)
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
 
     def record_request(self, metric: RequestMetric) -> None:
         """Record a request metric.
@@ -112,20 +274,24 @@ class ProviderPerformanceTracker:
         """
         provider = metric.provider.lower()
 
-        # Initialize deque if needed
         if provider not in self.metrics:
             self.metrics[provider] = deque(maxlen=self.window_size)
 
-        # Add metric
         self.metrics[provider].append(metric)
+        self._persist(metric)
 
         logger.debug(
-            f"Recorded metric for {provider}: success={metric.success}, "
-            f"latency={metric.latency_ms:.0f}ms"
+            "Recorded metric for %s: success=%s, latency=%.0fms",
+            provider,
+            metric.success,
+            metric.latency_ms,
         )
 
     def get_metrics(self, provider: str) -> List[RequestMetric]:
         """Get all metrics for a provider.
+
+        Hydrates from the global DB on first access if the in-memory window
+        is empty (cold start after a restart).
 
         Args:
             provider: Provider name
@@ -134,6 +300,7 @@ class ProviderPerformanceTracker:
             List of request metrics
         """
         provider = provider.lower()
+        self._hydrate(provider)
         return list(self.metrics.get(provider, []))
 
     def get_success_rate(self, provider: str) -> float:
@@ -143,7 +310,7 @@ class ProviderPerformanceTracker:
             provider: Provider name
 
         Returns:
-            Success rate from 0.0 to 1.0 (0% to 100%)
+            Success rate from 0.0 to 1.0 (0.5 = unknown)
         """
         metrics = self.get_metrics(provider)
 
@@ -167,7 +334,6 @@ class ProviderPerformanceTracker:
         if not metrics:
             return 1000.0  # Unknown provider, default to 1s
 
-        # Only consider successful requests for latency
         latencies = [m.latency_ms for m in metrics if m.success]
 
         if not latencies:
@@ -191,14 +357,12 @@ class ProviderPerformanceTracker:
         if len(metrics) < 10:
             return "stable"  # Not enough data
 
-        # Split into recent and older halves
         sorted_metrics = sorted(metrics, key=lambda m: m.timestamp)
         mid = len(sorted_metrics) // 2
 
         older = sorted_metrics[:mid]
         recent = sorted_metrics[mid:]
 
-        # Calculate average latencies
         older_latency = sum(m.latency_ms for m in older if m.success) / max(
             1, sum(1 for m in older if m.success)
         )
@@ -206,7 +370,6 @@ class ProviderPerformanceTracker:
             1, sum(1 for m in recent if m.success)
         )
 
-        # Determine trend (10% threshold)
         if recent_latency < older_latency * 0.9:
             return "improving"
         elif recent_latency > older_latency * 1.1:
@@ -225,25 +388,25 @@ class ProviderPerformanceTracker:
         Returns:
             Score from 0.0 to 1.0 (higher is better)
         """
-        # Get metrics
         success_rate = self.get_success_rate(provider)
         avg_latency = self.get_average_latency(provider)
         trend = self.get_latency_trend(provider)
 
-        # Normalize latency (lower is better, cap at 5000ms)
-        # Use inverse: 1.0 for 0ms, 0.0 for 5000ms+
+        # Normalize latency: 1.0 for 0ms, 0.0 for 5000ms+
         latency_score = max(0.0, 1.0 - (avg_latency / 5000.0))
 
-        # Trend score
         trend_scores = {"improving": 1.0, "stable": 0.7, "degrading": 0.3}
         trend_score = trend_scores.get(trend, 0.7)
 
-        # Composite score
         composite_score = 0.4 * success_rate + 0.3 * latency_score + 0.3 * trend_score
 
         logger.debug(
-            f"Provider {provider} score: {composite_score:.2f} "
-            f"(success={success_rate:.2f}, latency={latency_score:.2f}, trend={trend_score:.2f})"
+            "Provider %s score: %.2f (success=%.2f, latency=%.2f, trend=%.2f)",
+            provider,
+            composite_score,
+            success_rate,
+            latency_score,
+            trend_score,
         )
 
         return composite_score
@@ -269,12 +432,10 @@ class ProviderPerformanceTracker:
             return None
 
         scores = {provider: self.get_provider_score(provider) for provider in candidates}
-
-        # Return provider with highest score
         return max(scores.items(), key=lambda x: x[1])[0] if scores else None
 
     def reset_provider(self, provider: str) -> None:
-        """Reset all metrics for a provider.
+        """Reset in-memory metrics for a provider (does not touch DB).
 
         Args:
             provider: Provider name
@@ -282,23 +443,25 @@ class ProviderPerformanceTracker:
         provider = provider.lower()
         if provider in self.metrics:
             del self.metrics[provider]
-            logger.debug(f"Reset metrics for provider {provider}")
+        self._hydrated.discard(provider)
+        logger.debug("Reset in-memory metrics for provider %s", provider)
 
     def reset_all(self) -> None:
-        """Reset all metrics."""
+        """Reset all in-memory metrics (does not touch DB)."""
         self.metrics.clear()
-        logger.debug("Reset all provider metrics")
+        self._hydrated.clear()
+        logger.debug("Reset all in-memory provider metrics")
 
-    def get_stats(self) -> Dict[str, any]:
+    def get_stats(self) -> Dict[str, object]:
         """Get tracker statistics.
 
         Returns:
             Dict with tracker stats
         """
         provider_stats = {}
-        for provider, metrics in self.metrics.items():
+        for provider in list(self.metrics.keys()):
             provider_stats[provider] = {
-                "total_requests": len(metrics),
+                "total_requests": len(self.metrics[provider]),
                 "success_rate": self.get_success_rate(provider),
                 "average_latency_ms": self.get_average_latency(provider),
                 "latency_trend": self.get_latency_trend(provider),
@@ -308,5 +471,6 @@ class ProviderPerformanceTracker:
         return {
             "window_size": self.window_size,
             "providers_tracked": len(self.metrics),
+            "db_enabled": self._db is not None,
             "provider_stats": provider_stats,
         }

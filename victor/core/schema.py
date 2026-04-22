@@ -112,6 +112,9 @@ class Tables:
     RL_QUALITY_WEIGHT = "rl_quality_weight"  # Quality weights
     RL_QUALITY_HISTORY = "rl_quality_history"  # Quality weight history
 
+    # Provider routing stats (smart routing performance tracker)
+    RL_PROVIDER_STAT = "rl_provider_stat"  # Per-request provider telemetry (latency, success)
+
     # Context pruning (token optimization)
     RL_CONTEXT_PRUNING = "rl_context_pruning"  # Context pruning Q-values
 
@@ -220,6 +223,7 @@ class LearnerID:
     WORKFLOW_EXECUTION = "workflow_execution"
     TEAM_COMPOSITION = "team_composition"
     PROMPT_OPTIMIZER = "prompt_optimizer"
+    PROVIDER_ROUTING = "provider_routing"
 
     @classmethod
     def all(cls) -> List[str]:
@@ -366,6 +370,26 @@ class Schema:
             updated_at TEXT DEFAULT (datetime('now')),
             UNIQUE(learner_id, task_type, stat_key)
         )
+    """
+
+    RL_PROVIDER_STAT = f"""
+        CREATE TABLE IF NOT EXISTS {Tables.RL_PROVIDER_STAT} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            model TEXT NOT NULL,
+            task_type TEXT DEFAULT 'default',
+            success INTEGER NOT NULL,
+            latency_ms REAL NOT NULL,
+            error_type TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """
+
+    RL_PROVIDER_STAT_INDEXES = f"""
+        CREATE INDEX IF NOT EXISTS idx_rl_pstat_provider
+            ON {Tables.RL_PROVIDER_STAT}(provider, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_rl_pstat_model
+            ON {Tables.RL_PROVIDER_STAT}(provider, model, created_at DESC);
     """
 
     RL_PATTERN = f"""

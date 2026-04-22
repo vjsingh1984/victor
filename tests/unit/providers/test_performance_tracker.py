@@ -18,6 +18,7 @@ Unit tests for provider performance tracker.
 
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from victor.providers.performance_tracker import (
     RequestMetric,
@@ -93,6 +94,12 @@ class TestRequestMetric:
 
 class TestProviderPerformanceTracker:
     """Tests for ProviderPerformanceTracker."""
+
+    @pytest.fixture(autouse=True)
+    def _disable_db(self):
+        """Patch the global DatabaseManager so tracker stays in-memory for unit tests."""
+        with patch("victor.core.database.DatabaseManager", side_effect=RuntimeError("no db in unit tests")):
+            yield
 
     def test_tracker_initialization(self):
         """Test tracker initialization."""
