@@ -794,6 +794,14 @@ class Settings(BaseSettings):
             "subprocess_resource_limits_enabled": "subprocess.subprocess_resource_limits_enabled",
             # Usage Configuration
             "usage_sampling_enabled": "usage.usage_sampling_enabled",
+            # Headless Configuration
+            "headless_mode": "headless.headless_mode",
+            "dry_run_mode": "headless.dry_run_mode",
+            "auto_approve_safe": "headless.auto_approve_safe",
+            "max_file_changes": "headless.max_file_changes",
+            "one_shot_mode": "headless.one_shot_mode",
+            # Security Configuration
+            "docker_allow_dangerous_operations": "security.docker_allow_dangerous_operations",
             # Workflow Configuration
             "workflow_definition_cache_enabled": "workflow.workflow_definition_cache_enabled",
             "workflow_definition_cache_ttl": "workflow.workflow_definition_cache_ttl",
@@ -1088,15 +1096,7 @@ class Settings(BaseSettings):
     write_approval_mode: str = "risky_only"
 
     # Headless Mode Settings (for CI/CD and automation)
-    # These can be set via CLI flags or environment variables:
-    #   - VICTOR_HEADLESS_MODE=true
-    #   - VICTOR_DRY_RUN_MODE=true
-    #   - VICTOR_MAX_FILE_CHANGES=10
-    headless_mode: bool = False  # Run without prompts, auto-approve safe actions
-    dry_run_mode: bool = False  # Preview changes without applying them
-    auto_approve_safe: bool = False  # Auto-approve read-only and LOW risk operations
-    max_file_changes: Optional[int] = None  # Limit file modifications per session
-    one_shot_mode: bool = False  # Exit after completing a single request
+    # NOTE: These fields are now in headless nested group
 
     # Unified Embedding Model (Optimized for Memory + Cache Efficiency)
     # Using same model for tool selection AND codebase search provides:
@@ -1354,7 +1354,7 @@ class Settings(BaseSettings):
     security_iac_scan: bool = False
 
     # Docker security
-    docker_allow_dangerous_operations: bool = False
+    # NOTE: docker_allow_dangerous_operations now in security nested group
 
     # LMStudio resource guard
     lmstudio_max_vram_gb: Optional[float] = (
