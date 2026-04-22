@@ -104,6 +104,12 @@ class CompactionResult:
     session_id: Optional[str]
     """Session ID for analytics."""
 
+    llm_provider: Optional[str] = None
+    """LLM provider used (only set for LLM_BASED and HYBRID strategies)."""
+
+    llm_model: Optional[str] = None
+    """LLM model used (only set for LLM_BASED and HYBRID strategies)."""
+
 
 class CompactionRouter:
     """Routes compaction requests to optimal strategy.
@@ -368,16 +374,25 @@ class CompactionRouter:
         tokens_before = self._estimate_tokens(messages)
 
         # Execute based on strategy
+        llm_provider: Optional[str] = None
+        llm_model: Optional[str] = None
         if strategy == CompactionType.RULE_BASED:
             summary = self._rule_summarizer.summarize(messages)
         elif strategy == CompactionType.LLM_BASED:
             if not self._llm_summarizer:
                 raise ValueError("LLM summarizer not available")
             summary = self._llm_summarizer.summarize(messages)
+            llm_provider = getattr(getattr(self._llm_summarizer, "_provider", None), "name", None)
+            llm_model = getattr(self._llm_summarizer, "_model", None) or None
         elif strategy == CompactionType.HYBRID:
             if not self._hybrid_summarizer:
                 raise ValueError("Hybrid summarizer not available")
             summary = await self._hybrid_summarizer.summarize_async(messages)
+            # Hybrid may delegate to LLM internally — surface the provider if available
+            inner = getattr(self._hybrid_summarizer, "_llm_summarizer", None)
+            if inner:
+                llm_provider = getattr(getattr(inner, "_provider", None), "name", None)
+                llm_model = getattr(inner, "_model", None) or None
         else:
             raise ValueError(f"Unknown strategy: {strategy}")
 
@@ -395,6 +410,8 @@ class CompactionRouter:
             success=True,
             error_message=None,
             session_id=session_id,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
         )
 
     def _calculate_complexity(
@@ -576,8 +593,8 @@ class CompactionRouter:
                 token_count_before=result.tokens_saved + len(result.summary) * 4,  # Estimate
                 token_count_after=len(result.summary) * 4,  # Estimate
                 duration_ms=result.duration_ms,
-                llm_provider=None,  # TODO: Extract from result
-                llm_model=None,  # TODO: Extract from result
+                llm_provider=result.llm_provider,
+                llm_model=result.llm_model,
                 success=success,
                 error_message=error_message,
             )

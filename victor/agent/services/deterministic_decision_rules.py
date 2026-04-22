@@ -896,14 +896,34 @@ class EnsembleVoter:
             scale = 1.0 / total_weight
             votes = [(result, weight * scale) for result, weight in votes]
 
-        # For now, use the highest-weighted confident result
-        # TODO: Implement proper voting for multi-class decisions
-        votes.sort(key=lambda x: x[0].confidence, reverse=True)
-        best_result, _ = votes[0]
+        # Multi-class weighted voting: group by decision class, sum weighted confidences,
+        # then pick the class with the highest aggregate score.
+        def _decision_class_key(decision: Any) -> str:
+            """Extract the primary classification value from a decision object."""
+            model_fields = getattr(type(decision), "model_fields", None)
+            if model_fields:
+                for field in model_fields:
+                    if field not in ("confidence", "deliverables", "reason"):
+                        return str(getattr(decision, field, ""))
+            return str(decision)
 
-        # Boost confidence slightly based on ensemble agreement
-        confidence_boost = min(len(votes) * 0.05, 0.15)  # Max 15% boost
-        boosted_confidence = min(best_result.confidence + confidence_boost, 0.98)
+        class_scores: dict[str, float] = {}
+        class_best: dict[str, LookupResult] = {}
+        for result, weight in votes:
+            key = _decision_class_key(result.decision)
+            score = weight * result.confidence
+            class_scores[key] = class_scores.get(key, 0.0) + score
+            if key not in class_best or result.confidence > class_best[key].confidence:
+                class_best[key] = result
+
+        winning_key = max(class_scores, key=lambda k: class_scores[k])
+        best_result = class_best[winning_key]
+        agreement_count = sum(1 for r, _ in votes if _decision_class_key(r.decision) == winning_key)
+
+        # Confidence = aggregate weighted score, boosted slightly when multiple signals agree
+        aggregate_confidence = min(class_scores[winning_key], 0.95)
+        consensus_boost = min((agreement_count - 1) * 0.03, 0.10)
+        boosted_confidence = min(aggregate_confidence + consensus_boost, 0.98)
 
         # Create a new decision object with boosted confidence if it has a confidence field
         decision = best_result.decision
@@ -915,9 +935,10 @@ class EnsembleVoter:
                 # If model_copy fails, just use the original decision
                 pass
 
+        agree_label = f"{agreement_count}/{len(votes)} signals agree" if agreement_count > 1 else "1 signal"
         return LookupResult(
             decision=decision,
             confidence=boosted_confidence,
-            reason=f"Ensemble of {len(votes)} signals: {best_result.reason}",
+            reason=f"Ensemble ({agree_label}): {best_result.reason}",
             matched_pattern=best_result.matched_pattern,
         )
