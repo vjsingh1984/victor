@@ -193,7 +193,7 @@ def config_validate(
         # Display validation results
         print(format_validation_result(result))
 
-        if not result.is_valid:
+        if not result.is_valid():
             raise typer.Exit(1)
 
     except Exception as e:

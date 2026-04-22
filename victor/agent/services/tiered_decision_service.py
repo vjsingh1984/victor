@@ -123,10 +123,10 @@ class TieredDecisionService:
             from victor.config.settings import Settings
 
             settings = Settings()
-            if hasattr(settings, "default_provider") and settings.default_provider:
-                self._detected_provider = settings.default_provider
-                logger.debug(f"Auto-detected provider from settings: {settings.default_provider}")
-                return settings.default_provider
+            if hasattr(settings, "default_provider") and settings.provider.default_provider:
+                self._detected_provider = settings.provider.default_provider
+                logger.debug(f"Auto-detected provider from settings: {settings.provider.default_provider}")
+                return settings.provider.default_provider
         except Exception:
             pass
 

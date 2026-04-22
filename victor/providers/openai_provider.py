@@ -30,6 +30,7 @@ from victor.providers.base import (
     ToolDefinition,
 )
 from victor.providers.openai_compat import (
+    build_openai_messages,
     convert_tools_to_openai_format,
 )
 from victor.providers.resolution import (
@@ -269,8 +270,9 @@ class OpenAIProvider(BaseProvider):
             has_tools=tools is not None,
         ) as log_success:
             try:
-                # Convert messages to OpenAI format
-                openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+                # Serialize messages: preserves tool_calls on assistant turns and
+                # cleans orphaned tool pairs after context compaction (ZAI refinement).
+                openai_messages = build_openai_messages(messages)
 
                 # Check if O-series reasoning model
                 is_o_series = self._is_o_series_model(model)
@@ -351,8 +353,9 @@ class OpenAIProvider(BaseProvider):
             # Refresh OAuth token if needed
             await self._ensure_valid_token()
 
-            # Convert messages
-            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
+            # Serialize messages: preserves tool_calls on assistant turns and
+            # cleans orphaned tool pairs after context compaction (ZAI refinement).
+            openai_messages = build_openai_messages(messages)
 
             # Check if O-series reasoning model
             is_o_series = self._is_o_series_model(model)

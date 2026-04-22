@@ -245,5 +245,5 @@ class TestPlanningCoordinatorIntegration:
 
         # Check defaults
         assert settings.enable_planning is False
-        assert settings.planning_min_complexity == "moderate"
-        assert settings.planning_show_plan is True
+        assert settings.agent.planning_min_complexity == "moderate"
+        assert settings.agent.planning_show_plan is True

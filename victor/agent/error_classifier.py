@@ -25,6 +25,8 @@ SOLID Principles:
 """
 
 import logging
+import re
+from functools import lru_cache
 
 from dataclasses import dataclass, field
 from enum import Enum
@@ -81,36 +83,127 @@ class ToolErrorClassifier:
 
     Tracks permanently failed tool calls to prevent retrying
     operations that will never succeed.
+
+    Uses compiled regex patterns for precise matching, avoiding false positives
+    from substring matching (e.g., "connection refused" matching unrelated text).
     """
 
-    # Patterns that indicate permanent failure
-    PERMANENT_PATTERNS: list[str] = [
-        "No such file or directory",
-        "Permission denied",
-        "ModuleNotFoundError",
-        "ImportError: No module named",
-        "command not found",
-        "FileNotFoundError",
-        "IsADirectoryError",
-        "NotADirectoryError",
-        "PermissionError",
-        "directory not empty",
-        "File exists",
-        "read-only file system",
-    ]
+    # Compiled regex patterns for permanent errors
+    # These errors will never succeed on retry
+    PERMANENT_PATTERNS: tuple[re.Pattern, ...] = (
+        # File system errors
+        re.compile(r"No such file or directory:?\s*[\'\"].*?[\'\"]", re.IGNORECASE),
+        re.compile(r"FileNotFoundError:?\s*.+?", re.IGNORECASE),
+        re.compile(r"\[Errno 2\]\s*No such file or directory", re.IGNORECASE),
+        re.compile(r"IsADirectoryError:?\s*.+?", re.IGNORECASE),
+        re.compile(r"NotADirectoryError:?\s*.+?", re.IGNORECASE),
+        re.compile(r"directory not empty\b", re.IGNORECASE),
+        re.compile(r"File exists:?\s*.+?", re.IGNORECASE),
+        re.compile(r"read-only file system", re.IGNORECASE),
 
-    # Patterns that indicate transient failure (might succeed later)
-    TRANSIENT_PATTERNS: list[str] = [
-        "Connection refused",
-        "Connection timed out",
-        "Network is unreachable",
-        "rate limit",
-        "too many requests",
-        "Service Unavailable",
-        "Gateway Timeout",
-        "temporary",
-        "try again",
-    ]
+        # Permission errors
+        re.compile(r"Permission denied:?\s*.+?", re.IGNORECASE),
+        re.compile(r"PermissionError:?\s*.+?", re.IGNORECASE),
+        re.compile(r"\[Errno 13\]\s*Permission denied", re.IGNORECASE),
+        re.compile(r"Access denied\b", re.IGNORECASE),
+        re.compile(r"403\b.*?Forbidden", re.IGNORECASE),  # HTTP 403 Forbidden
+
+        # Module/import errors
+        re.compile(r"ModuleNotFoundError:?\s*No module named\s+[\'\"].*?[\'\"]", re.IGNORECASE),
+        re.compile(r"ImportError:?\s*No module named\s+[\'\"].*?[\'\"]", re.IGNORECASE),
+        re.compile(r"cannot import name\s+[\'\"].*?[\'\"]\s+from\s+[\'\"].*?[\'\"]", re.IGNORECASE),
+
+        # Command errors
+        re.compile(r"command not found:?\s*\S+", re.IGNORECASE),
+        re.compile(r"executable not found:?\s*\S+", re.IGNORECASE),
+        re.compile(r"\[Errno 8\]\s*Exec format error", re.IGNORECASE),
+
+        # Syntax errors (permanent without code changes)
+        re.compile(r"SyntaxError:?\s*.+?", re.IGNORECASE),
+        re.compile(r"IndentationError:?\s*.+?", re.IGNORECASE),
+
+        # Type/conversion errors
+        re.compile(r"TypeError:?\s*.+?", re.IGNORECASE),
+        re.compile(r"ValueError:?\s*.+?", re.IGNORECASE),
+
+        # Configuration errors
+        re.compile(r"ConfigurationError:?\s*.+?", re.IGNORECASE),
+        re.compile(r"ValidationError:?\s*.+?", re.IGNORECASE),
+
+        # Docker/container errors
+        re.compile(r"No such container\b", re.IGNORECASE),
+        re.compile(r"No such image\b", re.IGNORECASE),
+        re.compile(r"Container .*? not found\b", re.IGNORECASE),
+
+        # Git errors
+        re.compile(r"pathspec .*? did not match any file", re.IGNORECASE),
+
+
+        # Edge case: errno names not found
+        re.compile(r"\[Errno -2\]\s*No such file or directory", re.IGNORECASE),
+        re.compile(r"getaddrinfo failed:?\s*Name or service not known", re.IGNORECASE),
+        re.compile(r"nodename nor servname provided", re.IGNORECASE),
+
+        # Edge case: SSL/TLS certificate errors
+        re.compile(r"SSL: CERTIFICATE_VERIFY_FAILED", re.IGNORECASE),
+        re.compile(r"certificate verify failed", re.IGNORECASE),
+        re.compile(r"SSL: WRONG_VERSION_NUMBER", re.IGNORECASE),
+        re.compile(r"TLS: wrong version number", re.IGNORECASE),
+        re.compile(r"handshake failure", re.IGNORECASE),
+
+        # Edge case: Windows-specific errors
+        re.compile(r"\[WinError \d+\]", re.IGNORECASE),
+        re.compile(r"\[Error \d+\]", re.IGNORECASE),
+    )
+        # Edge case: ECONNREFUSED (errno name not found) - TRANSIENT not permanent
+        # These are in TRANSIENT_PATTERNS below
+        # Edge case: SSL/TLS certificate errors
+
+    # Compiled regex patterns for transient errors
+    # These errors might succeed later (network issues, rate limits, etc.)
+    TRANSIENT_PATTERNS: tuple[re.Pattern, ...] = (
+        # Network connectivity errors - more precise patterns
+        re.compile(r"^(?!.*refused to die).*Connection refused(?:\s|$)", re.IGNORECASE),
+        re.compile(r"Connection timed out\b", re.IGNORECASE),
+        re.compile(r"Connection reset by peer\b", re.IGNORECASE),
+        re.compile(r"Network is unreachable\b", re.IGNORECASE),
+        re.compile(r"Host unreachable\b", re.IGNORECASE),
+        re.compile(r"No route to host\b", re.IGNORECASE),
+
+        # HTTP errors
+        re.compile(r"rate limit(?:ed)?\b", re.IGNORECASE),
+        re.compile(r"too many requests\b", re.IGNORECASE),
+        re.compile(r"429\b"),  # HTTP 429 Too Many Requests
+        re.compile(r"500\b"),  # HTTP 500 Internal Server Error
+        re.compile(r"502\b"),  # HTTP 502 Bad Gateway
+        re.compile(r"503\b"),  # HTTP 503 Service Unavailable
+        re.compile(r"504\b"),  # HTTP 504 Gateway Timeout
+        re.compile(r"Service Unavailable\b", re.IGNORECASE),
+        re.compile(r"Gateway Timeout\b", re.IGNORECASE),
+        re.compile(r"Bad Gateway\b", re.IGNORECASE),
+        re.compile(r"Internal Server Error\b", re.IGNORECASE),
+
+        # Timeout errors
+        re.compile(r"Request timed out\b", re.IGNORECASE),
+        re.compile(r"Timeout exceeded\b", re.IGNORECASE),
+        re.compile(r"timed out\b", re.IGNORECASE),
+        re.compile(r"Network timeout\b", re.IGNORECASE),
+        re.compile(r"timeout while connecting\b", re.IGNORECASE),
+
+        # Temporary errors
+        re.compile(r"temporary fail(?:ure|ed)?\b", re.IGNORECASE),
+        re.compile(r"try again later\b", re.IGNORECASE),
+        re.compile(r"temporarily unavailable\b", re.IGNORECASE),
+
+        # SSL/TLS errors
+        re.compile(r"SSL:?\s*.*?certificate verify failed", re.IGNORECASE),
+        re.compile(r"TLS:?\s*.*?handshake failure", re.IGNORECASE),
+
+        # Edge case: errno names not found (but still TRANSIENT)
+        re.compile(r"\[Errno 111\]\s*Connection refused", re.IGNORECASE),
+        re.compile(r"\[Errno 61\]\s*Connection refused", re.IGNORECASE),
+        re.compile(r"ECONNREFUSED\b", re.IGNORECASE),
+    )
 
     def __init__(self, decision_service=None) -> None:
         """Initialize the classifier with empty failure tracking.
@@ -121,8 +214,12 @@ class ToolErrorClassifier:
         self._failed_calls: Set[ToolCallSignature] = set()
         self._decision_service = decision_service
 
+    @lru_cache(maxsize=512)
     def classify(self, error_message: str) -> ErrorType:
-        """Classify an error message.
+        """Classify an error message using regex patterns.
+
+        Uses compiled regex patterns for precise matching, avoiding false positives.
+        Results are cached to avoid repeated classification of the same error.
 
         Args:
             error_message: The error message from tool execution
@@ -130,16 +227,16 @@ class ToolErrorClassifier:
         Returns:
             ErrorType indicating whether the error is permanent, transient, or retryable
         """
-        error_lower = error_message.lower()
-
-        # Check for permanent patterns first
+        # Check for permanent patterns first (highest priority)
         for pattern in self.PERMANENT_PATTERNS:
-            if pattern.lower() in error_lower:
+            if pattern.search(error_message):
+                logger.debug(f"Error classified as PERMANENT: matched pattern '{pattern.pattern}'")
                 return ErrorType.PERMANENT
 
         # Check for transient patterns
         for pattern in self.TRANSIENT_PATTERNS:
-            if pattern.lower() in error_lower:
+            if pattern.search(error_message):
+                logger.debug(f"Error classified as TRANSIENT: matched pattern '{pattern.pattern}'")
                 return ErrorType.TRANSIENT
 
         # LLM augmentation: when no pattern matches, consult LLM if available
@@ -175,7 +272,8 @@ class ToolErrorClassifier:
             except Exception:
                 logger.debug("LLM error classification failed", exc_info=True)
 
-        # Default to retryable (e.g., syntax errors can be fixed)
+        # Default to retryable (e.g., syntax errors can be fixed by agent)
+        logger.debug("Error classified as RETRYABLE (no pattern matched)")
         return ErrorType.RETRYABLE
 
     def record_failure(
@@ -244,8 +342,10 @@ class ToolErrorClassifier:
         return None
 
     def reset(self) -> None:
-        """Clear all recorded failures."""
+        """Clear all recorded failures and classification cache."""
         self._failed_calls.clear()
+        # Clear the LRU cache for classify method
+        self.classify.cache_clear()
 
     @property
     def failed_call_count(self) -> int:

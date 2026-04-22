@@ -216,7 +216,7 @@ class OpenAIConfig(ProviderConfigStrategy):
             result.setdefault("base_url", "https://chatgpt.com/backend-api/codex/v1")
         else:
             # API key mode
-            raw_key = settings.openai_api_key
+            raw_key = settings.provider.openai_api_key
             api_key = (raw_key.get_secret_value() if raw_key else None) or get_api_key("openai")
             if api_key:
                 result["api_key"] = api_key

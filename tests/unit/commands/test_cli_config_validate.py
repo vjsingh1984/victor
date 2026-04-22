@@ -20,13 +20,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from typer.testing import CliRunner
 
-from victor.config.validation import ValidationResult
+from victor.config.validation import ConfigValidationResult
 from victor.ui.cli import app
 
 runner = CliRunner()
 
-# A passing ValidationResult to bypass validate_configuration when testing verbose checks
-_VALID_RESULT = ValidationResult(is_valid=True)
+# A passing ConfigValidationResult to bypass validate_configuration when testing verbose checks
+_VALID_RESULT = ConfigValidationResult()
 
 
 def strip_ansi(text: str) -> str:

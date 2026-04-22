@@ -293,7 +293,7 @@ class IntentClassificationHandler:
         is_repeated_response = self._unified_tracker.check_response_loop(full_content or "")
 
         # Step 5: Build task completion signals
-        task_completion_signals = self._build_task_completion_signals(tracking_state)
+        task_completion_signals = self._build_task_completion_signals(tracking_state, stream_ctx)
 
         # Step 6: Determine continuation action
         action_result = self._determine_action(
@@ -342,8 +342,16 @@ class IntentClassificationHandler:
 
         return intent_result
 
-    def _build_task_completion_signals(self, tracking_state: TrackingState) -> Dict[str, Any]:
-        """Build task completion signals for early termination detection."""
+    def _build_task_completion_signals(self, tracking_state: TrackingState, stream_ctx: Optional[Any] = None) -> Dict[str, Any]:
+        """Build task completion signals for early termination detection.
+
+        Args:
+            tracking_state: Current tracking state
+            stream_ctx: Optional streaming context for iteration count
+
+        Returns:
+            Dictionary with task completion signals
+        """
         # Get cycle count from conversation state
         cycle_count = 0
         if self._conversation_state:
@@ -359,6 +367,11 @@ class IntentClassificationHandler:
             except Exception:
                 pass  # Don't fail on state access errors
 
+        # AGENTIC LOOP FIX: Include current iteration for loop detection
+        current_iteration = 0
+        if stream_ctx and hasattr(stream_ctx, 'total_iterations'):
+            current_iteration = stream_ctx.total_iterations
+
         return {
             "required_files": tracking_state.required_files,
             "read_files": tracking_state.read_files_session,
@@ -370,6 +383,7 @@ class IntentClassificationHandler:
             "cycle_count": cycle_count,
             "synthesis_nudge_count": tracking_state.synthesis_nudge_count,
             "cumulative_prompt_interventions": tracking_state.cumulative_prompt_interventions,
+            "current_iteration": current_iteration,  # NEW: For algorithmic loop detection
         }
 
     def _determine_action(

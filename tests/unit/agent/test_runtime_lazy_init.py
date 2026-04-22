@@ -107,13 +107,10 @@ class TestRuntimeLazyInitialization:
 
                 # Check that components are NOT initialized (lazy)
                 chat_coordinator = getattr(interaction_runtime, "chat_coordinator", None)
-                tool_coordinator = getattr(interaction_runtime, "tool_coordinator", None)
                 session_coordinator = getattr(interaction_runtime, "session_coordinator", None)
 
-                # All should be LazyRuntimeProxy instances
-                # Note: With service layer feature flags enabled, tool_coordinator
-                # may be eagerly initialized during bootstrap. We still check that
-                # chat and session coordinators remain lazy.
+                # Primary interaction runtime surface is service-first and only
+                # exposes the chat/session coordinator shims.
                 for component_name, component in [
                     ("chat_coordinator", chat_coordinator),
                     ("session_coordinator", session_coordinator),
@@ -125,9 +122,12 @@ class TestRuntimeLazyInitialization:
                         not initialized
                     ), f"{component_name} should NOT be initialized after Agent.create()"
 
-                # tool_coordinator should exist but may be eagerly initialized
-                # when USE_NEW_TOOL_SERVICE or USE_SERVICE_LAYER flags are enabled
-                assert tool_coordinator is not None, "tool_coordinator should exist"
+                assert hasattr(interaction_runtime, "tool_coordinator") is False
+
+                # Deprecated compatibility shim still exists on the orchestrator.
+                tool_coordinator = getattr(orchestrator, "_tool_coordinator", None)
+                assert tool_coordinator is not None, "tool_coordinator shim should exist"
+                assert getattr(tool_coordinator, "initialized", False) is False
 
             finally:
                 await agent.close()

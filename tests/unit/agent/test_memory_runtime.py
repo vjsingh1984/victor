@@ -38,13 +38,13 @@ def test_create_memory_runtime_components_delegates_to_factory():
     assert components.memory_session_id == "session-123"
 
 
-def test_initialize_conversation_embedding_store_delegates_to_session_coordinator():
+def test_initialize_conversation_embedding_store_delegates_to_session_service():
     memory_manager = object()
     expected_store = object()
     expected_cache = object()
 
     with patch(
-        "victor.agent.coordinators.session_coordinator.SessionCoordinator.init_conversation_embedding_store"
+        "victor.agent.services.session_service.SessionService.init_conversation_embedding_store"
     ) as init_store:
         init_store.return_value = (expected_store, expected_cache)
         store, cache = initialize_conversation_embedding_store(memory_manager=memory_manager)

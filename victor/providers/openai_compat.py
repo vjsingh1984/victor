@@ -20,9 +20,13 @@ OpenAI-compatible APIs (OpenAI, xAI, LMStudio, vLLM, Ollama).
 These utilities help reduce code duplication across provider implementations.
 """
 
+import hashlib
 import json
 import logging
+import time
 from typing import Any, Dict, List, Optional
+
+import httpx
 
 from victor.providers.base import Message, ToolDefinition
 
@@ -276,3 +280,169 @@ def fix_orphaned_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str,
     ]
 
     return messages
+
+
+def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
+    """Build a fully-validated OpenAI-format message list from standard Message objects.
+
+    Extracted from ZAIProvider._build_request_payload — the most complete message
+    serialization in the codebase. Shared across all OpenAI-compatible providers.
+
+    Handles:
+    - Assistant messages: serializes tool_calls to OpenAI ``{id, type, function}`` format;
+      sets content=None when tool_calls are present (required by GLM/OpenAI spec)
+    - Tool response messages: copies tool_call_id; generates a fallback MD5 ID when
+      the original is missing or orphaned (prevents 400 errors after context compaction)
+    - Second-pass orphaned cleanup via fix_orphaned_tool_messages()
+
+    Args:
+        messages: Standard Message objects from the conversation history
+
+    Returns:
+        Cleaned OpenAI-format message list ready to send to any /v1/chat/completions API
+    """
+    formatted: List[Dict[str, Any]] = []
+    valid_tool_call_ids: set = set()
+
+    for msg in messages:
+        entry: Dict[str, Any] = {
+            "role": msg.role,
+            "content": msg.content if msg.content is not None else "",
+        }
+
+        if msg.role == "assistant":
+            tool_calls = getattr(msg, "tool_calls", None)
+            if tool_calls:
+                openai_tcs = []
+                for tc in tool_calls:
+                    if isinstance(tc, dict):
+                        tc_id = tc.get("id", "")
+                        tc_name = tc.get("name", "")
+                        tc_args = tc.get("arguments", {})
+                        if isinstance(tc_args, dict):
+                            tc_args = json.dumps(tc_args)
+                        openai_tcs.append({
+                            "id": tc_id,
+                            "type": "function",
+                            "function": {"name": tc_name, "arguments": tc_args},
+                        })
+                        valid_tool_call_ids.add(tc_id)
+                if openai_tcs:
+                    entry["tool_calls"] = openai_tcs
+                    if not entry["content"]:
+                        entry["content"] = None
+
+        elif msg.role == "tool":
+            tool_call_id = getattr(msg, "tool_call_id", None)
+            tool_name = getattr(msg, "name", None) or "unknown"
+            if tool_call_id and tool_call_id in valid_tool_call_ids:
+                entry["tool_call_id"] = tool_call_id
+            else:
+                # Missing or orphaned ID — generate stable fallback to avoid 400 errors
+                fallback = hashlib.md5(f"{tool_name}_{time.time()}".encode()).hexdigest()[:16]
+                entry["tool_call_id"] = fallback
+                logger.debug(
+                    "build_openai_messages: generated fallback tool_call_id=%s "
+                    "(original=%s, tool=%s)",
+                    fallback,
+                    tool_call_id,
+                    tool_name,
+                )
+
+        elif msg.role == "tool":
+            # name field for function responses
+            if hasattr(msg, "name") and msg.name:
+                entry["name"] = msg.name
+
+        formatted.append(entry)
+
+    return fix_orphaned_tool_messages(formatted)
+
+
+def handle_httpx_status_error(
+    exc: "httpx.HTTPStatusError",
+    provider_name: str,
+) -> Exception:
+    """Map an httpx.HTTPStatusError to a typed ProviderError subclass.
+
+    Extracted from ZAIProvider — provides richer 400 error messages by parsing
+    the JSON error body for the ``error.message`` field. Shared across all
+    httpx-based OpenAI-compatible providers.
+
+    Args:
+        exc: The HTTPStatusError raised by httpx
+        provider_name: Provider name for error messages (e.g., "zai", "xai")
+
+    Returns:
+        The mapped exception (caller should raise it).
+    """
+    from victor.providers.base import ProviderAuthError, ProviderError, ProviderRateLimitError
+
+    status = exc.response.status_code
+    raw = ""
+    try:
+        raw = exc.response.text[:500]
+    except Exception:
+        pass
+
+    if status == 401:
+        return ProviderAuthError(
+            message=f"Authentication failed: {raw or 'HTTP 401'}",
+            provider=provider_name,
+            status_code=401,
+        )
+    if status == 429:
+        return ProviderRateLimitError(
+            message=f"Rate limit exceeded: {raw or 'HTTP 429'}",
+            provider=provider_name,
+            status_code=429,
+        )
+    if status == 400:
+        msg = raw
+        try:
+            body = json.loads(raw)
+            msg = body.get("error", {}).get("message", raw)
+        except Exception:
+            pass
+        return ProviderError(
+            message=f"{provider_name} request format error: {msg}",
+            provider=provider_name,
+            status_code=400,
+            raw_error=exc,
+        )
+    return ProviderError(
+        message=f"{provider_name} HTTP error {status}: {raw}",
+        provider=provider_name,
+        status_code=status,
+        raw_error=exc,
+    )
+
+
+def accumulate_tool_call_delta(
+    delta: Dict[str, Any],
+    accumulated: List[Dict[str, Any]],
+) -> None:
+    """Accumulate a streaming tool-call delta into the running accumulator list.
+
+    Extracted from ZAIProvider._parse_stream_chunk — handles OpenAI SSE streaming
+    format where tool call data arrives in fragments across multiple chunks.
+
+    Each entry in ``accumulated`` has shape: ``{id, name, arguments}`` where
+    ``arguments`` is a string being built up by concatenation.
+
+    Args:
+        delta: The ``delta`` dict from an SSE chunk (``choices[0].delta``)
+        accumulated: Mutable list; extended and mutated in place
+    """
+    tool_call_deltas = delta.get("tool_calls", [])
+    for tc_delta in tool_call_deltas:
+        idx = tc_delta.get("index", 0)
+        while len(accumulated) <= idx:
+            accumulated.append({"id": "", "name": "", "arguments": ""})
+        if "id" in tc_delta:
+            accumulated[idx]["id"] = tc_delta["id"]
+        func = tc_delta.get("function", {})
+        if "name" in func:
+            accumulated[idx]["name"] = func["name"]
+        if "arguments" in func:
+            accumulated[idx]["arguments"] += func["arguments"]

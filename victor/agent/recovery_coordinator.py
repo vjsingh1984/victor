@@ -155,6 +155,20 @@ class StreamingRecoveryCoordinator:
             self._presentation = create_presentation_adapter()
         else:
             self._presentation = presentation
+        self._recovery_service: Optional[Any] = None
+
+    def bind_recovery_service(self, recovery_service: Any) -> None:
+        """Bind the canonical RecoveryService for backward-compatible delegation."""
+        self._recovery_service = recovery_service
+
+    def _delegate_service(self) -> Optional[Any]:
+        """Return the bound recovery service when it is ready to own runtime behavior."""
+        if self._recovery_service is None:
+            return None
+        native_runtime = getattr(self._recovery_service, "has_native_streaming_runtime", None)
+        if callable(native_runtime) and native_runtime():
+            return self._recovery_service
+        return None
 
     def _get_default_bus(self) -> Optional[ObservabilityBus]:
         """Get default ObservabilityBus from DI container.
@@ -274,6 +288,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             StreamChunk if natural completion detected, None otherwise
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.check_natural_completion(ctx, has_tool_calls, content_length)
+
         result = self.streaming_handler.check_natural_completion(
             ctx.streaming_context, has_tool_calls, content_length
         )
@@ -299,6 +317,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             StreamChunk with warning if approaching limit, None otherwise
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.check_tool_budget(ctx, warning_threshold)
+
         remaining = ctx.tool_budget - ctx.tool_calls_used
 
         # Warn when we've used at least warning_threshold calls and still have remaining
@@ -351,6 +373,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             Tuple of (chunk, should_clear_tools) if threshold exceeded, None otherwise
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.check_blocked_threshold(ctx, all_blocked)
+
         consecutive_limit = getattr(self.settings, "recovery_blocked_consecutive_threshold", 4)
         total_limit = getattr(self.settings, "recovery_blocked_total_threshold", 6)
 
@@ -381,6 +407,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             Tuple of (should_force, action_type)
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.check_force_action(ctx)
+
         if not self.recovery_handler:
             return False, None
 
@@ -405,6 +435,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             Tuple of (StreamChunk if threshold exceeded, should_force_completion flag)
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.handle_empty_response(ctx)
+
         result = self.streaming_handler.handle_empty_response(ctx.streaming_context)
         if result and result.chunks:
             # Emit ERROR event for empty response
@@ -597,6 +631,16 @@ class StreamingRecoveryCoordinator:
         Returns:
             RecoveryAction with action to take (continue, retry, abort, force_summary)
         """
+        service = self._delegate_service()
+        if service is not None:
+            return await service.handle_recovery_with_integration(
+                ctx,
+                full_content,
+                tool_calls,
+                mentioned_tools,
+                message_adder=message_adder,
+            )
+
         # Import here to avoid circular import
         from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
 
@@ -662,6 +706,14 @@ class StreamingRecoveryCoordinator:
         Returns:
             StreamChunk if action requires immediate yield, None otherwise
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.apply_recovery_action(
+                recovery_action,
+                ctx,
+                message_adder=message_adder,
+            )
+
         if recovery_action.action == "continue":
             return None
 
@@ -764,6 +816,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             Tuple of (filtered_tool_calls, blocked_chunks, blocked_count)
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.filter_blocked_tool_calls(ctx, tool_calls)
+
         return self.streaming_handler.filter_blocked_tool_calls(
             ctx.streaming_context,
             tool_calls,
@@ -786,6 +842,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             Tuple of (truncated_tool_calls, was_truncated)
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.truncate_tool_calls(ctx, tool_calls, max_calls)
+
         if len(tool_calls) <= max_calls:
             return tool_calls, False
 
@@ -828,6 +888,10 @@ class StreamingRecoveryCoordinator:
         Returns:
             Fallback message
         """
+        service = self._delegate_service()
+        if service is not None:
+            return service.get_recovery_fallback_message(ctx)
+
         return (
             "I apologize, but I'm having difficulty completing this task. "
             "Here's a summary of what I've accomplished so far..."

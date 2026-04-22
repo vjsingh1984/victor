@@ -49,7 +49,6 @@ from victor.agent.protocols import (
     TaskTrackerProtocol,
     TaskTypeHinterProtocol,
     ToolCacheProtocol,
-    ToolCoordinatorProtocol,
     ToolDeduplicationTrackerProtocol,
     ToolExecutorProtocol,
     ToolOutputFormatterProtocol,
@@ -160,11 +159,6 @@ AGENT_SINGLETON_SPECS: List[ServiceSpec] = [
     ServiceSpec(CompactionSummarizerProtocol, "_create_compaction_summarizer"),
     ServiceSpec(HierarchicalCompactionProtocol, "_create_hierarchical_compaction_manager"),
     ServiceSpec(SessionContextLinkerProtocol, "_create_session_context_linker"),
-    ServiceSpec(
-        ToolCoordinatorProtocol,
-        "_create_tool_coordinator",
-        ServiceLifetime.SCOPED,
-    ),
     ServiceSpec(
         StateCoordinatorProtocol,
         "_create_state_coordinator",

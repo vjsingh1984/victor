@@ -479,7 +479,7 @@ class ToolCoordinator:
 
         # Use ToolAccessController if available
         if self._tool_access_controller:
-            context = self._build_tool_access_context()
+            context = self.build_tool_access_context()
             allowed = self._tool_access_controller.get_allowed_tools(context)
 
             # Keep selector + orchestrator tools in sync with controller decisions
@@ -534,7 +534,7 @@ class ToolCoordinator:
 
         # Use ToolAccessController if available
         if self._tool_access_controller:
-            context = self._build_tool_access_context()
+            context = self.build_tool_access_context()
             decision = self._tool_access_controller.check_access(tool_name, context)
             return decision.allowed
 
@@ -588,6 +588,14 @@ class ToolCoordinator:
             session_enabled_tools=self._enabled_tools,
             current_mode=(self._mode_controller.config.name if self._mode_controller else None),
         )
+
+    def build_tool_access_context(self) -> "ToolAccessContext":
+        """Build ToolAccessContext via the canonical service-first path."""
+        if self._tool_service is not None and hasattr(
+            self._tool_service, "build_tool_access_context"
+        ):
+            return self._tool_service.build_tool_access_context()
+        return self._build_tool_access_context()
 
     # =====================================================================
     # Tool Alias Resolution
@@ -1015,6 +1023,19 @@ class ToolCoordinator:
         pipeline_calls_used: int = 0,
     ) -> None:
         """Handle tool execution completion with event emission and file tracking."""
+        if self._tool_service is not None and hasattr(self._tool_service, "on_tool_complete"):
+            return self._tool_service.on_tool_complete(
+                result=result,
+                metrics_collector=metrics_collector,
+                read_files_session=read_files_session,
+                required_files=required_files,
+                required_outputs=required_outputs,
+                nudge_sent_flag=nudge_sent_flag,
+                add_message=add_message,
+                observability=observability,
+                pipeline_calls_used=pipeline_calls_used,
+            )
+
         return self._observability.on_tool_complete(
             result=result,
             metrics_collector=metrics_collector,

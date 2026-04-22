@@ -183,6 +183,38 @@ class TestProtocolImplementation:
             def build_tool_access_context(self):
                 return {"tools": self.get_enabled_tools()}
 
+            def validate_tool_call(self, tool_call, sanitizer, is_tool_enabled_fn=None):
+                return {"valid": True, "tool_call": tool_call}
+
+            def normalize_arguments_full(
+                self,
+                tool_name,
+                original_name,
+                raw_args,
+                argument_normalizer,
+                tool_adapter,
+                failed_signatures=None,
+            ):
+                return {"args": raw_args, "tool_name": tool_name}
+
+            def on_tool_complete(
+                self,
+                result,
+                metrics_collector=None,
+                *,
+                read_files_session=None,
+                required_files=None,
+                required_outputs=None,
+                nudge_sent_flag=None,
+                add_message=None,
+                observability=None,
+                pipeline_calls_used=0,
+                tool_name=None,
+                elapsed=0.0,
+                session_id=None,
+            ):
+                return None
+
             def is_healthy(self):
                 return self.budget > 0
 
@@ -686,6 +718,38 @@ class TestProtocolCompliance:
 
             def build_tool_access_context(self):
                 return {}
+
+            def validate_tool_call(self, tool_call, sanitizer, is_tool_enabled_fn=None):
+                return {"valid": True}
+
+            def normalize_arguments_full(
+                self,
+                tool_name,
+                original_name,
+                raw_args,
+                argument_normalizer,
+                tool_adapter,
+                failed_signatures=None,
+            ):
+                return {"args": raw_args}
+
+            def on_tool_complete(
+                self,
+                result,
+                metrics_collector=None,
+                *,
+                read_files_session=None,
+                required_files=None,
+                required_outputs=None,
+                nudge_sent_flag=None,
+                add_message=None,
+                observability=None,
+                pipeline_calls_used=0,
+                tool_name=None,
+                elapsed=0.0,
+                session_id=None,
+            ):
+                return None
 
         service = MultiService()
         assert isinstance(service, ChatServiceProtocol)

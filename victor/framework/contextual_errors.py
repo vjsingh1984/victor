@@ -457,49 +457,166 @@ def wrap_error(
     )
 
 
-def format_exception_for_user(error: Exception) -> str:
-    """Format an exception for user-friendly display.
+def format_exception_for_user(
+    error: Exception,
+    context: dict | None = None,
+) -> str:
+    """Format an exception for user-friendly display with contextual suggestions.
 
     Args:
         error: The exception to format
+        context: Additional context (operation, provider, file_path, etc.)
 
     Returns:
-        User-friendly error message with suggestions
+        User-friendly error message with actionable suggestions
     """
-    # Already a contextual error
+    context = context or {}
+    operation = context.get("operation", "operation")
+    provider = context.get("provider", "provider")
+
+    # Already a contextual error - just return it
     if isinstance(error, ContextualError):
         return str(error)
 
-    # Provider errors
-    if "api key" in str(error).lower() or "unauthorized" in str(error).lower():
+    # Import VictorError types for better handling
+    try:
+        from victor.core.errors import (
+            ConfigurationError,
+            ProviderError,
+            ProviderConnectionError,
+            ProviderAuthError,
+            ProviderNotFoundError,
+            ToolError,
+            ToolExecutionError,
+            ValidationError,
+        )
+    except ImportError:
+        # Fallback if errors module not available
+        ConfigurationError = ProviderError = None
+
+    # Handle specific Victor error types
+    if ConfigurationError is not None:
+        if isinstance(error, ConfigurationError):
+            suggestions = [
+                "Run 'victor doctor' to diagnose issues",
+                "Check your profile: victor profile list",
+                "Validate config: victor config validate",
+            ]
+            if provider != "provider":
+                suggestions.append(f"Verify {provider} provider configuration")
+            return _format_error_with_suggestions(error, operation, suggestions)
+
+        if isinstance(error, ProviderAuthError):
+            return (
+                f"{error}\n\n"
+                f"💡 Suggestions:\n"
+                f"  • Verify API key for {provider if provider != 'provider' else 'provider'}: victor doctor --credentials\n"
+                f"  • Check API key has required permissions\n"
+                f"  • Try re-exporting your API key: export {provider.upper()}_API_KEY=...\n"
+            )
+
+        if isinstance(error, ProviderConnectionError):
+            suggestions = [
+                "Check if provider is running: victor doctor --providers",
+            ]
+            if provider in ("ollama", "lmstudio", "vllm"):
+                suggestions.append(f"Ensure {provider} service is running locally")
+            else:
+                suggestions.append("Check your internet connection")
+            return _format_error_with_suggestions(error, operation, suggestions)
+
+        if isinstance(error, ProviderNotFoundError):
+            return (
+                f"{error}\n\n"
+                f"💡 Suggestions:\n"
+                f"  • Check available providers: victor doctor --providers\n"
+                f"  • Verify provider name in profiles.yaml\n"
+                f"  • Try default provider: victor chat --provider ollama\n"
+            )
+
+        if isinstance(error, ToolExecutionError):
+            tool_name = context.get("tool_name", "tool")
+            return (
+                f"{error}\n\n"
+                f"💡 Suggestions:\n"
+                f"  • Check tool permissions and requirements\n"
+                f"  • Verify file/directory paths are correct\n"
+                f"  • Run: victor tools list (to see available tools)\n"
+            )
+
+        if isinstance(error, ValidationError):
+            return (
+                f"{error}\n\n"
+                f"💡 Suggestions:\n"
+                f"  • Check input format and data types\n"
+                f"  • Validate configuration files: victor config validate\n"
+                f"  • Review error details above for specific issues\n"
+            )
+
+    # Fallback to string-based detection for unknown exception types
+    error_str = str(error).lower()
+
+    # API key / authentication errors
+    if "api key" in error_str or "unauthorized" in error_str or "authentication" in error_str:
         return (
             f"{error}\n\n"
-            "💡 Suggestion: Check your API key configuration.\n"
-            "Run 'victor doctor' to verify provider setup."
+            f"💡 Suggestions:\n"
+            f"  • Verify API key: victor doctor --credentials\n"
+            f"  • Check API key has required permissions\n"
         )
 
-    # Network errors
-    if "connection" in str(error).lower() or "network" in str(error).lower():
+    # Network/connection errors
+    if "connection" in error_str or "network" in error_str:
         return (
             f"{error}\n\n"
-            "💡 Suggestion: Check your internet connection.\n"
-            "For local providers (Ollama, LM Studio), ensure the service is running."
+            f"💡 Suggestions:\n"
+            f"  • Check internet connection\n"
+            f"  • For local providers, ensure service is running\n"
         )
 
     # Permission errors
-    if "permission" in str(error).lower():
+    if "permission" in error_str:
         return (
-            f"{error}\n\n" "💡 Suggestion: Check file/directory permissions.\n" "Try: ls -la <path>"
+            f"{error}\n\n"
+            f"💡 Suggestions:\n"
+            f"  • Check file/directory permissions\n"
+            f"  • Try: ls -la <path>\n"
         )
 
-    # File not found
-    if "not found" in str(error).lower():
-        return f"{error}\n\n" "💡 Suggestion: Verify the file/path exists.\n" "Try: ls <path>"
+    # File not found errors
+    if "not found" in error_str or "no such file" in error_str:
+        return (
+            f"{error}\n\n"
+            f"💡 Suggestions:\n"
+            f"  • Verify the file/path exists\n"
+            f"  • Try: ls <path>\n"
+        )
 
     # Generic error with system info
-    return (
-        f"{error}\n\n"
-        "💡 Run 'victor doctor' for diagnostics\n"
-        f"System: Python {sys.version_info.major}.{sys.version_info.minor} | "
-        f"{sys.platform}"
-    )
+    suggestions = ["Run 'victor doctor' for diagnostics"]
+    if os.getenv("VICTOR_DEBUG"):
+        suggestions.append("Check traceback above for details")
+
+    return _format_error_with_suggestions(error, operation, suggestions)
+
+
+def _format_error_with_suggestions(
+    error: Exception,
+    operation: str,
+    suggestions: list[str],
+) -> str:
+    """Format error with operation context and suggestions.
+
+    Args:
+        error: The exception
+        operation: Operation being performed
+        suggestions: List of suggestion strings
+
+    Returns:
+        Formatted error message
+    """
+    message = f"[bold red]Error during {operation}:[/]\n{error}\n"
+    message += "\n[yellow]💡 Suggestions:[/]\n"
+    for suggestion in suggestions:
+        message += f"  • {suggestion}\n"
+    return message

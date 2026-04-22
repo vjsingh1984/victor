@@ -492,62 +492,44 @@ class ProfileConfig(BaseSettings):
 # enabling both flat access (settings.default_provider) and
 # structured access (settings.provider.default_provider).
 
-from victor.config.provider_settings import ProviderSettings  # noqa: E402
+# Phase 5: New config groups
+from victor.config.groups import (
+    ProviderSettings,
+    AgentSettings,
+    ServerSettings,
+    CodebaseSettings,
+    UsageSettings,
+    SubprocessSettings,
+    HeadlessSettings,
+    WorkflowSettings,
+    ResponseSettings,
+    CacheSettings,
+    RecoverySettings,
+    AnalyticsSettings,
+    NetworkSettings,
+    EmbeddingSettings,
+    ToolSelectionSettings,
+)
 
-
+# Old config imports (to be migrated to groups)
 from victor.config.tool_settings import ToolSettings  # noqa: E402
-
-
 from victor.config.search_settings import SearchSettings  # noqa: E402
-
-
 from victor.config.resilience_settings import ResilienceSettings  # noqa: E402
-
-
 from victor.config.security_settings import SecuritySettings  # noqa: E402
-
-
 from victor.config.event_settings import EventSettings  # noqa: E402
-
-
 from victor.config.event_debouncing_settings import EventDebouncingSettings  # noqa: E402
-
-
 from victor.config.observability_settings import ObservabilitySettings  # noqa: E402
-
-
 from victor.config.context_settings import ContextSettings  # noqa: E402
-
-
 from victor.config.checkpoint_settings import CheckpointSettings  # noqa: E402
-
-
 from victor.config.ui_settings import UISettings  # noqa: E402
-
-
 from victor.config.pipeline_settings import PipelineSettings  # noqa: E402
-
-
 from victor.config.feature_flag_settings import FeatureFlagSettings  # noqa: E402
-
-
 from victor.config.prompt_enrichment_settings import PromptEnrichmentSettings  # noqa: E402
-
-
 from victor.config.hitl_settings import HITLSettings  # noqa: E402
-
-
 from victor.config.plugin_settings import PluginSettings  # noqa: E402
-
-
 from victor.config.prompt_policy_settings import PromptPolicySettings  # noqa: E402
-
-
 from victor.config.conversation_settings import ConversationSettings  # noqa: E402
-
-
 from victor.config.exploration_settings import ExplorationSettings  # noqa: E402
-
 
 from victor.config.serialization_settings import SerializationSettings  # noqa: E402
 
@@ -607,6 +589,21 @@ _NESTED_GROUPS = {
     "permissions": PermissionSettings,
     "prompt_optimization": PromptOptimizationSettings,
     "credit_assignment": CreditAssignmentSettings,
+    # Phase 5: Additional nested config groups
+    "agent": AgentSettings,
+    "server": ServerSettings,
+    "codebase": CodebaseSettings,
+    "usage": UsageSettings,
+    "subprocess": SubprocessSettings,
+    "headless": HeadlessSettings,
+    "workflow": WorkflowSettings,
+    "response": ResponseSettings,
+    "cache": CacheSettings,
+    "recovery": RecoverySettings,
+    "analytics": AnalyticsSettings,
+    "network": NetworkSettings,
+    "embedding": EmbeddingSettings,
+    "tool_selection": ToolSelectionSettings,
 }
 
 
@@ -956,6 +953,23 @@ class Settings(BaseSettings):
     credit_assignment: Optional[CreditAssignmentSettings] = Field(
         default=None, exclude=True, repr=False
     )
+
+    # Phase 5: Additional nested config groups
+    agent: Optional[AgentSettings] = Field(default=None, exclude=True, repr=False)
+    server: Optional[ServerSettings] = Field(default=None, exclude=True, repr=False)
+    codebase: Optional[CodebaseSettings] = Field(default=None, exclude=True, repr=False)
+    usage: Optional[UsageSettings] = Field(default=None, exclude=True, repr=False)
+    subprocess: Optional[SubprocessSettings] = Field(default=None, exclude=True, repr=False)
+    headless: Optional[HeadlessSettings] = Field(default=None, exclude=True, repr=False)
+    workflow: Optional[WorkflowSettings] = Field(default=None, exclude=True, repr=False)
+    response: Optional[ResponseSettings] = Field(default=None, exclude=True, repr=False)
+    cache: Optional[CacheSettings] = Field(default=None, exclude=True, repr=False)
+    recovery: Optional[RecoverySettings] = Field(default=None, exclude=True, repr=False)
+    analytics: Optional[AnalyticsSettings] = Field(default=None, exclude=True, repr=False)
+    network: Optional[NetworkSettings] = Field(default=None, exclude=True, repr=False)
+    embedding: Optional[EmbeddingSettings] = Field(default=None, exclude=True, repr=False)
+    tool_selection: Optional[ToolSelectionSettings] = Field(default=None, exclude=True, repr=False)
+
     tool_settings: Optional[ToolSettings] = Field(
         default_factory=ToolSettings, exclude=True, repr=False
     )

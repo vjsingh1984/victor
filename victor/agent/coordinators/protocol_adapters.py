@@ -324,11 +324,6 @@ class OrchestratorProtocolAdapter:
         return self._orchestrator.tool_adapter
 
     @property
-    def _tool_coordinator(self) -> Any:
-        """Get tool coordinator."""
-        return self._orchestrator._tool_coordinator
-
-    @property
     def _tool_planner(self) -> "ToolPlanner":
         """Get tool planner."""
         return self._orchestrator._tool_planner

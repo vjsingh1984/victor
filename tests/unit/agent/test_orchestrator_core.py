@@ -1018,7 +1018,7 @@ class TestServiceFirstDelegation:
     def test_build_tool_access_context_uses_tool_service(self, orchestrator):
         sentinel = MagicMock(name="tool_access_context")
         orchestrator._tool_service.build_tool_access_context = MagicMock(return_value=sentinel)
-        orchestrator._tool_coordinator._build_tool_access_context = MagicMock(
+        orchestrator._tool_coordinator.build_tool_access_context = MagicMock(
             side_effect=AssertionError("coordinator path should not be used")
         )
 

@@ -1094,11 +1094,6 @@ class ChatCoordinator:
                             full_content += final_chunk.content
                             final_content_received = True
 
-                            # CRITICAL FIX: Always forward to renderer immediately
-                            # This ensures content is displayed even at tool call boundaries
-                            if hasattr(stream_ctx, 'renderer') and stream_ctx.renderer:
-                                stream_ctx.renderer.on_content(final_chunk.content)
-
                         # Check if this is a final chunk
                         if getattr(final_chunk, 'is_final', False):
                             logger.debug("Received final chunk after tool calls")
@@ -1115,9 +1110,6 @@ class ChatCoordinator:
 
                 except Exception as e:
                     logger.warning(f"Error processing final chunks after tool calls: {e}")
-                    # CRITICAL FIX: Don't lose content on error - still forward what we have
-                    if full_content and hasattr(stream_ctx, 'renderer') and stream_ctx.renderer:
-                        stream_ctx.renderer.on_content(full_content)
 
                 # Now break from the main loop
                 break

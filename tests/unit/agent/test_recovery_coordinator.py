@@ -171,6 +171,24 @@ def recovery_context(mock_streaming_context):
 class TestConditionChecking:
     """Tests for condition checking methods."""
 
+    def test_delegates_to_bound_recovery_service_when_native_runtime_ready(
+        self, recovery_coordinator, recovery_context, mock_streaming_handler
+    ):
+        """Uses RecoveryService as the canonical runtime when bound and ready."""
+        recovery_service = MagicMock()
+        recovery_service.has_native_streaming_runtime.return_value = True
+        recovery_service.check_tool_budget.return_value = StreamChunk(
+            content="service-warn",
+            is_final=False,
+        )
+        recovery_coordinator.bind_recovery_service(recovery_service)
+
+        result = recovery_coordinator.check_tool_budget(recovery_context, warning_threshold=10)
+
+        assert result.content == "service-warn"
+        recovery_service.check_tool_budget.assert_called_once_with(recovery_context, 10)
+        mock_streaming_handler.check_tool_budget.assert_not_called()
+
     def test_check_time_limit_no_limit_reached(
         self, recovery_coordinator, recovery_context, mock_streaming_handler
     ):

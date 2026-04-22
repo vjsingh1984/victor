@@ -28,8 +28,8 @@ class TestVictorSettingsBasic:
 
         assert settings.default_provider == "ollama"
         assert settings.default_model == "qwen3-coder:30b"
-        assert settings.default_temperature == 0.7
-        assert settings.default_max_tokens == 4096
+        assert settings.provider.default_temperature == 0.7
+        assert settings.provider.default_max_tokens == 4096
         assert settings.airgapped_mode is False
         assert settings.use_semantic_tool_selection is True
         assert settings.tool_cache_enabled is True
@@ -113,9 +113,9 @@ class TestVictorSettingsBasic:
         """Test numeric field constraints."""
         # Temperature range
         settings = VictorSettings(default_temperature=0.0)
-        assert settings.default_temperature == 0.0
+        assert settings.provider.default_temperature == 0.0
         settings = VictorSettings(default_temperature=2.0)
-        assert settings.default_temperature == 2.0
+        assert settings.provider.default_temperature == 2.0
 
         with pytest.raises(ValueError):
             VictorSettings(default_temperature=-0.1)
@@ -124,7 +124,7 @@ class TestVictorSettingsBasic:
 
         # Max tokens must be positive
         settings = VictorSettings(default_max_tokens=100)
-        assert settings.default_max_tokens == 100
+        assert settings.provider.default_max_tokens == 100
 
         with pytest.raises(ValueError):
             VictorSettings(default_max_tokens=0)
@@ -177,7 +177,7 @@ class TestVictorSettingsPrecedence:
 
         assert settings.default_provider == "anthropic"
         assert settings.default_model == "claude-opus-4"
-        assert settings.default_temperature == 0.5
+        assert settings.provider.default_temperature == 0.5
 
     def test_prompt_policy_profile_override(self, tmp_path):
         """Profiles.yaml should configure prompt policy fields."""
@@ -340,7 +340,7 @@ class TestVictorSettingsTypeSafety:
         """Test that optional fields can be None."""
         settings = VictorSettings()
 
-        assert settings.anthropic_api_key is None
+        assert settings.provider.anthropic_api_key is None
         assert settings.openai_api_key is None
         assert settings.log_file is None
         assert settings.codebase_persist_directory is None

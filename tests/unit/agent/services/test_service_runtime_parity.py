@@ -1,7 +1,8 @@
 """Focused tests for service runtime parity helpers."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -9,6 +10,7 @@ from victor.agent.services.session_service import SessionService
 from victor.agent.services.provider_service import ProviderService
 from victor.agent.services.recovery_service import RecoveryService
 from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+from victor.providers.base import StreamChunk
 
 
 def _make_tool_service() -> ToolService:
@@ -33,6 +35,24 @@ async def test_tool_service_execute_tool_with_retry_uses_bound_retry_executor():
     assert result == ("result", True, None)
 
 
+@pytest.mark.asyncio
+async def test_tool_service_execute_tool_with_retry_uses_service_owned_retry_runtime():
+    service = _make_tool_service()
+    pipeline = MagicMock()
+    pipeline._execute_single_tool = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
+
+    service.bind_runtime_components(tool_pipeline=pipeline)
+
+    result = await service.execute_tool_with_retry("read", {"path": "a.py"}, {"task_type": "read"})
+
+    pipeline._execute_single_tool.assert_awaited_once_with(
+        "read",
+        {"path": "a.py"},
+        {"task_type": "read"},
+    )
+    assert result == (pipeline._execute_single_tool.return_value, True, None)
+
+
 def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
     service = _make_tool_service()
     parser = MagicMock()
@@ -53,6 +73,80 @@ def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
 
     assert tool_calls == [{"name": "read", "arguments": {"path": "a.py"}}]
     assert remaining == "trimmed content"
+
+
+def test_tool_service_validate_tool_call_matches_legacy_contract():
+    service = _make_tool_service()
+    service.bind_runtime_components(tool_registry=SimpleNamespace(get_registered_tools=lambda: {"read"}))
+    sanitizer = SimpleNamespace(is_valid_tool_name=lambda name: name == "read")
+
+    validation = service.validate_tool_call({"name": "read", "arguments": {}}, sanitizer)
+
+    assert validation.valid is True
+    assert validation.canonical_name == "read"
+
+
+def test_tool_service_normalize_arguments_full_matches_legacy_contract():
+    service = _make_tool_service()
+    argument_normalizer = SimpleNamespace(
+        normalize_arguments=lambda args, _tool_name: (args, "direct")
+    )
+    tool_adapter = SimpleNamespace(normalize_arguments=lambda args, _tool_name: args)
+
+    normalized = service.normalize_arguments_full(
+        "read",
+        "read",
+        '{"path": "a.py"}',
+        argument_normalizer,
+        tool_adapter,
+        failed_signatures={("read", '{"path": "b.py"}')},
+    )
+
+    assert normalized.args == {"path": "a.py"}
+    assert normalized.strategy == "direct"
+    assert normalized.signature == ("read", '{"path": "a.py"}')
+    assert normalized.is_repeated_failure is False
+
+
+@pytest.mark.asyncio
+async def test_tool_service_on_tool_complete_uses_canonical_completion_flow():
+    service = _make_tool_service()
+    metrics_collector = MagicMock()
+    observability = MagicMock()
+    add_message = MagicMock()
+    bus = MagicMock()
+    bus.emit = AsyncMock()
+    read_files_session = set()
+    nudge_flag = [False]
+    result = SimpleNamespace(
+        tool_name="read",
+        success=True,
+        result="print('hello')\n",
+        error=None,
+        arguments={"path": "main.py"},
+        execution_time_ms=42.0,
+    )
+
+    with patch("victor.core.events.get_observability_bus", return_value=bus):
+        service.on_tool_complete(
+            result=result,
+            metrics_collector=metrics_collector,
+            read_files_session=read_files_session,
+            required_files=["main.py"],
+            required_outputs=["summary"],
+            nudge_sent_flag=nudge_flag,
+            add_message=add_message,
+            observability=observability,
+            pipeline_calls_used=2,
+        )
+        await asyncio.sleep(0)
+
+    metrics_collector.on_tool_complete.assert_called_once_with(result)
+    observability.on_tool_end.assert_called_once()
+    assert "main.py" in read_files_session
+    assert nudge_flag[0] is True
+    add_message.assert_called_once()
+    assert bus.emit.await_count >= 1
 
 
 def test_tool_service_build_tool_access_context_uses_bound_mode_controller():
@@ -124,21 +218,18 @@ async def test_provider_service_switch_provider_uses_bound_provider_manager():
 
 
 @pytest.mark.asyncio
-async def test_recovery_service_streaming_methods_use_bound_recovery_coordinator():
+async def test_recovery_service_streaming_methods_fallback_to_bound_recovery_coordinator():
     service = RecoveryService()
     coordinator = MagicMock()
     coordinator.handle_recovery_with_integration = AsyncMock(
         return_value=SimpleNamespace(action="continue")
     )
-    coordinator.apply_recovery_action.return_value = "applied"
     coordinator.check_natural_completion.return_value = "done"
     coordinator.handle_empty_response.return_value = ("chunk", True)
     coordinator.get_recovery_fallback_message.return_value = "fallback"
     coordinator.check_tool_budget.return_value = "warn"
-    coordinator.truncate_tool_calls.return_value = ([{"name": "read"}], True)
     coordinator.filter_blocked_tool_calls.return_value = ([{"name": "read"}], [], 0)
     coordinator.check_blocked_threshold.return_value = None
-    coordinator.check_force_action.return_value = (False, None)
 
     service.bind_runtime_components(recovery_coordinator=coordinator)
 
@@ -152,15 +243,10 @@ async def test_recovery_service_streaming_methods_use_bound_recovery_coordinator
 
     assert recovery_action.action == "continue"
     coordinator.handle_recovery_with_integration.assert_awaited_once()
-    assert service.apply_recovery_action("action", ctx) == "applied"
     assert service.check_natural_completion(ctx, False, 0) == "done"
     assert service.handle_empty_response(ctx) == ("chunk", True)
     assert service.get_recovery_fallback_message(ctx) == "fallback"
     assert service.check_tool_budget(ctx, 10) == "warn"
-    assert service.truncate_tool_calls(ctx, [{"name": "read"}], 1) == (
-        [{"name": "read"}],
-        True,
-    )
     assert service.filter_blocked_tool_calls(ctx, [{"name": "read"}]) == (
         [{"name": "read"}],
         [],
@@ -168,3 +254,113 @@ async def test_recovery_service_streaming_methods_use_bound_recovery_coordinator
     )
     assert service.check_blocked_threshold(ctx, False) is None
     assert service.check_force_action(ctx) == (False, None)
+
+    message_adder = MagicMock()
+    retry_action = SimpleNamespace(
+        action="retry",
+        reason="retry",
+        message="retry now",
+        new_temperature=None,
+        failure_type=None,
+    )
+    assert service.apply_recovery_action(retry_action, ctx, message_adder=message_adder) is None
+    message_adder.assert_called_once_with("user", "retry now")
+    assert service.truncate_tool_calls(ctx, [{"name": "read"}, {"name": "grep"}], 1) == (
+        [{"name": "read"}],
+        True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_recovery_service_streaming_methods_use_native_runtime_components():
+    service = RecoveryService()
+    recovery_integration = MagicMock()
+    recovery_integration.enabled = True
+    recovery_integration.handle_response = AsyncMock(
+        return_value=SimpleNamespace(
+            action="continue",
+            reason="ok",
+            failure_type=None,
+            strategy_name=None,
+            message=None,
+            new_temperature=None,
+        )
+    )
+    streaming_handler = MagicMock()
+    streaming_handler.check_natural_completion.return_value = True
+    streaming_handler.handle_empty_response.return_value = SimpleNamespace(
+        chunks=[StreamChunk(content="recover-empty")]
+    )
+    streaming_handler.check_tool_budget.return_value = SimpleNamespace(
+        chunks=[StreamChunk(content="warn")]
+    )
+    streaming_handler.filter_blocked_tool_calls.return_value = (
+        [{"name": "read"}],
+        [StreamChunk(content="blocked")],
+        1,
+    )
+    streaming_handler.check_blocked_threshold.return_value = SimpleNamespace(
+        chunks=[StreamChunk(content="threshold")],
+        clear_tool_calls=True,
+    )
+    context_compactor = MagicMock()
+    context_compactor.get_statistics.return_value = {"current_utilization": 0.42}
+    unified_tracker = MagicMock()
+    settings = SimpleNamespace(
+        recovery_blocked_consecutive_threshold=4,
+        recovery_blocked_total_threshold=6,
+    )
+
+    service.bind_runtime_components(
+        recovery_integration=recovery_integration,
+        streaming_handler=streaming_handler,
+        context_compactor=context_compactor,
+        unified_tracker=unified_tracker,
+        settings=settings,
+    )
+
+    streaming_context = SimpleNamespace(
+        total_iterations=3,
+        max_total_iterations=7,
+        force_completion=True,
+    )
+    ctx = SimpleNamespace(
+        provider_name="openai",
+        model="gpt-5.4",
+        tool_calls_used=2,
+        tool_budget=8,
+        temperature=0.3,
+        last_quality_score=0.8,
+        unified_task_type=SimpleNamespace(value="analysis"),
+        is_analysis_task=True,
+        is_action_task=False,
+        streaming_context=streaming_context,
+        iteration=3,
+    )
+
+    recovery_action = await service.handle_recovery_with_integration(
+        ctx,
+        "content",
+        [{"name": "read"}],
+        mentioned_tools=["read"],
+    )
+
+    assert recovery_action.action == "continue"
+    recovery_integration.handle_response.assert_awaited_once()
+    assert service.has_native_streaming_runtime() is True
+    assert service.check_natural_completion(ctx, False, 10).is_final is True
+    assert service.handle_empty_response(ctx) == (
+        streaming_handler.handle_empty_response.return_value.chunks[0],
+        True,
+    )
+    assert service.check_tool_budget(ctx, 10).content == "warn"
+    filtered, blocked_chunks, blocked_count = service.filter_blocked_tool_calls(
+        ctx,
+        [{"name": "read"}],
+    )
+    assert filtered == [{"name": "read"}]
+    assert blocked_count == 1
+    assert blocked_chunks[0].content == "blocked"
+    threshold_chunk, should_clear = service.check_blocked_threshold(ctx, True)
+    assert threshold_chunk.content == "threshold"
+    assert should_clear is True

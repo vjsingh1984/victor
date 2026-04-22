@@ -42,6 +42,10 @@ from victor.providers.registry import ProviderRegistry
 __all__ = [
     # Base classes
     "BaseProvider",
+    # HttpxOpenAICompatProvider is intentionally NOT eagerly imported here to
+    # avoid pulling ProviderLogger → resolution → settings into the providers
+    # package import chain. Import it directly:
+    #   from victor.providers.httpx_openai_compat import HttpxOpenAICompatProvider
     "Message",
     "CompletionResponse",
     "StreamChunk",

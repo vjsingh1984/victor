@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -17,11 +18,59 @@ from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 class InteractionRuntimeComponents:
     """Interaction runtime handles exposed to the orchestrator facade."""
 
+    chat_service: Any
     tool_service: Any
     session_service: Any
+    context_service: Any
+    recovery_service: Any
     chat_coordinator: LazyRuntimeProxy[Any]
-    tool_coordinator: LazyRuntimeProxy[Any]
     session_coordinator: LazyRuntimeProxy[Any]
+
+
+def create_tool_coordinator_shim(
+    *,
+    orchestrator: Any,
+    tool_pipeline: Any,
+    tool_registry: Any,
+    tool_selector: Any,
+    tool_access_controller: Any,
+    mode_controller: Any,
+    tool_service: Optional[Any] = None,
+) -> LazyRuntimeProxy[Any]:
+    """Create the deprecated ToolCoordinator compatibility shim.
+
+    This helper is intentionally separate from ``InteractionRuntimeComponents``
+    so the main interaction runtime contract stays service-first.
+    """
+
+    orch_tools = getattr(orchestrator, "_enabled_tools", None)
+
+    def _build_tool_coordinator() -> Any:
+        warnings.warn(
+            "ToolCoordinator shim is deprecated. Use ToolService (self._tool_service) "
+            "directly. The shim will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+
+        coordinator = ToolCoordinator(
+            tool_pipeline=tool_pipeline,
+            tool_registry=tool_registry,
+            tool_selector=tool_selector,
+            tool_access_controller=tool_access_controller,
+        )
+        coordinator.set_mode_controller(mode_controller)
+        if tool_service is not None:
+            coordinator.bind_tool_service(tool_service)
+        if orch_tools:
+            coordinator.set_enabled_tools(orch_tools)
+        return coordinator
+
+    return LazyRuntimeProxy(
+        factory=_build_tool_coordinator,
+        name="tool_coordinator",
+    )
 
 
 def create_interaction_runtime_components(
@@ -31,20 +80,34 @@ def create_interaction_runtime_components(
     tool_pipeline: Any,
     tool_registry: Any,
     tool_executor: Any,
+    tool_cache: Any,
     tool_budget: int,
     tool_selector: Any,
     tool_access_controller: Any,
     mode_controller: Any,
+    argument_normalizer: Any,
     session_state_manager: Any,
     lifecycle_manager: Any,
     memory_manager: Any,
     memory_session_id: Optional[str],
     checkpoint_manager: Any,
     cost_tracker: Any,
+    conversation_controller: Any,
+    streaming_coordinator: Any,
+    provider_service: Optional[Any] = None,
+    chat_service: Optional[Any] = None,
+    context_service: Optional[Any] = None,
+    recovery_service: Optional[Any] = None,
     tool_service: Optional[Any] = None,
     session_service: Optional[Any] = None,
 ) -> InteractionRuntimeComponents:
     """Create service-first interaction/runtime components for orchestrator wiring."""
+    from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+    from victor.agent.services.context_service import (
+        ContextService,
+        ContextServiceConfig,
+    )
+    from victor.agent.services.recovery_service import RecoveryService
     from victor.agent.services.session_service import SessionService
     from victor.agent.services.tool_service import ToolService, ToolServiceConfig
 
@@ -60,7 +123,10 @@ def create_interaction_runtime_components(
     if hasattr(resolved_tool_service, "bind_runtime_components"):
         resolved_tool_service.bind_runtime_components(
             tool_registry=tool_registry,
+            tool_pipeline=tool_pipeline,
+            tool_cache=tool_cache,
             mode_controller=mode_controller,
+            argument_normalizer=argument_normalizer,
         )
 
     orch_tools = getattr(orchestrator, "_enabled_tools", None)
@@ -86,28 +152,43 @@ def create_interaction_runtime_components(
             memory_session_id=memory_session_id,
         )
 
+    resolved_context_service = context_service
+    if resolved_context_service is None:
+        resolved_context_service = ContextService(
+            config=ContextServiceConfig(
+                max_tokens=100000,
+                overflow_threshold_percent=90.0,
+            )
+        )
+
+    resolved_recovery_service = recovery_service
+    if resolved_recovery_service is None:
+        resolved_recovery_service = RecoveryService()
+
+    resolved_chat_service = chat_service
+    if resolved_chat_service is None:
+        resolved_chat_service = ChatService(
+            config=ChatServiceConfig(
+                max_iterations=200,
+                stream_chunk_size=100,
+            ),
+            provider_service=provider_service,
+            tool_service=resolved_tool_service,
+            context_service=resolved_context_service,
+            recovery_service=resolved_recovery_service,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
+        )
+
     def _build_chat_coordinator() -> Any:
         from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
         coordinator = ChatCoordinator(orchestrator)
+        if hasattr(coordinator, "bind_chat_service"):
+            coordinator.bind_chat_service(resolved_chat_service)
         if hasattr(factory, "create_streaming_chat_pipeline"):
             pipeline = factory.create_streaming_chat_pipeline(coordinator)
             coordinator.set_streaming_pipeline(pipeline)
-        return coordinator
-
-    def _build_tool_coordinator() -> Any:
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
-
-        coordinator = ToolCoordinator(
-            tool_pipeline=tool_pipeline,
-            tool_registry=tool_registry,
-            tool_selector=tool_selector,
-            tool_access_controller=tool_access_controller,
-        )
-        coordinator.set_mode_controller(mode_controller)
-        coordinator.bind_tool_service(resolved_tool_service)
-        if orch_tools:
-            coordinator.set_enabled_tools(orch_tools)
         return coordinator
 
     def _build_session_coordinator() -> Any:
@@ -125,17 +206,43 @@ def create_interaction_runtime_components(
         coordinator.bind_session_service(resolved_session_service)
         return coordinator
 
+    chat_coordinator = LazyRuntimeProxy(
+        factory=_build_chat_coordinator,
+        name="chat_coordinator",
+    )
+    if hasattr(resolved_chat_service, "bind_runtime_components"):
+        async def _planning_handler(user_message: str) -> Any:
+            return await chat_coordinator._chat_with_planning(user_message)
+
+        async def _stream_chat_handler(
+            user_message: str, **kwargs: Any
+        ) -> Any:
+            async for chunk in chat_coordinator.stream_chat(user_message, **kwargs):
+                yield chunk
+
+        async def _context_limit_handler(*args: Any, **kwargs: Any) -> Any:
+            return await chat_coordinator._handle_context_and_iteration_limits(
+                *args,
+                **kwargs,
+            )
+
+        resolved_chat_service.bind_runtime_components(
+            turn_executor=LazyRuntimeProxy(
+                factory=lambda: orchestrator.turn_executor,
+                name="turn_executor",
+            ),
+            planning_handler=_planning_handler,
+            stream_chat_handler=_stream_chat_handler,
+            context_limit_handler=_context_limit_handler,
+        )
+
     return InteractionRuntimeComponents(
+        chat_service=resolved_chat_service,
         tool_service=resolved_tool_service,
         session_service=resolved_session_service,
-        chat_coordinator=LazyRuntimeProxy(
-            factory=_build_chat_coordinator,
-            name="chat_coordinator",
-        ),
-        tool_coordinator=LazyRuntimeProxy(
-            factory=_build_tool_coordinator,
-            name="tool_coordinator",
-        ),
+        context_service=resolved_context_service,
+        recovery_service=resolved_recovery_service,
+        chat_coordinator=chat_coordinator,
         session_coordinator=LazyRuntimeProxy(
             factory=_build_session_coordinator,
             name="session_coordinator",

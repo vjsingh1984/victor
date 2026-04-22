@@ -336,12 +336,20 @@ class ToolServiceConfig:
         enable_parallel_execution: bool = True,
         enable_caching: bool = True,
         cache_ttl: int = 600,
+        retry_enabled: bool = True,
+        max_retry_attempts: int = 3,
+        retry_base_delay: float = 1.0,
+        retry_max_delay: float = 10.0,
     ):
         self.default_max_tools = default_max_tools
         self.default_tool_budget = default_tool_budget
         self.enable_parallel_execution = enable_parallel_execution
         self.enable_caching = enable_caching
         self.cache_ttl = cache_ttl
+        self.retry_enabled = retry_enabled
+        self.max_retry_attempts = max_retry_attempts
+        self.retry_base_delay = retry_base_delay
+        self.retry_max_delay = retry_max_delay
 
 
 class BudgetManager:
@@ -439,8 +447,14 @@ class ToolService:
         self._mode_controller: Optional[Any] = None
         self._tool_planner: Optional[Any] = None
         self._argument_normalizer: Optional[Any] = None
+        self._tool_pipeline: Optional[Any] = None
+        self._tool_cache: Optional[Any] = None
         self._retry_executor: Optional[Any] = None
-        self._tool_call_parser: Optional[Any] = None
+        from victor.tools.tool_call_parser import ToolCallParser
+        from victor.tools.tool_call_validator import ToolCallValidator
+
+        self._tool_call_parser: Optional[Any] = ToolCallParser()
+        self._tool_call_validator: Optional[Any] = ToolCallValidator()
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
 
     async def select_tools(
@@ -643,6 +657,8 @@ class ToolService:
         self,
         *,
         tool_registry: Optional[Any] = None,
+        tool_pipeline: Optional[Any] = None,
+        tool_cache: Optional[Any] = None,
         mode_controller: Optional[Any] = None,
         tool_planner: Optional[Any] = None,
         argument_normalizer: Optional[Any] = None,
@@ -657,6 +673,10 @@ class ToolService:
         """
         if tool_registry is not None:
             self._registrar = tool_registry
+        if tool_pipeline is not None:
+            self._tool_pipeline = tool_pipeline
+        if tool_cache is not None:
+            self._tool_cache = tool_cache
         if mode_controller is not None:
             self._mode_controller = mode_controller
         if tool_planner is not None:
@@ -665,6 +685,14 @@ class ToolService:
             self._argument_normalizer = argument_normalizer
         if retry_executor is not None:
             self._retry_executor = retry_executor
+        elif self._tool_pipeline is not None and self._retry_executor is None:
+            from victor.agent.coordinators.tool_retry import ToolRetryExecutor
+
+            self._retry_executor = ToolRetryExecutor(
+                self._config,
+                self._tool_pipeline,
+                self._tool_cache,
+            )
         if tool_call_parser is not None:
             self._tool_call_parser = tool_call_parser
 
@@ -763,6 +791,62 @@ class ToolService:
             raise BudgetExhaustedError(f"Insufficient budget: need {amount}, have {remaining}")
 
         self._budget_manager.record_usage(amount)
+
+    def on_tool_complete(
+        self,
+        result: Any,
+        metrics_collector: Optional[Any] = None,
+        *,
+        read_files_session: Optional[Set[str]] = None,
+        required_files: Optional[List[str]] = None,
+        required_outputs: Optional[List[str]] = None,
+        nudge_sent_flag: Optional[List[bool]] = None,
+        add_message: Optional[Callable[[str, str], None]] = None,
+        observability: Optional[Any] = None,
+        pipeline_calls_used: int = 0,
+        tool_name: Optional[str] = None,
+        elapsed: float = 0.0,
+        session_id: Optional[str] = None,
+    ) -> None:
+        """Handle tool completion through the canonical service path.
+
+        When ``metrics_collector`` is provided this uses the existing shared
+        ``ToolObservabilityHandler`` implementation, which preserves file-read
+        nudges, tool completion events, and UI preview behavior. When only the
+        lightweight hook arguments are provided, it degrades to the narrower
+        observability callback for backward compatibility.
+        """
+        if metrics_collector is not None:
+            from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
+
+            ToolObservabilityHandler(self).on_tool_complete(
+                result=result,
+                metrics_collector=metrics_collector,
+                read_files_session=read_files_session,
+                required_files=required_files,
+                required_outputs=required_outputs,
+                nudge_sent_flag=nudge_sent_flag,
+                add_message=add_message,
+                observability=observability,
+                pipeline_calls_used=pipeline_calls_used,
+            )
+            return
+
+        effective_observability = observability or getattr(self, "_observability", None)
+        effective_tool_name = tool_name or getattr(result, "tool_name", "")
+        if effective_observability is not None and hasattr(
+            effective_observability,
+            "on_tool_complete",
+        ):
+            try:
+                effective_observability.on_tool_complete(
+                    effective_tool_name,
+                    result,
+                    elapsed,
+                    session_id,
+                )
+            except Exception:
+                logger.debug("on_tool_complete observability hook failed", exc_info=True)
 
     def is_healthy(self) -> bool:
         """Check if the tool service is healthy.
@@ -1030,6 +1114,133 @@ class ToolService:
         return ToolAccessContext(
             session_enabled_tools=self._enabled_tools,
             current_mode=(self._mode_controller.config.name if self._mode_controller else None),
+        )
+
+    def validate_tool_call(
+        self,
+        tool_call: Any,
+        sanitizer: Any,
+        is_tool_enabled_fn: Optional[Callable[[str], bool]] = None,
+    ) -> Any:
+        """Validate a tool call's structure, name, and enabled status."""
+        from victor.agent.coordinators.tool_coordinator import ToolCallValidation
+
+        _is_enabled = is_tool_enabled_fn or self.is_tool_enabled
+        if not isinstance(tool_call, dict):
+            return ToolCallValidation(
+                valid=False,
+                skip_reason="Skipping malformed tool call payload",
+            )
+
+        tool_name = str(tool_call.get("name", "")).strip()
+        if not tool_name:
+            return ToolCallValidation(
+                valid=False,
+                skip_reason="Skipping tool call with no name",
+            )
+
+        canonical = self.resolve_tool_alias(tool_name)
+        available_tools = self.get_available_tools()
+        enabled = _is_enabled(canonical)
+
+        if not sanitizer.is_valid_tool_name(tool_name) and not (
+            enabled and canonical in available_tools
+        ):
+            return ToolCallValidation(
+                valid=False,
+                original_name=tool_name,
+                skip_reason=f"Skipping invalid/hallucinated tool name: {tool_name}",
+                error_result={
+                    "tool_name": tool_name,
+                    "success": False,
+                    "result": None,
+                    "error": (
+                        f"Invalid tool name '{tool_name}'. This tool does not exist. "
+                        "Use only tools from the provided tool list. "
+                        "Check for typos or hallucinated tool names."
+                    ),
+                },
+            )
+
+        if not enabled:
+            return ToolCallValidation(
+                valid=False,
+                original_name=tool_name,
+                canonical_name=canonical,
+                skip_reason=(
+                    f"Skipping unknown or disabled tool: {tool_name} (resolved: {canonical})"
+                ),
+                error_result={
+                    "tool_name": tool_name,
+                    "success": False,
+                    "result": None,
+                    "error": (
+                        f"Tool '{tool_name}' is not available. It may be disabled, not "
+                        "registered, or not included in the current tool selection. "
+                        "Use only the tools listed in your available tools."
+                    ),
+                },
+            )
+
+        validator = self._tool_call_validator
+        if (
+            validator is not None
+            and canonical in validator._tool_schemas
+        ):
+            schema_result = validator.validate(canonical, tool_call.get("arguments", {}))
+            if not schema_result.valid:
+                self._logger.warning("Schema validation: %s: %s", canonical, schema_result.errors)
+
+        return ToolCallValidation(
+            valid=True,
+            original_name=tool_name,
+            canonical_name=canonical,
+        )
+
+    def normalize_arguments_full(
+        self,
+        tool_name: str,
+        original_name: str,
+        raw_args: Any,
+        argument_normalizer: Any,
+        tool_adapter: Any,
+        failed_signatures: Optional[Set[Tuple[str, str]]] = None,
+    ) -> Any:
+        """Normalize tool arguments through parsing, repair, adapter defaults, and dedup."""
+        from victor.agent.coordinators.tool_coordinator import NormalizedArgs
+        from victor.agent.orchestrator_utils import infer_git_operation
+
+        _failed = failed_signatures if failed_signatures is not None else set()
+
+        tool_args = raw_args
+        if isinstance(tool_args, str):
+            try:
+                tool_args = json.loads(tool_args)
+            except Exception:
+                try:
+                    tool_args = ast.literal_eval(tool_args)
+                except Exception:
+                    tool_args = {"value": tool_args}
+        elif tool_args is None:
+            tool_args = {}
+
+        normalized_args, strategy = argument_normalizer.normalize_arguments(tool_args, tool_name)
+        normalized_args = tool_adapter.normalize_arguments(normalized_args, tool_name)
+        normalized_args = infer_git_operation(original_name, tool_name, normalized_args)
+
+        try:
+            signature = (
+                tool_name,
+                json.dumps(normalized_args, sort_keys=True, default=str),
+            )
+        except Exception:
+            signature = (tool_name, str(normalized_args))
+
+        return NormalizedArgs(
+            args=normalized_args,
+            strategy=strategy,
+            signature=signature,
+            is_repeated_failure=signature in _failed,
         )
 
     # ==========================================================================

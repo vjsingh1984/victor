@@ -368,6 +368,33 @@ class ContinuationStrategy:
 
         updates: Dict[str, Any] = {}
 
+        # AGENTIC LOOP FIX: Algorithmic loop detection (iteration threshold)
+        # Prevent excessive iterations by checking if we're past safe limits
+        if task_completion_signals and "current_iteration" in task_completion_signals:
+            current_iteration = task_completion_signals["current_iteration"]
+            max_iterations = unified_tracker_config.get("max_total_iterations", 50)
+            iteration_threshold = max_iterations // 3  # Stop at 1/3 of max (e.g., 16 of 50)
+
+            if current_iteration >= iteration_threshold:
+                logger.warning(
+                    f"Algorithmic loop detection: iteration {current_iteration} >= "
+                    f"threshold {iteration_threshold} - forcing completion to prevent wasted turns"
+                )
+                self._emit_event(
+                    topic="state.continuation.loop_detected",
+                    data={
+                        "reason": "iteration_threshold_exceeded",
+                        "current_iteration": current_iteration,
+                        "threshold": iteration_threshold,
+                    },
+                )
+                return {
+                    "action": "finish",
+                    "message": None,
+                    "reason": f"Loop detection: iteration {current_iteration} >= threshold {iteration_threshold}",
+                    "updates": updates,
+                }
+
         # TASK COMPLETION CHECK: If all required files read and output requirements met,
         # finish immediately to prevent prompting loop (prompting loop fix)
         if task_completion_signals:

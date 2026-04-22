@@ -520,7 +520,7 @@ class OnboardingWizard:
             settings = load_settings()
             result = validate_configuration(settings)
 
-            if result.is_valid:
+            if result.is_valid():
                 self.console.print("  [green]✓[/] Configuration is valid!")
             else:
                 self.console.print("  [yellow]⚠[/] Configuration has warnings:")

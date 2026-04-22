@@ -255,6 +255,19 @@ class ContinuationHandler:
         # Apply state updates from action result
         self._apply_state_updates(action_result)
 
+        # AGENTIC LOOP FIX: Check if continuation should be skipped due to forced completion
+        # This prevents continuation strategy from overriding task completion detector
+        if getattr(stream_ctx, 'skip_continuation', False):
+            logger.info(
+                "Continuation skipped: skip_continuation flag set (completion was forced)"
+            )
+            return ContinuationResult(
+                chunks=[],
+                should_stop=True,
+                should_continue=False,
+                control_action="finish",
+            )
+
         action = action_result.get("action", "finish")
 
         # Dispatch to specific handler

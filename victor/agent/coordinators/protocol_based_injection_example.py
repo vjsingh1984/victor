@@ -117,7 +117,6 @@ class MockChatOrchestrator:
     # -- ToolContextProtocol --
     tool_selector: Any = field(default_factory=MockToolSelector)
     tool_adapter: Any = None
-    _tool_coordinator: Any = None
     _tool_planner: Any = None
     tool_budget: int = 10
     tool_calls_used: int = 0

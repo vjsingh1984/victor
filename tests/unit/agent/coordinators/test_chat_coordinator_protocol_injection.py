@@ -41,7 +41,7 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     _context_compactor: Any = None
     _context_manager: Any = None
     settings: Any = MagicMock()
-    settings.enable_planning = False
+    settings.agent.enable_planning = False
     _session_state: Any = MagicMock(reset_for_new_turn=lambda: None)
     _cumulative_token_usage: dict = field(
         default_factory=lambda: {
@@ -69,7 +69,6 @@ class MockOrchestrator(ChatOrchestratorProtocol):
     # -- ToolContextProtocol --
     tool_selector: Any = AsyncMock()
     tool_adapter: Any = MagicMock()
-    _tool_coordinator: Any = MagicMock()
     _tool_planner: Any = MagicMock()
     tool_budget: int = 10
     tool_calls_used: int = 0

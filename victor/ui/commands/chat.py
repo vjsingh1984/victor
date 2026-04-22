@@ -16,6 +16,14 @@ from victor.config.settings import load_settings, ProfileConfig
 from victor.core.async_utils import run_sync
 from victor.framework.shim import FrameworkShim
 from victor.core.verticals import get_vertical, list_verticals
+from victor.core.errors import (
+    ConfigurationError,
+    ProviderError,
+    ProviderConnectionError,
+    ProviderAuthError,
+    ProviderNotFoundError,
+    VictorError,
+)
 from victor.ui.output_formatter import InputReader, create_formatter
 from victor.ui.commands.utils import (
     preload_semantic_index,
@@ -635,7 +643,7 @@ victor chat --sessionid abc123            # Resume session
             )
 
             validation_result = validate_configuration(settings)
-            if not validation_result.is_valid:
+            if not validation_result.is_valid():
                 # Configuration has errors - display and exit
                 console.print("[bold red]Configuration Validation Failed:[/]")
                 console.print(format_validation_result(validation_result))
@@ -977,24 +985,67 @@ async def run_oneshot(
                     tool_budget=tool_budget,
                     max_iterations=max_iterations if "max_iterations" in dir() else None,
                 )
+            except ConfigurationError as e:
+                console.print(f"\n[red]✗[/] Configuration error: {e}")
+                console.print("\n[yellow]Suggestions:[/]")
+                console.print("  • Run 'victor doctor' to diagnose configuration issues")
+                console.print("  • Check your profile configuration: victor profile list")
+                console.print("  • Validate config: victor config validate\n")
+                raise typer.Exit(code=1)
+            except (ProviderConnectionError, ProviderNotFoundError) as e:
+                console.print(f"\n[red]✗[/] Provider error: {e}")
+                console.print("\n[yellow]Suggestions:[/]")
+                console.print("  • Check if provider is available: victor doctor --providers")
+                console.print("  • Verify provider configuration in profiles.yaml")
+                console.print("  • Try a different profile: victor profile list\n")
+                raise typer.Exit(code=1)
+            except ProviderAuthError as e:
+                console.print(f"\n[red]✗[/] Authentication error: {e}")
+                console.print("\n[yellow]Suggestions:[/]")
+                console.print("  • Verify API key is set: victor doctor --credentials")
+                console.print("  • Check API key has required permissions")
+                console.print("  • Try re-exporting your API key\n")
+                raise typer.Exit(code=1)
             except Exception as e:
+                # Unexpected error - show full traceback in debug mode
                 console.print(f"\n[red]✗[/] Failed to initialize agent factory: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Run 'victor doctor' to diagnose configuration issues")
                 console.print("  • Check your profile configuration: victor profile list")
                 console.print("  • Try default profile: victor chat --profile default\n")
+                if os.getenv("VICTOR_DEBUG"):
+                    import traceback
+                    console.print(traceback.format_exc())
                 raise typer.Exit(code=1)
 
             # Step 3: Create agent
             status.update("Creating agent...")
             try:
                 agent = await factory.create()
+            except ConfigurationError as e:
+                console.print(f"\n[red]✗[/] Configuration error during agent creation: {e}")
+                console.print("\n[yellow]Suggestions:[/]")
+                console.print("  • Check vertical configuration: victor vertical list")
+                console.print("  • Validate config: victor config validate")
+                console.print("  • Try default vertical: victor chat --vertical default\n")
+                raise typer.Exit(code=1)
+            except ProviderError as e:
+                console.print(f"\n[red]✗[/] Provider error during agent creation: {e}")
+                console.print("\n[yellow]Suggestions:[/]")
+                console.print("  • Check provider status: victor doctor --providers")
+                console.print("  • Verify provider is running (for local models)")
+                console.print("  • Try a different provider: victor chat --provider ollama\n")
+                raise typer.Exit(code=1)
             except Exception as e:
+                # Unexpected error - show full traceback in debug mode
                 console.print(f"\n[red]✗[/] Failed to create agent: {e}")
                 console.print("\n[yellow]Suggestions:[/]")
                 console.print("  • Check if provider is configured: victor doctor --providers")
                 console.print("  • Verify API keys or local model availability")
                 console.print("  • Try a different profile: victor profile list\n")
+                if os.getenv("VICTOR_DEBUG"):
+                    import traceback
+                    console.print(traceback.format_exc())
                 raise typer.Exit(code=1)
 
             # Set planning model override if provided (for planning coordinator)
@@ -1911,15 +1962,30 @@ async def run_workflow_mode(
         console.print(f"  [red]{e}[/]")
         console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         raise typer.Exit(1)
-
-    except Exception as e:
-        # Use contextual error formatting for better UX
+    except ConfigurationError as e:
+        console.print(f"[bold red]✗[/] Workflow configuration error: {e}")
+        console.print("\n[yellow]Suggestions:[/]")
+        console.print("  • Check workflow YAML syntax")
+        console.print("  • Validate workflow: victor workflow validate <file>")
+        console.print("  • Run 'victor doctor' for diagnostics\n")
+        raise typer.Exit(1)
+    except VictorError as e:
+        # Known Victor errors - use contextual formatting
         error_message = format_exception_for_user(e)
         console.print(f"[bold red]Error:[/]\n{error_message}")
         console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
+        if os.getenv("VICTOR_DEBUG"):
+            import traceback
+            console.print(traceback.format_exc())
+        raise typer.Exit(1)
+    except Exception as e:
+        # Unexpected error - always show in debug mode
+        console.print(f"[bold red]Unexpected error:[/]\n{e}")
+        console.print("\n[yellow]Suggestions:[/]")
+        console.print("  • This may be a bug - please report it")
+        console.print("  • Run 'victor doctor' for diagnostics")
+        console.print("  • Enable debug mode: VICTOR_DEBUG=1 victor chat\n")
         import traceback
-
-        # Still show traceback in debug mode
         if os.getenv("VICTOR_DEBUG"):
             console.print(traceback.format_exc())
         raise typer.Exit(1)

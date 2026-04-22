@@ -19,7 +19,7 @@ for AgentOrchestrator components.
 """
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock, patch
 
 # Suppress deprecation warnings for complexity_classifier shim during migration
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -217,6 +217,85 @@ class TestOrchestratorServiceProvider:
         # Both types should be registered
         assert container.is_registered(ResponseSanitizerProtocol)
         assert container.is_registered(ConversationStateMachineProtocol)
+
+    def test_tool_coordinator_protocol_is_not_registered_by_default(self, mock_settings):
+        """ToolCoordinatorProtocol is compatibility-only, not a primary DI service."""
+        from victor.agent.service_provider import OrchestratorServiceProvider
+        from victor.agent.protocols import ToolCoordinatorProtocol
+
+        container = ServiceContainer()
+        provider = OrchestratorServiceProvider(mock_settings)
+
+        provider.register_singleton_services(container)
+
+        assert container.is_registered(ToolCoordinatorProtocol) is False
+
+    def test_create_tool_coordinator_builds_bound_compatibility_shim(self, mock_settings):
+        """Explicit ToolCoordinator factory still builds a service-bound shim."""
+        from victor.agent.protocols import (
+            IBudgetManager,
+            IToolAccessController,
+            ModeControllerProtocol,
+            ToolCacheProtocol,
+            ToolPipelineProtocol,
+            ToolRegistryProtocol,
+            ToolSelectorProtocol,
+        )
+        from victor.agent.service_provider import OrchestratorServiceProvider
+        from victor.agent.services.protocols import ToolServiceProtocol
+
+        tool_pipeline = MagicMock()
+        tool_registry = MagicMock()
+        tool_selector = MagicMock()
+        budget_manager = MagicMock()
+        tool_cache = MagicMock()
+        mode_controller = MagicMock()
+        tool_access_controller = MagicMock()
+        tool_service = MagicMock()
+
+        container = ServiceContainer()
+        container.register(ToolPipelineProtocol, lambda c: tool_pipeline, ServiceLifetime.SINGLETON)
+        container.register(ToolRegistryProtocol, lambda c: tool_registry, ServiceLifetime.SINGLETON)
+        container.register(ToolSelectorProtocol, lambda c: tool_selector, ServiceLifetime.SINGLETON)
+        container.register(IBudgetManager, lambda c: budget_manager, ServiceLifetime.SINGLETON)
+        container.register(ToolCacheProtocol, lambda c: tool_cache, ServiceLifetime.SINGLETON)
+        container.register(
+            ModeControllerProtocol,
+            lambda c: mode_controller,
+            ServiceLifetime.SINGLETON,
+        )
+        container.register(
+            IToolAccessController,
+            lambda c: tool_access_controller,
+            ServiceLifetime.SINGLETON,
+        )
+        container.register(ToolServiceProtocol, lambda c: tool_service, ServiceLifetime.SINGLETON)
+
+        provider = OrchestratorServiceProvider(mock_settings)
+        provider.container = container
+        coordinator = MagicMock()
+
+        with (
+            pytest.warns(
+                DeprecationWarning,
+                match="creates a deprecated ToolCoordinator shim",
+            ),
+            patch("victor.agent.coordinators.ToolCoordinator", return_value=coordinator) as ctor,
+        ):
+            result = provider._create_tool_coordinator()
+
+        assert result is coordinator
+        ctor.assert_called_once_with(
+            tool_pipeline=tool_pipeline,
+            tool_registry=tool_registry,
+            tool_selector=tool_selector,
+            budget_manager=budget_manager,
+            tool_cache=tool_cache,
+            tool_access_controller=tool_access_controller,
+            config=ANY,
+        )
+        coordinator.set_mode_controller.assert_called_once_with(mode_controller)
+        coordinator.bind_tool_service.assert_called_once_with(tool_service)
 
 
 # =============================================================================

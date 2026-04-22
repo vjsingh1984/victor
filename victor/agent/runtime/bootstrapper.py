@@ -139,8 +139,14 @@ class AgentRuntimeBootstrapper:
 
         orchestrator._orchestration_facade = OrchestrationFacade(
             interaction_runtime=orchestrator._interaction_runtime,
+            chat_service=getattr(orchestrator, "_chat_service", None),
+            tool_service=getattr(orchestrator, "_tool_service", None),
+            session_service=getattr(orchestrator, "_session_service", None),
+            context_service=getattr(orchestrator, "_context_service", None),
+            provider_service=getattr(orchestrator, "_provider_service", None),
+            recovery_service=getattr(orchestrator, "_recovery_service", None),
             chat_coordinator=orchestrator._chat_coordinator,
-            tool_coordinator=orchestrator._tool_coordinator,
+            get_tool_coordinator=orchestrator._get_deprecated_tool_coordinator,
             session_coordinator=orchestrator._session_coordinator,
             turn_executor=orchestrator._turn_executor,
             sync_chat_coordinator=orchestrator._sync_chat_coordinator,

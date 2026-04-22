@@ -250,13 +250,13 @@ class TaskCompletionDetector:
             "done:",
             "task_done:",
             "task done:",
-            "summary:",
+            # "summary:",  # REMOVED: Too fragile, triggers on analysis text (agentic loop issue)
             "blocked:",
             "cannot_complete:",
             # Legacy underscore-wrapped forms (backward compat)
             "_done_",
             "_task_done_",
-            "_summary_",
+            # "_summary_",  # REMOVED: Too fragile, triggers on analysis text
             "_blocked_",
             "_cannot_complete_",
             # Additional natural language variants

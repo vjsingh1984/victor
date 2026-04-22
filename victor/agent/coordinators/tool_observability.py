@@ -102,33 +102,24 @@ class ToolObservabilityHandler:
 
         bus = get_observability_bus()
         correlation_id = get_request_correlation_id()
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                bus.emit(
-                    topic="tool.complete",
-                    data={
-                        "tool_id": tool_id,
-                        "tool_name": result.tool_name,
-                        "success": result.success,
-                        "result_length": (len(str(result.result or "")) if result.result else 0),
-                        "error": str(result.error) if result.error else None,
-                        "category": "tool",
-                        "arguments": self._sanitize_arguments(result.arguments or {}),
-                        "execution_time_ms": getattr(result, "execution_time_ms", None),
-                        "result_excerpt": self._build_result_excerpt(result.result),
-                        "preview": self._build_tool_preview(result),
-                        "follow_up_suggestions": follow_up_suggestions,
-                    },
-                    correlation_id=correlation_id,
-                )
-            )
-        except RuntimeError:
-            # No event loop running
-            pass
-        except Exception:
-            # Ignore errors during event emission
-            pass
+        self._emit_bus_event(
+            bus,
+            topic="tool.complete",
+            data={
+                "tool_id": tool_id,
+                "tool_name": result.tool_name,
+                "success": result.success,
+                "result_length": (len(str(result.result or "")) if result.result else 0),
+                "error": str(result.error) if result.error else None,
+                "category": "tool",
+                "arguments": self._sanitize_arguments(result.arguments or {}),
+                "execution_time_ms": getattr(result, "execution_time_ms", None),
+                "result_excerpt": self._build_result_excerpt(result.result),
+                "preview": self._build_tool_preview(result),
+                "follow_up_suggestions": follow_up_suggestions,
+            },
+            correlation_id=correlation_id,
+        )
 
         # Track read files for task completion detection
         if (
@@ -157,7 +148,8 @@ class ToolObservabilityHandler:
 
                         # Emit nudge event
                         event_bus = get_observability_bus()
-                        event_bus.emit(
+                        self._emit_bus_event(
+                            event_bus,
                             topic="state.task.all_files_read_nudge",
                             data={
                                 "required_files": list(required_files),
@@ -339,6 +331,35 @@ class ToolObservabilityHandler:
                 if isinstance(value, str):
                     return value
         return None
+
+    def _emit_bus_event(
+        self,
+        bus: Any,
+        *,
+        topic: str,
+        data: Dict[str, Any],
+        correlation_id: Optional[str] = None,
+    ) -> None:
+        """Emit an observability event without leaking un-awaited coroutines."""
+        try:
+            emitted = bus.emit(
+                topic=topic,
+                data=data,
+                correlation_id=correlation_id,
+            )
+            if asyncio.iscoroutine(emitted):
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    asyncio.run(emitted)
+                else:
+                    loop.create_task(emitted)
+        except RuntimeError:
+            # No event loop running
+            pass
+        except Exception:
+            # Ignore errors during event emission
+            pass
 
     def _looks_like_diff(self, text: str) -> bool:
         if not text or len(text) < 10:

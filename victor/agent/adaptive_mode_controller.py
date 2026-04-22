@@ -295,6 +295,40 @@ class QLearningStore:
             CREATE INDEX IF NOT EXISTS idx_{_Q_TABLE}_state ON {_Q_TABLE}(state_key)
         """)
 
+        # Migration: Add missing columns if table exists with old schema
+        try:
+            # Check which columns exist and their constraints
+            cursor = conn.execute(f"PRAGMA table_info({_HISTORY_TABLE})")
+            columns_info = cursor.fetchall()
+            columns = {row[1]: row for row in columns_info}
+
+            # Add profile_name column if missing
+            if "profile_name" not in columns:
+                logger.info(f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding profile_name column")
+                conn.execute(f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN profile_name TEXT DEFAULT 'default'")
+                conn.execute(f"UPDATE {_HISTORY_TABLE} SET profile_name = 'default' WHERE profile_name IS NULL")
+                logger.info(f"[AdaptiveModeController] Migration complete: profile_name column added to {_HISTORY_TABLE}")
+
+            # Add trigger column if missing (old schema used task_type instead)
+            if "trigger" not in columns:
+                logger.info(f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding trigger column")
+
+                # If task_type exists and has NOT NULL constraint, make it nullable first
+                if "task_type" in columns:
+                    # SQLite doesn't support ALTER COLUMN directly, need to recreate table
+                    # For simplicity, we'll just provide a default value for task_type in new inserts
+                    # and make trigger NOT NULL with a default
+                    conn.execute(f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'")
+                    # Migrate existing task_type values to trigger
+                    conn.execute(f"UPDATE {_HISTORY_TABLE} SET trigger = task_type WHERE trigger = 'unknown'")
+                else:
+                    conn.execute(f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'")
+
+                logger.info(f"[AdaptiveModeController] Migration complete: trigger column added to {_HISTORY_TABLE}")
+
+        except Exception as e:
+            logger.warning(f"[AdaptiveModeController] Migration failed (non-critical): {e}")
+
         conn.execute(f"""
             CREATE INDEX IF NOT EXISTS idx_{_HISTORY_TABLE}_profile
             ON {_HISTORY_TABLE}(profile_name, timestamp)
@@ -397,23 +431,73 @@ class QLearningStore:
         self._ensure_initialized()
 
         conn = self._db.get_connection()
-        conn.execute(
-            f"""
-            INSERT INTO {_HISTORY_TABLE}
-            (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            (
-                profile_name,
-                from_mode.value,
-                to_mode.value,
-                trigger.value,
-                state_key,
-                action_key,
-                reward,
-                datetime.now().isoformat(),
-            ),
-        )
+
+        # Check schema to handle both old and new table structures
+        cursor = conn.execute(f"PRAGMA table_info({_HISTORY_TABLE})")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        # Old schema has task_type but no trigger, new schema has trigger
+        # Migrated schema has both columns
+        if "trigger" in columns:
+            # New or migrated schema: use trigger column (and task_type if it exists)
+            if "task_type" in columns:
+                # Migrated schema: both columns exist
+                conn.execute(
+                    f"""
+                    INSERT INTO {_HISTORY_TABLE}
+                    (profile_name, from_mode, to_mode, task_type, trigger, state_key, action_key, reward, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        profile_name,
+                        from_mode.value,
+                        to_mode.value,
+                        trigger.value,  # Store trigger in both columns for compatibility
+                        trigger.value,
+                        state_key,
+                        action_key,
+                        reward,
+                        datetime.now().isoformat(),
+                    ),
+                )
+            else:
+                # New schema: only trigger column
+                conn.execute(
+                    f"""
+                    INSERT INTO {_HISTORY_TABLE}
+                    (profile_name, from_mode, to_mode, trigger, state_key, action_key, reward, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                    (
+                        profile_name,
+                        from_mode.value,
+                        to_mode.value,
+                        trigger.value,
+                        state_key,
+                        action_key,
+                        reward,
+                        datetime.now().isoformat(),
+                    ),
+                )
+        else:
+            # Old schema: only task_type column
+            conn.execute(
+                f"""
+                INSERT INTO {_HISTORY_TABLE}
+                (profile_name, from_mode, to_mode, task_type, state_key, action_key, reward, timestamp)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    profile_name,
+                    from_mode.value,
+                    to_mode.value,
+                    trigger.value,  # Store trigger value in task_type column
+                    state_key,
+                    action_key,
+                    reward,
+                    datetime.now().isoformat(),
+                ),
+            )
         conn.commit()
 
     def update_task_stats(

@@ -662,6 +662,34 @@ class AgenticLoop:
                 # Track progress (SubSearch intermediate rewards)
                 self._progress_scores.append(evaluation.score)
 
+                # AGENTIC LOOP FIX: Content degradation detection
+                # Detect if agent is looping without making progress (same content repeated)
+                if len(self._progress_scores) >= 3:
+                    # Check content lengths from recent iterations
+                    recent_lengths = []
+                    for iter_obj in iterations[-3:]:
+                        if iter_obj.action_result and hasattr(iter_obj.action_result, 'content'):
+                            content_length = len(iter_obj.action_result.content)
+                            recent_lengths.append(content_length)
+                        elif iter_obj.action_result and hasattr(iter_obj.action_result, 'response'):
+                            content_length = len(iter_obj.action_result.response)
+                            recent_lengths.append(content_length)
+
+                    # If all 3 recent iterations have same content length, likely looping
+                    if len(recent_lengths) >= 3 and \
+                       len(set(recent_lengths)) == 1 and \
+                       i >= 5:  # Only check after 5 iterations to avoid false positives
+                        logger.warning(
+                            f"Content degradation detected: same content length ({recent_lengths[0]}) "
+                            f"repeated for 3 iterations - stopping loop"
+                        )
+                        evaluation = EvaluationResult(
+                            decision=EvaluationDecision.FAIL,
+                            score=evaluation.score,
+                            reason=f"Content degradation: same length repeated 3x (iteration {i})",
+                        )
+                        # Continue to exit logic below
+
                 # FULFILLMENT CHECK (optional)
                 if self.enable_fulfillment_check:
                     logger.info(f"[Iteration {i}/{effective_max}] FULFILLMENT")

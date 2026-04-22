@@ -43,3 +43,18 @@ def test_create_coordination_runtime_components_lazy_materialization():
     factory.create_chunk_generator.assert_called_once_with()
     factory.create_tool_planner.assert_called_once_with()
     factory.create_task_coordinator.assert_called_once_with()
+
+
+def test_create_coordination_runtime_components_binds_recovery_service_on_materialization():
+    factory = MagicMock()
+    recovery_coordinator = MagicMock()
+    recovery_service = MagicMock()
+    factory.create_recovery_coordinator.return_value = recovery_coordinator
+
+    runtime = create_coordination_runtime_components(
+        factory=factory,
+        get_recovery_service=lambda: recovery_service,
+    )
+
+    assert runtime.recovery_coordinator.get_instance() is recovery_coordinator
+    recovery_coordinator.bind_recovery_service.assert_called_once_with(recovery_service)

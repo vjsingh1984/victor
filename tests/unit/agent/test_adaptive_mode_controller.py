@@ -18,6 +18,7 @@ Tests the adaptive mode controller which manages mode transitions using
 Q-learning, provider-aware thresholds, and tool budget optimization.
 """
 
+import sqlite3
 import pytest
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -40,24 +41,87 @@ from victor.agent.adaptive_mode_controller import (
 # =============================================================================
 
 
+def _make_isolated_db():
+    """Build a fresh in-memory DB mock that satisfies QLearningStore."""
+    from victor.agent.adaptive_mode_controller import _Q_TABLE, _TASK_TABLE
+
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(f"""
+        CREATE TABLE IF NOT EXISTS {_Q_TABLE} (
+            state_key TEXT NOT NULL,
+            action_key TEXT NOT NULL,
+            q_value REAL DEFAULT 0.0,
+            visit_count INTEGER DEFAULT 0,
+            last_updated REAL,
+            PRIMARY KEY (state_key, action_key)
+        );
+        CREATE TABLE IF NOT EXISTS {_TASK_TABLE} (
+            task_type TEXT PRIMARY KEY,
+            optimal_tool_budget REAL DEFAULT 10.0,
+            avg_quality_score REAL DEFAULT 0.5,
+            avg_completion_rate REAL DEFAULT 0.5,
+            sample_count INTEGER DEFAULT 0,
+            last_updated REAL
+        );
+    """)
+    conn.commit()
+    mock_db = MagicMock()
+    mock_db.get_connection.return_value = conn
+    mock_db.db_path = Path(":memory:")
+    return mock_db
+
+
+def _make_q_store(mock_db=None) -> QLearningStore:
+    """Construct a QLearningStore wired to an isolated in-memory DB."""
+    if mock_db is None:
+        mock_db = _make_isolated_db()
+    store = QLearningStore.__new__(QLearningStore)
+    store._db = mock_db
+    store.db_path = mock_db.db_path
+    store._initialized = False
+    store.learning_rate = 0.1
+    store.discount_factor = 0.9
+    store.exploration_rate = 0.1
+    return store
+
+
 @pytest.fixture
 def tmp_project_path(tmp_path: Path) -> Path:
-    """Create a temporary project path for testing."""
+    """Temporary project path — also patches DatabaseManager so any
+    QLearningStore(project_path=...) call in the test body gets an
+    isolated in-memory DB instead of the global singleton."""
     victor_dir = tmp_path / ".victor"
     victor_dir.mkdir(parents=True, exist_ok=True)
     return tmp_path
 
 
-@pytest.fixture
-def q_store(tmp_project_path: Path) -> QLearningStore:
-    """Create a QLearningStore with temporary database."""
-    return QLearningStore(project_path=tmp_project_path)
+@pytest.fixture(autouse=True)
+def _patch_db_manager(monkeypatch):
+    """Redirect DatabaseManager() to a fresh in-memory instance per test.
+
+    QLearningStore ignores project_path and calls DatabaseManager() directly
+    (imported inline inside __init__). We patch the class in its home module
+    so the local `from victor.core.database import DatabaseManager` picks it up.
+    Without this patch every test shares the same singleton DB, causing
+    sample_count / Q-value accumulation across the test session.
+    """
+    mock_db = _make_isolated_db()
+    monkeypatch.setattr(
+        "victor.core.database.DatabaseManager",
+        lambda: mock_db,
+    )
 
 
 @pytest.fixture
-def controller(tmp_project_path: Path) -> AdaptiveModeController:
-    """Create an AdaptiveModeController with temporary database."""
-    q_store = QLearningStore(project_path=tmp_project_path)
+def q_store() -> QLearningStore:
+    """QLearningStore backed by the per-test isolated DB (via _patch_db_manager)."""
+    return QLearningStore()
+
+
+@pytest.fixture
+def controller(q_store: QLearningStore) -> AdaptiveModeController:
+    """Create an AdaptiveModeController with an isolated database."""
     return AdaptiveModeController(
         profile_name="test_profile",
         q_store=q_store,
@@ -65,9 +129,8 @@ def controller(tmp_project_path: Path) -> AdaptiveModeController:
 
 
 @pytest.fixture
-def controller_with_provider(tmp_project_path: Path) -> AdaptiveModeController:
+def controller_with_provider(q_store: QLearningStore) -> AdaptiveModeController:
     """Create an AdaptiveModeController with provider configuration."""
-    q_store = QLearningStore(project_path=tmp_project_path)
     return AdaptiveModeController(
         profile_name="test_profile",
         q_store=q_store,

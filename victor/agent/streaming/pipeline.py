@@ -349,9 +349,10 @@ class StreamingChatPipeline:
                 if confidence == CompletionConfidence.HIGH:
                     logger.info(
                         "Task completion: HIGH confidence detected (active signal), "
-                        "forcing completion after this response"
+                        "forcing completion NOW (immediate stop, skip continuation)"
                     )
                     stream_ctx.force_completion = True
+                    stream_ctx.skip_continuation = True  # NEW: Prevent continuation strategy override
                 elif confidence == CompletionConfidence.MEDIUM:
                     logger.info(
                         "Task completion: MEDIUM confidence detected (file mods + passive signal)"
@@ -431,10 +432,15 @@ class StreamingChatPipeline:
                 sanitized = orch.sanitizer.sanitize(full_content)
                 if sanitized:
                     orch.add_message("assistant", sanitized, tool_calls=tool_calls)
+                    # CRITICAL FIX: Yield content as StreamChunk for real-time display
+                    # This ensures LLM responses appear in console as they're generated
+                    yield orch._chunk_generator.generate_content_chunk(sanitized)
                 else:
                     plain_text = orch.sanitizer.strip_markup(full_content)
                     if plain_text:
                         orch.add_message("assistant", plain_text, tool_calls=tool_calls)
+                        # CRITICAL FIX: Yield content as StreamChunk for real-time display
+                        yield orch._chunk_generator.generate_content_chunk(plain_text)
             elif tool_calls:
                 # OpenAI spec: assistant message with tool_calls must be in
                 # conversation even when content is empty. Without this,

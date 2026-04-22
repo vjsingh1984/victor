@@ -45,6 +45,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import TYPE_CHECKING, Any, Optional
 
 from victor.core.container import ServiceContainer, ServiceLifetime
@@ -1207,10 +1208,10 @@ class OrchestratorServiceProvider:
     # =========================================================================
 
     def _create_tool_coordinator(self) -> "ToolCoordinatorProtocol | None":
-        """Create ToolCoordinator instance.
+        """Create the deprecated ToolCoordinator compatibility shim.
 
-        The ToolCoordinator provides a centralized interface for tool-related
-        operations: selection, budgeting, and execution coordination.
+        The main runtime should resolve ToolService instead. This factory is
+        retained only for explicit backward-compatibility use.
 
         Returns:
             ToolCoordinator instance
@@ -1220,17 +1221,32 @@ class OrchestratorServiceProvider:
             ToolCoordinatorConfig,
         )
         from victor.agent.protocols import (
+            IToolAccessController,
+            ModeControllerProtocol,
             ToolPipelineProtocol,
+            ToolRegistryProtocol,
             ToolSelectorProtocol,
             IBudgetManager,
             ToolCacheProtocol,
         )
+        from victor.agent.services.protocols import ToolServiceProtocol
+
+        warnings.warn(
+            "OrchestratorServiceProvider._create_tool_coordinator() creates a deprecated "
+            "ToolCoordinator shim. Prefer ToolServiceProtocol.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
         # Get dependencies from DI container (optional for some)
         tool_pipeline = self.container.get_optional(ToolPipelineProtocol)
+        tool_registry = self.container.get_optional(ToolRegistryProtocol)
         tool_selector = self.container.get_optional(ToolSelectorProtocol)
         budget_manager = self.container.get_optional(IBudgetManager)
         tool_cache = self.container.get_optional(ToolCacheProtocol)
+        mode_controller = self.container.get_optional(ModeControllerProtocol)
+        tool_access_controller = self.container.get_optional(IToolAccessController)
+        tool_service = self.container.get_optional(ToolServiceProtocol)
 
         # Build config from settings
         config = ToolCoordinatorConfig(
@@ -1240,19 +1256,24 @@ class OrchestratorServiceProvider:
             selection_threshold=getattr(self._settings, "tool_selection_threshold", 0.3),
         )
 
-        # Note: tool_pipeline may be None if not yet registered
-        # The coordinator handles this gracefully
-        if tool_pipeline is None:
-            logger.debug("ToolPipeline not available for ToolCoordinator")
+        if tool_pipeline is None or tool_registry is None:
+            logger.debug("ToolPipeline or ToolRegistry not available for ToolCoordinator")
             return None
 
-        return ToolCoordinator(
+        coordinator = ToolCoordinator(
             tool_pipeline=tool_pipeline,
+            tool_registry=tool_registry,
             tool_selector=tool_selector,
             budget_manager=budget_manager,
             tool_cache=tool_cache,
+            tool_access_controller=tool_access_controller,
             config=config,
         )
+        if mode_controller is not None:
+            coordinator.set_mode_controller(mode_controller)
+        if tool_service is not None:
+            coordinator.bind_tool_service(tool_service)
+        return coordinator
 
     def _create_state_coordinator(self) -> "StateCoordinatorProtocol | None":
         """Create StateCoordinator instance.

@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable, Optional
 
 from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
@@ -26,12 +26,21 @@ class CoordinationRuntimeComponents:
 def create_coordination_runtime_components(
     *,
     factory: Any,
+    get_recovery_service: Optional[Callable[[], Any]] = None,
 ) -> CoordinationRuntimeComponents:
     """Create lazy coordination components for orchestrator wiring."""
 
+    def _build_recovery_coordinator() -> Any:
+        coordinator = factory.create_recovery_coordinator()
+        if get_recovery_service is not None and hasattr(coordinator, "bind_recovery_service"):
+            service = get_recovery_service()
+            if service is not None:
+                coordinator.bind_recovery_service(service)
+        return coordinator
+
     return CoordinationRuntimeComponents(
         recovery_coordinator=LazyRuntimeProxy(
-            factory=lambda: factory.create_recovery_coordinator(),
+            factory=_build_recovery_coordinator,
             name="recovery_coordinator",
         ),
         chunk_generator=LazyRuntimeProxy(

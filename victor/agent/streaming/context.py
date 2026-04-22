@@ -63,6 +63,7 @@ class StreamingChatContext:
     total_iterations: int = 0
     force_completion: bool = False
     force_completion_warning_shown: bool = False  # Prevent duplicate warnings
+    skip_continuation: bool = False  # Skip continuation strategy when completion is forced (agentic loop fix)
 
     # Task classification
     unified_task_type: ClassifierTaskType = ClassifierTaskType.DEFAULT

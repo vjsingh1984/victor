@@ -80,6 +80,7 @@ class SyncChatCoordinator:
         turn_executor: "TurnExecutor",
         orchestrator: Any = None,
         query_classifier: Optional["QueryClassifier"] = None,
+        chat_service: Optional[Any] = None,
     ) -> None:
         """Initialize the SyncChatCoordinator.
 
@@ -97,6 +98,11 @@ class SyncChatCoordinator:
         self._turn_executor = turn_executor
         self._orchestrator = orchestrator
         self._query_classifier = query_classifier
+        self._chat_service = chat_service
+
+    def bind_chat_service(self, chat_service: Any) -> None:
+        """Bind the canonical ChatService for backward-compatible delegation."""
+        self._chat_service = chat_service
 
     # =====================================================================
     # Public API
@@ -125,6 +131,12 @@ class SyncChatCoordinator:
         Returns:
             CompletionResponse with complete response
         """
+        if self._chat_service is not None:
+            return await self._chat_service.chat(
+                user_message,
+                use_planning=use_planning,
+            )
+
         # Skill auto-selection (shared logic lives on orchestrator)
         if self._orchestrator and hasattr(self._orchestrator, "apply_skill_for_turn"):
             self._orchestrator.apply_skill_for_turn(user_message)

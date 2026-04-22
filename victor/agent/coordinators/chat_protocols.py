@@ -134,9 +134,6 @@ class ToolContextProtocol(Protocol):
     tool_adapter: Any
     """ToolCallAdapter for normalizing tool call formats."""
 
-    _tool_coordinator: Any
-    """ToolCoordinator for parse_and_validate_tool_calls."""
-
     _tool_planner: Any
     """ToolPlanner for goal-based tool planning and intent filtering."""
 

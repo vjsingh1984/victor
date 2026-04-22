@@ -31,6 +31,12 @@ class TestOrchestrationFacadeInit:
 
         facade = OrchestrationFacade(
             interaction_runtime=MagicMock(),
+            chat_service=MagicMock(),
+            tool_service=MagicMock(),
+            session_service=MagicMock(),
+            context_service=MagicMock(),
+            provider_service=MagicMock(),
+            recovery_service=MagicMock(),
             chat_coordinator=MagicMock(),
             tool_coordinator=MagicMock(),
             session_coordinator=MagicMock(),
@@ -62,6 +68,12 @@ class TestOrchestrationFacadeInit:
         facade = OrchestrationFacade()
 
         assert facade.interaction_runtime is None
+        assert facade.chat_service is None
+        assert facade.tool_service is None
+        assert facade.session_service is None
+        assert facade.context_service is None
+        assert facade.provider_service is None
+        assert facade.recovery_service is None
         assert facade.chat_coordinator is None
         assert facade.tool_coordinator is None
         assert facade.session_coordinator is None
@@ -93,6 +105,12 @@ class TestOrchestrationFacadeProperties:
         """Create an OrchestrationFacade with mock components."""
         return OrchestrationFacade(
             interaction_runtime=MagicMock(name="interaction"),
+            chat_service=MagicMock(name="chat_service"),
+            tool_service=MagicMock(name="tool_service"),
+            session_service=MagicMock(name="session_service"),
+            context_service=MagicMock(name="context_service"),
+            provider_service=MagicMock(name="provider_service"),
+            recovery_service=MagicMock(name="recovery_service"),
             chat_coordinator=MagicMock(name="chat"),
             tool_coordinator=MagicMock(name="tool"),
             session_coordinator=MagicMock(name="session"),
@@ -117,6 +135,37 @@ class TestOrchestrationFacadeProperties:
     def test_protocol_adapter_property(self, facade):
         """ProtocolAdapter property returns the adapter."""
         assert facade.protocol_adapter._mock_name == "adapter"
+
+    def test_chat_service_property(self, facade):
+        """ChatService property returns the canonical service."""
+        assert facade.chat_service._mock_name == "chat_service"
+
+    def test_tool_service_property(self, facade):
+        """ToolService property returns the canonical service."""
+        assert facade.tool_service._mock_name == "tool_service"
+
+    def test_tool_coordinator_property_is_deprecated(self, facade):
+        """ToolCoordinator property remains available as a deprecated shim."""
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.tool_coordinator is deprecated",
+        ):
+            coordinator = facade.tool_coordinator
+
+        assert coordinator._mock_name == "tool"
+
+    def test_tool_coordinator_property_resolves_lazy_compatibility_getter(self):
+        """ToolCoordinator compatibility accessor resolves lazily when needed."""
+        tool = MagicMock(name="tool")
+        facade = OrchestrationFacade(get_tool_coordinator=lambda: tool)
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="OrchestrationFacade.tool_coordinator is deprecated",
+        ):
+            coordinator = facade.tool_coordinator
+
+        assert coordinator is tool
 
     def test_protocol_adapter_setter(self, facade):
         """ProtocolAdapter setter updates the adapter."""

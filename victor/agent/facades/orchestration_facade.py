@@ -26,7 +26,8 @@ The orchestrator delegates property access through this facade.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+import warnings
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +41,14 @@ class OrchestrationFacade:
 
     Components managed:
         - interaction_runtime: Interaction runtime boundary components
+        - chat_service: Canonical chat service
+        - tool_service: Canonical tool service
+        - session_service: Canonical session service
+        - context_service: Canonical context service
+        - provider_service: Canonical provider service
+        - recovery_service: Canonical recovery service
         - chat_coordinator: Chat coordinator for chat operations
-        - tool_coordinator: Tool coordinator for tool operations
+        - tool_coordinator: Deprecated tool coordinator compatibility shim
         - session_coordinator: Session coordinator for session operations
         - turn_executor: Execution coordinator for agentic loop
         - sync_chat_coordinator: Sync chat coordinator (non-streaming)
@@ -67,8 +74,15 @@ class OrchestrationFacade:
         self,
         *,
         interaction_runtime: Optional[Any] = None,
+        chat_service: Optional[Any] = None,
+        tool_service: Optional[Any] = None,
+        session_service: Optional[Any] = None,
+        context_service: Optional[Any] = None,
+        provider_service: Optional[Any] = None,
+        recovery_service: Optional[Any] = None,
         chat_coordinator: Optional[Any] = None,
         tool_coordinator: Optional[Any] = None,
+        get_tool_coordinator: Optional[Callable[[], Optional[Any]]] = None,
         session_coordinator: Optional[Any] = None,
         turn_executor: Optional[Any] = None,
         sync_chat_coordinator: Optional[Any] = None,
@@ -90,8 +104,15 @@ class OrchestrationFacade:
         subagent_orchestrator: Optional[Any] = None,
     ) -> None:
         self._interaction_runtime = interaction_runtime
+        self._chat_service = chat_service
+        self._tool_service = tool_service
+        self._session_service = session_service
+        self._context_service = context_service
+        self._provider_service = provider_service
+        self._recovery_service = recovery_service
         self._chat_coordinator = chat_coordinator
-        self._tool_coordinator = tool_coordinator
+        self._deprecated_tool_coordinator = tool_coordinator
+        self._get_tool_coordinator = get_tool_coordinator
         self._session_coordinator = session_coordinator
         self._turn_executor = turn_executor
         self._sync_chat_coordinator = sync_chat_coordinator
@@ -130,14 +151,53 @@ class OrchestrationFacade:
         return self._interaction_runtime
 
     @property
+    def chat_service(self) -> Optional[Any]:
+        """Canonical chat service."""
+        return self._chat_service
+
+    @property
+    def tool_service(self) -> Optional[Any]:
+        """Canonical tool service."""
+        return self._tool_service
+
+    @property
+    def session_service(self) -> Optional[Any]:
+        """Canonical session service."""
+        return self._session_service
+
+    @property
+    def context_service(self) -> Optional[Any]:
+        """Canonical context service."""
+        return self._context_service
+
+    @property
+    def provider_service(self) -> Optional[Any]:
+        """Canonical provider service."""
+        return self._provider_service
+
+    @property
+    def recovery_service(self) -> Optional[Any]:
+        """Canonical recovery service."""
+        return self._recovery_service
+
+    @property
     def chat_coordinator(self) -> Optional[Any]:
         """Chat coordinator for chat operations."""
         return self._chat_coordinator
 
     @property
     def tool_coordinator(self) -> Optional[Any]:
-        """Tool coordinator for tool operations."""
-        return self._tool_coordinator
+        """Deprecated tool coordinator compatibility shim."""
+        if self._deprecated_tool_coordinator is None and self._get_tool_coordinator is not None:
+            self._deprecated_tool_coordinator = self._get_tool_coordinator()
+        if self._deprecated_tool_coordinator is not None:
+            warnings.warn(
+                "OrchestrationFacade.tool_coordinator is deprecated. "
+                "Use OrchestrationFacade.tool_service instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        return self._deprecated_tool_coordinator
 
     @property
     def session_coordinator(self) -> Optional[Any]:

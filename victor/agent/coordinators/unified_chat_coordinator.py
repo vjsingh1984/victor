@@ -71,6 +71,7 @@ class UnifiedChatCoordinator:
         sync_coordinator: "SyncChatCoordinator",
         streaming_coordinator: "StreamingChatCoordinator",
         default_mode: ExecutionMode = ExecutionMode.AUTO,
+        chat_service: Any = None,
     ) -> None:
         """Initialize the UnifiedChatCoordinator.
 
@@ -82,6 +83,11 @@ class UnifiedChatCoordinator:
         self._sync = sync_coordinator
         self._streaming = streaming_coordinator
         self._default_mode = default_mode
+        self._chat_service = chat_service
+
+    def bind_chat_service(self, chat_service: Any) -> None:
+        """Bind the canonical ChatService for backward-compatible delegation."""
+        self._chat_service = chat_service
 
     # =====================================================================
     # Public API
@@ -113,6 +119,18 @@ class UnifiedChatCoordinator:
             - AUTO mode: Automatically selects based on message characteristics
         """
         execution_mode = self._resolve_execution_mode(mode)
+
+        if self._chat_service is not None:
+            if execution_mode == ExecutionMode.STREAMING:
+                return await self._chat_service.chat(
+                    user_message,
+                    stream=True,
+                    use_planning=use_planning,
+                )
+            return await self._chat_service.chat(
+                user_message,
+                use_planning=use_planning,
+            )
 
         if execution_mode == ExecutionMode.STREAMING:
             # Streaming mode: collect all chunks and return aggregated response
@@ -154,6 +172,11 @@ class UnifiedChatCoordinator:
         Yields:
             StreamChunk objects with incremental response
         """
+        if self._chat_service is not None:
+            async for chunk in self._chat_service.stream_chat(user_message):
+                yield chunk
+            return
+
         async for chunk in self._streaming.stream_chat(user_message):
             yield chunk
 

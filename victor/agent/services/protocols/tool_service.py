@@ -307,6 +307,65 @@ class ToolServiceProtocol(Protocol):
         """Build access-control context for tool gating decisions."""
         ...
 
+    def validate_tool_call(
+        self,
+        tool_call: Any,
+        sanitizer: Any,
+        is_tool_enabled_fn: Optional[Callable[[str], bool]] = None,
+    ) -> Any:
+        """Validate one tool call and return a compatibility validation result."""
+        ...
+
+    def normalize_arguments_full(
+        self,
+        tool_name: str,
+        original_name: str,
+        raw_args: Any,
+        argument_normalizer: Any,
+        tool_adapter: Any,
+        failed_signatures: Optional[Set[Tuple[str, str]]] = None,
+    ) -> Any:
+        """Normalize arguments using parser repair, adapter defaults, and dedup metadata."""
+        ...
+
+    def on_tool_complete(
+        self,
+        result: Any,
+        metrics_collector: Optional[Any] = None,
+        *,
+        read_files_session: Optional[Set[str]] = None,
+        required_files: Optional[List[str]] = None,
+        required_outputs: Optional[List[str]] = None,
+        nudge_sent_flag: Optional[List[bool]] = None,
+        add_message: Optional[Callable[[str, str], None]] = None,
+        observability: Optional[Any] = None,
+        pipeline_calls_used: int = 0,
+        tool_name: Optional[str] = None,
+        elapsed: float = 0.0,
+        session_id: Optional[str] = None,
+    ) -> None:
+        """Notify the service that a tool execution has completed.
+
+        Used by CallbackCoordinator and legacy coordinator shims to record
+        tool completion metrics, nudges, and observability events without
+        requiring ToolCoordinator to remain the canonical owner.
+
+        Args:
+            result: The tool execution result
+            metrics_collector: Optional metrics collector for the full completion flow
+            read_files_session: Mutable set of read files for synthesis nudges
+            required_files: Files required to complete the current task
+            required_outputs: Outputs still required from the current task
+            nudge_sent_flag: Mutable one-item flag tracking synthesis nudges
+            add_message: Optional message injection callback
+            observability: Optional observability integration
+            pipeline_calls_used: Current pipeline tool-call count
+            tool_name: Optional explicit tool name for narrow observability hooks
+            elapsed: Elapsed wall-clock seconds for the execution
+            session_id: Optional session identifier for metrics
+        """
+        ...
+
     def is_healthy(self) -> bool:
         """Check if the tool service is healthy.
 

@@ -374,11 +374,11 @@ def run_skill(
 
         settings = load_settings()
 
-        # Apply provider/model overrides same as victor chat does
+        # Apply provider/model overrides
         if provider:
-            settings.default_provider = provider
+            settings.provider.default_provider = provider
         if model:
-            settings.default_model = model
+            settings.provider.default_model = model
 
         # Set tool budget from skill
         settings.tools.tool_call_budget = skill.max_tool_calls

@@ -38,6 +38,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+from victor.providers.base import StreamChunk
+
 
 class RecoveryStrategy(str, Enum):
     """Error recovery strategy selection."""
@@ -86,39 +88,18 @@ class RecoveryService:
         success = await service.execute_recovery(context)
     """
 
-    def __init__(
-        self,
-        max_retry_attempts: int = 3,
-        base_retry_delay: float = 1.0,
-        max_retry_delay: float = 60.0,
-    ):
-        """Initialize the recovery service.
-
-        Args:
-            max_retry_attempts: Maximum retry attempts
-            base_retry_delay: Base delay for exponential backoff
-            max_retry_delay: Maximum delay between retries
-        """
-        self._max_retry_attempts = max_retry_attempts
-        self._base_retry_delay = base_retry_delay
-        self._max_retry_delay = max_retry_delay
-        self._metrics: Dict[str, Any] = {
-            "total_attempts": 0,
-            "successful_recoveries": 0,
-            "failed_recoveries": 0,
-            "by_error_type": {},
-        }
-        self._logger = logging.getLogger(f"{__name__}.{id(self)}")
-        self._recovery_coordinator: Optional[Any] = None
-        self._recovery_handler: Optional[Any] = None
-        self._recovery_integration: Optional[Any] = None
-
     def bind_runtime_components(
         self,
         *,
         recovery_coordinator: Optional[Any] = None,
         recovery_handler: Optional[Any] = None,
         recovery_integration: Optional[Any] = None,
+        streaming_handler: Optional[Any] = None,
+        context_compactor: Optional[Any] = None,
+        unified_tracker: Optional[Any] = None,
+        settings: Optional[Any] = None,
+        event_bus: Optional[Any] = None,
+        presentation: Optional[Any] = None,
     ) -> None:
         """Bind live runtime collaborators after bootstrap."""
         if recovery_coordinator is not None:
@@ -127,6 +108,61 @@ class RecoveryService:
             self._recovery_handler = recovery_handler
         if recovery_integration is not None:
             self._recovery_integration = recovery_integration
+        if streaming_handler is not None:
+            self._streaming_handler = streaming_handler
+        if context_compactor is not None:
+            self._context_compactor = context_compactor
+        if unified_tracker is not None:
+            self._unified_tracker = unified_tracker
+        if settings is not None:
+            self._settings = settings
+        if event_bus is not None:
+            self._event_bus = event_bus
+        if presentation is not None:
+            self._presentation = presentation
+
+    def has_native_streaming_runtime(self) -> bool:
+        """Whether the service has enough runtime state to own streaming recovery."""
+        return (
+            self._streaming_handler is not None
+            and self._settings is not None
+            and self._unified_tracker is not None
+            and self._recovery_integration is not None
+        )
+
+    def _icon(self, name: str) -> str:
+        if self._presentation is None:
+            return ""
+        try:
+            return self._presentation.icon(name, with_color=False)
+        except Exception:
+            return ""
+
+    def _emit_async_event(
+        self,
+        *,
+        topic: str,
+        data: Dict[str, Any],
+        source: Optional[str] = None,
+    ) -> None:
+        """Emit an observability event without blocking the recovery path."""
+        if self._event_bus is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        try:
+            kwargs = {"topic": topic, "data": data}
+            if source is not None:
+                kwargs["source"] = source
+            loop.create_task(self._event_bus.emit(**kwargs))
+        except Exception as exc:
+            self._logger.debug("Failed to emit recovery event %s: %s", topic, exc)
+
+    @staticmethod
+    def _task_type_value(task_type: Any) -> Any:
+        return getattr(task_type, "value", task_type)
 
     async def classify_error(self, error: Exception) -> str:
         """Classify an error for recovery strategy selection.
@@ -603,6 +639,48 @@ class RecoveryService:
         message_adder: Any = None,
     ) -> Any:
         """Handle streaming recovery through the canonical runtime service."""
+        if self._recovery_integration is not None:
+            from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
+
+            if not self._recovery_integration.enabled:
+                return OrchestratorRecoveryAction(action="continue", reason="Recovery disabled")
+
+            context_utilization = None
+            if self._context_compactor is not None:
+                try:
+                    stats = self._context_compactor.get_statistics()
+                    context_utilization = stats.get("current_utilization")
+                except Exception as exc:
+                    self._logger.debug("Failed to get context utilization for recovery: %s", exc)
+
+            recovery_action = await self._recovery_integration.handle_response(
+                content=full_content,
+                tool_calls=tool_calls,
+                mentioned_tools=mentioned_tools,
+                provider_name=ctx.provider_name,
+                model_name=ctx.model,
+                tool_calls_made=ctx.tool_calls_used,
+                tool_budget=ctx.tool_budget,
+                iteration_count=ctx.streaming_context.total_iterations,
+                max_iterations=ctx.streaming_context.max_total_iterations,
+                current_temperature=ctx.temperature,
+                quality_score=ctx.last_quality_score,
+                task_type=self._task_type_value(ctx.unified_task_type),
+                is_analysis_task=ctx.is_analysis_task,
+                is_action_task=ctx.is_action_task,
+                context_utilization=context_utilization,
+            )
+
+            if recovery_action.action != "continue":
+                self._logger.info(
+                    "Recovery integration: action=%s, reason=%s, failure_type=%s, strategy=%s",
+                    recovery_action.action,
+                    recovery_action.reason,
+                    recovery_action.failure_type,
+                    recovery_action.strategy_name,
+                )
+            return recovery_action
+
         if self._recovery_coordinator is not None:
             return await self._recovery_coordinator.handle_recovery_with_integration(
                 ctx,
@@ -626,12 +704,60 @@ class RecoveryService:
         message_adder: Any = None,
     ) -> Any:
         """Apply a recovery action through the canonical runtime service."""
-        if self._recovery_coordinator is not None:
-            return self._recovery_coordinator.apply_recovery_action(
-                recovery_action,
-                ctx,
-                message_adder=message_adder,
+        if recovery_action.action == "continue":
+            return None
+
+        self._emit_async_event(
+            topic=f"state.recovery.action_{recovery_action.action}",
+            data={
+                "action": recovery_action.action,
+                "reason": recovery_action.reason,
+                "category": "state",
+            },
+            source="RecoveryService",
+        )
+
+        if recovery_action.action == "retry":
+            if recovery_action.message and message_adder:
+                message_adder("user", recovery_action.message)
+            if recovery_action.new_temperature is not None:
+                self._logger.debug(
+                    "Recovery: adjusting temperature from %s to %s",
+                    ctx.temperature,
+                    recovery_action.new_temperature,
+                )
+            return None
+
+        if recovery_action.action == "force_summary":
+            ctx.streaming_context.force_completion = True
+            if recovery_action.message and message_adder:
+                message_adder("user", recovery_action.message)
+            elif message_adder:
+                message_adder(
+                    "user",
+                    "Please provide a brief summary of what you've accomplished and any findings.",
+                )
+            return None
+
+        if recovery_action.action == "abort":
+            self._emit_async_event(
+                topic="error.raised",
+                data={
+                    "error_type": "RuntimeError",
+                    "error_message": f"Session aborted: {recovery_action.reason}",
+                    "category": "error",
+                    "recoverable": False,
+                    "context": {
+                        "failure_type": recovery_action.failure_type,
+                        "iteration": ctx.iteration,
+                    },
+                },
             )
+            return StreamChunk(
+                content=f"\n[recovery] Session aborted: {recovery_action.reason}\n",
+                is_final=True,
+            )
+
         return None
 
     def check_natural_completion(
@@ -641,6 +767,16 @@ class RecoveryService:
         content_length: int,
     ) -> Any:
         """Check whether the current streaming turn should terminate naturally."""
+        if self._streaming_handler is not None:
+            result = self._streaming_handler.check_natural_completion(
+                ctx.streaming_context,
+                has_tool_calls,
+                content_length,
+            )
+            if result:
+                return StreamChunk(content="", is_final=True)
+            return None
+
         if self._recovery_coordinator is not None:
             return self._recovery_coordinator.check_natural_completion(
                 ctx,
@@ -654,6 +790,27 @@ class RecoveryService:
         ctx: Any,
     ) -> Any:
         """Handle an empty model response during streaming."""
+        if self._streaming_handler is not None:
+            result = self._streaming_handler.handle_empty_response(ctx.streaming_context)
+            if result and result.chunks:
+                self._emit_async_event(
+                    topic="error.raised",
+                    data={
+                        "error_type": "RuntimeError",
+                        "error_message": "Empty model response",
+                        "category": "error",
+                        "recoverable": True,
+                        "context": {
+                            "iteration": ctx.iteration,
+                            "provider": ctx.provider_name,
+                            "model": ctx.model,
+                            "force_completion": ctx.streaming_context.force_completion,
+                        },
+                    },
+                )
+                return result.chunks[0], ctx.streaming_context.force_completion
+            return None, False
+
         if self._recovery_coordinator is not None:
             return self._recovery_coordinator.handle_empty_response(ctx)
         return None, False
@@ -676,6 +833,15 @@ class RecoveryService:
         warning_threshold: int = 250,
     ) -> Any:
         """Check whether the streaming tool budget is approaching exhaustion."""
+        if self._streaming_handler is not None:
+            result = self._streaming_handler.check_tool_budget(
+                ctx.streaming_context,
+                warning_threshold,
+            )
+            if result and result.chunks:
+                return result.chunks[0]
+            return None
+
         if self._recovery_coordinator is not None:
             return self._recovery_coordinator.check_tool_budget(ctx, warning_threshold)
         return None
@@ -687,10 +853,13 @@ class RecoveryService:
         max_calls: int,
     ) -> Any:
         """Truncate tool calls to the allowed budget."""
-        if self._recovery_coordinator is not None:
-            return self._recovery_coordinator.truncate_tool_calls(ctx, tool_calls, max_calls)
         if len(tool_calls) <= max_calls:
             return tool_calls, False
+        self._logger.warning(
+            "Truncating %d tool calls to budget limit of %d",
+            len(tool_calls),
+            max_calls,
+        )
         return tool_calls[:max_calls], True
 
     def filter_blocked_tool_calls(
@@ -699,6 +868,13 @@ class RecoveryService:
         tool_calls: List[Dict[str, Any]],
     ) -> Any:
         """Filter tool calls that are blocked by runtime safeguards."""
+        if self._streaming_handler is not None and self._unified_tracker is not None:
+            return self._streaming_handler.filter_blocked_tool_calls(
+                ctx.streaming_context,
+                tool_calls,
+                self._unified_tracker.is_blocked_after_warning,
+            )
+
         if self._recovery_coordinator is not None:
             return self._recovery_coordinator.filter_blocked_tool_calls(ctx, tool_calls)
         return tool_calls, [], 0
@@ -709,6 +885,31 @@ class RecoveryService:
         all_blocked: bool,
     ) -> Any:
         """Check whether blocked-tool thresholds require recovery action."""
+        if self._streaming_handler is not None and self._settings is not None:
+            consecutive_limit = getattr(
+                self._settings,
+                "recovery_blocked_consecutive_threshold",
+                4,
+            )
+            total_limit = getattr(self._settings, "recovery_blocked_total_threshold", 6)
+            result = self._streaming_handler.check_blocked_threshold(
+                ctx.streaming_context,
+                all_blocked,
+                consecutive_limit,
+                total_limit,
+            )
+            if result:
+                warning_icon = self._icon("warning")
+                chunk = (
+                    result.chunks[0]
+                    if result.chunks
+                    else StreamChunk(
+                        content=f"\n[loop] {warning_icon} Multiple blocked attempts - forcing completion\n"
+                    )
+                )
+                return chunk, result.clear_tool_calls
+            return None
+
         if self._recovery_coordinator is not None:
             return self._recovery_coordinator.check_blocked_threshold(ctx, all_blocked)
         return None
@@ -718,8 +919,6 @@ class RecoveryService:
         ctx: Any,
     ) -> Any:
         """Check whether recovery should force a follow-up action."""
-        if self._recovery_coordinator is not None:
-            return self._recovery_coordinator.check_force_action(ctx)
         return False, None
 
     def get_circuit_state(
@@ -906,6 +1105,22 @@ class RecoveryService:
         self._max_retry_attempts = max_retry_attempts
         self._base_retry_delay = base_retry_delay
         self._max_retry_delay = max_retry_delay
+        self._metrics: Dict[str, Any] = {
+            "total_attempts": 0,
+            "successful_recoveries": 0,
+            "failed_recoveries": 0,
+            "by_error_type": {},
+        }
+        self._logger = logging.getLogger(f"{__name__}.{id(self)}")
+        self._recovery_coordinator: Optional[Any] = None
+        self._recovery_handler: Optional[Any] = None
+        self._recovery_integration: Optional[Any] = None
+        self._streaming_handler: Optional[Any] = None
+        self._context_compactor: Optional[Any] = None
+        self._unified_tracker: Optional[Any] = None
+        self._settings: Optional[Any] = None
+        self._event_bus: Optional[Any] = None
+        self._presentation: Optional[Any] = None
 
         # Provider health tracking
         self._provider_health: Dict[str, Dict[str, Any]] = {}

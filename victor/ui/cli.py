@@ -127,7 +127,7 @@ def doctor_command(
             settings = load_settings()
             result = validate_configuration(settings)
             print(format_validation_result(result))
-            if not result.is_valid:
+            if not result.is_valid():
                 exit_code = 1
         except Exception as e:
             console.print(f"[red]\u2717 Config validation failed:[/] {e}")
@@ -279,6 +279,47 @@ def onboarding_command(
         console.print("Run [cyan]victor onboarding[/] again to complete setup.")
 
     raise typer.Exit(exit_code)
+
+
+# =============================================================================
+# Backward Compatibility Aliases
+# =============================================================================
+
+@app.command("profile")
+def profile_alias(
+    verb: str = typer.Argument(..., help="Subcommand (list, show, apply, current, create, edit, delete, set-default)"),
+    args: Optional[list[str]] = typer.Argument(None, help="Additional arguments for the subcommand"),
+) -> None:
+    """Backward-compatible alias for 'victor profiles' commands.
+
+    This command exists for backward compatibility and redirects to
+    the canonical 'victor profiles' command group.
+
+    Deprecated: Use 'victor profiles <verb>' directly instead.
+    """
+    import sys
+    import warnings
+
+    # Issue deprecation warning
+    warnings.warn(
+        "'victor profile' is deprecated, use 'victor profiles' instead. "
+        "Example: 'victor profiles list' instead of 'victor profile list'",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    # Reinvoke as "victor profiles <verb> <args>"
+    # Reconstruct sys.argv for the profiles command
+    sys.argv = ["victor", "profiles", verb] + (args or [])
+
+    # Import and run the profiles app directly
+    from victor.ui.commands.profiles import profiles_app
+
+    try:
+        profiles_app()
+    except SystemExit as e:
+        # Propagate the exit code from profiles app
+        sys.exit(e.code if e.code is not None else 0)
 
 
 # =============================================================================

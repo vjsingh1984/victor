@@ -583,7 +583,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             create_coordination_runtime_components,
         )
 
-        self._coordination_runtime = create_coordination_runtime_components(factory=self._factory)
+        self._coordination_runtime = create_coordination_runtime_components(
+            factory=self._factory,
+            get_recovery_service=lambda: getattr(self, "_recovery_service", None),
+        )
         self._recovery_coordinator = self._coordination_runtime.recovery_coordinator
         self._chunk_generator = self._coordination_runtime.chunk_generator
         self._tool_planner = self._coordination_runtime.tool_planner
@@ -603,8 +606,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._recovery_integration = self._resilience_runtime.recovery_integration
 
     def _initialize_interaction_runtime(self) -> None:
-        """Initialize interaction runtime boundaries for chat/tool/session coordinators."""
+        """Initialize interaction runtime boundaries with canonical services first."""
         from victor.agent.runtime.interaction_runtime import (
+            create_tool_coordinator_shim,
             create_interaction_runtime_components,
         )
 
@@ -614,24 +618,43 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
             tool_executor=getattr(self, "tool_executor", None),
+            tool_cache=getattr(self, "tool_cache", None),
             tool_budget=self.tool_budget,
             tool_selector=(self.tool_selector if hasattr(self, "tool_selector") else None),
             tool_access_controller=getattr(self, "_tool_access_controller", None),
             mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
+            argument_normalizer=getattr(self, "argument_normalizer", None),
             session_state_manager=self._session_state,
             lifecycle_manager=self._lifecycle_manager,
             memory_manager=self.memory_manager,
             memory_session_id=self._memory_session_id,
             checkpoint_manager=self._checkpoint_manager,
             cost_tracker=self._session_cost_tracker,
+            conversation_controller=self._conversation_controller,
+            streaming_coordinator=self._streaming_controller,
+            provider_service=getattr(self, "_provider_service", None),
+            chat_service=getattr(self, "_chat_service", None),
+            context_service=getattr(self, "_context_service", None),
+            recovery_service=getattr(self, "_recovery_service", None),
             tool_service=getattr(self, "_tool_service", None),
             session_service=getattr(self, "_session_service", None),
         )
+        self._chat_service = self._interaction_runtime.chat_service
         self._tool_service = self._interaction_runtime.tool_service
         self._session_service = self._interaction_runtime.session_service
+        self._context_service = self._interaction_runtime.context_service
+        self._recovery_service = self._interaction_runtime.recovery_service
         self._chat_coordinator = self._interaction_runtime.chat_coordinator
-        self._tool_coordinator = self._interaction_runtime.tool_coordinator
         self._session_coordinator = self._interaction_runtime.session_coordinator
+        self._deprecated_tool_coordinator = create_tool_coordinator_shim(
+            orchestrator=self,
+            tool_pipeline=self._tool_pipeline,
+            tool_registry=self.tools,
+            tool_selector=(self.tool_selector if hasattr(self, "tool_selector") else None),
+            tool_access_controller=getattr(self, "_tool_access_controller", None),
+            mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
+            tool_service=getattr(self, "_tool_service", None),
+        )
 
     def _initialize_credit_runtime(self) -> None:
         """Initialize credit assignment runtime (FEP-0001 Phase 3).
@@ -701,6 +724,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 lambda c: self._provider_service,
                 ServiceLifetime.SINGLETON,
             )
+        if getattr(self, "_chat_service", None) is not None:
+            self._container.register_or_replace(
+                ChatServiceProtocol,
+                lambda c: self._chat_service,
+                ServiceLifetime.SINGLETON,
+            )
         if getattr(self, "_session_service", None) is not None:
             self._container.register_or_replace(
                 SessionServiceProtocol,
@@ -711,6 +740,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._container.register_or_replace(
                 ToolServiceProtocol,
                 lambda c: self._tool_service,
+                ServiceLifetime.SINGLETON,
+            )
+        if getattr(self, "_context_service", None) is not None:
+            self._container.register_or_replace(
+                ContextServiceProtocol,
+                lambda c: self._context_service,
+                ServiceLifetime.SINGLETON,
+            )
+        if getattr(self, "_recovery_service", None) is not None:
+            self._container.register_or_replace(
+                RecoveryServiceProtocol,
+                lambda c: self._recovery_service,
                 ServiceLifetime.SINGLETON,
             )
 
@@ -741,11 +782,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self._tool_service and hasattr(self._tool_service, "bind_runtime_components"):
             self._tool_service.bind_runtime_components(
                 tool_registry=getattr(self, "tools", None),
+                tool_pipeline=getattr(self, "_tool_pipeline", None),
+                tool_cache=getattr(self, "tool_cache", None),
                 mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
                 tool_planner=getattr(self, "_tool_planner", None),
                 argument_normalizer=getattr(self, "argument_normalizer", None),
-                retry_executor=getattr(self._tool_coordinator, "_retry_executor", None),
-                tool_call_parser=getattr(self._tool_coordinator, "_tool_call_parser", None),
             )
 
         if self._chat_service and hasattr(self._chat_service, "bind_runtime_components"):
@@ -806,7 +847,27 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 recovery_coordinator=self._recovery_coordinator,
                 recovery_handler=self._recovery_handler,
                 recovery_integration=self._recovery_integration,
+                streaming_handler=getattr(self, "_streaming_handler", None),
+                context_compactor=getattr(self, "_context_compactor", None),
+                unified_tracker=getattr(self, "unified_tracker", None),
+                settings=getattr(self, "settings", None),
+                event_bus=getattr(self, "_observability_bus", None),
+                presentation=getattr(self, "_presentation", None),
             )
+
+            recovery_coordinator = getattr(self, "_recovery_coordinator", None)
+            resolved_recovery_coordinator = None
+            if recovery_coordinator is not None:
+                if hasattr(recovery_coordinator, "initialized"):
+                    if recovery_coordinator.initialized:
+                        resolved_recovery_coordinator = recovery_coordinator.get_instance()
+                else:
+                    resolved_recovery_coordinator = recovery_coordinator
+            if resolved_recovery_coordinator is not None and hasattr(
+                resolved_recovery_coordinator,
+                "bind_recovery_service",
+            ):
+                resolved_recovery_coordinator.bind_recovery_service(self._recovery_service)
 
         logger.info(
             "Service layer initialized: chat=%s, tool=%s, session=%s, "
@@ -1130,13 +1191,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     # Callbacks for decomposed components — delegated to CallbackCoordinator
     # =====================================================================
 
+    def _get_deprecated_tool_coordinator(self) -> Any:
+        """Get the deprecated ToolCoordinator compatibility shim."""
+        return getattr(self, "_deprecated_tool_coordinator", None)
+
     def _build_callback_coordinator(self) -> Any:
         """Lazily construct the CallbackCoordinator."""
         from victor.agent.callback_coordinator import CallbackCoordinator
 
         return CallbackCoordinator(
             metrics_coordinator=self._metrics_coordinator,
-            get_tool_coordinator=lambda: self._tool_coordinator,
             get_observability=lambda: getattr(self, "_observability", None),
             get_pipeline_calls_used=lambda: (
                 self._tool_pipeline.calls_used if hasattr(self, "_tool_pipeline") else 0
@@ -1148,6 +1212,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             ),
             get_rl_coordinator=lambda: self._rl_coordinator,
             get_vertical_context=lambda: self._vertical_context,
+            get_tool_service=lambda: getattr(self, "_tool_service", None),
         )
 
     def _on_tool_start_callback(self, tool_name: str, arguments: Dict[str, Any]) -> None:

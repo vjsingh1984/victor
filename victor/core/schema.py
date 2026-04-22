@@ -732,8 +732,6 @@ class Schema:
     CONV_INDEXES = """
         CREATE INDEX IF NOT EXISTS idx_messages_session
             ON messages(session_id, created_at);
-        CREATE INDEX IF NOT EXISTS idx_context_sizes_session
-            ON context_sizes(session_id);
     """
 
     # ===========================================
@@ -896,23 +894,28 @@ class Schema:
     CHANGES_GROUP = """
         CREATE TABLE IF NOT EXISTS change_groups (
             id TEXT PRIMARY KEY,
+            session_id TEXT,
+            timestamp REAL,
             description TEXT,
-            commit_hash TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            finalized_at TEXT
+            tool_name TEXT,
+            undone INTEGER DEFAULT 0,
+            data TEXT
         )
     """
 
     CHANGES_FILE = """
         CREATE TABLE IF NOT EXISTS file_changes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            group_id TEXT NOT NULL,
-            file_path TEXT NOT NULL,
-            change_type TEXT NOT NULL,
-            old_content TEXT,
+            id TEXT PRIMARY KEY,
+            group_id TEXT,
+            change_type TEXT,
+            file_path TEXT,
+            timestamp REAL,
+            tool_name TEXT,
+            original_content TEXT,
             new_content TEXT,
-            diff TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
+            original_path TEXT,
+            checksum_before TEXT,
+            checksum_after TEXT,
             FOREIGN KEY (group_id) REFERENCES change_groups(id)
         )
     """

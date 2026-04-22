@@ -102,7 +102,7 @@ class ProviderSettings(BaseModel):
 
     # Default provider and model
     default_provider: str = "ollama"
-    default_model: str = "llama2"
+    default_model: str = "qwen3.5:27b-q4_K_M"  # MoE model: fast + knowledgeable
 
     # Default generation parameters
     default_temperature: float = Field(
@@ -131,6 +131,12 @@ class ProviderSettings(BaseModel):
         default_factory=lambda: ["http://127.0.0.1:1234"]
     )
     vllm_base_url: str = "http://localhost:8000"
+
+    # LMStudio resource guard
+    lmstudio_max_vram_gb: Optional[float] = Field(
+        default=48.0,
+        description="Cap model selection to this budget (GB); override via env/config"
+    )
 
     # Provider configurations (dict keyed by provider name)
     providers: Dict[str, ProviderConfig] = Field(default_factory=dict)

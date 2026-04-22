@@ -28,6 +28,43 @@ class TestAgentRuntimeBootstrapper:
         assert hasattr(orch, "_workflow_facade")
         assert hasattr(orch, "_orchestration_facade")
 
+    def test_create_facades_uses_explicit_tool_coordinator_compat_getter(self):
+        orch = self._make_mock_orchestrator()
+
+        with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
+            AgentRuntimeBootstrapper.create_facades(orch)
+
+        facade_cls.assert_called_once_with(
+            interaction_runtime=orch._interaction_runtime,
+            chat_service=getattr(orch, "_chat_service", None),
+            tool_service=getattr(orch, "_tool_service", None),
+            session_service=getattr(orch, "_session_service", None),
+            context_service=getattr(orch, "_context_service", None),
+            provider_service=getattr(orch, "_provider_service", None),
+            recovery_service=getattr(orch, "_recovery_service", None),
+            chat_coordinator=orch._chat_coordinator,
+            get_tool_coordinator=orch._get_deprecated_tool_coordinator,
+            session_coordinator=orch._session_coordinator,
+            turn_executor=orch._turn_executor,
+            sync_chat_coordinator=orch._sync_chat_coordinator,
+            streaming_chat_coordinator=orch._streaming_chat_coordinator,
+            unified_chat_coordinator=orch._unified_chat_coordinator,
+            protocol_adapter=orch._protocol_adapter,
+            streaming_handler=orch._streaming_handler,
+            streaming_controller=orch._streaming_controller,
+            streaming_coordinator=orch._streaming_coordinator,
+            iteration_coordinator=getattr(orch, "_iteration_coordinator", None),
+            task_analyzer=orch._task_analyzer,
+            presentation=orch._presentation,
+            vertical_integration_adapter=orch._vertical_integration_adapter,
+            vertical_context=orch._vertical_context,
+            observability=orch._observability,
+            execution_tracer=getattr(orch, "_execution_tracer", None),
+            tool_call_tracer=getattr(orch, "_tool_call_tracer", None),
+            intelligent_integration=orch._intelligent_integration,
+            subagent_orchestrator=orch._subagent_orchestrator,
+        )
+
     def test_wire_lifecycle_calls_setters(self):
         orch = self._make_mock_orchestrator()
         AgentRuntimeBootstrapper.wire_lifecycle(orch)

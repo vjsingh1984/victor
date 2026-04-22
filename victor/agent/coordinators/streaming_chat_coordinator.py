@@ -75,6 +75,7 @@ class StreamingChatCoordinator:
         tool_context: "ToolContextProtocol",
         provider_context: "ProviderContextProtocol",
         event_emitter: Any = None,  # EventEmitter protocol
+        chat_service: Any = None,
     ) -> None:
         """Initialize the StreamingChatCoordinator.
 
@@ -88,6 +89,11 @@ class StreamingChatCoordinator:
         self._tool_context = tool_context
         self._provider_context = provider_context
         self._event_emitter = event_emitter
+        self._chat_service = chat_service
+
+    def bind_chat_service(self, chat_service: Any) -> None:
+        """Bind the canonical ChatService for backward-compatible delegation."""
+        self._chat_service = chat_service
 
     # =====================================================================
     # Public API
@@ -110,6 +116,11 @@ class StreamingChatCoordinator:
         Yields:
             StreamChunk objects with incremental response
         """
+        if self._chat_service is not None:
+            async for chunk in self._chat_service.stream_chat(user_message):
+                yield chunk
+            return
+
         # Ensure system prompt is included once at start of conversation
         self._chat_context.conversation.ensure_system_prompt()
         self._chat_context._system_added = True

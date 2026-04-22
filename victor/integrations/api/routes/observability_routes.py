@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 
 from fastapi import APIRouter, Query, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from victor.observability.query_service import (
@@ -36,6 +36,8 @@ from victor.observability.query_service import (
     SessionInfo,
     MetricsSnapshot,
 )
+from victor.observability.aggregation_service import AggregationService
+from victor.observability.export_service import ExportService
 
 
 # Request/Response Models
@@ -72,6 +74,8 @@ router = APIRouter(
 
 # Initialize query service (will be injected by FastAPI dependency injection in production)
 _query_service: Optional[QueryService] = None
+_aggregation_service: Optional[AggregationService] = None
+_export_service: Optional[ExportService] = None
 
 
 def get_query_service() -> QueryService:
@@ -84,6 +88,30 @@ def get_query_service() -> QueryService:
     if _query_service is None:
         _query_service = QueryService()
     return _query_service
+
+
+def get_aggregation_service() -> AggregationService:
+    """Get or create aggregation service instance.
+
+    Returns:
+        AggregationService instance
+    """
+    global _aggregation_service
+    if _aggregation_service is None:
+        _aggregation_service = AggregationService()
+    return _aggregation_service
+
+
+def get_export_service() -> ExportService:
+    """Get or create export service instance.
+
+    Returns:
+        ExportService instance
+    """
+    global _export_service
+    if _export_service is None:
+        _export_service = ExportService()
+    return _export_service
 
 
 # =============================================================================
@@ -171,8 +199,42 @@ async def get_session_details(
     Returns:
         Session details with messages, metrics, etc.
     """
-    # TODO: Implement in Phase 3
-    raise HTTPException(status_code=501, detail="Not implemented yet - Phase 3")
+    service = get_query_service()
+
+    # Get session info
+    session_info = await service.get_session(session_id)
+
+    if session_info is None:
+        raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
+
+    # Get events for this session
+    events = await service.get_recent_events(
+        session_id=session_id,
+        limit=1000,
+    )
+
+    # Calculate session metrics from events
+    tool_calls = sum(1 for e in events if e.event_type and "tool" in e.event_type.lower())
+    errors = sum(1 for e in events if e.severity == "error")
+
+    # Calculate duration
+    if events:
+        first_event = min(events, key=lambda e: e.timestamp)
+        last_event = max(events, key=lambda e: e.timestamp)
+        duration_seconds = (last_event.timestamp - first_event.timestamp).total_seconds()
+    else:
+        duration_seconds = 0
+
+    return {
+        "session": session_info.to_dict(),
+        "metrics": {
+            "tool_calls": tool_calls,
+            "errors": errors,
+            "duration_seconds": duration_seconds,
+            "total_events": len(events),
+        },
+        "events": [e.to_dict() for e in events[:100]],  # First 100 events
+    }
 
 
 # =============================================================================
@@ -209,8 +271,8 @@ async def get_metrics_history(
     Returns:
         Time-series metrics data
     """
-    # TODO: Implement in Phase 2 with AggregationService
-    raise HTTPException(status_code=501, detail="Not implemented yet - Phase 2")
+    service = get_aggregation_service()
+    return await service.get_metrics_history(time_window=time_window)
 
 
 @router.get("/metrics/tools")
@@ -220,8 +282,8 @@ async def get_tool_metrics() -> dict:
     Returns tool execution counts, success rates, and
     performance metrics.
     """
-    # TODO: Implement in Phase 2 with AggregationService
-    raise HTTPException(status_code=501, detail="Not implemented yet - Phase 2")
+    service = get_aggregation_service()
+    return await service.get_tool_statistics()
 
 
 @router.get("/metrics/performance")
@@ -231,8 +293,8 @@ async def get_performance_metrics() -> dict:
     Returns latency percentiles (p50, p95, p99), throughput,
     and resource utilization.
     """
-    # TODO: Implement in Phase 2 with AggregationService
-    raise HTTPException(status_code=501, detail="Not implemented yet - Phase 2")
+    service = get_aggregation_service()
+    return await service.get_performance_metrics()
 
 
 # =============================================================================
@@ -241,13 +303,60 @@ async def get_performance_metrics() -> dict:
 
 
 @router.get("/traces")
-async def list_traces() -> dict:
+async def list_traces(
+    limit: int = Query(100, ge=1, le=1000, description="Maximum traces to return"),
+    offset: int = Query(0, ge=0, description="Number of traces to skip"),
+) -> dict:
     """List execution traces.
 
-    Returns available traces with metadata.
+    A trace is a collection of related events identified by correlation_id.
+    Each trace represents a complete execution flow.
+
+    Returns:
+        List of traces with metadata
     """
-    # TODO: Implement in Phase 4
-    raise HTTPException(status_code=501, detail="Not implemented yet - Phase 4")
+    service = get_query_service()
+
+    # Get recent events
+    all_events = await service.get_recent_events(limit=10000, offset=0)
+
+    # Group events by correlation_id to form traces
+    traces_dict: Dict[str, List[Event]] = {}
+
+    for event in all_events:
+        trace_id = event.session_id  # Use session_id as trace identifier
+        if trace_id not in traces_dict:
+            traces_dict[trace_id] = []
+        traces_dict[trace_id].append(event)
+
+    # Build trace metadata
+    traces = []
+    for trace_id, events in sorted(
+        traces_dict.items(),
+        key=lambda x: max(x[1], key=lambda e: e.timestamp),
+        reverse=True,
+    ):
+        first_event = min(events, key=lambda e: e.timestamp)
+        last_event = max(events, key=lambda e: e.timestamp)
+
+        traces.append({
+            "trace_id": trace_id,
+            "event_count": len(events),
+            "start_time": first_event.timestamp.isoformat(),
+            "end_time": last_event.timestamp.isoformat(),
+            "duration_seconds": (last_event.timestamp - first_event.timestamp).total_seconds(),
+            "has_errors": any(e.severity == "error" for e in events),
+        })
+
+    # Apply pagination
+    paginated_traces = traces[offset:offset + limit]
+
+    return {
+        "traces": paginated_traces,
+        "total": len(traces),
+        "limit": limit,
+        "offset": offset,
+    }
 
 
 @router.get("/traces/{trace_id}")
@@ -255,13 +364,61 @@ async def get_trace_details(trace_id: str) -> dict:
     """Get detailed execution trace.
 
     Args:
-        trace_id: Trace ID
+        trace_id: Trace ID (correlation_id or session_id)
 
     Returns:
-        Execution trace with spans
+        Execution trace with spans (events)
     """
-    # TODO: Implement in Phase 4
-    raise HTTPException(status_code=501, detail="Not implemented yet - Phase 4")
+    service = get_query_service()
+
+    # Get events for this trace
+    events = await service.get_recent_events(
+        session_id=trace_id,
+        limit=10000,
+    )
+
+    if not events:
+        raise HTTPException(status_code=404, detail=f"Trace {trace_id} not found")
+
+    # Sort events by timestamp
+    sorted_events = sorted(events, key=lambda e: e.timestamp)
+
+    # Calculate trace statistics
+    tool_calls = [e for e in sorted_events if e.event_type and "tool" in e.event_type.lower()]
+    errors = [e for e in sorted_events if e.severity == "error"]
+
+    # Build span tree (simplified - just list events in order)
+    spans = []
+    for event in sorted_events:
+        span = {
+            "span_id": str(event.id),
+            "parent_span_id": None,  # Could be derived from event hierarchy
+            "operation": event.event_type or "unknown",
+            "start_time": event.timestamp.isoformat(),
+            "duration_ms": None,  # Could be calculated from paired events
+            "status": "error" if event.severity == "error" else "success",
+            "tags": {
+                "severity": event.severity,
+                "tool_name": event.tool_name,
+            },
+            "data": event.data,
+        }
+        spans.append(span)
+
+    return {
+        "trace_id": trace_id,
+        "spans": spans,
+        "span_count": len(spans),
+        "tool_calls": len(tool_calls),
+        "errors": len(errors),
+        "start_time": sorted_events[0].timestamp.isoformat() if sorted_events else None,
+        "end_time": sorted_events[-1].timestamp.isoformat() if sorted_events else None,
+        "duration_seconds": (
+            (sorted_events[-1].timestamp - sorted_events[0].timestamp).total_seconds()
+            if len(sorted_events) >= 2
+            else 0
+        ),
+    }
 
 
 # =============================================================================
@@ -271,18 +428,57 @@ async def get_trace_details(trace_id: str) -> dict:
 
 @router.get("/export/events")
 async def export_events(
-    format: str = Query("json", description="Export format (json, csv)"),
-) -> dict:
+    format: str = Query("json", description="Export format (json, csv, jsonl)"),
+    start_time: Optional[str] = Query(None, description="Start time (ISO format)"),
+    end_time: Optional[str] = Query(None, description="End time (ISO format)"),
+    topic_pattern: Optional[str] = Query(None, description="Topic pattern filter"),
+) -> StreamingResponse:
     """Export events data.
 
     Args:
-        format: Export format
+        format: Export format (json, csv, jsonl)
+        start_time: Start time filter
+        end_time: End time filter
+        topic_pattern: Topic pattern filter
 
     Returns:
-        Exported data file
+        Streaming response with exported data
     """
-    # TODO: Implement in Phase 5 with ExportService
-    raise HTTPException(status_code=501, detail="Not implemented yet - Phase 5")
+    # Parse time filters
+    start_dt = datetime.fromisoformat(start_time) if start_time else None
+    end_dt = datetime.fromisoformat(end_time) if end_time else None
+
+    service = get_export_service()
+
+    # Determine media type
+    media_types = {
+        "json": "application/json",
+        "csv": "text/csv",
+        "jsonl": "application/jsonl",
+    }
+    media_type = media_types.get(format, "application/json")
+
+    # Create filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"victor_events_{timestamp}.{format}"
+
+    # Stream export
+    async def event_stream():
+        async for chunk in service.export_events(
+            format=format,
+            start_time=start_dt,
+            end_time=end_dt,
+            topic_pattern=topic_pattern,
+        ):
+            yield chunk
+
+    return StreamingResponse(
+        event_stream(),
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+        },
+    )
 
 
 # =============================================================================
