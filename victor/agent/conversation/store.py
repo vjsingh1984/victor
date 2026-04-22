@@ -171,7 +171,7 @@ class ConversationStore:
     """
 
     # Schema version for migration tracking (semver format: major.minor.patch)
-    SCHEMA_VERSION = "0.2.0"  # Aligned with Victor 0.2.0 release
+    SCHEMA_VERSION = "0.3.0"  # Aligned with migration 0.3.0 (normalized schema)
 
     def __init__(
         self,
@@ -313,15 +313,17 @@ class ConversationStore:
             CREATE TABLE IF NOT EXISTS model_families (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
-                description TEXT
+                provider_id INTEGER
             );
 
             -- Model size lookup (tiny, small, medium, large, xlarge, xxlarge)
             CREATE TABLE IF NOT EXISTS model_sizes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
-                min_params_b REAL,
-                max_params_b REAL
+                family_id INTEGER,
+                num_parameters INTEGER,
+                FOREIGN KEY (family_id) REFERENCES model_families(id)
+                    ON DELETE SET NULL
             );
 
             -- Context size lookup (small, medium, large, xlarge)
@@ -620,36 +622,36 @@ class ConversationStore:
         """Populate lookup tables with predefined enum values."""
         # Model families
         families = [
-            ("llama", "Meta Llama models"),
-            ("qwen", "Alibaba Qwen models"),
-            ("mistral", "Mistral AI dense models"),
-            ("mixtral", "Mistral AI MoE models"),
-            ("claude", "Anthropic Claude models"),
-            ("gpt", "OpenAI GPT models"),
-            ("gemini", "Google Gemini models"),
-            ("deepseek", "DeepSeek models"),
-            ("phi", "Microsoft Phi models"),
-            ("codellama", "Meta Code Llama models"),
-            ("command", "Cohere Command models"),
-            ("grok", "xAI Grok models"),
-            ("unknown", "Unknown model family"),
+            ("llama", None),  # provider_id will be set later
+            ("qwen", None),
+            ("mistral", None),
+            ("mixtral", None),
+            ("claude", None),
+            ("gpt", None),
+            ("gemini", None),
+            ("deepseek", None),
+            ("phi", None),
+            ("codellama", None),
+            ("command", None),
+            ("grok", None),
+            ("unknown", None),
         ]
         conn.executemany(
-            "INSERT OR IGNORE INTO model_families (name, description) VALUES (?, ?)",
+            "INSERT OR IGNORE INTO model_families (name, provider_id) VALUES (?, ?)",
             families,
         )
 
-        # Model sizes with parameter ranges
+        # Model sizes with parameter ranges (using midpoint as num_parameters)
         sizes = [
-            ("tiny", 0, 1),  # <1B
-            ("small", 1, 8),  # 1-8B
-            ("medium", 8, 32),  # 8-32B
-            ("large", 32, 70),  # 32-70B
-            ("xlarge", 70, 175),  # 70-175B
-            ("xxlarge", 175, 999999),  # >175B
+            ("tiny", None, 0),  # <1B (use midpoint, family_id NULL)
+            ("small", None, 4),  # 1-8B (midpoint: 4B)
+            ("medium", None, 20),  # 8-32B (midpoint: 20B)
+            ("large", None, 51),  # 32-70B (midpoint: 51B)
+            ("xlarge", None, 122),  # 70-175B (midpoint: 122B)
+            ("xxlarge", None, 175),  # >175B (minimum)
         ]
         conn.executemany(
-            "INSERT OR IGNORE INTO model_sizes (name, min_params_b, max_params_b) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO model_sizes (name, family_id, num_parameters) VALUES (?, ?, ?)",
             sizes,
         )
 

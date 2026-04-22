@@ -148,7 +148,7 @@ class TestNudgePolicy:
         assert decision.nudge_type == NudgeType.DIFFERENT_TOOLS
         assert decision.should_inject is True
         assert "blocked" in decision.message.lower()
-        assert decision.role == "system"
+        assert decision.role == "user"
 
     def test_code_search_nudge_on_read_only(self):
         policy = NudgePolicy()
@@ -175,7 +175,7 @@ class TestNudgePolicy:
         assert decision.nudge_type == NudgeType.BUDGET_WARNING
         assert decision.should_inject is True
         assert "remaining" in decision.message
-        assert decision.role == "system"
+        assert decision.role == "user"
 
     def test_no_budget_warning_before_halfway(self):
         policy = NudgePolicy()

@@ -300,6 +300,9 @@ class TestProtocolImplementation:
                 if model:
                     self.current.model_name = model
 
+            async def switch_model(self, model):
+                self.current.model_name = model
+
             def get_current_provider_info(self):
                 return self.current
 
@@ -326,6 +329,9 @@ class TestProtocolImplementation:
 
             def get_rate_limit_wait_time(self, error):
                 return 1.0
+
+            def get_rate_limit_stats(self):
+                return {"rate_limits_hit": 0}
 
             def is_healthy(self):
                 return self.current is not None
@@ -382,6 +388,46 @@ class TestProtocolImplementation:
 
             def can_retry(self, error, attempt_count):
                 return attempt_count < 3
+
+            def should_attempt_recovery(self, error_type, consecutive_failures=0):
+                return error_type != "auth" and consecutive_failures < 3
+
+            async def handle_recovery_with_integration(
+                self,
+                ctx,
+                full_content,
+                tool_calls,
+                mentioned_tools=None,
+                message_adder=None,
+            ):
+                return type("MockRecoveryAction", (), {"action": "continue"})()
+
+            def apply_recovery_action(self, recovery_action, ctx, message_adder=None):
+                return None
+
+            def check_natural_completion(self, ctx, has_tool_calls, content_length):
+                return None
+
+            def handle_empty_response(self, ctx):
+                return None, False
+
+            def get_recovery_fallback_message(self, ctx):
+                return "fallback"
+
+            def check_tool_budget(self, ctx, warning_threshold=250):
+                return None
+
+            def truncate_tool_calls(self, ctx, tool_calls, max_calls):
+                return tool_calls[:max_calls], len(tool_calls) > max_calls
+
+            def filter_blocked_tool_calls(self, ctx, tool_calls):
+                return tool_calls, [], 0
+
+            def check_blocked_threshold(self, ctx, all_blocked):
+                return None
+
+            def check_force_action(self, ctx):
+                return False, None
 
             def get_recovery_metrics(self):
                 return self.metrics.copy()

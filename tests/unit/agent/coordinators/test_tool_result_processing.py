@@ -229,7 +229,10 @@ class TestProcessToolResults:
         # Second "not found" for same tool should be deduped
         assert ctx.console.print.call_count == 1
 
-    def test_safe_default_pruning_runs_on_formatted_read_output(self):
+    def test_safe_default_pruning_marks_preview_but_llm_gets_full_output(self):
+        # Pruning is detected for user preview (was_pruned=True) but LLM always receives
+        # the full output for accuracy. The [PRUNED FOR LLM:] marker no longer appears
+        # in content — that was the old accuracy-compromising behavior.
         coord = self._make_coordinator()
         formatted = "\n".join(
             [
@@ -269,7 +272,9 @@ class TestProcessToolResults:
 
         assert results[0]["was_pruned"] is True
         assert results[0]["result"] == formatted
-        assert "[PRUNED FOR LLM:" in results[0]["content"]
+        # LLM always receives the full output — accuracy-first architecture
+        assert results[0]["content"] == formatted
+        assert "[PRUNED FOR LLM:" not in results[0]["content"]
         added_content = ctx.add_message.call_args.args[1]
         assert added_content == results[0]["content"]
         assert results[0]["pruning_info"].recovery_hint.startswith("Use read(")

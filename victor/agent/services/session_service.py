@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     pass
 
 logger = logging.getLogger(__name__)
+_UNSET = object()
 
 
 class SessionInfoImpl:
@@ -105,6 +106,27 @@ class SessionService:
         Called by component_assembler after lifecycle_manager creation.
         """
         self._lifecycle_manager = lifecycle_manager
+
+    def bind_runtime_components(
+        self,
+        *,
+        lifecycle_manager: Optional[Any] = _UNSET,
+        memory_manager: Optional[Any] = _UNSET,
+        checkpoint_manager: Optional[Any] = _UNSET,
+        cost_tracker: Optional[Any] = _UNSET,
+        memory_session_id: Optional[str] = _UNSET,
+    ) -> None:
+        """Bind live runtime collaborators after bootstrap."""
+        if lifecycle_manager is not _UNSET:
+            self._lifecycle_manager = lifecycle_manager
+        if memory_manager is not _UNSET:
+            self._memory_manager = memory_manager
+        if checkpoint_manager is not _UNSET:
+            self._checkpoint_manager = checkpoint_manager
+        if cost_tracker is not _UNSET:
+            self._cost_tracker = cost_tracker
+        if memory_session_id is not _UNSET:
+            self._memory_session_id = memory_session_id
 
     async def create_session(
         self,
@@ -292,13 +314,23 @@ class SessionService:
 
     def get_session_stats(self) -> Dict[str, Any]:
         """Get comprehensive session statistics."""
-        return {
+        base_stats: Dict[str, Any] = {
             "enabled": bool(self._memory_manager),
             "session_id": self.get_current_session_id(),
             "memory_session_id": self._memory_session_id,
             "tool_calls_used": self._session_state.tool_calls_used,
             "token_usage": self._session_state.get_token_usage(),
         }
+
+        if self._memory_manager and self._memory_session_id:
+            try:
+                memory_stats = self._memory_manager.get_session_stats(self._memory_session_id)
+                if memory_stats:
+                    base_stats.update(memory_stats)
+            except Exception as e:
+                self._logger.warning(f"Failed to get memory stats: {e}")
+
+        return base_stats
 
     def _get_checkpoint_state(self) -> Dict[str, Any]:
         """Build state dict for checkpointing."""
@@ -1053,6 +1085,7 @@ class SessionService:
                     "project_path": getattr(s, "project_path", None),
                     "provider": getattr(s, "provider", None),
                     "model": getattr(s, "model", None),
+                    "message_count": len(s.messages) if hasattr(s, "messages") else 0,
                 }
                 for s in sessions
             ]

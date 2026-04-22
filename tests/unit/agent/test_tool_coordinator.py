@@ -156,6 +156,15 @@ class TestToolCoordinator:
         coordinator.consume_budget(10)
         assert coordinator.get_remaining_budget() == 15
 
+    def test_get_enabled_tools_delegates_to_bound_tool_service(self, coordinator):
+        """Bound coordinators should delegate enabled-tool queries to ToolService."""
+        service = MagicMock()
+        service.get_enabled_tools.return_value = {"read", "grep"}
+        coordinator.bind_tool_service(service)
+
+        assert coordinator.get_enabled_tools() == {"read", "grep"}
+        service.get_enabled_tools.assert_called_once_with()
+
     def test_consume_budget(self, coordinator):
         """Test budget consumption."""
         coordinator.consume_budget(5)
@@ -163,6 +172,18 @@ class TestToolCoordinator:
 
         coordinator.consume_budget(3)
         assert coordinator.budget_used == 8
+
+    @pytest.mark.asyncio
+    async def test_execute_tool_with_retry_delegates_to_bound_tool_service(self, coordinator):
+        """Bound coordinators should delegate retry execution to ToolService."""
+        service = MagicMock()
+        service.execute_tool_with_retry = AsyncMock(return_value=("result", True, None))
+        coordinator.bind_tool_service(service)
+
+        result = await coordinator.execute_tool_with_retry("read", {"path": "a.py"}, {})
+
+        assert result == ("result", True, None)
+        service.execute_tool_with_retry.assert_awaited_once()
 
     def test_reset_budget(self, coordinator):
         """Test budget reset."""

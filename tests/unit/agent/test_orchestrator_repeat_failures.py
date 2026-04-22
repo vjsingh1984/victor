@@ -86,12 +86,15 @@ async def test_repeated_failing_call_is_skipped_after_first_failure(monkeypatch,
 
     # Inject a mock _tool_service so is_tool_enabled can be configured.
     # bootstrap_new_services was patched out, so _tool_service is None on fresh orchestrators.
+    # process_tool_results uses the real function to properly populate executed_tools.
     from unittest.mock import MagicMock
+    from victor.agent.services.tool_service import process_tool_results_with_context
 
     mock_tool_svc = MagicMock()
     orch._tool_service = mock_tool_svc
     enabled_names = {"always_fail"} | {t.name for t in orch.tools.list_tools()}
     mock_tool_svc.is_tool_enabled = lambda name: name in enabled_names
+    mock_tool_svc.process_tool_results = process_tool_results_with_context
 
     # Simulate a single tool call repeated twice
     tool_calls = [

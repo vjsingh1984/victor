@@ -2,7 +2,7 @@
 
 import asyncio
 import threading
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -108,3 +108,26 @@ class TestCreateBackgroundTask:
         await asyncio.sleep(0)
         assert len(task_state["tasks"]) == 0
         assert sorted(results) == [0, 1, 2, 3, 4]
+
+
+class TestSessionCoordinatorServiceShim:
+    def test_recover_session_delegates_to_bound_service(self):
+        coordinator = SessionCoordinator(session_state_manager=MagicMock())
+        service = MagicMock()
+        service.recover_session.return_value = True
+        coordinator.bind_session_service(service)
+
+        assert coordinator.recover_session("session-123") is True
+        service.recover_session.assert_called_once_with("session-123")
+
+    @pytest.mark.asyncio
+    async def test_save_checkpoint_delegates_to_bound_service(self):
+        coordinator = SessionCoordinator(session_state_manager=MagicMock())
+        service = MagicMock()
+        service.save_checkpoint = AsyncMock(return_value="ckpt-123")
+        coordinator.bind_session_service(service)
+
+        result = await coordinator.save_checkpoint("before", ["manual"])
+
+        assert result == "ckpt-123"
+        service.save_checkpoint.assert_awaited_once_with("before", ["manual"])

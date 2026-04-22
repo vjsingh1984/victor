@@ -1052,7 +1052,7 @@ class ChatService:
             recovery_context.state.update(context)
 
         # Check if recovery is possible
-        should_recover = await self._recovery_service.should_attempt_recovery(
+        should_recover = self._recovery.should_attempt_recovery(
             recovery_context.error_type,
             consecutive_failures=0,
         )
@@ -1459,7 +1459,10 @@ class ChatService:
         if self._recovery:
             try:
                 # Try to recover using recovery service
-                recovered = self._recovery.should_attempt_recovery(error)
+                recovered = self._recovery.should_attempt_recovery(
+                    type(error).__name__,
+                    consecutive_failures=0,
+                )
                 if recovered:
                     return {
                         "handled": True,

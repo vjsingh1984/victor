@@ -88,6 +88,7 @@ class ProviderService:
         """
         self._registry = registry
         self._health_checker = health_checker
+        self._provider_manager: Optional[Any] = None
         self._current_provider: Optional["BaseProvider"] = None
         self._current_info: Optional[ProviderInfoImpl] = None
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
@@ -102,6 +103,16 @@ class ProviderService:
         }
         self._post_switch_hooks: List[callable] = []
 
+    def bind_runtime_components(
+        self,
+        *,
+        provider_manager: Optional[Any] = None,
+    ) -> None:
+        """Bind live runtime collaborators after bootstrap."""
+        if provider_manager is not None:
+            self._provider_manager = provider_manager
+            self._sync_from_provider_manager()
+
     async def switch_provider(
         self,
         provider: str,
@@ -115,6 +126,14 @@ class ProviderService:
             model: Optional model name
             validate: If True, validate provider before switching
         """
+        if self._provider_manager is not None and hasattr(self._provider_manager, "switch_provider"):
+            switched = await self._provider_manager.switch_provider(provider, model)
+            if not switched:
+                raise ValueError(f"Provider switch failed: {provider}")
+            self._sync_from_provider_manager()
+            self._notify_post_switch_hooks(provider, model)
+            return
+
         self._logger.info(f"Switching to provider: {provider}")
 
         # Get provider from registry
@@ -145,12 +164,30 @@ class ProviderService:
 
         self._logger.info(f"Switched to provider: {provider} (switch #{self._switch_count})")
 
+    async def switch_model(self, model: str) -> None:
+        """Switch models on the current provider."""
+        if self._provider_manager is not None and hasattr(self._provider_manager, "switch_model"):
+            switched = await self._provider_manager.switch_model(model)
+            if not switched:
+                raise ValueError(f"Model switch failed: {model}")
+            self._sync_from_provider_manager()
+            self._notify_post_switch_hooks(self.provider_name, model)
+            return
+
+        if self.provider_name in {"", "none"}:
+            raise ValueError("No provider is currently configured")
+
+        await self.switch_provider(self.provider_name, model)
+
     def get_current_provider_info(self) -> ProviderInfoImpl:
         """Get current provider information.
 
         Returns:
             ProviderInfo with current provider details
         """
+        if self._provider_manager is not None:
+            self._sync_from_provider_manager()
+
         if self._current_info is None:
             # Create info for current provider
             if self._current_provider:
@@ -200,14 +237,22 @@ class ProviderService:
 
     async def start_health_monitoring(self) -> None:
         """Start background health monitoring."""
-        if hasattr(self._registry, "start_health_monitoring"):
+        if self._provider_manager is not None and hasattr(
+            self._provider_manager, "start_health_monitoring"
+        ):
+            await self._provider_manager.start_health_monitoring()
+        elif hasattr(self._registry, "start_health_monitoring"):
             await self._registry.start_health_monitoring()
         elif self._health_checker and hasattr(self._health_checker, "start_monitoring"):
             await self._health_checker.start_monitoring()
 
     async def stop_health_monitoring(self) -> None:
         """Stop background health monitoring."""
-        if hasattr(self._registry, "stop_health_monitoring"):
+        if self._provider_manager is not None and hasattr(
+            self._provider_manager, "stop_health_monitoring"
+        ):
+            await self._provider_manager.stop_health_monitoring()
+        elif hasattr(self._registry, "stop_health_monitoring"):
             await self._registry.stop_health_monitoring()
         elif self._health_checker and hasattr(self._health_checker, "stop_monitoring"):
             await self._health_checker.stop_monitoring()
@@ -256,6 +301,9 @@ class ProviderService:
         Raises:
             ValueError: If no provider is configured
         """
+        if self._provider_manager is not None:
+            self._sync_from_provider_manager()
+
         if self._current_provider is None:
             raise ValueError("No provider is currently configured")
 
@@ -347,6 +395,8 @@ class ProviderService:
         Returns:
             True if the service is healthy
         """
+        if self._provider_manager is not None:
+            return getattr(self._provider_manager, "provider", None) is not None
         return self._current_provider is not None
 
     # ==========================================================================
@@ -367,6 +417,8 @@ class ProviderService:
             if provider:
                 print(f"Using: {provider.name}")
         """
+        if self._provider_manager is not None:
+            return getattr(self._provider_manager, "provider", None)
         return self._current_provider
 
     @property
@@ -382,6 +434,8 @@ class ProviderService:
             model = service.model
             print(f"Using model: {model}")
         """
+        if self._provider_manager is not None:
+            return getattr(self._provider_manager, "model", "none")
         info = self.get_current_provider_info()
         return info.model_name if info else "none"
 
@@ -398,6 +452,8 @@ class ProviderService:
             name = service.provider_name
             print(f"Using provider: {name}")
         """
+        if self._provider_manager is not None:
+            return getattr(self._provider_manager, "provider_name", "none")
         info = self.get_current_provider_info()
         return info.provider_name if info else "none"
 
@@ -415,6 +471,8 @@ class ProviderService:
             if adapter:
                 tool_calls = adapter.parse_tool_calls(response)
         """
+        if self._provider_manager is not None:
+            return getattr(self._provider_manager, "tool_adapter", None)
         if self._current_provider is None:
             return None
 
@@ -436,6 +494,20 @@ class ProviderService:
             print(f"Streaming: {caps['streaming']}")
             print(f"Max tokens: {caps['max_tokens']}")
         """
+        if self._provider_manager is not None:
+            capabilities = getattr(self._provider_manager, "capabilities", None)
+            if capabilities is None:
+                return {
+                    "streaming": False,
+                    "tools": False,
+                    "max_tokens": 0,
+                }
+            return {
+                "streaming": getattr(capabilities, "streaming_tool_calls", False),
+                "tools": getattr(capabilities, "native_tool_calls", False),
+                "max_tokens": getattr(self.provider, "max_tokens", 0) if self.provider else 0,
+            }
+
         # Use cached info if available, otherwise get from provider
         if self._current_info:
             info = self._current_info
@@ -467,6 +539,8 @@ class ProviderService:
             count = service.switch_count
             print(f"Provider switched {count} times")
         """
+        if self._provider_manager is not None:
+            return getattr(self._provider_manager, "switch_count", 0)
         return self._switch_count
 
     def track_rate_limit(self, provider_name: str, wait_time: float) -> None:
@@ -548,6 +622,23 @@ class ProviderService:
                 hook(provider_name, model)
             except Exception as e:
                 self._logger.warning(f"Post-switch hook failed: {e}")
+
+    def _sync_from_provider_manager(self) -> None:
+        """Refresh cached provider info from the live provider manager."""
+        manager = self._provider_manager
+        if manager is None:
+            return
+
+        provider = getattr(manager, "provider", None)
+        self._current_provider = provider
+        if provider is None:
+            self._current_info = None
+            return
+
+        info = self._create_provider_info(provider)
+        info.provider_name = getattr(manager, "provider_name", info.provider_name)
+        info.model_name = getattr(manager, "model", info.model_name)
+        self._current_info = info
 
     def _create_provider_info(self, provider: "BaseProvider") -> ProviderInfoImpl:
         """Create provider info from provider instance.

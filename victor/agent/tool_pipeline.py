@@ -1223,12 +1223,17 @@ class ToolPipeline:
                 )
             else:
                 call_result = await self._execute_single_call(tool_call, context)
-            # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec
-            # Generate deterministic ID if not provided
-            if tc_id is None:
+            # Propagate tool_call_id from provider's tool_calls[].id per OpenAI spec.
+            # Only auto-generate an ID for executed calls — internally-skipped calls
+            # without a provider ID have no corresponding tool_call entry, so they
+            # must NOT get an ID (process_tool_results would otherwise emit a spurious
+            # tool response for them, double-counting executed_tools).
+            if tc_id is not None:
+                call_result.tool_call_id = tc_id
+            elif not call_result.skipped:
                 tool_name = tool_call.get("name", "unknown") if isinstance(tool_call, dict) else "unknown"
                 tc_id = self._generate_tool_call_id(tool_name)
-            call_result.tool_call_id = tc_id
+                call_result.tool_call_id = tc_id
             result.results.append(call_result)
 
             # Store result by signature for duplicate resolution (only for dict items)
@@ -1281,10 +1286,14 @@ class ToolPipeline:
                 break
 
         # Add skipped results for duplicates (reuse first occurrence's result)
-        for _original_idx, signature in duplicate_info:
+        for original_idx, signature in duplicate_info:
             if signature in results_by_signature:
                 original_result = results_by_signature[signature]
-                # Create a copy marked as from deduplication
+                # Use the provider-given ID for the duplicate call if available.
+                # If the provider gave no ID, leave it None — process_tool_results
+                # will then skip the entry (no tool_call to respond to per OpenAI spec).
+                dup_call = tool_calls[original_idx] if original_idx < len(tool_calls) else {}
+                dup_tc_id = dup_call.get("id") if isinstance(dup_call, dict) else None
                 dup_result = ToolCallResult(
                     tool_name=original_result.tool_name,
                     arguments=original_result.arguments,
@@ -1295,7 +1304,7 @@ class ToolPipeline:
                     cached=True,  # Mark as effectively cached
                     skipped=True,
                     skip_reason="Deduplicated (duplicate call in batch)",
-                    tool_call_id=self._generate_tool_call_id(original_result.tool_name),
+                    tool_call_id=dup_tc_id,
                 )
                 result.results.append(dup_result)
                 result.skipped_calls += 1

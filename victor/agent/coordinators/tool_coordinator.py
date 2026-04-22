@@ -265,6 +265,7 @@ class ToolCoordinator:
         # Tool access dependencies (injected after init)
         self._mode_controller: Optional[Any] = None
         self._tool_planner: Optional[Any] = None
+        self._tool_service: Optional[Any] = None
 
         # Known tool names for hallucination pre-filtering
         self._known_tool_names: Optional[Set[str]] = None
@@ -281,16 +282,25 @@ class ToolCoordinator:
     @property
     def budget(self) -> int:
         """Get the total tool budget."""
+        if self._tool_service is not None and hasattr(self._tool_service, "get_tool_budget"):
+            return self._tool_service.get_tool_budget()
         return self._total_budget
 
     @budget.setter
     def budget(self, value: int) -> None:
         """Set the total tool budget."""
+        if self._tool_service is not None and hasattr(self._tool_service, "set_tool_budget"):
+            self._tool_service.set_tool_budget(value)
+            return
         self._total_budget = max(0, value)
 
     @property
     def budget_used(self) -> int:
         """Get the number of budget units used."""
+        if self._tool_service is not None and hasattr(self._tool_service, "get_tool_budget"):
+            total_budget = self._tool_service.get_tool_budget()
+            remaining = self._tool_service.get_remaining_budget()
+            return max(0, total_budget - remaining)
         return self._budget_used
 
     @property
@@ -304,6 +314,8 @@ class ToolCoordinator:
         Returns:
             Number of tool calls remaining
         """
+        if self._tool_service is not None and hasattr(self._tool_service, "get_remaining_budget"):
+            return self._tool_service.get_remaining_budget()
         if self._budget_manager:
             return self._budget_manager.get_remaining_tool_calls()
         return self._budget_controller.get_remaining()
@@ -314,6 +326,9 @@ class ToolCoordinator:
         Args:
             amount: Number of budget units to consume
         """
+        if self._tool_service is not None and hasattr(self._tool_service, "consume_budget"):
+            self._tool_service.consume_budget(amount)
+            return
         self._budget_used += amount
         self._budget_controller.consume("_coordinator", amount)
 
@@ -335,6 +350,12 @@ class ToolCoordinator:
         Args:
             new_budget: New budget to set, or use default
         """
+        if self._tool_service is not None:
+            if new_budget is not None and hasattr(self._tool_service, "set_tool_budget"):
+                self._tool_service.set_tool_budget(new_budget)
+            elif hasattr(self._tool_service, "reset_tool_budget"):
+                self._tool_service.reset_tool_budget()
+            return
         self._budget_used = 0
         if new_budget is not None:
             self._total_budget = new_budget
@@ -453,6 +474,9 @@ class ToolCoordinator:
         Returns:
             Set of enabled tool names for this session
         """
+        if self._tool_service is not None:
+            return self._tool_service.get_enabled_tools()
+
         # Use ToolAccessController if available
         if self._tool_access_controller:
             context = self._build_tool_access_context()
@@ -486,6 +510,9 @@ class ToolCoordinator:
         Args:
             tools: Set of tool names to enable
         """
+        if self._tool_service is not None:
+            self._tool_service.set_enabled_tools(tools)
+            return
         self._enabled_tools = tools
 
         # Propagate to tool_selector if available
@@ -502,6 +529,9 @@ class ToolCoordinator:
         Returns:
             True if tool is enabled
         """
+        if self._tool_service is not None:
+            return self._tool_service.is_tool_enabled(tool_name)
+
         # Use ToolAccessController if available
         if self._tool_access_controller:
             context = self._build_tool_access_context()
@@ -527,6 +557,8 @@ class ToolCoordinator:
         Returns:
             Set of tool names available in registry
         """
+        if self._tool_service is not None:
+            return self._tool_service.get_available_tools()
         if self._registry:
             tool_names: Set[str] = set()
             for tool in self._registry.list_tools():
@@ -545,6 +577,11 @@ class ToolCoordinator:
         Returns:
             ToolAccessContext with session tools and current mode
         """
+        if self._tool_service is not None and hasattr(
+            self._tool_service, "build_tool_access_context"
+        ):
+            return self._tool_service.build_tool_access_context()
+
         from victor.agent.protocols import ToolAccessContext
 
         return ToolAccessContext(
@@ -567,6 +604,9 @@ class ToolCoordinator:
         Returns:
             Canonical tool name
         """
+        if self._tool_service is not None:
+            return self._tool_service.resolve_tool_alias(tool_name)
+
         from victor.tools.tool_names import get_canonical_name
 
         canonical = get_canonical_name(tool_name)
@@ -753,6 +793,16 @@ class ToolCoordinator:
         retry_config: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Optional[Any], bool, Optional[str]]:
         """Execute a tool with retry logic and exponential backoff."""
+        if self._tool_service is not None:
+            return await self._tool_service.execute_tool_with_retry(
+                tool_name=tool_name,
+                tool_args=tool_args,
+                context=context,
+                tool_executor=tool_executor,
+                cache=cache,
+                on_success=on_success,
+                retry_config=retry_config,
+            )
         return await self._retry_executor.execute_tool_with_retry(
             tool_name=tool_name,
             tool_args=tool_args,
@@ -805,6 +855,13 @@ class ToolCoordinator:
         tool_adapter: Any,
     ) -> Tuple[Optional[List[Dict[str, Any]]], str]:
         """Parse, validate, normalize, and filter tool calls from provider response."""
+        if self._tool_service is not None:
+            return self._tool_service.parse_and_validate_tool_calls(
+                tool_calls,
+                full_content,
+                tool_adapter,
+            )
+
         # Use unified adapter-based tool call parsing with fallbacks
         if not tool_calls and full_content:
             logger.debug(
@@ -937,6 +994,8 @@ class ToolCoordinator:
 
     def get_tool_usage_stats(self) -> Dict[str, Any]:
         """Get comprehensive tool usage statistics."""
+        if self._tool_service is not None:
+            return self._tool_service.get_tool_usage_stats()
         return self._observability.get_tool_usage_stats()
 
     # =====================================================================
@@ -1151,10 +1210,20 @@ class ToolCoordinator:
         Returns:
             List of result dicts suitable for the agentic loop.
         """
+        if self._tool_service is not None:
+            logger.debug(
+                "ToolCoordinator.process_tool_results is deprecated; delegating to bound ToolService"
+            )
+            return self._tool_service.process_tool_results(pipeline_result, ctx)
+
         logger.debug(
             "ToolCoordinator.process_tool_results is deprecated; delegating to ToolService"
         )
         return process_tool_results_with_context(pipeline_result, ctx)
+
+    def bind_tool_service(self, tool_service: Any) -> None:
+        """Bind the canonical tool service for service-first delegation."""
+        self._tool_service = tool_service
 
 
 @dataclass

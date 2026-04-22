@@ -310,8 +310,11 @@ class TestChatServiceContextMethods:
         error = Exception("Test error")
         result = service.handle_chat_error(error, {"context": "info"})
 
-        # Verify recovery was attempted
-        recovery.should_attempt_recovery.assert_called_once_with(error)
+        # Verify recovery was attempted with error type name (string) and consecutive_failures kwarg
+        recovery.should_attempt_recovery.assert_called_once_with(
+            "Exception",
+            consecutive_failures=0,
+        )
         assert result["handled"] is True
         assert result["action"] == "retry"
         assert "message" in result

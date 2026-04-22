@@ -170,62 +170,24 @@ def apply_migration_0_3_0(db_path: str) -> bool:
     try:
         cursor = conn.cursor()
 
-        # Check current messages table schema
-        cursor.execute("PRAGMA table_info(messages)")
-        columns = {col[1]: col[2] for col in cursor.fetchall()}
+        # Migrate messages table
+        messages_migrated = _migrate_messages_table(cursor)
 
-        logger.debug(f"Current messages table columns: {list(columns.keys())}")
+        # Migrate model_families table
+        model_families_migrated = _migrate_model_families_table(cursor)
 
-        # Define target schema
-        required_columns = {
-            "id": "TEXT",
-            "session_id": "TEXT",
-            "role": "TEXT",
-            "content": "TEXT",
-            "timestamp": "TIMESTAMP",
-            "token_count": "INTEGER",
-            "priority": "INTEGER",
-            "tool_name": "TEXT",
-            "tool_call_id": "TEXT",
-            "metadata": "TEXT",
-        }
+        # Migrate model_sizes table
+        model_sizes_migrated = _migrate_model_sizes_table(cursor)
 
-        # Check if we're already at the target schema
-        has_all_columns = all(col in columns for col in required_columns.keys())
-        if has_all_columns:
-            logger.info("Messages table schema is already up-to-date")
-            return False
+        # Migrate context_sizes table
+        context_sizes_migrated = _migrate_context_sizes_table(cursor)
 
-        # Check if we need a full table recreation (schema is too different)
-        needs_recreation = (
-            "id" in columns and columns["id"] == "INTEGER"  # Wrong type
-            or "created_at" in columns  # Old column name
-            or "tool_calls" in columns  # Old column name
-        )
-
-        if needs_recreation:
-            logger.info("Performing full table recreation for schema migration")
-            _recreate_messages_table(cursor, columns)
+        # Commit if any migration was applied
+        if messages_migrated or model_families_migrated or model_sizes_migrated or context_sizes_migrated:
             conn.commit()
-            logger.info("Successfully migrated messages table via recreation")
             return True
-        else:
-            # Just add missing columns
-            logger.info("Adding missing columns to messages table")
-            missing_cols = [
-                (col_name, col_type)
-                for col_name, col_type in required_columns.items()
-                if col_name not in columns
-            ]
-            for col_name, col_type in missing_cols:
-                try:
-                    cursor.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_type}")
-                    logger.debug(f"Added column {col_name}")
-                except Exception as e:
-                    logger.warning(f"Failed to add column {col_name}: {e}")
-            conn.commit()
-            logger.info(f"Added {len(missing_cols)} columns to messages table")
-            return True
+
+        return False
 
     except Exception as e:
         conn.rollback()
@@ -233,6 +195,245 @@ def apply_migration_0_3_0(db_path: str) -> bool:
         raise
     finally:
         conn.close()
+
+
+def _migrate_messages_table(cursor: sqlite3.Cursor) -> bool:
+    """Migrate messages table to add timestamp column.
+
+    Args:
+        cursor: Database cursor
+
+    Returns:
+        True if migration was applied, False if already up-to-date
+    """
+    # Check current messages table schema
+    cursor.execute("PRAGMA table_info(messages)")
+    columns = {col[1]: col[2] for col in cursor.fetchall()}
+
+    if not columns:
+        logger.debug("Messages table does not exist yet, skipping migration")
+        return False
+
+    logger.debug(f"Current messages table columns: {list(columns.keys())}")
+
+    # Define target schema
+    required_columns = {
+        "id": "TEXT",
+        "session_id": "TEXT",
+        "role": "TEXT",
+        "content": "TEXT",
+        "timestamp": "TIMESTAMP",
+        "token_count": "INTEGER",
+        "priority": "INTEGER",
+        "tool_name": "TEXT",
+        "tool_call_id": "TEXT",
+        "metadata": "TEXT",
+    }
+
+    # Check if we're already at the target schema
+    has_all_columns = all(col in columns for col in required_columns.keys())
+    if has_all_columns:
+        logger.info("Messages table schema is already up-to-date")
+        return False
+
+    # Check if we need a full table recreation (schema is too different)
+    needs_recreation = (
+        "id" in columns and columns["id"] == "INTEGER"  # Wrong type
+        or "created_at" in columns  # Old column name
+        or "tool_calls" in columns  # Old column name
+    )
+
+    if needs_recreation:
+        logger.info("Performing full table recreation for schema migration")
+        _recreate_messages_table(cursor, columns)
+        logger.info("Successfully migrated messages table via recreation")
+        return True
+    else:
+        # Just add missing columns
+        logger.info("Adding missing columns to messages table")
+        missing_cols = [
+            (col_name, col_type)
+            for col_name, col_type in required_columns.items()
+            if col_name not in columns
+        ]
+        for col_name, col_type in missing_cols:
+            try:
+                cursor.execute(f"ALTER TABLE messages ADD COLUMN {col_name} {col_type}")
+                logger.debug(f"Added column {col_name}")
+            except Exception as e:
+                logger.warning(f"Failed to add column {col_name}: {e}")
+        logger.info(f"Added {len(missing_cols)} columns to messages table")
+        return True
+
+
+def _migrate_model_sizes_table(cursor: sqlite3.Cursor) -> bool:
+    """Migrate model_sizes table from old schema to new normalized schema.
+
+    Old schema: (id, name, min_params_b, max_params_b)
+    New schema: (id, name, family_id, num_parameters)
+
+    Args:
+        cursor: Database cursor
+
+    Returns:
+        True if migration was applied, False if already up-to-date
+    """
+    # Check current model_sizes table schema
+    cursor.execute("PRAGMA table_info(model_sizes)")
+    columns = {col[1]: col[2] for col in cursor.fetchall()}
+
+    logger.debug(f"Current model_sizes table columns: {list(columns.keys())}")
+
+    # Check if already using new schema
+    if "family_id" in columns and "num_parameters" in columns:
+        logger.info("model_sizes table already using new schema")
+        return False
+
+    # Check if using old schema
+    if "min_params_b" in columns and "max_params_b" in columns:
+        logger.info("Migrating model_sizes table from old schema to new schema")
+
+        # Read existing data
+        cursor.execute("SELECT id, name, min_params_b, max_params_b FROM model_sizes")
+        existing_rows = cursor.fetchall()
+
+        # Rename old table
+        cursor.execute("ALTER TABLE model_sizes RENAME TO model_sizes_old")
+
+        # Create new table with correct schema
+        cursor.execute("""
+            CREATE TABLE model_sizes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                family_id INTEGER,
+                num_parameters INTEGER,
+                FOREIGN KEY (family_id) REFERENCES model_families(id)
+                    ON DELETE SET NULL
+            )
+        """)
+
+        # Migrate data (use midpoint of range as num_parameters)
+        for row_id, name, min_params, max_params in existing_rows:
+            # Calculate midpoint as num_parameters
+            midpoint = int((min_params + max_params) / 2) if min_params is not None else 0
+            cursor.execute(
+                "INSERT INTO model_sizes (id, name, family_id, num_parameters) VALUES (?, ?, ?, ?)",
+                (row_id, name, None, midpoint)
+            )
+
+        # Drop old table
+        cursor.execute("DROP TABLE model_sizes_old")
+
+        logger.info(f"Successfully migrated {len(existing_rows)} rows in model_sizes table")
+        return True
+
+    logger.info("model_sizes table schema is already up-to-date")
+    return False
+
+
+def _migrate_model_families_table(cursor: sqlite3.Cursor) -> bool:
+    """Migrate model_families table from old schema to new normalized schema.
+
+    Old schema: (id, name, description)
+    New schema: (id, name, provider_id)
+
+    Args:
+        cursor: Database cursor
+
+    Returns:
+        True if migration was applied, False if already up-to-date
+    """
+    # Check current model_families table schema
+    cursor.execute("PRAGMA table_info(model_families)")
+    columns = {col[1]: col[2] for col in cursor.fetchall()}
+
+    logger.debug(f"Current model_families table columns: {list(columns.keys())}")
+
+    # Check if already using new schema
+    if "provider_id" in columns:
+        logger.info("model_families table already using new schema")
+        return False
+
+    # Check if using old schema
+    if "description" in columns:
+        logger.info("Migrating model_families table from old schema to new schema")
+
+        # Read existing data
+        cursor.execute("SELECT id, name FROM model_families")
+        existing_rows = cursor.fetchall()
+
+        # Rename old table
+        cursor.execute("ALTER TABLE model_families RENAME TO model_families_old")
+
+        # Create new table with correct schema
+        cursor.execute("""
+            CREATE TABLE model_families (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                provider_id INTEGER,
+                FOREIGN KEY (provider_id) REFERENCES providers(id)
+                    ON DELETE SET NULL
+            )
+        """)
+
+        # Migrate data (provider_id will be NULL for all existing rows)
+        for row_id, name in existing_rows:
+            cursor.execute(
+                "INSERT INTO model_families (id, name, provider_id) VALUES (?, ?, ?)",
+                (row_id, name, None)
+            )
+
+        # Drop old table
+        cursor.execute("DROP TABLE model_families_old")
+
+        logger.info(f"Successfully migrated {len(existing_rows)} rows in model_families table")
+        return True
+
+    logger.info("model_families table schema is already up-to-date")
+    return False
+
+
+def _migrate_context_sizes_table(cursor: sqlite3.Cursor) -> bool:
+    """Migrate context_sizes table to correct lookup table schema.
+
+    Correct schema: (id, name, min_tokens, max_tokens)
+    Wrong schema: (id, session_id, token_count, message_count, created_at)
+
+    Args:
+        cursor: Database cursor
+
+    Returns:
+        True if migration was applied, False if already up-to-date
+    """
+    # Check current context_sizes table schema
+    cursor.execute("PRAGMA table_info(context_sizes)")
+    columns = {col[1]: col[2] for col in cursor.fetchall()}
+
+    logger.debug(f"Current context_sizes table columns: {list(columns.keys())}")
+
+    # Check if already using correct schema
+    if "name" in columns and "min_tokens" in columns and "max_tokens" in columns:
+        logger.info("context_sizes table already using correct schema")
+        return False
+
+    # Wrong schema detected - need to recreate
+    logger.info("Migrating context_sizes table to correct lookup schema")
+
+    # Drop the wrong table (no data to preserve since it's a lookup table)
+    cursor.execute("DROP TABLE IF EXISTS context_sizes")
+
+    # Create correct table
+    cursor.execute("""
+        CREATE TABLE context_sizes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            min_tokens INTEGER,
+            max_tokens INTEGER
+        )
+    """)
+
+    logger.info("Successfully recreated context_sizes table with correct schema")
+    return True
 
 
 def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> None:
@@ -346,19 +547,32 @@ def migrate_database(db_path: str) -> None:
     except Exception as e:
         logger.warning(f"Migration 0.3.0 failed (may already be applied): {e}")
 
-    # Update schema version to 0.3.0
+    # Update schema version to 0.3.0 only for existing databases that already have tables.
+    # Fresh databases get their schema version set by ConversationStore._apply_normalized_schema()
+    # after all tables are created. Inserting the version here on a fresh DB would cause
+    # store.__init__ to skip _apply_normalized_schema and call _load_lookup_caches instead,
+    # failing because model_families doesn't exist yet.
     conn = sqlite3.connect(db_path)
     try:
         ensure_schema_version_table(conn)
 
-        # Check if version 0.3.0 is already recorded
+        # Only record the version if the core tables already exist (existing DB)
         cursor = conn.cursor()
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
+        )
+        if cursor.fetchone() is None:
+            # Fresh DB — schema version will be set by _apply_normalized_schema
+            logger.debug("Skipping schema version record for fresh database (no tables yet)")
+            return
+
+        # Check if version 0.3.0 is already recorded
         cursor.execute(
             "SELECT version FROM schema_version WHERE version = ?",
             ("0.3.0",)
         )
         if cursor.fetchone() is None:
-            # Insert version record
+            # Insert version record for existing DB that was just migrated
             cursor.execute(
                 "INSERT INTO schema_version (version, applied_at) VALUES (?, ?)",
                 ("0.3.0", datetime.utcnow().isoformat()),

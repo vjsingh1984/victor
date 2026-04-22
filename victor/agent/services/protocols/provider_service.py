@@ -140,6 +140,14 @@ class ProviderServiceProtocol(Protocol):
         """
         ...
 
+    async def switch_model(self, model: str) -> None:
+        """Switch models on the current provider.
+
+        Args:
+            model: Target model name
+        """
+        ...
+
     def get_current_provider_info(self) -> "ProviderInfo":
         """Get current provider information.
 
@@ -261,6 +269,10 @@ class ProviderServiceProtocol(Protocol):
 
     def get_rate_limit_wait_time(self, error: Exception) -> float:
         """Extract retry wait time from a provider rate-limit error."""
+        ...
+
+    def get_rate_limit_stats(self) -> Dict[str, Any]:
+        """Return accumulated provider rate-limit statistics."""
         ...
 
     def is_healthy(self) -> bool:

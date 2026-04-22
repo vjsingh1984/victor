@@ -381,10 +381,16 @@ class OrchestratorFactory(
     # -----------------------------------------------------------------
 
     def create_sanitizer(self) -> "ResponseSanitizer":
-        """Create response sanitizer (from DI container)."""
+        """Create response sanitizer (from DI container with fallback)."""
         from victor.agent.protocols import ResponseSanitizerProtocol
 
-        return self.container.get(ResponseSanitizerProtocol)
+        sanitizer = self.container.get_optional(ResponseSanitizerProtocol)
+        if sanitizer is not None:
+            return sanitizer
+        # Fallback: construct directly when not registered (e.g. tests patching bootstrap)
+        from victor.agent.response_sanitizer import ResponseSanitizer
+
+        return ResponseSanitizer()
 
     def create_prompt_builder(
         self,

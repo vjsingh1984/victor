@@ -81,23 +81,10 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_ctx_svc.check_context_overflow.return_value = False
     orch._context_service = mock_ctx_svc
 
-    # Wire session service to delegate to session coordinator
-    session_coordinator = orch._session_coordinator
-    mock_session_svc = MagicMock()
-    mock_session_svc.get_recent_sessions.side_effect = lambda limit=10: (
-        session_coordinator.get_recent_sessions(limit)
-    )
-    mock_session_svc.get_session_stats.side_effect = lambda: (
-        session_coordinator.get_session_stats()
-    )
-    mock_session_svc.recover_session.side_effect = lambda session_id: (
-        session_coordinator.recover_session(session_id)
-    )
-    mock_session_svc.get_memory_context.side_effect = lambda max_tokens=None, messages=None: (
-        session_coordinator.get_memory_context(max_tokens=max_tokens, messages=messages)
-    )
-    mock_session_svc.maybe_auto_checkpoint = AsyncMock(return_value=None)
-    orch._session_service = mock_session_svc
+    # Keep the canonical SessionService instance rather than replacing it
+    # with a coordinator-backed mock. Individual tests can still override
+    # specific methods when they need tighter control.
+    orch._session_service.maybe_auto_checkpoint = AsyncMock(return_value=None)
 
     mock_provider_svc = MagicMock()
     from victor.core.errors import ProviderNotFoundError
@@ -106,6 +93,19 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_provider_svc.switch_provider = AsyncMock(
         side_effect=ProviderNotFoundError("not configured")
     )
+    mock_provider_svc.switch_model = AsyncMock(
+        side_effect=ProviderNotFoundError("not configured")
+    )
+    mock_provider_svc.get_current_provider = MagicMock(return_value=mock_provider)
+    mock_provider_svc.get_current_provider_info.return_value = MagicMock(
+        provider_name="mock_provider",
+        model_name="test-model",
+        api_key_configured=False,
+        supports_streaming=True,
+        supports_tool_calling=True,
+        max_tokens=100000,
+    )
+    mock_provider_svc.get_rate_limit_stats.return_value = {"rate_limits_hit": 0}
     # Wire rate-limit parsing to real logic so TestRateLimitRetry assertions hold.
     mock_provider_svc.get_rate_limit_wait_time.side_effect = (
         lambda exc: ProviderService.get_rate_limit_wait_time(None, exc)
@@ -2221,22 +2221,24 @@ class TestSwitchProvider:
             # Mock the provider service to simulate a successful switch
             mock_provider_svc = MagicMock()
             mock_provider_svc.switch_provider = AsyncMock()
+            new_provider = MagicMock()
+            mock_provider_svc.get_current_provider = MagicMock(return_value=new_provider)
+            mock_provider_svc.get_current_provider_info.return_value = MagicMock(
+                provider_name="new_provider",
+                model_name="new-model",
+                api_key_configured=True,
+                supports_streaming=True,
+                supports_tool_calling=True,
+                max_tokens=200000,
+            )
             orchestrator._provider_service = mock_provider_svc
-
-            # Mock provider_coordinator so the sync step also succeeds
-            mock_provider_coordinator = MagicMock()
-            mock_provider_coordinator.switch_provider_async = AsyncMock()
-            orchestrator._provider_coordinator = mock_provider_coordinator
-
-            # Mock provider_manager so post-switch reads succeed
-            orchestrator._provider_manager = MagicMock()
-            orchestrator._provider_manager.provider_name = "new_provider"
-            orchestrator._provider_manager.model = "new-model"
 
             result = await orchestrator.switch_provider("new_provider", "new-model")
 
             assert result is True
             mock_provider_svc.switch_provider.assert_called_once_with("new_provider", "new-model")
+            assert orchestrator.provider_name == "new_provider"
+            assert orchestrator.model == "new-model"
 
 
 class TestSwitchModel:
@@ -3249,11 +3251,10 @@ class TestRecoverSession:
         mock_manager = MagicMock()
         mock_manager.get_session.return_value = mock_session
         orchestrator.memory_manager = mock_manager
-        orchestrator._session_coordinator._memory_manager = mock_manager
 
         # Mock lifecycle manager's recover_session to return True
-        orchestrator._session_coordinator._lifecycle_manager = MagicMock()
-        orchestrator._session_coordinator._lifecycle_manager.recover_session.return_value = True
+        orchestrator._lifecycle_manager = MagicMock()
+        orchestrator._lifecycle_manager.recover_session.return_value = True
 
         result = orchestrator.recover_session("session-123")
 

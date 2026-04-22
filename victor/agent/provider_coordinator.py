@@ -101,7 +101,10 @@ class RateLimitInfo:
 
 
 class ProviderCoordinator:
-    """High-level coordinator for provider management with rate limiting.
+    """[DEPRECATED] Backward-compatible shim over provider management services.
+
+    Prefers delegating to ``ProviderService`` when bound, otherwise falls back
+    to the legacy ``ProviderManager``-backed implementation.
 
     Wraps ProviderManager, adding:
     - Rate limit handling with exponential backoff
@@ -140,6 +143,7 @@ class ProviderCoordinator:
 
         # Post-switch hooks
         self._post_switch_hooks: List[Callable[[ProviderState], None]] = []
+        self._provider_service: Optional[Any] = None
 
         # Health monitoring state
         self._health_task: Optional[asyncio.Task] = None
@@ -155,19 +159,29 @@ class ProviderCoordinator:
             f"max_retries={self.config.max_rate_limit_retries}"
         )
 
+    def bind_provider_service(self, provider_service: Any) -> None:
+        """Bind the canonical provider service for service-first delegation."""
+        self._provider_service = provider_service
+
     @property
     def provider(self) -> Optional[BaseProvider]:
         """Get current provider instance."""
+        if self._provider_service is not None:
+            return getattr(self._provider_service, "provider", None)
         return self._manager.provider
 
     @property
     def model(self) -> str:
         """Get current model name."""
+        if self._provider_service is not None:
+            return getattr(self._provider_service, "model", self._manager.model)
         return self._manager.model
 
     @property
     def provider_name(self) -> str:
         """Get current provider name."""
+        if self._provider_service is not None:
+            return getattr(self._provider_service, "provider_name", self._manager.provider_name)
         return self._manager.provider_name
 
     @property
@@ -178,6 +192,8 @@ class ProviderCoordinator:
         """
         if self._tool_adapter_override is not None:
             return self._tool_adapter_override
+        if self._provider_service is not None:
+            return getattr(self._provider_service, "tool_adapter", None)
         return self._manager.tool_adapter
 
     @property
@@ -188,11 +204,15 @@ class ProviderCoordinator:
         """
         if self._capabilities_override is not None:
             return self._capabilities_override
+        if self._provider_service is not None:
+            return getattr(self._provider_service, "capabilities", None)
         return self._manager.capabilities
 
     @property
     def switch_count(self) -> int:
         """Get the number of provider/model switches."""
+        if self._provider_service is not None:
+            return getattr(self._provider_service, "switch_count", self._manager.switch_count)
         return self._manager.switch_count
 
     def switch_provider(
@@ -232,6 +252,11 @@ class ProviderCoordinator:
         **kwargs: Any,
     ) -> bool:
         """Switch to a different provider asynchronously."""
+        if self._provider_service is not None:
+            await self._provider_service.switch_provider(provider_name, model)
+            self._notify_post_switch_hooks()
+            return True
+
         result = await self._manager.switch_provider(provider_name, model, **kwargs)
         if result:
             self._notify_post_switch_hooks()
@@ -262,6 +287,11 @@ class ProviderCoordinator:
 
     async def switch_model_async(self, model: str) -> bool:
         """Switch to a different model asynchronously."""
+        if self._provider_service is not None:
+            await self._provider_service.switch_model(model)
+            self._notify_post_switch_hooks()
+            return True
+
         result = await self._manager.switch_model(model)
         if result:
             self._notify_post_switch_hooks()
@@ -273,10 +303,24 @@ class ProviderCoordinator:
         Returns:
             Dictionary with provider/model info and capabilities
         """
-        info = self._manager.get_info()
+        if self._provider_service is not None:
+            provider_info = self._provider_service.get_current_provider_info()
+            info = {
+                "provider": provider_info.provider_name,
+                "model": provider_info.model_name,
+                "supports_streaming": provider_info.supports_streaming,
+                "supports_tool_calling": provider_info.supports_tool_calling,
+                "max_tokens": provider_info.max_tokens,
+            }
+            rate_limit_stats = getattr(self._provider_service, "get_rate_limit_stats", lambda: {})()
+            if "rate_limit_count" not in rate_limit_stats:
+                info["rate_limit_count"] = rate_limit_stats.get("rate_limits_hit", 0)
+                info["last_rate_limit_time"] = rate_limit_stats.get("last_rate_limit_time")
+        else:
+            info = self._manager.get_info()
 
         # Add coordinator-specific info
-        info["rate_limit_count"] = self._rate_limit_count
+        info.setdefault("rate_limit_count", self._rate_limit_count)
         info["is_health_monitoring"] = self._is_monitoring
         info["switch_count"] = self.switch_count
 
@@ -288,6 +332,16 @@ class ProviderCoordinator:
         Returns:
             Dictionary with health information
         """
+        if self._provider_service is not None:
+            info = self._provider_service.get_current_provider_info()
+            return {
+                "healthy": await self._provider_service.check_provider_health(),
+                "provider": info.provider_name,
+                "model": info.model_name,
+                "last_error": None,
+                "switch_count": self.switch_count,
+            }
+
         state = self._manager.get_current_state()
         if not state:
             return {
@@ -310,7 +364,10 @@ class ProviderCoordinator:
         if self._is_monitoring:
             return
 
-        await self._manager.start_health_monitoring()
+        if self._provider_service is not None:
+            await self._provider_service.start_health_monitoring()
+        else:
+            await self._manager.start_health_monitoring()
         self._is_monitoring = True
         logger.info("ProviderCoordinator: Started health monitoring")
 
@@ -319,7 +376,10 @@ class ProviderCoordinator:
         if not self._is_monitoring:
             return
 
-        await self._manager.stop_health_monitoring()
+        if self._provider_service is not None:
+            await self._provider_service.stop_health_monitoring()
+        else:
+            await self._manager.stop_health_monitoring()
         self._is_monitoring = False
         logger.info("ProviderCoordinator: Stopped health monitoring")
 
@@ -335,6 +395,9 @@ class ProviderCoordinator:
         Returns:
             Wait time in seconds
         """
+        if self._provider_service is not None:
+            return self._provider_service.get_rate_limit_wait_time(error)
+
         # Check for retry_after attribute (e.g., ProviderRateLimitError)
         if hasattr(error, "retry_after") and error.retry_after is not None:
             try:
@@ -383,6 +446,12 @@ class ProviderCoordinator:
 
     def get_rate_limit_stats(self) -> dict:
         """Get rate limit statistics."""
+        if self._provider_service is not None:
+            stats = getattr(self._provider_service, "get_rate_limit_stats", lambda: {})()
+            return {
+                "rate_limit_count": stats.get("rate_limit_count", stats.get("rate_limits_hit", 0)),
+                "last_rate_limit_time": stats.get("last_rate_limit_time"),
+            }
         return {
             "rate_limit_count": self._rate_limit_count,
             "last_rate_limit_time": self._last_rate_limit_time,

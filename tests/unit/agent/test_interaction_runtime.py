@@ -12,16 +12,21 @@ from victor.agent.runtime.interaction_runtime import (
 
 def test_create_interaction_runtime_components_lazy_materialization():
     orchestrator = MagicMock()
+    orchestrator._enabled_tools = None
     tool_pipeline = MagicMock()
     tool_registry = MagicMock()
+    tool_executor = MagicMock()
     tool_selector = MagicMock()
     tool_access_controller = MagicMock()
     mode_controller = MagicMock()
     session_state_manager = MagicMock()
     lifecycle_manager = MagicMock()
     memory_manager = MagicMock()
+    memory_session_id = "mem-123"
     checkpoint_manager = MagicMock()
     cost_tracker = MagicMock()
+    tool_service = MagicMock()
+    session_service = MagicMock()
     factory = MagicMock()
     pipeline = MagicMock()
     factory.create_streaming_chat_pipeline.return_value = pipeline
@@ -45,16 +50,23 @@ def test_create_interaction_runtime_components_lazy_materialization():
                     factory=factory,
                     tool_pipeline=tool_pipeline,
                     tool_registry=tool_registry,
+                    tool_executor=tool_executor,
+                    tool_budget=25,
                     tool_selector=tool_selector,
                     tool_access_controller=tool_access_controller,
                     mode_controller=mode_controller,
                     session_state_manager=session_state_manager,
                     lifecycle_manager=lifecycle_manager,
                     memory_manager=memory_manager,
+                    memory_session_id=memory_session_id,
                     checkpoint_manager=checkpoint_manager,
                     cost_tracker=cost_tracker,
+                    tool_service=tool_service,
+                    session_service=session_service,
                 )
 
+                assert runtime.tool_service is tool_service
+                assert runtime.session_service is session_service
                 assert runtime.chat_coordinator.initialized is False
                 assert runtime.tool_coordinator.initialized is False
                 assert runtime.session_coordinator.initialized is False
@@ -73,6 +85,7 @@ def test_create_interaction_runtime_components_lazy_materialization():
         tool_access_controller=tool_access_controller,
     )
     tool_coordinator.set_mode_controller.assert_called_once_with(mode_controller)
+    tool_coordinator.bind_tool_service.assert_called_once_with(tool_service)
     # set_orchestrator_reference replaced with direct set_enabled_tools
     # (protocol-based injection — no orchestrator reference passed)
     session_factory.assert_called_once_with(
@@ -82,3 +95,4 @@ def test_create_interaction_runtime_components_lazy_materialization():
         checkpoint_manager=checkpoint_manager,
         cost_tracker=cost_tracker,
     )
+    session_coordinator.bind_session_service.assert_called_once_with(session_service)

@@ -473,14 +473,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         )
         from victor.agent.services.provider_service import ProviderService
 
+        # [CANONICAL] Initialize state-passed provider service first so the lazy
+        # factory can bind it when the coordinator is first accessed.
+        self._provider_service = ProviderService(registry=ProviderRegistry)
+
         self._provider_runtime = create_provider_runtime_components(
             factory=self._factory,
             settings=self.settings,
             provider_manager=self._provider_manager,
+            get_provider_service=lambda: getattr(self, "_provider_service", None),
         )
-
-        # [CANONICAL] Initialize state-passed provider service
-        self._provider_service = ProviderService(registry=ProviderRegistry)
 
         # [LEGACY] Keep coordinator for compatibility while deferring heavy init.
         self._provider_coordinator = self._provider_runtime.provider_coordinator
@@ -611,15 +613,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             factory=self._factory,
             tool_pipeline=self._tool_pipeline,
             tool_registry=self.tools,
+            tool_executor=getattr(self, "tool_executor", None),
+            tool_budget=self.tool_budget,
             tool_selector=(self.tool_selector if hasattr(self, "tool_selector") else None),
             tool_access_controller=getattr(self, "_tool_access_controller", None),
             mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
             session_state_manager=self._session_state,
             lifecycle_manager=self._lifecycle_manager,
             memory_manager=self.memory_manager,
+            memory_session_id=self._memory_session_id,
             checkpoint_manager=self._checkpoint_manager,
             cost_tracker=self._session_cost_tracker,
+            tool_service=getattr(self, "_tool_service", None),
+            session_service=getattr(self, "_session_service", None),
         )
+        self._tool_service = self._interaction_runtime.tool_service
+        self._session_service = self._interaction_runtime.session_service
         self._chat_coordinator = self._interaction_runtime.chat_coordinator
         self._tool_coordinator = self._interaction_runtime.tool_coordinator
         self._session_coordinator = self._interaction_runtime.session_coordinator
@@ -698,6 +707,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 lambda c: self._session_service,
                 ServiceLifetime.SINGLETON,
             )
+        if getattr(self, "_tool_service", None) is not None:
+            self._container.register_or_replace(
+                ToolServiceProtocol,
+                lambda c: self._tool_service,
+                ServiceLifetime.SINGLETON,
+            )
 
         # Register coordinators in container for service dependencies
         self._register_coordinators_for_services()
@@ -720,12 +735,12 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 config=ToolServiceConfig(default_tool_budget=getattr(self, "tool_budget", 100)),
                 tool_selector=(self.tool_selector if hasattr(self, "tool_selector") else None),
                 tool_executor=getattr(self, "tool_executor", None),
-                tool_registrar=self.tools,
+                tool_registrar=getattr(self, "tools", None),
             )
 
         if self._tool_service and hasattr(self._tool_service, "bind_runtime_components"):
             self._tool_service.bind_runtime_components(
-                tool_registry=self.tools,
+                tool_registry=getattr(self, "tools", None),
                 mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
                 tool_planner=getattr(self, "_tool_planner", None),
                 argument_normalizer=getattr(self, "argument_normalizer", None),
@@ -734,22 +749,64 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             )
 
         if self._chat_service and hasattr(self._chat_service, "bind_runtime_components"):
+            from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
+
+            async def _planning_handler(user_message: str) -> Any:
+                return await self._chat_coordinator._chat_with_planning(user_message)
+
+            async def _stream_chat_handler(
+                user_message: str, **kwargs: Any
+            ) -> AsyncIterator[Any]:
+                async for chunk in self._chat_coordinator.stream_chat(user_message, **kwargs):
+                    yield chunk
+
+            async def _context_limit_handler(*args: Any, **kwargs: Any) -> Any:
+                return await self._chat_coordinator._handle_context_and_iteration_limits(
+                    *args,
+                    **kwargs,
+                )
+
             self._chat_service.bind_runtime_components(
-                turn_executor=getattr(self._chat_coordinator, "turn_executor", None),
-                planning_handler=getattr(self._chat_coordinator, "_chat_with_planning", None),
-                stream_chat_handler=getattr(self._chat_coordinator, "stream_chat", None),
-                context_limit_handler=getattr(
-                    self._chat_coordinator,
-                    "_handle_context_and_iteration_limits",
-                    None,
+                turn_executor=LazyRuntimeProxy(
+                    factory=lambda: self.turn_executor,
+                    name="turn_executor",
                 ),
+                planning_handler=_planning_handler,
+                stream_chat_handler=_stream_chat_handler,
+                context_limit_handler=_context_limit_handler,
             )
 
-        # Inject the current provider into ProviderService so it knows the
-        # active provider from orchestrator construction (not just from registry).
-        if self._provider_service is not None and hasattr(self, "provider"):
+            chat_coordinator = getattr(self, "_chat_coordinator", None)
+            resolved_chat_coordinator = None
+            if chat_coordinator is not None:
+                if hasattr(chat_coordinator, "initialized"):
+                    if chat_coordinator.initialized:
+                        resolved_chat_coordinator = chat_coordinator.get_instance()
+                else:
+                    resolved_chat_coordinator = chat_coordinator
+            if resolved_chat_coordinator is not None and hasattr(
+                resolved_chat_coordinator,
+                "bind_chat_service",
+            ):
+                resolved_chat_coordinator.bind_chat_service(self._chat_service)
+
+        if self._provider_service is not None and hasattr(
+            self._provider_service, "bind_runtime_components"
+        ):
+            self._provider_service.bind_runtime_components(
+                provider_manager=getattr(self, "_provider_manager", None),
+            )
+        elif self._provider_service is not None and hasattr(self, "provider"):
             self._provider_service._current_provider = self.provider
-            self._provider_service._current_model = getattr(self, "model", "default")
+
+        if self._recovery_service is not None and hasattr(
+            self._recovery_service, "bind_runtime_components"
+        ):
+            self._recovery_service.bind_runtime_components(
+                recovery_coordinator=self._recovery_coordinator,
+                recovery_handler=self._recovery_handler,
+                recovery_integration=self._recovery_integration,
+            )
 
         logger.info(
             "Service layer initialized: chat=%s, tool=%s, session=%s, "
@@ -2503,10 +2560,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         try:
             # [CANONICAL] Use state-passed service
-            await self._provider_service.start_health_monitoring()
-
-            # Sync legacy coordinator
-            await self._provider_coordinator.start_health_monitoring()
+            if self._provider_service is not None:
+                await self._provider_service.start_health_monitoring()
+            elif self._provider_coordinator is not None:
+                await self._provider_coordinator.start_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to start health monitoring: {e}")
@@ -2520,10 +2577,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         try:
             # [CANONICAL] Use state-passed service
-            await self._provider_service.stop_health_monitoring()
-
-            # Sync legacy coordinator
-            await self._provider_coordinator.stop_health_monitoring()
+            if self._provider_service is not None:
+                await self._provider_service.stop_health_monitoring()
+            elif self._provider_coordinator is not None:
+                await self._provider_coordinator.stop_health_monitoring()
             return True
         except Exception as e:
             logger.warning(f"Failed to stop health monitoring: {e}")
@@ -2600,9 +2657,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             "tool_calls_used": self.tool_calls_used,
         }
 
-        # Add legacy coordinator stats if available
-        if self._provider_coordinator:
+        stats = {}
+        if self._provider_service is not None and hasattr(
+            self._provider_service, "get_rate_limit_stats"
+        ):
+            stats = self._provider_service.get_rate_limit_stats()
+        elif self._provider_coordinator:
             stats = self._provider_coordinator.get_rate_limit_stats()
+        if stats:
             result.update(stats)
 
         return result
@@ -3793,8 +3855,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Create recovery context from current state
         recovery_ctx = self._create_recovery_context(stream_ctx)
 
-        # Delegate to RecoveryCoordinator
-        return await self._recovery_coordinator.handle_recovery_with_integration(
+        # Delegate to RecoveryService (canonical runtime path)
+        return await self._recovery_service.handle_recovery_with_integration(
             recovery_ctx,
             full_content,
             tool_calls,
@@ -3822,8 +3884,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Create recovery context from current state
         recovery_ctx = self._create_recovery_context(stream_ctx)
 
-        # Delegate to RecoveryCoordinator
-        return self._recovery_coordinator.apply_recovery_action(
+        # Delegate to RecoveryService (canonical runtime path)
+        return self._recovery_service.apply_recovery_action(
             recovery_action, recovery_ctx, message_adder=self.add_message
         )
 
@@ -4075,6 +4137,22 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return self._memory_session_id
 
+    def _sync_session_service_runtime_state(self) -> None:
+        """Keep SessionService bound to the current live runtime state."""
+        if self._session_service is None or not hasattr(
+            self._session_service,
+            "bind_runtime_components",
+        ):
+            return
+
+        self._session_service.bind_runtime_components(
+            lifecycle_manager=self._lifecycle_manager,
+            memory_manager=self.memory_manager,
+            checkpoint_manager=self._checkpoint_manager,
+            cost_tracker=self._session_cost_tracker,
+            memory_session_id=self._memory_session_id,
+        )
+
     def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
         """Get recent conversation sessions for recovery.
 
@@ -4086,6 +4164,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of session metadata dictionaries
         """
+        self._sync_session_service_runtime_state()
         return self._session_service.get_recent_sessions(limit)
 
     def recover_session(self, session_id: str) -> bool:
@@ -4099,6 +4178,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             True if session was recovered successfully
         """
+        self._sync_session_service_runtime_state()
         success = self._session_service.recover_session(session_id)
         if success:
             self._memory_session_id = session_id
@@ -4115,6 +4195,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             List of messages in provider format.
         """
+        self._sync_session_service_runtime_state()
         return self._session_service.get_memory_context(
             max_tokens=max_tokens,
             messages=self.messages,
@@ -4128,6 +4209,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             Dictionary with session statistics.
         """
+        self._sync_session_service_runtime_state()
         return self._session_service.get_session_stats()
 
     async def shutdown(self) -> None:
@@ -4265,13 +4347,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         try:
             # [CANONICAL] Switch via state-passed service
-            await self._provider_service.switch_provider(provider_name, model)
-
-            # Synchronize legacy state (manager/coordinator)
-            await self._provider_coordinator.switch_provider_async(provider_name, model)
-
-            self.model = self._provider_manager.model
-            self.provider_name = self._provider_manager.provider_name
+            if self._provider_service is not None:
+                await self._provider_service.switch_provider(provider_name, model)
+                info = self._provider_service.get_current_provider_info()
+                self.provider = self._provider_service.get_current_provider()
+                self.provider_name = info.provider_name
+                self.model = info.model_name
+            else:
+                await self._provider_coordinator.switch_provider_async(provider_name, model)
+                self.provider = self._provider_coordinator.provider
+                self.model = self._provider_coordinator.model
+                self.provider_name = self._provider_coordinator.provider_name
 
             if on_switch:
                 on_switch(self.provider_name, self.model)
@@ -4283,13 +4369,17 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def switch_model(self, model: str) -> bool:
         """[CANONICAL] Switch model via ProviderService."""
         try:
-            # Update service state
-            await self._provider_service.switch_provider(self.provider_name, model)
-
-            # Synchronize legacy state
-            await self._provider_coordinator.switch_model_async(model)
-
-            self.model = self._provider_manager.model
+            if self._provider_service is not None:
+                await self._provider_service.switch_model(model)
+                info = self._provider_service.get_current_provider_info()
+                self.provider = self._provider_service.get_current_provider()
+                self.provider_name = info.provider_name
+                self.model = info.model_name
+            else:
+                await self._provider_coordinator.switch_model_async(model)
+                self.provider = self._provider_coordinator.provider
+                self.provider_name = self._provider_coordinator.provider_name
+                self.model = self._provider_coordinator.model
             return True
         except Exception as e:
             logger.error(f"Model switch failed: {e}")

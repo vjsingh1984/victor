@@ -128,6 +128,10 @@ class ChatCoordinator:
         # NEW: Execution coordinator for agentic loop (Phase 1)
         self._turn_executor: Optional[Any] = None
 
+    def bind_chat_service(self, chat_service: Any) -> None:
+        """Bind the canonical ChatService for backward-compatible delegation."""
+        self._chat_service = chat_service
+
     # =====================================================================
     # Public API
     # =====================================================================
@@ -183,6 +187,12 @@ class ChatCoordinator:
         Returns:
             CompletionResponse from the model with complete response
         """
+        if self._chat_service is not None:
+            return await self._chat_service.chat(
+                user_message,
+                use_planning=use_planning,
+            )
+
         # If planning is explicitly disabled, skip planning check
         if use_planning is False:
             return await self.turn_executor.execute_agentic_loop(user_message)

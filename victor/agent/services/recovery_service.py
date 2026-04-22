@@ -109,6 +109,24 @@ class RecoveryService:
             "by_error_type": {},
         }
         self._logger = logging.getLogger(f"{__name__}.{id(self)}")
+        self._recovery_coordinator: Optional[Any] = None
+        self._recovery_handler: Optional[Any] = None
+        self._recovery_integration: Optional[Any] = None
+
+    def bind_runtime_components(
+        self,
+        *,
+        recovery_coordinator: Optional[Any] = None,
+        recovery_handler: Optional[Any] = None,
+        recovery_integration: Optional[Any] = None,
+    ) -> None:
+        """Bind live runtime collaborators after bootstrap."""
+        if recovery_coordinator is not None:
+            self._recovery_coordinator = recovery_coordinator
+        if recovery_handler is not None:
+            self._recovery_handler = recovery_handler
+        if recovery_integration is not None:
+            self._recovery_integration = recovery_integration
 
     async def classify_error(self, error: Exception) -> str:
         """Classify an error for recovery strategy selection.
@@ -575,6 +593,134 @@ class RecoveryService:
             return False
 
         return True
+
+    async def handle_recovery_with_integration(
+        self,
+        ctx: Any,
+        full_content: str,
+        tool_calls: Optional[List[Dict[str, Any]]],
+        mentioned_tools: Optional[List[str]] = None,
+        message_adder: Any = None,
+    ) -> Any:
+        """Handle streaming recovery through the canonical runtime service."""
+        if self._recovery_coordinator is not None:
+            return await self._recovery_coordinator.handle_recovery_with_integration(
+                ctx,
+                full_content,
+                tool_calls,
+                mentioned_tools,
+                message_adder=message_adder,
+            )
+
+        from victor.agent.orchestrator_recovery import OrchestratorRecoveryAction
+
+        return OrchestratorRecoveryAction(
+            action="continue",
+            reason="Recovery coordinator unavailable",
+        )
+
+    def apply_recovery_action(
+        self,
+        recovery_action: Any,
+        ctx: Any,
+        message_adder: Any = None,
+    ) -> Any:
+        """Apply a recovery action through the canonical runtime service."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.apply_recovery_action(
+                recovery_action,
+                ctx,
+                message_adder=message_adder,
+            )
+        return None
+
+    def check_natural_completion(
+        self,
+        ctx: Any,
+        has_tool_calls: bool,
+        content_length: int,
+    ) -> Any:
+        """Check whether the current streaming turn should terminate naturally."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.check_natural_completion(
+                ctx,
+                has_tool_calls,
+                content_length,
+            )
+        return None
+
+    def handle_empty_response(
+        self,
+        ctx: Any,
+    ) -> Any:
+        """Handle an empty model response during streaming."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.handle_empty_response(ctx)
+        return None, False
+
+    def get_recovery_fallback_message(
+        self,
+        ctx: Any,
+    ) -> str:
+        """Get the fallback recovery message for streaming."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.get_recovery_fallback_message(ctx)
+        return (
+            "I apologize, but I'm having difficulty completing this task. "
+            "Here's a summary of what I've accomplished so far..."
+        )
+
+    def check_tool_budget(
+        self,
+        ctx: Any,
+        warning_threshold: int = 250,
+    ) -> Any:
+        """Check whether the streaming tool budget is approaching exhaustion."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.check_tool_budget(ctx, warning_threshold)
+        return None
+
+    def truncate_tool_calls(
+        self,
+        ctx: Any,
+        tool_calls: List[Dict[str, Any]],
+        max_calls: int,
+    ) -> Any:
+        """Truncate tool calls to the allowed budget."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.truncate_tool_calls(ctx, tool_calls, max_calls)
+        if len(tool_calls) <= max_calls:
+            return tool_calls, False
+        return tool_calls[:max_calls], True
+
+    def filter_blocked_tool_calls(
+        self,
+        ctx: Any,
+        tool_calls: List[Dict[str, Any]],
+    ) -> Any:
+        """Filter tool calls that are blocked by runtime safeguards."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.filter_blocked_tool_calls(ctx, tool_calls)
+        return tool_calls, [], 0
+
+    def check_blocked_threshold(
+        self,
+        ctx: Any,
+        all_blocked: bool,
+    ) -> Any:
+        """Check whether blocked-tool thresholds require recovery action."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.check_blocked_threshold(ctx, all_blocked)
+        return None
+
+    def check_force_action(
+        self,
+        ctx: Any,
+    ) -> Any:
+        """Check whether recovery should force a follow-up action."""
+        if self._recovery_coordinator is not None:
+            return self._recovery_coordinator.check_force_action(ctx)
+        return False, None
 
     def get_circuit_state(
         self,

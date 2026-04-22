@@ -764,10 +764,10 @@ class TestForceCompletionMessages:
         assert result is not None
         assert len(result.chunks) == 1
         assert "Research loop detected" in result.chunks[0].content
-        # Check system message was added
+        # Check user message was added (force completion uses "user" role)
         mock_message_adder.add_message.assert_called_once()
         call_args = mock_message_adder.add_message.call_args
-        assert call_args[0][0] == "system"
+        assert call_args[0][0] == "user"
         assert "SYNTHESIZE" in call_args[0][1]
 
     def test_handle_force_completion_exploration_limit(self, handler, mock_message_adder):
@@ -781,10 +781,10 @@ class TestForceCompletionMessages:
         assert result is not None
         assert len(result.chunks) == 1
         assert "exploration limit" in result.chunks[0].content
-        # Check system message was added
+        # Check user message was added (force completion uses "user" role)
         mock_message_adder.add_message.assert_called_once()
         call_args = mock_message_adder.add_message.call_args
-        assert call_args[0][0] == "system"
+        assert call_args[0][0] == "user"
         assert "FINAL COMPREHENSIVE ANSWER" in call_args[0][1]
 
 
@@ -1401,7 +1401,7 @@ class TestHandleLoopWarning:
         assert "repeated pattern detected" in chunk.content
         mock_message_adder.add_message.assert_called_once()
         call_args = mock_message_adder.add_message.call_args
-        assert call_args[0][0] == "system"
+        assert call_args[0][0] == "user"
 
     def test_returns_none_when_no_warning(self, handler, mock_message_adder):
         """Returns None when warning message is empty."""

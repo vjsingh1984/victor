@@ -17,6 +17,7 @@
 Tests for chat and streaming chat operations extracted from orchestrator.
 """
 
+import importlib
 import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from typing import Any
@@ -127,6 +128,10 @@ def mock_orchestrator():
     orch._tool_planner = MagicMock()
     orch._tool_planner.filter_tools_by_intent = MagicMock(return_value=[])
 
+    # Capability protocol — return False so stream_chat finally block is skipped
+    orch.has_capability = MagicMock(return_value=False)
+    orch.get_capability_value = MagicMock(return_value=None)
+
     return orch
 
 
@@ -215,6 +220,23 @@ class TestPrepareTask:
             TrackerTaskType.EDIT,
         )
         mock_orchestrator.task_coordinator.prepare_task.assert_called_once()
+
+
+class TestChatServiceShim:
+    """Tests for ChatCoordinator delegation to canonical ChatService."""
+
+    @pytest.mark.asyncio
+    async def test_chat_delegates_to_bound_chat_service(self, chat_coordinator):
+        chat_service = MagicMock()
+        response = MagicMock(content="service response")
+        chat_service.chat = AsyncMock(return_value=response)
+
+        chat_coordinator.bind_chat_service(chat_service)
+
+        result = await chat_coordinator.chat("hello", use_planning=True)
+
+        assert result is response
+        chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
 
 
 class TestGetRateLimitWaitTime:
@@ -308,15 +330,13 @@ class TestStreamingPipelineIntegration:
         """ChatCoordinator should delegate streaming to StreamingChatPipeline."""
         pipeline = StubStreamingPipeline()
         created = []
+        streaming_module = importlib.import_module("victor.agent.streaming")
 
         def fake_factory(coordinator, **kwargs):
             created.append(coordinator)
             return pipeline
 
-        monkeypatch.setattr(
-            "victor.agent.streaming.create_streaming_chat_pipeline",
-            fake_factory,
-        )
+        monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
 
         chunks = []
         async for chunk in chat_coordinator.stream_chat("hello world"):
@@ -331,16 +351,14 @@ class TestStreamingPipelineIntegration:
         """Pipeline is instantiated once and reused across turns."""
         pipeline = StubStreamingPipeline()
         factory_calls = 0
+        streaming_module = importlib.import_module("victor.agent.streaming")
 
         def fake_factory(_, **kwargs):
             nonlocal factory_calls
             factory_calls += 1
             return pipeline
 
-        monkeypatch.setattr(
-            "victor.agent.streaming.create_streaming_chat_pipeline",
-            fake_factory,
-        )
+        monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
 
         async for _ in chat_coordinator.stream_chat("first"):
             pass

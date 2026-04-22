@@ -99,12 +99,14 @@ class TestServiceProtocolImports:
 
         required = {
             "switch_provider",
+            "switch_model",
             "get_current_provider_info",
             "check_provider_health",
             "get_available_providers",
             "start_health_monitoring",
             "stop_health_monitoring",
             "get_rate_limit_wait_time",
+            "get_rate_limit_stats",
             "is_healthy",
         }
         actual = {name for name in dir(ProviderServiceProtocol) if not name.startswith("_")}
@@ -118,6 +120,17 @@ class TestServiceProtocolImports:
             "select_recovery_action",
             "execute_recovery",
             "can_retry",
+            "should_attempt_recovery",
+            "handle_recovery_with_integration",
+            "apply_recovery_action",
+            "check_natural_completion",
+            "handle_empty_response",
+            "get_recovery_fallback_message",
+            "check_tool_budget",
+            "truncate_tool_calls",
+            "filter_blocked_tool_calls",
+            "check_blocked_threshold",
+            "check_force_action",
             "is_healthy",
         }
         actual = {name for name in dir(RecoveryServiceProtocol) if not name.startswith("_")}
@@ -176,3 +189,79 @@ class TestAdapterProtocolConformance:
         assert callable(getattr(adapter, "add_message", None))
         assert callable(getattr(adapter, "get_messages", None))
         assert callable(getattr(adapter, "is_healthy", None))
+
+
+class TestChatServiceBootstrapLaziness:
+    """Chat service bootstrap should not force deprecated coordinator init."""
+
+    def test_initialize_services_keeps_chat_coordinator_lazy(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+        from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
+
+        obj = object.__new__(AgentOrchestrator)
+        chat_service = MagicMock()
+        tool_service = MagicMock()
+        session_service = MagicMock()
+        context_service = MagicMock()
+        provider_service = MagicMock()
+        recovery_service = MagicMock()
+
+        obj._container = MagicMock()
+        obj._container.get_optional.side_effect = [
+            chat_service,
+            tool_service,
+            session_service,
+            context_service,
+            provider_service,
+            recovery_service,
+        ]
+        obj._container.is_registered.return_value = True
+        obj._conversation_controller = MagicMock()
+        obj._streaming_controller = MagicMock()
+        obj._tool_coordinator = MagicMock()
+        obj._provider_coordinator = MagicMock()
+        obj._recovery_coordinator = MagicMock()
+        obj._recovery_handler = MagicMock()
+        obj._recovery_integration = MagicMock()
+        obj._provider_manager = MagicMock()
+        obj._lifecycle_manager = MagicMock()
+        obj._checkpoint_manager = MagicMock()
+        obj._session_cost_tracker = MagicMock()
+        obj._tool_planner = MagicMock()
+        obj.tools = MagicMock()
+        obj.mode_controller = MagicMock()
+        obj.argument_normalizer = MagicMock()
+        obj.memory_manager = MagicMock()
+        obj._memory_session_id = "mem-1"
+        obj.tool_budget = 100
+        obj._turn_executor = None
+        obj._protocol_adapter = None
+        obj.observability = MagicMock()
+
+        class TrapChatCoordinator:
+            touched = False
+
+            def __getattr__(self, name):
+                self.touched = True
+                raise AssertionError(f"chat coordinator should remain lazy during bootstrap: {name}")
+
+        trap_chat = TrapChatCoordinator()
+        obj._chat_coordinator = LazyRuntimeProxy(
+            factory=lambda: trap_chat,
+            name="chat_coordinator",
+        )
+
+        with (
+            patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
+            patch.object(AgentOrchestrator, "_bootstrap_service_layer"),
+        ):
+            obj._initialize_services()
+
+        chat_service.bind_runtime_components.assert_called_once()
+        kwargs = chat_service.bind_runtime_components.call_args.kwargs
+        assert kwargs["turn_executor"].initialized is False
+        assert callable(kwargs["planning_handler"])
+        assert callable(kwargs["stream_chat_handler"])
+        assert callable(kwargs["context_limit_handler"])
+        assert obj._chat_coordinator.initialized is False
+        assert trap_chat.touched is False

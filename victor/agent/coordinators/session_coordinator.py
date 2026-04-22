@@ -192,6 +192,7 @@ class SessionCoordinator:
         self._memory_manager = memory_manager
         self._checkpoint_manager = checkpoint_manager
         self._cost_tracker = cost_tracker
+        self._session_service: Optional[Any] = None
 
         # Current session info
         self._current_session: Optional[SessionInfo] = None
@@ -213,6 +214,9 @@ class SessionCoordinator:
         Returns:
             The session ID for the new session
         """
+        if self._session_service is not None:
+            return run_sync(self._session_service.create_session(session_id=session_id))
+
         # Generate session ID if not provided
         if not session_id:
             session_id = f"session-{uuid.uuid4().hex[:16]}"
@@ -242,6 +246,10 @@ class SessionCoordinator:
 
         Marks the session as inactive and prepares for cleanup.
         """
+        if self._session_service is not None:
+            run_sync(self._session_service.end_session())
+            return
+
         if self._current_session:
             self._current_session.is_active = False
             logger.info(f"Session ended: {self._current_session.session_id}")
@@ -262,6 +270,10 @@ class SessionCoordinator:
         Args:
             preserve_token_usage: If True, keep accumulated token usage
         """
+        if self._session_service is not None and hasattr(self._session_service, "reset_session"):
+            run_sync(self._session_service.reset_session())
+            return
+
         # Reset session state (with option to preserve tokens)
         self._session_state.reset(preserve_token_usage=preserve_token_usage)
 
@@ -284,6 +296,9 @@ class SessionCoordinator:
         Returns:
             True if session was recovered successfully
         """
+        if self._session_service is not None:
+            return self._session_service.recover_session(session_id)
+
         if not self._memory_manager:
             logger.warning("Memory manager not available for session recovery")
             return False
@@ -374,6 +389,9 @@ class SessionCoordinator:
             - is_active: Whether session is active
             - token_usage: Token usage breakdown
         """
+        if self._session_service is not None:
+            return self._session_service.get_session_stats()
+
         base_stats: Dict[str, Any] = {
             "enabled": bool(self._memory_manager),
             "session_id": self.session_id,
@@ -446,6 +464,9 @@ class SessionCoordinator:
         Returns:
             Checkpoint ID if saved, None if checkpointing disabled
         """
+        if self._session_service is not None:
+            return await self._session_service.save_checkpoint(description, tags)
+
         if not self._checkpoint_manager:
             logger.debug("Checkpoint save skipped - manager not initialized")
             return None
@@ -478,6 +499,9 @@ class SessionCoordinator:
         Returns:
             True if restored successfully, False otherwise
         """
+        if self._session_service is not None:
+            return await self._session_service.restore_checkpoint(checkpoint_id)
+
         if not self._checkpoint_manager:
             logger.warning("Cannot restore - checkpoint manager not initialized")
             return False
@@ -500,6 +524,9 @@ class SessionCoordinator:
         Returns:
             Checkpoint ID if auto-checkpoint was created, None otherwise
         """
+        if self._session_service is not None:
+            return await self._session_service.maybe_auto_checkpoint()
+
         if not self._checkpoint_manager:
             return None
 
@@ -564,6 +591,9 @@ class SessionCoordinator:
         Returns:
             List of session metadata dictionaries
         """
+        if self._session_service is not None:
+            return self._session_service.get_recent_sessions(limit)
+
         if not self._memory_manager:
             return []
 
@@ -641,6 +671,12 @@ class SessionCoordinator:
         Returns:
             List of messages in provider format
         """
+        if self._session_service is not None:
+            return self._session_service.get_memory_context(
+                max_tokens=max_tokens,
+                messages=messages,
+            )
+
         if not self._memory_manager or not self._memory_session_id:
             # Fall back to provided messages
             if messages:
@@ -848,6 +884,10 @@ class SessionCoordinator:
             f"active={self.is_active}, "
             f"tool_calls={self.tool_calls_used}/{self._session_state.tool_budget})"
         )
+
+    def bind_session_service(self, session_service: Any) -> None:
+        """Bind the canonical session service for service-first delegation."""
+        self._session_service = session_service
 
 
 # =============================================================================

@@ -87,6 +87,7 @@ class StreamingChatPipeline:
         """Run the streaming pipeline for the provided message."""
         coord = self._coordinator
         orch = coord._orchestrator
+        recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
 
         # Initialize and prepare using StreamingChatContext
         stream_ctx = await coord._create_stream_context(user_message, **kwargs)
@@ -443,7 +444,7 @@ class StreamingChatPipeline:
             else:
                 # No content and no tool calls - check for natural completion
                 recovery_ctx = orch._create_recovery_context(stream_ctx)
-                final_chunk = orch._recovery_coordinator.check_natural_completion(
+                final_chunk = recovery.check_natural_completion(
                     recovery_ctx, has_tool_calls=False, content_length=0
                 )
                 if final_chunk:
@@ -454,9 +455,7 @@ class StreamingChatPipeline:
                 logger.warning("Model returned empty response - attempting aggressive recovery")
 
                 recovery_ctx = orch._create_recovery_context(stream_ctx)
-                recovery_chunk, should_force = orch._recovery_coordinator.handle_empty_response(
-                    recovery_ctx
-                )
+                recovery_chunk, should_force = recovery.handle_empty_response(recovery_ctx)
                 if recovery_chunk:
                     yield recovery_chunk
                     continue
@@ -477,9 +476,7 @@ class StreamingChatPipeline:
                         )
                 else:
                     recovery_ctx = orch._create_recovery_context(stream_ctx)
-                    fallback_msg = orch._recovery_coordinator.get_recovery_fallback_message(
-                        recovery_ctx
-                    )
+                    fallback_msg = recovery.get_recovery_fallback_message(recovery_ctx)
                     orch._record_intelligent_outcome(
                         success=False,
                         quality_score=0.3,
@@ -594,7 +591,7 @@ class StreamingChatPipeline:
             else:
                 # Check UnifiedTaskTracker for stop decision via recovery coordinator
                 recovery_ctx = orch._create_recovery_context(stream_ctx)
-                was_triggered, hint = orch._recovery_coordinator.check_force_action(recovery_ctx)
+                was_triggered, hint = recovery.check_force_action(recovery_ctx)
                 if was_triggered:
                     logger.info(
                         f"UnifiedTaskTracker forcing action: {hint}, "

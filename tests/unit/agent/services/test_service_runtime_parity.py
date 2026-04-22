@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from victor.agent.services.session_service import SessionService
+from victor.agent.services.provider_service import ProviderService
+from victor.agent.services.recovery_service import RecoveryService
 from victor.agent.services.tool_service import ToolService, ToolServiceConfig
 
 
@@ -99,3 +101,70 @@ async def test_session_service_save_and_restore_checkpoint_round_trip():
     assert restored is True
     assert service._session_state.tool_calls_used == 3
     assert service._session_state.observed_files == {"b.py"}
+
+
+@pytest.mark.asyncio
+async def test_provider_service_switch_provider_uses_bound_provider_manager():
+    manager = MagicMock()
+    manager.switch_provider = AsyncMock(return_value=True)
+    manager.provider = SimpleNamespace(name="openai", model="gpt-4.1", max_tokens=200000)
+    manager.provider_name = "openai"
+    manager.model = "gpt-4.1"
+    manager.switch_count = 2
+
+    service = ProviderService(registry=MagicMock())
+    service.bind_runtime_components(provider_manager=manager)
+
+    await service.switch_provider("openai", "gpt-4.1")
+
+    manager.switch_provider.assert_awaited_once_with("openai", "gpt-4.1")
+    assert service.provider_name == "openai"
+    assert service.model == "gpt-4.1"
+    assert service.get_current_provider() is manager.provider
+
+
+@pytest.mark.asyncio
+async def test_recovery_service_streaming_methods_use_bound_recovery_coordinator():
+    service = RecoveryService()
+    coordinator = MagicMock()
+    coordinator.handle_recovery_with_integration = AsyncMock(
+        return_value=SimpleNamespace(action="continue")
+    )
+    coordinator.apply_recovery_action.return_value = "applied"
+    coordinator.check_natural_completion.return_value = "done"
+    coordinator.handle_empty_response.return_value = ("chunk", True)
+    coordinator.get_recovery_fallback_message.return_value = "fallback"
+    coordinator.check_tool_budget.return_value = "warn"
+    coordinator.truncate_tool_calls.return_value = ([{"name": "read"}], True)
+    coordinator.filter_blocked_tool_calls.return_value = ([{"name": "read"}], [], 0)
+    coordinator.check_blocked_threshold.return_value = None
+    coordinator.check_force_action.return_value = (False, None)
+
+    service.bind_runtime_components(recovery_coordinator=coordinator)
+
+    ctx = SimpleNamespace()
+
+    recovery_action = await service.handle_recovery_with_integration(
+        ctx,
+        "content",
+        [{"name": "read"}],
+    )
+
+    assert recovery_action.action == "continue"
+    coordinator.handle_recovery_with_integration.assert_awaited_once()
+    assert service.apply_recovery_action("action", ctx) == "applied"
+    assert service.check_natural_completion(ctx, False, 0) == "done"
+    assert service.handle_empty_response(ctx) == ("chunk", True)
+    assert service.get_recovery_fallback_message(ctx) == "fallback"
+    assert service.check_tool_budget(ctx, 10) == "warn"
+    assert service.truncate_tool_calls(ctx, [{"name": "read"}], 1) == (
+        [{"name": "read"}],
+        True,
+    )
+    assert service.filter_blocked_tool_calls(ctx, [{"name": "read"}]) == (
+        [{"name": "read"}],
+        [],
+        0,
+    )
+    assert service.check_blocked_threshold(ctx, False) is None
+    assert service.check_force_action(ctx) == (False, None)

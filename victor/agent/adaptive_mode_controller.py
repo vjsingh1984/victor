@@ -230,11 +230,13 @@ class QLearningStore:
         """Initialize the Q-learning store.
 
         Args:
-            project_path: Path to project root. If None, uses current directory.
+            project_path: Ignored - RL data is stored in global database for cross-project learning.
         """
-        from victor.core.database import get_project_database
+        # Use GLOBAL database for RL data (cross-project, cross-provider learning)
+        # This enables GEPA and prompt optimization to learn from all projects
+        from victor.core.database import DatabaseManager
 
-        self._db = get_project_database(project_path)
+        self._db = DatabaseManager()
         self.db_path = self._db.db_path
         self._initialized = False
 
@@ -244,7 +246,7 @@ class QLearningStore:
         self.exploration_rate = 0.1  # Epsilon for epsilon-greedy
 
     def _ensure_initialized(self) -> None:
-        """Ensure database tables exist (handled by ProjectDatabaseManager)."""
+        """Ensure database tables exist (handled by global DatabaseManager)."""
         if self._initialized:
             return
 

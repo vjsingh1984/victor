@@ -27,12 +27,12 @@ The handler manages:
 
 Design Pattern: Command + Facade
 ================================
-The handler acts as a facade over the recovery coordinator, chunk generator,
+The handler acts as a facade over the recovery runtime, chunk generator,
 and tool executor, providing a single entry point for tool execution.
 
 Usage:
     handler = ToolExecutionHandler(
-        recovery_coordinator=self._recovery_coordinator,
+        recovery_runtime=self._recovery_service or self._recovery_coordinator,
         chunk_generator=self._chunk_generator,
         ...
     )
@@ -83,8 +83,8 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 
 
-class RecoveryCoordinatorProtocol(Protocol):
-    """Protocol for recovery coordination."""
+class RecoveryRuntimeProtocol(Protocol):
+    """Protocol for recovery runtime delegation."""
 
     def check_tool_budget(
         self, recovery_ctx: Any, warning_threshold: int
@@ -204,7 +204,7 @@ class ToolExecutionHandler:
 
     def __init__(
         self,
-        recovery_coordinator: RecoveryCoordinatorProtocol,
+        recovery_runtime: RecoveryRuntimeProtocol,
         chunk_generator: ChunkGeneratorProtocol,
         message_adder: MessageAdderProtocol,
         reminder_manager: ReminderManagerProtocol,
@@ -224,7 +224,7 @@ class ToolExecutionHandler:
         """Initialize the tool execution handler.
 
         Args:
-            recovery_coordinator: Coordinator for recovery actions.
+            recovery_runtime: Runtime port for recovery actions.
             chunk_generator: Generator for stream chunks.
             message_adder: Object that can add messages to conversation.
             reminder_manager: Manager for context reminders.
@@ -239,7 +239,7 @@ class ToolExecutionHandler:
             get_tool_status_message: Function to generate tool status messages.
             observed_files: Set of observed files (for reminder tracking).
         """
-        self._recovery_coordinator = recovery_coordinator
+        self._recovery_runtime = recovery_runtime
         self._chunk_generator = chunk_generator
         self._message_adder = message_adder
         self._reminder_manager = reminder_manager
@@ -338,7 +338,7 @@ class ToolExecutionHandler:
         """Check if budget warning should be shown."""
         recovery_ctx = self._create_recovery_context(stream_ctx)
         warning_threshold = getattr(self._settings, "tool_call_budget_warning_threshold", 250)
-        return self._recovery_coordinator.check_tool_budget(recovery_ctx, warning_threshold)
+        return self._recovery_runtime.check_tool_budget(recovery_ctx, warning_threshold)
 
     async def _handle_budget_exhausted_phase(
         self, stream_ctx: StreamingChatContext
@@ -375,21 +375,24 @@ class ToolExecutionHandler:
         # Truncate to remaining budget
         recovery_ctx = self._create_recovery_context(stream_ctx)
         remaining = stream_ctx.get_remaining_budget()
-        tool_calls, _ = self._recovery_coordinator.truncate_tool_calls(
-            recovery_ctx, tool_calls, remaining
+        tool_calls, _ = self._recovery_runtime.truncate_tool_calls(
+            recovery_ctx,
+            tool_calls,
+            remaining,
         )
 
         # Filter blocked tool calls
         filtered_calls, blocked_chunks, blocked_count = (
-            self._recovery_coordinator.filter_blocked_tool_calls(recovery_ctx, tool_calls)
+            self._recovery_runtime.filter_blocked_tool_calls(recovery_ctx, tool_calls)
         )
         result.add_chunks(blocked_chunks)
 
         # Check blocked threshold
         all_blocked = blocked_count > 0 and not filtered_calls
         recovery_ctx = self._create_recovery_context(stream_ctx)
-        threshold_result = self._recovery_coordinator.check_blocked_threshold(
-            recovery_ctx, all_blocked
+        threshold_result = self._recovery_runtime.check_blocked_threshold(
+            recovery_ctx,
+            all_blocked,
         )
         if threshold_result:
             chunk, should_clear = threshold_result
@@ -481,7 +484,9 @@ def create_tool_execution_handler(
     from victor.agent.orchestrator_utils import get_tool_status_message
 
     return ToolExecutionHandler(
-        recovery_coordinator=orchestrator._recovery_coordinator,
+        recovery_runtime=(
+            getattr(orchestrator, "_recovery_service", None) or orchestrator._recovery_coordinator
+        ),
         chunk_generator=orchestrator._chunk_generator,
         message_adder=orchestrator,
         reminder_manager=orchestrator.reminder_manager,
