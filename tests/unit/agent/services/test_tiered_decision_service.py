@@ -254,9 +254,9 @@ class TestProviderAgnosticTiers:
 
         # Anthropic models
         anthropic_tiers = config.provider_model_tiers["anthropic"]
-        assert anthropic_tiers["edge"] == "claude-3-5-haiku-20241022"
-        assert anthropic_tiers["balanced"] == "claude-sonnet-4-20250514"
-        assert anthropic_tiers["performance"] == "claude-opus-4-5-20251101"
+        assert anthropic_tiers["edge"] == "claude-haiku-4-5-20251001"
+        assert anthropic_tiers["balanced"] == "claude-sonnet-4-6"
+        assert anthropic_tiers["performance"] == "claude-opus-4-7"
 
         # OpenAI models
         openai_tiers = config.provider_model_tiers["openai"]

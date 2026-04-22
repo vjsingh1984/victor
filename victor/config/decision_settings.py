@@ -80,9 +80,9 @@ class DecisionServiceSettings(BaseModel):
         default_factory=lambda: {
             # Anthropic Claude models
             "anthropic": {
-                "edge": "claude-3-5-haiku-20241022",  # TODO: Update to Haiku 4.5 API ID when available
-                "balanced": "claude-sonnet-4-20250514",  # TODO: Update to Sonnet 4.6 API ID when available
-                "performance": "claude-opus-4-5-20251101",  # TODO: Update to Opus 4.7 API ID when available
+                "edge": "claude-haiku-4-5-20251001",
+                "balanced": "claude-sonnet-4-6",
+                "performance": "claude-opus-4-7",
             },
             # OpenAI GPT models
             "openai": {
