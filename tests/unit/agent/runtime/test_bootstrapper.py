@@ -42,7 +42,7 @@ class TestAgentRuntimeBootstrapper:
             context_service=getattr(orch, "_context_service", None),
             provider_service=getattr(orch, "_provider_service", None),
             recovery_service=getattr(orch, "_recovery_service", None),
-            deprecated_chat_coordinator=orch._chat_coordinator,
+            deprecated_chat_coordinator=orch._get_deprecated_chat_coordinator(),
             get_tool_coordinator=orch._get_deprecated_tool_coordinator,
             deprecated_session_coordinator=orch._session_coordinator,
             turn_executor=orch._turn_executor,

@@ -608,6 +608,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _initialize_interaction_runtime(self) -> None:
         """Initialize interaction runtime boundaries with canonical services first."""
         from victor.agent.runtime.interaction_runtime import (
+            create_chat_coordinator_shim,
             create_tool_coordinator_shim,
             create_interaction_runtime_components,
         )
@@ -644,8 +645,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._session_service = self._interaction_runtime.session_service
         self._context_service = self._interaction_runtime.context_service
         self._recovery_service = self._interaction_runtime.recovery_service
-        self._chat_coordinator = self._interaction_runtime.chat_coordinator
         self._session_coordinator = self._interaction_runtime.session_coordinator
+        self._deprecated_chat_coordinator = create_chat_coordinator_shim(
+            orchestrator=self,
+            factory=self._factory,
+            chat_service=getattr(self, "_chat_service", None),
+        )
+        self._chat_coordinator = self._deprecated_chat_coordinator
         self._deprecated_tool_coordinator = create_tool_coordinator_shim(
             orchestrator=self,
             tool_pipeline=self._tool_pipeline,
@@ -1194,6 +1200,10 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _get_deprecated_tool_coordinator(self) -> Any:
         """Get the deprecated ToolCoordinator compatibility shim."""
         return getattr(self, "_deprecated_tool_coordinator", None)
+
+    def _get_deprecated_chat_coordinator(self) -> Any:
+        """Get the deprecated ChatCoordinator compatibility shim."""
+        return getattr(self, "_deprecated_chat_coordinator", None)
 
     def _build_callback_coordinator(self) -> Any:
         """Lazily construct the CallbackCoordinator."""

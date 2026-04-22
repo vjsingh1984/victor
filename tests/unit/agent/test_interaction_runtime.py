@@ -6,6 +6,7 @@
 from unittest.mock import MagicMock, patch
 
 from victor.agent.runtime.interaction_runtime import (
+    create_chat_coordinator_shim,
     create_tool_coordinator_shim,
     create_interaction_runtime_components,
 )
@@ -36,65 +37,52 @@ def test_create_interaction_runtime_components_lazy_materialization():
     tool_service = MagicMock()
     session_service = MagicMock()
     factory = MagicMock()
-    pipeline = MagicMock()
-    factory.create_streaming_chat_pipeline.return_value = pipeline
+    with patch(
+        "victor.agent.coordinators.session_coordinator.create_session_coordinator"
+    ) as session_factory:
+        session_coordinator = MagicMock()
+        session_factory.return_value = session_coordinator
 
-    with patch("victor.agent.coordinators.chat_coordinator.ChatCoordinator") as chat_cls:
-        with patch(
-            "victor.agent.coordinators.session_coordinator.create_session_coordinator"
-        ) as session_factory:
-            chat_coordinator = MagicMock()
-            session_coordinator = MagicMock()
-            chat_cls.return_value = chat_coordinator
-            session_factory.return_value = session_coordinator
+        runtime = create_interaction_runtime_components(
+            orchestrator=orchestrator,
+            factory=factory,
+            tool_pipeline=tool_pipeline,
+            tool_registry=tool_registry,
+            tool_executor=tool_executor,
+            tool_cache=tool_cache,
+            tool_budget=25,
+            tool_selector=tool_selector,
+            tool_access_controller=MagicMock(),
+            mode_controller=mode_controller,
+            argument_normalizer=argument_normalizer,
+            session_state_manager=session_state_manager,
+            lifecycle_manager=lifecycle_manager,
+            memory_manager=memory_manager,
+            memory_session_id=memory_session_id,
+            checkpoint_manager=checkpoint_manager,
+            cost_tracker=cost_tracker,
+            conversation_controller=conversation_controller,
+            streaming_coordinator=streaming_coordinator,
+            provider_service=provider_service,
+            chat_service=chat_service,
+            context_service=context_service,
+            recovery_service=recovery_service,
+            tool_service=tool_service,
+            session_service=session_service,
+        )
 
-            chat_coordinator.set_streaming_pipeline = MagicMock()
+        assert runtime.chat_service is chat_service
+        assert runtime.tool_service is tool_service
+        assert runtime.session_service is session_service
+        assert runtime.context_service is context_service
+        assert runtime.recovery_service is recovery_service
+        assert runtime.session_coordinator.initialized is False
+        assert hasattr(runtime, "chat_coordinator") is False
+        assert hasattr(runtime, "tool_coordinator") is False
 
-            runtime = create_interaction_runtime_components(
-                orchestrator=orchestrator,
-                factory=factory,
-                tool_pipeline=tool_pipeline,
-                tool_registry=tool_registry,
-                tool_executor=tool_executor,
-                tool_cache=tool_cache,
-                tool_budget=25,
-                tool_selector=tool_selector,
-                tool_access_controller=MagicMock(),
-                mode_controller=mode_controller,
-                argument_normalizer=argument_normalizer,
-                session_state_manager=session_state_manager,
-                lifecycle_manager=lifecycle_manager,
-                memory_manager=memory_manager,
-                memory_session_id=memory_session_id,
-                checkpoint_manager=checkpoint_manager,
-                cost_tracker=cost_tracker,
-                conversation_controller=conversation_controller,
-                streaming_coordinator=streaming_coordinator,
-                provider_service=provider_service,
-                chat_service=chat_service,
-                context_service=context_service,
-                recovery_service=recovery_service,
-                tool_service=tool_service,
-                session_service=session_service,
-            )
+        assert runtime.session_coordinator.get_instance() is session_coordinator
 
-            assert runtime.chat_service is chat_service
-            assert runtime.tool_service is tool_service
-            assert runtime.session_service is session_service
-            assert runtime.context_service is context_service
-            assert runtime.recovery_service is recovery_service
-            assert runtime.chat_coordinator.initialized is False
-            assert runtime.session_coordinator.initialized is False
-            assert hasattr(runtime, "tool_coordinator") is False
-
-            assert runtime.chat_coordinator.get_instance() is chat_coordinator
-            assert runtime.session_coordinator.get_instance() is session_coordinator
-
-    chat_cls.assert_called_once_with(orchestrator)
-    factory.create_streaming_chat_pipeline.assert_called_once_with(chat_coordinator)
-    chat_service.bind_runtime_components.assert_called_once()
-    chat_coordinator.bind_chat_service.assert_called_once_with(chat_service)
-    chat_coordinator.set_streaming_pipeline.assert_called_once_with(pipeline)
+    chat_service.bind_runtime_components.assert_not_called()
     tool_service.bind_runtime_components.assert_called_once_with(
         tool_registry=tool_registry,
         tool_pipeline=tool_pipeline,
@@ -112,6 +100,36 @@ def test_create_interaction_runtime_components_lazy_materialization():
         cost_tracker=cost_tracker,
     )
     session_coordinator.bind_session_service.assert_called_once_with(session_service)
+
+
+def test_create_chat_coordinator_shim_lazy_materialization():
+    orchestrator = MagicMock()
+    chat_service = MagicMock()
+    factory = MagicMock()
+    pipeline = MagicMock()
+    factory.create_streaming_chat_pipeline.return_value = pipeline
+
+    with patch("victor.agent.coordinators.chat_coordinator.ChatCoordinator") as chat_cls:
+        chat_coordinator = MagicMock()
+        chat_cls.return_value = chat_coordinator
+        chat_coordinator.set_streaming_pipeline = MagicMock()
+
+        shim = create_chat_coordinator_shim(
+            orchestrator=orchestrator,
+            factory=factory,
+            chat_service=chat_service,
+        )
+
+        assert shim.initialized is False
+
+        with patch("warnings.warn") as warn:
+            assert shim.get_instance() is chat_coordinator
+
+        warn.assert_called_once()
+        chat_cls.assert_called_once_with(orchestrator)
+        chat_coordinator.bind_chat_service.assert_called_once_with(chat_service)
+        factory.create_streaming_chat_pipeline.assert_called_once_with(chat_coordinator)
+        chat_coordinator.set_streaming_pipeline.assert_called_once_with(pipeline)
 
 
 def test_create_tool_coordinator_shim_lazy_materialization():

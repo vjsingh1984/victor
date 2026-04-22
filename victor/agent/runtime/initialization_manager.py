@@ -83,7 +83,7 @@ class InitializationPhaseManager:
         4. memory_runtime — memory manager and embedding store
         5. resilience_runtime — recovery handler and integration
         6. coordination_runtime — recovery/chunk/planner/task coordinators
-        7. interaction_runtime — chat/tool/session coordinators (CRITICAL)
+        7. interaction_runtime — canonical interaction services plus compatibility shims (CRITICAL)
         8. services — DI service layer delegation (Strangler Fig)
         9. credit_runtime — credit assignment tracking (opt-in)
 
@@ -151,7 +151,7 @@ class InitializationPhaseManager:
                 "interaction_runtime",
                 orchestrator._initialize_interaction_runtime,
                 [
-                    "chat_coordinator",
+                    "chat_service",
                     "session_coordinator",
                 ],
                 True,  # critical

@@ -23,8 +23,42 @@ class InteractionRuntimeComponents:
     session_service: Any
     context_service: Any
     recovery_service: Any
-    chat_coordinator: LazyRuntimeProxy[Any]
     session_coordinator: LazyRuntimeProxy[Any]
+
+
+def create_chat_coordinator_shim(
+    *,
+    orchestrator: Any,
+    factory: Any,
+    chat_service: Optional[Any] = None,
+) -> LazyRuntimeProxy[Any]:
+    """Create the deprecated ChatCoordinator compatibility shim.
+
+    This helper is intentionally separate from ``InteractionRuntimeComponents``
+    so the primary interaction runtime contract stays service-first.
+    """
+
+    def _build_chat_coordinator() -> Any:
+        warnings.warn(
+            "ChatCoordinator shim is deprecated. Use ChatService (self._chat_service) "
+            "directly. The shim will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+
+        coordinator = ChatCoordinator(orchestrator)
+        if chat_service is not None and hasattr(coordinator, "bind_chat_service"):
+            coordinator.bind_chat_service(chat_service)
+        if hasattr(factory, "create_streaming_chat_pipeline"):
+            pipeline = factory.create_streaming_chat_pipeline(coordinator)
+            coordinator.set_streaming_pipeline(pipeline)
+        return coordinator
+
+    return LazyRuntimeProxy(
+        factory=_build_chat_coordinator,
+        name="chat_coordinator",
+    )
 
 
 def create_tool_coordinator_shim(
@@ -180,17 +214,6 @@ def create_interaction_runtime_components(
             streaming_coordinator=streaming_coordinator,
         )
 
-    def _build_chat_coordinator() -> Any:
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
-
-        coordinator = ChatCoordinator(orchestrator)
-        if hasattr(coordinator, "bind_chat_service"):
-            coordinator.bind_chat_service(resolved_chat_service)
-        if hasattr(factory, "create_streaming_chat_pipeline"):
-            pipeline = factory.create_streaming_chat_pipeline(coordinator)
-            coordinator.set_streaming_pipeline(pipeline)
-        return coordinator
-
     def _build_session_coordinator() -> Any:
         from victor.agent.coordinators.session_coordinator import (
             create_session_coordinator,
@@ -205,44 +228,12 @@ def create_interaction_runtime_components(
         )
         coordinator.bind_session_service(resolved_session_service)
         return coordinator
-
-    chat_coordinator = LazyRuntimeProxy(
-        factory=_build_chat_coordinator,
-        name="chat_coordinator",
-    )
-    if hasattr(resolved_chat_service, "bind_runtime_components"):
-        async def _planning_handler(user_message: str) -> Any:
-            return await chat_coordinator._chat_with_planning(user_message)
-
-        async def _stream_chat_handler(
-            user_message: str, **kwargs: Any
-        ) -> Any:
-            async for chunk in chat_coordinator.stream_chat(user_message, **kwargs):
-                yield chunk
-
-        async def _context_limit_handler(*args: Any, **kwargs: Any) -> Any:
-            return await chat_coordinator._handle_context_and_iteration_limits(
-                *args,
-                **kwargs,
-            )
-
-        resolved_chat_service.bind_runtime_components(
-            turn_executor=LazyRuntimeProxy(
-                factory=lambda: orchestrator.turn_executor,
-                name="turn_executor",
-            ),
-            planning_handler=_planning_handler,
-            stream_chat_handler=_stream_chat_handler,
-            context_limit_handler=_context_limit_handler,
-        )
-
     return InteractionRuntimeComponents(
         chat_service=resolved_chat_service,
         tool_service=resolved_tool_service,
         session_service=resolved_session_service,
         context_service=resolved_context_service,
         recovery_service=resolved_recovery_service,
-        chat_coordinator=chat_coordinator,
         session_coordinator=LazyRuntimeProxy(
             factory=_build_session_coordinator,
             name="session_coordinator",

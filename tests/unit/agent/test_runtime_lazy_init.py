@@ -105,14 +105,10 @@ class TestRuntimeLazyInitialization:
                 interaction_runtime = getattr(orchestrator, "_interaction_runtime", None)
                 assert interaction_runtime is not None, "interaction_runtime should exist"
 
-                # Check that components are NOT initialized (lazy)
-                chat_coordinator = getattr(interaction_runtime, "chat_coordinator", None)
+                # Check that the primary runtime surface is service-first.
                 session_coordinator = getattr(interaction_runtime, "session_coordinator", None)
 
-                # Primary interaction runtime surface is service-first and only
-                # exposes the chat/session coordinator shims.
                 for component_name, component in [
-                    ("chat_coordinator", chat_coordinator),
                     ("session_coordinator", session_coordinator),
                 ]:
                     assert component is not None, f"{component_name} should exist"
@@ -122,9 +118,14 @@ class TestRuntimeLazyInitialization:
                         not initialized
                     ), f"{component_name} should NOT be initialized after Agent.create()"
 
+                assert hasattr(interaction_runtime, "chat_coordinator") is False
                 assert hasattr(interaction_runtime, "tool_coordinator") is False
 
-                # Deprecated compatibility shim still exists on the orchestrator.
+                # Deprecated compatibility shims still exist on the orchestrator.
+                chat_coordinator = orchestrator._get_deprecated_chat_coordinator()
+                assert chat_coordinator is not None, "chat_coordinator shim should exist"
+                assert getattr(chat_coordinator, "initialized", False) is False
+
                 tool_coordinator = orchestrator._get_deprecated_tool_coordinator()
                 assert tool_coordinator is not None, "tool_coordinator shim should exist"
                 assert getattr(tool_coordinator, "initialized", False) is False
