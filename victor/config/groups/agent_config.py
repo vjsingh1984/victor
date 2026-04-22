@@ -1,0 +1,82 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Agent configuration settings.
+
+Extracted from victor/config/settings.py to improve maintainability.
+Contains configuration for autonomous planning and agent-level behavior.
+
+Note: Tool-level configuration (budget, retry, cache, selection) is already
+extracted in victor/config/tool_settings.py as ToolSettings.
+"""
+
+from typing import Dict
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class PlanningConfig(BaseModel):
+    """Configuration for autonomous planning mode."""
+
+    enabled: bool = False
+    min_complexity: str = Field(default="moderate", description="Minimum complexity: simple, moderate, complex")
+    show_plan: bool = True
+
+    @field_validator("min_complexity")
+    @classmethod
+    def validate_complexity(cls, v: str) -> str:
+        """Validate complexity level.
+
+        Args:
+            v: Complexity level
+
+        Returns:
+            Validated complexity level
+
+        Raises:
+            ValueError: If complexity is unknown
+        """
+        valid_levels = {"simple", "moderate", "complex"}
+        if v not in valid_levels:
+            raise ValueError(
+                f"Unknown complexity level '{v}'. "
+                f"Valid levels: {', '.join(sorted(valid_levels))}"
+            )
+        return v
+
+
+class AgentSettings(BaseModel):
+    """Agent-level settings extracted from main Settings class.
+
+    Groups agent behavior configuration including planning and validation.
+    Note: Tool-level configuration is in ToolSettings (tool_settings.py).
+    """
+
+    # Planning
+    enable_planning: bool = False
+    planning_min_complexity: str = "moderate"
+    planning_show_plan: bool = True
+
+    @field_validator("planning_min_complexity")
+    @classmethod
+    def validate_complexity(cls, v: str) -> str:
+        """Validate complexity level."""
+        valid_levels = {"simple", "moderate", "complex"}
+        if v not in valid_levels:
+            raise ValueError(
+                f"Unknown complexity level '{v}'. "
+                f"Valid levels: {', '.join(sorted(valid_levels))}"
+            )
+        return v
+

@@ -12,514 +12,356 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Configuration validation for early error detection.
+"""Configuration validation framework.
 
-This module provides validation functions that check configuration at startup
-rather than at runtime, providing clear, actionable error messages to users.
+Provides early validation of settings before orchestrator initialization,
+separating warnings from errors and providing actionable suggestions.
 """
 
-from __future__ import annotations
-
-import logging
-import os
-import sys
-from pathlib import Path
-from typing import TYPE_CHECKING, List, Tuple
-
-if TYPE_CHECKING:
-    from victor.config.settings import Settings
-
-logger = logging.getLogger(__name__)
-
-# =============================================================================
-# Configuration Validation Result
-# =============================================================================
+from dataclasses import dataclass, field
+from typing import List, Optional
+from enum import Enum
 
 
-class ValidationError:
-    """Represents a configuration validation error with helpful context."""
+class ValidationSeverity(Enum):
+    """Severity level for validation issues."""
+    ERROR = "error"
+    WARNING = "warning"
+    INFO = "info"
 
-    def __init__(
-        self,
-        message: str,
-        field: str | None = None,
-        suggestion: str | None = None,
-        error_code: str | None = None,
-    ):
-        self.message = message
-        self.field = field
-        self.suggestion = suggestion
-        self.error_code = error_code
-        # Severity is not stored, just used during validation
-        self._severity = None  # type: str | None
+
+@dataclass
+class ValidationIssue:
+    """A single validation issue found during configuration validation."""
+
+    category: str  # e.g., "provider", "profile", "api_key"
+    severity: ValidationSeverity
+    message: str
+    suggestion: Optional[str] = None
+    setting_path: Optional[str] = None  # e.g., "providers.anthropic.api_key"
 
     def __str__(self) -> str:
-        parts = [f"✗ {self.message}"]
-        if self.field:
-            parts.append(f"\n  Field: {self.field}")
+        """Format validation issue for display."""
+        severity_icon = {
+            ValidationSeverity.ERROR: "✗",
+            ValidationSeverity.WARNING: "⚠",
+            ValidationSeverity.INFO: "ℹ",
+        }[self.severity]
+
+        result = f"{severity_icon} [{self.category}] {self.message}"
         if self.suggestion:
-            parts.append(f"\n  💡 Suggestion: {self.suggestion}")
-        if self.error_code:
-            parts.append(f"\n  Error Code: {self.error_code}")
-        return "\n".join(parts)
+            result += f"\n    💡 {self.suggestion}"
+        if self.setting_path:
+            result += f"\n    📍 Setting: {self.setting_path}"
+        return result
 
 
-class ValidationResult:
-    """Result of configuration validation."""
+@dataclass
+class ConfigValidationResult:
+    """Result of configuration validation.
 
-    def __init__(self, is_valid: bool, errors: List[ValidationError] | None = None):
-        self.is_valid = is_valid
-        self.errors = errors or []
-
-    @property
-    def error_count(self) -> int:
-        return len(self.errors)
-
-    def add_error(self, error: ValidationError) -> None:
-        """Add a validation error."""
-        self.errors.append(error)
-        self.is_valid = False
-
-
-# =============================================================================
-# Validation Checks
-# =============================================================================
-
-
-def validate_environment(settings: "Settings" | None = None) -> ValidationResult:
-    """Validate environment variables and system configuration.
-
-    Args:
-        settings: Optional Settings instance for provider-aware validation
-
-    Returns:
-        ValidationResult with any environment issues
+    Contains lists of errors, warnings, and info messages found during validation.
+    Provides methods to check validity and get formatted output.
     """
-    result = ValidationResult(True)
 
-    # Check Python version
-    if sys.version_info < (3, 10):
-        result.add_error(
-            ValidationError(
-                message=f"Python {sys.version_info.major}.{sys.version_info.minor} is not supported",
-                suggestion="Python 3.10 or higher is required. "
-                "Try: python3.10 -m pip install victor-ai or upgrade your Python version.",
-                error_code="PYTHON_VERSION",
-            )
-        )
+    errors: List[ValidationIssue] = field(default_factory=list)
+    warnings: List[ValidationIssue] = field(default_factory=list)
+    info: List[ValidationIssue] = field(default_factory=list)
 
-    # Check for deprecated configuration
-    deprecated_vars = [
-        "VICTOR_API_KEY",
-        "OPENAI_API_BASE",
-        "ANTHROPIC_API_BASE",
-    ]
-    found_deprecated = [var for var in deprecated_vars if os.getenv(var)]
-    if found_deprecated:
-        result.add_error(
-            ValidationError(
-                message=f"Deprecated environment variable(s) found: {', '.join(found_deprecated)}",
-                suggestion="Remove deprecated variables. Use provider-specific environment variables "
-                "(e.g., ANTHROPIC_API_KEY) instead.",
-                error_code="DEPRECATED_ENV_VAR",
-            )
-        )
+    def add_error(
+        self,
+        category: str,
+        message: str,
+        suggestion: Optional[str] = None,
+        setting_path: Optional[str] = None,
+    ) -> None:
+        """Add an error to the validation result."""
+        self.errors.append(ValidationIssue(
+            category=category,
+            severity=ValidationSeverity.ERROR,
+            message=message,
+            suggestion=suggestion,
+            setting_path=setting_path,
+        ))
 
-    # Check for API keys (only if using cloud providers)
-    if settings and hasattr(settings, "default_provider"):
-        provider = settings.provider.default_provider
-        local_providers = ["ollama", "lmstudio", "vllm", "llama.cpp"]
+    def add_warning(
+        self,
+        category: str,
+        message: str,
+        suggestion: Optional[str] = None,
+        setting_path: Optional[str] = None,
+    ) -> None:
+        """Add a warning to the validation result."""
+        self.warnings.append(ValidationIssue(
+            category=category,
+            severity=ValidationSeverity.WARNING,
+            message=message,
+            suggestion=suggestion,
+            setting_path=setting_path,
+        ))
 
-        # Only check for API keys if not using a local provider
-        if provider and provider.lower() not in local_providers:
-            has_anthropic_key = bool(os.getenv("ANTHROPIC_API_KEY"))
-            has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+    def add_info(
+        self,
+        category: str,
+        message: str,
+        suggestion: Optional[str] = None,
+        setting_path: Optional[str] = None,
+    ) -> None:
+        """Add an info message to the validation result."""
+        self.info.append(ValidationIssue(
+            category=category,
+            severity=ValidationSeverity.INFO,
+            message=message,
+            suggestion=suggestion,
+            setting_path=setting_path,
+        ))
 
-            if not has_anthropic_key and not has_openai_key:
-                result.add_error(
-                    ValidationError(
-                        message="No API key found for cloud provider",
-                        suggestion="Set ANTHROPIC_API_KEY or OPENAI_API_KEY environment variable. "
-                        "For local models, use --provider ollama (requires Ollama to be running).",
-                        error_code="NO_API_KEY",
-                    )
-                )
+    def is_valid(self) -> bool:
+        """Check if configuration is valid (no errors).
 
-    return result
+        Returns:
+            True if there are no errors, False otherwise
+        """
+        return len(self.errors) == 0
+
+    def has_warnings(self) -> bool:
+        """Check if configuration has warnings.
+
+        Returns:
+            True if there are warnings, False otherwise
+        """
+        return len(self.warnings) > 0
+
+    def get_total_issues(self) -> int:
+        """Get total number of issues (errors + warnings + info).
+
+        Returns:
+            Total count of all issues
+        """
+        return len(self.errors) + len(self.warnings) + len(self.info)
+
+    def get_summary(self) -> str:
+        """Get a summary of validation results.
+
+        Returns:
+            Formatted summary string
+        """
+        parts = []
+        if self.errors:
+            parts.append(f"{len(self.errors)} error(s)")
+        if self.warnings:
+            parts.append(f"{len(self.warnings)} warning(s)")
+        if self.info:
+            parts.append(f"{len(self.info)} info")
+
+        if not parts:
+            return "✓ Configuration is valid"
+
+        status = "invalid" if self.errors else "valid with warnings"
+        return f"Configuration {status}: {', '.join(parts)}"
+
+    def format_for_display(self) -> str:
+        """Format all validation issues for display.
+
+        Returns:
+            Formatted string with all issues grouped by severity
+        """
+        lines = []
+
+        if self.errors:
+            lines.append("Errors:")
+            for error in self.errors:
+                lines.append(f"  {error}")
+
+        if self.warnings:
+            if self.errors:
+                lines.append("")
+            lines.append("Warnings:")
+            for warning in self.warnings:
+                lines.append(f"  {warning}")
+
+        if self.info:
+            if self.errors or self.warnings:
+                lines.append("")
+            lines.append("Info:")
+            for info_msg in self.info:
+                lines.append(f"  {info_msg}")
+
+        return "\n".join(lines)
 
 
-def validate_paths(settings: "Settings") -> ValidationResult:
-    """Validate file system paths in configuration.
+class ConfigValidator:
+    """Validates configuration settings before initialization.
 
-    Args:
-        settings: Settings instance to validate
-
-    Returns:
-        ValidationResult with any path issues
+    Provides validation methods for different aspects of configuration:
+    - Provider configuration
+    - API keys
+    - Profile settings
+    - File paths
+    - Feature flags
     """
-    result = ValidationResult(True)
 
-    # Get config directory (victor config directory)
-    try:
-        config_dir = settings.get_config_dir()
-        if config_dir and not config_dir.exists():
-            result.add_error(
-                ValidationError(
-                    message=f"Configuration directory does not exist: {config_dir}",
-                    suggestion="Run 'victor init' to create configuration or set VICTOR_CONFIG_DIR to a valid location.",
-                    field="VICTOR_CONFIG_DIR",
-                    error_code="CONFIG_DIR_NOT_FOUND",
-                )
-            )
-    except Exception as e:
-        logger.debug(f"Could not validate config directory: {e}")
+    def __init__(self):
+        """Initialize the validator."""
+        self._validators = {
+            "providers": self._validate_providers,
+            "api_keys": self._validate_api_keys,
+            "profiles": self._validate_profiles,
+            "paths": self._validate_paths,
+        }
 
-    # Validate codebase persist directory if specified
-    if (
-        hasattr(settings, "codebase_persist_directory")
-        and settings.search.codebase_persist_directory
-    ):
-        persist_path = Path(settings.search.codebase_persist_directory)
-        if not persist_path.exists():
+    def validate(self, settings) -> ConfigValidationResult:
+        """Validate all aspects of configuration.
+
+        Args:
+            settings: Settings object to validate
+
+        Returns:
+            ConfigValidationResult with all issues found
+        """
+        result = ConfigValidationResult()
+
+        # Run all validators
+        for name, validator in self._validators.items():
             try:
-                persist_path.mkdir(parents=True, exist_ok=True)
+                validator(settings, result)
             except Exception as e:
-                result.add_error(
-                    ValidationError(
-                        message=f"Cannot create codebase persist directory: {persist_path}",
-                        suggestion=f"Check permissions for {persist_path.parent} or set codebase_persist_directory "
-                        f"to a writable location. Error: {e}",
-                        field="codebase_persist_directory",
-                        error_code="PERSIST_DIR_PERMISSIONS",
-                    )
+                # Don't let validator errors break validation
+                result.add_warning(
+                    category="validator",
+                    message=f"Validator '{name}' failed: {e}",
+                    suggestion="This may indicate a bug in the validator",
                 )
 
-    return result
+        return result
 
+    def _validate_providers(self, settings, result: ConfigValidationResult) -> None:
+        """Validate provider configuration.
 
-def validate_provider_settings(settings: "Settings") -> ValidationResult:
-    """Validate provider configuration.
+        Args:
+            settings: Settings object
+            result: Validation result to add issues to
+        """
+        # Check if default_provider is known
+        known_providers = [
+            "ollama", "anthropic", "openai", "google", "cohere",
+            "groq", "deepseek", "openrouter", "zhipu", "mistral",
+            "azure", "aws", "lambdalabs", "replicate", "together",
+            "xai", "wangrui"
+        ]
 
-    Args:
-        settings: Settings instance to validate
-
-    Returns:
-        ValidationResult with any provider issues
-    """
-    result = ValidationResult(True)
-
-    # Check if default provider is configured
-    default_provider = settings.provider.default_provider
-    if not default_provider:
-        result.add_error(
-            ValidationError(
-                message="No default provider configured",
-                suggestion="Set the 'default_provider' setting in your profile or use --provider flag. "
-                "Available: anthropic, openai, ollama, lmstudio, vllm, and 18 more.",
-                field="default_provider",
-                error_code="NO_DEFAULT_PROVIDER",
-            )
-        )
-        return result  # Cannot validate further without provider
-
-    # Check for local providers that require additional setup
-    local_providers = ["ollama", "lmstudio", "vllm", "llama.cpp"]
-    if default_provider.lower() in local_providers:
-        # Check if the provider is running/accessible
-        if default_provider.lower() == "ollama":
-            try:
-                import subprocess
-
-                result_check = subprocess.run(
-                    ["ollama", "list"],
-                    capture_output=True,
-                    timeout=2,
+        if settings.provider and settings.provider.default_provider:
+            provider = settings.provider.default_provider
+            if provider not in known_providers:
+                result.add_warning(
+                    category="provider",
+                    message=f"Unknown provider '{provider}'",
+                    suggestion=f"Known providers: {', '.join(known_providers[:5])}...",
+                    setting_path="provider.default_provider",
                 )
-                if result_check.returncode != 0:
+
+    def _validate_api_keys(self, settings, result: ConfigValidationResult) -> None:
+        """Validate API key configuration.
+
+        Args:
+            settings: Settings object
+            result: Validation result to add issues to
+        """
+        # Check if provider has API key when required
+        if settings.provider and settings.provider.default_provider:
+            provider = settings.provider.default_provider
+
+            # Providers that require API keys
+            requires_key = ["anthropic", "openai", "google", "cohere", "groq"]
+
+            if provider in requires_key:
+                # Check for API key in flat fields
+                key_field = f"{provider}_api_key"
+                api_key = getattr(settings, key_field, None)
+                if api_key is None or (hasattr(api_key, 'get_secret_value') and not api_key.get_secret_value()):
                     result.add_error(
-                        ValidationError(
-                            message="Ollama provider selected but Ollama is not running",
-                            suggestion="Start Ollama: 'ollama serve' or 'brew services start ollama'. "
-                            "Verify with: ollama list",
-                            field="default_provider",
-                            error_code="OLLAMA_NOT_RUNNING",
-                        )
+                        category="api_key",
+                        message=f"API key not set for provider '{provider}'",
+                        suggestion=f"Set {provider.upper()}_API_KEY environment variable",
+                        setting_path=key_field,
                     )
-            except FileNotFoundError:
-                result.add_error(
-                    ValidationError(
-                        message="Ollama provider selected but Ollama is not installed",
-                        suggestion="Install Ollama: 'curl -fsSL https://ollama.com/install.sh | sh' "
-                        "or use: brew install ollama",
-                        field="default_provider",
-                        error_code="OLLAMA_NOT_INSTALLED",
-                    )
-                )
-            except Exception as e:
-                logger.debug(f"Could not check Ollama status: {e}")
 
-    # Check API keys for cloud providers
-    cloud_providers = {
-        "anthropic": "ANTHROPIC_API_KEY",
-        "openai": "OPENAI_API_KEY",
-        "google": "GOOGLE_API_KEY",
-        "azure": "AZURE_API_KEY",
-        "cohere": "COHERE_API_KEY",
-        "bedrock": "AWS_ACCESS_KEY_ID",
-    }
+    def _validate_profiles(self, settings, result: ConfigValidationResult) -> None:
+        """Validate profile configuration.
 
-    if default_provider.lower() in cloud_providers:
-        env_var = cloud_providers.get(default_provider.lower())
-        if env_var and not os.getenv(env_var):
-            result.add_error(
-                ValidationError(
-                    message=f"{default_provider.title()} provider selected but API key not found",
-                    suggestion=f"Set {env_var} environment variable or configure in profile YAML. "
-                    f"Example: export {env_var}=your_key_here",
-                    field=f"default_provider.{default_provider}",
-                    error_code="API_KEY_MISSING",
-                )
+        Args:
+            settings: Settings object
+            result: Validation result to add issues to
+        """
+        # Check if profile exists
+        if hasattr(settings, 'profile'):
+            profile = settings.profile
+            # Profile validation would go here
+            # For now, just add info about which profile is active
+            result.add_info(
+                category="profile",
+                message=f"Using profile: {profile}",
             )
 
-    return result
+    def _validate_paths(self, settings, result: ConfigValidationResult) -> None:
+        """Validate file system paths.
+
+        Args:
+            settings: Settings object
+            result: Validation result to add issues to
+        """
+        import os
+
+        # Check common paths
+        paths_to_check = []
+
+        if hasattr(settings, 'codebase_persist_directory'):
+            path = settings.codebase_persist_directory
+            if path:
+                paths_to_check.append(("codebase_persist_directory", path))
+
+        for setting_name, path in paths_to_check:
+            if path and not os.path.exists(os.path.dirname(path)):
+                result.add_warning(
+                    category="path",
+                    message=f"Parent directory does not exist for {setting_name}",
+                    suggestion=f"Create directory: mkdir -p {os.path.dirname(path)}",
+                    setting_path=setting_name,
+                )
 
 
-def validate_tool_settings(settings: "Settings") -> ValidationResult:
-    """Validate tool-related configuration.
+def validate_settings(settings) -> ConfigValidationResult:
+    """Validate settings and return result.
+
+    This is a convenience function that creates a ConfigValidator
+    and runs validation on the provided settings.
 
     Args:
-        settings: Settings Settings instance to validate
+        settings: Settings object to validate
 
     Returns:
-        ValidationResult with any tool issues
+        ConfigValidationResult with all issues found
     """
-    result = ValidationResult(True)
-
-    # Validate fallback_max_tools
-    if settings.tools.fallback_max_tools < 1:
-        result.add_error(
-            ValidationError(
-                message=f"fallback_max_tools must be at least 1, got {settings.tools.fallback_max_tools}",
-                suggestion="Set fallback_max_tools to 1 or higher in your profile YAML.",
-                field="fallback_max_tools",
-                error_code="INVALID_TOOL_BUDGET",
-            )
-        )
-
-    if settings.tools.fallback_max_tools > 20:
-        result.add_error(
-            ValidationError(
-                message=f"fallback_max_tools is very high: {settings.tools.fallback_max_tools}",
-                suggestion="Consider reducing fallback_max_tools to 10 or fewer for better performance. "
-                "Large tool budgets can lead to slower response times.",
-                field="fallback_max_tools",
-                error_code="HIGH_TOOL_BUDGET",
-            )
-        )
-
-    # Validate cache settings
-    if settings.tools.tool_selection_cache_ttl < 0:
-        result.add_error(
-            ValidationError(
-                message=f"tool_selection_cache_ttl cannot be negative: {settings.tools.tool_selection_cache_ttl}",
-                suggestion="Set tool_selection_cache_ttl to 0 or higher in your profile YAML.",
-                field="tool_selection_cache_ttl",
-                error_code="INVALID_CACHE_TTL",
-            )
-        )
-
-    return result
+    validator = ConfigValidator()
+    return validator.validate(settings)
 
 
-def validate_performance_settings(settings: "Settings") -> ValidationResult:
-    """Validate performance-related settings.
+# Alias for backward compatibility with existing code
+validate_configuration = validate_settings
+
+
+def format_validation_result(result: ConfigValidationResult) -> str:
+    """Format validation result for display.
+
+    This is a convenience function that formats the validation result
+    in a user-friendly way for CLI output.
 
     Args:
-        settings: Settings Settings instance to validate
+        result: ConfigValidationResult to format
 
     Returns:
-        ValidationResult with any performance issues
+        Formatted string for display
     """
-    result = ValidationResult(True)
-
-    # Check if optimizations are enabled (warnings only, not errors)
-    try:
-        if not settings.framework_preload_enabled:
-            result.add_error(
-                ValidationError(
-                    message="Framework preloading is disabled",
-                    suggestion="Enable framework_preload in your profile YAML for 50-70% faster first requests. "
-                    "This adds a small startup cost but dramatically improves first-use experience.",
-                    field="framework_preload_enabled",
-                    error_code="PRELOAD_DISABLED",
-                )
-            )
-
-        if not settings.http_connection_pool_enabled:
-            result.add_error(
-                ValidationError(
-                    message="HTTP connection pooling is disabled",
-                    suggestion="Enable http_connection_pool_enabled in your profile YAML for 20-30% "
-                    "faster HTTP requests to web search and API providers.",
-                    field="http_connection_pool_enabled",
-                    error_code="HTTP_POOL_DISABLED",
-                )
-            )
-
-        if not settings.tools.tool_selection_cache_enabled:
-            result.add_error(
-                ValidationError(
-                    message="Tool selection cache is disabled",
-                    suggestion="Enable tool_selection_cache_enabled in your profile YAML for 20-40% faster "
-                    "conversational responses (semantic search caching).",
-                    field="tool_selection_cache_enabled",
-                    error_code="TOOL_CACHE_DISABLED",
-                )
-            )
-    except Exception as e:
-        # Settings might not have these attributes in older versions
-        logger.debug(f"Could not validate performance settings: {e}")
-
-    return result
+    return result.format_for_display()
 
 
-# =============================================================================
-# Main Validation Entry Point
-# =============================================================================
-
-
-def validate_configuration(settings: "Settings" | None = None) -> ValidationResult:
-    """Perform comprehensive configuration validation.
-
-    This function checks all aspects of the configuration and provides
-    clear, actionable error messages for any issues found.
-
-    Args:
-        settings: Optional Settings instance. If None, will load default settings.
-
-    Returns:
-        ValidationResult indicating whether configuration is valid and any errors found
-    """
-    if settings is None:
-        try:
-            from victor.config.settings import Settings
-
-            settings = Settings()
-        except Exception as e:
-            # Settings creation failed catastrophically
-            return ValidationResult(
-                is_valid=False,
-                errors=[
-                    ValidationError(
-                        message=f"Failed to load settings: {e}",
-                        suggestion="Check your profiles.yaml and environment variables. "
-                        "Run 'victor config validate' for detailed diagnostics.",
-                        error_code="SETTINGS_LOAD_FAILED",
-                    )
-                ],
-            )
-
-    # Run all validation checks
-    result = ValidationResult(True)
-
-    # Environment checks (pass settings for provider-aware validation)
-    env_result = validate_environment(settings)
-    result.errors.extend(env_result.errors)
-
-    # Path checks
-    path_result = validate_paths(settings)
-    result.errors.extend(path_result.errors)
-
-    # Provider checks
-    provider_result = validate_provider_settings(settings)
-    result.errors.extend(provider_result.errors)
-
-    # Tool settings
-    tool_result = validate_tool_settings(settings)
-    result.errors.extend(tool_result.errors)
-
-    # Performance settings
-    perf_result = validate_performance_settings(settings)
-    result.errors.extend(perf_result.errors)
-
-    # Separate warnings from errors
-    errors = []
-    warnings = []
-
-    for error in result.errors:
-        # Check if this is a warning (has severity="warning" in suggestion or error_code in ("PRELOAD_DISABLED", "HTTP_POOL_DISABLED", "TOOL_CACHE_DISABLED"))
-        if "warning" in str(error.suggestion or "").lower() or error.error_code in (
-            "PRELOAD_DISABLED",
-            "HTTP_POOL_DISABLED",
-            "TOOL_CACHE_DISABLED",
-        ):
-            warnings.append(error)
-        else:
-            errors.append(error)
-
-    # Update result with only errors (warnings are informational)
-    result.errors = errors
-    result.is_valid = len(errors) == 0
-
-    return result
-
-
-def format_validation_result(result: ValidationResult) -> str:
-    """Format validation result for user display.
-
-    Args:
-        result: ValidationResult from validate_configuration
-
-    Returns:
-        Formatted string suitable for terminal display
-    """
-    lines = []
-
-    if result.is_valid:
-        lines.append("✓ Configuration is valid!")
-    else:
-        lines.append(f"✗ Configuration validation failed ({result.error_count} error(s):")
-        lines.append("")
-        for i, error in enumerate(result.errors, 1):
-            lines.append(f"\n{i}. {error.message}")
-            if error.field:
-                lines.append(f"   Field: {error.field}")
-            if error.suggestion:
-                lines.append(f"   💡 {error.suggestion}")
-            if error.error_code:
-                lines.append(f"   Code: {error.error_code}")
-
-    return "\n".join(lines)
-
-
-# =============================================================================
-# CLI Command
-# =============================================================================
-
-
-def validate_command() -> int:
-    """Run validation and exit with appropriate status code.
-
-    This is the entry point for 'victor config validate' command.
-
-    Returns:
-        Exit code (0 for success, 1 for validation failure)
-    """
-    try:
-        from victor.config.settings import Settings, load_settings
-
-        settings = load_settings()
-        result = validate_configuration(settings)
-
-        print(format_validation_result(result))
-
-        # Return exit code
-        if result.is_valid:
-            return 0
-        else:
-            return 1
-
-    except Exception as e:
-        print(f"✗ Validation failed with unexpected error: {e}")
-        logger.exception("Configuration validation failed")
-        return 1
