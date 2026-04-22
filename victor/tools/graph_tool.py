@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
@@ -76,6 +77,8 @@ class GraphMode(str, Enum):
     CALLERS = "callers"  # Find callers of a node
     CALLEES = "callees"  # Find callees of a node
     TRACE = "trace"  # Trace execution paths
+    SEMANTIC = "semantic"  # Semantic relationship discovery
+    QUERY = "query"  # Direct SQL query mode
 
 
 ALL_EDGE_TYPES = [
@@ -740,6 +743,171 @@ def _build_file_dependency_result(
     return result
 
 
+async def _run_graph_sql_query(
+    loaded: LoadedGraph,
+    sql: str,
+) -> Dict[str, Any]:
+    """Execute a raw SQL query against the graph database.
+
+    Enables 'Big Picture' metrics by leveraging SQLite's aggregation capabilities.
+    For safety, only SELECT statements are allowed.
+
+    Args:
+        loaded: LoadedGraph instance
+        sql: SQL SELECT query to execute
+
+    Returns:
+        Dict with query results and metadata
+    """
+    from victor.core.database import get_project_database
+
+    # Security: strictly enforce read-only SELECT queries
+    # Strip whitespace and check prefix
+    clean_sql = sql.strip()
+    if not clean_sql.upper().startswith("SELECT"):
+        return {
+            "error": "Only SELECT queries are allowed for security reasons.",
+            "success": False,
+        }
+
+    # Block common malicious patterns
+    forbidden = ["DELETE", "UPDATE", "INSERT", "DROP", "ALTER", "CREATE", "REPLACE", "ATTACH"]
+    for word in forbidden:
+        if f" {word} " in clean_sql.upper() or clean_sql.upper().startswith(f"{word} "):
+            return {
+                "error": f"Forbidden keyword detected in query: {word}",
+                "success": False,
+            }
+
+    try:
+        # Get project database using the root from LoadedGraph
+        project_db = get_project_database(loaded.root_path)
+
+        # Execute query
+        start_time = time.perf_counter()
+        rows = project_db.query(clean_sql)
+        duration = time.perf_counter() - start_time
+
+        # Convert Row objects to serializable dicts
+        results = [dict(row) for row in rows]
+
+        return {
+            "results": results,
+            "row_count": len(results),
+            "execution_time_sec": round(duration, 4),
+            "query": clean_sql,
+            "success": True,
+        }
+    except Exception as e:
+        logger.warning(f"[graph] SQL query failed: {e}")
+        return {
+            "error": f"SQL execution failed: {str(e)}",
+            "success": False,
+        }
+
+
+async def _find_semantic_relationships(
+    loaded: LoadedGraph,
+    node_id: str,
+    *,
+    threshold: float = 0.5,
+    limit: int = 10,
+    node_types: Optional[Set[str]] = None,
+) -> Dict[str, Any]:
+    """Find components semantically similar to a given node.
+
+    Uses vector embeddings to discover 'Potential Architectural Relationships'
+    between components that lack explicit code-level links.
+
+    Args:
+        loaded: LoadedGraph instance with index and analyzer
+        node_id: Target node identifier
+        threshold: Minimum similarity score (0.0 to 1.0)
+        limit: Maximum number of relationships to return
+        node_types: Optional set of node types to filter results
+
+    Returns:
+        Dict with discovered potential relationships
+    """
+    target_node = loaded.analyzer.nodes.get(node_id)
+    if not target_node:
+        return {"error": f"Node '{node_id}' not found in graph analyzer"}
+
+    # 1. Create semantic anchor for the node
+    # Combine name, type, and docstring to capture the node's intent
+    parts = [target_node.name, f"type:{target_node.type}"]
+    if target_node.signature:
+        parts.append(target_node.signature)
+    if target_node.docstring:
+        # Take first 250 chars of docstring to focus on intent, not details
+        parts.append(target_node.docstring[:250])
+
+    anchor_text = " ".join(parts)
+    logger.info(f"[graph] Searching for semantic matches for '{target_node.name}'")
+
+    # 2. Search for similar nodes using CodebaseIndex
+    try:
+        # Use existing semantic search infrastructure
+        search_results = await loaded.index.semantic_search(
+            query=anchor_text,
+            max_results=limit * 3,  # Over-fetch for filtering
+            similarity_threshold=threshold,
+        )
+    except Exception as e:
+        logger.warning(f"[graph] Semantic search failed during discovery: {e}")
+        return {"error": f"Semantic search failed: {str(e)}"}
+
+    # 3. Filter and rank results
+    # Get existing structural neighbors (OUT only for dependency-like relationships)
+    neighbors = loaded.analyzer.get_neighbors(node_id, direction=GraphDirection.OUT, max_depth=1)
+    existing_neighbor_ids = {
+        item["node_id"] for depth_items in neighbors["neighbors_by_depth"].values() for item in depth_items
+    }
+    # Also ignore self
+    existing_neighbor_ids.add(node_id)
+
+    relationships: List[Dict[str, Any]] = []
+    for result in search_results:
+        # Match search result back to a graph node if possible
+        # Result typically contains 'file_path', 'symbol_name'
+        res_file = result.get("file_path")
+        res_name = result.get("symbol_name")
+
+        if not res_file or not res_name:
+            continue
+
+        # Find corresponding node ID in graph analyzer
+        match_id = loaded.analyzer.resolve_node_id(res_name, preferred_types={result.get("symbol_type") or "function"})
+        if not match_id or match_id in existing_neighbor_ids:
+            continue
+
+        # Double check it's the right file to avoid collisions with same-named symbols
+        match_node = loaded.analyzer.nodes[match_id]
+        if _normalize_relpath(match_node.file) != _normalize_relpath(res_file):
+            continue
+
+        if node_types and match_node.type not in node_types:
+            continue
+
+        relationships.append(
+            _node_payload(
+                match_node,
+                similarity=round(float(result.get("score") or 0.0), 3),
+                discovery_reason="semantic_similarity",
+            )
+        )
+
+        if len(relationships) >= limit:
+            break
+
+    return {
+        "focus_node": _node_payload(target_node),
+        "potential_relationships": sorted(relationships, key=lambda x: x["similarity"], reverse=True),
+        "threshold_used": threshold,
+        "total_discovered": len(relationships),
+    }
+
+
 def _find_similar_node_names(
     analyzer: GraphAnalyzer, node_ref: str, max_suggestions: int = 5
 ) -> List[str]:
@@ -930,6 +1098,7 @@ async def graph(
     query: Optional[str] = None,
     depth: int = 2,
     top_k: int = 10,
+    threshold: float = 0.5,
     direction: GraphDirection = "out",
     edge_types: Optional[List[str]] = None,
     reindex: bool = False,
@@ -1178,6 +1347,35 @@ async def graph(
                     top_k=min(top_k, 5),
                 ),
             }
+        elif mode == GraphMode.SEMANTIC:
+            target_ref = node or source
+            if not target_ref:
+                raise ValueError("semantic mode requires node")
+
+            preferred_types = (
+                {"file"} if files_only else {"module"} if modules_only else _SYMBOL_TYPES
+            )
+            resolved_id = loaded.analyzer.resolve_node_id(
+                target_ref, preferred_types=preferred_types
+            )
+            if resolved_id is None:
+                suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
+                error_msg = f"Could not resolve graph node '{target_ref}'"
+                if suggestions:
+                    error_msg += f"\n\nDid you mean one of these?\n  - " + "\n  - ".join(suggestions[:5])
+                raise ValueError(error_msg)
+
+            result = await _find_semantic_relationships(
+                loaded,
+                resolved_id,
+                threshold=threshold,
+                limit=top_k,
+                node_types=node_types,
+            )
+        elif mode == GraphMode.QUERY:
+            if not query:
+                raise ValueError("query mode requires a SQL SELECT statement")
+            result = await _run_graph_sql_query(loaded, query)
         else:
             raise ValueError(f"Unsupported graph mode: {mode}")
 
@@ -1395,6 +1593,90 @@ async def graph_path(
         target=target,
         path=path,
         depth=max_depth,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+@tool(
+    category="analysis",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "semantic", "discovery", "similarity", "architectural patterns"],
+    timeout=60.0,
+)
+async def graph_semantic(
+    node: str,
+    path: str = ".",
+    threshold: float = 0.5,
+    top_k: int = 5,
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Discover potential architectural relationships based on semantic similarity.
+
+    Identifies components that are semantically related but lack explicit code-level links.
+    Use for: Finding members of a registry, related service implementations, or pattern participants.
+
+    Args:
+        node: Node identifier (symbol, file, or module) to analyze
+        path: Path to codebase root (default: ".")
+        threshold: Minimum similarity score (default: 0.5)
+        top_k: Maximum number of results to return (default: 5)
+
+    Returns:
+        Dict with potential relationships and similarity scores
+    """
+    return await graph(
+        mode="semantic",
+        node=node,
+        path=path,
+        top_k=top_k,
+        threshold=threshold,
+        _exec_ctx=_exec_ctx,
+    )
+
+
+@tool(
+    category="analysis",
+    priority=Priority.MEDIUM,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    execution_category=ExecutionCategory.READ_ONLY,
+    keywords=["graph", "sql", "query", "aggregate", "metrics", "coupling"],
+    timeout=30.0,
+)
+async def graph_query(
+    query: str,
+    path: str = ".",
+    _exec_ctx: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Execute a raw SQL SELECT query against the code graph database.
+
+    Enables 'Big Picture' metrics by leveraging SQLite's aggregation capabilities.
+    For security, only SELECT statements are allowed.
+
+    Tables available:
+    - graph_node (node_id, type, name, file, line, end_line, lang, signature, docstring, parent_id, metadata)
+    - graph_edge (src, dst, type, weight, metadata)
+    - graph_file_mtime (file, mtime, indexed_at)
+
+    Examples:
+    - Find most imported modules: "SELECT count(*) as count, dst FROM graph_edge WHERE type='IMPORTS' GROUP BY dst ORDER BY count DESC LIMIT 10"
+    - Count symbols by type: "SELECT type, count(*) as count FROM graph_node GROUP BY type ORDER BY count DESC"
+    - Find files with most symbols: "SELECT file, count(*) as count FROM graph_node GROUP BY file ORDER BY count DESC LIMIT 10"
+
+    Args:
+        query: SQL SELECT query to execute
+        path: Path to codebase root (default: ".")
+
+    Returns:
+        Dict with query results and execution metadata
+    """
+    return await graph(
+        mode="query",
+        query=query,
+        path=path,
         _exec_ctx=_exec_ctx,
     )
 

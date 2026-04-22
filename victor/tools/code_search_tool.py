@@ -139,13 +139,16 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
     """Validate persistent index integrity with a lightweight check.
 
     Returns True if corruption was detected (rebuild triggered in background),
-    False if index is healthy.
+    False if index is healthy or currently being initialized.
 
-    When corruption is found, the rebuild fires as an asyncio background task so
-    the calling code is never blocked — the stale/corrupt index is returned
-    immediately and the rebuilt one will be available on the next tool call.
+    ENHANCEMENT: Distinguishes between init-time races and actual corruption.
     """
     try:
+        # NEW: Check if index is currently being built
+        if hasattr(index, "_is_indexing") and index._is_indexing:
+            logger.debug("Index currently being built, skipping integrity check")
+            return False  # Don't trigger rebuild during init
+
         # Quick check: does the vector store have data?
         store = getattr(index, "_vector_store", None) or getattr(index, "vector_store", None)
         if store:
@@ -163,28 +166,68 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
         )
         return False  # Healthy — no rebuild needed
     except Exception as e:
-        logger.warning("Persistent index corrupt (%s); scheduling background rebuild", e)
+        # ENHANCEMENT: Better error classification
+        error_msg = str(e) if str(e) else f"{type(e).__name__}"
+
+        # Don't rebuild for common init-time / transient errors
+        transient_keywords = [
+            "locked", "timeout", "timed out", "not ready", "unavailable",
+            "initializing", "building", "in progress"
+        ]
+
+        if any(kw in error_msg.lower() for kw in transient_keywords):
+            logger.debug(
+                "Transient init issue detected (%s), skipping rebuild",
+                error_msg
+            )
+            return False  # Don't rebuild for transient issues
+
+        # Log with full error details for debugging
+        logger.warning(
+            "Persistent index corrupt (%s); scheduling background rebuild",
+            error_msg
+        )
+
         if hasattr(index, "_is_indexed"):
             index._is_indexed = False
-        # Fire rebuild as a non-blocking background task — callers are never blocked.
-        # The freshly rebuilt index will be available on the next tool invocation.
+
+        # Fire rebuild as background task
         asyncio.create_task(_background_index_rebuild(index))
         return True  # Corruption detected, rebuild in flight
 
 
 async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> None:
     """Rebuild a corrupt index in the background without blocking callers."""
+    import time
+    start_time = time.time()
     try:
-        logger.info("Background index rebuild started (timeout=%ds)", rebuild_timeout)
+        index_path = getattr(index, "root", "unknown")
+        logger.info(
+            "Background index rebuild started (timeout=%ds, index=%s)",
+            rebuild_timeout,
+            index_path
+        )
         await asyncio.wait_for(index.index_codebase(), timeout=rebuild_timeout)
-        logger.info("Background index rebuild completed successfully")
+        elapsed = time.time() - start_time
+        logger.info(
+            "Background index rebuild completed successfully in %.2fs (index=%s)",
+            elapsed,
+            index_path
+        )
     except asyncio.TimeoutError:
         logger.warning(
-            "Background index rebuild timed out after %ds; index remains stale",
+            "Background index rebuild timed out after %ds; index remains stale (index=%s)",
             rebuild_timeout,
+            getattr(index, "root", "unknown"),
         )
     except Exception as err:
-        logger.warning("Background index rebuild failed: %s", err)
+        error_msg = str(err) if str(err) else f"{type(err).__name__}"
+        logger.warning(
+            "Background index rebuild failed after %.2fs: %s (index=%s)",
+            time.time() - start_time,
+            error_msg,
+            getattr(index, "root", "unknown"),
+        )
 
 
 def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

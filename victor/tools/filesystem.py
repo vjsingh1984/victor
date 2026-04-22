@@ -14,6 +14,7 @@
 
 """Filesystem tools for reading, writing, and listing contents."""
 
+import asyncio
 import logging
 import os
 import threading
@@ -2642,6 +2643,148 @@ IMPORTANT_DOC_PATTERNS = [
         "explore the project structure",
     ],
 )
+async def _get_directory_summaries(root: Path, directory_paths: List[str]) -> Dict[str, str]:
+    """Get summaries for directories based on symbol index.
+
+    Uses the project's SQLite symbol graph to identify key classes and functions
+    within each directory, providing a high-level view of its purpose.
+
+    Args:
+        root: Codebase root path
+        directory_paths: List of relative directory paths to summarize
+
+    Returns:
+        Dict mapping directory path to summary string
+    """
+    from victor.core.database import get_project_database
+
+    try:
+        # Use absolute path to resolve the correct project database
+        # This is safe to call even if the database is already open
+        project_db = get_project_database(root)
+        if not project_db.table_exists("graph_node"):
+            logger.debug("graph_node table does not exist yet (init still in progress)")
+            return {}
+
+        # Limit number of summaries to avoid excessive DB queries on large repos
+        max_summaries = 40
+        target_paths = directory_paths[:max_summaries]
+
+        summaries: Dict[str, str] = {}
+
+        for rel_path in target_paths:
+            # Normalize path for SQLite LIKE (use / even on Windows)
+            # We look for recursive matches (file LIKE 'rel_path/%')
+            db_path_prefix = rel_path.replace("\\", "/") + "/%"
+
+            # Query for top symbols (prioritizing classes then functions)
+            # This is a lightweight query that avoids full graph traversal
+            query = f"""
+                SELECT type, name
+                FROM graph_node
+                WHERE (file LIKE ? OR file = ?)
+                AND type IN ('class', 'function', 'interface', 'module')
+                ORDER BY CASE type
+                    WHEN 'class' THEN 1
+                    WHEN 'interface' THEN 2
+                    WHEN 'function' THEN 3
+                    ELSE 4
+                END
+                LIMIT 15
+            """
+            rows = project_db.query(query, (db_path_prefix, rel_path))
+
+            if not rows:
+                continue
+
+            # Group by type and build summary
+            by_type: Dict[str, List[str]] = {}
+            for row in rows:
+                t = row["type"]
+                if t not in by_type:
+                    by_type[t] = []
+                by_type[t].append(row["name"])
+
+            parts = []
+            if "class" in by_type:
+                classes = sorted(list(set(by_type["class"])))[:4]
+                parts.append(f"Classes: {', '.join(classes)}")
+            if "function" in by_type:
+                funcs = sorted(list(set(by_type["function"])))[:4]
+                parts.append(f"Funcs: {', '.join(funcs)}")
+
+            if parts:
+                summaries[rel_path] = " | ".join(parts)
+
+        return summaries
+    except Exception as e:
+        # ENHANCEMENT: Better error logging for debugging
+        error_msg = str(e) if str(e) else f"{type(e).__name__}"
+
+        # Log with context for debugging
+        logger.warning(
+            "Failed to get directory summaries from symbol graph: %s "
+            "(this is OK during init - will retry on next tool call)",
+            error_msg
+        )
+
+        # Return partial results if available
+        return summaries if 'summaries' in locals() else {}
+
+
+@tool(
+    category="filesystem",
+    name="project_overview",
+    priority=Priority.HIGH,
+    access_mode=AccessMode.READONLY,
+    danger_level=DangerLevel.SAFE,
+    # Registry-driven metadata for tool selection
+    progress_params=[
+        "path",
+        "max_depth",
+    ],  # Params indicating exploration progress
+    stages=[
+        "initial",
+        "exploration",
+        "analysis",
+    ],  # Conversation stages where relevant
+    task_types=["analysis", "exploration"],  # Task types for classification
+    execution_category=ExecutionCategory.READ_ONLY,  # Safe for parallel execution
+    keywords=[
+        "overview",
+        "summary",
+        "structure",
+        "directories",
+        "project",
+        "architecture",
+        "layout",
+        "components",
+        "organization",
+        "tree",
+    ],
+    use_cases=[
+        "getting initial project overview",
+        "understanding directory structure",
+        "identifying important files",
+        "project exploration",
+        "finding documentation files",
+        "discovering main components",
+    ],
+    examples=[
+        "give me a project overview",
+        "show me the directory structure",
+        "what are the main components",
+        "summarize the project layout",
+        "what does this codebase contain",
+        "how is this project organized",
+    ],
+    mandatory_keywords=[
+        "project overview",
+        "directory structure",
+        "main components",
+        "codebase layout",
+    ],  # Force inclusion for these intents
+)
 async def overview(
     path: str = ".",
     max_depth: int = 2,
@@ -2767,6 +2910,28 @@ async def overview(
 
         walk_tree(root, 1)
 
+        # Get summaries for directories from symbol index
+        # ENHANCEMENT: Add retry logic for init-time database locks
+        max_retries = 2
+        dir_summaries = {}
+
+        for attempt in range(max_retries):
+            dir_summaries = await _get_directory_summaries(
+                root, [d["path"] for d in directories]
+            )
+
+            if dir_summaries:
+                break  # Success
+
+            if attempt < max_retries - 1:
+                logger.debug("Retry %d/%d for directory summaries", attempt + 1, max_retries)
+                await asyncio.sleep(0.5)  # Brief wait before retry
+
+        # Attach summaries to directories
+        for d in directories:
+            if d["path"] in dir_summaries:
+                d["summary"] = dir_summaries[d["path"]]
+
         # Sort important docs by importance then size
         importance_order = {"high": 0, "medium": 1}
         important_docs.sort(
@@ -2804,6 +2969,7 @@ async def overview(
             "largest_files": largest_files,
             "total_files_scanned": len(all_files),
             "hints": [
+                "Summary-First: Use directory summaries to identify relevant subsystems before deep diving.",
                 "Use read_file to examine important documentation first",
                 "Large files often indicate core modules",
                 "Check README.md and CLAUDE.md for project-specific guidance",
