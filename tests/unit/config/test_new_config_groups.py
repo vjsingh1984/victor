@@ -226,13 +226,9 @@ class TestConfigGroupsIntegration:
 
         settings = Settings()
 
-        # Nested access
+        # Nested access only
         assert settings.workflow is not None
         assert isinstance(settings.workflow, WorkflowSettings)
-
-        # Flat access (backward compatible)
-        assert settings.workflow_definition_cache_enabled == settings.workflow.workflow_definition_cache_enabled
-        assert settings.stategraph_copy_on_write_enabled == settings.workflow.stategraph_copy_on_write_enabled
 
     def test_response_settings_in_main_settings(self):
         """Test that ResponseSettings is accessible from Settings."""
@@ -240,13 +236,9 @@ class TestConfigGroupsIntegration:
 
         settings = Settings()
 
-        # Nested access
+        # Nested access only
         assert settings.response is not None
         assert isinstance(settings.response, ResponseSettings)
-
-        # Flat access (backward compatible)
-        assert settings.response_completion_retries == settings.response.response_completion_retries
-        assert settings.response_token_reserve == settings.response.response_token_reserve
 
     def test_cache_settings_in_main_settings(self):
         """Test that CacheSettings is accessible from Settings."""
@@ -258,24 +250,21 @@ class TestConfigGroupsIntegration:
         assert settings.cache is not None
         assert isinstance(settings.cache, CacheSettings)
 
-        # Flat access (backward compatible)
-        assert settings.tool_cache_enabled == settings.cache.tool_cache_enabled
-        assert settings.generic_result_cache_enabled == settings.cache.generic_result_cache_enabled
-        assert settings.tool_selection_cache_enabled == settings.cache.tool_selection_cache_enabled
-        assert settings.http_connection_pool_enabled == settings.cache.http_connection_pool_enabled
+        # Flat access removed - all access is now via nested groups
+        # NOTE: Flat fields have been removed, use nested access only
 
     def test_flat_field_overrides_sync_to_nested_groups(self):
-        """Test that flat field overrides sync to nested groups."""
+        """Test that nested initialization works correctly."""
         from victor.config.settings import Settings
 
-        # Override flat fields
+        # Initialize with nested structure
         settings = Settings(
-            workflow_definition_cache_enabled=False,
-            response_completion_retries=5,
-            tool_cache_enabled=False,
+            **{"workflow": {"workflow_definition_cache_enabled": False}},
+            **{"response": {"response_completion_retries": 5}},
+            **{"cache": {"tool_cache_enabled": False}},
         )
 
-        # Verify sync to nested groups
+        # Verify nested values are set correctly
         assert settings.workflow.workflow_definition_cache_enabled is False
         assert settings.response.response_completion_retries == 5
         assert settings.cache.tool_cache_enabled is False

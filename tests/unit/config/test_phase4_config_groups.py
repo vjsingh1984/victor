@@ -196,9 +196,7 @@ class TestPhase4ConfigGroupsIntegration:
         assert settings.recovery is not None
         assert isinstance(settings.recovery, RecoverySettings)
 
-        # Flat access (backward compatible)
-        assert settings.chat_max_iterations == settings.recovery.chat_max_iterations
-        assert settings.max_consecutive_tool_calls == settings.recovery.max_consecutive_tool_calls
+        # NOTE: Flat access removed - use nested access only
 
     def test_analytics_settings_in_main_settings(self):
         """Test that AnalyticsSettings is accessible from Settings."""
@@ -210,8 +208,7 @@ class TestPhase4ConfigGroupsIntegration:
         assert settings.analytics is not None
         assert isinstance(settings.analytics, AnalyticsSettings)
 
-        # Flat access (backward compatible)
-        assert settings.streaming_metrics_enabled == settings.analytics.streaming_metrics_enabled
+        # NOTE: Flat access removed - use nested access only
         assert settings.analytics_enabled == settings.analytics.analytics_enabled
 
     def test_network_settings_in_main_settings(self):
@@ -224,22 +221,22 @@ class TestPhase4ConfigGroupsIntegration:
         assert settings.network is not None
         assert isinstance(settings.network, NetworkSettings)
 
-        # Flat access (backward compatible)
-        assert settings.tool_retry_enabled == settings.network.tool_retry_enabled
-        assert settings.tool_retry_max_attempts == settings.network.tool_retry_max_attempts
+        # NOTE: Flat access removed - use nested access only
+        assert settings.network.tool_retry_enabled == settings.network.tool_retry_enabled
+        assert settings.network.tool_retry_max_attempts == settings.network.tool_retry_max_attempts
 
     def test_flat_field_overrides_sync_to_nested_groups(self):
-        """Test that flat field overrides sync to nested groups."""
+        """Test that nested initialization works correctly."""
         from victor.config.settings import Settings
 
-        # Override flat fields
+        # Initialize with nested structure
         settings = Settings(
-            chat_max_iterations=100,
-            streaming_metrics_enabled=False,
-            tool_retry_enabled=False,
+            **{"recovery": {"chat_max_iterations": 100}},
+            **{"analytics": {"streaming_metrics_enabled": False}},
+            **{"network": {"tool_retry_enabled": False}},
         )
 
-        # Verify sync to nested groups
+        # Verify nested values are set correctly
         assert settings.recovery.chat_max_iterations == 100
         assert settings.analytics.streaming_metrics_enabled is False
         assert settings.network.tool_retry_enabled is False

@@ -188,13 +188,9 @@ class TestPhase5ConfigGroupsIntegration:
 
         settings = Settings()
 
-        # Nested access
+        # Nested access only
         assert settings.embedding is not None
         assert isinstance(settings.embedding, EmbeddingSettings)
-
-        # Flat access (backward compatible)
-        assert settings.unified_embedding_model == settings.embedding.unified_embedding_model
-        assert settings.semantic_similarity_threshold == settings.embedding.semantic_similarity_threshold
 
     def test_tool_selection_settings_in_main_settings(self):
         """Test that ToolSelectionSettings is accessible from Settings."""
@@ -202,13 +198,9 @@ class TestPhase5ConfigGroupsIntegration:
 
         settings = Settings()
 
-        # Nested access
+        # Nested access only
         assert settings.tool_selection is not None
         assert isinstance(settings.tool_selection, ToolSelectionSettings)
-
-        # Flat access (backward compatible)
-        assert settings.use_semantic_tool_selection == settings.tool_selection.use_semantic_tool_selection
-        assert settings.enable_tool_deduplication == settings.tool_selection.enable_tool_deduplication
 
     def test_nested_group_independence(self):
         """Test that nested groups are independent from each other."""
