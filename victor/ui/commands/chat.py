@@ -3,13 +3,16 @@ import os
 import sys
 import time
 import uuid
+from types import SimpleNamespace
 from typing import Optional, Any
 
-from rich.console import Console
+from rich import box
+from rich.console import Console, Group
 from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
+from rich.text import Text
 
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.config.settings import load_settings, ProfileConfig
@@ -25,6 +28,7 @@ from victor.core.errors import (
     VictorError,
 )
 from victor.ui.output_formatter import InputReader, create_formatter
+from victor.ui.rendering.utils import render_status_message
 from victor.ui.commands.utils import (
     preload_semantic_index,
     check_codebase_index,
@@ -95,6 +99,186 @@ def _display_skill_preview(con: Console, agent: Any, message: str) -> None:
             con.print(f"[dim]\U0001f3af Skills: {names}[/]")
     except Exception:
         pass
+
+
+def _print_tool_output_mode_banner(con: Console, tool_settings: Any) -> None:
+    """Render a compact banner describing tool-output preview behavior."""
+    preview_enabled = bool(getattr(tool_settings, "tool_output_preview_enabled", True))
+    safe_only = bool(getattr(tool_settings, "tool_output_pruning_safe_only", True))
+
+    if safe_only:
+        icon = "[green]✓[/]"
+        summary = "safe read-heavy pruning"
+    else:
+        icon = "[yellow]![/]"
+        summary = "broader pruning"
+
+    preview_state = "preview on" if preview_enabled else "preview off"
+    con.print(f"{icon} [bold]Tool output[/] [dim]{summary} • {preview_state}[/]")
+
+
+def _should_render_cli_chrome(formatter: Any) -> bool:
+    """Return True when stdout can safely include Rich-only CLI chrome."""
+    config = getattr(formatter, "config", None)
+    if config is None:
+        return True
+
+    quiet = getattr(config, "quiet", False)
+    if isinstance(quiet, bool) and quiet:
+        return False
+
+    mode = getattr(config, "mode", None)
+    if mode is None:
+        return True
+
+    mode_value = getattr(mode, "value", mode)
+    return str(mode_value).lower() == "rich"
+
+
+def _should_render_interactive_tool_banner(use_tui: bool) -> bool:
+    """Return True when interactive startup should print CLI tool-output chrome."""
+    return not use_tui
+
+
+def _print_interactive_startup_messages(con: Console, messages: list[str]) -> None:
+    """Print queued startup notices for interactive CLI surfaces."""
+    for message in messages:
+        render_status_message(con, message)
+
+
+class _NoopStatus:
+    """No-op replacement for Rich status in automation output modes."""
+
+    def __enter__(self) -> "_NoopStatus":
+        return self
+
+    def __exit__(self, *_args: Any) -> bool:
+        return False
+
+    def update(self, *_args: Any, **_kwargs: Any) -> None:
+        pass
+
+    def stop(self) -> None:
+        pass
+
+
+def _build_cli_panel(
+    profile_config: Any,
+    vertical_name: Optional[str] = None,
+    rl_suggestion: Optional[tuple[str, str, float]] = None,
+    settings: Any = None,
+) -> Panel:
+    """Build the interactive CLI header panel."""
+    brand = Text()
+    brand.append("Victor", style="bold white")
+    brand.append("  ", style="dim")
+    brand.append("Open-source agentic AI framework", style="dim")
+
+    meta = Text()
+    meta.append("Provider ", style="dim")
+    # Handle None profile_config (default settings)
+    provider_name = profile_config.provider if profile_config else settings.provider.default_provider
+    model_name = profile_config.model if profile_config else settings.provider.default_model
+    meta.append(str(provider_name), style="bold cyan")
+    meta.append("  •  ", style="dim")
+    meta.append("Model ", style="dim")
+    meta.append(str(model_name), style="bold green")
+    if vertical_name:
+        meta.append("  •  ", style="dim")
+        meta.append("Vertical ", style="dim")
+        meta.append(vertical_name, style="bold magenta")
+
+    controls = Text()
+    controls.append("/help", style="bold")
+    controls.append(" commands  •  ", style="dim")
+    controls.append("/exit", style="bold")
+    controls.append(" or Ctrl+D  •  history with Up/Down", style="dim")
+
+    lines: list[Any] = [brand, meta, controls]
+
+    if rl_suggestion:
+        profile_name, provider_name, q_value = rl_suggestion
+        hint = Text()
+        hint.append("Routing hint ", style="dim")
+        hint.append(provider_name, style="bold cyan")
+        hint.append(f"  Q={q_value:.2f}", style="yellow")
+        hint.append("  •  victor chat -p ", style="dim")
+        hint.append(profile_name, style="bold cyan")
+        lines.append(hint)
+
+    return Panel(
+        Group(*lines),
+        title="Victor CLI",
+        border_style="bright_blue",
+        box=box.ROUNDED,
+        padding=(1, 2),
+    )
+
+
+def _configure_agent_compaction(
+    agent: Any,
+    *,
+    compaction_threshold: Optional[float] = None,
+    adaptive_threshold: Optional[bool] = None,
+    compaction_min_threshold: Optional[float] = None,
+    compaction_max_threshold: Optional[float] = None,
+    con: Console = console,
+    show_status: bool = True,
+) -> None:
+    """Apply CLI compaction overrides to an agent/orchestrator if supported."""
+    if not any(
+        (
+            compaction_threshold is not None,
+            adaptive_threshold is not None,
+            compaction_min_threshold is not None,
+            compaction_max_threshold is not None,
+        )
+    ):
+        return
+
+    orchestrator_getter = getattr(agent, "get_orchestrator", None)
+    orchestrator = orchestrator_getter() if callable(orchestrator_getter) else agent
+    compactor = getattr(orchestrator, "context_compactor", None)
+    if compactor is None:
+        return
+
+    if compaction_threshold is not None:
+        if not (0.1 <= compaction_threshold <= 0.95):
+            if show_status:
+                con.print(f"\n[red]✗[/] Invalid compaction threshold: {compaction_threshold}")
+                con.print("[yellow]Threshold must be between 0.1 (10%) and 0.95 (95%)[/]")
+            raise typer.Exit(code=1)
+        compactor.config.proactive_threshold = compaction_threshold
+        if show_status:
+            con.print(f"[dim]Compaction threshold set to {compaction_threshold:.0%}[/]")
+
+    if adaptive_threshold is not None:
+        if adaptive_threshold:
+            from victor.agent.adaptive_compaction import AdaptiveCompactionThreshold
+
+            min_thresh = compaction_min_threshold or 0.35
+            max_thresh = compaction_max_threshold or 0.70
+            if min_thresh >= max_thresh:
+                if show_status:
+                    con.print(
+                        f"\n[red]✗[/] Min threshold ({min_thresh}) must be less than max "
+                        f"({max_thresh})"
+                    )
+                raise typer.Exit(code=1)
+
+            adaptive = AdaptiveCompactionThreshold(
+                min_threshold=min_thresh,
+                max_threshold=max_thresh,
+            )
+            compactor.set_adaptive_threshold(adaptive)
+            if show_status:
+                con.print(
+                    f"[dim]Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})[/]"
+                )
+        else:
+            compactor.disable_adaptive_threshold()
+            if show_status:
+                con.print("[dim]Adaptive threshold disabled[/]")
 
 
 @chat_app.callback(invoke_without_command=True)
@@ -274,6 +458,31 @@ def chat(
         "--planning-model",
         help="Override model for planning tasks (e.g., 'deepseek-chat').",
         rich_help_panel="Advanced Agent Behavior",
+    ),
+    # Compaction options
+    compaction_threshold: Optional[float] = typer.Option(
+        None,
+        "--compaction-threshold",
+        help="Compaction threshold (0.1-0.95). Default: 0.50. Lower = earlier compaction.",
+        rich_help_panel="Compaction",
+    ),
+    adaptive_threshold: Optional[bool] = typer.Option(
+        None,
+        "--adaptive-threshold/--no-adaptive-threshold",
+        help="Enable adaptive threshold based on conversation patterns (35-70% range).",
+        rich_help_panel="Compaction",
+    ),
+    compaction_min_threshold: Optional[float] = typer.Option(
+        None,
+        "--compaction-min-threshold",
+        help="Minimum adaptive threshold (0.1-0.8). Default: 0.35. Used with --adaptive-threshold.",
+        rich_help_panel="Compaction",
+    ),
+    compaction_max_threshold: Optional[float] = typer.Option(
+        None,
+        "--compaction-max-threshold",
+        help="Maximum adaptive threshold (0.2-0.95). Default: 0.70. Used with --adaptive-threshold.",
+        rich_help_panel="Compaction",
     ),
     # Workflow options (grouped separately)
     workflow: Optional[str] = typer.Option(
@@ -739,6 +948,10 @@ victor chat --sessionid abc123            # Resume session
                     planning_model=planning_model,
                     legacy_mode=legacy_mode,
                     show_reasoning=show_reasoning,
+                    compaction_threshold=compaction_threshold,
+                    adaptive_threshold=adaptive_threshold,
+                    compaction_min_threshold=compaction_min_threshold,
+                    compaction_max_threshold=compaction_max_threshold,
                     # Smart routing
                     enable_smart_routing=enable_smart_routing,
                     routing_profile=routing_profile,
@@ -771,6 +984,10 @@ victor chat --sessionid abc123            # Resume session
                     use_tui=use_tui,
                     resume_session_id=session_id,
                     show_reasoning=show_reasoning,
+                    compaction_threshold=compaction_threshold,
+                    adaptive_threshold=adaptive_threshold,
+                    compaction_min_threshold=compaction_min_threshold,
+                    compaction_max_threshold=compaction_max_threshold,
                     # Smart routing
                     enable_smart_routing=enable_smart_routing,
                     routing_profile=routing_profile,
@@ -789,6 +1006,7 @@ def _configure_smart_routing(
     enable_smart_routing: bool,
     routing_profile: str,
     fallback_chain: Optional[str],
+    show_status: bool = True,
 ) -> None:
     """Apply smart-routing settings when the feature flag permits."""
     if not enable_smart_routing:
@@ -803,13 +1021,15 @@ def _configure_smart_routing(
             settings.smart_routing_fallback_chain = [
                 p.strip() for p in fallback_chain.split(",")
             ]
-        console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
+        if show_status:
+            console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
     else:
-        console.print("[yellow]Smart routing is currently disabled via feature flag.[/]")
-        console.print(
-            "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
-            "[cyan]--enable-smart-routing[/] flag in beta period"
-        )
+        if show_status:
+            console.print("[yellow]Smart routing is currently disabled via feature flag.[/]")
+            console.print(
+                "Enable with: [cyan]export VICTOR_USE_SMART_ROUTING=true[/] or "
+                "[cyan]--enable-smart-routing[/] flag in beta period"
+            )
 
 
 def _run_default_interactive() -> None:
@@ -840,6 +1060,10 @@ async def run_oneshot(
     planning_model: Optional[str] = None,
     legacy_mode: bool = False,
     show_reasoning: bool = False,
+    compaction_threshold: Optional[float] = None,
+    adaptive_threshold: Optional[bool] = None,
+    compaction_min_threshold: Optional[float] = None,
+    compaction_max_threshold: Optional[float] = None,
     # Smart routing parameters
     enable_smart_routing: bool = False,
     routing_profile: str = "balanced",
@@ -864,8 +1088,16 @@ async def run_oneshot(
     session_id = str(uuid.uuid4())
     success = False
     tool_calls_made = 0
+    show_cli_chrome = _should_render_cli_chrome(formatter)
 
-    _configure_smart_routing(settings, console, enable_smart_routing, routing_profile, fallback_chain)
+    _configure_smart_routing(
+        settings,
+        console,
+        enable_smart_routing,
+        routing_profile,
+        fallback_chain,
+        show_status=show_cli_chrome,
+    )
 
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
@@ -877,14 +1109,9 @@ async def run_oneshot(
         settings.tool_settings.tool_output_pruning_enabled = True
         settings.tool_settings.tool_output_pruning_safe_only = False
 
-    # Show status message if non-default
     tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
-    if enable_pruning:
-        console.print("[yellow]⚠ Tool output: broader pruning enabled (cost optimization)[/]")
-    else:
-        console.print(
-            "[green]✓[/] Tool output: safe read-heavy pruning active, preview enabled"
-        )
+    if show_cli_chrome:
+        _print_tool_output_mode_banner(console, tool_settings)
 
     try:
         from victor.framework.task import TaskComplexityService as ComplexityClassifier
@@ -898,9 +1125,10 @@ async def run_oneshot(
     # If planning is enabled, disable thinking mode to avoid context bloat
     # Planning mode generates structured plans which don't need extended reasoning
     if enable_planning and thinking:
-        console.print(
-            "[yellow]Planning mode enabled: disabling thinking mode to avoid context overflow.[/]"
-        )
+        if show_cli_chrome:
+            console.print(
+                "[yellow]Planning mode enabled: disabling thinking mode to avoid context overflow.[/]"
+            )
         thinking = False
 
     # Auto-enable show_reasoning for thinking models (GLM-5.x, DeepSeek-R1, Qwen3)
@@ -919,6 +1147,7 @@ async def run_oneshot(
 
     agent = None
     shim: Optional[FrameworkShim] = None
+    provider_for_suggestions = getattr(settings.provider, "default_provider", "unknown")
     try:
         # Unified initialization via AgentFactory (replaces legacy/framework split)
         from victor.framework.agent_factory import AgentFactory, InitializationError
@@ -928,7 +1157,12 @@ async def run_oneshot(
         vertical_param = vertical if vertical else None
 
         # Show initialization progress for first-time setup (can take 20-30s)
-        with console.status("[bold green]Initializing Victor...[/]", spinner="dots") as status:
+        status_context = (
+            console.status("[bold green]Initializing Victor...[/]", spinner="dots")
+            if show_cli_chrome
+            else _NoopStatus()
+        )
+        with status_context as status:
             # Step 1: Load and validate configuration
             status.update("Loading configuration...")
 
@@ -942,31 +1176,45 @@ async def run_oneshot(
                 if not validation_result.is_valid():
                     # Configuration has errors - display and exit
                     status.stop()  # Stop the spinner to show errors clearly
-                    console.print("[bold red]Configuration Validation Failed:[/]")
-                    console.print(format_validation_result(validation_result))
-                    console.print("")
-                    console.print("[yellow]Run 'victor config validate' for detailed diagnostics[/]")
+                    formatted_validation = format_validation_result(validation_result)
+                    if show_cli_chrome:
+                        console.print("[bold red]Configuration Validation Failed:[/]")
+                        console.print(formatted_validation)
+                        console.print("")
+                        console.print(
+                            "[yellow]Run 'victor config validate' for detailed diagnostics[/]"
+                        )
+                    else:
+                        formatter.error("Configuration validation failed", formatted_validation)
                     raise typer.Exit(1)
                 elif validation_result.has_warnings():
                     # Configuration has warnings but is valid - show summary
                     warning_count = len(validation_result.warnings)
-                    if warning_count > 0:
+                    if show_cli_chrome and warning_count > 0:
                         console.print(f"[dim]✓ Configuration valid with {warning_count} warning(s)[/]")
                 else:
                     # Configuration is completely valid
-                    console.print("[dim]✓ Configuration valid[/]")
+                    if show_cli_chrome:
+                        console.print("[dim]✓ Configuration valid[/]")
+            except typer.Exit:
+                raise
             except Exception as e:
                 # If validation itself fails, log it but don't block startup
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Configuration validation skipped due to error: {e}")
-                console.print("[dim yellow]⚠ Configuration validation skipped[/]")
+                if show_cli_chrome:
+                    console.print("[dim yellow]⚠ Configuration validation skipped[/]")
 
             # Validate default model existence (Phase 1 UX improvement)
             from victor.config.settings import validate_default_model
 
             model_valid, model_warning = validate_default_model(settings)
             if not model_valid and model_warning:
+                if not show_cli_chrome:
+                    formatter.error("Configuration warning", model_warning)
+                    raise typer.Exit(code=1)
+
                 # Model validation failed - show warning and offer to continue
                 console.print("\n[yellow]⚠ Configuration Warning:[/]")
                 console.print(model_warning)
@@ -1070,6 +1318,16 @@ async def run_oneshot(
             if max_iterations is not None:
                 agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
 
+            _configure_agent_compaction(
+                agent,
+                compaction_threshold=compaction_threshold,
+                adaptive_threshold=adaptive_threshold,
+                compaction_min_threshold=compaction_min_threshold,
+                compaction_max_threshold=compaction_max_threshold,
+                con=console,
+                show_status=show_cli_chrome,
+            )
+
             if mode:
                 from victor.agent.mode_controller import AgentMode, get_mode_controller
 
@@ -1077,8 +1335,9 @@ async def run_oneshot(
                 try:
                     controller.switch_mode(AgentMode(mode))
                 except Exception as e:
-                    console.print(f"\n[yellow]Warning:[/] Failed to set mode '{mode}': {e}")
-                    console.print("  Continuing with default mode.\n")
+                    if show_cli_chrome:
+                        console.print(f"\n[yellow]Warning:[/] Failed to set mode '{mode}': {e}")
+                        console.print("  Continuing with default mode.\n")
 
             # Step 5: Preload semantic index if requested
             if preindex:
@@ -1086,22 +1345,27 @@ async def run_oneshot(
                 try:
                     await preload_semantic_index(os.getcwd(), settings, console)
                 except Exception as e:
-                    console.print(f"\n[yellow]Warning:[/] Failed to preload semantic index: {e}")
-                    console.print("  Continuing without preindex (first search will be slower).\n")
+                    if show_cli_chrome:
+                        console.print(f"\n[yellow]Warning:[/] Failed to preload semantic index: {e}")
+                        console.print(
+                            "  Continuing without preindex (first search will be slower).\n"
+                        )
 
             # Step 6: Start embedding preload
             status.update("Starting embedding preload...")
             try:
                 agent.start_embedding_preload()
             except Exception as e:
-                console.print(f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}")
-                console.print("  Continuing without embeddings (some features may be slower).\n")
+                if show_cli_chrome:
+                    console.print(f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}")
+                    console.print("  Continuing without embeddings (some features may be slower).\n")
 
             # Planning mode requires non-streaming (plan generation → step execution → summary)
             use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
 
             # Display skill auto-selection feedback before response
-            _display_skill_preview(console, agent, message)
+            if show_cli_chrome:
+                _display_skill_preview(console, agent, message)
 
             if use_streaming:
                 from victor.ui.rendering import (
@@ -1110,7 +1374,7 @@ async def run_oneshot(
                     stream_response,
                 )
 
-                use_live = renderer_choice in {"rich", "auto"}
+                use_live = show_cli_chrome and renderer_choice in {"rich", "auto"}
                 if renderer_choice in {"rich-text", "text"}:
                     use_live = False
                 renderer = (
@@ -1136,7 +1400,10 @@ async def run_oneshot(
                 await stream_response(
                     agent, message, buffered, suppress_thinking=not show_reasoning
                 )
-                buffered.flush(console)
+                if show_cli_chrome:
+                    buffered.flush(console)
+                else:
+                    formatter.response(content=buffered.finalize())
 
             success = True
             if hasattr(agent, "get_session_metrics"):
@@ -1150,6 +1417,8 @@ async def run_oneshot(
         if e.run_command:
             formatter.info(f"Run: {e.run_command}")
         raise typer.Exit(1)
+    except typer.Exit:
+        raise
     except Exception as e:
         # Use contextual error formatting for better UX
         error_message = format_exception_for_user(e)
@@ -1170,8 +1439,7 @@ async def run_oneshot(
         )
 
         if is_provider_error:
-            provider = getattr(profile_config, "provider", "unknown")
-            if provider != "ollama":
+            if provider_for_suggestions != "ollama":
                 formatter.info(
                     "💡 Try switching to a different provider:\n"
                     "  victor chat -p ollama  # Local models (free)\n"
@@ -1224,6 +1492,10 @@ async def run_interactive(
     use_tui: bool = True,
     resume_session_id: Optional[str] = None,
     show_reasoning: bool = False,
+    compaction_threshold: Optional[float] = None,
+    adaptive_threshold: Optional[bool] = None,
+    compaction_min_threshold: Optional[float] = None,
+    compaction_max_threshold: Optional[float] = None,
     # Smart routing parameters
     enable_smart_routing: bool = False,
     routing_profile: str = "balanced",
@@ -1262,8 +1534,20 @@ async def run_interactive(
     session_id = str(uuid.uuid4())
     success = False
     tool_calls_made = 0
+    show_startup_cli_chrome = _should_render_interactive_tool_banner(use_tui)
+    smart_routing_status_shown = False
+    compaction_status_shown = False
+    tui_startup_messages: list[str] = []
 
-    _configure_smart_routing(settings, console, enable_smart_routing, routing_profile, fallback_chain)
+    _configure_smart_routing(
+        settings,
+        console,
+        enable_smart_routing,
+        routing_profile,
+        fallback_chain,
+        show_status=show_startup_cli_chrome,
+    )
+    smart_routing_status_shown = show_startup_cli_chrome and enable_smart_routing
 
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
@@ -1275,31 +1559,71 @@ async def run_interactive(
         settings.tool_settings.tool_output_pruning_enabled = True
         settings.tool_settings.tool_output_pruning_safe_only = False
 
-    # Show status message if non-default
     tool_settings = settings.tool_settings if hasattr(settings, "tool_settings") else ToolSettings()
-    if enable_pruning:
-        console.print("[yellow]⚠ Tool output: broader pruning enabled (cost optimization)[/]")
-    else:
-        console.print(
-            "[green]✓[/] Tool output: safe read-heavy pruning active, preview enabled"
-        )
+    tool_banner_shown = False
+    if show_startup_cli_chrome:
+        _print_tool_output_mode_banner(console, tool_settings)
+        tool_banner_shown = True
 
     try:
         profiles = settings.load_profiles()
         profile_config = profiles.get(profile)
 
         if not profile_config:
-            console.print(f"[bold red]Error:[/ ] Profile '{profile}' not found")
-            raise typer.Exit(1)
+            # Profile not found - show available profiles
+            if use_tui:
+                tui_startup_messages.append(
+                    f"Profile '{profile}' not found. Using default settings "
+                    f"({settings.provider.default_provider}/{settings.provider.default_model})."
+                )
+                if profiles:
+                    available = ", ".join(sorted(profiles.keys()))
+                    tui_startup_messages.append(f"Available profiles: {available}")
+                else:
+                    tui_startup_messages.append(
+                        "No profiles configured. Create profiles in ~/.victor/profiles.yaml."
+                    )
+            else:
+                console.print(f"[bold red]Error:[/ ] Profile '{profile}' not found\n")
+
+                if profiles:
+                    console.print("[bold]Available profiles:[/]")
+                    for profile_name in sorted(profiles.keys()):
+                        profile_info = profiles[profile_name]
+                        # ProfileConfig is a Pydantic model with direct attributes
+                        provider = getattr(profile_info, 'provider', settings.provider.default_provider)
+                        model = getattr(profile_info, 'model', settings.provider.default_model)
+                        console.print(
+                            f"  • [cyan]{profile_name}[/] (provider: {provider}, model: {model})"
+                        )
+
+                    console.print(
+                        f"\n[dim]Using default settings "
+                        f"({settings.provider.default_provider}/{settings.provider.default_model})[/]"
+                    )
+                else:
+                    console.print("[yellow]No profiles configured. Using default settings.[/]")
+                    console.print("[dim]Tip:[/] Create profiles in ~/.victor/profiles.yaml[/]\n")
+
+            # Continue with default settings
+            profile_config = None
+        profile_display = profile_config or SimpleNamespace(
+            provider=settings.provider.default_provider,
+            model=settings.provider.default_model,
+        )
 
         # Unified initialization via AgentFactory
         from victor.framework.agent_factory import AgentFactory, InitializationError
 
         # Pass original vertical string to AgentFactory (preserves name for error reporting)
         vertical_param = vertical if vertical else None
+
+        # Use "default" profile if profile_config is None (default settings)
+        profile_to_use = profile if profile_config else "default"
+
         factory = AgentFactory(
             settings=settings,
-            profile=profile,
+            profile=profile_to_use,
             vertical=vertical_param,
             thinking=thinking,
             session_id=session_id,
@@ -1343,14 +1667,23 @@ async def run_interactive(
                             conversation_state_dict
                         )
                     except Exception as e:
-                        console.print(
-                            f"[yellow]Warning:[/] Failed to restore conversation state: {e}"
-                        )
+                        if use_tui:
+                            tui_startup_messages.append(
+                                f"Warning: failed to restore conversation state: {e}"
+                            )
+                        else:
+                            console.print(
+                                f"[yellow]Warning:[/] Failed to restore conversation state: {e}"
+                            )
 
-                console.print(
-                    f"[green]✓[/] Resumed session: {metadata.get('title', 'Untitled')} "
-                    f"({metadata.get('message_count', 0)} messages)\n"
+                resumed_message = (
+                    f"Resumed session: {metadata.get('title', 'Untitled')} "
+                    f"({metadata.get('message_count', 0)} messages)"
                 )
+                if use_tui:
+                    tui_startup_messages.append(resumed_message)
+                else:
+                    console.print(f"[green]✓[/] {resumed_message}\n")
 
             # Note: Observability (shim) is handled by AgentFactory internally
             # The factory creates the agent with framework features already wired
@@ -1370,10 +1703,16 @@ async def run_interactive(
                 await initialize_from_context(exec_ctx)
             except Exception as e:
                 # Non-fatal: log warning but continue
-                console.print(
-                    f"[yellow]Warning:[/] Failed to initialize file watchers: {e}"
-                )
-                console.print("  Continuing without automatic file watching.\n")
+                if use_tui:
+                    tui_startup_messages.append(
+                        f"Warning: failed to initialize file watchers: {e}. "
+                        "Continuing without automatic file watching."
+                    )
+                else:
+                    console.print(
+                        f"[yellow]Warning:[/] Failed to initialize file watchers: {e}"
+                    )
+                    console.print("  Continuing without automatic file watching.\n")
         except InitializationError as e:
             console.print(f"[red]Error ({e.stage}):[/] {e.message}")
             for s in e.suggestions:
@@ -1386,6 +1725,23 @@ async def run_interactive(
             agent.unified_tracker.set_tool_budget(tool_budget, user_override=True)
         if max_iterations is not None:
             agent.unified_tracker.set_max_iterations(max_iterations, user_override=True)
+        _configure_agent_compaction(
+            agent,
+            compaction_threshold=compaction_threshold,
+            adaptive_threshold=adaptive_threshold,
+            compaction_min_threshold=compaction_min_threshold,
+            compaction_max_threshold=compaction_max_threshold,
+            con=console,
+            show_status=show_startup_cli_chrome,
+        )
+        compaction_status_shown = show_startup_cli_chrome and any(
+            (
+                compaction_threshold is not None,
+                adaptive_threshold is not None,
+                compaction_min_threshold is not None,
+                compaction_max_threshold is not None,
+            )
+        )
 
         if mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller
@@ -1403,10 +1759,11 @@ async def run_interactive(
 
                 tui_app = VictorTUI(
                     agent=agent,
-                    provider=profile_config.provider,
-                    model=profile_config.model,
+                    provider=profile_display.provider,
+                    model=profile_display.model,
                     stream=stream,
                     settings=settings,  # Pass settings for slash commands
+                    startup_messages=tui_startup_messages,
                 )
                 await tui_app.run_async()
             except ImportError:
@@ -1418,22 +1775,55 @@ async def run_interactive(
                 use_tui = False
 
         if not use_tui:
+            if enable_smart_routing and not smart_routing_status_shown:
+                _configure_smart_routing(
+                    settings,
+                    console,
+                    enable_smart_routing,
+                    routing_profile,
+                    fallback_chain,
+                    show_status=True,
+                )
+                smart_routing_status_shown = True
+            if not tool_banner_shown:
+                _print_tool_output_mode_banner(console, tool_settings)
+                tool_banner_shown = True
+            if not compaction_status_shown and any(
+                (
+                    compaction_threshold is not None,
+                    adaptive_threshold is not None,
+                    compaction_min_threshold is not None,
+                    compaction_max_threshold is not None,
+                )
+            ):
+                _configure_agent_compaction(
+                    agent,
+                    compaction_threshold=compaction_threshold,
+                    adaptive_threshold=adaptive_threshold,
+                    compaction_min_threshold=compaction_min_threshold,
+                    compaction_max_threshold=compaction_max_threshold,
+                    con=console,
+                    show_status=True,
+                )
+                compaction_status_shown = True
             from victor.ui.commands import SlashCommandHandler
 
             cmd_handler = SlashCommandHandler(console, settings, agent)
 
-            rl_suggestion = get_rl_profile_suggestion(profile_config.provider, profiles)
+            rl_suggestion = get_rl_profile_suggestion(profile_display.provider, profiles)
             await _run_cli_repl(
                 agent,
                 settings,
                 cmd_handler,
-                profile_config,
+                profile_display,
                 stream,
                 rl_suggestion,
                 renderer_choice=renderer_choice,
                 vertical_name=vertical,
                 enable_planning=enable_planning,
                 show_reasoning=show_reasoning,
+                profile_name=profile,
+                startup_messages=tui_startup_messages,
             )
 
         success = True
@@ -1447,6 +1837,7 @@ async def run_interactive(
         console.print(f"[bold red]Error:[/]\n{error_message}")
 
         # Show traceback in debug mode only
+        import os
         if os.getenv("VICTOR_DEBUG"):
             import traceback
 
@@ -1561,31 +1952,13 @@ async def _run_cli_repl(
     vertical_name: Optional[str] = None,
     enable_planning: Optional[bool] = None,
     show_reasoning: bool = False,
+    profile_name: str = "default",
+    startup_messages: Optional[list[str]] = None,
 ) -> None:
     """Run the CLI-based REPL (fallback for unsupported terminals)."""
-    vertical_display = f"  [bold]Vertical:[/ ] [magenta]{vertical_name}[/]" if vertical_name else ""
-    panel_content = (
-        f"[bold blue]Victor[/] - Open-source agentic AI framework\n\n"
-        f"[bold]Provider:[/ ] [cyan]{profile_config.provider}[/]  "
-        f"[bold]Model:[/ ] [cyan]{profile_config.model}[/]{vertical_display}\n\n"
-        f"Type [bold]/help[/] for commands, [bold]/exit[/] or [bold]Ctrl+D[/] to quit.\n"
-        f"Use [bold]Up/Down[/] arrows to browse conversation history."
-    )
-
-    if rl_suggestion:
-        profile_name, provider_name, q_value = rl_suggestion
-        panel_content += (
-            f"\n\n[dim]RL Tip: [cyan]{provider_name}[/] has higher Q-value ({q_value:.2f}) - "
-            f"try [cyan]-p {profile_name}[/][/]"
-        )
-
-    console.print(
-        Panel(
-            panel_content,
-            title="Victor CLI",
-            border_style="blue",
-        )
-    )
+    console.print(_build_cli_panel(profile_config, vertical_name, rl_suggestion, settings))
+    if startup_messages:
+        _print_interactive_startup_messages(console, startup_messages)
 
     # Set up prompt_toolkit with persistent history for Up/Down arrow navigation
     prompt_session = _create_cli_prompt_session()
@@ -1626,7 +1999,7 @@ async def _run_cli_repl(
                 console.print("[green]Conversation cleared[/]")
                 continue
 
-            console.print("[blue]Assistant:[/]")
+            console.print("[bold cyan]Assistant[/]")
 
             # Planning mode requires non-streaming execution
             use_streaming = stream and not enable_planning
@@ -1660,9 +2033,8 @@ async def _run_cli_repl(
                 )
                 content_buffer = sanitize_response(content_buffer)
 
-                # Print the assistant's response to the console
-                if content_buffer:
-                    console.print(Markdown(content_buffer))
+                # Renderers own streamed output. Re-printing the returned buffer here
+                # duplicates the assistant response for FormatterRenderer.
             else:
                 response = await agent.chat(user_input, use_planning=enable_planning)
                 console.print(Markdown(response.content))
@@ -1679,6 +2051,7 @@ async def _run_cli_repl(
             console.print(f"[bold red]Error:[/]\n{error_message}")
 
             # Show traceback in debug mode only
+            import os  # Import os for getenv
             if os.getenv("VICTOR_DEBUG"):
                 import traceback
 
@@ -1702,7 +2075,7 @@ async def _run_cli_repl(
                         conversation=conversation,
                         model=model,
                         provider=provider,
-                        profile=profile,
+                        profile=profile_name,
                         tags=["error-recovery", "auto-saved"],
                     )
                     console.print(
