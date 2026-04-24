@@ -2019,6 +2019,21 @@ class ToolSelector(ModeAwareMixin):
 
         all_tools = list(self.tools.list_tools())
 
+        # Fallback to SharedToolRegistry if ToolRegistry is empty (registration delay)
+        if not all_tools:
+            from victor.agent.shared_tool_registry import SharedToolRegistry
+
+            shared_registry = SharedToolRegistry.get_instance()
+            shared_tools = shared_registry.get_all_tools_for_registration()
+            logger.debug(
+                f"ToolRegistry empty ({len(all_tools)} tools), "
+                f"using SharedToolRegistry ({len(shared_tools)} tools) as fallback"
+            )
+            # Convert shared tools to ToolDefinition format
+            for tool in shared_tools:
+                if hasattr(tool, "name"):
+                    all_tools.append(tool)
+
         # Start with planned tools if provided
         selected_tools: List[ToolDefinition] = list(planned_tools) if planned_tools else []
         existing_names = {t.name for t in selected_tools}
