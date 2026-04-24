@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from victor.agent.response_sanitizer import create_streaming_filter
 from victor.ui.rendering.protocol import StreamRenderer
-from victor.ui.rendering.utils import StreamDeltaNormalizer
+from victor.ui.rendering.utils import StreamDeltaNormalizer, normalize_reasoning_content
 
 logger = logging.getLogger(__name__)
 
@@ -159,13 +159,9 @@ async def stream_response(
             elif chunk.metadata and "reasoning_content" in chunk.metadata:
                 reasoning = chunk.metadata["reasoning_content"]
                 if reasoning and not suppress_thinking:
-                    # Filter out continuation markers from provider responses
-                    # (e.g., "💭 Thinking...", "🤔 Thinking...") to avoid redundancy with our badge
-                    reasoning = reasoning.lstrip()
-                    for marker in ["💭 Thinking...", "💭", "🤔 Thinking...", "🤔", "Thinking..."]:
-                        if reasoning.startswith(marker):
-                            reasoning = reasoning[len(marker):].lstrip()
-                            break
+                    # Filter out provider-added continuation markers to avoid
+                    # duplicating our own thinking indicator in the transcript.
+                    reasoning = normalize_reasoning_content(reasoning)
 
                     # Log state transition for debugging
                     if not was_thinking:

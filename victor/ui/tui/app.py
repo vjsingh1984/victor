@@ -20,7 +20,7 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label
-from victor.ui.rendering.utils import StreamDeltaNormalizer
+from victor.ui.rendering.utils import StreamDeltaNormalizer, normalize_reasoning_content
 from victor.ui.tui.session import Message
 from victor.ui.tui.theme import THEME_CSS
 from victor.ui.tui.widgets import (
@@ -814,11 +814,18 @@ class VictorTUI(App):
 
         def update_content(raw_content: str) -> None:
             """Normalize content and update the streaming transcript."""
-            nonlocal content_buffer
+            nonlocal content_buffer, thinking_visible
 
             content_delta = content_normalizer.consume(raw_content)
             if not content_delta:
                 return
+
+            if thinking_visible:
+                try:
+                    thinking_visible = False
+                    self._hide_thinking()
+                except Exception as e:
+                    logger.warning(f"Failed to hide thinking panel: {e}")
 
             content_buffer += content_delta
             if self._conversation_log:
@@ -913,14 +920,15 @@ class VictorTUI(App):
 
                     elif "reasoning_content" in metadata:
                         try:
+                            reasoning = normalize_reasoning_content(
+                                metadata["reasoning_content"] or ""
+                            )
                             if not thinking_visible:
                                 thinking_buffer = ""
                                 thinking_normalizer.reset()
                                 thinking_visible = True
                                 self._show_thinking()
-                            thinking_delta = thinking_normalizer.consume(
-                                metadata["reasoning_content"] or ""
-                            )
+                            thinking_delta = thinking_normalizer.consume(reasoning)
                             if thinking_delta:
                                 thinking_buffer += thinking_delta
                                 self._update_thinking(thinking_buffer)
@@ -940,10 +948,11 @@ class VictorTUI(App):
                     self._conversation_log.finish_streaming()
                 except Exception as e:
                     logger.warning(f"Failed to finish streaming: {e}")
-            try:
-                self._hide_thinking()
-            except Exception as e:
-                logger.warning(f"Failed to hide thinking panel: {e}")
+            if thinking_visible:
+                try:
+                    self._hide_thinking()
+                except Exception as e:
+                    logger.warning(f"Failed to hide thinking panel: {e}")
             self._set_status("Idle", "idle")
             if content_buffer.strip():
                 self._record_message("assistant", content_buffer)

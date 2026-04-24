@@ -1056,6 +1056,21 @@ class TestStreamResponse:
         assert result == mock_renderer.finalize.return_value
 
     @pytest.mark.asyncio
+    async def test_strips_provider_reasoning_prefix(self, mock_agent, mock_renderer):
+        """Provider-added thinking banners should not be echoed in reasoning output."""
+
+        async def mock_stream():
+            yield StreamChunk(content="", metadata={"reasoning_content": "💭 Thinking...Plan"})
+            yield StreamChunk(content="Answer", metadata=None)
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+
+        await stream_response(mock_agent, "test message", mock_renderer)
+
+        mock_renderer.on_thinking_content.assert_called_once_with("Plan")
+        mock_renderer.on_content.assert_called_once_with("Answer")
+
+    @pytest.mark.asyncio
     async def test_buffered_renderer_accepts_tool_result_payloads(self, mock_agent):
         """Buffered non-stream rendering should accept tool result payload metadata."""
 

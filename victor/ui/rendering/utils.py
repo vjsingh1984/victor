@@ -16,6 +16,14 @@ from rich.text import Text
 
 logger = logging.getLogger(__name__)
 
+_REASONING_PREFIX_MARKERS = (
+    "💭 Thinking...",
+    "💭",
+    "🤔 Thinking...",
+    "🤔",
+    "Thinking...",
+)
+
 
 class StreamDeltaNormalizer:
     """Normalize provider stream chunks to append-only deltas.
@@ -88,6 +96,15 @@ class StreamDeltaNormalizer:
             if self._emitted_tail[-size:] == text[:size]:
                 return size
         return 0
+
+
+def normalize_reasoning_content(text: str) -> str:
+    """Strip provider-added reasoning banners from reasoning stream content."""
+    normalized = text.lstrip()
+    for marker in _REASONING_PREFIX_MARKERS:
+        if normalized.startswith(marker):
+            return normalized[len(marker) :].lstrip()
+    return normalized
 
 
 def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:

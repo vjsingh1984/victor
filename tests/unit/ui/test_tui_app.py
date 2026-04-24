@@ -478,6 +478,7 @@ def test_stream_response_normalizes_cumulative_reasoning_snapshots() -> None:
     asyncio.run(app._stream_response("hello"))
 
     app._update_thinking.assert_has_calls([call("Plan"), call("Plan carefully")])
+    app._hide_thinking.assert_called_once()
     app._record_message.assert_called_once_with("assistant", "Done")
 
 
@@ -502,7 +503,34 @@ def test_stream_response_handles_reasoning_and_content_same_chunk() -> None:
     asyncio.run(app._stream_response("hello"))
 
     app._update_thinking.assert_called_once_with("Thinking")
+    app._hide_thinking.assert_called_once()
     app._conversation_log.update_streaming.assert_called_once_with("Answer")
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
+def test_stream_response_strips_provider_reasoning_prefix() -> None:
+    """TUI should not display provider-added thinking banners inside the panel."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"reasoning_content": "💭 Thinking...Plan"})
+        yield StreamChunk(content="Answer", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._update_thinking.assert_called_once_with("Plan")
+    app._hide_thinking.assert_called_once()
     app._record_message.assert_called_once_with("assistant", "Answer")
 
 

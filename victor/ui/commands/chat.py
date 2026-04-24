@@ -15,7 +15,7 @@ from rich.table import Table
 from rich.text import Text
 
 from victor.agent.orchestrator import AgentOrchestrator
-from victor.config.settings import load_settings, ProfileConfig
+from victor.config.settings import get_project_paths, load_settings, ProfileConfig
 from victor.core.async_utils import run_sync
 from victor.framework.shim import FrameworkShim
 from victor.core.verticals import get_vertical, list_verticals
@@ -893,7 +893,7 @@ victor chat --sessionid abc123            # Resume session
         # Periodic cleanup: check if history file needs rotation (once per 7 days)
         try:
             history_file = get_project_paths().project_victor_dir / "chat_history"
-            max_entries = 250  # Hard limit for CLI history
+            max_entries = settings.ui.cli_history_max_entries  # Use configured max entries
             _maybe_rotate_history_file(history_file, max_entries=max_entries)
         except Exception:
             pass  # Periodic cleanup is best-effort
@@ -2034,11 +2034,12 @@ def _maybe_rotate_history_file(history_file, max_entries: int = 250) -> None:
         logger.debug(f"Failed to rotate history file: {e}")
 
 
-def _check_history_health(history_file) -> None:
+def _check_history_health(history_file, max_entries: int = 250) -> None:
     """Check history file health and warn if too large.
 
     Args:
         history_file: Path to history file
+        max_entries: Configured maximum entries (for warning threshold)
     """
     if not history_file.exists():
         return
@@ -2047,15 +2048,76 @@ def _check_history_health(history_file) -> None:
         line_count = sum(1 for _ in open(history_file))
         size_kb = history_file.stat().st_size / 1024
 
-        if line_count > 500 or size_kb > 50:
+        # Warning threshold: 2x the configured max_entries or 500, whichever is higher
+        warning_threshold = max(max_entries * 2, 500)
+        size_warning_threshold = 50  # KB
+
+        if line_count > warning_threshold or size_kb > size_warning_threshold:
             console.print(
                 f"[yellow]Warning:[/] CLI history file is large "
                 f"({line_count:,} entries, {size_kb:.1f} KB). "
                 f"This may slow down typing. "
-                f"Run 'victor chat --cleanup-history' to optimize."
+                f"Run 'victor chat cleanup-history' to optimize."
             )
     except Exception:
         pass
+
+
+@chat_app.command("cleanup-history")
+def cleanup_history_command(
+    max_entries: int = typer.Option(
+        250,
+        "--max-entries",
+        "-m",
+        help="Maximum entries to keep (default: 250, range: 10-1000).",
+        min=10,
+        max=1000,
+    ),
+):
+    """Clean up CLI chat history to improve typing performance.
+
+    Reduces the history file to the most recent entries, which improves
+    prompt_toolkit's search performance and makes typing feel snappier.
+
+    **Examples:**
+        victor chat cleanup-history          # Keep default 250 entries
+        victor chat cleanup-history -m 500   # Keep 500 entries
+    """
+    from victor.config.settings import get_project_paths
+
+    history_file = get_project_paths().project_victor_dir / "chat_history"
+
+    if not history_file.exists():
+        console.print("[green]✓[/] No history file to clean up")
+        return
+
+    try:
+        # Count original lines
+        with open(history_file, "r") as f:
+            original_lines = sum(1 for _ in f)
+    except Exception as e:
+        console.print(f"[bold red]Error:[/] Failed to read history file: {e}")
+        raise typer.Exit(1)
+
+    # Prune the history file
+    _prune_history_file(history_file, max_entries=max_entries)
+
+    # Count new lines
+    try:
+        with open(history_file, "r") as f:
+            new_lines = sum(1 for _ in f)
+    except Exception as e:
+        console.print(f"[bold red]Error:[/] Failed to read history file after pruning: {e}")
+        raise typer.Exit(1)
+
+    removed = original_lines - new_lines
+    size_kb = history_file.stat().st_size / 1024
+
+    console.print(f"[green]✓[/] Cleaned up history file:")
+    console.print(f"  Entries: {original_lines:,} → {new_lines:,} (removed {removed:,})")
+    console.print(f"  File size: {size_kb:.1f} KB")
+    console.print()
+    console.print("[dim]Typing should feel snappier now![/]")
 
 
 def _create_cli_prompt_session(settings=None):
@@ -2071,7 +2133,11 @@ def _create_cli_prompt_session(settings=None):
     from prompt_toolkit.history import FileHistory, InMemoryHistory
     from prompt_toolkit.key_binding import KeyBindings
 
-    max_entries = 250  # Hard limit for CLI history
+    # Get max_entries from settings or use default
+    if settings and hasattr(settings, 'ui'):
+        max_entries = settings.ui.cli_history_max_entries
+    else:
+        max_entries = 250  # Default limit for CLI history
 
     # Use a persistent history file in project-specific .victor/
     try:

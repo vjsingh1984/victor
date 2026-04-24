@@ -315,7 +315,7 @@ class OutputFormatter:
                     if preview.lines:
                         render_tool_preview(
                             self._console,
-                            "\n".join(_markup_escape(l) for l in preview.lines),
+                            "\n".join(_markup_escape(line) for line in preview.lines),
                             total_lines=preview.total_line_count,
                             preview_lines=preview_lines,
                             hotkey=hotkey,
