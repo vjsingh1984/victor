@@ -29,6 +29,7 @@ Services:
 """
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 from victor.agent.services.chunk_runtime import ChunkGenerator
 from victor.agent.services.context_service import ContextService, ContextServiceConfig
 from victor.agent.services.decision_service import (
@@ -102,6 +103,7 @@ from victor.agent.services.turn_execution_runtime import TurnExecutor, TurnResul
 __all__ = [
     "ChatService",
     "ChatServiceConfig",
+    "ServiceStreamingRuntime",
     "ChunkGenerator",
     "ContextService",
     "ContextServiceConfig",

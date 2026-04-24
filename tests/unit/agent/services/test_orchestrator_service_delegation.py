@@ -271,6 +271,8 @@ class TestChatServiceBootstrapLaziness:
         obj.memory_manager = MagicMock()
         obj._memory_session_id = "mem-1"
         obj.tool_budget = 100
+        obj._factory = MagicMock()
+        obj._factory.create_service_streaming_runtime.return_value = MagicMock()
         obj._turn_executor = None
         obj._protocol_adapter = None
         obj.observability = MagicMock()
@@ -328,8 +330,12 @@ class TestChatServiceBootstrapLaziness:
         kwargs = chat_service.bind_runtime_components.call_args.kwargs
         assert kwargs["turn_executor"].initialized is False
         assert callable(kwargs["planning_handler"])
-        assert callable(kwargs["stream_chat_handler"])
+        assert (
+            kwargs["stream_chat_handler"]
+            is obj._factory.create_service_streaming_runtime.return_value.stream_chat
+        )
         assert callable(kwargs["context_limit_handler"])
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
         assert obj._get_deprecated_chat_coordinator().initialized is False
         assert trap_chat.touched is False
 
@@ -388,6 +394,8 @@ class TestChatServiceBootstrapLaziness:
         obj.memory_manager = MagicMock()
         obj._memory_session_id = "mem-1"
         obj.tool_budget = 100
+        obj._factory = MagicMock()
+        obj._factory.create_service_streaming_runtime.return_value = MagicMock()
         obj._turn_executor = None
         obj._protocol_adapter = None
         obj.observability = MagicMock()
@@ -446,6 +454,7 @@ class TestChatServiceBootstrapLaziness:
         obj.conversation.ensure_system_prompt.assert_called_once()
         obj.add_message.assert_any_call("user", "plan this")
         obj.add_message.assert_any_call("assistant", "planned")
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
         assert obj._get_deprecated_chat_coordinator().initialized is False
         assert trap_chat.touched is False
 
@@ -495,6 +504,7 @@ class TestChatServiceBootstrapLaziness:
         obj.memory_manager = MagicMock()
         obj._memory_session_id = "mem-1"
         obj.tool_budget = 100
+        obj._factory = MagicMock()
         obj._turn_executor = None
         obj._protocol_adapter = None
         obj.observability = MagicMock()
@@ -526,20 +536,20 @@ class TestChatServiceBootstrapLaziness:
 
         runtime = MagicMock()
         runtime.stream_chat = _runtime_stream_chat
+        obj._factory.create_service_streaming_runtime.return_value = runtime
 
         with (
             patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
             patch.object(AgentOrchestrator, "_bootstrap_service_layer"),
         ):
             obj._initialize_services()
-            obj._get_service_streaming_runtime = MagicMock(return_value=runtime)
 
             kwargs = chat_service.bind_runtime_components.call_args.kwargs
             stream_chat_handler = kwargs["stream_chat_handler"]
             chunks = [c async for c in stream_chat_handler("hello", _preserve_iteration=True)]
 
         assert chunks == [stream_chunk]
-        obj._get_service_streaming_runtime.assert_called_once_with()
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)
         assert obj._get_deprecated_chat_coordinator().initialized is False
         assert trap_chat.touched is False
 
@@ -582,3 +592,18 @@ class TestChatServiceBootstrapLaziness:
         obj._apply_skill_for_turn.assert_called_once_with("hello")
         obj._get_service_streaming_runtime.assert_called_once_with()
         runtime.get_pipeline.assert_called_once_with()
+
+    def test_get_service_streaming_runtime_prefers_factory_and_caches(self):
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        obj = object.__new__(AgentOrchestrator)
+        runtime = MagicMock(name="service_streaming_runtime")
+        obj._factory = MagicMock()
+        obj._factory.create_service_streaming_runtime.return_value = runtime
+
+        first = obj._get_service_streaming_runtime()
+        second = obj._get_service_streaming_runtime()
+
+        assert first is runtime
+        assert second is runtime
+        obj._factory.create_service_streaming_runtime.assert_called_once_with(obj)

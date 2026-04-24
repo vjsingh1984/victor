@@ -31,7 +31,7 @@ class TestServiceInitialization:
 
     def test_all_service_attributes_set(self):
         obj = self._make_init_stub()
-        mock_svc = MagicMock()
+        mock_svc = object()
         obj._container.get_optional.return_value = mock_svc
         obj._initialize_services()
         assert obj._chat_service is mock_svc

@@ -45,6 +45,7 @@ from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoord
 from victor.agent.coordinators.system_prompt_state_passed import (
     SystemPromptStatePassedCoordinator,
 )
+from victor.agent.services import ServiceStreamingRuntime
 from victor.agent.services.exploration_runtime import ExplorationCoordinator
 
 
@@ -206,6 +207,19 @@ class TestCreateProjectContext:
 
         # Verify DI container was used
         mock_container.get.assert_called_with(ProjectContextProtocol)
+
+
+class TestCreateServiceStreamingRuntime:
+    """Tests for create_service_streaming_runtime method."""
+
+    def test_create_service_streaming_runtime_returns_runtime(self, factory):
+        """create_service_streaming_runtime returns the canonical runtime adapter."""
+        orchestrator = MagicMock()
+
+        runtime = factory.create_service_streaming_runtime(orchestrator)
+
+        assert isinstance(runtime, ServiceStreamingRuntime)
+        assert runtime._orchestrator is orchestrator
 
 
 class TestCreateComplexityClassifier:

@@ -806,13 +806,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self._chat_service and hasattr(self._chat_service, "bind_runtime_components"):
             from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
+            stream_chat_runtime = self._get_service_streaming_runtime()
             self._chat_service.bind_runtime_components(
                 turn_executor=LazyRuntimeProxy(
                     factory=lambda: self.turn_executor,
                     name="turn_executor",
                 ),
                 planning_handler=self._run_planning_chat_runtime,
-                stream_chat_handler=self._stream_chat_runtime,
+                stream_chat_handler=stream_chat_runtime.stream_chat,
                 context_limit_handler=self._handle_context_and_iteration_limits_runtime,
             )
 
@@ -3662,9 +3663,13 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """Get the canonical service-owned streaming runtime adapter."""
         runtime = getattr(self, "_service_streaming_runtime", None)
         if runtime is None:
-            from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+            factory = getattr(self, "_factory", None)
+            if factory is not None and hasattr(factory, "create_service_streaming_runtime"):
+                runtime = factory.create_service_streaming_runtime(self)
+            else:
+                from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
 
-            runtime = ServiceStreamingRuntime(self)
+                runtime = ServiceStreamingRuntime(self)
             self._service_streaming_runtime = runtime
         return runtime
 
