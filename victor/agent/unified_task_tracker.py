@@ -460,10 +460,18 @@ class UnifiedTaskConfigLoader:
                 logger.debug(f"Loaded task config from {task_config_path}")
             except Exception as e:
                 logger.warning(f"Failed to load task config: {e}, using defaults")
-                self._config = self.DEFAULT_CONFIG
+                self._config = {
+                    **self.DEFAULT_CONFIG,
+                    "task_types": self._normalize_task_types(
+                        self.DEFAULT_CONFIG.get("task_types", {})
+                    ),
+                }
         else:
             logger.debug("Using default task config (task_tool_config.yaml not found)")
-            self._config = self.DEFAULT_CONFIG
+            self._config = {
+                **self.DEFAULT_CONFIG,
+                "task_types": self._normalize_task_types(self.DEFAULT_CONFIG.get("task_types", {})),
+            }
 
     def reload(self) -> None:
         """Force reload configuration."""

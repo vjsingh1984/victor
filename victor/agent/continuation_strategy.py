@@ -900,13 +900,13 @@ class ContinuationStrategy:
             # Determine message based on task type
             if is_analysis_task:
                 message = (
-                    "Continue your analysis. Use tools like read_file, list_directory, "
+                    "Continue your analysis. Use tools like read, ls, "
                     "code_search to gather more information."
                 )
             elif is_action_task:
                 message = (
-                    "Continue with the implementation. Use tools like write_file, "
-                    "edit_files to make the necessary changes."
+                    "Continue with the implementation. Use tools like write "
+                    "and edit to make the necessary changes."
                 )
             else:
                 message = "Continue. Use appropriate tools if needed."

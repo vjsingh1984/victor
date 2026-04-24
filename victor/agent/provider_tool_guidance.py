@@ -21,7 +21,14 @@ from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import logging
 
+from victor.tools.tool_names import ToolNames, get_canonical_name
+
 logger = logging.getLogger(__name__)
+
+
+def _canonical_tool_name(tool_name: str) -> str:
+    """Normalize tool aliases before provider-specific scoring."""
+    return get_canonical_name(tool_name)
 
 
 class ToolGuidanceStrategy(ABC):
@@ -127,13 +134,13 @@ class GrokToolGuidance(ToolGuidanceStrategy):
     """
 
     PREFERRED_TOOLS = {
-        "read_file",
+        ToolNames.READ,
         "code_search",
         "grep",
-        "write_file",
-        "edit_file",
-        "list_directory",
-        "shell",
+        ToolNames.WRITE,
+        ToolNames.EDIT,
+        ToolNames.LS,
+        ToolNames.SHELL,
         "git",
     }
 
@@ -159,7 +166,7 @@ class GrokToolGuidance(ToolGuidanceStrategy):
 
     def get_tool_boost(self, tool_name: str) -> float:
         # Boost fast operations for Grok's speed advantage
-        if tool_name in self.PREFERRED_TOOLS:
+        if _canonical_tool_name(tool_name) in self.PREFERRED_TOOLS:
             return 1.15  # 15% boost
         return 1.0
 
@@ -236,7 +243,7 @@ Focus on depth over breadth when exploring.
 
         # Check for same tool called 3+ times
         if len(tool_history) >= 3:
-            recent_tools = [h.get("tool") for h in tool_history[-5:]]
+            recent_tools = [_canonical_tool_name(h.get("tool", "")) for h in tool_history[-5:]]
             tool_counts = {}
             for tool in recent_tools:
                 tool_counts[tool] = tool_counts.get(tool, 0) + 1
@@ -244,7 +251,9 @@ Focus on depth over breadth when exploring.
                     return True
 
         # Check for excessive ls/listing calls
-        ls_count = sum(1 for h in tool_history if h.get("tool") in ("ls", "list_directory"))
+        ls_count = sum(
+            1 for h in tool_history if _canonical_tool_name(h.get("tool", "")) == ToolNames.LS
+        )
         if ls_count >= 4:
             return True
 
@@ -271,7 +280,7 @@ SYNTHESIS CHECKPOINT: You've made several tool calls. Before continuing:
 
     def get_tool_boost(self, tool_name: str) -> float:
         # Boost reasoning-heavy tasks for DeepSeek's thinking mode
-        if tool_name in self.PREFERRED_TOOLS:
+        if _canonical_tool_name(tool_name) in self.PREFERRED_TOOLS:
             return 1.25  # 25% boost for reasoning tasks
         return 1.0
 
@@ -285,12 +294,12 @@ class OllamaToolGuidance(ToolGuidanceStrategy):
     """
 
     PREFERRED_TOOLS = {
-        "read_file",
-        "write_file",
-        "edit_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.WRITE,
+        ToolNames.EDIT,
+        ToolNames.LS,
         "grep",
-        "shell",
+        ToolNames.SHELL,
         "git",
         "code_search",
     }
@@ -335,7 +344,7 @@ Guidelines:
 
     def get_tool_boost(self, tool_name: str) -> float:
         # Prefer offline tools for air-gapped/local deployments
-        if tool_name in self.PREFERRED_TOOLS:
+        if _canonical_tool_name(tool_name) in self.PREFERRED_TOOLS:
             return 1.1  # 10% boost for offline-safe tools
         elif tool_name in self.AVOIDED_TOOLS:
             return 0.5  # 50% penalty for tools requiring internet
@@ -355,9 +364,9 @@ class AnthropicToolGuidance(ToolGuidanceStrategy):
         "architectural_summary",
         "refactor_code",
         "security_scan",
-        "write_file",
+        ToolNames.WRITE,
         "generate_docs",
-        "edit_file",
+        ToolNames.EDIT,
     }
 
     def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
@@ -382,7 +391,7 @@ class AnthropicToolGuidance(ToolGuidanceStrategy):
 
     def get_tool_boost(self, tool_name: str) -> float:
         # Boost reasoning and analysis tools for Claude's strengths
-        if tool_name in self.PREFERRED_TOOLS:
+        if _canonical_tool_name(tool_name) in self.PREFERRED_TOOLS:
             return 1.2  # 20% boost for reasoning/analysis tasks
         return 1.0
 
@@ -396,14 +405,14 @@ class OpenAIToolGuidance(ToolGuidanceStrategy):
     """
 
     PREFERRED_TOOLS = {
-        "write_file",
-        "edit_file",
+        ToolNames.WRITE,
+        ToolNames.EDIT,
         "plan_implementation",
-        "shell",
+        ToolNames.SHELL,
         "git",
-        "read_file",
+        ToolNames.READ,
         "grep",
-        "list_directory",
+        ToolNames.LS,
     }
 
     def get_guidance_prompt(self, task_type: str, available_tools: List[str]) -> str:
@@ -419,7 +428,7 @@ class OpenAIToolGuidance(ToolGuidanceStrategy):
         # Same file read twice
         files_read = []
         for entry in tool_history:
-            if entry.get("tool") == "read":
+            if _canonical_tool_name(entry.get("tool", "")) == ToolNames.READ:
                 path = entry.get("args", {}).get("path")
                 if path:
                     files_read.append(path)
@@ -441,7 +450,7 @@ class OpenAIToolGuidance(ToolGuidanceStrategy):
 
     def get_tool_boost(self, tool_name: str) -> float:
         # Boost general-purpose tools for GPT-4's versatility
-        if tool_name in self.PREFERRED_TOOLS:
+        if _canonical_tool_name(tool_name) in self.PREFERRED_TOOLS:
             return 1.2  # 20% boost for general-purpose operations
         return 1.0
 

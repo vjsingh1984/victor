@@ -311,7 +311,7 @@ class TaskCoordinator:
                 "user",
                 "[ANALYSIS-GUIDANCE: This is an ANALYSIS task requiring thorough exploration of the codebase. "
                 "You MUST systematically examine multiple modules and files using tools like "
-                "read_file, list_directory, and code_search. "
+                "read, ls, and code_search. "
                 "DO NOT stop after examining just a few files. "
                 "Continue using tools until you have gathered comprehensive information about "
                 "all major components of the codebase. "
@@ -328,8 +328,8 @@ class TaskCoordinator:
                     "user",
                     "[ACTION-GUIDANCE: This is an action-oriented task requiring execution. "
                     "Follow this workflow: "
-                    "1. CREATE the file/script with write_file or edit_files "
-                    "2. EXECUTE it immediately with execute_bash (don't skip this step!) "
+                    "1. CREATE the file/script with write or edit "
+                    "2. EXECUTE it immediately with shell (don't skip this step!) "
                     "3. SHOW the output to the user. "
                     "Minimize exploration and proceed directly to create→execute→show results.]",
                 )
