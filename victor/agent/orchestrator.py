@@ -1087,8 +1087,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Decouples agent layer from direct UI dependencies
         self._presentation = self._factory.create_presentation_adapter()
 
-        # Task Completion Detection: Signal-based completion detection
-        # Uses explicit markers (_DONE_, _TASK_DONE_, _SUMMARY_) for deterministic completion
+        # Task Completion Detection: signal-based completion detection
+        # Uses explicit rare completion markers for deterministic completion
         from victor.agent.task_completion import TaskCompletionDetector
 
         self._task_completion_detector = TaskCompletionDetector()

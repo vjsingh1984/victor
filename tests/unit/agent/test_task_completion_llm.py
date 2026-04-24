@@ -10,6 +10,7 @@ from victor.agent.task_completion import (
     CompletionConfidence,
     TaskCompletionDetector,
 )
+from victor.core.completion_markers import FILE_DONE_MARKER, TASK_DONE_MARKER
 
 
 def _make_decision_service(
@@ -39,8 +40,15 @@ class TestTaskCompletionWithoutService:
 
     def test_active_signal_still_high(self):
         detector = TaskCompletionDetector()
-        detector.analyze_response("**DONE**: Task complete")
+        detector.analyze_response(f"{FILE_DONE_MARKER} Created cache.py")
         assert detector.get_completion_confidence() == CompletionConfidence.HIGH
+
+    def test_plain_done_no_longer_triggers_active_completion(self):
+        detector = TaskCompletionDetector()
+        detector.analyze_response("DONE: Task complete")
+
+        assert detector.get_completion_confidence() != CompletionConfidence.HIGH
+        assert detector._state.active_signal_detected is False
 
     def test_passive_signal_still_low(self):
         detector = TaskCompletionDetector()
@@ -83,7 +91,7 @@ class TestTaskCompletionWithLLMService:
         """LLM is never consulted when heuristic confidence is HIGH."""
         service = _make_decision_service()
         detector = TaskCompletionDetector(decision_service=service)
-        detector.analyze_response("**DONE**: Task is complete")
+        detector.analyze_response(f"{TASK_DONE_MARKER} Task is complete")
 
         result = detector.get_completion_confidence()
         assert result == CompletionConfidence.HIGH
@@ -124,7 +132,7 @@ class TestTaskCompletionWithLLMService:
         service = _make_decision_service()
         detector = TaskCompletionDetector(decision_service=service)
 
-        detector.analyze_response("**DONE**: Implementation complete")
+        detector.analyze_response(f"{TASK_DONE_MARKER} Implementation complete")
 
         # Active signal was detected, LLM should NOT be called
         # (the analyze_response returns early on active signal)

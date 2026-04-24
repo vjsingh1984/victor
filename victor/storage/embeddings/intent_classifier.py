@@ -29,6 +29,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
+from victor.core.completion_markers import detect_active_completion_marker
 from victor.storage.embeddings.collections import (
     CollectionItem,
     StaticEmbeddingCollection,
@@ -208,40 +209,11 @@ COMPLETION_OFFER_HEURISTIC_PATTERNS = [
 ]
 
 
-# Compiled regex patterns for detecting bold/markdown-wrapped completion markers
-# These handle **DONE**: , __SUMMARY__: , DONE: , SUMMARY: etc.
-# The model is instructed to output these; markdown rendering strips formatting
-COMPLETION_MARKER_HEURISTIC_PATTERNS = [
-    # **DONE**: or DONE: at line start (with optional markdown bold/italic)
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:DONE|_DONE_)(?:\*\*|__)?[\s]*[:|-]",
-        re.IGNORECASE,
-    ),
-    # **SUMMARY**: or SUMMARY: at line start
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:SUMMARY|_SUMMARY_)(?:\*\*|__)?[\s]*[:|-]",
-        re.IGNORECASE,
-    ),
-    # **TASK_DONE**: or TASK_DONE: at line start
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:TASK[_\s]?DONE|_TASK_DONE_)(?:\*\*|__)?[\s]*[:|-]",
-        re.IGNORECASE,
-    ),
-    # **BLOCKED**: at line start
-    re.compile(
-        r"(?:^|\n)\s*(?:\*\*|__)?(?:BLOCKED|_BLOCKED_)(?:\*\*|__)?[\s]*[:|-]",
-        re.IGNORECASE,
-    ),
-]
-
-
 def _has_completion_marker_heuristic(text: str) -> bool:
-    """Check if text contains explicit completion markers (DONE:, SUMMARY:, etc.).
+    """Check if text contains explicit rare completion markers.
 
     These markers are instructed in the system prompt and are the primary
-    mechanism for deterministic task completion detection. They survive
-    markdown rendering because the detector matches both the raw format
-    (**DONE**:) and the rendered format (DONE:).
+    mechanism for deterministic task completion detection.
 
     Args:
         text: Text to check
@@ -249,10 +221,10 @@ def _has_completion_marker_heuristic(text: str) -> bool:
     Returns:
         True if text contains completion markers
     """
-    for pattern in COMPLETION_MARKER_HEURISTIC_PATTERNS:
-        if pattern.search(text):
-            logger.debug(f"Completion-marker heuristic matched: {pattern.pattern[:40]}...")
-            return True
+    marker = detect_active_completion_marker(text)
+    if marker:
+        logger.debug(f"Completion-marker heuristic matched: {marker}")
+        return True
     return False
 
 
@@ -486,7 +458,7 @@ def _classify_with_heuristics(
     duplicating the heuristic override chain.
 
     Heuristic priority order:
-    0. Completion markers (**DONE**:, **SUMMARY**:) - highest, deterministic
+    0. Rare completion markers (VICTOR_*::) - highest, deterministic
     1. Stuck loop patterns - model planning but not executing
     2. Continuation patterns - "let me read", "let me check"
     3. Completion offer patterns - task done + offering to elaborate
@@ -506,9 +478,9 @@ def _classify_with_heuristics(
     Returns:
         IntentResult with classified intent
     """
-    # HEURISTIC OVERRIDE 0 (HIGHEST PRIORITY): Completion markers
-    # **DONE**: , **SUMMARY**: , **TASK_DONE**: - these are definitive completion signals
-    # instructed in the system prompt, checked first because they are unambiguous
+    # HEURISTIC OVERRIDE 0 (HIGHEST PRIORITY): Rare completion markers
+    # VICTOR_*:: markers are definitive completion signals instructed in the
+    # system prompt, checked first because they are unambiguous.
     if _has_completion_marker_heuristic(text):
         top_matches.append(("heuristic:completion_marker", 0.95))
         logger.debug("COMPLETION detected via marker heuristic (conf=0.95)")

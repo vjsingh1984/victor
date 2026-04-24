@@ -8,6 +8,7 @@ import re
 from typing import Any, AsyncIterator, List, Optional
 
 from victor.agent.services.protocols.streaming_runtime import StreamingPipelineRuntimeProtocol
+from victor.core.completion_markers import FILE_DONE_MARKER
 from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
@@ -477,7 +478,7 @@ class StreamingChatPipeline:
                         "user",
                         f"[TOOL-FORMAT-HINT: You described wanting to use '{tool_hint}' but didn't call it. "
                         f"Call the tool directly — don't describe what you want to do, execute it. "
-                        f"If you've already modified the file successfully, say _DONE_.]",
+                        f"If you've already modified the file successfully, say {FILE_DONE_MARKER}]",
                     )
 
             # Use recovery integration to detect and handle failures

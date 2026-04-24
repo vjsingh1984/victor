@@ -29,6 +29,12 @@ from victor.agent.provider_tool_guidance import (
     ToolGuidanceStrategy,
 )
 from victor.agent.prompt_normalizer import get_prompt_normalizer
+from victor.core.completion_markers import (
+    BLOCKED_MARKER,
+    FILE_DONE_MARKER,
+    SUMMARY_MARKER,
+    TASK_DONE_MARKER,
+)
 from victor.core.constants import DEFAULT_VERTICAL
 
 if TYPE_CHECKING:
@@ -83,31 +89,29 @@ OUTPUT STYLE: CONCISE
 """.strip()
 
 # Active completion signaling - deterministic detection
-# This guidance is always included to ensure predictable task completion detection
-# Uses bold-wrapped markers with colon suffix for markdown-safe rendering:
-#   **DONE**: description  → rendered as bold "DONE:" → stripped to "DONE:"
-#   __DONE__: description  → rendered as italic "DONE:" → stripped to "DONE:"
-# The detector strips markdown formatting (**, __, *, _) and matches "KEYWORD:"
-COMPLETION_GUIDANCE = """
+# This guidance is always included to ensure predictable task completion detection.
+# The markers are intentionally rare to avoid collisions with ordinary prose.
+COMPLETION_GUIDANCE = f"""
 TASK COMPLETION (MANDATORY):
 When you complete a task, you MUST signal completion using these EXACT markers.
-Use the bold format with a colon suffix exactly as shown:
+Put the marker at the START of its own line exactly as shown:
 
 1. For FILE OPERATIONS (create/edit/write):
-   **DONE**: Created/Modified <filename>
+   {FILE_DONE_MARKER} Created/Modified <filename>
 
 2. For BUG FIXES / ISSUE RESOLUTION:
-   **TASK_DONE**: <what was fixed>
+   {TASK_DONE_MARKER} <what was fixed>
 
 3. For ANALYSIS / QUESTIONS / RESEARCH:
-   **SUMMARY**: <key findings>
+   {SUMMARY_MARKER} <key findings>
 
 4. For FAILED / BLOCKED TASKS:
-   **BLOCKED**: <reason>
+   {BLOCKED_MARKER} <reason>
 
 IMPORTANT:
 - These markers are REQUIRED for the system to detect task completion
-- Always use the bold format with colon: **DONE**: or **SUMMARY**: or **TASK_DONE**:
+- Use the exact uppercase marker token including the trailing double colon
+- Do NOT wrap the marker in markdown or change its spelling
 - After signaling completion, STOP - do NOT ask follow-up questions
 - Do NOT say "would you like me to continue?" after completing the task
 - Do NOT re-read files you have already read

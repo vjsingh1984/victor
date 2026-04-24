@@ -37,6 +37,8 @@ from typing import (
     runtime_checkable,
 )
 
+from victor.core.completion_markers import detect_active_completion_marker
+
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
 
@@ -123,7 +125,7 @@ class ResponsePhase(Enum):
 class CompletionConfidence(Enum):
     """Confidence levels for task completion detection."""
 
-    HIGH = "high"  # Active signal detected (_DONE_, _TASK_DONE_) - deterministic
+    HIGH = "high"  # Active rare marker detected - deterministic
     MEDIUM = "medium"  # File modifications + passive signal
     LOW = "low"  # Only passive phrase detected
     NONE = "none"  # No completion signal detected
@@ -235,38 +237,8 @@ class TaskCompletionDetector:
             print(detector.get_completion_summary())
     """
 
-    # Priority 1: Active signals - deterministic, instructed in system prompt
-    # The prompt instructs models to use bold-wrapped markers: **DONE**: description
-    # Markdown rendering strips ** or __ leaving "DONE: description"
-    # Detection strategy: strip markdown formatting, then match "KEYWORD:" or "KEYWORD -"
-    #
-    # Canonical markers (case-insensitive after markdown stripping):
-    #   DONE:         - file operations complete
-    #   TASK_DONE:    - bug fix / task complete
-    #   SUMMARY:      - analysis / research complete
-    #   BLOCKED:      - cannot proceed
-    ACTIVE_SIGNAL_KEYWORDS: frozenset = frozenset(
-        {
-            "done:",
-            "task_done:",
-            "task done:",
-            # "summary:",  # REMOVED: Too fragile, triggers on analysis text (agentic loop issue)
-            "blocked:",
-            "cannot_complete:",
-            # Legacy underscore-wrapped forms (backward compat)
-            "_done_",
-            "_task_done_",
-            # "_summary_",  # REMOVED: Too fragile, triggers on analysis text
-            "_blocked_",
-            "_cannot_complete_",
-            # Additional natural language variants
-            "task complete:",
-        }
-    )
-
-    # Regex for stripping markdown bold/italic wrapping from text
-    # Handles: **text**, __text__, *text*, _text_, `text`
-    _MARKDOWN_STRIP_RE = re.compile(r"\*\*|__|\*|_|`")
+    # Priority 1: Active signals - deterministic, instructed in system prompt.
+    # Rare terminal markers avoid collisions with normal status prose.
 
     # Priority 3: Passive phrases indicating task completion (fallback)
     COMPLETION_PHRASES: frozenset = frozenset(
@@ -562,18 +534,14 @@ class TaskCompletionDetector:
         """
         response_lower = response_text.lower()
 
-        # Priority 1: Check active signals with markdown stripping
-        # The model outputs **DONE**: or __SUMMARY__: which markdown renders
-        # by stripping bold/italic markers. We strip them here to match reliably.
-        stripped_lower = self._MARKDOWN_STRIP_RE.sub("", response_lower)
-
-        for signal in self.ACTIVE_SIGNAL_KEYWORDS:
-            if signal in stripped_lower or signal in response_lower:
-                self._state.completion_signals.add(f"active:{signal}")
-                self._state.active_signal_detected = True
-                logger.info(f"Active completion signal detected: {signal}")
-                # Active signal is definitive - skip passive detection
-                return
+        # Priority 1: Check rare, line-anchored active markers.
+        active_marker = detect_active_completion_marker(response_text)
+        if active_marker:
+            signal = active_marker.lower()
+            self._state.completion_signals.add(f"active:{signal}")
+            self._state.active_signal_detected = True
+            logger.info(f"Active completion signal detected: {signal}")
+            return
 
         # Priority 3: Passive phrase detection (fallback)
         for phrase in self.COMPLETION_PHRASES:
