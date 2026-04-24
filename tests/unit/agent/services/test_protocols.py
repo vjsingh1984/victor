@@ -25,15 +25,21 @@ from victor.agent.services.protocols import (
     ChunkRuntimeProtocol,
     ToolServiceProtocol,
     ContextServiceProtocol,
+    IntentClassifierProtocol,
     PromptRuntimeProtocol,
     ProviderServiceProtocol,
     RLLearningRuntimeProtocol,
     RecoveryServiceProtocol,
+    ReminderManagerProtocol,
+    ResponseSanitizerProtocol,
     SessionServiceProtocol,
     StreamingChunkRuntimeProtocol,
+    StreamingConfidenceMonitorProtocol,
     StreamingConversationStateProtocol,
+    StreamingHandlerProtocol,
     StreamingIntentClassifierRuntimeProtocol,
     StreamingMessageAdderProtocol,
+    StreamingMetricsCollectorProtocol,
     StreamingPipelineRuntimeProtocol,
     StreamingProviderRuntimeProtocol,
     StreamingReminderRuntimeProtocol,
@@ -85,6 +91,15 @@ class TestProtocolDefinitions:
         assert StreamingRecoveryRuntimeProtocol is not None
         assert RLLearningRuntimeProtocol is not None
 
+    def test_runtime_infrastructure_protocols_exist(self):
+        """Service-hosted runtime infrastructure protocols should be importable."""
+        assert IntentClassifierProtocol is not None
+        assert ReminderManagerProtocol is not None
+        assert ResponseSanitizerProtocol is not None
+        assert StreamingHandlerProtocol is not None
+        assert StreamingMetricsCollectorProtocol is not None
+        assert StreamingConfidenceMonitorProtocol is not None
+
     def test_streaming_runtime_support_protocols_exist(self):
         """Service-owned streaming helper protocols should be importable."""
         assert StreamingChunkRuntimeProtocol is not None
@@ -132,6 +147,24 @@ class TestProtocolDefinitions:
         assert PromptRuntimeProtocol is PromptCoordinatorProtocol
         assert StreamingRecoveryRuntimeProtocol is StreamingRecoveryCoordinatorProtocol
         assert RLLearningRuntimeProtocol is RLCoordinatorProtocol
+
+    def test_runtime_infrastructure_protocols_match_legacy_protocol_identity(self):
+        """Service-hosted runtime infrastructure protocols should preserve identity."""
+        from victor.agent.protocols import (
+            IntentClassifierProtocol as LegacyIntentClassifierProtocol,
+            ReminderManagerProtocol as LegacyReminderManagerProtocol,
+            ResponseSanitizerProtocol as LegacyResponseSanitizerProtocol,
+            StreamingConfidenceMonitorProtocol as LegacyStreamingConfidenceMonitorProtocol,
+            StreamingHandlerProtocol as LegacyStreamingHandlerProtocol,
+            StreamingMetricsCollectorProtocol as LegacyStreamingMetricsCollectorProtocol,
+        )
+
+        assert IntentClassifierProtocol is LegacyIntentClassifierProtocol
+        assert ReminderManagerProtocol is LegacyReminderManagerProtocol
+        assert ResponseSanitizerProtocol is LegacyResponseSanitizerProtocol
+        assert StreamingHandlerProtocol is LegacyStreamingHandlerProtocol
+        assert StreamingMetricsCollectorProtocol is LegacyStreamingMetricsCollectorProtocol
+        assert StreamingConfidenceMonitorProtocol is LegacyStreamingConfidenceMonitorProtocol
 
     def test_streaming_runtime_support_aliases_match_canonical_identity(self):
         """Streaming support aliases should preserve identity where canonical hosts exist."""

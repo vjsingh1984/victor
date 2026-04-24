@@ -56,6 +56,14 @@ from victor.agent.services.protocols.chat_runtime import (
 )
 from victor.agent.services.protocols.context_service import ContextServiceProtocol
 from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+from victor.agent.services.protocols.infrastructure_runtime import (
+    IntentClassifierProtocol,
+    ReminderManagerProtocol,
+    ResponseSanitizerProtocol,
+    StreamingConfidenceMonitorProtocol,
+    StreamingHandlerProtocol,
+    StreamingMetricsCollectorProtocol,
+)
 from victor.agent.services.protocols.provider_service import ProviderServiceProtocol
 from victor.agent.services.protocols.recovery_service import RecoveryServiceProtocol
 from victor.agent.services.protocols.runtime_support import (
@@ -91,19 +99,25 @@ __all__ = [
     "ChatOrchestratorProtocol",
     "ContextServiceProtocol",
     "ExecutionMode",
+    "IntentClassifierProtocol",
     "LLMDecisionServiceProtocol",
     "PlanningContextProtocol",
     "PromptRuntimeProtocol",
     "ProviderServiceProtocol",
     "ProviderContextProtocol",
     "RLLearningRuntimeProtocol",
+    "ReminderManagerProtocol",
     "RecoveryServiceProtocol",
+    "ResponseSanitizerProtocol",
     "SessionLedgerProtocol",
     "SessionServiceProtocol",
     "StreamingChunkRuntimeProtocol",
+    "StreamingConfidenceMonitorProtocol",
     "StreamingConversationStateProtocol",
+    "StreamingHandlerProtocol",
     "StreamingIntentClassifierRuntimeProtocol",
     "StreamingMessageAdderProtocol",
+    "StreamingMetricsCollectorProtocol",
     "StreamingPipelineRuntimeProtocol",
     "StreamingProviderRuntimeProtocol",
     "StreamingReminderRuntimeProtocol",
