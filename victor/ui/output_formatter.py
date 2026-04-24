@@ -330,12 +330,12 @@ class OutputFormatter:
                     tool_settings = get_tool_settings()
                     if tool_settings.tool_output_show_transparency:
                         self._console.print(
-                            "[dim yellow]! Output preview was pruned before sending to the model[/]"
+                            "[dim yellow]! Preview truncated (full output sent to model)[/]"
                         )
                 except Exception:
                     # Fallback if settings not available
                     self._console.print(
-                        "[dim yellow]! Output preview was pruned before sending to the model[/]"
+                        "[dim yellow]! Preview truncated (full output sent to model)[/]"
                     )
 
             # Store full result for potential expansion

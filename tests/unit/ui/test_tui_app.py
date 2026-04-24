@@ -497,7 +497,7 @@ def test_stream_response_surfaces_pruned_tool_notice() -> None:
     asyncio.run(app._stream_response("trace main"))
 
     app._add_system_message.assert_called_once_with(
-        "Tool output for code_search was pruned before sending to the model."
+        "Tool output for code_search was truncated (full output sent to model)."
     )
     app._finish_tool_call.assert_called_once_with(
         success=True,

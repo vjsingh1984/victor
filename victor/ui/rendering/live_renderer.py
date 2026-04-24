@@ -236,7 +236,7 @@ class LiveDisplayRenderer:
         # Show pruning transparency
         if was_pruned and tool_settings.tool_output_show_transparency:
             self.console.print(
-                "[dim yellow]! Output preview was pruned before sending to the model[/]"
+                "[dim yellow]! Preview truncated (full output sent to model)[/]"
             )
 
         # Store result for potential expansion
