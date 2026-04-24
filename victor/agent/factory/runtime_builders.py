@@ -55,11 +55,11 @@ if TYPE_CHECKING:
     from victor.agent.lifecycle_manager import LifecycleManager
     from victor.agent.provider_manager import ProviderManager
     from victor.tools.registry import ToolRegistry
-    from victor.agent.protocols.infrastructure_protocols import ReminderManagerProtocol
     from victor.agent.protocols.provider_protocols import (
         IProviderSwitcher,
         IProviderHealthMonitor,
     )
+    from victor.agent.services.protocols import ReminderManagerProtocol
 
 logger = logging.getLogger(__name__)
 

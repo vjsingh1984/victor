@@ -62,12 +62,12 @@ if TYPE_CHECKING:
     from victor.agent.protocols.infrastructure_protocols import (
         SafetyCheckerProtocol,
         AutoCommitterProtocol,
-        ReminderManagerProtocol,
         CodeExecutionManagerProtocol,
         WorkflowRegistryProtocol,
     )
     from victor.agent.services.protocols import (
         ChunkRuntimeProtocol as ChunkGeneratorProto,
+        ReminderManagerProtocol,
         RLLearningRuntimeProtocol as RLCoordinatorProtocol,
         StreamingRecoveryRuntimeProtocol as StreamingRecoveryCoordinatorProto,
         TaskRuntimeProtocol as TaskCoordinatorProtocol,
@@ -421,7 +421,7 @@ class CoordinationBuildersMixin:
         Returns:
             ReminderManager instance
         """
-        from victor.agent.protocols import ReminderManagerProtocol
+        from victor.agent.services.protocols import ReminderManagerProtocol
 
         with self.container.create_scope() as scope:
             reminder_manager = scope.get(ReminderManagerProtocol)
