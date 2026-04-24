@@ -104,7 +104,7 @@ ACTION-FIRST PRINCIPLE:
 
 IMPLEMENTATION WORKFLOW:
 1. Read the target file ONCE to understand current state
-2. IMMEDIATELY use edit_files() or write_file() to make changes
+2. IMMEDIATELY use edit() or write() to make changes
 3. Run tests if applicable
 4. Commit your changes
 
@@ -114,18 +114,17 @@ ANTI-PATTERNS TO AVOID:
 - Planning to edit without actually calling the edit tool
 - Exploration loops without taking action
 
-When the user asks you to edit a file, your NEXT tool call should be edit_files() or write_file().
+When the user asks you to edit a file, your NEXT tool call should be edit() or write().
 """,
         require_write_confirmation=False,
         verbose_planning=False,
         max_files_per_operation=0,  # No limit
         tool_priorities={
             "edit": 1.5,  # Boost edit tool priority in BUILD mode (canonical name)
-            "edit_files": 1.5,  # Alias for edit
-            "write_file": 1.5,  # Boost write tool priority
-            "bash": 1.2,
+            "write": 1.5,  # Boost write tool priority
+            "shell": 1.2,
             "git_status": 1.0,
-            "read_file": 0.9,  # Slightly lower read priority to encourage action
+            "read": 0.9,  # Slightly lower read priority to encourage action
         },
         exploration_multiplier=5.0,  # 5x exploration for reading before writing (was 2x)
     ),
@@ -135,8 +134,8 @@ When the user asks you to edit a file, your NEXT tool call should be edit_files(
         allow_all_tools=False,
         allowed_tools={
             # Read-only and analysis tools
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "code_search",
             "semantic_code_search",
             "glob",
@@ -149,8 +148,8 @@ When the user asks you to edit a file, your NEXT tool call should be edit_files(
             # Planning-specific
             "plan_files",
             # Sandbox editing (limited to .victor/sandbox/)
-            "write_file",
-            "edit_files",
+            "write",
+            "edit",
         },
         disallowed_tools={
             # No direct bash/shell or git modifications
@@ -201,8 +200,8 @@ WORKFLOW:
         allow_all_tools=False,
         allowed_tools={
             # Read-only tools only
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "code_search",
             "semantic_code_search",
             "glob",
@@ -216,11 +215,10 @@ WORKFLOW:
             "web_search",
             "web_fetch",
             # Sandbox notes (limited to .victor/sandbox/)
-            "write_file",
+            "write",
         },
         disallowed_tools={
-            "edit_files",  # No editing main codebase
-            "bash",
+            "edit",  # No editing main codebase
             "shell",  # Also shell tool (same as bash)
             "git_commit",
             "git_push",
@@ -249,10 +247,10 @@ WORKFLOW:
         verbose_planning=False,
         max_files_per_operation=3,  # Limited notes in sandbox
         tool_priorities={
-            "read_file": 1.3,
+            "read": 1.3,
             "code_search": 1.2,
             "semantic_code_search": 1.2,
-            "list_directory": 1.1,
+            "ls": 1.1,
         },
         exploration_multiplier=20.0,  # 20x exploration in explore mode (effectively unlimited like Claude Code)
         sandbox_dir=".victor/sandbox",

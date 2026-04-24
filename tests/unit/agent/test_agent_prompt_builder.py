@@ -90,7 +90,7 @@ class TestSystemPromptBuilder:
         builder = SystemPromptBuilder(provider_name="anthropic", model="claude-3")
         result = builder._build_cloud_prompt()
         assert "tool" in result.lower()
-        assert "read_file" in result or "list_directory" in result
+        assert "read" in result or "ls" in result
 
     def test_build_cloud_prompt_mentions_graph_call_modes(self):
         """Test that generic cloud prompts mention graph traversal modes."""
@@ -274,7 +274,7 @@ class TestSystemPromptBuilderEdgeCases:
         # Should include grounding rules
         assert "GROUNDING" in result
         # Should include tool efficiency guidance
-        assert "TOOL EFFICIENCY" in result or "list_directory" in result
+        assert "TOOL EFFICIENCY" in result or "ls" in result
 
     def test_build_xai_prompt(self):
         """Test xAI/Grok prompt includes task structure and grounding."""
