@@ -447,6 +447,20 @@ class StreamingChatPipeline:
                     stream_ctx.skip_continuation = (
                         True  # NEW: Prevent continuation strategy override
                     )
+                    # Persist VICTOR_SUMMARY text as a compaction summary so it
+                    # survives context compaction and is injected into the next turn.
+                    last_summary = getattr(
+                        orch._task_completion_detector._state, "last_summary", ""
+                    )
+                    if last_summary and hasattr(orch, "_conversation_controller"):
+                        try:
+                            orch._conversation_controller.persist_compaction_summary(
+                                last_summary, []
+                            )
+                            orch._conversation_controller.inject_compaction_context()
+                            logger.info("VICTOR_SUMMARY persisted for next-turn context injection")
+                        except Exception as _e:
+                            logger.debug(f"Failed to persist VICTOR_SUMMARY: {_e}")
                 elif confidence == CompletionConfidence.MEDIUM:
                     logger.info(
                         "Task completion: MEDIUM confidence detected (file mods + passive signal)"

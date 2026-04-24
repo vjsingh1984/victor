@@ -1010,6 +1010,34 @@ class ContinuationStrategy:
             except Exception:
                 logger.debug("LLM continuation decision failed", exc_info=True)
 
+        # Short preamble with no tool calls: model started a response but stalled,
+        # typically because context compaction erased the pending task state.
+        # "Let me verify the files I need to modify:" is 164 chars — a classic symptom.
+        _PREAMBLE_PREFIXES = (
+            "let me ", "i'll ", "i will ", "i need to ", "first, ", "first i ",
+            "to implement", "to complete", "to continue", "next, i",
+        )
+        if (
+            not is_completion
+            and content_length < 400
+            and full_content
+            and full_content.lower().lstrip().startswith(_PREAMBLE_PREFIXES)
+        ):
+            logger.warning(
+                f"Short preamble ({content_length} chars) with no tool calls — "
+                "model likely lost context. Injecting continuation prompt."
+            )
+            return {
+                "action": "prompt_tool_call",
+                "message": (
+                    "You started your response but didn't complete it or make any tool calls. "
+                    "If you need to verify or read files, do so now using the available tools. "
+                    "Do not describe what you will do — just do it."
+                ),
+                "reason": "Short preamble with no tool calls (likely context loss)",
+                "updates": updates,
+            }
+
         # Default: finish
         logger.info("No continuation needed - finishing")
         return {

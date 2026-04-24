@@ -31,7 +31,7 @@ class TestVictorSettingsBasic:
         assert settings.provider.default_temperature == 0.7
         assert settings.provider.default_max_tokens == 4096
         assert settings.airgapped_mode is False
-        assert settings.use_semantic_tool_selection is True
+        assert settings.tool_selection.use_semantic_tool_selection is True
         assert settings.tool_cache_enabled is True
         assert settings.tool_cache_ttl == 600
         assert settings.analytics_enabled is True
@@ -98,8 +98,8 @@ class TestVictorSettingsBasic:
             hybrid_search_semantic_weight=0.7,
             hybrid_search_keyword_weight=0.3,
         )
-        assert settings.hybrid_search_semantic_weight == 0.7
-        assert settings.hybrid_search_keyword_weight == 0.3
+        assert settings.search.hybrid_search_semantic_weight == 0.7
+        assert settings.search.hybrid_search_keyword_weight == 0.3
 
         # Invalid: weights don't sum to 1.0
         with pytest.raises(ValueError, match="must sum to 1.0"):
@@ -333,7 +333,7 @@ class TestVictorSettingsTypeSafety:
         # Should work without getattr
         assert isinstance(settings.default_provider, str)
         assert isinstance(settings.tool_cache_ttl, int)
-        assert isinstance(settings.use_semantic_tool_selection, bool)
+        assert isinstance(settings.tool_selection.use_semantic_tool_selection, bool)
         assert isinstance(settings.tool_cache_allowlist, list)
 
     def test_optional_fields(self):
@@ -367,7 +367,7 @@ class TestVictorSettingsTypeSafety:
         )
         assert settings.default_provider == "ollama"
         assert settings.tool_cache_ttl == 300
-        assert settings.use_semantic_tool_selection is True
+        assert settings.tool_selection.use_semantic_tool_selection is True
 
         # Invalid type for integer field
         with pytest.raises(ValueError):

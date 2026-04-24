@@ -37,7 +37,7 @@ from typing import (
     runtime_checkable,
 )
 
-from victor.core.completion_markers import detect_active_completion_marker
+from victor.core.completion_markers import SUMMARY_MARKER, detect_active_completion_marker
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -158,6 +158,8 @@ class TaskCompletionState:
     max_continuation_requests: int = 5
     # Active signal detection flag - set when explicit completion signal detected
     active_signal_detected: bool = False
+    # Text extracted from the last VICTOR_SUMMARY:: marker; persisted for next-turn injection
+    last_summary: str = ""
 
     @property
     def is_complete(self) -> bool:
@@ -541,6 +543,16 @@ class TaskCompletionDetector:
             self._state.completion_signals.add(f"active:{signal}")
             self._state.active_signal_detected = True
             logger.info(f"Active completion signal detected: {signal}")
+            # Extract and persist VICTOR_SUMMARY content for next-turn context injection.
+            # Without this, compaction drops the assistant message and the model loses
+            # all pending task state when the user says "continue".
+            if active_marker == SUMMARY_MARKER:
+                marker_pos = response_text.find(SUMMARY_MARKER)
+                if marker_pos != -1:
+                    summary_text = response_text[marker_pos + len(SUMMARY_MARKER):].strip()
+                    if summary_text:
+                        self._state.last_summary = summary_text
+                        logger.info(f"Persisted VICTOR_SUMMARY for next-turn injection ({len(summary_text)} chars)")
             return
 
         # Priority 3: Passive phrase detection (fallback)
