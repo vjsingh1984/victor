@@ -59,6 +59,7 @@ except ImportError:
         return str(e)
 
 
+
 chat_app = typer.Typer(
     name="chat",
     help="""Start interactive chat or send a one-shot message.
@@ -103,18 +104,34 @@ def _display_skill_preview(con: Console, agent: Any, message: str) -> None:
 
 def _print_tool_output_mode_banner(con: Console, tool_settings: Any) -> None:
     """Render a compact banner describing tool-output preview behavior."""
+    con.print(_describe_tool_output_mode(tool_settings))
+
+
+def _describe_tool_output_mode(tool_settings: Any) -> str:
+    """Return the user-facing tool-output mode summary."""
+    summary, preview_state = _tool_output_mode_parts(tool_settings)
+    icon = "[green]✓[/]" if summary == "safe read-heavy pruning" else "[yellow]![/]"
+    return f"{icon} [bold]Tool output[/] [dim]{summary} • {preview_state}[/]"
+
+
+def _summarize_tool_output_mode(tool_settings: Any) -> str:
+    """Return a plain-text startup message describing tool-output behavior."""
+    summary, preview_state = _tool_output_mode_parts(tool_settings)
+    return f"Tool output: {summary}, {preview_state}"
+
+
+def _tool_output_mode_parts(tool_settings: Any) -> tuple[str, str]:
+    """Return summary parts for tool-output startup messaging."""
     preview_enabled = bool(getattr(tool_settings, "tool_output_preview_enabled", True))
     safe_only = bool(getattr(tool_settings, "tool_output_pruning_safe_only", True))
 
     if safe_only:
-        icon = "[green]✓[/]"
         summary = "safe read-heavy pruning"
     else:
-        icon = "[yellow]![/]"
         summary = "broader pruning"
 
     preview_state = "preview on" if preview_enabled else "preview off"
-    con.print(f"{icon} [bold]Tool output[/] [dim]{summary} • {preview_state}[/]")
+    return summary, preview_state
 
 
 def _should_render_cli_chrome(formatter: Any) -> bool:
@@ -144,6 +161,35 @@ def _print_interactive_startup_messages(con: Console, messages: list[str]) -> No
     """Print queued startup notices for interactive CLI surfaces."""
     for message in messages:
         render_status_message(con, message)
+
+
+def _summarize_smart_routing(settings: Any, enable_smart_routing: bool, routing_profile: str) -> list[str]:
+    """Return startup messages describing smart-routing state."""
+    if not enable_smart_routing:
+        return []
+    if getattr(settings, "smart_routing_enabled", False):
+        return [f"Smart routing enabled (profile={routing_profile})"]
+    return ["Smart routing is currently disabled via feature flag."]
+
+
+def _summarize_compaction_overrides(
+    *,
+    compaction_threshold: Optional[float] = None,
+    adaptive_threshold: Optional[bool] = None,
+    compaction_min_threshold: Optional[float] = None,
+    compaction_max_threshold: Optional[float] = None,
+) -> list[str]:
+    """Return startup messages describing CLI compaction overrides."""
+    messages: list[str] = []
+    if compaction_threshold is not None:
+        messages.append(f"Compaction threshold set to {compaction_threshold:.0%}")
+    if adaptive_threshold is True:
+        min_thresh = compaction_min_threshold or 0.35
+        max_thresh = compaction_max_threshold or 0.70
+        messages.append(f"Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})")
+    elif adaptive_threshold is False:
+        messages.append("Adaptive threshold disabled")
+    return messages
 
 
 class _NoopStatus:
@@ -844,6 +890,14 @@ victor chat --sessionid abc123            # Resume session
 
         settings = load_settings()
 
+        # Periodic cleanup: check if history file needs rotation (once per 7 days)
+        try:
+            history_file = get_project_paths().project_victor_dir / "chat_history"
+            max_entries = 250  # Hard limit for CLI history
+            _maybe_rotate_history_file(history_file, max_entries=max_entries)
+        except Exception:
+            pass  # Periodic cleanup is best-effort
+
         # Apply CLI flags to settings
         if log_events:
             settings.observability.enable_observability_logging = True
@@ -1538,6 +1592,7 @@ async def run_interactive(
     smart_routing_status_shown = False
     compaction_status_shown = False
     tui_startup_messages: list[str] = []
+    tui_status_messages: list[str] = []
 
     _configure_smart_routing(
         settings,
@@ -1548,6 +1603,10 @@ async def run_interactive(
         show_status=show_startup_cli_chrome,
     )
     smart_routing_status_shown = show_startup_cli_chrome and enable_smart_routing
+    if use_tui:
+        tui_status_messages.extend(
+            _summarize_smart_routing(settings, enable_smart_routing, routing_profile)
+        )
 
     # Configure tool output preview (safe-default pruning)
     from victor.config.tool_settings import ToolSettings
@@ -1564,6 +1623,8 @@ async def run_interactive(
     if show_startup_cli_chrome:
         _print_tool_output_mode_banner(console, tool_settings)
         tool_banner_shown = True
+    elif use_tui:
+        tui_status_messages.append(_summarize_tool_output_mode(tool_settings))
 
     try:
         profiles = settings.load_profiles()
@@ -1742,6 +1803,15 @@ async def run_interactive(
                 compaction_max_threshold is not None,
             )
         )
+        if use_tui:
+            tui_status_messages.extend(
+                _summarize_compaction_overrides(
+                    compaction_threshold=compaction_threshold,
+                    adaptive_threshold=adaptive_threshold,
+                    compaction_min_threshold=compaction_min_threshold,
+                    compaction_max_threshold=compaction_max_threshold,
+                )
+            )
 
         if mode:
             from victor.agent.mode_controller import AgentMode, get_mode_controller
@@ -1763,7 +1833,7 @@ async def run_interactive(
                     model=profile_display.model,
                     stream=stream,
                     settings=settings,  # Pass settings for slash commands
-                    startup_messages=tui_startup_messages,
+                    startup_messages=[*tui_status_messages, *tui_startup_messages],
                 )
                 await tui_app.run_async()
             except ImportError:
@@ -1888,6 +1958,106 @@ async def run_interactive(
             console.print(f"[dim]Note: Failed to cleanup file watchers: {e}[/]")
 
 
+def _prune_history_file(history_file, max_entries: int = 250) -> None:
+    """Prune history file to keep only the most recent entries.
+
+    This prevents the history file from growing unbounded, which would
+    slow down prompt_toolkit's history search on every keystroke.
+
+    Args:
+        history_file: Path to history file
+        max_entries: Maximum number of entries to keep (default 200)
+    """
+    if not history_file.exists():
+        return
+
+    try:
+        with open(history_file, 'r') as f:
+            lines = f.readlines()
+
+        # If file is small enough, no pruning needed
+        if len(lines) <= max_entries:
+            return
+
+        # Keep only the last max_entries lines
+        pruned_lines = lines[-max_entries:]
+
+        # Write back to file
+        with open(history_file, 'w') as f:
+            f.writelines(pruned_lines)
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Failed to prune history file {history_file}: {e}")
+
+
+def _maybe_rotate_history_file(history_file, max_entries: int = 250) -> None:
+    """Periodically rotate history file if it grows too large.
+
+    This is called periodically to prevent the history file from
+    growing unbounded over time.
+
+    Args:
+        history_file: Path to history file
+        max_entries: Maximum entries before rotation
+    """
+    if not history_file.exists():
+        return
+
+    try:
+        import time
+
+        # Only check once per session
+        rotation_marker = history_file.with_suffix('.last_rotation')
+
+        if rotation_marker.exists():
+            last_rotation = rotation_marker.stat().st_mtime
+            # Only rotate if more than 7 days since last rotation
+            if time.time() - last_rotation < 7 * 24 * 3600:
+                return
+
+        # Count lines
+        with open(history_file, 'r') as f:
+            line_count = sum(1 for _ in f)
+
+        # If too large, prune
+        if line_count > max_entries * 1.5:  # 50% buffer
+            _prune_history_file(history_file, max_entries)
+
+            # Update rotation marker
+            rotation_marker.touch()
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Failed to rotate history file: {e}")
+
+
+def _check_history_health(history_file) -> None:
+    """Check history file health and warn if too large.
+
+    Args:
+        history_file: Path to history file
+    """
+    if not history_file.exists():
+        return
+
+    try:
+        line_count = sum(1 for _ in open(history_file))
+        size_kb = history_file.stat().st_size / 1024
+
+        if line_count > 500 or size_kb > 50:
+            console.print(
+                f"[yellow]Warning:[/] CLI history file is large "
+                f"({line_count:,} entries, {size_kb:.1f} KB). "
+                f"This may slow down typing. "
+                f"Run 'victor chat --cleanup-history' to optimize."
+            )
+    except Exception:
+        pass
+
+
 def _create_cli_prompt_session():
     """Create a prompt_toolkit PromptSession with persistent history.
 
@@ -1900,10 +2070,21 @@ def _create_cli_prompt_session():
 
     # Use a persistent history file in ~/.victor/
     try:
-        from victor.config.settings import get_project_paths
+        from victor.config.settings import get_project_paths, load_settings
 
-        history_file = get_project_paths().global_victor_dir / "chat_history"
+        # Load settings to get max_entries configuration
+        try:
+            settings = load_settings()
+            max_entries = 250  # Hard limit for CLI history
+        except Exception:
+            max_entries = 250  # Hard limit
+
+        history_file = get_project_paths().project_victor_dir / "chat_history"
         history_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Prune history file if too large
+        _prune_history_file(history_file, max_entries=max_entries)
+
         history = FileHistory(str(history_file))
 
         # Seed from conversation DB if history file is empty/new
@@ -1929,6 +2110,9 @@ def _create_cli_prompt_session():
                             """)
                         for (msg,) in cursor.fetchall():
                             history.store_string(msg)
+
+                        # Prune again after seeding to ensure we stay at max_entries
+                        _prune_history_file(history_file, max_entries=max_entries)
             except Exception:
                 pass  # DB seeding is best-effort
 
@@ -1938,7 +2122,12 @@ def _create_cli_prompt_session():
     # Create key bindings for the session
     key_bindings = KeyBindings()
 
-    return PromptSession(history=history, key_bindings=key_bindings)
+    return PromptSession(
+        history=history,
+        key_bindings=key_bindings,
+        complete_while_typing=False,  # Disable per-keystroke completion checks for better performance
+        enable_history_search=False,  # Disable history search on typing for better performance
+    )
 
 
 async def _run_cli_repl(

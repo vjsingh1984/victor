@@ -357,3 +357,42 @@ class ApprovalsCommand(BaseSlashCommand):
                 "[yellow]Warning: full-auto mode will auto-approve all actions. "
                 "Use with caution![/]"
             )
+
+
+@register_command
+class CleanupHistoryCommand(BaseSlashCommand):
+    """Clean up CLI chat history to improve typing performance."""
+
+    @property
+    def metadata(self) -> CommandMetadata:
+        return CommandMetadata(
+            name="cleanup-history",
+            description="Clean up CLI chat history to improve typing performance",
+            usage="/cleanup-history",
+            aliases=["prune-history"],
+            category="system",
+        )
+
+    def execute(self, ctx: CommandContext) -> None:
+        from victor.config.settings import get_project_paths
+
+        history_file = get_project_paths().project_victor_dir / "chat_history"
+
+        if not history_file.exists():
+            ctx.console.print("[green]✓[/] No history file to clean up")
+            return
+
+        # Import the prune function from chat.py
+        from victor.ui.commands.chat import _prune_history_file
+
+        original_lines = sum(1 for _ in open(history_file))
+        _prune_history_file(history_file, max_entries=250)
+
+        new_lines = sum(1 for _ in open(history_file))
+        removed = original_lines - new_lines
+
+        ctx.console.print(f"[green]✓[/] Cleaned up history file:")
+        ctx.console.print(f"  Entries: {original_lines:,} → {new_lines:,} (removed {removed:,})")
+        ctx.console.print(f"  File size: {history_file.stat().st_size / 1024:.1f} KB")
+        ctx.console.print()
+        ctx.console.print("[dim]Typing should feel snappier now![/]")
