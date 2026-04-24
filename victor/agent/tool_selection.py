@@ -20,6 +20,12 @@ This module centralizes tool selection configuration including:
 - Keyword-to-category mappings
 - Small model indicators for adaptive selection
 - ToolSelector class for unified tool selection logic
+
+Note: All tool selection automatically respects tool deduplication configured in
+ToolRegistry. When enable_tool_deduplication=True, duplicate tools from LangChain
+and MCP sources are automatically filtered out in favor of native tools with
+higher priority. Tool selection queries registry.list_tools(only_enabled=True),
+which only returns deduplicated tools.
 """
 
 from __future__ import annotations
