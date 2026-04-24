@@ -39,7 +39,7 @@ def mock_session_coordinator():
 @pytest.fixture
 def session_adapter(mock_session_service, mock_session_coordinator):
     return SessionServiceAdapter(
-        mock_session_service,
+        session_service=mock_session_service,
         deprecated_session_coordinator=mock_session_coordinator,
     )
 
@@ -135,7 +135,7 @@ def test_is_healthy(session_adapter):
 
 
 def test_is_healthy_with_none():
-    adapter = SessionServiceAdapter(None)
+    adapter = SessionServiceAdapter(session_service=None)
     assert adapter.is_healthy() is False
 
 
@@ -145,7 +145,7 @@ def test_explicit_coordinator_fallback_warns(mock_session_coordinator):
         match="coordinator fallback only",
     ):
         adapter = SessionServiceAdapter(
-            None,
+            session_service=None,
             deprecated_session_coordinator=mock_session_coordinator,
         )
 
@@ -159,7 +159,7 @@ def test_old_session_coordinator_kwarg_warns(mock_session_service, mock_session_
         match="SessionServiceAdapter\\(session_coordinator=...\\) is deprecated",
     ):
         adapter = SessionServiceAdapter(
-            mock_session_service,
+            session_service=mock_session_service,
             session_coordinator=mock_session_coordinator,
         )
 
@@ -175,14 +175,18 @@ def test_old_and_new_session_coordinator_kwargs_conflict(
         match="Use only one of session_coordinator or deprecated_session_coordinator",
     ):
         SessionServiceAdapter(
-            mock_session_service,
+            session_service=mock_session_service,
             session_coordinator=mock_session_coordinator,
             deprecated_session_coordinator=mock_session_coordinator,
         )
 
 
 def test_legacy_positional_coordinator_is_still_supported(mock_session_coordinator):
-    adapter = SessionServiceAdapter(mock_session_coordinator)
+    with pytest.warns(
+        DeprecationWarning,
+        match="Positional SessionServiceAdapter\\(\\.\\.\\.\\) construction is deprecated",
+    ):
+        adapter = SessionServiceAdapter(mock_session_coordinator)
 
     assert adapter.get_session_stats() == {"messages": 1}
     mock_session_coordinator.get_session_stats.assert_called_once()

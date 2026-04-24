@@ -1,0 +1,897 @@
+# Copyright 2025 Vijaykumar Singh <singhvjd@gmail.com>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Service-owned compatibility runtime for deprecated session coordination.
+
+This module hosts the deprecated SessionCoordinator compatibility shim while
+the canonical active runtime remains SessionService.
+
+The legacy `victor.agent.coordinators.session_coordinator` module now
+re-exports this implementation for compatibility.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import threading
+import time
+import uuid
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TYPE_CHECKING
+
+from victor.core.async_utils import run_sync
+
+if TYPE_CHECKING:
+    from victor.agent.session_state_manager import SessionStateManager
+    from victor.agent.lifecycle_manager import LifecycleManager
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SessionInfo:
+    """Information about a session.
+
+    Attributes:
+        session_id: Unique identifier for the session
+        created_at: Timestamp when session was created
+        last_activity: Timestamp of last activity
+        message_count: Number of messages in session
+        tool_calls_used: Number of tool calls made
+        is_active: Whether the session is currently active
+    """
+
+    session_id: str
+    created_at: float = field(default_factory=time.time)
+    last_activity: float = field(default_factory=time.time)
+    message_count: int = 0
+    tool_calls_used: int = 0
+    is_active: bool = True
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "session_id": self.session_id,
+            "created_at": self.created_at,
+            "last_activity": self.last_activity,
+            "message_count": self.message_count,
+            "tool_calls_used": self.tool_calls_used,
+            "is_active": self.is_active,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SessionInfo":
+        """Create from dictionary."""
+        return cls(
+            session_id=data.get("session_id", ""),
+            created_at=data.get("created_at", time.time()),
+            last_activity=data.get("last_activity", time.time()),
+            message_count=data.get("message_count", 0),
+            tool_calls_used=data.get("tool_calls_used", 0),
+            is_active=data.get("is_active", True),
+        )
+
+
+@dataclass
+class SessionCostSummary:
+    """Summary of costs for a session.
+
+    Attributes:
+        total_cost: Total cost in USD
+        input_cost: Cost for input tokens
+        output_cost: Cost for output tokens
+        total_tokens: Total tokens used
+        input_tokens: Input tokens used
+        output_tokens: Output tokens used
+    """
+
+    total_cost: float = 0.0
+    input_cost: float = 0.0
+    output_cost: float = 0.0
+    total_tokens: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "total_cost": self.total_cost,
+            "input_cost": self.input_cost,
+            "output_cost": self.output_cost,
+            "total_tokens": self.total_tokens,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+        }
+
+
+class SessionCoordinator:
+    """[DEPRECATED] Coordinates session lifecycle and state management.
+
+    This class is being superseded by SessionService as part of the
+    state-passed architectural migration. It remains for backward
+    compatibility with facade-driven components.
+
+    Responsibilities:
+    - Session ID creation and tracking
+    - Session lifecycle (create, end, reset, recover)
+    - Memory session integration
+    - Checkpoint/recovery coordination
+    - Session statistics and summary
+
+    The coordinator does NOT directly manage:
+    - Conversation messages (delegates to ConversationController)
+    - Tool execution (delegates to ToolPipeline)
+    - Resource cleanup (delegates to LifecycleManager)
+    """
+
+    def __init__(
+        self,
+        session_state_manager: SessionStateManager,
+        lifecycle_manager: Optional[LifecycleManager] = None,
+        memory_manager: Optional[Any] = None,
+        checkpoint_manager: Optional[Any] = None,
+        cost_tracker: Optional[Any] = None,
+    ):
+        """Initialize the session coordinator.
+
+        Args:
+            session_state_manager: Manager for execution state tracking
+            lifecycle_manager: Optional manager for lifecycle operations
+            memory_manager: Optional manager for persistent session storage
+            checkpoint_manager: Optional manager for checkpoint save/restore
+            cost_tracker: Optional tracker for session costs
+        """
+        self._session_state = session_state_manager
+        self._lifecycle_manager = lifecycle_manager
+        self._memory_manager = memory_manager
+        self._checkpoint_manager = checkpoint_manager
+        self._cost_tracker = cost_tracker
+        self._session_service: Optional[Any] = None
+
+        # Current session info
+        self._current_session: Optional[SessionInfo] = None
+        self._memory_session_id: Optional[str] = None
+
+        logger.debug("SessionCoordinator initialized")
+
+    # ========================================================================
+    # Session Lifecycle
+    # ========================================================================
+
+    def create_session(self, session_id: Optional[str] = None) -> str:
+        """Create a new session.
+
+        Args:
+            session_id: Optional custom session ID. If not provided,
+                       generates a UUID.
+
+        Returns:
+            The session ID for the new session
+        """
+        if self._session_service is not None:
+            return run_sync(self._session_service.create_session(session_id=session_id))
+
+        # Generate session ID if not provided
+        if not session_id:
+            session_id = f"session-{uuid.uuid4().hex[:16]}"
+
+        # Create session info
+        self._current_session = SessionInfo(session_id=session_id)
+
+        # Reset session state for new session
+        self._session_state.reset()
+
+        # Initialize memory session if memory manager available
+        if self._memory_manager:
+            try:
+                self._memory_session_id = self._memory_manager.create_session(
+                    project_path=getattr(self._memory_manager, "_project_path", None),
+                )
+                logger.debug(f"Memory session created: {self._memory_session_id}")
+            except Exception as e:
+                logger.warning(f"Failed to create memory session: {e}")
+                self._memory_session_id = None
+
+        logger.info(f"Session created: {session_id}")
+        return session_id
+
+    def end_session(self) -> None:
+        """End the current session.
+
+        Marks the session as inactive and prepares for cleanup.
+        """
+        if self._session_service is not None:
+            run_sync(self._session_service.end_session())
+            return
+
+        if self._current_session:
+            self._current_session.is_active = False
+            logger.info(f"Session ended: {self._current_session.session_id}")
+
+        # End memory session if active
+        if self._memory_manager and self._memory_session_id:
+            try:
+                # Memory manager may have an end_session method
+                if hasattr(self._memory_manager, "end_session"):
+                    self._memory_manager.end_session(self._memory_session_id)
+                logger.debug(f"Memory session ended: {self._memory_session_id}")
+            except Exception as e:
+                logger.warning(f"Failed to end memory session: {e}")
+
+    def reset_session(self, preserve_token_usage: bool = False) -> None:
+        """Reset the current session state.
+
+        Args:
+            preserve_token_usage: If True, keep accumulated token usage
+        """
+        if self._session_service is not None and hasattr(self._session_service, "reset_session"):
+            run_sync(self._session_service.reset_session())
+            return
+
+        # Reset session state (with option to preserve tokens)
+        self._session_state.reset(preserve_token_usage=preserve_token_usage)
+
+        # Delegate to lifecycle manager for conversation reset
+        if self._lifecycle_manager:
+            self._lifecycle_manager.reset_conversation()
+
+        # Update session activity
+        if self._current_session:
+            self._current_session.last_activity = time.time()
+
+        logger.debug("Session reset")
+
+    def recover_session(self, session_id: str) -> bool:
+        """Recover a previous session.
+
+        Args:
+            session_id: ID of the session to recover
+
+        Returns:
+            True if session was recovered successfully
+        """
+        if self._session_service is not None:
+            return self._session_service.recover_session(session_id)
+
+        if not self._memory_manager:
+            logger.warning("Memory manager not available for session recovery")
+            return False
+
+        # Delegate to lifecycle manager for recovery
+        if self._lifecycle_manager:
+            success = self._lifecycle_manager.recover_session(
+                session_id=session_id,
+                memory_manager=self._memory_manager,
+            )
+
+            if success:
+                self._memory_session_id = session_id
+                self._current_session = SessionInfo(
+                    session_id=session_id,
+                    is_active=True,
+                )
+                logger.info(f"Session recovered: {session_id[:8]}...")
+            else:
+                logger.warning(f"Failed to recover session: {session_id}")
+
+            return success
+
+        return False
+
+    # ========================================================================
+    # Session State Access
+    # ========================================================================
+
+    @property
+    def session_id(self) -> Optional[str]:
+        """Get the current session ID."""
+        return self._current_session.session_id if self._current_session else None
+
+    @property
+    def memory_session_id(self) -> Optional[str]:
+        """Get the current memory session ID."""
+        return self._memory_session_id
+
+    @property
+    def session_state(self) -> SessionStateManager:
+        """Get the session state manager."""
+        return self._session_state
+
+    @property
+    def is_active(self) -> bool:
+        """Check if current session is active."""
+        return self._current_session.is_active if self._current_session else False
+
+    @property
+    def tool_calls_used(self) -> int:
+        """Get number of tool calls used in current session."""
+        return self._session_state.tool_calls_used
+
+    @property
+    def remaining_budget(self) -> int:
+        """Get remaining tool budget."""
+        return self._session_state.get_remaining_budget()
+
+    @property
+    def is_budget_exhausted(self) -> bool:
+        """Check if tool budget is exhausted."""
+        return self._session_state.is_budget_exhausted()
+
+    # ========================================================================
+    # Session Statistics
+    # ========================================================================
+
+    def get_session_info(self) -> Optional[SessionInfo]:
+        """Get current session information.
+
+        Returns:
+            SessionInfo if session exists, None otherwise
+        """
+        return self._current_session
+
+    def get_session_stats(self) -> Dict[str, Any]:
+        """Get comprehensive session statistics.
+
+        Returns:
+            Dictionary with session statistics including:
+            - enabled: Whether memory manager is active
+            - session_id: Current session ID
+            - message_count: Number of messages
+            - tool_calls_used: Tool calls made
+            - tool_budget: Total tool budget
+            - budget_remaining: Remaining tool budget
+            - is_active: Whether session is active
+            - token_usage: Token usage breakdown
+        """
+        if self._session_service is not None:
+            return self._session_service.get_session_stats()
+
+        base_stats: Dict[str, Any] = {
+            "enabled": bool(self._memory_manager),
+            "session_id": self.session_id,
+            "memory_session_id": self._memory_session_id,
+            "is_active": self.is_active,
+            "tool_calls_used": self.tool_calls_used,
+            "tool_budget": self._session_state.tool_budget,
+            "budget_remaining": self.remaining_budget,
+            "budget_exhausted": self.is_budget_exhausted,
+            "token_usage": self._session_state.get_token_usage(),
+        }
+
+        # Add memory manager stats if available
+        if self._memory_manager and self._memory_session_id:
+            try:
+                memory_stats = self._memory_manager.get_session_stats(self._memory_session_id)
+                if memory_stats:
+                    base_stats.update(memory_stats)
+            except Exception as e:
+                logger.warning(f"Failed to get memory stats: {e}")
+
+        return base_stats
+
+    def get_session_summary(self) -> Dict[str, Any]:
+        """Get a summary of the current session.
+
+        Returns:
+            Dictionary with session summary from SessionStateManager
+        """
+        summary = self._session_state.get_session_summary()
+        summary["session_id"] = self.session_id
+        summary["memory_session_id"] = self._memory_session_id
+        return summary
+
+    def get_session_cost_summary(self) -> Dict[str, Any]:
+        """Get session cost summary.
+
+        Returns:
+            Dictionary with session cost statistics
+        """
+        if self._cost_tracker and hasattr(self._cost_tracker, "get_summary"):
+            return self._cost_tracker.get_summary()
+        return {}
+
+    def get_session_cost_formatted(self) -> str:
+        """Get formatted session cost string.
+
+        Returns:
+            Cost string like "$0.0123" or "cost n/a"
+        """
+        if self._cost_tracker and hasattr(self._cost_tracker, "format_inline_cost"):
+            return self._cost_tracker.format_inline_cost()
+        return "cost n/a"
+
+    # ========================================================================
+    # Checkpoint/Recovery
+    # ========================================================================
+
+    async def save_checkpoint(
+        self,
+        description: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> Optional[str]:
+        """Save a checkpoint of current session state.
+
+        Args:
+            description: Human-readable description for the checkpoint
+            tags: Optional tags for categorization
+
+        Returns:
+            Checkpoint ID if saved, None if checkpointing disabled
+        """
+        if self._session_service is not None:
+            return await self._session_service.save_checkpoint(description, tags)
+
+        if not self._checkpoint_manager:
+            logger.debug("Checkpoint save skipped - manager not initialized")
+            return None
+
+        # Build conversation state from session state
+        state = self._get_checkpoint_state()
+
+        try:
+            checkpoint_id = await self._checkpoint_manager.save_checkpoint(
+                session_id=self._memory_session_id or "default",
+                state=state,
+                description=description,
+                tags=tags,
+            )
+            logger.info(f"Checkpoint saved: {checkpoint_id[:20]}...")
+            return checkpoint_id
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to save checkpoint (I/O error): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Failed to save checkpoint (serialization error): {e}")
+            return None
+
+    async def restore_checkpoint(self, checkpoint_id: str) -> bool:
+        """Restore session state from a checkpoint.
+
+        Args:
+            checkpoint_id: ID of checkpoint to restore
+
+        Returns:
+            True if restored successfully, False otherwise
+        """
+        if self._session_service is not None:
+            return await self._session_service.restore_checkpoint(checkpoint_id)
+
+        if not self._checkpoint_manager:
+            logger.warning("Cannot restore - checkpoint manager not initialized")
+            return False
+
+        try:
+            state = await self._checkpoint_manager.restore_checkpoint(checkpoint_id)
+            self._apply_checkpoint_state(state)
+            logger.info(f"Checkpoint restored: {checkpoint_id[:20]}...")
+            return True
+        except (OSError, IOError) as e:
+            logger.warning(f"Failed to restore checkpoint (I/O error): {e}")
+            return False
+        except (KeyError, ValueError) as e:
+            logger.warning(f"Failed to restore checkpoint (invalid data): {e}")
+            return False
+
+    async def maybe_auto_checkpoint(self) -> Optional[str]:
+        """Trigger auto-checkpoint if interval threshold is met.
+
+        Returns:
+            Checkpoint ID if auto-checkpoint was created, None otherwise
+        """
+        if self._session_service is not None:
+            return await self._session_service.maybe_auto_checkpoint()
+
+        if not self._checkpoint_manager:
+            return None
+
+        state = self._get_checkpoint_state()
+
+        try:
+            return await self._checkpoint_manager.maybe_auto_checkpoint(
+                session_id=self._memory_session_id or "default",
+                state=state,
+            )
+        except (OSError, IOError) as e:
+            logger.debug(f"Auto-checkpoint failed (I/O error): {e}")
+            return None
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Auto-checkpoint failed (serialization error): {e}")
+            return None
+
+    def _get_checkpoint_state(self) -> Dict[str, Any]:
+        """Build a dictionary representing current session state for checkpointing."""
+        return {
+            "session_id": self.session_id,
+            "tool_calls_used": self.tool_calls_used,
+            "tool_budget": self._session_state.tool_budget,
+            "token_usage": self._session_state.get_token_usage(),
+            "observed_files": list(self._session_state.observed_files),
+            "executed_tools": list(self._session_state.executed_tools),
+        }
+
+    def _apply_checkpoint_state(self, state: Dict[str, Any]) -> None:
+        """Apply a checkpoint state to restore the session.
+
+        Args:
+            state: State dictionary from checkpoint
+        """
+        # Restore session state
+        self._session_state.execution_state.tool_calls_used = state.get("tool_calls_used", 0)
+        self._session_state._tool_budget = state.get("tool_budget", self._session_state.tool_budget)
+
+        # Restore token usage
+        token_usage = state.get("token_usage", {})
+        if token_usage:
+            self._session_state.execution_state.token_usage = token_usage
+
+        # Restore observed files and executed tools
+        self._session_state.execution_state.observed_files = set(state.get("observed_files", []))
+        self._session_state.execution_state.executed_tools = list(state.get("executed_tools", []))
+
+        # Update session activity
+        if self._current_session:
+            self._current_session.last_activity = time.time()
+
+    # ========================================================================
+    # Recent Sessions
+    # ========================================================================
+
+    def get_recent_sessions(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get recent conversation sessions for recovery.
+
+        Args:
+            limit: Maximum number of sessions to return
+
+        Returns:
+            List of session metadata dictionaries
+        """
+        if self._session_service is not None:
+            return self._session_service.get_recent_sessions(limit)
+
+        if not self._memory_manager:
+            return []
+
+        try:
+            sessions = self._memory_manager.list_sessions(limit=limit)
+            return [
+                {
+                    "session_id": s.session_id,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                    "last_activity": (s.last_activity.isoformat() if s.last_activity else None),
+                    "project_path": s.project_path,
+                    "provider": s.provider,
+                    "model": s.model,
+                    "message_count": len(s.messages) if hasattr(s, "messages") else 0,
+                }
+                for s in sessions
+            ]
+        except Exception as e:
+            logger.warning(f"Failed to get recent sessions: {e}")
+            return []
+
+    # ========================================================================
+    # Token Usage
+    # ========================================================================
+
+    def get_token_usage(self) -> Dict[str, int]:
+        """Get cumulative token usage.
+
+        Returns:
+            Dictionary with prompt_tokens, completion_tokens, total_tokens, etc.
+        """
+        return self._session_state.get_token_usage()
+
+    def update_token_usage(
+        self,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        cache_creation_input_tokens: int = 0,
+        cache_read_input_tokens: int = 0,
+    ) -> None:
+        """Update cumulative token usage.
+
+        Args:
+            prompt_tokens: Input tokens used
+            completion_tokens: Output tokens generated
+            cache_creation_input_tokens: Tokens used for cache creation
+            cache_read_input_tokens: Tokens read from cache
+        """
+        self._session_state.update_token_usage(
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            cache_creation_input_tokens=cache_creation_input_tokens,
+            cache_read_input_tokens=cache_read_input_tokens,
+        )
+
+    def reset_token_usage(self) -> None:
+        """Reset cumulative token usage tracking."""
+        self._session_state.reset_token_usage()
+
+    # ========================================================================
+    # Memory Context
+    # ========================================================================
+
+    def get_memory_context(
+        self,
+        max_tokens: Optional[int] = None,
+        messages: Optional[List[Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get token-aware context messages from memory manager.
+
+        Args:
+            max_tokens: Override max tokens for this retrieval
+            messages: Fallback messages if memory not available
+
+        Returns:
+            List of messages in provider format
+        """
+        if self._session_service is not None:
+            return self._session_service.get_memory_context(
+                max_tokens=max_tokens,
+                messages=messages,
+            )
+
+        if not self._memory_manager or not self._memory_session_id:
+            # Fall back to provided messages
+            if messages:
+                # Convert Message objects to dict if needed
+                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+            return []
+
+        try:
+            return self._memory_manager.get_context_messages(
+                session_id=self._memory_session_id,
+                max_tokens=max_tokens,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to get memory context: {e}, using fallback")
+            if messages:
+                return [msg.model_dump() if hasattr(msg, "model_dump") else msg for msg in messages]
+            return []
+
+    # ========================================================================
+    # Embedding Store Initialization
+    # ========================================================================
+
+    @staticmethod
+    def init_conversation_embedding_store(
+        memory_manager: Any,
+    ) -> Tuple[Optional[Any], Optional[Any]]:
+        """Initialize LanceDB embedding store for semantic conversation retrieval.
+
+        Uses the module-level singleton to prevent duplicate initialization.
+        The singleton pattern ensures that intelligent_prompt_builder and other
+        components share the same instance.
+
+        Args:
+            memory_manager: Memory manager to wire the embedding store to
+
+        Returns:
+            Tuple of (conversation_embedding_store, pending_semantic_cache).
+            Either or both may be None if initialization fails.
+        """
+        if memory_manager is None:
+            return None, None
+
+        conversation_embedding_store = None
+        pending_semantic_cache = None
+
+        try:
+            from victor.storage.embeddings.service import EmbeddingService
+            from victor.agent.conversation_embedding_store import (
+                ConversationEmbeddingStore,
+            )
+
+            # Note: Can't use 'import victor.agent.conversation_embedding_store as ces_module'
+            # because victor.agent is shadowed by the @victor.agent decorator function.
+            # Access the module via sys.modules instead.
+            import sys
+
+            ces_module = sys.modules.get("victor.agent.conversation_embedding_store")
+
+            # Prefer an already-wired memory-manager service to avoid splitting
+            # runtime state. Otherwise use the canonical singleton directly.
+            # This bridge runs before some containerized startup paths, so
+            # explicit singleton resolution is more deterministic here than the
+            # container-preferred helper.
+            embedding_service = vars(memory_manager).get("_embedding_service")
+            if embedding_service is None:
+                embedding_service = EmbeddingService.get_instance()
+
+            # Use singleton pattern - check if already exists
+            if ces_module._embedding_store is not None:
+                conversation_embedding_store = ces_module._embedding_store
+                logger.debug("Reusing existing ConversationEmbeddingStore singleton")
+            else:
+                # Create new instance and register as singleton
+                conversation_embedding_store = ConversationEmbeddingStore(
+                    embedding_service=embedding_service,
+                )
+                ces_module._embedding_store = conversation_embedding_store
+                logger.debug("Created ConversationEmbeddingStore singleton")
+
+            # Wire it to the memory manager for automatic sync
+            memory_manager.set_embedding_store(conversation_embedding_store)
+
+            # Also set the embedding service for fallback
+            memory_manager.set_embedding_service(embedding_service)
+
+            # Initialize async (fire and forget for faster startup).
+            # If there's no running event loop (e.g., unit tests), fall back
+            # to synchronous initialization to avoid 'coroutine was never awaited' warnings.
+            if not conversation_embedding_store.is_initialized:
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    try:
+                        run_sync(conversation_embedding_store.initialize())
+                    except Exception as e:
+                        logger.debug(
+                            "Failed to run ConversationEmbeddingStore.initialize() "
+                            "synchronously: %s",
+                            e,
+                        )
+                else:
+                    loop.create_task(conversation_embedding_store.initialize())
+
+            logger.info(
+                "ConversationEmbeddingStore configured. " "Message embeddings will sync to LanceDB."
+            )
+
+            # Set up semantic tool result cache using the embedding service
+            # This enables FAISS-based semantic caching with mtime invalidation
+            try:
+                from victor.agent.tool_result_cache import ToolResultCache
+
+                pending_semantic_cache = ToolResultCache(
+                    embedding_service=embedding_service,
+                    max_entries=500,
+                    cleanup_interval=60.0,
+                )
+                logger.debug("Semantic tool cache created, pending wire to pipeline")
+            except ImportError as e:
+                logger.warning(
+                    f"ToolResultCache not available: {e}. "
+                    "Semantic tool caching will be disabled. "
+                    "This is optional - Victor will work normally without it."
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to initialize semantic tool cache: {e}. "
+                    "Semantic tool caching will be disabled. "
+                    "This is optional - Victor will work normally without it."
+                )
+
+        except ImportError as e:
+            logger.warning(
+                f"ConversationEmbeddingStore not available: {e}. "
+                "Semantic search in conversations will be disabled. "
+                "This is optional - Victor will work normally without it."
+            )
+            logger.debug(
+                "ConversationEmbeddingStore is part of victor-ai, not victor-coding. "
+                "Check that lancedb is installed: pip install lancedb"
+            )
+            conversation_embedding_store = None
+        except Exception as e:
+            logger.warning(
+                f"Failed to initialize ConversationEmbeddingStore: {e}. "
+                "Semantic search in conversations will be disabled. "
+                "This is optional - Victor will work normally without it."
+            )
+            conversation_embedding_store = None
+
+        return conversation_embedding_store, pending_semantic_cache
+
+    # ========================================================================
+    # Background Task Management
+    # ========================================================================
+
+    @staticmethod
+    def create_background_task(
+        coro: Any,
+        name: str,
+        background_tasks: Set[asyncio.Task],
+        bg_task_lock: threading.Lock,
+    ) -> Optional[asyncio.Task]:
+        """Create and track a background task for graceful shutdown.
+
+        Args:
+            coro: The coroutine to run as a background task.
+            name: Name for the task (for logging).
+            background_tasks: Set tracking active background tasks.
+            bg_task_lock: Lock protecting concurrent add/discard.
+
+        Returns:
+            The created task, or None if no event loop is available.
+        """
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(coro, name=name)
+
+            with bg_task_lock:
+                background_tasks.add(task)
+
+            def _discard_task(t: asyncio.Task) -> None:
+                with bg_task_lock:
+                    background_tasks.discard(t)
+
+            task.add_done_callback(_discard_task)
+
+            logger.debug(f"Created background task: {name}")
+            return task
+        except RuntimeError:
+            if asyncio.iscoroutine(coro):
+                coro.close()
+            logger.debug(f"No event loop available for background task: {name}")
+            return None
+
+    # ========================================================================
+    # String Representation
+    # ========================================================================
+
+    def __repr__(self) -> str:
+        """String representation for debugging."""
+        return (
+            f"SessionCoordinator("
+            f"session_id={self.session_id}, "
+            f"active={self.is_active}, "
+            f"tool_calls={self.tool_calls_used}/{self._session_state.tool_budget})"
+        )
+
+    def bind_session_service(self, session_service: Any) -> None:
+        """Bind the canonical session service for service-first delegation."""
+        self._session_service = session_service
+
+
+# =============================================================================
+# Factory Function
+# =============================================================================
+
+
+def create_session_coordinator(
+    session_state_manager: SessionStateManager,
+    lifecycle_manager: Optional[LifecycleManager] = None,
+    memory_manager: Optional[Any] = None,
+    checkpoint_manager: Optional[Any] = None,
+    cost_tracker: Optional[Any] = None,
+) -> SessionCoordinator:
+    """Factory function to create a SessionCoordinator.
+
+    Args:
+        session_state_manager: Manager for execution state tracking
+        lifecycle_manager: Optional manager for lifecycle operations
+        memory_manager: Optional manager for persistent session storage
+        checkpoint_manager: Optional manager for checkpoint save/restore
+        cost_tracker: Optional tracker for session costs
+
+    Returns:
+        Configured SessionCoordinator instance
+    """
+    return SessionCoordinator(
+        session_state_manager=session_state_manager,
+        lifecycle_manager=lifecycle_manager,
+        memory_manager=memory_manager,
+        checkpoint_manager=checkpoint_manager,
+        cost_tracker=cost_tracker,
+    )
+
+
+__all__ = [
+    "SessionCoordinator",
+    "SessionInfo",
+    "SessionCostSummary",
+    "create_session_coordinator",
+]

@@ -46,35 +46,35 @@ class TestToolNecessityPrompt:
 
 class TestIsQuestionOnlyWithConfidence:
     def test_pure_qa_high_confidence(self):
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         is_qa, conf = TurnExecutor._is_question_only_scored("What is Python?")
         assert is_qa is True
         assert conf >= 0.8
 
     def test_action_task_high_confidence(self):
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         is_qa, conf = TurnExecutor._is_question_only_scored("Fix the bug in main.py")
         assert is_qa is False
         assert conf >= 0.8
 
     def test_ambiguous_lower_confidence(self):
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         is_qa, conf = TurnExecutor._is_question_only_scored("Show me how to fix the auth module")
         # "Show me" prefix triggers QA but "fix" is an action word — ambiguous
         assert conf < 0.8
 
     def test_short_question_high_confidence(self):
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         is_qa, conf = TurnExecutor._is_question_only_scored("What is 2+2?")
         assert is_qa is True
         assert conf >= 0.9
 
     def test_long_action_request(self):
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         is_qa, conf = TurnExecutor._is_question_only_scored(
             "Create a new REST API endpoint for user authentication with JWT tokens"
@@ -83,7 +83,7 @@ class TestIsQuestionOnlyWithConfidence:
 
     def test_backward_compatible_bool(self):
         """Original _is_question_only still works as bool."""
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         assert TurnExecutor._is_question_only("What is Python?") is True
         assert TurnExecutor._is_question_only("Fix the bug") is False

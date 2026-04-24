@@ -53,8 +53,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
+from victor.core.circuit_breaker import CircuitState
 from victor.core.health import HealthStatus
-from victor.providers.circuit_breaker import CircuitState
 
 logger = logging.getLogger(__name__)
 

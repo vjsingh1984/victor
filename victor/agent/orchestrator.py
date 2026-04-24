@@ -67,14 +67,14 @@ from rich.console import Console
 
 # Coordinators (Phase 2 refactoring - being integrated)
 # NOTE: These are runtime imports, not type-checking only
-from victor.agent.coordinators.metrics_coordinator import (
+from victor.agent.services.metrics_service import (
     MetricsCoordinator,
 )  # noqa: F401  # imported for runtime use
 
 if TYPE_CHECKING:
     # Type-only imports (created by factory, only used for type hints)
     from victor.agent.orchestrator_integration import OrchestratorIntegration
-    from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
+    from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
@@ -202,7 +202,7 @@ from victor.agent.streaming_controller import (
     StreamingSession,
 )
 from victor.agent.task_analyzer import get_task_analyzer
-from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
+from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
 from victor.agent.tool_registrar import ToolRegistrarConfig
 from victor.agent.provider_manager import ProviderManagerConfig, ProviderState
 
@@ -608,10 +608,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _initialize_interaction_runtime(self) -> None:
         """Initialize interaction runtime boundaries with canonical services first."""
         from victor.agent.runtime.interaction_runtime import (
-            create_chat_coordinator_shim,
-            create_tool_coordinator_shim,
-            create_interaction_runtime_components,
-        )
+        create_chat_coordinator_shim,
+        create_session_coordinator_shim,
+        create_tool_coordinator_shim,
+        create_interaction_runtime_components,
+    )
 
         self._interaction_runtime = create_interaction_runtime_components(
             orchestrator=self,
@@ -645,13 +646,18 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         self._session_service = self._interaction_runtime.session_service
         self._context_service = self._interaction_runtime.context_service
         self._recovery_service = self._interaction_runtime.recovery_service
-        self._session_coordinator = self._interaction_runtime.session_coordinator
+        self._deprecated_session_coordinator = create_session_coordinator_shim(
+            session_state_manager=self._session_state,
+            lifecycle_manager=self._lifecycle_manager,
+            memory_manager=self.memory_manager,
+            checkpoint_manager=self._checkpoint_manager,
+            cost_tracker=self._session_cost_tracker,
+            session_service=self._session_service,
+        )
         self._deprecated_chat_coordinator = create_chat_coordinator_shim(
             orchestrator=self,
-            factory=self._factory,
-            chat_service=getattr(self, "_chat_service", None),
+            get_chat_service=lambda: getattr(self, "_chat_service", None),
         )
-        self._chat_coordinator = self._deprecated_chat_coordinator
         self._deprecated_tool_coordinator = create_tool_coordinator_shim(
             orchestrator=self,
             tool_pipeline=self._tool_pipeline,
@@ -798,44 +804,15 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if self._chat_service and hasattr(self._chat_service, "bind_runtime_components"):
             from victor.agent.runtime.provider_runtime import LazyRuntimeProxy
 
-            async def _planning_handler(user_message: str) -> Any:
-                return await self._chat_coordinator._chat_with_planning(user_message)
-
-            async def _stream_chat_handler(
-                user_message: str, **kwargs: Any
-            ) -> AsyncIterator[Any]:
-                async for chunk in self._chat_coordinator.stream_chat(user_message, **kwargs):
-                    yield chunk
-
-            async def _context_limit_handler(*args: Any, **kwargs: Any) -> Any:
-                return await self._chat_coordinator._handle_context_and_iteration_limits(
-                    *args,
-                    **kwargs,
-                )
-
             self._chat_service.bind_runtime_components(
                 turn_executor=LazyRuntimeProxy(
                     factory=lambda: self.turn_executor,
                     name="turn_executor",
                 ),
-                planning_handler=_planning_handler,
-                stream_chat_handler=_stream_chat_handler,
-                context_limit_handler=_context_limit_handler,
+                planning_handler=self._run_planning_chat_runtime,
+                stream_chat_handler=self._stream_chat_runtime,
+                context_limit_handler=self._handle_context_and_iteration_limits_runtime,
             )
-
-            chat_coordinator = getattr(self, "_chat_coordinator", None)
-            resolved_chat_coordinator = None
-            if chat_coordinator is not None:
-                if hasattr(chat_coordinator, "initialized"):
-                    if chat_coordinator.initialized:
-                        resolved_chat_coordinator = chat_coordinator.get_instance()
-                else:
-                    resolved_chat_coordinator = chat_coordinator
-            if resolved_chat_coordinator is not None and hasattr(
-                resolved_chat_coordinator,
-                "bind_chat_service",
-            ):
-                resolved_chat_coordinator.bind_chat_service(self._chat_service)
 
         if self._provider_service is not None and hasattr(
             self._provider_service, "bind_runtime_components"
@@ -1204,6 +1181,28 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _get_deprecated_chat_coordinator(self) -> Any:
         """Get the deprecated ChatCoordinator compatibility shim."""
         return getattr(self, "_deprecated_chat_coordinator", None)
+
+    def _get_deprecated_session_coordinator(self) -> Any:
+        """Get the deprecated SessionCoordinator compatibility shim."""
+        return getattr(self, "_deprecated_session_coordinator", None)
+
+    def _get_deprecated_sync_chat_coordinator(self) -> Any:
+        """Get the deprecated sync chat coordinator compatibility shim."""
+        from victor.agent.orchestrator_properties import _ensure_sync_chat_coordinator
+
+        return _ensure_sync_chat_coordinator(self)
+
+    def _get_deprecated_streaming_chat_coordinator(self) -> Any:
+        """Get the deprecated streaming chat coordinator compatibility shim."""
+        from victor.agent.orchestrator_properties import _ensure_streaming_chat_coordinator
+
+        return _ensure_streaming_chat_coordinator(self)
+
+    def _get_deprecated_unified_chat_coordinator(self) -> Any:
+        """Get the deprecated unified chat coordinator compatibility shim."""
+        from victor.agent.orchestrator_properties import _ensure_unified_chat_coordinator
+
+        return _ensure_unified_chat_coordinator(self)
 
     def _build_callback_coordinator(self) -> Any:
         """Lazily construct the CallbackCoordinator."""
@@ -3382,8 +3381,6 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         turn_executor = getattr(self, "_turn_executor", None)
         if turn_executor is None and hasattr(self._chat_service, "turn_executor"):
             turn_executor = self._chat_service.turn_executor
-        if turn_executor is None and hasattr(self, "_chat_coordinator"):
-            turn_executor = self._chat_coordinator.turn_executor
 
         loop = AgenticLoop(
             orchestrator=self,
@@ -3478,6 +3475,167 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         """
         return await self._chat_service.chat_with_planning(user_message, use_planning)
 
+    async def _run_planning_chat_runtime(self, user_message: str) -> CompletionResponse:
+        """Execute structured planning from the canonical service runtime path."""
+        from victor.agent.services.planning_runtime import PlanningCoordinator
+
+        planning_coordinator = getattr(self, "_service_planning_coordinator", None)
+        if planning_coordinator is None:
+            planning_coordinator = PlanningCoordinator(self)
+            self._service_planning_coordinator = planning_coordinator
+
+        task_analysis = self.task_analyzer.analyze(user_message)
+        response = await planning_coordinator.chat_with_planning(
+            user_message,
+            task_analysis=task_analysis,
+        )
+
+        if not self._system_added:
+            self.conversation.ensure_system_prompt()
+            self._system_added = True
+
+        self.add_message("user", user_message)
+        if response.content:
+            self.add_message("assistant", response.content)
+
+        return response
+
+    async def _handle_context_and_iteration_limits_runtime(
+        self,
+        user_message: str,
+        max_total_iterations: int,
+        max_context: int,
+        total_iterations: int,
+        last_quality_score: float,
+    ) -> tuple[bool, Optional[StreamChunk]]:
+        """Handle context and iteration limits from the canonical service runtime path."""
+        if self._check_context_overflow(max_context):
+            logger.warning("Context overflow detected. Attempting smart compaction...")
+            removed = self._conversation_controller.smart_compact_history(
+                current_query=user_message
+            )
+            if removed > 0:
+                logger.info(f"Smart compaction removed {removed} messages")
+                chunk = StreamChunk(
+                    content=f"\n[context] Compacted history ({removed} messages) to continue.\n"
+                )
+                self._conversation_controller.inject_compaction_context()
+                return False, chunk
+
+            if self._check_context_overflow(max_context):
+                logger.warning("Still overflowing after compaction. Forcing completion.")
+                chunk = StreamChunk(
+                    content=(
+                        f"\n[tool] {self._presentation.icon('warning', with_color=False)} "
+                        "Context size limit reached. Providing summary.\n"
+                    )
+                )
+                completion_prompt = self._get_thinking_disabled_prompt(
+                    "Context limit reached. Summarize in 2-3 sentences."
+                )
+                recent_messages = self.messages[-8:] if len(self.messages) > 8 else self.messages[:]
+                completion_messages = recent_messages + [
+                    Message(role="user", content=completion_prompt)
+                ]
+
+                try:
+                    response = await self.provider.chat(
+                        messages=completion_messages,
+                        model=self.model,
+                        temperature=self.temperature,
+                        max_tokens=min(self.max_tokens, 1024),
+                        tools=None,
+                    )
+                    if response and response.content:
+                        sanitized = self.sanitizer.sanitize(response.content)
+                        if sanitized:
+                            self.add_message("assistant", sanitized)
+                            chunk = StreamChunk(content=sanitized, is_final=True)
+                            self._record_intelligent_outcome(
+                                success=True,
+                                quality_score=last_quality_score,
+                                user_satisfied=True,
+                                completed=True,
+                            )
+                            return True, chunk
+                except Exception as exc:
+                    logger.warning(f"Final response after context overflow failed: {exc}")
+                self._record_intelligent_outcome(
+                    success=True,
+                    quality_score=last_quality_score,
+                    user_satisfied=True,
+                    completed=True,
+                )
+                return True, StreamChunk(content="", is_final=True)
+
+        if total_iterations > max_total_iterations:
+            logger.warning(
+                f"Hard iteration limit reached ({max_total_iterations}). Forcing completion."
+            )
+            iteration_prompt = self._get_thinking_disabled_prompt(
+                "Max iterations reached. Summarize key findings in 3-4 sentences. "
+                "Do NOT attempt any more tool calls."
+            )
+            recent_messages = self.messages[-10:] if len(self.messages) > 10 else self.messages[:]
+            completion_messages = recent_messages + [Message(role="user", content=iteration_prompt)]
+
+            chunk = StreamChunk(
+                content=(
+                    f"\n[tool] {self._presentation.icon('warning', with_color=False)} "
+                    f"Maximum iterations ({max_total_iterations}) reached. Providing summary.\n"
+                )
+            )
+
+            try:
+                response = await self.provider.chat(
+                    messages=completion_messages,
+                    model=self.model,
+                    temperature=self.temperature,
+                    max_tokens=min(self.max_tokens, 1024),
+                    tools=None,
+                )
+                if response and response.content:
+                    sanitized = self.sanitizer.sanitize(response.content)
+                    if sanitized:
+                        self.add_message("assistant", sanitized)
+                        chunk = StreamChunk(content=sanitized, is_final=True)
+                        self._record_intelligent_outcome(
+                            success=True,
+                            quality_score=last_quality_score,
+                            user_satisfied=True,
+                            completed=True,
+                        )
+                        return True, chunk
+            except (ProviderRateLimitError, ProviderTimeoutError) as exc:
+                logger.error(f"Rate limit/timeout during final response: {exc}")
+                chunk = StreamChunk(
+                    content="Rate limited or timeout. Please retry in a moment.\n", is_final=True
+                )
+            except ProviderAuthError as exc:
+                logger.error(f"Auth error during final response: {exc}")
+                chunk = StreamChunk(
+                    content="Authentication error. Check API credentials.\n", is_final=True
+                )
+            except (ConnectionError, TimeoutError) as exc:
+                logger.error(f"Network error during final response: {exc}")
+                chunk = StreamChunk(content="Network error. Check connection.\n", is_final=True)
+            except Exception:
+                logger.exception("Unexpected error during final response generation")
+                chunk = StreamChunk(
+                    content="Unable to generate final summary due to iteration limit.\n",
+                    is_final=True,
+                )
+
+            self._record_intelligent_outcome(
+                success=True,
+                quality_score=last_quality_score,
+                user_satisfied=True,
+                completed=True,
+            )
+            return True, chunk if chunk else StreamChunk(content="", is_final=True)
+
+        return False, None
+
     async def _handle_context_and_iteration_limits(
         self,
         user_message: str,
@@ -3497,6 +3655,24 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             total_iterations,
             last_quality_score,
         )
+
+    def _get_service_streaming_runtime(self) -> Any:
+        """Get the canonical service-owned streaming runtime adapter."""
+        runtime = getattr(self, "_service_streaming_runtime", None)
+        if runtime is None:
+            from victor.agent.services.chat_stream_runtime import ServiceStreamingRuntime
+
+            runtime = ServiceStreamingRuntime(self)
+            self._service_streaming_runtime = runtime
+        return runtime
+
+    async def _stream_chat_runtime(
+        self, user_message: str, **kwargs: Any
+    ) -> AsyncIterator[StreamChunk]:
+        """Stream via the canonical service-owned runtime adapter."""
+        runtime = self._get_service_streaming_runtime()
+        async for chunk in runtime.stream_chat(user_message, **kwargs):
+            yield chunk
 
     def _prepare_task(
         self, user_message: str, unified_task_type: TrackerTaskType
@@ -3871,7 +4047,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         Returns:
             StreamingRecoveryContext with all necessary state
         """
-        from victor.agent.recovery_coordinator import StreamingRecoveryContext
+        from victor.agent.services.recovery_compat import StreamingRecoveryContext
 
         # Get elapsed time from streaming controller
         elapsed_time = 0.0
@@ -4005,31 +4181,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                     turn_executor=getattr(self, "_turn_executor", None),
                 )
 
-                # Get streaming pipeline from ChatCoordinator
-                pipeline = None
-                if hasattr(self, "_chat_coordinator"):
-                    coord = self._chat_coordinator
-                    # Ensure pipeline exists
-                    if (
-                        not hasattr(coord, "_streaming_pipeline")
-                        or coord._streaming_pipeline is None
-                    ):
-                        from victor.agent.streaming import create_streaming_chat_pipeline
-
-                        coord._streaming_pipeline = create_streaming_chat_pipeline(coord)
-                    pipeline = coord._streaming_pipeline
+                pipeline = self._get_service_streaming_runtime().get_pipeline()
 
                 async for chunk in loop.stream_chat(user_message, streaming_pipeline=pipeline):
                     yield chunk
                 return
         except Exception as e:
-            logger.warning("AgenticLoop streaming failed, falling back to ChatCoordinator: %s", e)
+            logger.warning("AgenticLoop streaming failed, falling back to ChatService: %s", e)
             logger.info(
                 "[Fallback] Conversation history preserved (%d messages)",
                 len(self.conversation.messages),
             )
 
-        # Fallback: ChatCoordinator streaming with conversation state preserved.
+        # Fallback: ChatService streaming with conversation state preserved.
         # _preserve_iteration=True signals chat_service to maintain context continuity
         # regardless of how many tool-call iterations had completed before the failure.
         async for chunk in self._chat_service.stream_chat(

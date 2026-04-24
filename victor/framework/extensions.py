@@ -139,15 +139,15 @@ def __getattr__(name: str):
     """Lazy imports to avoid circular dependencies and unnecessary loading."""
     _LAZY_IMPORTS = {
         # Safety
-        "SafetyCoordinator": "victor.agent.coordinators.safety_coordinator",
-        "SafetyAction": "victor.agent.coordinators.safety_coordinator",
-        "SafetyCategory": "victor.agent.coordinators.safety_coordinator",
-        "SafetyRule": "victor.agent.coordinators.safety_coordinator",
+        "SafetyCoordinator": "victor_sdk.safety",
+        "SafetyAction": "victor_sdk.safety",
+        "SafetyCategory": "victor_sdk.safety",
+        "SafetyRule": "victor_sdk.safety",
         # Conversation
-        "ConversationCoordinator": "victor.agent.coordinators.conversation_coordinator",
-        "ConversationStats": "victor.agent.coordinators.conversation_coordinator",
-        "ConversationTurn": "victor.agent.coordinators.conversation_coordinator",
-        "TurnType": "victor.agent.coordinators.conversation_coordinator",
+        "ConversationCoordinator": "victor_sdk.conversation",
+        "ConversationStats": "victor_sdk.conversation",
+        "ConversationTurn": "victor_sdk.conversation",
+        "TurnType": "victor_sdk.conversation",
         # Workflow execution
         "WorkflowExecutor": "victor.workflows.executor",
         "WorkflowContext": "victor.workflows.executor",

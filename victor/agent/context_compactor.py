@@ -49,6 +49,9 @@ from victor.config.orchestrator_constants import (
     CONTEXT_LIMITS,
     RL_LEARNER_CONFIG,
 )
+
+# Lazy import to avoid circular dependency
+AdaptiveCompactionThreshold = None
 from victor.core.shared_types import TaskPhase
 from victor.providers.base import Message
 
@@ -306,6 +309,7 @@ class ContextCompactor:
         provider_type: str = "cloud",
         event_bus: Optional[Any] = None,
         decision_service: Optional[Any] = None,
+        adaptive_threshold: Optional["AdaptiveCompactionThreshold"] = None,
     ):
         """Initialize the context compactor.
 
@@ -316,6 +320,7 @@ class ContextCompactor:
             provider_type: Provider type for RL state (cloud, local)
             event_bus: Optional event bus for compaction events (ObservabilityBus)
             decision_service: Optional TieredDecisionService for tier-based compaction routing
+            adaptive_threshold: Optional adaptive threshold system for pattern-based thresholds
         """
         self.controller = controller
         self.config = config or CompactorConfig()
@@ -333,9 +338,14 @@ class ContextCompactor:
         self._last_rl_action: Optional[str] = None
         self._last_task_success: bool = True
 
+        # Adaptive threshold system
+        self._adaptive_threshold = adaptive_threshold
+        self._adaptive_enabled = adaptive_threshold is not None
+
         logger.debug(
             f"ContextCompactor initialized (threshold: {self.config.proactive_threshold:.0%}, "
             f"rl_enabled: {self._rl_enabled}, "
+            f"adaptive_enabled: {self._adaptive_enabled}, "
             f"decision_service: {decision_service is not None})"
         )
 
@@ -751,6 +761,14 @@ class ContextCompactor:
         metrics = self.controller.get_context_metrics()
         utilization = metrics.utilization
 
+        # Get messages for adaptive threshold calculation
+        messages = None
+        if self._adaptive_enabled:
+            try:
+                messages = self.controller.get_messages()
+            except Exception as e:
+                logger.debug(f"Could not get messages for adaptive threshold: {e}")
+
         # Get RL recommendation if learner is available
         rl_config = None
         rl_action = None
@@ -771,8 +789,8 @@ class ContextCompactor:
             except Exception as e:
                 logger.warning(f"RL recommendation failed: {e}")
 
-        # Get base threshold (phase-aware or default)
-        base_threshold = self._get_compaction_threshold(phase)
+        # Get base threshold (adaptive > phase-aware > default)
+        base_threshold = self._get_compaction_threshold(phase, messages)
 
         # Get effective thresholds (RL config overrides phase-aware)
         effective_threshold = (
@@ -1119,15 +1137,37 @@ class ContextCompactor:
     # Phase-Aware Compaction
     # ========================================================================
 
-    def _get_compaction_threshold(self, phase: Optional[TaskPhase]) -> float:
+    def _get_compaction_threshold(
+        self,
+        phase: Optional[TaskPhase] = None,
+        messages: Optional[List[Any]] = None,
+    ) -> float:
         """Get the compaction threshold for the current phase.
+
+        Priority order:
+        1. Adaptive threshold (if enabled and messages available)
+        2. Phase-aware threshold (if enabled and phase provided)
+        3. Default threshold from config
 
         Args:
             phase: Current task phase
+            messages: Optional list of messages for adaptive threshold calculation
 
         Returns:
             Compaction threshold (0.0-1.0)
         """
+        # Try adaptive threshold first (if enabled and messages available)
+        if self._adaptive_enabled and messages:
+            try:
+                adaptive_threshold = self._adaptive_threshold.calculate_threshold(messages)
+                logger.debug(
+                    f"Using adaptive threshold: {adaptive_threshold:.0%} "
+                    f"(pattern: {self._adaptive_threshold.get_current_analysis().pattern.value if self._adaptive_threshold.get_current_analysis() else 'unknown'})"
+                )
+                return adaptive_threshold
+            except Exception as e:
+                logger.warning(f"Adaptive threshold calculation failed, falling back: {e}")
+
         # Use phase-aware threshold if enabled and phase is provided
         if self.config.enable_phase_aware and phase and phase in self.config.phase_thresholds:
             return self.config.phase_thresholds[phase]
@@ -1194,7 +1234,7 @@ class ContextCompactor:
         """
         metrics = self.controller.get_context_metrics()
 
-        return {
+        stats = {
             "current_utilization": metrics.utilization,
             "current_chars": metrics.char_count,
             "current_messages": metrics.message_count,
@@ -1205,7 +1245,23 @@ class ContextCompactor:
             "proactive_threshold": self.config.proactive_threshold,
             "proactive_enabled": self.config.enable_proactive,
             "truncation_enabled": self.config.enable_tool_truncation,
+            "adaptive_enabled": self._adaptive_enabled,
         }
+
+        # Add adaptive threshold info if enabled
+        if self._adaptive_enabled and self._adaptive_threshold:
+            analysis = self._adaptive_threshold.get_current_analysis()
+            if analysis:
+                stats.update({
+                    "adaptive_pattern": analysis.pattern.value,
+                    "adaptive_confidence": analysis.confidence,
+                    "adaptive_topic_coherence": analysis.topic_coherence,
+                    "adaptive_context_dependency": analysis.context_dependency,
+                    "adaptive_threshold": analysis.recommended_threshold,
+                    "adaptive_reasoning": analysis.reasoning,
+                })
+
+        return stats
 
     def get_compaction_history(self) -> List[str]:
         """Get summaries of past compactions.
@@ -1226,6 +1282,50 @@ class ContextCompactor:
         self._compaction_count = 0
         self._last_compaction_turn = 0
         logger.debug("Compactor statistics reset")
+
+    # ========================================================================
+    # Adaptive Threshold Management
+    # ========================================================================
+
+    def set_adaptive_threshold(self, adaptive_threshold: "AdaptiveCompactionThreshold") -> None:
+        """Set or update the adaptive threshold system.
+
+        Args:
+            adaptive_threshold: AdaptiveCompactionThreshold instance
+        """
+        global AdaptiveCompactionThreshold
+        if AdaptiveCompactionThreshold is None:
+            from victor.agent.adaptive_compaction import AdaptiveCompactionThreshold as ACT
+            AdaptiveCompactionThreshold = ACT
+
+        self._adaptive_threshold = adaptive_threshold
+        self._adaptive_enabled = True
+        logger.info("Adaptive threshold system enabled")
+
+    def disable_adaptive_threshold(self) -> None:
+        """Disable adaptive threshold and use static thresholds."""
+        self._adaptive_enabled = False
+        logger.info("Adaptive threshold system disabled")
+
+    def get_adaptive_analysis(self) -> Optional[Any]:
+        """Get the most recent adaptive threshold analysis.
+
+        Returns:
+            PatternAnalysis from adaptive system, or None if not enabled
+        """
+        if self._adaptive_enabled and self._adaptive_threshold:
+            return self._adaptive_threshold.get_current_analysis()
+        return None
+
+    def get_adaptive_threshold_history(self) -> List[Dict[str, Any]]:
+        """Get history of adaptive threshold calculations.
+
+        Returns:
+            List of dicts with timestamp, threshold, and pattern
+        """
+        if self._adaptive_enabled and self._adaptive_threshold:
+            return self._adaptive_threshold.get_threshold_history()
+        return []
 
     # =========================================================================
     # Async API
@@ -1265,6 +1365,17 @@ class ContextCompactor:
         Returns:
             CompactionAction describing what was done
         """
+        import asyncio
+
+        # Get messages for adaptive threshold
+        messages = None
+        if self._adaptive_enabled:
+            try:
+                messages = self.controller.get_messages()
+            except Exception as e:
+                logger.debug(f"Could not get messages for adaptive threshold: {e}")
+
+        self._ensure_async_state()
         import asyncio
 
         self._ensure_async_state()
@@ -1405,7 +1516,7 @@ class ContextCompactor:
 
 def create_context_compactor(
     controller: "ConversationController",
-    proactive_threshold: float = 0.90,
+    proactive_threshold: float = 0.50,  # Changed from 0.90 - balanced default
     min_messages_after_compact: int = 8,
     tool_result_max_chars: int = 8192,
     tool_result_max_lines: int = 200,

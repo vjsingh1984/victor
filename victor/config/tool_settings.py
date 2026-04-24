@@ -107,6 +107,30 @@ class ToolSettings(BaseModel):
         description="Maximum tool output size in MB for display (default: 10MB, higher when pruning disabled)",
     )
 
+    # Adaptive preview sizing (context-aware)
+    tool_output_preview_adaptive: bool = Field(
+        default=True,
+        description="Adjust preview size based on content type and size (default: enabled)",
+    )
+    tool_output_preview_lines_min: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        description="Minimum preview lines for adaptive mode (default: 1)",
+    )
+    tool_output_preview_lines_max: int = Field(
+        default=10,
+        ge=1,
+        le=20,
+        description="Maximum preview lines for adaptive mode (default: 10)",
+    )
+
+    # Tool grouping for content organization
+    enable_tool_grouping: bool = Field(
+        default=True,
+        description="Group related tools by category with visual headers (default: enabled)",
+    )
+
     # Embedding-intensive tool concurrency configuration
     # These tools use embedding models and need lower concurrency limits
     # to prevent resource exhaustion (memory, CPU, embedding model contention)

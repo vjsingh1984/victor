@@ -467,7 +467,7 @@ class TestTurnResultEvaluation:
 
     async def test_qa_response_completes(self):
         """Q&A response with content should complete immediately."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         loop = self._make_loop()
         turn = TurnResult(
@@ -480,7 +480,7 @@ class TestTurnResultEvaluation:
 
     async def test_spin_detection_fails(self):
         """3+ consecutive all-blocked turns should fail."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         loop = self._make_loop()
         loop.spin_detector.consecutive_all_blocked = 3
@@ -495,7 +495,7 @@ class TestTurnResultEvaluation:
 
     async def test_stuck_agent_fails(self):
         """3+ turns without tools should fail."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         loop = self._make_loop()
         loop.spin_detector.consecutive_no_tool_turns = 3
@@ -509,7 +509,7 @@ class TestTurnResultEvaluation:
 
     async def test_successful_tools_continue(self):
         """Successful tool execution should continue."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         loop = self._make_loop()
         turn = TurnResult(
@@ -524,7 +524,7 @@ class TestTurnResultEvaluation:
 
     async def test_final_answer_after_tools_completes(self):
         """No tools + content + previously used tools = done."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         loop = self._make_loop()
         loop.spin_detector.total_tool_calls = 5
@@ -538,7 +538,7 @@ class TestTurnResultEvaluation:
 
     async def test_act_with_turn_executor(self):
         """_act() should call execute_turn() when coordinator available."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         mock_coord = AsyncMock()
         mock_turn = TurnResult(
@@ -559,7 +559,7 @@ class TestTurnResultEvaluation:
 
     async def test_act_tracks_tool_calls(self):
         """_act() should update turn-level tracking from TurnResult."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         mock_coord = AsyncMock()
         mock_turn = TurnResult(
@@ -589,7 +589,7 @@ class TestTurnResultDataclass:
     """Tests for TurnResult dataclass."""
 
     def test_properties(self):
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         turn = TurnResult(
             response=MagicMock(content="hello"),
@@ -607,7 +607,7 @@ class TestTurnResultDataclass:
         assert turn.failed_tool_count == 1
 
     def test_empty_content(self):
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         turn = TurnResult(response=MagicMock(content=None))
         assert turn.content == ""
@@ -625,7 +625,7 @@ class TestNudgeInjection:
 
     async def test_nudge_injected_on_no_tool_turns(self):
         """When agent doesn't use tools for 2+ turns, nudge is injected."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         mock_coord = AsyncMock()
         mock_chat_ctx = MagicMock()
@@ -663,7 +663,7 @@ class TestNudgeInjection:
 
     async def test_spin_nudge_injected_on_blocked_tools(self):
         """When all tools are blocked by dedup, spin nudge is injected."""
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         mock_coord = AsyncMock()
         mock_chat_ctx = MagicMock()

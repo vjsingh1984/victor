@@ -34,6 +34,20 @@ from victor.agent.coordinators.tool_coordinator import (
 class TestToolCoordinatorConfig:
     """Tests for ToolCoordinatorConfig."""
 
+    def test_legacy_module_reexports_service_runtime(self):
+        """Legacy coordinator path should re-export the service-owned tool shim."""
+        from victor.agent.services.tool_compat import (
+            ToolCoordinator as service_tool_coordinator,
+            ToolCoordinatorConfig as service_tool_coordinator_config,
+            TaskContext as service_task_context,
+            create_tool_coordinator as service_create_tool_coordinator,
+        )
+
+        assert ToolCoordinator is service_tool_coordinator
+        assert ToolCoordinatorConfig is service_tool_coordinator_config
+        assert TaskContext is service_task_context
+        assert create_tool_coordinator is service_create_tool_coordinator
+
     def test_default_config(self):
         """Test default configuration values."""
         config = ToolCoordinatorConfig()

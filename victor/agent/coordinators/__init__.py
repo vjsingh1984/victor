@@ -46,6 +46,15 @@ _MODULE_MEMBERS = {
     "chat_coordinator": [
         "ChatCoordinator",
     ],
+    "sync_chat_coordinator": [
+        "SyncChatCoordinator",
+    ],
+    "streaming_chat_coordinator": [
+        "StreamingChatCoordinator",
+    ],
+    "unified_chat_coordinator": [
+        "UnifiedChatCoordinator",
+    ],
     "chat_protocols": [
         "ChatContextProtocol",
         "ChatOrchestratorProtocol",
@@ -102,8 +111,40 @@ for _module_name, _exported_names in _MODULE_MEMBERS.items():
 __all__ = list(_SUBMODULE_MAP.keys())
 
 _DEPRECATED_EXPORTS = {
+    "ChatContextProtocol": (
+        "victor.agent.coordinators.ChatContextProtocol is deprecated compatibility "
+        "surface. Prefer ChatServiceProtocol and service-owned runtime boundaries "
+        "from victor.agent.services."
+    ),
+    "ChatOrchestratorProtocol": (
+        "victor.agent.coordinators.ChatOrchestratorProtocol is deprecated "
+        "compatibility surface. Prefer ChatServiceProtocol and service-owned "
+        "runtime boundaries from victor.agent.services."
+    ),
+    "ProviderContextProtocol": (
+        "victor.agent.coordinators.ProviderContextProtocol is deprecated "
+        "compatibility surface. Prefer ProviderServiceProtocol and service-owned "
+        "runtime boundaries from victor.agent.services."
+    ),
+    "ToolContextProtocol": (
+        "victor.agent.coordinators.ToolContextProtocol is deprecated compatibility "
+        "surface. Prefer ToolServiceProtocol and service-owned runtime boundaries "
+        "from victor.agent.services."
+    ),
     "ChatCoordinator": (
         "victor.agent.coordinators.ChatCoordinator is deprecated compatibility "
+        "surface. Prefer ChatService from victor.agent.services."
+    ),
+    "SyncChatCoordinator": (
+        "victor.agent.coordinators.SyncChatCoordinator is deprecated compatibility "
+        "surface. Prefer ChatService from victor.agent.services."
+    ),
+    "StreamingChatCoordinator": (
+        "victor.agent.coordinators.StreamingChatCoordinator is deprecated compatibility "
+        "surface. Prefer ChatService from victor.agent.services."
+    ),
+    "UnifiedChatCoordinator": (
+        "victor.agent.coordinators.UnifiedChatCoordinator is deprecated compatibility "
         "surface. Prefer ChatService from victor.agent.services."
     ),
     "ToolCoordinator": (
@@ -128,7 +169,10 @@ _DEPRECATED_EXPORTS = {
 def __getattr__(name: str) -> Any:
     """Resolve coordinator exports lazily and warn on deprecated shims."""
     if name in _SUBMODULE_MAP:
-        module = importlib.import_module(f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}")
+        if _SUBMODULE_MAP[name] == "chat_protocols":
+            module = importlib.import_module("victor.agent.services.protocols.chat_runtime")
+        else:
+            module = importlib.import_module(f"victor.agent.coordinators.{_SUBMODULE_MAP[name]}")
         value = getattr(module, name)
         if name in _DEPRECATED_EXPORTS:
             warnings.warn(

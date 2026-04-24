@@ -1,22 +1,22 @@
-"""Tests for ChatCoordinator.persist_message (extracted from orchestrator)."""
+"""Tests for canonical chat message persistence and shim delegation."""
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+from victor.agent.services.chat_service import ChatService
 
 
 class TestPersistMessage:
     def test_persists_to_memory_manager(self):
-        """Calls memory_manager.add_message (sync or via executor)."""
+        """ChatService.persist_message calls memory_manager.add_message."""
         mm = MagicMock()
         logger = MagicMock(spec=["log_event"])
 
         # Patch get_running_loop to simulate no event loop (sync path)
         with patch("asyncio.get_running_loop", side_effect=RuntimeError):
-            ChatCoordinator.persist_message(
+            ChatService.persist_message(
                 role="user",
                 content="hello",
                 memory_manager=mm,
@@ -32,7 +32,7 @@ class TestPersistMessage:
     def test_logs_user_prompt_event(self):
         logger = MagicMock(spec=["log_event"])
 
-        ChatCoordinator.persist_message(
+        ChatService.persist_message(
             role="user",
             content="test query",
             memory_manager=None,
@@ -45,7 +45,7 @@ class TestPersistMessage:
     def test_logs_assistant_response_event(self):
         logger = MagicMock(spec=["log_event", "set_reasoning_context"])
 
-        ChatCoordinator.persist_message(
+        ChatService.persist_message(
             role="assistant",
             content="here's the answer",
             memory_manager=None,
@@ -61,7 +61,7 @@ class TestPersistMessage:
     def test_system_role_no_event(self):
         logger = MagicMock(spec=["log_event"])
 
-        ChatCoordinator.persist_message(
+        ChatService.persist_message(
             role="system",
             content="sys prompt",
             memory_manager=None,
@@ -75,7 +75,7 @@ class TestPersistMessage:
         logger = MagicMock(spec=["log_event"])
 
         # Should not raise
-        ChatCoordinator.persist_message(
+        ChatService.persist_message(
             role="user",
             content="hello",
             memory_manager=None,
@@ -89,7 +89,7 @@ class TestPersistMessage:
         logger = MagicMock(spec=["log_event"])
 
         # Should not raise
-        ChatCoordinator.persist_message(
+        ChatService.persist_message(
             role="user",
             content="hello",
             memory_manager=mm,
@@ -99,3 +99,28 @@ class TestPersistMessage:
 
         # Usage event still logged despite persistence failure
         logger.log_event.assert_called_once()
+
+    def test_chat_coordinator_persist_message_warns_and_delegates(self):
+        with patch("victor.agent.services.chat_service.ChatService.persist_message") as persist:
+            with pytest.warns(
+                DeprecationWarning,
+                match="ChatCoordinator.persist_message\\(\\) is deprecated compatibility surface",
+            ):
+                ChatCoordinator.persist_message(
+                    role="user",
+                    content="hello",
+                    memory_manager=None,
+                    memory_session_id=None,
+                    usage_logger=None,
+                )
+
+        persist.assert_called_once_with(
+            role="user",
+            content="hello",
+            memory_manager=None,
+            memory_session_id=None,
+            usage_logger=None,
+            tool_name=None,
+            tool_call_id=None,
+            tool_calls=None,
+        )

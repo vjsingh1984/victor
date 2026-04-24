@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from victor.agent.coordinators.exploration_coordinator import (
+from victor.agent.services.exploration_runtime import (
     ExplorationCoordinator,
     ExplorationResult,
 )
@@ -17,6 +17,16 @@ from victor.agent.coordinators.exploration_coordinator import (
 
 class TestExplorationCoordinator:
     """Tests for parallel exploration."""
+
+    def test_legacy_module_reexports_service_runtime(self):
+        """Legacy coordinator path should re-export service-owned exploration runtime."""
+        from victor.agent.coordinators.exploration_coordinator import (
+            ExplorationCoordinator as legacy_coordinator,
+            ExplorationResult as legacy_result,
+        )
+
+        assert legacy_coordinator is ExplorationCoordinator
+        assert legacy_result is ExplorationResult
 
     def test_extract_search_terms_from_camelcase(self):
         """Extracts CamelCase identifiers."""

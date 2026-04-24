@@ -131,12 +131,14 @@ class TestTaskPreparation:
         ):
             task_coordinator.prepare_task(message, unified_type, mock_conversation_controller)
 
-            # Verify hint was injected
+            # Verify hint was injected as a user message with [TASK-HINT:] prefix
             mock_conversation_controller.add_message.assert_called()
             calls = [
                 call
                 for call in mock_conversation_controller.add_message.call_args_list
-                if len(call[0]) >= 2 and call[0][0] == "system"
+                if len(call[0]) >= 2
+                and call[0][0] == "user"
+                and "[TASK-HINT:" in str(call[0][1])
             ]
             assert len(calls) > 0
 
@@ -183,9 +185,9 @@ class TestIntentDetection:
         message = "Show me the code"
         task_coordinator.apply_intent_guard(message, mock_conversation_controller)
 
-        # Verify prompt guard was injected
+        # Verify prompt guard was injected as user message with [INTENT-GUARD:] prefix
         mock_conversation_controller.add_message.assert_called_with(
-            "system", "READ ONLY MODE: Do not modify files."
+            "user", "[INTENT-GUARD: READ ONLY MODE: Do not modify files.]"
         )
 
         # Verify current intent was set
@@ -206,9 +208,9 @@ class TestIntentDetection:
         message = "Analyze the codebase"
         task_coordinator.apply_intent_guard(message, mock_conversation_controller)
 
-        # Verify prompt guard was injected
+        # Verify prompt guard was injected as user message with [INTENT-GUARD:] prefix
         mock_conversation_controller.add_message.assert_called_with(
-            "system", "This is read-only analysis."
+            "user", "[INTENT-GUARD: This is read-only analysis.]"
         )
 
 

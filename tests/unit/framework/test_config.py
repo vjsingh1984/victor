@@ -20,7 +20,9 @@ promoted from verticals to eliminate duplication.
 
 import pytest
 
+from victor.agent.config import UnifiedAgentConfig as CanonicalUnifiedAgentConfig
 from victor.framework.config import (
+    UnifiedAgentConfig,
     SafetyConfig,
     StyleConfig,
     ToolConfig,
@@ -28,6 +30,19 @@ from victor.framework.config import (
     SafetyRule,
     SafetyEnforcer,
 )
+
+# =============================================================================
+# Agent Config Re-export Tests
+# =============================================================================
+
+
+class TestAgentConfigExports:
+    """Tests for framework-facing agent config exports."""
+
+    def test_unified_agent_config_re_export(self):
+        """framework.config should re-export the canonical UnifiedAgentConfig."""
+        assert UnifiedAgentConfig is CanonicalUnifiedAgentConfig
+
 
 # =============================================================================
 # SafetyConfig Tests

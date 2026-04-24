@@ -26,7 +26,7 @@ Design Pattern: Template Method
 
 Usage:
     from victor.contrib.conversation import BaseConversationManager
-    from victor.agent.coordinators.conversation_coordinator import TurnType
+    from victor_sdk.conversation import TurnType
 
     class MyVerticalConversationManager(BaseConversationManager):
         def get_vertical_name(self) -> str:
@@ -53,7 +53,7 @@ import logging
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
-from victor.agent.coordinators.conversation_coordinator import (
+from victor_sdk.conversation import (
     ConversationCoordinator,
     TurnType,
 )

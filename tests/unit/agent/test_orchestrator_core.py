@@ -985,8 +985,9 @@ class TestServiceFirstDelegation:
 
     @pytest.mark.asyncio
     async def test_maybe_auto_checkpoint_uses_session_service(self, orchestrator):
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator._session_service.maybe_auto_checkpoint = AsyncMock(return_value="ckpt-1")
-        orchestrator._session_coordinator.maybe_auto_checkpoint = AsyncMock(
+        deprecated_session_coordinator.maybe_auto_checkpoint = AsyncMock(
             side_effect=AssertionError("coordinator path should not be used")
         )
 
@@ -1010,8 +1011,9 @@ class TestServiceFirstDelegation:
         assert result == ([{"name": "read", "arguments": {}}], "")
 
     def test_recover_session_uses_session_service(self, orchestrator):
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator._session_service.recover_session = MagicMock(return_value=True)
-        orchestrator._session_coordinator.recover_session = MagicMock(
+        deprecated_session_coordinator.recover_session = MagicMock(
             side_effect=AssertionError("coordinator path should not be used")
         )
 
@@ -2947,8 +2949,8 @@ class TestPrepareStream:
 
     @pytest.mark.asyncio
     async def test_prepare_stream_basic(self, orchestrator):
-        """Test _prepare_stream initializes stream variables (delegated to ChatCoordinator)."""
-        result = await orchestrator._chat_coordinator._prepare_stream("test message")
+        """Test _prepare_stream initializes stream variables via service runtime."""
+        result = await orchestrator._get_service_streaming_runtime()._prepare_stream("test message")
         assert result is not None
         assert len(result) == 11  # Should return 11 values
         # Unpack to verify structure
@@ -3184,8 +3186,9 @@ class TestGetRecentSessions:
 
     def test_returns_empty_when_no_memory_manager(self, orchestrator):
         """Test returns empty list when memory manager not enabled."""
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = None
-        orchestrator._session_coordinator._memory_manager = None
+        deprecated_session_coordinator._memory_manager = None
         result = orchestrator.get_recent_sessions()
         assert result == []
 
@@ -3204,8 +3207,9 @@ class TestGetRecentSessions:
 
         mock_manager = MagicMock()
         mock_manager.list_sessions.return_value = [mock_session]
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = mock_manager
-        orchestrator._session_coordinator._memory_manager = mock_manager
+        deprecated_session_coordinator._memory_manager = mock_manager
 
         result = orchestrator.get_recent_sessions(limit=5)
 
@@ -3218,8 +3222,9 @@ class TestGetRecentSessions:
         """Test handles exception and returns empty list."""
         mock_manager = MagicMock()
         mock_manager.list_sessions.side_effect = Exception("Database error")
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = mock_manager
-        orchestrator._session_coordinator._memory_manager = mock_manager
+        deprecated_session_coordinator._memory_manager = mock_manager
 
         result = orchestrator.get_recent_sessions()
         assert result == []
@@ -3312,10 +3317,11 @@ class TestGetMemoryContext:
             {"role": "user", "content": "test1"},
             {"role": "assistant", "content": "test2"},
         ]
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
-        orchestrator._session_coordinator._memory_manager = mock_manager
-        orchestrator._session_coordinator._memory_session_id = "session-123"
+        deprecated_session_coordinator._memory_manager = mock_manager
+        deprecated_session_coordinator._memory_session_id = "session-123"
 
         result = orchestrator.get_memory_context(max_tokens=1000)
 
@@ -3350,10 +3356,11 @@ class TestGetSessionStats:
 
     def test_returns_disabled_when_no_memory_manager(self, orchestrator):
         """Test returns disabled stats when no memory manager."""
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = None
         orchestrator._memory_session_id = None
-        orchestrator._session_coordinator._memory_manager = None
-        orchestrator._session_coordinator._memory_session_id = None
+        deprecated_session_coordinator._memory_manager = None
+        deprecated_session_coordinator._memory_session_id = None
 
         result = orchestrator.get_session_stats()
 
@@ -3364,10 +3371,11 @@ class TestGetSessionStats:
         mock_manager = MagicMock()
         # Simulate get_session_stats returning empty dict when session not found
         mock_manager.get_session_stats.return_value = {}
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
-        orchestrator._session_coordinator._memory_manager = mock_manager
-        orchestrator._session_coordinator._memory_session_id = "session-123"
+        deprecated_session_coordinator._memory_manager = mock_manager
+        deprecated_session_coordinator._memory_session_id = "session-123"
 
         result = orchestrator.get_session_stats()
 
@@ -3388,10 +3396,11 @@ class TestGetSessionStats:
             "last_activity": "2024-01-01T13:00:00",
             "duration_seconds": 3600.0,
         }
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
-        orchestrator._session_coordinator._memory_manager = mock_manager
-        orchestrator._session_coordinator._memory_session_id = "session-123"
+        deprecated_session_coordinator._memory_manager = mock_manager
+        deprecated_session_coordinator._memory_session_id = "session-123"
 
         result = orchestrator.get_session_stats()
 
@@ -3408,10 +3417,11 @@ class TestGetSessionStats:
         """Test handles exception and returns error via SessionCoordinator."""
         mock_manager = MagicMock()
         mock_manager.get_session_stats.side_effect = Exception("DB error")
+        deprecated_session_coordinator = orchestrator._get_deprecated_session_coordinator()
         orchestrator.memory_manager = mock_manager
         orchestrator._memory_session_id = "session-123"
-        orchestrator._session_coordinator._memory_manager = mock_manager
-        orchestrator._session_coordinator._memory_session_id = "session-123"
+        deprecated_session_coordinator._memory_manager = mock_manager
+        deprecated_session_coordinator._memory_session_id = "session-123"
 
         result = orchestrator.get_session_stats()
 
@@ -4793,35 +4803,41 @@ class TestRateLimitRetry:
     """Tests for rate limit retry logic in _stream_provider_response."""
 
     def test_get_rate_limit_wait_time_with_retry_after(self, orchestrator):
-        """Extract wait time from ProviderRateLimitError.retry_after (delegated to ChatCoordinator)."""
+        """Extract wait time from ProviderRateLimitError.retry_after via service runtime."""
         from victor.core.errors import ProviderRateLimitError
 
         exc = ProviderRateLimitError("Rate limit hit", retry_after=10)
-        wait_time = orchestrator._chat_coordinator._get_rate_limit_wait_time(exc, attempt=0)
+        wait_time = orchestrator._get_service_streaming_runtime()._get_rate_limit_wait_time(
+            exc, attempt=0
+        )
         # Delegates to ProviderCoordinator - returns exact retry_after value
         assert wait_time == 10.0
 
     def test_get_rate_limit_wait_time_extracts_from_message(self, orchestrator):
-        """Extract wait time from 'try again in X.XXs' pattern (delegated to ChatCoordinator)."""
+        """Extract wait time from 'try again in X.XXs' pattern via service runtime."""
         exc = Exception("Rate limit exceeded. Please try again in 5.5s")
-        wait_time = orchestrator._chat_coordinator._get_rate_limit_wait_time(exc, attempt=0)
+        wait_time = orchestrator._get_service_streaming_runtime()._get_rate_limit_wait_time(
+            exc, attempt=0
+        )
         # Delegates to ProviderCoordinator - exact parsed value (no buffer)
         assert wait_time == 5.5
 
     def test_get_rate_limit_wait_time_extracts_retry_after_pattern(self, orchestrator):
-        """Extract wait time from 'retry after Xs' pattern (delegated to ChatCoordinator)."""
+        """Extract wait time from 'retry after Xs' pattern via service runtime."""
         exc = Exception("Too many requests. Please retry after 3 seconds")
-        wait_time = orchestrator._chat_coordinator._get_rate_limit_wait_time(exc, attempt=0)
+        wait_time = orchestrator._get_service_streaming_runtime()._get_rate_limit_wait_time(
+            exc, attempt=0
+        )
         # Delegates to ProviderCoordinator - exact parsed value (no buffer)
         assert wait_time == 3.0
 
     def test_get_rate_limit_wait_time_exponential_backoff(self, orchestrator):
-        """Use exponential backoff when no wait time in error message (delegated to ChatCoordinator).
+        """Use exponential backoff when no wait time in error message via service runtime.
 
         When no wait time can be parsed, ProviderCoordinator returns default_rate_limit_wait (60s).
-        The ChatCoordinator then applies exponential backoff: base_wait * 2^attempt.
+        The service runtime helper then applies exponential backoff: base_wait * 2^attempt.
         """
-        cc = orchestrator._chat_coordinator
+        cc = orchestrator._get_service_streaming_runtime()
         exc = Exception("429 Too Many Requests")
         # Attempt 0: 60 * 2^0 = 60 seconds (coordinator default)
         assert cc._get_rate_limit_wait_time(exc, attempt=0) == 60.0
@@ -4835,8 +4851,8 @@ class TestRateLimitRetry:
         assert cc._get_rate_limit_wait_time(exc, attempt=4) == 300.0
 
     def test_get_rate_limit_wait_time_caps_at_300_seconds(self, orchestrator):
-        """Wait time capped at 300 seconds (5 minutes) (delegated to ChatCoordinator)."""
-        cc = orchestrator._chat_coordinator
+        """Wait time capped at 300 seconds (5 minutes) via service runtime."""
+        cc = orchestrator._get_service_streaming_runtime()
         exc = Exception("Rate limit exceeded. Please try again in 120s")
         # attempt=0: 120 * 2^0 = 120 (under cap)
         wait_time = cc._get_rate_limit_wait_time(exc, attempt=0)

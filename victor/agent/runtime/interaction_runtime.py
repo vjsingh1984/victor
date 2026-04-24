@@ -23,14 +23,13 @@ class InteractionRuntimeComponents:
     session_service: Any
     context_service: Any
     recovery_service: Any
-    session_coordinator: LazyRuntimeProxy[Any]
 
 
 def create_chat_coordinator_shim(
     *,
     orchestrator: Any,
-    factory: Any,
     chat_service: Optional[Any] = None,
+    get_chat_service: Optional[Any] = None,
 ) -> LazyRuntimeProxy[Any]:
     """Create the deprecated ChatCoordinator compatibility shim.
 
@@ -45,14 +44,13 @@ def create_chat_coordinator_shim(
             DeprecationWarning,
             stacklevel=2,
         )
-        from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+        from victor.agent.services.chat_compat import ChatCoordinator
 
         coordinator = ChatCoordinator(orchestrator)
-        if chat_service is not None and hasattr(coordinator, "bind_chat_service"):
+        if get_chat_service is not None and hasattr(coordinator, "bind_chat_service_getter"):
+            coordinator.bind_chat_service_getter(get_chat_service)
+        elif chat_service is not None and hasattr(coordinator, "bind_chat_service"):
             coordinator.bind_chat_service(chat_service)
-        if hasattr(factory, "create_streaming_chat_pipeline"):
-            pipeline = factory.create_streaming_chat_pipeline(coordinator)
-            coordinator.set_streaming_pipeline(pipeline)
         return coordinator
 
     return LazyRuntimeProxy(
@@ -86,7 +84,7 @@ def create_tool_coordinator_shim(
             DeprecationWarning,
             stacklevel=2,
         )
-        from victor.agent.coordinators.tool_coordinator import ToolCoordinator
+        from victor.agent.services.tool_compat import ToolCoordinator
 
         coordinator = ToolCoordinator(
             tool_pipeline=tool_pipeline,
@@ -104,6 +102,48 @@ def create_tool_coordinator_shim(
     return LazyRuntimeProxy(
         factory=_build_tool_coordinator,
         name="tool_coordinator",
+    )
+
+
+def create_session_coordinator_shim(
+    *,
+    session_state_manager: Any,
+    lifecycle_manager: Any,
+    memory_manager: Any,
+    checkpoint_manager: Any,
+    cost_tracker: Any,
+    session_service: Optional[Any] = None,
+) -> LazyRuntimeProxy[Any]:
+    """Create the deprecated SessionCoordinator compatibility shim.
+
+    This helper is intentionally separate from ``InteractionRuntimeComponents``
+    so the primary interaction runtime contract stays service-first.
+    """
+
+    def _build_session_coordinator() -> Any:
+        warnings.warn(
+            "SessionCoordinator shim is deprecated. Use SessionService "
+            "(self._session_service) directly. The shim will be removed in a "
+            "future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from victor.agent.services.session_compat import create_session_coordinator
+
+        coordinator = create_session_coordinator(
+            session_state_manager=session_state_manager,
+            lifecycle_manager=lifecycle_manager,
+            memory_manager=memory_manager,
+            checkpoint_manager=checkpoint_manager,
+            cost_tracker=cost_tracker,
+        )
+        if session_service is not None and hasattr(coordinator, "bind_session_service"):
+            coordinator.bind_session_service(session_service)
+        return coordinator
+
+    return LazyRuntimeProxy(
+        factory=_build_session_coordinator,
+        name="session_coordinator",
     )
 
 
@@ -214,28 +254,10 @@ def create_interaction_runtime_components(
             streaming_coordinator=streaming_coordinator,
         )
 
-    def _build_session_coordinator() -> Any:
-        from victor.agent.coordinators.session_coordinator import (
-            create_session_coordinator,
-        )
-
-        coordinator = create_session_coordinator(
-            session_state_manager=session_state_manager,
-            lifecycle_manager=lifecycle_manager,
-            memory_manager=memory_manager,
-            checkpoint_manager=checkpoint_manager,
-            cost_tracker=cost_tracker,
-        )
-        coordinator.bind_session_service(resolved_session_service)
-        return coordinator
     return InteractionRuntimeComponents(
         chat_service=resolved_chat_service,
         tool_service=resolved_tool_service,
         session_service=resolved_session_service,
         context_service=resolved_context_service,
         recovery_service=resolved_recovery_service,
-        session_coordinator=LazyRuntimeProxy(
-            factory=_build_session_coordinator,
-            name="session_coordinator",
-        ),
     )

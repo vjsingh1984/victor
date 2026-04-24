@@ -42,11 +42,13 @@ class TestResilienceFacade:
     def test_circuit_breaker_error_reexport_identity(self):
         """Verify CircuitBreakerError is same object from both modules."""
         from victor.framework.resilience import CircuitBreakerError as FacadeError
+        from victor.core.circuit_breaker import CircuitBreakerError as CoreError
         from victor.providers.circuit_breaker import (
             CircuitBreakerError as OriginalError,
         )
 
         assert FacadeError is OriginalError
+        assert OriginalError is CoreError
 
     def test_circuit_breaker_registry_reexport_identity(self):
         """Verify CircuitBreakerRegistry is same object from both modules."""
@@ -60,9 +62,11 @@ class TestResilienceFacade:
     def test_circuit_state_reexport_identity(self):
         """Verify CircuitState is same enum from both modules."""
         from victor.framework.resilience import CircuitState as FacadeState
+        from victor.core.circuit_breaker import CircuitState as CoreState
         from victor.providers.circuit_breaker import CircuitState as OriginalState
 
         assert FacadeState is OriginalState
+        assert OriginalState is CoreState
         assert FacadeState.CLOSED is OriginalState.CLOSED
         assert FacadeState.OPEN is OriginalState.OPEN
         assert FacadeState.HALF_OPEN is OriginalState.HALF_OPEN
@@ -77,9 +81,11 @@ class TestResilienceFacade:
     def test_circuit_breaker_config_reexport_identity(self):
         """Verify CircuitBreakerConfig is same object from both modules."""
         from victor.framework.resilience import CircuitBreakerConfig as FacadeConfig
+        from victor.core.circuit_breaker import CircuitBreakerConfig as CoreConfig
         from victor.providers.resilience import CircuitBreakerConfig as OriginalConfig
 
         assert FacadeConfig is OriginalConfig
+        assert OriginalConfig is CoreConfig
 
     def test_retry_config_reexport_identity(self):
         """Verify ProviderRetryConfig is same object from both modules."""

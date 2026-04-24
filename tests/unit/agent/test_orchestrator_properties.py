@@ -109,6 +109,68 @@ class TestOrchestratorPropertyInstallation:
 
         assert orchestrator._deprecated_tool_coordinator is shim
 
+    def test_chat_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
+        """The legacy _chat_coordinator alias should warn and proxy the shim."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="chat_shim")
+        orchestrator._deprecated_chat_coordinator = shim
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._chat_coordinator is deprecated compatibility surface",
+        ):
+            result = orchestrator._chat_coordinator
+
+        assert result is shim
+
+    def test_chat_coordinator_alias_setter_warns(self):
+        """The legacy _chat_coordinator setter should warn and update the shim slot."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="chat_shim")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._chat_coordinator is deprecated compatibility surface",
+        ):
+            orchestrator._chat_coordinator = shim
+
+        assert orchestrator._deprecated_chat_coordinator is shim
+
+    def test_session_coordinator_alias_warns_and_delegates_to_deprecated_shim(self):
+        """The legacy _session_coordinator alias should warn and proxy the shim."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="session_shim")
+        orchestrator._deprecated_session_coordinator = shim
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._session_coordinator is deprecated compatibility surface",
+        ):
+            result = orchestrator._session_coordinator
+
+        assert result is shim
+
+    def test_session_coordinator_alias_setter_warns(self):
+        """The legacy _session_coordinator setter should warn and update the shim slot."""
+        from victor.agent.orchestrator import AgentOrchestrator
+
+        orchestrator = object.__new__(AgentOrchestrator)
+        shim = MagicMock(name="session_shim")
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator._session_coordinator is deprecated compatibility surface",
+        ):
+            orchestrator._session_coordinator = shim
+
+        assert orchestrator._deprecated_session_coordinator is shim
+
     def test_specialized_chat_coordinators_use_deprecated_backing_slots(self):
         """Lazy chat coordinator properties should store instances in deprecated slots."""
         from victor.agent.orchestrator import AgentOrchestrator
@@ -118,6 +180,26 @@ class TestOrchestratorPropertyInstallation:
         orchestrator._deprecated_streaming_chat_coordinator = MagicMock(name="streaming")
         orchestrator._deprecated_unified_chat_coordinator = MagicMock(name="unified")
 
-        assert orchestrator.sync_chat_coordinator._mock_name == "sync"
-        assert orchestrator.streaming_chat_coordinator._mock_name == "streaming"
-        assert orchestrator.unified_chat_coordinator._mock_name == "unified"
+        with pytest.warns(
+            DeprecationWarning,
+            match="AgentOrchestrator.sync_chat_coordinator is deprecated compatibility surface",
+        ):
+            assert orchestrator.sync_chat_coordinator._mock_name == "sync"
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator.streaming_chat_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            assert orchestrator.streaming_chat_coordinator._mock_name == "streaming"
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "AgentOrchestrator.unified_chat_coordinator is deprecated "
+                "compatibility surface"
+            ),
+        ):
+            assert orchestrator.unified_chat_coordinator._mock_name == "unified"

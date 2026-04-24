@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolCallResult
     from victor.agent.streaming_controller import StreamingSession
-    from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+    from victor.agent.services.metrics_service import MetricsCoordinator
 
 logger = logging.getLogger(__name__)
 

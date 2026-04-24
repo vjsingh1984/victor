@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from victor.ui.rendering.utils import format_duration, format_tool_args, render_tool_preview
+
 
 class BufferedRenderer:
     """Collects streaming events and renders them at completion.
@@ -50,18 +52,32 @@ class BufferedRenderer:
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
         was_pruned: bool = False,
+        result: Any = None,
     ) -> None:
         """Record tool execution result."""
+        tool_output = str(result) if result is not None else ""
+        result_data = {
+            "success": success,
+            "elapsed": elapsed,
+            "error": error,
+            "was_pruned": was_pruned,
+            "output": tool_output,
+            "follow_up_suggestions": follow_up_suggestions or [],
+        }
+
         # Update last matching tool call with result
         for tc in reversed(self._tool_calls):
             if tc["name"] == name and tc["result"] is None:
-                tc["result"] = {
-                    "success": success,
-                    "elapsed": elapsed,
-                    "error": error,
-                    "was_pruned": was_pruned,
-                }
+                tc["result"] = result_data
                 break
+        else:
+            self._tool_calls.append(
+                {
+                    "name": name,
+                    "arguments": arguments,
+                    "result": result_data,
+                }
+            )
 
     def on_status(self, message: str) -> None:
         """Record status message."""
@@ -113,15 +129,31 @@ class BufferedRenderer:
             for tc in self._tool_calls:
                 result = tc.get("result", {})
                 if result:
-                    status = "[green]ok[/]" if result.get("success") else "[red]fail[/]"
+                    icon = "[green]✓[/]" if result.get("success") else "[red]✗[/]"
                     elapsed = result.get("elapsed", 0)
-                    error_msg = f" - {result['error']}" if result.get("error") else ""
-                    console.print(
-                        f"  [dim]Tool:[/] {tc['name']} {status} "
-                        f"[dim]({elapsed:.1f}s){error_msg}[/]"
-                    )
+                    args_display = format_tool_args(tc.get("arguments", {}))
+                    status_line = f"{icon} [bold]{tc['name']}[/]"
+                    if args_display:
+                        status_line += f" [dim]{args_display}[/]"
+                    status_line += f" [dim]• {format_duration(elapsed)}[/]"
+                    if result.get("error"):
+                        status_line += f" [red]{str(result['error'])[:80]}[/]"
+                    console.print(status_line)
+
+                    output = result.get("output")
+                    if output and result.get("success"):
+                        preview_lines = 3
+                        preview_text = "\n".join(output.splitlines()[:preview_lines])
+                        if preview_text:
+                            render_tool_preview(
+                                console,
+                                preview_text,
+                                total_lines=len(output.splitlines()),
+                                preview_lines=preview_lines,
+                                hotkey="^O",
+                            )
                 else:
-                    console.print(f"  [dim]Tool:[/] {tc['name']}")
+                    console.print(f"[blue]•[/] [bold]{tc['name']}[/] [dim]pending[/]")
 
         # Print reasoning if --show-reasoning
         if self._reasoning_chunks:

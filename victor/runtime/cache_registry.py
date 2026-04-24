@@ -27,7 +27,7 @@ import logging
 import threading
 import time
 
-from victor.core.registry_base import SingletonRegistry
+from victor.core.registry import SingletonRegistry
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable

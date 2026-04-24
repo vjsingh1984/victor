@@ -107,10 +107,21 @@ class TestRecordActualUsage:
 class TestTokenAccountingWiring:
     """TurnExecutor and ChatCoordinator wire record_actual_usage correctly."""
 
+    def test_legacy_turn_executor_module_reexports_service_runtime(self):
+        """Legacy coordinator import path should re-export the service runtime."""
+        from victor.agent.coordinators.turn_executor import (
+            TurnExecutor as legacy_turn_executor,
+        )
+        from victor.agent.services.turn_execution_runtime import (
+            TurnExecutor as service_turn_executor,
+        )
+
+        assert legacy_turn_executor is service_turn_executor
+
     def test_accumulate_calls_record_actual_usage(self):
         """_accumulate_token_usage() calls record_actual_usage on the controller."""
         from victor.providers.base import CompletionResponse
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         mock_ctrl = MagicMock()
         mock_ctrl.messages = [MagicMock(content="hello world")]
@@ -139,7 +150,7 @@ class TestTokenAccountingWiring:
     def test_accumulate_no_crash_when_controller_raises(self):
         """_accumulate_token_usage() never raises even if record_actual_usage fails."""
         from victor.providers.base import CompletionResponse
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         mock_ctrl = MagicMock()
         mock_ctrl.record_actual_usage.side_effect = RuntimeError("DB down")
@@ -164,7 +175,7 @@ class TestTokenAccountingWiring:
     def test_accumulate_skips_record_when_prompt_tokens_zero(self):
         """record_actual_usage is NOT called when prompt_tokens is 0."""
         from victor.providers.base import CompletionResponse
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         mock_ctrl = MagicMock()
         mock_ctrl.messages = []

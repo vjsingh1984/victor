@@ -19,6 +19,11 @@ Quick Start:
     result = await agent.run("Write a hello world function")
     print(result.content)
 
+Advanced Config:
+    from victor.framework import Agent, UnifiedAgentConfig
+
+    agent = await Agent.create(config=UnifiedAgentConfig.high_budget())
+
 Streaming:
     async for event in agent.stream("Refactor this code"):
         if event.type == EventType.CONTENT:

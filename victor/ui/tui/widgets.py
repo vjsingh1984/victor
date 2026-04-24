@@ -720,6 +720,7 @@ class ToolCallWidget(Static):
                 (elapsed_str, "dim"),
             ),
             classes="tool-header",
+            id="tool-header-label",
         )
         if self.follow_up_suggestions:
             with Horizontal(classes="tool-follow-ups"):
@@ -746,7 +747,34 @@ class ToolCallWidget(Static):
                 follow_up_suggestions
             )
         self.add_class(status)
-        self.refresh(recompose=True)
+        # Targeted header update instead of expensive refresh(recompose=True)
+        try:
+            header = self.query_one("#tool-header-label", Label)
+            status_icon = {
+                "pending": "...",
+                "success": "✓",
+                "error": "✗",
+            }.get(status, "?")
+            elapsed_str = f" ({self.elapsed:.1f}s)" if self.elapsed else ""
+            args_preview = ""
+            if self.arguments:
+                first_key = next(iter(self.arguments.keys()), None)
+                if first_key:
+                    first_val = str(self.arguments[first_key])[:30]
+                    if len(str(self.arguments[first_key])) > 30:
+                        first_val += "..."
+                    args_preview = f"({first_key}={first_val})"
+            header.update(
+                Text.assemble(
+                    (status_icon, "bold"),
+                    " ",
+                    (self.tool_name, "cyan"),
+                    (args_preview, "dim"),
+                    (elapsed_str, "dim"),
+                )
+            )
+        except Exception as e:
+            logger.debug(f"Failed to update tool header label: {e}")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle follow-up suggestion buttons."""
@@ -1265,6 +1293,10 @@ class EnhancedConversationLog(VerticalScroll):
     _PROGRAMMATIC_GUARD_SECONDS = 0.15
     # Duration (seconds) of the guard window after a resize event.
     _RESIZE_GUARD_SECONDS = 0.3
+    # Minimum interval between scroll_end calls during streaming (200ms).
+    _SCROLL_THROTTLE_SECONDS = 0.2
+    # Max widgets before trimming old messages (virtual scrolling).
+    MAX_VISIBLE_MESSAGES = 100
 
     def __init__(self, show_unread_separator: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -1282,6 +1314,8 @@ class EnhancedConversationLog(VerticalScroll):
         # Programmatic scroll guard timestamps
         self._ignore_scroll_update_until: float = 0.0
         self._ignore_resize_scroll_update_until: float = 0.0
+        # Streaming scroll throttle
+        self._last_scroll_end_time: float = 0.0
 
     # -- public properties ---------------------------------------------------
 
@@ -1326,6 +1360,7 @@ class EnhancedConversationLog(VerticalScroll):
         )
         self._message_count += 1
         self.mount(msg)
+        self._trim_old_messages()
         # User messages always re-enable follow (unless sticky-paused)
         if not self._follow_paused:
             self._auto_scroll = True
@@ -1343,6 +1378,7 @@ class EnhancedConversationLog(VerticalScroll):
         if not self._auto_scroll:
             self._increment_unread(msg_id)
         self.mount(msg)
+        self._trim_old_messages()
         self._maybe_scroll_end()
 
     def add_system_message(self, content: str) -> None:
@@ -1617,12 +1653,33 @@ class EnhancedConversationLog(VerticalScroll):
     def _maybe_scroll_end(self, force: bool = False) -> None:
         """Conditionally scroll to end.
 
-        Sets a short guard window to suppress transient UpdateScroll events
-        triggered by our own programmatic scroll.
+        Throttled during streaming to avoid triggering a full layout
+        recalculation on every chunk (max once per _SCROLL_THROTTLE_SECONDS).
+        Sets a short guard window to suppress transient UpdateScroll events.
         """
-        if force or self._auto_scroll:
-            self.scroll_end(animate=False)
-            self._ignore_scroll_update_until = time.monotonic() + self._PROGRAMMATIC_GUARD_SECONDS
+        if not (force or self._auto_scroll):
+            return
+        now = time.monotonic()
+        if not force and (now - self._last_scroll_end_time) < self._SCROLL_THROTTLE_SECONDS:
+            return
+        self._last_scroll_end_time = now
+        self.scroll_end(animate=False)
+        self._ignore_scroll_update_until = now + self._PROGRAMMATIC_GUARD_SECONDS
+
+    def _trim_old_messages(self) -> None:
+        """Remove oldest message widgets when the DOM grows too large.
+
+        Keeps at most MAX_VISIBLE_MESSAGES children mounted to prevent
+        unbounded widget tree growth across long conversations.
+        """
+        children = [c for c in self.children if not isinstance(c, type(self._unread_separator))]
+        excess = len(children) - self.MAX_VISIBLE_MESSAGES
+        if excess > 0:
+            for child in children[:excess]:
+                try:
+                    child.remove()
+                except Exception:
+                    pass
 
     def _is_at_bottom(self) -> bool:
         try:

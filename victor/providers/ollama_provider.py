@@ -179,6 +179,17 @@ class OllamaProvider(BaseProvider):
         """Ollama reuses KV cache via llama.cpp for matching prefixes."""
         return True
 
+    def get_tool_output_format(self) -> Any:
+        """Ollama models trained on XML format - use XML for optimal cognition.
+
+        Ollama models (and other local models) have been trained on Victor's
+        historical XML format with <TOOL_OUTPUT> tags and ═══ delimiters.
+        Removing this format may hurt model cognition and tool result parsing.
+        """
+        from victor.agent.format_strategies import XML_FORMAT
+
+        return XML_FORMAT
+
     def get_context_window(self, model: str) -> int:
         """Get context window size using cached discovery or config fallback."""
         cache_key = f"{self.base_url}:{model}"

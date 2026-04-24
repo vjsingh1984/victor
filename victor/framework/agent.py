@@ -35,8 +35,11 @@ from typing import (
 
 logger = logging.getLogger(__name__)
 
-from victor.framework.config import AgentConfig
-from victor.agent.config import UnifiedAgentConfig
+from victor.agent.config import (
+    FrameworkCompatibleAgentConfig,
+    UnifiedAgentConfig,
+    normalize_agent_config,
+)
 from victor.core.errors import AgentError, CancellationError, ProviderError
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.state import State, StateObserver
@@ -150,7 +153,7 @@ class Agent:
         airgapped: bool = False,
         profile: Optional[str] = None,
         workspace: Optional[str] = None,
-        config: Optional[Union[AgentConfig, UnifiedAgentConfig]] = None,
+        config: Optional[FrameworkCompatibleAgentConfig] = None,
         vertical: Optional[Type["VerticalBase"]] = None,
         enable_observability: bool = True,
         session_id: Optional[str] = None,
@@ -197,7 +200,7 @@ class Agent:
             agent = await Agent.create(tools=ToolSet.coding())
 
             # With UnifiedAgentConfig (preferred)
-            from victor.agent.config import UnifiedAgentConfig
+            from victor.framework.config import UnifiedAgentConfig
             agent = await Agent.create(config=UnifiedAgentConfig.high_budget())
 
             # With vertical (domain-specific assistant)
@@ -211,7 +214,9 @@ class Agent:
         if workspace:
             settings.working_directory = workspace
 
-        # Overlay config settings — both AgentConfig and UnifiedAgentConfig expose to_settings_dict()
+        config = normalize_agent_config(config)
+
+        # Overlay config settings after normalizing legacy AgentConfig inputs.
         if config is not None:
             for key, value in config.to_settings_dict().items():
                 if hasattr(settings, key):
@@ -282,7 +287,7 @@ class Agent:
         max_iterations: int = 50,
         timeout_seconds: int = 600,
         shared_context: Optional[Dict[str, Any]] = None,
-        config: Optional[AgentConfig] = None,
+        config: Optional[FrameworkCompatibleAgentConfig] = None,
     ) -> "AgentTeam":
         """Create a multi-agent team.
 

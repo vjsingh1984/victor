@@ -78,10 +78,19 @@ class FormattingContext:
     Provides information about the current state to enable
     context-aware formatting decisions (e.g., more aggressive
     compression when context is nearly full).
+
+    Attributes:
+        provider_name: Name of the provider (e.g., "openai", "ollama")
+        model: Model name/identifier
+        provider: Provider instance (for format preferences)
+        remaining_tokens: Remaining tokens in context window
+        max_tokens: Maximum context window size
+        response_token_reserve: Tokens to reserve for response
     """
 
     provider_name: Optional[str] = None
     model: Optional[str] = None
+    provider: Optional[Any] = None
     remaining_tokens: int = 50000
     max_tokens: int = 100000
     response_token_reserve: int = 4096
@@ -175,10 +184,13 @@ class ToolOutputFormatter:
         output: Any,
         context: Optional[FormattingContext] = None,
     ) -> str:
-        """Format tool output with clear boundaries to prevent model hallucination.
+        """Format tool output with provider-specific strategy.
 
-        Uses structured markers that models recognize as authoritative tool output.
-        This prevents the model from ignoring or fabricating tool results.
+        Uses Strategy pattern to select appropriate formatting based on
+        provider preferences:
+        - Cloud providers: Plain JSON (token-efficient)
+        - Local providers: XML with delimiters (cognition-optimized)
+        - Experimental: TOON compact format
 
         For structured data (lists, dicts), uses token-optimized serialization
         to achieve 30-60% savings on tabular data.
@@ -190,7 +202,7 @@ class ToolOutputFormatter:
             context: Optional formatting context for adaptive decisions
 
         Returns:
-            Formatted string with clear TOOL_OUTPUT boundaries
+            Formatted string ready for LLM context injection
         """
         # CRITICAL GUARD: Check if output is a coroutine (indicates tool not awaited)
         import inspect as _inspect
@@ -248,21 +260,132 @@ class ToolOutputFormatter:
             truncated = True
             output_str = output_str[: self.config.max_output_chars]
 
-        # Tool-specific formatting
-        if tool_name in ("read_file", "read"):
-            return self._format_read_file(args, output, output_str, original_len, truncated)
+        # Use strategy pattern for ALL tools (provider-specific optimization)
+        # This ensures cloud providers get Plain JSON (token-efficient)
+        # and local providers get XML format (cognition-optimized)
+        return self._format_with_strategy(tool_name, args, output_str, truncated, format_hint, context)
 
-        if tool_name == "list_directory":
-            return self._format_list_directory(args, output_str)
+    def _format_with_strategy(
+        self,
+        tool_name: str,
+        args: Dict[str, Any],
+        output_str: str,
+        truncated: bool,
+        format_hint: Optional[str],
+        context: FormattingContext,
+    ) -> str:
+        """Format output using provider-specific strategy.
 
-        if tool_name in ("code_search", "semantic_code_search"):
-            return self._format_code_search(tool_name, args, output_str, output)
+        This implements the Strategy pattern - selecting the appropriate
+        formatting strategy based on provider preferences.
 
-        if tool_name == "execute_bash":
-            return self._format_bash(args, output_str)
+        Args:
+            tool_name: Name of the tool
+            args: Tool arguments
+            output_str: Serialized output string
+            truncated: Whether output was truncated
+            format_hint: Serialization format hint
+            context: Formatting context with provider info
 
-        # Generic tool output format
-        return self._format_generic(tool_name, output_str, truncated, format_hint)
+        Returns:
+            Formatted output string
+        """
+        from victor.agent.format_strategies import FormatStrategyFactory
+
+        # Get format specification from provider
+        format_spec = self._get_format_spec(context)
+
+        # Create strategy using factory
+        try:
+            strategy = FormatStrategyFactory.create(format_spec)
+
+            # Build output object
+            output_obj = output_str
+            if truncated:
+                output_obj = f"{output_str}\n[OUTPUT TRUNCATED]"
+
+            # Format using strategy
+            formatted = strategy.format(tool_name, args, output_obj, format_hint)
+
+            # Estimate tokens
+            estimated_tokens = strategy.estimate_tokens(formatted)
+
+            logger.debug(
+                f"Formatted {tool_name} output using {format_spec.style} strategy "
+                f"({len(formatted)} chars, ~{estimated_tokens} tokens)"
+            )
+
+            # Record performance metric (non-blocking)
+            self._record_format_metric(
+                provider_name=context.provider_name or "unknown",
+                format_style=format_spec.style,
+                tool_name=tool_name,
+                input_chars=len(output_str),
+                output_chars=len(formatted),
+                estimated_tokens=estimated_tokens,
+            )
+
+            return formatted
+
+        except Exception as e:
+            logger.warning(f"Strategy formatting failed for {tool_name}, falling back to generic: {e}")
+            return self._format_generic(tool_name, output_str, truncated, format_hint)
+
+    def _record_format_metric(
+        self,
+        provider_name: str,
+        format_style: str,
+        tool_name: str,
+        input_chars: int,
+        output_chars: int,
+        estimated_tokens: int,
+    ) -> None:
+        """Record formatting performance metric (non-blocking).
+
+        Args:
+            provider_name: Provider identifier
+            format_style: Format style used
+            tool_name: Tool name
+            input_chars: Input character count
+            output_chars: Output character count
+            estimated_tokens: Estimated token count
+        """
+        try:
+            from victor.agent.format_monitoring import FormatPerformanceMonitor
+
+            monitor = FormatPerformanceMonitor.get_instance()
+            monitor.record_format_metric(
+                provider_name=provider_name,
+                format_style=format_style,
+                tool_name=tool_name,
+                input_chars=input_chars,
+                output_chars=output_chars,
+                estimated_tokens=estimated_tokens,
+            )
+        except Exception as e:
+            # Never fail formatting due to monitoring issues
+            logger.debug(f"Failed to record format metric: {e}")
+
+    def _get_format_spec(self, context: FormattingContext) -> Any:
+        """Get format specification from provider or use default.
+
+        Args:
+            context: Formatting context
+
+        Returns:
+            ToolOutputFormat specification
+        """
+        from victor.agent.format_strategies import ToolOutputFormat
+
+        # Check if provider has format preference
+        if context.provider and hasattr(context.provider, "get_tool_output_format"):
+            try:
+                return context.provider.get_tool_output_format()
+            except Exception as e:
+                logger.debug(f"Failed to get provider format spec: {e}")
+
+        # Default: plain JSON format
+        return ToolOutputFormat(style="plain")
 
     def _format_read_file(
         self,

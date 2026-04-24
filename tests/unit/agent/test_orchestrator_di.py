@@ -286,7 +286,7 @@ class TestOrchestratorServiceProvider:
                 match="creates a deprecated ToolCoordinator shim",
             ),
             patch(
-                "victor.agent.coordinators.tool_coordinator.create_tool_coordinator",
+                "victor.agent.services.tool_compat.create_tool_coordinator",
                 return_value=coordinator,
             ) as create_tool_coordinator,
         ):

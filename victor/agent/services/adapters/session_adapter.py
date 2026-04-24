@@ -8,10 +8,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
-
-if TYPE_CHECKING:
-    from victor.agent.coordinators.session_coordinator import SessionCoordinator
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +18,35 @@ class SessionServiceAdapter:
 
     def __init__(
         self,
+        *args: Any,
         session_service: Optional[Any] = None,
-        session_coordinator: Optional["SessionCoordinator"] = None,
-        *,
-        deprecated_session_coordinator: Optional["SessionCoordinator"] = None,
+        session_coordinator: Optional[Any] = None,
+        deprecated_session_coordinator: Optional[Any] = None,
     ) -> None:
+        if len(args) > 2:
+            raise TypeError("SessionServiceAdapter accepts at most 2 positional arguments.")
+
+        if args:
+            warnings.warn(
+                "Positional SessionServiceAdapter(...) construction is deprecated. "
+                "Use session_service=... for canonical service wiring or "
+                "deprecated_session_coordinator=... for explicit compatibility mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if session_service is not None:
+                raise TypeError(
+                    "Use either positional session_service or keyword session_service, not both."
+                )
+            session_service = args[0]
+            if len(args) == 2:
+                if session_coordinator is not None or deprecated_session_coordinator is not None:
+                    raise TypeError(
+                        "Use either positional session_coordinator or keyword compatibility "
+                        "arguments, not both."
+                    )
+                session_coordinator = args[1]
+
         if session_coordinator is not None and deprecated_session_coordinator is not None:
             raise TypeError(
                 "Use only one of session_coordinator or deprecated_session_coordinator."

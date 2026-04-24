@@ -344,14 +344,30 @@ class ToolMetadataEntry:
     @classmethod
     def from_tool(cls, tool: BaseTool) -> "ToolMetadataEntry":
         """Create metadata entry from a tool instance."""
+        explicit_metadata = None
+        get_metadata = getattr(tool, "get_metadata", None)
+        if callable(get_metadata):
+            try:
+                explicit_metadata = get_metadata()
+            except Exception:
+                logger.debug("Tool '%s' metadata generation failed during registry indexing", tool.name)
+
         # Get properties with defaults for tools that don't have the new attributes
-        priority = getattr(tool, "priority", Priority.MEDIUM)
-        access_mode = getattr(tool, "access_mode", AccessMode.READONLY)
-        danger_level = getattr(tool, "danger_level", DangerLevel.SAFE)
+        priority = getattr(explicit_metadata, "priority", None) or getattr(
+            tool, "priority", Priority.MEDIUM
+        )
+        access_mode = getattr(explicit_metadata, "access_mode", None) or getattr(
+            tool, "access_mode", AccessMode.READONLY
+        )
+        danger_level = getattr(explicit_metadata, "danger_level", None) or getattr(
+            tool, "danger_level", DangerLevel.SAFE
+        )
         aliases = getattr(tool, "aliases", set())
-        category = getattr(tool, "category", None)
+        category = getattr(explicit_metadata, "category", None) or getattr(tool, "category", None)
         # Extract keywords from tool decorator metadata, filtering short keywords
-        raw_keywords = getattr(tool, "keywords", None) or []
+        raw_keywords = getattr(explicit_metadata, "keywords", None) or getattr(
+            tool, "keywords", None
+        ) or []
         keywords = (
             {k.lower() for k in raw_keywords if len(k) >= MIN_KEYWORD_LENGTH}
             if raw_keywords
@@ -367,24 +383,32 @@ class ToolMetadataEntry:
             )
 
         # Extract stages from tool decorator (lowercased for consistency)
-        raw_stages = getattr(tool, "stages", None) or []
+        raw_stages = getattr(explicit_metadata, "stages", None) or getattr(tool, "stages", None) or []
         stages = {s.lower() for s in raw_stages} if raw_stages else set()
 
         # NEW: Extract mandatory keywords (lowercased for matching)
-        raw_mandatory = getattr(tool, "mandatory_keywords", None) or []
+        raw_mandatory = getattr(explicit_metadata, "mandatory_keywords", None) or getattr(
+            tool, "mandatory_keywords", None
+        ) or []
         mandatory_keywords = {k.lower() for k in raw_mandatory} if raw_mandatory else set()
 
         # NEW: Extract task types (lowercased for consistency)
-        raw_task_types = getattr(tool, "task_types", None) or []
+        raw_task_types = getattr(explicit_metadata, "task_types", None) or getattr(
+            tool, "task_types", None
+        ) or []
         task_types = {t.lower() for t in raw_task_types} if raw_task_types else set()
 
         # NEW: Extract progress params
-        raw_progress_params = getattr(tool, "progress_params", None) or []
+        raw_progress_params = getattr(explicit_metadata, "progress_params", None) or getattr(
+            tool, "progress_params", None
+        ) or []
         progress_params = set(raw_progress_params) if raw_progress_params else set()
 
         # NEW: Extract execution category
         execution_category = (
-            getattr(tool, "execution_category", None) or ExecutionCategory.READ_ONLY
+            getattr(explicit_metadata, "execution_category", None)
+            or getattr(tool, "execution_category", None)
+            or ExecutionCategory.READ_ONLY
         )
 
         # NEW: Extract availability check for optional tools
@@ -486,6 +510,115 @@ class ToolMetadataRegistry:
         self._category_resolver = category_resolver or ToolCategoryResolver()
         self._keyword_matcher = keyword_matcher or KeywordMatcher()
         self._schema_cache = schema_cache or ToolSchemaCache()
+        self._tools_hash: Optional[str] = None
+        self._last_refresh_count: int = 0
+
+    @classmethod
+    def get_instance(cls) -> "ToolMetadataRegistry":
+        """Get the global registry singleton.
+
+        This compatibility entrypoint lets runtime callers migrate from the
+        older ``victor.tools.metadata.ToolMetadataRegistry`` singleton API
+        without having to special-case this richer registry implementation.
+        """
+        return get_global_registry()
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the global registry singleton."""
+        reset_global_registry()
+
+    @staticmethod
+    def _calculate_tools_hash(tools: List[BaseTool]) -> str:
+        """Calculate a stable hash of tool metadata-relevant fields."""
+        import hashlib
+        import json
+
+        snapshots = []
+        for tool in sorted(tools, key=lambda candidate: candidate.name):
+            snapshots.append(
+                {
+                    "name": tool.name,
+                    "description": getattr(tool, "description", ""),
+                    "parameters": getattr(tool, "parameters", None),
+                    "category": getattr(tool, "category", None),
+                    "keywords": sorted(getattr(tool, "keywords", None) or []),
+                    "aliases": sorted(getattr(tool, "aliases", None) or []),
+                    "stages": sorted(getattr(tool, "stages", None) or []),
+                    "mandatory_keywords": sorted(
+                        getattr(tool, "mandatory_keywords", None) or []
+                    ),
+                    "task_types": sorted(getattr(tool, "task_types", None) or []),
+                    "progress_params": sorted(getattr(tool, "progress_params", None) or []),
+                    "priority": str(getattr(tool, "priority", "")),
+                    "access_mode": str(getattr(tool, "access_mode", "")),
+                    "danger_level": str(getattr(tool, "danger_level", "")),
+                    "cost_tier": str(getattr(tool, "cost_tier", "")),
+                    "execution_category": str(getattr(tool, "execution_category", "")),
+                }
+            )
+
+        payload = json.dumps(snapshots, sort_keys=True, default=str)
+        return hashlib.sha256(payload.encode()).hexdigest()
+
+    def _reset_registered_state(self) -> None:
+        """Clear registered metadata and any composed indexes."""
+        self._entries.clear()
+        self._by_priority = {p: set() for p in Priority}
+        self._by_access_mode = {a: set() for a in AccessMode}
+        self._by_danger_level = {d: set() for d in DangerLevel}
+        self._by_category.clear()
+        self._by_keyword.clear()
+        self._by_stage.clear()
+        self._alias_map.clear()
+        self._metrics = MatchingMetrics()
+        self._by_mandatory_keyword.clear()
+        self._by_task_type.clear()
+        self._by_execution_category = {ec: set() for ec in ExecutionCategory}
+
+        if hasattr(self._schema_cache, "clear"):
+            self._schema_cache.clear()
+
+        # The composed helpers do not currently expose a public reset API.
+        # Clear their backing stores so refresh_from_tools() can rebuild them.
+        if hasattr(self._category_resolver, "_tool_categories"):
+            self._category_resolver._tool_categories.clear()
+        if hasattr(self._category_resolver, "_category_tools"):
+            self._category_resolver._category_tools.clear()
+
+        if hasattr(self._keyword_matcher, "_tool_keywords"):
+            self._keyword_matcher._tool_keywords.clear()
+        if hasattr(self._keyword_matcher, "_mandatory_keywords"):
+            self._keyword_matcher._mandatory_keywords.clear()
+        if hasattr(self._keyword_matcher, "_keyword_index"):
+            self._keyword_matcher._keyword_index.clear()
+
+    def needs_reindex(self, tools: List[BaseTool]) -> bool:
+        """Return True when a tool refresh would change the registry."""
+        if self._tools_hash is None:
+            return True
+        if len(tools) != self._last_refresh_count:
+            return True
+        return self._calculate_tools_hash(tools) != self._tools_hash
+
+    def refresh_from_tools(self, tools: List[BaseTool], force: bool = False) -> bool:
+        """Rebuild the registry from a tool list when needed.
+
+        Returns True when a rebuild happened and False when the current cache
+        already matches the provided tools.
+        """
+        if not force and not self.needs_reindex(tools):
+            return False
+
+        self._reset_registered_state()
+        self.register_all(tools)
+        self._tools_hash = self._calculate_tools_hash(tools)
+        self._last_refresh_count = len(tools)
+        return True
+
+    def register_tool(self, tool: BaseTool) -> None:
+        """Compatibility alias for register()."""
+        self.register(tool)
 
     def register(self, tool: BaseTool) -> None:
         """Register a tool in the metadata registry.
@@ -552,9 +685,69 @@ class ToolMetadataRegistry:
         if schema:
             self._schema_cache.register(entry.name, schema)
 
+    def unregister_tool(self, tool_name: str) -> None:
+        """Remove a tool and its indexes from the registry."""
+        entry = self._entries.pop(tool_name, None)
+        if entry is None:
+            return
+
+        self._by_priority.get(entry.priority, set()).discard(tool_name)
+        self._by_access_mode.get(entry.access_mode, set()).discard(tool_name)
+        self._by_danger_level.get(entry.danger_level, set()).discard(tool_name)
+
+        if entry.category in self._by_category:
+            self._by_category[entry.category].discard(tool_name)
+            if not self._by_category[entry.category]:
+                del self._by_category[entry.category]
+
+        for keyword in entry.keywords:
+            if keyword in self._by_keyword:
+                self._by_keyword[keyword].discard(tool_name)
+                if not self._by_keyword[keyword]:
+                    del self._by_keyword[keyword]
+
+        for stage in entry.stages:
+            if stage in self._by_stage:
+                self._by_stage[stage].discard(tool_name)
+                if not self._by_stage[stage]:
+                    del self._by_stage[stage]
+
+        for alias in entry.aliases:
+            if self._alias_map.get(alias) == tool_name:
+                del self._alias_map[alias]
+
+        for mandatory_keyword in entry.mandatory_keywords:
+            if mandatory_keyword in self._by_mandatory_keyword:
+                self._by_mandatory_keyword[mandatory_keyword].discard(tool_name)
+                if not self._by_mandatory_keyword[mandatory_keyword]:
+                    del self._by_mandatory_keyword[mandatory_keyword]
+
+        for task_type in entry.task_types:
+            if task_type in self._by_task_type:
+                self._by_task_type[task_type].discard(tool_name)
+                if not self._by_task_type[task_type]:
+                    del self._by_task_type[task_type]
+
+        self._by_execution_category.get(entry.execution_category, set()).discard(tool_name)
+
+        if hasattr(self._category_resolver, "remove_tool"):
+            self._category_resolver.remove_tool(tool_name)
+        if hasattr(self._keyword_matcher, "remove_tool"):
+            self._keyword_matcher.remove_tool(tool_name)
+        if hasattr(self._schema_cache, "invalidate"):
+            self._schema_cache.invalidate(tool_name)
+
     def get_tool_schema(self, tool_name: str) -> Optional[dict]:
         """Get cached schema for a tool by name."""
         return self._schema_cache.get_schema(tool_name)
+
+    def get_metadata(self, name: str) -> Optional[ToolMetadataEntry]:
+        """Compatibility alias for get()."""
+        return self.get(name)
+
+    def get_all(self) -> Dict[str, ToolMetadataEntry]:
+        """Return a copy of all registered metadata entries."""
+        return dict(self._entries)
 
     def register_all(self, tools: List[BaseTool]) -> None:
         """Register multiple tools.
@@ -1521,6 +1714,21 @@ class ToolMetadataRegistry:
             "available_tools": len(self.get_available_tools()),
             "unavailable_tools": len(self.get_unavailable_tools()),
             "tools_requiring_configuration": len(self.get_tools_requiring_configuration()),
+        }
+
+    def get_statistics(self) -> Dict[str, Any]:
+        """Compatibility summary matching the older registry API."""
+        total_tools = len(self._entries)
+        tools_with_explicit_metadata = sum(
+            1 for entry in self._entries.values() if entry.category and entry.keywords
+        )
+        return {
+            "total_tools": total_tools,
+            "tools_with_explicit_metadata": tools_with_explicit_metadata,
+            "tools_with_auto_metadata": total_tools - tools_with_explicit_metadata,
+            "total_categories": len(self._by_category),
+            "total_keywords": len(self._by_keyword),
+            "categories": sorted(self._by_category.keys()),
         }
 
 

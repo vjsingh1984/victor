@@ -368,12 +368,12 @@ class ContinuationStrategy:
 
         updates: Dict[str, Any] = {}
 
-        # AGENTIC LOOP FIX: Algorithmic loop detection (iteration threshold)
-        # Prevent excessive iterations by checking if we're past safe limits
+        # Algorithmic loop detection: only fire near the actual max to avoid cutting
+        # off legitimate multi-step work (previous 1/3 threshold was too aggressive).
         if task_completion_signals and "current_iteration" in task_completion_signals:
             current_iteration = task_completion_signals["current_iteration"]
             max_iterations = unified_tracker_config.get("max_total_iterations", 50)
-            iteration_threshold = max_iterations // 3  # Stop at 1/3 of max (e.g., 16 of 50)
+            iteration_threshold = max(max_iterations - 5, max_iterations * 4 // 5)
 
             if current_iteration >= iteration_threshold:
                 logger.warning(

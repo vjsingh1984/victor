@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 import warnings
 from typing import (
-    TYPE_CHECKING,
     Any,
     Awaitable,
     Callable,
@@ -20,11 +19,6 @@ from typing import (
     Tuple,
 )
 
-if TYPE_CHECKING:
-    from victor.agent.coordinators.tool_coordinator import ToolCoordinator
-    from victor.agent.services.tool_service import ToolResultContext
-    from victor.agent.protocols import ToolAccessContext
-
 logger = logging.getLogger(__name__)
 
 
@@ -33,11 +27,35 @@ class ToolServiceAdapter:
 
     def __init__(
         self,
+        *args: Any,
         tool_service: Optional[Any] = None,
-        tool_coordinator: Optional["ToolCoordinator"] = None,
-        *,
-        deprecated_tool_coordinator: Optional["ToolCoordinator"] = None,
+        tool_coordinator: Optional[Any] = None,
+        deprecated_tool_coordinator: Optional[Any] = None,
     ) -> None:
+        if len(args) > 2:
+            raise TypeError("ToolServiceAdapter accepts at most 2 positional arguments.")
+
+        if args:
+            warnings.warn(
+                "Positional ToolServiceAdapter(...) construction is deprecated. "
+                "Use tool_service=... for canonical service wiring or "
+                "deprecated_tool_coordinator=... for explicit compatibility mode.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if tool_service is not None:
+                raise TypeError(
+                    "Use either positional tool_service or keyword tool_service, not both."
+                )
+            tool_service = args[0]
+            if len(args) == 2:
+                if tool_coordinator is not None or deprecated_tool_coordinator is not None:
+                    raise TypeError(
+                        "Use either positional tool_coordinator or keyword compatibility "
+                        "arguments, not both."
+                    )
+                tool_coordinator = args[1]
+
         if tool_coordinator is not None and deprecated_tool_coordinator is not None:
             raise TypeError(
                 "Use only one of tool_coordinator or deprecated_tool_coordinator."
@@ -168,7 +186,7 @@ class ToolServiceAdapter:
     def process_tool_results(
         self,
         pipeline_result: Any,
-        ctx: "ToolResultContext",
+        ctx: Any,
     ) -> List[Dict[str, Any]]:
         """Process tool execution results via the canonical delegate."""
         return self._delegate("process_tool_results")(pipeline_result, ctx)
@@ -205,7 +223,7 @@ class ToolServiceAdapter:
             session_id=session_id,
         )
 
-    def _build_tool_access_context(self) -> "ToolAccessContext":
+    def _build_tool_access_context(self) -> Any:
         """Build tool access context."""
         service = self._tool_service
         if service is not None:
@@ -219,7 +237,7 @@ class ToolServiceAdapter:
                 return method()
         raise AttributeError("Tool service adapter has no delegate for tool access context")
 
-    def build_tool_access_context(self) -> "ToolAccessContext":
+    def build_tool_access_context(self) -> Any:
         """Build tool access context."""
         return self._build_tool_access_context()
 

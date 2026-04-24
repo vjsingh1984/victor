@@ -529,9 +529,9 @@ class ChatService:
         self._logger.warning(f"Max iterations ({self._config.max_iterations}) reached")
         return response
 
-    # NOTE: Orchestrator wires directly to ChatCoordinator (Phase 2).
-    # ChatCoordinator uses StreamingChatPipeline + AgenticLoop for full
-    # perception, fulfillment, and progress tracking.
+    # NOTE: Orchestrator now wires the canonical service/runtime path directly.
+    # ServiceStreamingRuntime owns StreamingChatPipeline + AgenticLoop
+    # integration for perception, fulfillment, and progress tracking.
 
     def _is_response_complete(self, response: "CompletionResponse") -> bool:
         """Check if response is complete.
@@ -1311,31 +1311,13 @@ class ChatService:
         tool_call_id: Optional[str] = None,
         tool_calls: Optional[list] = None,
     ) -> None:
-        """Persist a message to memory and log the event.
+        """Persist a message to memory and emit usage analytics.
 
-        Offloads blocking SQLite I/O to the thread pool when an event
-        loop is running, preventing async caller blocking.
-
-        Args:
-            role: Message role (user, assistant, system, tool)
-            content: Message content text
-            memory_manager: MemoryManager instance (or None)
-            memory_session_id: Active memory session ID (or None)
-            usage_logger: UsageLogger for event logging
-            tool_name: Tool name for tool role messages
-            tool_call_id: Tool call ID for correlation
-            tool_calls: Tool calls list for assistant messages
-
-        Example:
-            ChatService.persist_message(
-                role="user",
-                content="Hello",
-                memory_manager=memory_mgr,
-                memory_session_id=session_id,
-                usage_logger=logger,
-            )
+        This is the canonical persistence helper for orchestrator message
+        writes. It preserves the legacy logging behavior expected by existing
+        analytics flows while keeping ownership on ``ChatService`` rather than
+        the deprecated ``ChatCoordinator`` shim.
         """
-        # Persist to memory manager if available
         if memory_manager and memory_session_id:
             try:
                 from victor.agent.conversation.types import MessageRole
@@ -1345,28 +1327,55 @@ class ChatService:
                     "assistant": MessageRole.ASSISTANT,
                     "system": MessageRole.SYSTEM,
                     "tool": MessageRole.TOOL,
+                    "tool_result": MessageRole.TOOL,
+                    "tool_call": MessageRole.TOOL_CALL,
                 }
+                msg_role = role_map.get(role, MessageRole.USER)
 
-                message_role = role_map.get(role, MessageRole.USER)
+                add_kwargs: Dict[str, Any] = {
+                    "session_id": memory_session_id,
+                    "role": msg_role,
+                    "content": content,
+                }
+                if tool_name:
+                    add_kwargs["tool_name"] = tool_name
+                if tool_call_id:
+                    add_kwargs["tool_call_id"] = tool_call_id
+                if tool_calls:
+                    add_kwargs["tool_calls"] = tool_calls
 
-                # Add message to memory
-                memory_manager.add_message(
-                    session_id=memory_session_id,
-                    role=message_role,
-                    content=content,
-                    tool_name=tool_name,
-                    tool_call_id=tool_call_id,
-                    tool_calls=tool_calls,
-                )
+                try:
+                    loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+
+                if loop is not None and loop.is_running():
+                    loop.run_in_executor(
+                        None,
+                        lambda: memory_manager.add_message(**add_kwargs),
+                    )
+                else:
+                    memory_manager.add_message(**add_kwargs)
             except Exception as e:
-                logger.warning(f"Failed to persist message to memory: {e}")
+                logger.debug("Failed to persist message: %s", e)
 
-        # Log the event
-        if usage_logger:
-            try:
+        if not usage_logger:
+            return
+
+        try:
+            if hasattr(usage_logger, "log_event"):
+                if role == "user":
+                    usage_logger.log_event("user_prompt", {"content": content})
+                elif role == "assistant":
+                    usage_logger.log_event("assistant_response", {"content": content})
+                    if hasattr(usage_logger, "set_reasoning_context") and content:
+                        usage_logger.set_reasoning_context(content)
+                return
+
+            if hasattr(usage_logger, "log_message"):
                 usage_logger.log_message(role, content)
-            except Exception as e:
-                logger.debug(f"Failed to log message: {e}")
+        except Exception as e:
+            logger.debug("Failed to log message: %s", e)
 
     # ==========================================================================
     # Context Management Helpers

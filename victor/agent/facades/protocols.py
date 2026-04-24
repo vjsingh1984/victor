@@ -222,6 +222,11 @@ class OrchestrationFacadeProtocol(Protocol):
         ...
 
     @property
+    def chat_stream_runtime(self) -> Optional[Any]:
+        """Canonical service-owned chat streaming runtime."""
+        ...
+
+    @property
     def task_analyzer(self) -> Optional[Any]:
         """Optional task analyzer."""
         ...

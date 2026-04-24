@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
-from typing import Any, AsyncIterator, List, Optional, TYPE_CHECKING
+from typing import Any, AsyncIterator, List, Optional, Protocol
 
 from victor.providers.base import StreamChunk
-
-if TYPE_CHECKING:
-    from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
 logger = logging.getLogger(__name__)
 
@@ -45,17 +43,51 @@ def _get_decision_service(orchestrator: object) -> object | None:
     return None
 
 
+class StreamingPipelineRuntime(Protocol):
+    """Structural runtime contract consumed by ``StreamingChatPipeline``."""
+
+    _orchestrator: Any
+    _intent_classification_handler: Any
+    _continuation_handler: Any
+    _tool_execution_handler: Any
+
+    async def _create_stream_context(self, user_message: str, **kwargs: Any) -> Any: ...
+
+    def _run_iteration_pre_checks(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]: ...
+
+    async def _stream_provider_response(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any: ...
+
+    async def _handle_empty_response_recovery(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any: ...
+
+
 class StreamingChatPipeline:
-    """Canonical streaming pipeline wired to ChatCoordinator helpers."""
+    """Canonical streaming pipeline wired to a runtime owner.
+
+    The canonical owner is now the service/runtime path. Deprecated chat
+    coordinators may still satisfy this structural contract for backward
+    compatibility, but they are no longer the primary execution owner.
+    """
 
     def __init__(
         self,
-        coordinator: "ChatCoordinator",
+        runtime_owner: StreamingPipelineRuntime,
         perception: Optional[Any] = None,
         fulfillment: Optional[Any] = None,
         confidence_monitor: Optional[Any] = None,
     ) -> None:
-        self._coordinator = coordinator
+        self._runtime_owner = runtime_owner
         # AgenticLoop component integration (streaming parity)
         self._perception = perception  # PerceptionIntegration instance
         self._fulfillment = fulfillment  # FulfillmentDetector instance
@@ -64,6 +96,11 @@ class StreamingChatPipeline:
         # Tool selection cache — avoids redundant selection within same turn
         self._last_tool_context: Optional[str] = None
         self._last_tools: Optional[Any] = None
+
+        # Content repetition tracking (Fix 1 & 4: prevents infinite content loops)
+        self._content_hashes: List[str] = []  # Rolling window of last N content hashes
+        self._prev_full_content: str = ""  # Previous iteration's full_content for overlap check
+        self._repetition_count: int = 0  # Consecutive iterations with highly similar content
 
     async def _get_tools_cached(self, orch: Any, context_msg: str, goals: Any) -> Any:
         """Select tools with per-turn caching.
@@ -85,12 +122,12 @@ class StreamingChatPipeline:
         self, user_message: str, **kwargs: Any
     ) -> AsyncIterator[StreamChunk]:
         """Run the streaming pipeline for the provided message."""
-        coord = self._coordinator
-        orch = coord._orchestrator
+        runtime_owner = self._runtime_owner
+        orch = runtime_owner._orchestrator
         recovery = getattr(orch, "_recovery_service", None) or orch._recovery_coordinator
 
         # Initialize and prepare using StreamingChatContext
-        stream_ctx = await coord._create_stream_context(user_message, **kwargs)
+        stream_ctx = await runtime_owner._create_stream_context(user_message, **kwargs)
 
         # Store context reference for handler delegation methods
         orch._current_stream_context = stream_ctx
@@ -233,15 +270,23 @@ class StreamingChatPipeline:
         self._progress_scores.clear()
         _prev_iteration_had_content = False
 
+        # Reset content repetition tracking for this turn
+        self._content_hashes.clear()
+        self._prev_full_content = ""
+        self._repetition_count = 0
+
         while True:
             # Yield separator between iterations when content was emitted
             if _prev_iteration_had_content and stream_ctx.total_iterations > 1:
                 yield StreamChunk(content="\n\n")
             _prev_iteration_had_content = False
 
-            # === PRE-ITERATION CHECKS (via coordinator helper) ===
+            # === PRE-ITERATION CHECKS (via runtime helper) ===
             cancelled = False
-            async for pre_chunk in coord._run_iteration_pre_checks(stream_ctx, user_message):
+            async for pre_chunk in runtime_owner._run_iteration_pre_checks(
+                stream_ctx,
+                user_message,
+            ):
                 yield pre_chunk
                 if pre_chunk.content == "" and getattr(pre_chunk, "is_final", False):
                     cancelled = True
@@ -302,7 +347,12 @@ class StreamingChatPipeline:
                     "budget_tokens": 10000,
                 }
 
-            full_content, tool_calls, _, garbage_detected = await coord._stream_provider_response(
+            (
+                full_content,
+                tool_calls,
+                _,
+                garbage_detected,
+            ) = await runtime_owner._stream_provider_response(
                 tools=tools,
                 provider_kwargs=provider_kwargs,
                 stream_ctx=stream_ctx,
@@ -335,6 +385,77 @@ class StreamingChatPipeline:
             if garbage_detected and not tool_calls:
                 stream_ctx.force_completion = True
                 logger.info("Setting force_completion due to garbage detection")
+
+            # === CONTENT REPETITION DETECTION (Fix 1 & 4) ===
+            # Detect when the LLM regenerates the same or highly similar content
+            # across consecutive iterations — the root cause of infinite buffering.
+            if full_content and len(full_content.strip()) > 20:
+                # Compute a hash of the normalized content for exact-match detection
+                normalized = re.sub(r"\s+", " ", full_content.strip().lower())
+                content_hash = hashlib.md5(normalized.encode()).hexdigest()
+                self._content_hashes.append(content_hash)
+
+                # Keep only the last 5 hashes for sliding-window comparison
+                if len(self._content_hashes) > 5:
+                    self._content_hashes.pop(0)
+
+                # Check 1: Exact hash match — same content repeated
+                if len(self._content_hashes) >= 3:
+                    last_3 = self._content_hashes[-3:]
+                    if len(set(last_3)) == 1:
+                        self._repetition_count += 1
+                        logger.warning(
+                            f"[content-repetition] Exact content match detected "
+                            f"(consecutive={self._repetition_count}, "
+                            f"content_len={len(full_content)}). "
+                            f"Forcing completion to break feedback loop."
+                        )
+                        stream_ctx.force_completion = True
+                        stream_ctx.skip_continuation = True
+                        yield orch._chunk_generator.generate_content_chunk(
+                            "\n\n[Content repetition detected — stopping to prevent "
+                            "infinite output loop.]",
+                            is_final=True,
+                        )
+                        return
+
+                # Check 2: Text overlap — measure how much of previous content
+                # appears in current content (catches partial regeneration)
+                if self._prev_full_content and len(self._prev_full_content) > 50:
+                    prev_norm = re.sub(r"\s+", " ", self._prev_full_content.strip().lower())
+                    curr_norm = normalized
+                    # Use word-level Jaccard similarity for overlap detection
+                    prev_words = set(prev_norm.split())
+                    curr_words = set(curr_norm.split())
+                    if prev_words and curr_words:
+                        overlap = len(prev_words & curr_words) / len(prev_words | curr_words)
+                        if overlap > 0.6:  # >60% word overlap
+                            self._repetition_count += 1
+                            logger.warning(
+                                f"[content-repetition] High content overlap detected "
+                                f"(overlap={overlap:.1%}, consecutive={self._repetition_count}, "
+                                f"content_len={len(full_content)})"
+                            )
+                            if self._repetition_count >= 3:
+                                logger.warning(
+                                    "[content-repetition] 3+ consecutive high-overlap iterations — "
+                                    "forcing completion."
+                                )
+                                stream_ctx.force_completion = True
+                                stream_ctx.skip_continuation = True
+                                yield orch._chunk_generator.generate_content_chunk(
+                                    "\n\n[Content repetition detected — stopping to prevent "
+                                    "infinite output loop.]",
+                                    is_final=True,
+                                )
+                                return
+                        else:
+                            # Content has diverged — reset counter
+                            self._repetition_count = 0
+                else:
+                    self._repetition_count = 0
+
+                self._prev_full_content = full_content
 
             # Parse, validate, and normalize tool calls
             tool_calls, full_content = orch._parse_and_validate_tool_calls(tool_calls, full_content)
@@ -432,15 +553,19 @@ class StreamingChatPipeline:
                 sanitized = orch.sanitizer.sanitize(full_content)
                 if sanitized:
                     orch.add_message("assistant", sanitized, tool_calls=tool_calls)
-                    # CRITICAL FIX: Yield content as StreamChunk for real-time display
-                    # This ensures LLM responses appear in console as they're generated
-                    yield orch._chunk_generator.generate_content_chunk(sanitized)
+                    # Only yield here when tool_calls are present — the intent
+                    # classification handler (Step 1) is skipped for tool-call
+                    # turns and yields nothing, so we must display the content.
+                    # For non-tool turns, intent classification yields it at
+                    # classify_and_determine_action() to avoid double display.
+                    if tool_calls:
+                        yield orch._chunk_generator.generate_content_chunk(sanitized)
                 else:
                     plain_text = orch.sanitizer.strip_markup(full_content)
                     if plain_text:
                         orch.add_message("assistant", plain_text, tool_calls=tool_calls)
-                        # CRITICAL FIX: Yield content as StreamChunk for real-time display
-                        yield orch._chunk_generator.generate_content_chunk(plain_text)
+                        if tool_calls:
+                            yield orch._chunk_generator.generate_content_chunk(plain_text)
             elif tool_calls:
                 # OpenAI spec: assistant message with tool_calls must be in
                 # conversation even when content is empty. Without this,
@@ -468,7 +593,7 @@ class StreamingChatPipeline:
 
                 # Delegate empty response recovery to helper method
                 recovery_success, recovered_tool_calls, final_chunk = (
-                    await coord._handle_empty_response_recovery(stream_ctx, tools)
+                    await runtime_owner._handle_empty_response_recovery(stream_ctx, tools)
                 )
 
                 if recovery_success:
@@ -608,13 +733,13 @@ class StreamingChatPipeline:
 
                 if not tool_calls:
                     # === INTENT CLASSIFICATION (P0 SRP refactor) ===
-                    if not coord._intent_classification_handler:
+                    if not runtime_owner._intent_classification_handler:
                         from victor.agent.streaming import (
                             create_intent_classification_handler,
                         )
 
-                        coord._intent_classification_handler = create_intent_classification_handler(
-                            orch
+                        runtime_owner._intent_classification_handler = (
+                            create_intent_classification_handler(orch)
                         )
 
                     # Tracking variables now initialized in AgentOrchestrator.__init__
@@ -623,7 +748,7 @@ class StreamingChatPipeline:
                     tracking_state = create_tracking_state(orch)
 
                     intent_result = (
-                        coord._intent_classification_handler.classify_and_determine_action(
+                        runtime_owner._intent_classification_handler.classify_and_determine_action(
                             stream_ctx=stream_ctx,
                             full_content=full_content,
                             content_length=content_length,
@@ -657,14 +782,14 @@ class StreamingChatPipeline:
                     )
 
                     # === CONTINUATION ACTION HANDLING (P0 SRP refactor) ===
-                    if not coord._continuation_handler:
+                    if not runtime_owner._continuation_handler:
                         from victor.agent.streaming import create_continuation_handler
 
-                        coord._continuation_handler = create_continuation_handler(orch)
+                        runtime_owner._continuation_handler = create_continuation_handler(orch)
 
                     action_result["action"] = action
 
-                    continuation_result = await coord._continuation_handler.handle_action(
+                    continuation_result = await runtime_owner._continuation_handler.handle_action(
                         action_result=action_result,
                         stream_ctx=stream_ctx,
                         full_content=full_content,
@@ -682,16 +807,16 @@ class StreamingChatPipeline:
                         return
 
                 # === TOOL EXECUTION PHASE (P0 SRP refactor) ===
-                if not coord._tool_execution_handler:
+                if not runtime_owner._tool_execution_handler:
                     from victor.agent.streaming import create_tool_execution_handler
 
-                    coord._tool_execution_handler = create_tool_execution_handler(orch)
+                    runtime_owner._tool_execution_handler = create_tool_execution_handler(orch)
 
-                coord._tool_execution_handler.update_observed_files(
+                runtime_owner._tool_execution_handler.update_observed_files(
                     set(orch.observed_files) if orch.observed_files else set()
                 )
 
-                tool_exec_result = await coord._tool_execution_handler.execute_tools(
+                tool_exec_result = await runtime_owner._tool_execution_handler.execute_tools(
                     stream_ctx=stream_ctx,
                     tool_calls=tool_calls,
                     user_message=user_message,
@@ -770,9 +895,13 @@ class StreamingChatPipeline:
 
 
 def create_streaming_chat_pipeline(
-    coordinator: "ChatCoordinator",
+    runtime_owner: StreamingPipelineRuntime,
     perception: Optional[Any] = None,
     fulfillment: Optional[Any] = None,
 ) -> StreamingChatPipeline:
-    """Factory helper for creating a streaming pipeline bound to a coordinator."""
-    return StreamingChatPipeline(coordinator, perception=perception, fulfillment=fulfillment)
+    """Factory helper for creating a streaming pipeline bound to a runtime owner."""
+    return StreamingChatPipeline(
+        runtime_owner,
+        perception=perception,
+        fulfillment=fulfillment,
+    )

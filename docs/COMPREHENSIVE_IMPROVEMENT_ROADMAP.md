@@ -622,7 +622,7 @@ This roadmap outlines a systematic improvement plan for Victor. The **P0-P2 phas
    }
 
    type Mutation {
-     createAgent(config: AgentConfig!): Agent
+     createAgent(config: UnifiedAgentConfigInput!): Agent
    }
    ```
 

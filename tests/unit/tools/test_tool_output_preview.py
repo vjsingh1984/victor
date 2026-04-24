@@ -186,3 +186,77 @@ def test_output_formatter_tool_result_with_preview_params():
     # Verify state is stored
     assert formatter._last_tool_result is not None
     assert formatter._last_tool_result["tool_name"] == "read"
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: per-tool strategy output via Console(record=True)
+# ---------------------------------------------------------------------------
+
+def _make_formatter() -> OutputFormatter:
+    """Return an OutputFormatter with a record-mode Rich console."""
+    from io import StringIO
+    from victor.ui.output_formatter import OutputConfig, OutputMode
+    console = Console(record=True, width=120)
+    f = OutputFormatter(OutputConfig(mode=OutputMode.RICH, show_tools=True, stream=False))
+    f._console = console
+    return f
+
+
+def test_integration_shell_preview_shows_exit_and_stdout():
+    """shell tool_result renders exit code header + stdout lines."""
+    f = _make_formatter()
+    raw = str({"success": True, "stdout": "hello\nworld", "stderr": "", "return_code": 0})
+    # Prime _pending_tool so args are available
+    import time
+    f._pending_tool = ("shell", {}, time.time())
+    f.tool_result("shell", success=True, original_result=raw, show_preview=True, preview_lines=3)
+    rendered = f._console.export_text()
+    assert "exit 0" in rendered
+    assert "hello" in rendered
+
+
+def test_integration_edit_preview_shows_diff():
+    """edit tool_result renders a unified diff from arguments."""
+    f = _make_formatter()
+    import time
+    args = {"old_string": "x = 1", "new_string": "x = 99"}
+    f._pending_tool = ("edit", args, time.time())
+    f.tool_result("edit", success=True, original_result="", show_preview=True, preview_lines=5)
+    rendered = f._console.export_text()
+    # Header shows +1/-1 lines
+    assert "+1" in rendered and "-1" in rendered
+
+
+def test_integration_read_preview_shows_file_header():
+    """read tool_result renders [File:] metadata as header."""
+    f = _make_formatter()
+    import time
+    raw = "[File: foo.py]\n[Lines 1-3 of 100]\nprint('hello')\nprint('world')"
+    f._pending_tool = ("read", {"path": "foo.py"}, time.time())
+    f.tool_result("read", success=True, original_result=raw, show_preview=True, preview_lines=2)
+    rendered = f._console.export_text()
+    assert "File:" in rendered
+    assert "Lines" in rendered
+
+
+def test_integration_ls_preview_shows_item_count():
+    """ls tool_result renders 'N items' header."""
+    f = _make_formatter()
+    import time
+    raw = str({"items": [{"path": "a.py"}, {"path": "b.py"}, {"path": "c.py"}]})
+    f._pending_tool = ("ls", {}, time.time())
+    f.tool_result("ls", success=True, original_result=raw, show_preview=True, preview_lines=3)
+    rendered = f._console.export_text()
+    assert "3 items" in rendered
+
+
+def test_integration_failed_tool_no_preview():
+    """Failed tools do not show preview regardless of show_preview flag."""
+    f = _make_formatter()
+    import time
+    f._pending_tool = ("shell", {}, time.time())
+    f.tool_result("shell", success=False, error="permission denied",
+                  original_result="some output", show_preview=True, preview_lines=3)
+    rendered = f._console.export_text()
+    # Preview block should not appear for failed tools
+    assert "│" not in rendered

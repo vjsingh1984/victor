@@ -40,6 +40,7 @@ from victor.ui.rendering.live_renderer import LiveDisplayRenderer
 from victor.ui.rendering.metrics import StreamingMetrics
 from victor.ui.rendering.protocol import StreamRenderer
 from victor.ui.rendering.utils import (
+    StreamDeltaNormalizer,
     format_tool_args,
     render_edit_preview,
     render_file_preview,
@@ -59,6 +60,7 @@ __all__ = [
     # Handler
     "stream_response",
     # Utilities
+    "StreamDeltaNormalizer",
     "format_tool_args",
     "render_file_preview",
     "render_edit_preview",

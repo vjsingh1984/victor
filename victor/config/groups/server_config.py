@@ -20,12 +20,7 @@ Contains configuration for API server, WebSocket, and diagram rendering.
 
 from typing import Optional
 
-try:
-    from pydantic import SecretStr
-except ImportError:
-    from pydantic import SecretStr
-
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator
 
 
 class ServerSettings(BaseModel):
@@ -39,7 +34,7 @@ class ServerSettings(BaseModel):
     # When set, API key is required for HTTP + WebSocket requests (Authorization: Bearer <token>)
     server_api_key: Optional[SecretStr] = None
     # HMAC secret for issuing/verifying session tokens (defaults to random per-process secret)
-    server_session_secret: Optional[SecretStr] = None
+    server_session_secret: Optional[SecretStr] = Field(default=None, validate_default=True)
     # Hard cap on simultaneous sessions to avoid resource exhaustion
     server_max_sessions: int = 100
     # Maximum inbound message payload size (bytes) for WebSocket messages

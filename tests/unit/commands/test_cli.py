@@ -653,6 +653,121 @@ class TestOutputFormatOptions:
         assert hasattr(chat_module, "run_interactive")
 
 
+class TestChatChromePolicy:
+    """Tests for Rich-only chat command chrome."""
+
+    def test_cli_chrome_shown_for_default_rich_mode(self):
+        """Rich output can include human-facing command chrome."""
+        from victor.ui.commands.chat import _should_render_cli_chrome
+        from victor.ui.output_formatter import create_formatter
+
+        assert _should_render_cli_chrome(create_formatter()) is True
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"json_mode": True},
+            {"jsonl": True},
+            {"plain": True},
+            {"code_only": True},
+            {"quiet": True},
+        ],
+    )
+    def test_cli_chrome_hidden_for_automation_modes(self, kwargs):
+        """Automation output modes must not receive extra stdout chrome."""
+        from victor.ui.commands.chat import _should_render_cli_chrome
+        from victor.ui.output_formatter import create_formatter
+
+        assert _should_render_cli_chrome(create_formatter(**kwargs)) is False
+
+    def test_interactive_tool_banner_hidden_for_tui(self):
+        """TUI sessions should not print plain CLI startup chrome."""
+        from victor.ui.commands.chat import _should_render_interactive_tool_banner
+
+        assert _should_render_interactive_tool_banner(use_tui=True) is False
+        assert _should_render_interactive_tool_banner(use_tui=False) is True
+
+    def test_build_cli_panel_accepts_profile_like_object(self):
+        """CLI header builder should work with fallback profile display objects."""
+        from types import SimpleNamespace
+
+        from victor.ui.commands.chat import _build_cli_panel
+
+        panel = _build_cli_panel(SimpleNamespace(provider="openai", model="gpt-4o"))
+        assert panel is not None
+
+    def test_summarize_tool_output_mode_plain_text(self):
+        """TUI startup summaries should use plain text, not Rich markup."""
+        from types import SimpleNamespace
+
+        from victor.ui.commands.chat import _summarize_tool_output_mode
+
+        settings = SimpleNamespace(
+            tool_output_pruning_safe_only=True,
+            tool_output_preview_enabled=False,
+        )
+        assert _summarize_tool_output_mode(settings) == "Tool output: safe read-heavy pruning, preview off"
+
+    def test_print_interactive_startup_messages_handles_queue(self):
+        """Queued startup notices should render through the shared status style."""
+        from victor.ui.commands.chat import _print_interactive_startup_messages
+
+        console = MagicMock()
+        _print_interactive_startup_messages(
+            console,
+            ["Profile fallback active", "Warning: file watchers disabled"],
+        )
+
+        assert console.print.call_count == 2
+
+
+class TestChatReplRendering:
+    """Tests for CLI REPL rendering ownership."""
+
+    @pytest.mark.asyncio
+    async def test_formatter_renderer_response_is_not_reprinted(self):
+        """The REPL must not print stream_response() content a second time."""
+        from victor.ui.commands import chat as chat_module
+
+        class FakeKeyBindings:
+            def add(self, *_args, **_kwargs):
+                def decorator(func):
+                    return func
+
+                return decorator
+
+        class FakePromptSession:
+            def __init__(self):
+                self.key_bindings = FakeKeyBindings()
+                self._inputs = iter(["hello", "/exit"])
+
+            async def prompt_async(self, _prompt):
+                return next(self._inputs)
+
+        cmd_handler = MagicMock()
+        cmd_handler.is_command.return_value = False
+        agent = MagicMock()
+        settings = MagicMock()
+        profile_config = MagicMock(provider="test-provider", model="test-model")
+
+        with (
+            patch.object(chat_module, "_create_cli_prompt_session", return_value=FakePromptSession()),
+            patch.object(chat_module.console, "print") as mock_print,
+            patch("victor.ui.rendering.stream_response", new=AsyncMock(return_value="dup content")),
+        ):
+            await chat_module._run_cli_repl(
+                agent=agent,
+                settings=settings,
+                cmd_handler=cmd_handler,
+                profile_config=profile_config,
+                stream=True,
+                renderer_choice="text",
+            )
+
+        rendered = [str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args]
+        assert not any("dup content" in item for item in rendered)
+
+
 # =============================================================================
 # Integration-style tests (still mocked but more comprehensive)
 # =============================================================================

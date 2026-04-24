@@ -263,9 +263,8 @@ class ContinuationHandler:
             )
             return ContinuationResult(
                 chunks=[],
-                should_stop=True,
-                should_continue=False,
-                control_action="finish",
+                should_return=True,
+                should_continue_loop=False,
             )
 
         action = action_result.get("action", "finish")
@@ -334,17 +333,9 @@ class ContinuationHandler:
     ) -> ContinuationResult:
         """Handle return_to_user action.
 
-        Yields accumulated content and exits the loop.
+        Content is already yielded by the pipeline before continuation handling.
         """
         result = ContinuationResult(should_return=True)
-
-        # Yield accumulated content
-        if full_content:
-            sanitized = self._sanitizer.sanitize(full_content)
-            if sanitized:
-                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
-
-        # Add final marker
         result.add_chunk(self._chunk_generator.generate_final_marker_chunk())
         return result
 
@@ -588,11 +579,7 @@ class ContinuationHandler:
         """
         result = ContinuationResult(should_return=True)
 
-        # Yield accumulated content
-        if full_content:
-            sanitized = self._sanitizer.sanitize(full_content)
-            if sanitized:
-                result.add_chunk(self._chunk_generator.generate_content_chunk(sanitized))
+        # Content is already yielded by the pipeline before continuation handling.
 
         # Finalize and display metrics
         if self._finalize_metrics:

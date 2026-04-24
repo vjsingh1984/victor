@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.turn_executor import TurnExecutor
+from victor.agent.services.turn_execution_runtime import TurnExecutor
 
 # =====================================================================
 # Step 1-2: Provider capability detection

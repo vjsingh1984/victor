@@ -167,13 +167,15 @@ class TestCreateSanitizer:
         assert isinstance(sanitizer, ResponseSanitizer)
 
     def test_create_sanitizer_uses_di_if_available(self, factory, mock_container):
-        """create_sanitizer uses DI container (always)."""
+        """create_sanitizer checks DI container via get_optional then falls back."""
         from victor.agent.protocols import ResponseSanitizerProtocol
 
         sanitizer = factory.create_sanitizer()
 
-        # Verify DI container was used
-        mock_container.get.assert_called_with(ResponseSanitizerProtocol)
+        # create_sanitizer uses get_optional (soft lookup) so the factory
+        # can fall back to a direct constructor when the protocol isn't
+        # registered (e.g. test environments).
+        mock_container.get_optional.assert_called_with(ResponseSanitizerProtocol)
 
 
 class TestCreateProjectContext:

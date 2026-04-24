@@ -78,6 +78,7 @@ from victor.framework.fulfillment import FulfillmentDetector, TaskType
 from victor.framework.perception_integration import Perception, PerceptionIntegration
 from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
 from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
+from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -102,12 +103,12 @@ class AdaptiveTerminationDecision(str, Enum):
 _AdaptiveTerminationDecisionLiteral = Literal["plateau", "extend"]
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.turn_executor import (
+    from victor.agent.services.turn_execution_runtime import (
         TurnExecutor,
         TurnResult,
     )
     from victor.storage.memory.unified import UnifiedMemoryCoordinator
-    from victor.agent.coordinators.planning_coordinator import PlanningCoordinator
+    from victor.agent.services.planning_runtime import PlanningCoordinator
     from victor.framework.agent import Agent
 
 
@@ -411,6 +412,21 @@ class AgenticLoop:
         )
 
         self.fulfillment = FulfillmentDetector() if enable_fulfillment_check else None
+
+        # Initialize enhanced completion evaluator
+        # ENABLED BY DEFAULT - use disable_enhanced_completion setting to opt-out if needed
+        disable_enhanced_completion = self.config.get("disable_enhanced_completion", False)
+        self.enhanced_completion_evaluator = None
+        if not disable_enhanced_completion:
+            self.enhanced_completion_evaluator = EnhancedCompletionEvaluator(
+                enable_requirement_validation=self.config.get("enable_requirement_validation", True),
+                enable_completion_scoring=self.config.get("enable_completion_scoring", True),
+                enable_context_keywords=self.config.get("enable_context_keywords", True),
+                completion_threshold=self.config.get("completion_threshold", 0.80),
+            )
+            logger.info("[EnhancedCompletion] ENABLED by default - requirement-driven completion detection active (use disable_enhanced_completion=True to opt-out)")
+        else:
+            logger.warning("[EnhancedCompletion] DISABLED via config - using legacy completion detection")
 
         # Initialize planning gate for fast-slow architecture
         self.planning_gate = PlanningGate(enabled=self.config.get("enable_planning_gate", True))
@@ -1077,7 +1093,7 @@ class AgenticLoop:
 
         # PRIMARY: Use turn_executor for single-turn (no nested loop)
         if self.turn_executor is not None:
-            from victor.agent.coordinators.turn_executor import TurnResult
+            from victor.agent.services.turn_execution_runtime import TurnResult
 
             task_classification = state.get("_task_classification")
             is_qa = state.get("_is_qa_task", False)
@@ -1217,9 +1233,36 @@ class AgenticLoop:
         turn-level signals (tool calls, spin detection, Q&A shortcut)
         in addition to fulfillment checks. This replaces the nudge/spin
         logic that was previously inside TurnExecutor's while-loop.
+
+        Enhanced Completion Detection:
+        If enable_enhanced_completion is True, uses requirement-driven
+        completion detection with multi-signal fusion for more accurate
+        and earlier stopping when task requirements are satisfied.
         """
+        # ENHANCED: Use EnhancedCompletionEvaluator if enabled
+        if self.enhanced_completion_evaluator is not None:
+            try:
+                enhanced_result = await self.enhanced_completion_evaluator.evaluate(
+                    perception=perception,
+                    action_result=action_result,
+                    state=state,
+                    fulfillment_detector=self.fulfillment,
+                    spin_detector=self.spin_detector,
+                )
+                # Log enhanced evaluation decision for observability
+                logger.info(
+                    f"[EnhancedCompletion] Decision: {enhanced_result.decision.value}, "
+                    f"Score: {enhanced_result.score:.2f}, "
+                    f"Reason: {enhanced_result.reason[:100]}"
+                )
+                return enhanced_result
+            except Exception as e:
+                # Graceful degradation: fall back to legacy evaluation on error
+                logger.warning(f"[EnhancedCompletion] Evaluation failed: {e}, falling back to legacy")
+
+        # LEGACY: Original evaluation logic (preserved for backward compatibility)
         # Check for TurnResult-specific signals (single-turn mode)
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         if isinstance(action_result, TurnResult):
             turn: TurnResult = action_result

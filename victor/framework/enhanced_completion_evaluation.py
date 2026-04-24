@@ -78,7 +78,7 @@ from victor.framework.requirement_validator import (
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from victor.agent.coordinators.turn_executor import TurnResult
+    from victor.agent.services.turn_execution_runtime import TurnResult
     from victor.framework.agentic_loop import SpinState
     from victor.framework.fulfillment import FulfillmentDetector
     from victor.framework.perception_integration import Perception
@@ -87,7 +87,7 @@ if TYPE_CHECKING:
 class EnhancedCompletionEvaluator:
     """Enhanced completion evaluator with requirement-driven detection.
 
-    This evaluator implements Task #142's enhancement:
+    This evaluator provides algorithmic completion detection:
     - Uses PerceptionIntegration to understand task requirements
     - Validates completion against extracted requirements
     - Combines multiple signals (fulfillment, keywords, confidence)
@@ -151,7 +151,7 @@ class EnhancedCompletionEvaluator:
             EvaluationResult with decision and rationale
         """
         from victor.framework.evaluation_nodes import EvaluationResult
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         # === PRIORITY 1: Spin Detection (always check) ===
         if spin_detector is not None:
@@ -344,7 +344,7 @@ class EnhancedCompletionEvaluator:
         Returns EvaluationResult if Q&A shortcut applies, None otherwise.
         """
         from victor.framework.evaluation_nodes import EvaluationResult
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         if not isinstance(action_result, TurnResult):
             return None
@@ -378,7 +378,7 @@ class EnhancedCompletionEvaluator:
         when enhanced components are not available.
         """
         from victor.framework.evaluation_nodes import EvaluationResult
-        from victor.agent.coordinators.turn_executor import TurnResult
+        from victor.agent.services.turn_execution_runtime import TurnResult
 
         # Legacy: Tool execution tracking
         if isinstance(action_result, TurnResult):

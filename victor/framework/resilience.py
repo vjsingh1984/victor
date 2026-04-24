@@ -21,6 +21,7 @@ without duplicating code, following the Facade Pattern.
 Delegated modules:
 - victor.providers.circuit_breaker: Standalone circuit breaker with decorator support
 - victor.providers.resilience: ResilientProvider with circuit breaker + retry + fallback
+- victor.core.circuit_breaker: Shared circuit state/config/error types
 - victor.core.retry: Unified retry strategies (exponential, linear, fixed)
 
 Design Pattern: Facade
@@ -69,14 +70,22 @@ Example:
 from __future__ import annotations
 
 # =============================================================================
+# Shared Circuit Breaker Types
+# From: victor/core/circuit_breaker.py
+# =============================================================================
+from victor.core.circuit_breaker import (
+    CircuitBreakerConfig,
+    CircuitBreakerError,
+    CircuitState,
+)
+
+# =============================================================================
 # Circuit Breaker (Standalone)
 # From: victor/providers/circuit_breaker.py
 # =============================================================================
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
-    CircuitBreakerError,
     CircuitBreakerRegistry,
-    CircuitState,
 )
 
 # =============================================================================
@@ -84,7 +93,6 @@ from victor.providers.circuit_breaker import (
 # From: victor/providers/resilience.py
 # =============================================================================
 from victor.providers.resilience import (
-    CircuitBreakerConfig,
     CircuitBreakerState,
     CircuitOpenError,
     ProviderRetryConfig,

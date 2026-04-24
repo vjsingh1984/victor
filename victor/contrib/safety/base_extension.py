@@ -50,7 +50,7 @@ import logging
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
-from victor.agent.coordinators.safety_coordinator import (
+from victor_sdk.safety import (
     SafetyAction,
     SafetyCategory,
     SafetyCoordinator,

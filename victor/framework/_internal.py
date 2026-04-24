@@ -25,6 +25,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING, Any, AsyncIterator, Dict, List, Optional, Type, Union
 
+from victor.agent.config import FrameworkCompatibleAgentConfig, normalize_agent_config
 from victor.framework.event_registry import EventTarget, get_event_registry
 from victor.framework.events import (
     AgentExecutionEvent,
@@ -43,7 +44,6 @@ from victor.framework.capability_runtime import (
 )
 
 if TYPE_CHECKING:
-    from victor.framework.config import AgentConfig
     from victor.core.verticals.base import VerticalBase
 
 
@@ -57,7 +57,7 @@ async def create_orchestrator_from_options(
     airgapped: bool,
     profile: Optional[str],
     workspace: Optional[str],
-    config: Optional["AgentConfig"],
+    config: Optional[FrameworkCompatibleAgentConfig],
     system_prompt: Optional[str] = None,
     enable_observability: bool = True,
     session_id: Optional[str] = None,
@@ -100,6 +100,8 @@ async def create_orchestrator_from_options(
 
     # Load settings
     settings = load_settings()
+
+    config = normalize_agent_config(config)
 
     # Apply config overrides
     if config:

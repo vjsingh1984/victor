@@ -1,9 +1,9 @@
-"""Unit tests demonstrating protocol-based dependency injection for ChatCoordinator.
+"""Unit tests for legacy ChatCoordinator protocol injection coverage.
 
-These tests show how ChatOrchestratorProtocol enables:
+These tests show how the service-hosted ChatOrchestratorProtocol enables:
 1. Fast unit tests with lightweight mocks
 2. Deterministic behavior without external dependencies
-3. Isolated testing of ChatCoordinator logic
+3. Explicit compatibility coverage for the deprecated ChatCoordinator shim
 
 Phase 6 of DIP Hardening (docs/architecture-analysis-phase3.md:186).
 """
@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from unittest.mock import AsyncMock, MagicMock
 
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
-from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
 # =============================================================================
 # Lightweight Protocol Satisfying Mocks
@@ -166,8 +166,14 @@ class MockOrchestrator(ChatOrchestratorProtocol):
 # =============================================================================
 
 
+def _make_deprecated_chat_coordinator(mock_orchestrator: MockOrchestrator) -> ChatCoordinator:
+    """Construct the deprecated compatibility shim with an explicit warning assertion."""
+    with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):
+        return ChatCoordinator(orchestrator=mock_orchestrator)
+
+
 class TestChatCoordinatorProtocolInjection:
-    """Tests demonstrating protocol-based dependency injection."""
+    """Tests demonstrating legacy protocol-based shim injection."""
 
     def test_chat_coordinator_accepts_protocol_satisfying_mock(self):
         """ChatCoordinator should accept any object satisfying ChatOrchestratorProtocol."""
@@ -175,7 +181,7 @@ class TestChatCoordinatorProtocolInjection:
         mock_orchestrator = MockOrchestrator()
 
         # Should not raise - mock satisfies the protocol
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         assert coordinator is not None
         assert coordinator._orchestrator is mock_orchestrator
@@ -183,7 +189,7 @@ class TestChatCoordinatorProtocolInjection:
     def test_chat_coordinator_delegates_to_conversation_methods(self):
         """ChatCoordinator should use orchestrator's conversation methods."""
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Access conversation through orchestrator
         assert coordinator._orchestrator.conversation is not None
@@ -192,7 +198,7 @@ class TestChatCoordinatorProtocolInjection:
     def test_chat_coordinator_delegates_to_tool_methods(self):
         """ChatCoordinator should use orchestrator's tool methods."""
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Access tool budget through orchestrator
         assert coordinator._orchestrator.tool_budget == 10
@@ -201,7 +207,7 @@ class TestChatCoordinatorProtocolInjection:
     def test_chat_coordinator_delegates_to_provider_methods(self):
         """ChatCoordinator should use orchestrator's provider methods."""
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Access provider through orchestrator
         assert coordinator._orchestrator.model == "gpt-4"
@@ -212,7 +218,7 @@ class TestChatCoordinatorProtocolInjection:
     async def test_chat_coordinator_uses_turn_executor(self):
         """ChatCoordinator should have turn_executor as a property."""
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Verify turn_executor is a property on the class
         # (It's lazily created when first accessed, but requires setup_streaming_pipeline first)
@@ -236,7 +242,7 @@ class TestChatCoordinatorProtocolInjection:
         # Mock tool execution (no tools in this simple case)
         mock_orchestrator._handle_tool_calls = lambda *args, **kwargs: []
 
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Verify delegation: provider is accessible through orchestrator
         assert coordinator._orchestrator.provider is not None
@@ -251,7 +257,7 @@ class TestChatCoordinatorProtocolInjection:
     def test_chat_coordinator_respects_tool_budget_from_orchestrator(self):
         """ChatCoordinator should respect tool budget from orchestrator."""
         mock_orchestrator = MockOrchestrator(tool_budget=5)
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Budget should come from orchestrator
         assert coordinator._orchestrator.tool_budget == 5
@@ -259,7 +265,7 @@ class TestChatCoordinatorProtocolInjection:
     def test_chat_coordinator_uses_task_classifier_from_orchestrator(self):
         """ChatCoordinator should use task classifier from orchestrator."""
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Task classifier should be accessible
         assert coordinator._orchestrator.task_classifier is not None
@@ -272,7 +278,7 @@ class TestChatCoordinatorProtocolInjection:
         # - No file system dependencies (deterministic)
 
         # Import only the protocol and ChatCoordinator
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
         from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
         # Verify protocol is runtime-checkable
@@ -285,7 +291,7 @@ class TestChatCoordinatorProtocolInjection:
 
         # Create coordinator with mock
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Verify coordinator was created successfully
         assert coordinator is not None
@@ -302,7 +308,7 @@ class TestChatCoordinatorProtocolCompliance:
 
     def test_protocol_includes_chat_context_dependencies(self):
         """Protocol should include all chat context dependencies."""
-        from victor.agent.coordinators.chat_protocols import ChatContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatContextProtocol
         from typing import get_args, get_origin
 
         # Check that protocol defines the required attributes
@@ -319,7 +325,7 @@ class TestChatCoordinatorProtocolCompliance:
 
     def test_protocol_includes_tool_context_dependencies(self):
         """Protocol should include all tool context dependencies."""
-        from victor.agent.coordinators.chat_protocols import ToolContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ToolContextProtocol
 
         from typing import Protocol
 
@@ -330,7 +336,7 @@ class TestChatCoordinatorProtocolCompliance:
 
     def test_protocol_includes_provider_context_dependencies(self):
         """Protocol should include all provider context dependencies."""
-        from victor.agent.coordinators.chat_protocols import ProviderContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ProviderContextProtocol
 
         from typing import Protocol
 
@@ -344,14 +350,14 @@ class TestChatCoordinatorProtocolCompliance:
         mock = MockOrchestrator()
 
         # Runtime check - this will fail if mock doesn't satisfy protocol
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         assert isinstance(mock, ChatOrchestratorProtocol)
 
     def test_chat_coordinator_type_checks_protocols(self):
         """ChatCoordinator should verify orchestrator satisfies protocol at runtime."""
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Coordinator should accept the mock
         assert coordinator._orchestrator is mock_orchestrator
@@ -372,7 +378,7 @@ class TestProtocolBasedInjectionBenefits:
         # Lightweight mock - fast instantiation
         start = time.perf_counter()
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
         mock_time = time.perf_counter() - start
 
         # Even with mock, coordinator creation should be fast
@@ -394,7 +400,7 @@ class TestProtocolBasedInjectionBenefits:
         # without testing orchestrator correctness
 
         mock_orchestrator = MockOrchestrator()
-        coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
         # Verify coordinator initializes correctly
         assert coordinator is not None

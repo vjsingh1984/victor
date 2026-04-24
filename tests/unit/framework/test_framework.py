@@ -21,6 +21,7 @@ from victor.framework import (
     Stage,
     State,
     StateHooks,
+    UnifiedAgentConfig,
     Task,
     TaskResult,
     FrameworkTaskType,
@@ -107,6 +108,14 @@ class TestToolSet:
         ts = ToolSet.from_tools(["read", "write"])
         assert "read" in ts
         assert "unknown" not in ts
+
+
+class TestConfigExports:
+    """Tests for framework config exports."""
+
+    def test_unified_agent_config_exported(self):
+        """UnifiedAgentConfig should be available from victor.framework."""
+        assert UnifiedAgentConfig.high_budget().tool_budget == 200
 
 
 class TestEventType:

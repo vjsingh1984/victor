@@ -123,7 +123,7 @@ class TestToolPreFilter:
         tool_calls = [
             {"name": "get_stats", "arguments": {}},
         ]
-        with patch("victor.agent.coordinators.tool_coordinator.logger") as mock_logger:
+        with patch("victor.agent.services.tool_compat.logger") as mock_logger:
             valid, filtered = coordinator._pre_filter_tool_calls(tool_calls)
             mock_logger.warning.assert_called()
             call_args = str(mock_logger.warning.call_args)

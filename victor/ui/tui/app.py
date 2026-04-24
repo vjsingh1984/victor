@@ -20,6 +20,7 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label
+from victor.ui.rendering.utils import StreamDeltaNormalizer
 from victor.ui.tui.session import Message
 from victor.ui.tui.theme import THEME_CSS
 from victor.ui.tui.widgets import (
@@ -63,11 +64,11 @@ class TUIConsoleAdapter:
         self._console.print(*args, **kwargs)
 
         # Get rendered text (strip ANSI since TUI handles styling)
-        output = self._buffer.getvalue().strip()
+        output = self._buffer.getvalue().strip("\n")
         if output:
             # Split by lines and add each as system message
             for line in output.split("\n"):
-                line = line.strip()
+                line = line.rstrip()
                 if line:
                     self._log.add_system_message(line)
                     if self._on_line:
@@ -592,6 +593,7 @@ class VictorTUI(App):
         stream: bool = True,
         on_message: Optional[Callable[[str], Any]] = None,
         settings: Optional["Settings"] = None,
+        startup_messages: Optional[list[str]] = None,
         **kwargs,
     ) -> None:
         """Initialize Victor TUI.
@@ -603,6 +605,7 @@ class VictorTUI(App):
             stream: Whether to stream responses
             on_message: Callback when user sends a message
             settings: Optional Settings instance for slash commands
+            startup_messages: Optional system messages to show when the TUI mounts
         """
         super().__init__(**kwargs)
         self.agent = agent
@@ -611,6 +614,7 @@ class VictorTUI(App):
         self.stream = stream
         self.on_message = on_message
         self.settings = settings
+        self._startup_messages = list(startup_messages or [])
         self._conversation_log: EnhancedConversationLog | None = None
         self._input_widget: InputWidget | None = None
         self._status_bar: StatusBar | None = None
@@ -671,6 +675,8 @@ class VictorTUI(App):
         # Show welcome message
         self._add_system_message(f"Connected to {self.provider}/{self.model}")
         self._add_system_message("Type /help for commands, Ctrl+C to exit")
+        for message in self._startup_messages:
+            self._add_system_message(message)
         self._set_status("Idle", "idle")
         self._update_jump_to_bottom()
 
@@ -801,6 +807,29 @@ class VictorTUI(App):
     async def _stream_response(self, message: str) -> None:
         """Stream response from agent."""
         content_buffer = ""
+        thinking_buffer = ""
+        thinking_visible = False
+        content_normalizer = StreamDeltaNormalizer()
+        thinking_normalizer = StreamDeltaNormalizer()
+
+        def update_content(raw_content: str) -> None:
+            """Normalize content and update the streaming transcript."""
+            nonlocal content_buffer
+
+            content_delta = content_normalizer.consume(raw_content)
+            if not content_delta:
+                return
+
+            content_buffer += content_delta
+            if self._conversation_log:
+                try:
+                    self._conversation_log.update_streaming(content_buffer)
+                except Exception as e:
+                    logger.warning(f"Failed to update streaming content: {e}")
+                try:
+                    self._update_jump_to_bottom()
+                except Exception as e:
+                    logger.warning(f"Failed to update jump button: {e}")
 
         # Start streaming display
         await self._start_streaming_ui()
@@ -813,32 +842,29 @@ class VictorTUI(App):
                     chunk_type = chunk.type
 
                     if chunk_type == "content":
-                        content_buffer += chunk.content or ""
-                        if self._conversation_log:
-                            try:
-                                self._conversation_log.update_streaming(content_buffer)
-                            except Exception as e:
-                                logger.warning(f"Failed to update streaming content: {e}")
-                            # Update jump-to-bottom button visibility during streaming
-                            try:
-                                self._update_jump_to_bottom()
-                            except Exception as e:
-                                logger.warning(f"Failed to update jump button: {e}")
+                        update_content(chunk.content or "")
 
                     elif chunk_type == "thinking_start":
                         try:
+                            thinking_buffer = ""
+                            thinking_normalizer.reset()
+                            thinking_visible = True
                             self._show_thinking()
                         except Exception as e:
                             logger.warning(f"Failed to show thinking panel: {e}")
 
                     elif chunk_type == "thinking":
                         try:
-                            self._update_thinking(chunk.content or "")
+                            thinking_delta = thinking_normalizer.consume(chunk.content or "")
+                            if thinking_delta:
+                                thinking_buffer += thinking_delta
+                                self._update_thinking(thinking_buffer)
                         except Exception as e:
                             logger.warning(f"Failed to update thinking content: {e}")
 
                     elif chunk_type == "thinking_end":
                         try:
+                            thinking_visible = False
                             self._hide_thinking()
                         except Exception as e:
                             logger.warning(f"Failed to hide thinking panel: {e}")
@@ -887,24 +913,25 @@ class VictorTUI(App):
 
                     elif "reasoning_content" in metadata:
                         try:
-                            self._show_thinking()
-                            self._update_thinking(metadata["reasoning_content"] or "")
+                            if not thinking_visible:
+                                thinking_buffer = ""
+                                thinking_normalizer.reset()
+                                thinking_visible = True
+                                self._show_thinking()
+                            thinking_delta = thinking_normalizer.consume(
+                                metadata["reasoning_content"] or ""
+                            )
+                            if thinking_delta:
+                                thinking_buffer += thinking_delta
+                                self._update_thinking(thinking_buffer)
+                            if chunk.content:
+                                update_content(chunk.content)
                         except Exception as e:
                             logger.warning(f"Failed to update thinking content: {e}")
 
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
-                    content_buffer += chunk.content
-                    if self._conversation_log:
-                        try:
-                            self._conversation_log.update_streaming(content_buffer)
-                        except Exception as e:
-                            logger.warning(f"Failed to update streaming content: {e}")
-                        # Update jump-to-bottom button visibility during streaming
-                        try:
-                            self._update_jump_to_bottom()
-                        except Exception as e:
-                            logger.warning(f"Failed to update jump button: {e}")
+                    update_content(chunk.content)
 
         finally:
             # Finish streaming

@@ -513,6 +513,7 @@ from victor.config.groups import (
 
 # Old config imports (to be migrated to groups)
 from victor.config.tool_settings import ToolSettings  # noqa: E402
+from victor.config.theme_settings import ThemeSettings  # noqa: E402
 from victor.config.search_settings import SearchSettings  # noqa: E402
 from victor.config.resilience_settings import ResilienceSettings  # noqa: E402
 from victor.config.security_settings import SecuritySettings  # noqa: E402
@@ -1107,6 +1108,10 @@ class Settings(BaseSettings):
 
     tool_settings: Optional[ToolSettings] = Field(
         default_factory=ToolSettings, exclude=True, repr=False
+    )
+
+    theme_settings: Optional[ThemeSettings] = Field(
+        default_factory=ThemeSettings, exclude=True, repr=False
     )
 
     # Logging

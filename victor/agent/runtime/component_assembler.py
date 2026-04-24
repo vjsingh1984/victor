@@ -227,7 +227,7 @@ class ComponentAssembler:
 
         # Task analyzer and system prompt coordinator
         from victor.agent.task_analyzer import get_task_analyzer
-        from victor.agent.coordinators.system_prompt_coordinator import (
+        from victor.agent.services.system_prompt_runtime import (
             SystemPromptCoordinator,
         )
 

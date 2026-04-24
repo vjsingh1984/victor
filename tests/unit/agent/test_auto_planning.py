@@ -44,18 +44,29 @@ def _make_coordinator(query_classifier=None, orchestrator=None):
     mock_exec = AsyncMock()
     mock_exec.execute_agentic_loop = AsyncMock(return_value=MagicMock(content="direct response"))
 
-    coordinator = SyncChatCoordinator(
-        chat_context=mock_chat_ctx,
-        tool_context=mock_tool_ctx,
-        provider_context=mock_provider_ctx,
-        turn_executor=mock_exec,
-        orchestrator=orchestrator or MagicMock(),
-        query_classifier=query_classifier,
-    )
+    with pytest.warns(
+        DeprecationWarning,
+        match="SyncChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coordinator = SyncChatCoordinator(
+            chat_context=mock_chat_ctx,
+            tool_context=mock_tool_ctx,
+            provider_context=mock_provider_ctx,
+            turn_executor=mock_exec,
+            orchestrator=orchestrator or MagicMock(),
+            query_classifier=query_classifier,
+        )
     return coordinator, mock_exec
 
 
 class TestAutoPlanning:
+    async def _chat(self, coordinator, user_message: str, use_planning):
+        with pytest.warns(
+            DeprecationWarning,
+            match="SyncChatCoordinator.chat\\(\\) is deprecated compatibility surface",
+        ):
+            return await coordinator.chat(user_message, use_planning=use_planning)
+
     @pytest.mark.asyncio
     async def test_auto_none_complex_query_activates_planning(self):
         mock_classifier = MagicMock(spec=QueryClassifier)
@@ -66,7 +77,7 @@ class TestAutoPlanning:
 
         with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
             mock_plan.return_value = MagicMock(content="planned response")
-            result = await coordinator.chat("Implement JWT auth", use_planning=None)
+            result = await self._chat(coordinator, "Implement JWT auth", use_planning=None)
             mock_plan.assert_called_once()
 
     @pytest.mark.asyncio
@@ -78,7 +89,7 @@ class TestAutoPlanning:
             complexity=TaskComplexity.SIMPLE,
         )
         coordinator, mock_exec = _make_coordinator(query_classifier=mock_classifier)
-        result = await coordinator.chat("What is Python?", use_planning=None)
+        result = await self._chat(coordinator, "What is Python?", use_planning=None)
         mock_exec.execute_agentic_loop.assert_called_once()
 
     @pytest.mark.asyncio
@@ -89,13 +100,13 @@ class TestAutoPlanning:
                 coordinator, "_chat_with_planning", new_callable=AsyncMock
             ) as mock_plan:
                 mock_plan.return_value = MagicMock(content="planned")
-                await coordinator.chat("anything", use_planning=True)
+                await self._chat(coordinator, "anything", use_planning=True)
                 mock_plan.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_explicit_false_never_plans(self):
         coordinator, mock_exec = _make_coordinator()
-        await coordinator.chat("Implement complex auth system", use_planning=False)
+        await self._chat(coordinator, "Implement complex auth system", use_planning=False)
         mock_exec.execute_agentic_loop.assert_called_once()
 
     def test_classifier_injected_via_constructor(self):
@@ -112,7 +123,7 @@ class TestAutoPlanning:
             with patch.object(
                 coordinator, "_chat_with_planning", new_callable=AsyncMock
             ) as mock_plan:
-                await coordinator.chat("analyze architecture", use_planning=None)
+                await self._chat(coordinator, "analyze architecture", use_planning=None)
                 mock_plan.assert_not_called()
 
     @pytest.mark.asyncio
@@ -124,6 +135,6 @@ class TestAutoPlanning:
 
         with patch.object(coordinator, "_chat_with_planning", new_callable=AsyncMock) as mock_plan:
             mock_plan.return_value = MagicMock(content="planned")
-            await coordinator.chat("Implement feature X", use_planning=None)
+            await self._chat(coordinator, "Implement feature X", use_planning=None)
             # Verify the planning method was called
             mock_plan.assert_called_once()

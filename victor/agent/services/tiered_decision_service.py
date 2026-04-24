@@ -140,7 +140,7 @@ class TieredDecisionService:
         except Exception:
             pass
 
-        logger.warning("Could not auto-detect active provider")
+        logger.debug("Could not auto-detect active provider (normal at bootstrap)")
         return None
 
     def decide_sync(

@@ -65,15 +65,15 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Callable, Dict, Generic, Optional, TypeVar, Union, TYPE_CHECKING
 
-# Import canonical types from circuit_breaker.py to avoid duplication
-from victor.providers.circuit_breaker import (
+# Import shared circuit-breaker types from core to avoid cross-layer coupling
+from victor.core.circuit_breaker import (
     CircuitState as _CircuitState,
     CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
     CircuitBreakerError,
 )
 
 if TYPE_CHECKING:
-    from victor.providers.circuit_breaker import CircuitState
+    from victor.core.circuit_breaker import CircuitState
 
 logger = logging.getLogger(__name__)
 
@@ -331,8 +331,8 @@ def retry_with_backoff(
 # Circuit Breaker (State Pattern)
 # =============================================================================
 
-# CircuitState, CircuitBreakerConfig, and CircuitBreakerError imported from
-# victor.providers.circuit_breaker (canonical source)
+# CircuitState, CircuitBreakerConfig, and CircuitBreakerError are shared core
+# types imported from victor.core.circuit_breaker.
 
 
 class ObservableCircuitBreaker:

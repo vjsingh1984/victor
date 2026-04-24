@@ -33,7 +33,7 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -359,6 +359,38 @@ class StreamingContentFilter:
         return result
 
 
+class _NativeFilterWrapper:
+    """Python wrapper around the native Rust StreamingFilter.
+
+    The Rust extension exposes ``process_chunk`` / ``should_abort`` /
+    ``get_state`` but lacks ``is_thinking``, ``abort_reason``, and
+    ``flush`` — all used by ``handler.py``.  This thin wrapper fills those
+    gaps so callers see a uniform interface regardless of which backend is
+    active.
+    """
+
+    def __init__(self, inner: Any) -> None:
+        self._inner = inner
+
+    def process_chunk(self, text: str) -> StreamingChunkResult:
+        return self._inner.process_chunk(text)
+
+    def should_abort(self) -> bool:
+        return self._inner.should_abort()
+
+    @property
+    def abort_reason(self) -> Optional[str]:
+        return self._inner.get_abort_reason()
+
+    @property
+    def is_thinking(self) -> bool:
+        return self._inner.get_state() != "normal"
+
+    def flush(self) -> StreamingChunkResult:
+        # Native filter has no buffering — flush is a no-op.
+        return StreamingChunkResult(content="", is_thinking=self.is_thinking)
+
+
 def create_streaming_filter(
     suppress_thinking: bool = False, max_thinking_content: int = 50000
 ) -> "StreamingContentFilter":
@@ -375,7 +407,7 @@ def create_streaming_filter(
         StreamingContentFilter (native or Python implementation)
     """
     if _NATIVE_AVAILABLE:
-        return _native.StreamingFilter(suppress_thinking, max_thinking_content)
+        return _NativeFilterWrapper(_native.StreamingFilter(suppress_thinking, max_thinking_content))
     return StreamingContentFilter(suppress_thinking)
 
 

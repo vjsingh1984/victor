@@ -42,7 +42,7 @@ class TestSafetyContrib:
 
     def test_safety_context_track_operation(self):
         """Test SafetyContext tracks operations."""
-        from victor.agent.coordinators.safety_coordinator import SafetyCheckResult
+        from victor_sdk.safety import SafetyCheckResult
 
         ctx = SafetyContext(vertical_name="test")
         result = SafetyCheckResult(is_safe=True, action=None)

@@ -58,14 +58,14 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, TypeVar, TYPE_CHECKING
 
-# Import canonical types from circuit_breaker.py to avoid duplication
-from victor.providers.circuit_breaker import (
+# Import shared circuit-breaker types from core to avoid cross-layer coupling
+from victor.core.circuit_breaker import (
     CircuitState as _CircuitState,
     CircuitBreakerConfig as CanonicalCircuitBreakerConfig,
 )
 
 if TYPE_CHECKING:
-    from victor.providers.circuit_breaker import CircuitState
+    from victor.core.circuit_breaker import CircuitState
 
 logger = logging.getLogger(__name__)
 

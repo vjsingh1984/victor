@@ -19,6 +19,8 @@ when external LLM providers are unavailable or experiencing issues.
 
 This module provides a standalone CircuitBreaker with decorator and context
 manager support, plus a CircuitBreakerRegistry for managing multiple breakers.
+Shared state/config/error types are defined in victor.core.circuit_breaker and
+re-exported here for backward compatibility.
 
 States:
 - CLOSED: Normal operation, requests pass through
@@ -41,63 +43,14 @@ import asyncio
 import logging
 import time
 from collections import deque
-from dataclasses import dataclass
-from enum import Enum
 from typing import Any, Callable, Optional, TypeVar, Awaitable
 from functools import wraps
+
+from victor.core.circuit_breaker import CircuitBreakerConfig, CircuitBreakerError, CircuitState
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-
-
-class CircuitState(Enum):
-    """Circuit breaker states."""
-
-    CLOSED = "closed"  # Normal operation
-    OPEN = "open"  # Failing fast
-    HALF_OPEN = "half_open"  # Testing recovery
-
-
-@dataclass
-class CircuitBreakerConfig:
-    """Configuration for circuit breaker.
-
-    This is the canonical configuration class for CircuitBreaker.
-    Use this instead of passing individual parameters for cleaner code.
-
-    Attributes:
-        failure_threshold: Number of failures before opening circuit
-        success_threshold: Successes needed to close from half-open
-        timeout_seconds: Seconds to wait before attempting recovery (open -> half-open)
-        half_open_max_calls: Maximum concurrent calls allowed in half-open state
-    """
-
-    failure_threshold: int = 5
-    success_threshold: int = 2
-    timeout_seconds: float = 30.0
-    half_open_max_calls: int = 3
-
-    @property
-    def recovery_timeout(self) -> float:
-        """Alias for timeout_seconds for backward compatibility."""
-        return self.timeout_seconds
-
-
-class CircuitBreakerError(Exception):
-    """Raised when circuit is open and request is rejected."""
-
-    def __init__(
-        self,
-        message: str,
-        state: CircuitState,
-        retry_after: float,
-        last_error: Optional[Exception] = None,
-    ):
-        super().__init__(message)
-        self.state = state
-        self.retry_after = retry_after
-        self.last_error = last_error
 
 
 class CircuitBreaker:
@@ -114,7 +67,7 @@ class CircuitBreaker:
         )
 
     Usage with config:
-        config = CircuitBreakerConfig(failure_threshold=5, recovery_timeout=30.0)
+        config = CircuitBreakerConfig(failure_threshold=5, timeout_seconds=30.0)
         breaker = CircuitBreaker.from_config("my_service", config)
 
     As decorator:

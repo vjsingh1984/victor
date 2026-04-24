@@ -12,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for PlanningCoordinator integration with ChatCoordinator."""
+"""Unit tests for PlanningCoordinator and chat service/coordinator integration."""
 
 import pytest
 
-from victor.agent.coordinators.planning_coordinator import (
+from victor.agent.services.planning_runtime import (
     PlanningCoordinator,
     PlanningConfig,
     PlanningMode,
@@ -219,16 +219,28 @@ class TestPlanningCoordinator:
 
 
 class TestPlanningCoordinatorIntegration:
-    """Integration tests for PlanningCoordinator with ChatCoordinator."""
+    """Integration tests for PlanningCoordinator with chat entry points."""
 
-    def test_planning_coordinator_protocol(self):
-        """Test that coordinator can be used with ChatCoordinator."""
+    def test_legacy_coordinator_module_reexports_service_runtime(self):
+        """Legacy planning coordinator import path should re-export the service runtime."""
+        from victor.agent.coordinators.planning_coordinator import (
+            PlanningCoordinator as legacy_planning_coordinator,
+        )
+        from victor.agent.services.planning_runtime import (
+            PlanningCoordinator as service_planning_coordinator,
+        )
+
+        assert legacy_planning_coordinator is service_planning_coordinator
+
+    def test_planning_entrypoints_exist(self):
+        """Planning should be canonical on ChatService and shimmed on ChatCoordinator."""
+        from victor.agent.services.chat_service import ChatService
+        from victor.agent.services.protocols import ChatServiceProtocol
         from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
-        # This test verifies the integration structure
-        # Actual execution would require full orchestrator setup
+        assert hasattr(ChatServiceProtocol, "chat_with_planning")
+        assert hasattr(ChatService, "chat_with_planning")
         assert hasattr(ChatCoordinator, "__init__")
-        assert hasattr(ChatCoordinator, "chat")
         assert hasattr(ChatCoordinator, "_should_use_planning")
         assert hasattr(ChatCoordinator, "_chat_with_planning")
 

@@ -32,7 +32,6 @@ import httpx
 
 from victor.providers.base import ToolDefinition
 from victor.tools.enums import CostTier
-from victor.tools.metadata import ToolMetadataRegistry
 from victor.tools.registry import ToolRegistry
 from victor.agent.tool_sequence_tracker import (
     ToolSequenceTracker,
@@ -40,6 +39,7 @@ from victor.agent.tool_sequence_tracker import (
 )
 from victor.agent.debug_logger import TRACE  # Import TRACE level
 from victor.tools.metadata_registry import (
+    ToolMetadataRegistry,
     get_core_readonly_tools,
     get_tools_matching_mandatory_keywords,
     get_tools_by_task_type,

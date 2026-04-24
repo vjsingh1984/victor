@@ -221,13 +221,13 @@ class ExtensionLoaderPressureMonitor:
             "pressure_warnings": 0,
             "pressure_errors": 0,
         }
-        self._metrics_lock = threading.RLock()
+        self._metrics_lock = threading.Lock()
 
         # Queue pressure policy (P3 reliability).
         self.warn_queue_threshold: int = 24
         self.error_queue_threshold: int = 32
-        self.warn_in_flight_threshold: int = 6
-        self.error_in_flight_threshold: int = 8
+        self.warn_in_flight_threshold: int = 14
+        self.error_in_flight_threshold: int = 18
         self.pressure_cooldown_seconds: float = 5.0
         self.emit_pressure_events: bool = False
         self.last_pressure_level: PressureLevel = PressureLevel.OK
@@ -540,7 +540,7 @@ class VerticalExtensionLoader(ABC):
     _cache_manager: ClassVar[ExtensionCacheManager] = ExtensionCacheManager()
 
     # Shared async extension loading infrastructure (P3)
-    _extension_executor_max_workers: ClassVar[int] = 8
+    _extension_executor_max_workers: ClassVar[int] = 14
     _extension_executor_queue_limit: ClassVar[int] = 32
     _extension_load_timeout: ClassVar[float] = 10.0
     _extension_executor: ClassVar[Optional[concurrent.futures.ThreadPoolExecutor]] = None
@@ -1257,7 +1257,6 @@ class VerticalExtensionLoader(ABC):
             cls._increment_loader_metric("queued")
             queued_now = cls._pressure_monitor.get_metric("queued")
             cls._update_loader_peak_metric("max_queued", queued_now)
-            cls._check_pressure(reason=f"{extension_type}.queued")
 
             if semaphore.locked():
                 cls._increment_loader_metric("queue_waits")
@@ -1271,7 +1270,6 @@ class VerticalExtensionLoader(ABC):
                 cls._increment_loader_metric("in_flight")
                 in_flight_now = cls._pressure_monitor.get_metric("in_flight")
                 cls._update_loader_peak_metric("max_in_flight", in_flight_now)
-                cls._check_pressure(reason=f"{extension_type}.in_flight")
 
                 future = loop.run_in_executor(
                     executor,
@@ -1298,7 +1296,6 @@ class VerticalExtensionLoader(ABC):
                     semaphore.release()
                 else:
                     cls._increment_loader_metric("queued", -1)
-                cls._check_pressure(reason=f"{extension_type}.post")
 
         futures = {
             "middleware": asyncio.create_task(

@@ -99,7 +99,7 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.tool_coordinator import create_tool_coordinator
+            from victor.agent.services.tool_compat import create_tool_coordinator
             from victor.agent.protocols import (
                 IBudgetManager,
                 IToolAccessController,
@@ -159,7 +159,7 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.system_prompt_coordinator import SystemPromptCoordinator
+            from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
 
             # SystemPromptCoordinator has minimal dependencies
             coordinator = SystemPromptCoordinator()
@@ -182,7 +182,7 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.metrics_coordinator import MetricsCoordinator
+            from victor.agent.services.metrics_service import MetricsCoordinator
 
             # Resolve orchestrator for metrics access
             orchestrator = self._resolve_orchestrator()

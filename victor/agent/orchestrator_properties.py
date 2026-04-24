@@ -32,7 +32,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
-    from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
+    from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
     from victor.agent.chunk_generator import ChunkGenerator
     from victor.agent.tool_planner import ToolPlanner
     from victor.agent.task_coordinator import TaskCoordinator
@@ -194,7 +194,7 @@ def _vertical_context(self: "AgentOrchestrator") -> "VerticalContext":
 def _protocol_adapter(self: "AgentOrchestrator") -> Any:
     """Get the protocol adapter for DIP compliance (lazy init)."""
     if self._protocol_adapter is None:
-        from victor.agent.coordinators.protocol_adapters import (
+        from victor.agent.services.orchestrator_protocol_adapter import (
             OrchestratorProtocolAdapter,
         )
 
@@ -205,7 +205,7 @@ def _protocol_adapter(self: "AgentOrchestrator") -> Any:
 def _turn_executor(self: "AgentOrchestrator") -> Any:
     """Get the execution coordinator for agentic loop (lazy init)."""
     if self._turn_executor is None:
-        from victor.agent.coordinators.turn_executor import TurnExecutor
+        from victor.agent.services.turn_execution_runtime import TurnExecutor
 
         self._turn_executor = TurnExecutor(
             chat_context=self.protocol_adapter,
@@ -216,10 +216,10 @@ def _turn_executor(self: "AgentOrchestrator") -> Any:
     return self._turn_executor
 
 
-def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Get the sync chat coordinator for non-streaming execution (lazy init)."""
+def _ensure_sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
+    """Materialize the deprecated sync chat coordinator shim if needed."""
     if getattr(self, "_deprecated_sync_chat_coordinator", None) is None:
-        from victor.agent.coordinators.sync_chat_coordinator import SyncChatCoordinator
+        from victor.agent.services.sync_chat_compat import SyncChatCoordinator
 
         from victor.agent.query_classifier import QueryClassifier
 
@@ -235,10 +235,21 @@ def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
     return self._deprecated_sync_chat_coordinator
 
 
-def _streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Get the streaming chat coordinator for streaming execution (lazy init)."""
+def _sync_chat_coordinator(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated sync chat coordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator.sync_chat_coordinator is deprecated compatibility surface. "
+        "Use ChatService instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _ensure_sync_chat_coordinator(self)
+
+
+def _ensure_streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
+    """Materialize the deprecated streaming chat coordinator shim if needed."""
     if getattr(self, "_deprecated_streaming_chat_coordinator", None) is None:
-        from victor.agent.coordinators.streaming_chat_coordinator import (
+        from victor.agent.services.streaming_chat_compat import (
             StreamingChatCoordinator,
         )
 
@@ -252,21 +263,43 @@ def _streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
     return self._deprecated_streaming_chat_coordinator
 
 
-def _unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
-    """Get the unified chat coordinator facade (lazy init)."""
+def _streaming_chat_coordinator(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated streaming chat coordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator.streaming_chat_coordinator is deprecated compatibility surface. "
+        "Use ChatService instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _ensure_streaming_chat_coordinator(self)
+
+
+def _ensure_unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
+    """Materialize the deprecated unified chat coordinator shim if needed."""
     if getattr(self, "_deprecated_unified_chat_coordinator", None) is None:
-        from victor.agent.coordinators.unified_chat_coordinator import (
+        from victor.agent.services.unified_chat_compat import (
             UnifiedChatCoordinator,
         )
-        from victor.agent.coordinators.protocols import ExecutionMode
+        from victor.agent.services.protocols.chat_runtime import ExecutionMode
 
         self._deprecated_unified_chat_coordinator = UnifiedChatCoordinator(
-            sync_coordinator=self.sync_chat_coordinator,
-            streaming_coordinator=self.streaming_chat_coordinator,
+            sync_coordinator=_ensure_sync_chat_coordinator(self),
+            streaming_coordinator=_ensure_streaming_chat_coordinator(self),
             default_mode=ExecutionMode.SYNC,
             chat_service=getattr(self, "_chat_service", None),
         )
     return self._deprecated_unified_chat_coordinator
+
+
+def _unified_chat_coordinator(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated unified chat coordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator.unified_chat_coordinator is deprecated compatibility surface. "
+        "Use ChatService instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _ensure_unified_chat_coordinator(self)
 
 
 def _intelligent_integration(
@@ -497,6 +530,48 @@ def _tool_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
     self._deprecated_tool_coordinator = value
 
 
+def _chat_coordinator_get(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated ChatCoordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator._chat_coordinator is deprecated compatibility surface. "
+        "Use AgentOrchestrator._get_deprecated_chat_coordinator() or ChatService instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return getattr(self, "_deprecated_chat_coordinator", None)
+
+
+def _chat_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
+    warnings.warn(
+        "AgentOrchestrator._chat_coordinator is deprecated compatibility surface. "
+        "Store the shim on _deprecated_chat_coordinator instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    self._deprecated_chat_coordinator = value
+
+
+def _session_coordinator_get(self: "AgentOrchestrator") -> Any:
+    """Get the deprecated SessionCoordinator compatibility shim."""
+    warnings.warn(
+        "AgentOrchestrator._session_coordinator is deprecated compatibility surface. "
+        "Use AgentOrchestrator._get_deprecated_session_coordinator() or SessionService instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return getattr(self, "_deprecated_session_coordinator", None)
+
+
+def _session_coordinator_set(self: "AgentOrchestrator", value: Any) -> None:
+    warnings.warn(
+        "AgentOrchestrator._session_coordinator is deprecated compatibility surface. "
+        "Store the shim on _deprecated_session_coordinator instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    self._deprecated_session_coordinator = value
+
+
 # =====================================================================
 # Property installation registry
 # =====================================================================
@@ -591,6 +666,8 @@ _PROPERTY_REGISTRY: dict[str, Any] = {
         _cumulative_token_usage_get,
         _cumulative_token_usage_set,
     ),
+    "_chat_coordinator": (_chat_coordinator_get, _chat_coordinator_set),
+    "_session_coordinator": (_session_coordinator_get, _session_coordinator_set),
     "_tool_coordinator": (_tool_coordinator_get, _tool_coordinator_set),
     # Group 6: ToolService convenience methods (delegates to canonical service)
     "is_tool_enabled": (_is_tool_enabled_get, None),

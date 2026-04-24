@@ -218,6 +218,45 @@ class TestToolMetadataRegistryKeywords:
 
         assert tools == set()
 
+
+class TestToolMetadataRegistryCompatibility:
+    """Tests for singleton and compatibility helpers."""
+
+    def teardown_method(self):
+        ToolMetadataRegistry.reset_instance()
+
+    def test_get_instance_returns_global_registry(self):
+        """get_instance should delegate to the module-global singleton."""
+        instance = ToolMetadataRegistry.get_instance()
+
+        assert instance is get_global_registry()
+
+    def test_refresh_from_tools_populates_singleton_registry(self):
+        """refresh_from_tools should rebuild the singleton registry state."""
+        registry = ToolMetadataRegistry.get_instance()
+        tool = MockTool(name="scan", category="security", keywords=["security", "audit"])
+
+        refreshed = registry.refresh_from_tools([tool], force=True)
+
+        assert refreshed is True
+        assert registry.get_metadata("scan") is not None
+        stats = registry.get_statistics()
+        assert stats["total_tools"] == 1
+        assert stats["total_categories"] == 1
+        assert stats["total_keywords"] == 2
+
+    def test_refresh_from_tools_skips_unchanged_toolset(self):
+        """refresh_from_tools should avoid rebuilding unchanged metadata."""
+        registry = ToolMetadataRegistry.get_instance()
+        tools = [MockTool(name="scan", category="security", keywords=["security"])]
+
+        first = registry.refresh_from_tools(tools, force=True)
+        second = registry.refresh_from_tools(tools, force=False)
+
+        assert first is True
+        assert second is False
+        assert registry.needs_reindex(tools) is False
+
     def test_get_all_keywords(self):
         """Test getting all registered keywords."""
         registry = ToolMetadataRegistry()

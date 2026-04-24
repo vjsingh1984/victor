@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.exploration_coordinator import ExplorationResult
+from victor.agent.services.exploration_runtime import ExplorationResult
 from victor.agent.coordinators.exploration_state_passed import (
     ExplorationStatePassedCoordinator,
 )

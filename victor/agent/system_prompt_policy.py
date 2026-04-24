@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence
 from victor.framework.prompt_builder import PromptBuilder
 
 if TYPE_CHECKING:
-    from victor.agent.prompt_coordinator import TaskContext
+    from victor.agent.services.prompt_compat import TaskContext
 
 # Default prompt fragments used when contributors fail to populate sections.
 DEFAULT_VICTOR_IDENTITY = (

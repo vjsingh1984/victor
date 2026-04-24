@@ -37,8 +37,11 @@ from typing import (
 from contextlib import asynccontextmanager
 import uuid
 
-from victor.framework.config import AgentConfig
-from victor.agent.config import UnifiedAgentConfig
+from victor.agent.config import (
+    FrameworkCompatibleAgentConfig,
+    UnifiedAgentConfig,
+    normalize_agent_config,
+)
 from victor.core.errors import AgentError, ConfigurationError
 from victor.framework.events import AgentExecutionEvent, EventType
 from victor.framework.state import State
@@ -151,13 +154,17 @@ class AgentBuildOptions:
     airgapped: bool = False
     profile: Optional[str] = None
     workspace: Optional[str] = None
-    config: Optional[Union[AgentConfig, UnifiedAgentConfig]] = None
+    config: Optional[FrameworkCompatibleAgentConfig] = None
     vertical: Optional[Type["VerticalBase"]] = None
     enable_observability: bool = True
     session_id: Optional[str] = None
     custom_system_prompt: Optional[str] = None
     state_hooks: Optional[Dict[str, Callable]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Normalize deprecated framework config inputs to the canonical form."""
+        self.config = normalize_agent_config(self.config)
 
 
 # =============================================================================
@@ -275,19 +282,20 @@ class AgentBuilder:
 
         if preset == BuilderPreset.DEFAULT:
             self._options.tools = ToolSet.default()
-            self._options.config = AgentConfig.default()
+            self._options.config = UnifiedAgentConfig.foreground()
 
         elif preset == BuilderPreset.MINIMAL:
             self._options.tools = ToolSet.minimal()
-            self._options.config = AgentConfig.minimal()
+            self._options.config = UnifiedAgentConfig.minimal()
             self._options.enable_observability = False
 
         elif preset == BuilderPreset.HIGH_BUDGET:
-            self._options.config = AgentConfig.high_budget()
+            self._options.config = UnifiedAgentConfig.high_budget()
 
         elif preset == BuilderPreset.AIRGAPPED:
             self._options.airgapped = True
             self._options.tools = ToolSet.airgapped()
+            self._options.config = UnifiedAgentConfig.airgapped()
 
         else:
             raise ValueError(f"Unknown preset: {preset}")
@@ -543,7 +551,7 @@ class AgentBuilder:
         self._options.workspace = path
         return self
 
-    def config(self, config: Union[AgentConfig, UnifiedAgentConfig]) -> "AgentBuilder":
+    def config(self, config: FrameworkCompatibleAgentConfig) -> "AgentBuilder":
         """Set advanced configuration.
 
         Args:
@@ -552,7 +560,7 @@ class AgentBuilder:
         Returns:
             Self for chaining
         """
-        self._options.config = config
+        self._options.config = normalize_agent_config(config)
         return self
 
     def vertical(self, vertical_class: Type["VerticalBase"]) -> "AgentBuilder":

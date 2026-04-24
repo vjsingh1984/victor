@@ -17,13 +17,18 @@
 Tests for chat and streaming chat operations extracted from orchestrator.
 """
 
-import importlib
 import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 from typing import Any
 
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.core.errors import ProviderRateLimitError
+
+def _make_deprecated_chat_coordinator(mock_orchestrator):
+    """Construct the deprecated ChatCoordinator shim with an explicit warning assertion."""
+    with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):
+        return ChatCoordinator(mock_orchestrator)
+
 
 # =============================================================================
 # Fixtures
@@ -138,7 +143,7 @@ def mock_orchestrator():
 @pytest.fixture
 def chat_coordinator(mock_orchestrator):
     """Create ChatCoordinator with mock orchestrator."""
-    return ChatCoordinator(mock_orchestrator)
+    return _make_deprecated_chat_coordinator(mock_orchestrator)
 
 
 # =============================================================================
@@ -233,10 +238,34 @@ class TestChatServiceShim:
 
         chat_coordinator.bind_chat_service(chat_service)
 
-        result = await chat_coordinator.chat("hello", use_planning=True)
+        with pytest.warns(
+            DeprecationWarning,
+            match="ChatCoordinator.chat\\(\\) is deprecated compatibility surface",
+        ):
+            result = await chat_coordinator.chat("hello", use_planning=True)
 
         assert result is response
         chat_service.chat.assert_awaited_once_with("hello", use_planning=True)
+
+    def test_turn_executor_warns_when_materializing_legacy_fallback(self, mock_orchestrator):
+        fake_executor = MagicMock(name="legacy_executor")
+
+        with patch(
+            "victor.agent.services.orchestrator_protocol_adapter.OrchestratorProtocolAdapter",
+            return_value=MagicMock(name="adapter"),
+        ), patch(
+            "victor.agent.services.turn_execution_runtime.TurnExecutor",
+            return_value=fake_executor,
+        ):
+            coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
+
+            with pytest.warns(DeprecationWarning) as caught:
+                result = coordinator.turn_executor
+
+        assert result is fake_executor
+        messages = [str(item.message) for item in caught]
+        assert any("ChatCoordinator.turn_executor is deprecated" in message for message in messages)
+        assert any("materializing a legacy local TurnExecutor" in message for message in messages)
 
 
 class TestGetRateLimitWaitTime:
@@ -309,61 +338,40 @@ class TestHandleEmptyResponseRecovery:
     # The real logic is tested in test_orchestrator_core.py.
 
 
-class StubStreamingPipeline:
-    """Test double for StreamingChatPipeline."""
+class TestStreamingShimBehavior:
+    """Tests for ChatCoordinator.stream_chat shim delegation."""
 
-    def __init__(self):
-        self.calls = []
-
-    async def run(self, user_message: str):
+    @pytest.mark.asyncio
+    async def test_stream_chat_delegates_to_runtime_helper(self, mock_orchestrator):
+        """Shim delegates to orchestrator._stream_chat_runtime when wired."""
         from victor.providers.base import StreamChunk
 
-        self.calls.append(user_message)
-        yield StreamChunk(content=f"resp:{user_message}")
+        chunk = StreamChunk(content="streamed", role="assistant")
 
+        async def _runtime(user_message: str, **kwargs):
+            assert user_message == "hello"
+            yield chunk
 
-class TestStreamingPipelineIntegration:
-    """Tests for ChatCoordinator.stream_chat pipeline delegation."""
+        mock_orchestrator._stream_chat_runtime = _runtime
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
-    @pytest.mark.asyncio
-    async def test_stream_chat_uses_pipeline(self, chat_coordinator, monkeypatch):
-        """ChatCoordinator should delegate streaming to StreamingChatPipeline."""
-        pipeline = StubStreamingPipeline()
-        created = []
-        streaming_module = importlib.import_module("victor.agent.streaming")
-
-        def fake_factory(coordinator, **kwargs):
-            created.append(coordinator)
-            return pipeline
-
-        monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
-
-        chunks = []
-        async for chunk in chat_coordinator.stream_chat("hello world"):
-            chunks.append(chunk.content)
-
-        assert chunks == ["resp:hello world"]
-        assert pipeline.calls == ["hello world"]
-        assert created == [chat_coordinator]
+        with pytest.warns(
+            DeprecationWarning,
+            match="ChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+        ):
+            results = [c async for c in coordinator.stream_chat("hello")]
+        assert results == [chunk]
 
     @pytest.mark.asyncio
-    async def test_pipeline_is_cached(self, chat_coordinator, monkeypatch):
-        """Pipeline is instantiated once and reused across turns."""
-        pipeline = StubStreamingPipeline()
-        factory_calls = 0
-        streaming_module = importlib.import_module("victor.agent.streaming")
+    async def test_stream_chat_warns_when_no_runtime_helper(self, mock_orchestrator):
+        """Shim emits DeprecationWarning and yields nothing when runtime not wired."""
+        import warnings as _warnings
 
-        def fake_factory(_, **kwargs):
-            nonlocal factory_calls
-            factory_calls += 1
-            return pipeline
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
+            results = [c async for c in coordinator.stream_chat("hello")]
 
-        monkeypatch.setattr(streaming_module, "create_streaming_chat_pipeline", fake_factory)
-
-        async for _ in chat_coordinator.stream_chat("first"):
-            pass
-        async for _ in chat_coordinator.stream_chat("second"):
-            pass
-
-        assert factory_calls == 1
-        assert pipeline.calls == ["first", "second"]
+        assert results == []
+        deprecation_messages = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
+        assert any("_stream_chat_runtime" in m for m in deprecation_messages)

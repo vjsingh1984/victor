@@ -59,7 +59,8 @@ Prevents cascade failures by "tripping" after too many errors.
 ### Configuration
 
 ```python
-from victor.providers.circuit_breaker import CircuitBreaker, CircuitState
+from victor.core.circuit_breaker import CircuitState
+from victor.providers.circuit_breaker import CircuitBreaker
 
 breaker = CircuitBreaker(
     name="anthropic_api",

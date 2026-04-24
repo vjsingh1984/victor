@@ -33,8 +33,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-# Import canonical CircuitState from circuit_breaker.py
-from victor.providers.circuit_breaker import CircuitState
+from victor.core.circuit_breaker import CircuitState
 
 from victor.agent.recovery.protocols import (
     FailureType,

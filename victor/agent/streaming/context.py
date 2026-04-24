@@ -179,8 +179,57 @@ class StreamingChatContext:
         self.total_accumulated_chars += len(content)
 
     def update_context_message(self, content: str) -> None:
-        """Update the context message for next iteration."""
-        self.context_msg = content or self.user_message
+        """Update the context message for next iteration.
+
+        Deduplicates content to prevent the LLM feedback loop: if the new
+        content is largely a repeat of the current context_msg, we keep the
+        existing context_msg unchanged. This prevents the model from seeing
+        its own repeated output and continuing/regenerating it.
+
+        The strategy:
+        - If content is empty, fall back to user_message
+        - If >60% of words in new content already appear in context_msg,
+          strip the overlapping portion and only append genuinely new text
+        - Otherwise, replace context_msg with the new content
+        """
+        if not content:
+            self.context_msg = self.user_message
+            return
+
+        # If context_msg is still the original user_message, always update
+        if self.context_msg == self.user_message:
+            self.context_msg = content
+            return
+
+        # Compute word-level overlap between new content and current context_msg
+        new_words = content.split()
+        existing_words = set(self.context_msg.split())
+
+        if not existing_words or not new_words:
+            self.context_msg = content
+            return
+
+        overlap_count = sum(1 for w in new_words if w in existing_words)
+        overlap_ratio = overlap_count / len(new_words) if new_words else 0
+
+        if overlap_ratio > 0.6:
+            # High overlap — extract only the genuinely new portion
+            # Find the suffix of content that doesn't overlap with context_msg
+            for split_point in range(min(len(new_words), 20), 0, -1):
+                candidate = " ".join(new_words[:split_point])
+                if candidate in self.context_msg:
+                    # Everything after this split point is new
+                    remaining = " ".join(new_words[split_point:])
+                    if remaining.strip():
+                        self.context_msg = self.context_msg + " " + remaining
+                    # else: entirely duplicate — don't update at all
+                    return
+
+            # Couldn't find a clean split — don't update (break the feedback loop)
+            return
+        else:
+            # Low overlap — genuinely new content, safe to replace
+            self.context_msg = content
 
     def record_empty_response(self) -> bool:
         """Record an empty response and return True if threshold exceeded."""

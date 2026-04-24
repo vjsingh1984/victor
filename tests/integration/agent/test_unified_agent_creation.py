@@ -22,7 +22,7 @@ Tests cover:
 
 import pytest
 
-from victor.agent.config import UnifiedAgentConfig, AgentMode
+from victor.agent.config import AgentMode, UnifiedAgentConfig, normalize_agent_config
 from victor.framework.config import AgentConfig
 
 # =============================================================================
@@ -201,6 +201,16 @@ class TestUnifiedAgentConfig:
 
 class TestMigrationAndCompatibility:
     """Test migration helpers and backward compatibility."""
+
+    def test_normalize_agent_config_converts_legacy_config(self):
+        """Framework boundaries should normalize deprecated AgentConfig inputs."""
+        legacy_config = AgentConfig(tool_budget=150, max_iterations=75)
+
+        normalized = normalize_agent_config(legacy_config)
+
+        assert isinstance(normalized, UnifiedAgentConfig)
+        assert normalized.tool_budget == legacy_config.tool_budget
+        assert normalized.max_iterations == legacy_config.max_iterations
 
     def test_agent_config_to_unified_roundtrip(self):
         """Test roundtrip conversion AgentConfig → UnifiedAgentConfig → AgentConfig."""

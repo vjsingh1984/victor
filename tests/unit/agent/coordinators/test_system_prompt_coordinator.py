@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from victor.agent.coordinators.system_prompt_coordinator import (
+from victor.agent.services.system_prompt_runtime import (
     SystemPromptCoordinator,
 )
 
@@ -67,6 +67,14 @@ def coordinator(mock_prompt_builder, mock_task_analyzer, mock_tools):
 
 class TestSystemPromptCoordinator:
     """Test suite for SystemPromptCoordinator."""
+
+    def test_legacy_module_reexports_service_runtime(self):
+        """Legacy coordinator path should re-export service-owned runtime."""
+        from victor.agent.coordinators.system_prompt_coordinator import (
+            SystemPromptCoordinator as legacy_coordinator,
+        )
+
+        assert legacy_coordinator is SystemPromptCoordinator
 
     def test_build_system_prompt_large_context(self, mock_prompt_builder, mock_task_analyzer):
         """Prompt includes parallel read budget for >= 32K context."""

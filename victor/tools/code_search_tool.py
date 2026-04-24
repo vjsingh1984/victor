@@ -172,7 +172,8 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
         # Don't rebuild for common init-time / transient errors
         transient_keywords = [
             "locked", "timeout", "timed out", "not ready", "unavailable",
-            "initializing", "building", "in progress"
+            "initializing", "building", "in progress",
+            "not have attribute", "has no attribute",  # missing attr = code bug, not corruption
         ]
 
         if any(kw in error_msg.lower() for kw in transient_keywords):
@@ -1320,8 +1321,8 @@ async def code_search(
         if mode == "semantic":
             mode = "filename"
 
-    # Route to literal search if mode is "literal"
-    if mode == "literal":
+    # Route to literal search if mode is "literal" or "text" (alias)
+    if mode in ("literal", "text"):
         exts = filters.extensions if filters else None
         result = await _literal_search(query, path, k, exts)
         if result.get("count", 0) > 0:
@@ -1337,6 +1338,7 @@ async def code_search(
             mode = "semantic"  # Fall through to semantic path below
         else:
             return result
+    exts: Optional[List[str]] = filters.extensions if filters else None
     search_root = path
     # Resolve empty path to project root (benchmark/agent sets this)
     if not search_root or search_root == ".":

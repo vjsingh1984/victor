@@ -1143,16 +1143,9 @@ The circuit breaker pattern prevents cascading failures when providers are unava
 ```python
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
-    CircuitBreakerError,
     CircuitBreakerRegistry,
-    CircuitState,
 )
-
-# Circuit states
-class CircuitState(Enum):
-    CLOSED = "closed"      # Normal operation
-    OPEN = "open"          # Failing fast, rejecting requests
-    HALF_OPEN = "half_open"  # Testing recovery
+from victor.core.circuit_breaker import CircuitBreakerError, CircuitState
 
 # Get circuit breaker stats
 stats = provider.get_circuit_breaker_stats()

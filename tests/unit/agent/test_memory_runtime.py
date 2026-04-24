@@ -14,12 +14,17 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.coordinators.session_coordinator import SessionCoordinator
+from victor.agent.coordinators.session_coordinator import SessionCoordinator as LegacySessionCoordinator
 from victor.agent.runtime.memory_runtime import (
     create_memory_runtime_components,
     initialize_conversation_embedding_store,
 )
+from victor.agent.services.session_compat import SessionCoordinator
 from victor.core.async_utils import run_sync as real_run_sync
+
+
+def test_legacy_session_coordinator_module_reexports_service_runtime():
+    assert LegacySessionCoordinator is SessionCoordinator
 
 
 def test_create_memory_runtime_components_delegates_to_factory():
@@ -77,7 +82,7 @@ def test_session_coordinator_init_embedding_store_bridges_sync_initialization():
             return_value=semantic_cache,
         ),
         patch(
-            "victor.agent.coordinators.session_coordinator.run_sync",
+            "victor.agent.services.session_compat.run_sync",
             wraps=real_run_sync,
         ) as run_sync_mock,
     ):
@@ -125,10 +130,10 @@ def test_session_coordinator_init_embedding_store_schedules_on_running_loop():
             return_value=semantic_cache,
         ),
         patch(
-            "victor.agent.coordinators.session_coordinator.asyncio.get_running_loop",
+            "victor.agent.services.session_compat.asyncio.get_running_loop",
             return_value=loop,
         ),
-        patch("victor.agent.coordinators.session_coordinator.run_sync") as run_sync_mock,
+        patch("victor.agent.services.session_compat.run_sync") as run_sync_mock,
     ):
         result_store, result_cache = SessionCoordinator.init_conversation_embedding_store(
             memory_manager=memory_manager

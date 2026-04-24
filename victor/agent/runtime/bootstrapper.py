@@ -140,30 +140,21 @@ class AgentRuntimeBootstrapper:
         orchestrator._orchestration_facade = OrchestrationFacade(
             interaction_runtime=orchestrator._interaction_runtime,
             chat_service=getattr(orchestrator, "_chat_service", None),
+            get_chat_stream_runtime=orchestrator._get_service_streaming_runtime,
             tool_service=getattr(orchestrator, "_tool_service", None),
             session_service=getattr(orchestrator, "_session_service", None),
             context_service=getattr(orchestrator, "_context_service", None),
             provider_service=getattr(orchestrator, "_provider_service", None),
             recovery_service=getattr(orchestrator, "_recovery_service", None),
-            deprecated_chat_coordinator=orchestrator._get_deprecated_chat_coordinator(),
+            get_chat_coordinator=orchestrator._get_deprecated_chat_coordinator,
             get_tool_coordinator=orchestrator._get_deprecated_tool_coordinator,
-            deprecated_session_coordinator=orchestrator._session_coordinator,
+            get_session_coordinator=orchestrator._get_deprecated_session_coordinator,
             turn_executor=orchestrator._turn_executor,
-            deprecated_sync_chat_coordinator=getattr(
-                orchestrator,
-                "_deprecated_sync_chat_coordinator",
-                None,
+            get_sync_chat_coordinator=orchestrator._get_deprecated_sync_chat_coordinator,
+            get_streaming_chat_coordinator=(
+                orchestrator._get_deprecated_streaming_chat_coordinator
             ),
-            deprecated_streaming_chat_coordinator=getattr(
-                orchestrator,
-                "_deprecated_streaming_chat_coordinator",
-                None,
-            ),
-            deprecated_unified_chat_coordinator=getattr(
-                orchestrator,
-                "_deprecated_unified_chat_coordinator",
-                None,
-            ),
+            get_unified_chat_coordinator=orchestrator._get_deprecated_unified_chat_coordinator,
             protocol_adapter=orchestrator._protocol_adapter,
             streaming_handler=orchestrator._streaming_handler,
             streaming_controller=orchestrator._streaming_controller,
@@ -206,9 +197,9 @@ class AgentRuntimeBootstrapper:
 
     @staticmethod
     def assert_protocol_conformance(orchestrator: AgentOrchestrator) -> None:
-        """Debug-mode assertion for ChatOrchestratorProtocol conformance."""
+        """Debug-mode assertion for the legacy ChatOrchestratorProtocol shim."""
         if __debug__:
-            from victor.agent.coordinators.chat_protocols import (
+            from victor.agent.services.protocols.chat_runtime import (
                 ChatOrchestratorProtocol,
             )
             from victor.framework.protocols import (

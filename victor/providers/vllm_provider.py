@@ -368,6 +368,17 @@ class VLLMProvider(BaseProvider):
         """vLLM supports Automatic Prefix Caching (APC) for KV cache reuse."""
         return True
 
+    def get_tool_output_format(self) -> Any:
+        """vLLM models expect XML format (trained on Victor outputs).
+
+        vLLM models parse <TOOL_OUTPUT> tags in responses and have been
+        trained on Victor's historical XML format. Keeping this ensures
+        optimal tool result cognition.
+        """
+        from victor.agent.format_strategies import XML_FORMAT
+
+        return XML_FORMAT
+
     async def list_models(self) -> List[Dict[str, Any]]:
         """List models loaded in vLLM server.
 

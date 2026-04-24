@@ -46,6 +46,14 @@ Example:
 """
 
 from victor.agent.services.protocols.chat_service import ChatServiceProtocol
+from victor.agent.services.protocols.chat_runtime import (
+    ChatContextProtocol,
+    ChatOrchestratorProtocol,
+    ExecutionMode,
+    PlanningContextProtocol,
+    ProviderContextProtocol,
+    ToolContextProtocol,
+)
 from victor.agent.services.protocols.context_service import ContextServiceProtocol
 from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
 from victor.agent.services.protocols.provider_service import ProviderServiceProtocol
@@ -56,11 +64,17 @@ from victor.agent.services.protocols.tool_service import ToolServiceProtocol
 
 __all__ = [
     "ChatServiceProtocol",
+    "ChatContextProtocol",
+    "ChatOrchestratorProtocol",
     "ContextServiceProtocol",
+    "ExecutionMode",
     "LLMDecisionServiceProtocol",
+    "PlanningContextProtocol",
     "ProviderServiceProtocol",
+    "ProviderContextProtocol",
     "RecoveryServiceProtocol",
     "SessionLedgerProtocol",
     "SessionServiceProtocol",
+    "ToolContextProtocol",
     "ToolServiceProtocol",
 ]

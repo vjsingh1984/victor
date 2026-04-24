@@ -82,6 +82,19 @@ def test_console_adapter_invokes_callback_after_log_update() -> None:
     assert observed_counts == [1]
 
 
+def test_console_adapter_preserves_leading_indentation() -> None:
+    """Indented console output should stay indented in the TUI log."""
+    log = MagicMock()
+    adapter = TUIConsoleAdapter(log)
+
+    adapter.print("  child\n    grandchild")
+
+    assert log.add_system_message.call_args_list == [
+        call("  child"),
+        call("    grandchild"),
+    ]
+
+
 def test_action_clear_clears_session_messages_and_agent_state() -> None:
     """Clear action should reset transcript state and session history consistently."""
     app = VictorTUI()
@@ -417,6 +430,82 @@ def test_stream_response_handles_metadata_tool_results_with_follow_ups() -> None
     )
 
 
+def test_stream_response_normalizes_cumulative_content_snapshots() -> None:
+    """TUI streaming should not duplicate cumulative provider content."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="Hello", metadata=None)
+        yield StreamChunk(content="Hello world", metadata=None)
+        yield StreamChunk(content="Hello world", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._conversation_log.update_streaming.assert_any_call("Hello")
+    app._conversation_log.update_streaming.assert_any_call("Hello world")
+    app._record_message.assert_called_once_with("assistant", "Hello world")
+
+
+def test_stream_response_normalizes_cumulative_reasoning_snapshots() -> None:
+    """TUI thinking panel should receive full reasoning without duplicate prefixes."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"reasoning_content": "Plan"})
+        yield StreamChunk(content="", metadata={"reasoning_content": "Plan carefully"})
+        yield StreamChunk(content="Done", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._update_thinking.assert_has_calls([call("Plan"), call("Plan carefully")])
+    app._record_message.assert_called_once_with("assistant", "Done")
+
+
+def test_stream_response_handles_reasoning_and_content_same_chunk() -> None:
+    """TUI streaming should render reasoning metadata and content from one chunk."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="Answer", metadata={"reasoning_content": "Thinking"})
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._update_thinking.assert_called_once_with("Thinking")
+    app._conversation_log.update_streaming.assert_called_once_with("Answer")
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
 def test_input_submit_ignored_while_processing_keeps_draft() -> None:
     """Submitting while busy should not clear input or enqueue a second send."""
     app = VictorTUI()
@@ -447,6 +536,45 @@ def test_process_message_async_toggles_input_busy_state() -> None:
     app._input_widget.set_busy.assert_any_call(True)
     app._input_widget.set_busy.assert_any_call(False)
     app._input_widget.focus_input.assert_called_once()
+
+
+def test_on_mount_renders_startup_messages() -> None:
+    """TUI mount should replay queued startup notices as system messages."""
+    app = VictorTUI(
+        provider="test-provider",
+        model="test-model",
+        startup_messages=["Profile fallback active", "Resumed session: Demo"],
+    )
+    conversation_log = MagicMock()
+    input_widget = MagicMock()
+    thinking_widget = MagicMock()
+    status_bar = MagicMock()
+    jump_button = MagicMock()
+    app._set_status = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    def _query_one(selector, *_args):
+        if selector == "#conversation-log":
+            return conversation_log
+        if selector == "#input-widget":
+            return input_widget
+        if selector == "#thinking-widget":
+            return thinking_widget
+        if selector == "#jump-to-bottom":
+            return jump_button
+        return status_bar
+
+    app.query_one = MagicMock(side_effect=_query_one)
+
+    app.on_mount()
+
+    assert conversation_log.add_system_message.call_args_list[:4] == [
+        call("Connected to test-provider/test-model"),
+        call("Type /help for commands, Ctrl+C to exit"),
+        call("Profile fallback active"),
+        call("Resumed session: Demo"),
+    ]
+    input_widget.focus_input.assert_called_once()
 
 
 def test_update_jump_button_label_with_unread_count() -> None:

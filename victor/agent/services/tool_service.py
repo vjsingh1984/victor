@@ -686,7 +686,7 @@ class ToolService:
         if retry_executor is not None:
             self._retry_executor = retry_executor
         elif self._tool_pipeline is not None and self._retry_executor is None:
-            from victor.agent.coordinators.tool_retry import ToolRetryExecutor
+            from victor.agent.services.tool_retry import ToolRetryExecutor
 
             self._retry_executor = ToolRetryExecutor(
                 self._config,
@@ -817,7 +817,7 @@ class ToolService:
         observability callback for backward compatibility.
         """
         if metrics_collector is not None:
-            from victor.agent.coordinators.tool_observability import ToolObservabilityHandler
+            from victor.agent.services.tool_observability import ToolObservabilityHandler
 
             ToolObservabilityHandler(self).on_tool_complete(
                 result=result,
@@ -1123,7 +1123,7 @@ class ToolService:
         is_tool_enabled_fn: Optional[Callable[[str], bool]] = None,
     ) -> Any:
         """Validate a tool call's structure, name, and enabled status."""
-        from victor.agent.coordinators.tool_coordinator import ToolCallValidation
+        from victor.agent.services.tool_contracts import ToolCallValidation
 
         _is_enabled = is_tool_enabled_fn or self.is_tool_enabled
         if not isinstance(tool_call, dict):
@@ -1207,7 +1207,7 @@ class ToolService:
         failed_signatures: Optional[Set[Tuple[str, str]]] = None,
     ) -> Any:
         """Normalize tool arguments through parsing, repair, adapter defaults, and dedup."""
-        from victor.agent.coordinators.tool_coordinator import NormalizedArgs
+        from victor.agent.services.tool_contracts import NormalizedArgs
         from victor.agent.orchestrator_utils import infer_git_operation
 
         _failed = failed_signatures if failed_signatures is not None else set()

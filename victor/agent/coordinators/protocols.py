@@ -42,6 +42,8 @@ from typing import (
 from abc import ABC, abstractmethod
 from enum import Enum
 
+from victor.agent.services.protocols.chat_runtime import ExecutionMode
+
 T = TypeVar("T")
 
 
@@ -566,14 +568,6 @@ __all__ = [
 # =============================================================================
 # Phase 3: Enhanced Protocol-Based Injection
 # =============================================================================
-
-
-class ExecutionMode(Enum):
-    """Execution mode for chat operations."""
-
-    SYNC = "sync"
-    STREAMING = "streaming"
-    AUTO = "auto"
 
 
 @runtime_checkable

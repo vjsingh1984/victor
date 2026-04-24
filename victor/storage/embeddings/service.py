@@ -138,6 +138,9 @@ class EmbeddingService:
         # Shutdown flag to prevent new operations after shutdown initiated
         self._shutdown = False
 
+        # Tracks whether model has been successfully loaded at least once
+        self._initialized = False
+
         # Fast hash for cache keys (xxhash if available, else SHA-256)
         self._hash_fn = self._init_hash_fn()
 
@@ -227,6 +230,7 @@ class EmbeddingService:
 
                         # Get embedding dimension from model
                         self._dimension = self._model.get_sentence_embedding_dimension()
+                        self._initialized = True
                         load_time = time.perf_counter() - load_start
 
                         logger.info(

@@ -56,7 +56,10 @@ from typing import Any, Dict, List, Literal, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from victor.framework.config import AgentConfig
-    from victor.agent.subagents.base import SubAgentConfig, SubAgentRole
+    from victor.agent.subagents.base import SubAgentConfig
+
+
+FrameworkCompatibleAgentConfig = Union["AgentConfig", "UnifiedAgentConfig"]
 
 
 class AgentMode(str, Enum):
@@ -472,7 +475,29 @@ class UnifiedAgentConfig:
         )
 
 
+def normalize_agent_config(
+    config: Optional[FrameworkCompatibleAgentConfig],
+) -> Optional[FrameworkCompatibleAgentConfig]:
+    """Convert legacy AgentConfig instances to UnifiedAgentConfig.
+
+    Framework entry points still accept the deprecated AgentConfig surface for
+    backward compatibility. Internally, prefer UnifiedAgentConfig so presets and
+    settings overlays flow through one canonical config representation.
+    """
+    if config is None or isinstance(config, UnifiedAgentConfig):
+        return config
+
+    from victor.framework.config import AgentConfig
+
+    if isinstance(config, AgentConfig):
+        return UnifiedAgentConfig.from_agent_config(config)
+
+    return config
+
+
 __all__ = [
     "UnifiedAgentConfig",
     "AgentMode",
+    "FrameworkCompatibleAgentConfig",
+    "normalize_agent_config",
 ]

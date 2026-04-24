@@ -86,6 +86,41 @@ def test_tool_service_validate_tool_call_matches_legacy_contract():
     assert validation.canonical_name == "read"
 
 
+def test_legacy_tool_retry_module_reexports_service_executor():
+    """Legacy coordinator path should re-export the service-owned retry runtime."""
+    from victor.agent.coordinators.tool_retry import ToolRetryExecutor as legacy_executor
+    from victor.agent.services.tool_retry import ToolRetryExecutor as service_executor
+
+    assert legacy_executor is service_executor
+
+
+def test_legacy_tool_coordinator_contracts_reexport_service_contracts():
+    """Legacy coordinator path should re-export service-owned tool contract DTOs."""
+    from victor.agent.coordinators.tool_coordinator import (
+        NormalizedArgs as legacy_normalized_args,
+        ToolCallValidation as legacy_tool_call_validation,
+    )
+    from victor.agent.services.tool_contracts import (
+        NormalizedArgs as service_normalized_args,
+        ToolCallValidation as service_tool_call_validation,
+    )
+
+    assert legacy_tool_call_validation is service_tool_call_validation
+    assert legacy_normalized_args is service_normalized_args
+
+
+def test_legacy_protocol_adapter_module_reexports_service_adapter():
+    """Legacy coordinator adapter path should re-export the service-owned adapter."""
+    from victor.agent.coordinators.protocol_adapters import (
+        OrchestratorProtocolAdapter as legacy_adapter,
+    )
+    from victor.agent.services.orchestrator_protocol_adapter import (
+        OrchestratorProtocolAdapter as service_adapter,
+    )
+
+    assert legacy_adapter is service_adapter
+
+
 def test_tool_service_normalize_arguments_full_matches_legacy_contract():
     service = _make_tool_service()
     argument_normalizer = SimpleNamespace(

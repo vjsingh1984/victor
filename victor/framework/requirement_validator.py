@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.agent.task_completion import DeliverableType
-    from victor.agent.coordinators.turn_executor import TurnResult
+    from victor.agent.services.turn_execution_runtime import TurnResult
     from victor.framework.perception_integration import Requirement
 
 

@@ -61,7 +61,7 @@ class TestExplorationCoordinatorUsesBudget:
 
     @pytest.mark.asyncio
     async def test_respects_max_parallel_agents(self):
-        from victor.agent.coordinators.exploration_coordinator import (
+        from victor.agent.services.exploration_runtime import (
             ExplorationCoordinator,
         )
 

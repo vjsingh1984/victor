@@ -54,8 +54,8 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-# Import canonical types from circuit_breaker.py to avoid duplication
-from victor.providers.circuit_breaker import (
+# Import shared circuit-breaker types from core to avoid cross-layer coupling
+from victor.core.circuit_breaker import (
     CircuitState,
     CircuitBreakerConfig,
     CircuitBreakerError as CanonicalCircuitBreakerError,

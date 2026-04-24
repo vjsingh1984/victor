@@ -33,12 +33,13 @@ from victor.tools.enums import (
 )
 
 # Import metadata classes from separate module
-from victor.tools.metadata import ToolMetadata, ToolMetadataRegistry
+from victor.tools.metadata import ToolMetadata
 
 # NOTE: Enums (CostTier, Priority, AccessMode, ExecutionCategory, DangerLevel)
 # have been moved to victor/tools/enums.py and are imported above.
-# ToolMetadata and ToolMetadataRegistry have been moved to victor/tools/metadata.py
-# and are imported above.
+# ToolMetadata lives in victor/tools/metadata.py.
+# ToolMetadataRegistry lives in victor/tools/metadata_registry.py and is exposed
+# here only through a deprecated lazy re-export for backward compatibility.
 # ToolRegistry, Hook, and HookError have been moved to victor/tools/registry.py
 # Import them with: from victor.tools.registry import ToolRegistry, Hook, HookError
 
@@ -50,14 +51,16 @@ from victor.tools.registry import Hook, HookError  # noqa: F401
 
 # Lazy import with deprecation warning for ToolRegistry
 _ToolRegistry = None
+_ToolMetadataRegistry = None
 
 
 def __getattr__(name: str):
-    """Lazy import with deprecation warning for ToolRegistry.
+    """Lazy imports with deprecation warnings for moved tool classes.
 
     This provides backward compatibility while warning users to import
-    from the canonical location (victor.tools.registry).
+    from the canonical location.
     """
+    global _ToolMetadataRegistry
     if name == "ToolRegistry":
         global _ToolRegistry
         if _ToolRegistry is None:
@@ -73,6 +76,20 @@ def __getattr__(name: str):
             stacklevel=2,
         )
         return _ToolRegistry
+    if name == "ToolMetadataRegistry":
+        if _ToolMetadataRegistry is None:
+            from victor.tools.metadata_registry import ToolMetadataRegistry as _TMR
+
+            _ToolMetadataRegistry = _TMR
+
+        _warnings.warn(
+            "Direct import of ToolMetadataRegistry from victor.tools.base is deprecated. "
+            "Use 'from victor.tools.metadata_registry import ToolMetadataRegistry' instead. "
+            "This re-export will be removed in version 0.10.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return _ToolMetadataRegistry
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -722,4 +739,4 @@ class BaseTool(ABC):
 # Import it with: from victor.tools.registry import ToolRegistry
 
 
-# ToolMetadataRegistry class has been moved to victor/tools/metadata.py and is imported above
+# ToolMetadataRegistry class has moved to victor/tools/metadata_registry.py

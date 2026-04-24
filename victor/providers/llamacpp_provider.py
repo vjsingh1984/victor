@@ -353,6 +353,17 @@ class LlamaCppProvider(BaseProvider):
         """llama.cpp natively reuses KV cache for matching prefixes."""
         return True
 
+    def get_tool_output_format(self) -> Any:
+        """llama.cpp models parse XML tags in responses.
+
+        llama.cpp models have been trained on Victor's XML format
+        with <TOOL_OUTPUT> tags. This format ensures optimal tool
+        result parsing and cognition.
+        """
+        from victor.agent.format_strategies import XML_FORMAT
+
+        return XML_FORMAT
+
     async def list_models(self) -> List[Dict[str, Any]]:
         """List models loaded in llama.cpp server.
 

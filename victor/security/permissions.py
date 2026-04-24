@@ -315,9 +315,9 @@ class PermissionPolicy:
         """
         count = 0
         try:
-            from victor.tools.metadata import ToolMetadataRegistry
+            from victor.tools.metadata_registry import ToolMetadataRegistry
 
-            registry = ToolMetadataRegistry()
+            registry = ToolMetadataRegistry.get_instance()
             for name, meta in registry.get_all().items():
                 if name in self._tool_requirements:
                     continue  # Explicit override takes precedence

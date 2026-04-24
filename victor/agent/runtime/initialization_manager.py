@@ -152,7 +152,7 @@ class InitializationPhaseManager:
                 orchestrator._initialize_interaction_runtime,
                 [
                     "chat_service",
-                    "session_coordinator",
+                    "session_service",
                 ],
                 True,  # critical
                 ["provider_runtime", "coordination_runtime"],

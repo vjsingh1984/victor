@@ -433,8 +433,10 @@ class ToolExecutionHandler:
             for chunk in self._chunk_generator.generate_tool_result_chunks(tool_result):
                 result.add_chunk(chunk)
 
-        # Generate thinking status chunk
-        result.add_chunk(self._chunk_generator.generate_thinking_status_chunk())
+        # NOTE: We no longer add a "Thinking..." status chunk here because:
+        # 1. The main pipeline iteration logic already handles status updates.
+        # 2. Providers like z.ai/Anthropic yield their own reasoning/thinking content.
+        # 3. Adding it here often causes duplication in the UI (see handler.py:278).
 
         # Update reminder manager
         self._reminder_manager.update_state(

@@ -14,6 +14,7 @@ from rich.console import Console
 
 from victor.ui.rendering import (
     StreamRenderer,
+    BufferedRenderer,
     FormatterRenderer,
     LiveDisplayRenderer,
     stream_response,
@@ -494,6 +495,298 @@ class TestLiveDisplayRenderer:
         # Just resume the live display
         assert renderer._in_thinking_mode is False
 
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_on_thinking_content_renders_immediately(self, mock_live_class, renderer, mock_console):
+        """Test on_thinking_content() renders text immediately without buffering.
+
+        Note: Delta normalization is handled upstream in stream_response(),
+        so this method just displays what it receives.
+        """
+        mock_live = MagicMock()
+        mock_live_class.return_value = mock_live
+
+        renderer.start()
+        renderer.on_thinking_start()
+
+        # Send thinking chunks (already normalized by stream_response)
+        renderer.on_thinking_content("Analyzing the problem...")
+        renderer.on_thinking_content("Let me explore...")
+        renderer.on_thinking_content("Now checking...")
+
+        # Should print each chunk immediately (no buffering at display layer)
+        # Now includes: separator + badge + indicator + 3 chunks
+        assert mock_console.print.call_count == 6  # Separator + badge + indicator + 3 chunks
+
+    def test_calculate_adaptive_preview_lines_with_error_shows_all(self, renderer):
+        """Adaptive preview with error shows all lines."""
+        from unittest.mock import MagicMock
+        tool_settings = MagicMock()
+        tool_settings.tool_output_preview_lines_min = 1
+        tool_settings.tool_output_preview_lines_max = 10
+
+        output = "line1\nline2\nline3\nline4\nline5"
+        lines = renderer._calculate_adaptive_preview_lines(
+            output, "Error occurred", 3, tool_settings
+        )
+        assert lines == 5  # All lines shown for errors
+
+    def test_calculate_adaptive_preview_lines_small_output_shows_all(self, renderer):
+        """Adaptive preview with small output (≤5 lines) shows all."""
+        from unittest.mock import MagicMock
+        tool_settings = MagicMock()
+        tool_settings.tool_output_preview_lines_min = 1
+        tool_settings.tool_output_preview_lines_max = 10
+
+        output = "line1\nline2\nline3"
+        lines = renderer._calculate_adaptive_preview_lines(
+            output, None, 3, tool_settings
+        )
+        assert lines == 3  # All lines shown for small output
+
+    def test_calculate_adaptive_preview_lines_medium_output_shows_moderate(self, renderer):
+        """Adaptive preview with medium output (5-50 lines) shows 3-5 lines."""
+        from unittest.mock import MagicMock
+        tool_settings = MagicMock()
+        tool_settings.tool_output_preview_lines_min = 1
+        tool_settings.tool_output_preview_lines_max = 10
+
+        # 20 lines → should show 5 lines (max for medium)
+        output = "\n".join([f"line{i}" for i in range(20)])
+        lines = renderer._calculate_adaptive_preview_lines(
+            output, None, 3, tool_settings
+        )
+        assert lines == 5  # Moderate preview for medium output
+
+    def test_calculate_adaptive_preview_lines_large_output_shows_minimal(self, renderer):
+        """Adaptive preview with large output (>50 lines) shows 1-2 lines."""
+        from unittest.mock import MagicMock
+        tool_settings = MagicMock()
+        tool_settings.tool_output_preview_lines_min = 1
+        tool_settings.tool_output_preview_lines_max = 10
+
+        # 100 lines → should show 2 lines (max for large)
+        output = "\n".join([f"line{i}" for i in range(100)])
+        lines = renderer._calculate_adaptive_preview_lines(
+            output, None, 3, tool_settings
+        )
+        assert lines == 2  # Minimal preview for large output
+
+    def test_calculate_adaptive_preview_lines_respects_min_max_bounds(self, renderer):
+        """Adaptive preview respects configured min/max bounds."""
+        from unittest.mock import MagicMock
+        tool_settings = MagicMock()
+        tool_settings.tool_output_preview_lines_min = 3  # Higher minimum
+        tool_settings.tool_output_preview_lines_max = 8  # Lower maximum
+
+        # Large output that would normally show 2 lines
+        output = "\n".join([f"line{i}" for i in range(100)])
+        lines = renderer._calculate_adaptive_preview_lines(
+            output, None, 3, tool_settings
+        )
+        assert lines == 3  # Respects minimum bound
+
+        # Small output that would show 5 lines
+        output = "\n".join([f"line{i}" for i in range(20)])
+        lines = renderer._calculate_adaptive_preview_lines(
+            output, None, 3, tool_settings
+        )
+        assert lines == 5  # Within bounds
+
+    def test_categorize_tool_groups_filesystem_tools(self, renderer):
+        """Tool categorization correctly identifies filesystem tools."""
+        assert renderer._categorize_tool("read") == "File System"
+        assert renderer._categorize_tool("write") == "File System"
+        assert renderer._categorize_tool("ls") == "File System"
+        assert renderer._categorize_tool("grep") == "File System"
+
+    def test_categorize_tool_groups_search_tools(self, renderer):
+        """Tool categorization correctly identifies search tools."""
+        assert renderer._categorize_tool("code_search") == "Search"
+        assert renderer._categorize_tool("semantic_code_search") == "Search"
+        assert renderer._categorize_tool("search") == "Search"
+
+    def test_categorize_tool_groups_git_tools(self, renderer):
+        """Tool categorization correctly identifies git tools."""
+        assert renderer._categorize_tool("git_status") == "Git"
+        assert renderer._categorize_tool("git_diff") == "Git"
+        assert renderer._categorize_tool("git_log") == "Git"
+
+    def test_categorize_tool_defaults_unknown_tools(self, renderer):
+        """Tool categorization defaults to 'Other' for unknown tools."""
+        assert renderer._categorize_tool("unknown_tool") == "Other"
+        assert renderer._categorize_tool("custom_action") == "Other"
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_on_tool_result_shows_group_header_on_category_change(
+        self, mock_live_class, renderer, mock_console
+    ):
+        """Group header is shown when tool category changes."""
+        from unittest.mock import MagicMock
+        mock_live_class.return_value = MagicMock()
+        renderer.start()
+
+        # Mock tool settings to enable grouping
+        with patch("victor.config.tool_settings.get_tool_settings") as mock_settings:
+            tool_settings = MagicMock()
+            tool_settings.enable_tool_grouping = True
+            tool_settings.tool_output_preview_enabled = False
+            mock_settings.return_value = tool_settings
+
+            # First tool (File System)
+            renderer.on_tool_result(
+                name="read",
+                success=True,
+                elapsed=0.1,
+                arguments={"path": "file1.txt"},
+                result="content1",
+            )
+
+            # Second tool (Search) - different category
+            renderer.on_tool_result(
+                name="code_search",
+                success=True,
+                elapsed=0.2,
+                arguments={"query": "test"},
+                result="results",
+            )
+
+        # Should have printed: status + blank line + group header + status
+        assert mock_console.print.call_count >= 4
+
+    @patch("victor.ui.rendering.live_renderer.Live")
+    def test_on_tool_result_skips_group_header_when_disabled(
+        self, mock_live_class, renderer, mock_console
+    ):
+        """Group header is not shown when grouping is disabled."""
+        from unittest.mock import MagicMock
+        mock_live_class.return_value = MagicMock()
+        renderer.start()
+
+        # Mock tool settings to disable grouping
+        with patch("victor.config.tool_settings.get_tool_settings") as mock_settings:
+            tool_settings = MagicMock()
+            tool_settings.enable_tool_grouping = False
+            tool_settings.tool_output_preview_enabled = False
+            mock_settings.return_value = tool_settings
+
+            # First tool
+            renderer.on_tool_result(
+                name="read",
+                success=True,
+                elapsed=0.1,
+                arguments={"path": "file1.txt"},
+                result="content1",
+            )
+
+            # Second tool (different category)
+            renderer.on_tool_result(
+                name="code_search",
+                success=True,
+                elapsed=0.2,
+                arguments={"query": "test"},
+                result="results",
+            )
+
+        # Should only have status prints (no group headers)
+        # Count should be less than when grouping is enabled
+        assert mock_console.print.call_count < 4
+
+
+class TestAccessibilityFeatures:
+    """Tests for accessibility features like high contrast mode."""
+
+    @pytest.fixture
+    def mock_console(self):
+        return MagicMock(spec=Console)
+
+    def test_render_thinking_indicator_normal_mode(self, mock_console):
+        """Thinking indicator uses dim colors in normal mode."""
+        from victor.ui.rendering.utils import render_thinking_indicator
+        from unittest.mock import patch
+
+        with patch("victor.config.theme_settings.get_theme_settings") as mock_settings:
+            theme_settings = MagicMock()
+            theme_settings.high_contrast = False
+            mock_settings.return_value = theme_settings
+
+            render_thinking_indicator(mock_console)
+
+            # Should have been called with dim styling
+            assert mock_console.print.called
+            assert mock_console.rule.called
+
+    def test_render_thinking_indicator_high_contrast_mode(self, mock_console):
+        """Thinking indicator uses bold colors in high contrast mode."""
+        from victor.ui.rendering.utils import render_thinking_indicator
+        from unittest.mock import patch
+
+        with patch("victor.config.theme_settings.get_theme_settings") as mock_settings:
+            theme_settings = MagicMock()
+            theme_settings.high_contrast = True
+            mock_settings.return_value = theme_settings
+
+            render_thinking_indicator(mock_console)
+
+            # Should have been called with bold styling
+            assert mock_console.print.called
+            assert mock_console.rule.called
+
+    def test_render_content_badge_normal_mode(self, mock_console):
+        """Content badge uses dim colors in normal mode."""
+        from victor.ui.rendering.utils import render_content_badge
+        from unittest.mock import patch
+
+        with patch("victor.config.theme_settings.get_theme_settings") as mock_settings:
+            theme_settings = MagicMock()
+            theme_settings.high_contrast = False
+            mock_settings.return_value = theme_settings
+
+            render_content_badge(mock_console, "thinking")
+
+            assert mock_console.print.called
+
+    def test_render_content_badge_high_contrast_mode(self, mock_console):
+        """Content badge uses bold colors in high contrast mode."""
+        from victor.ui.rendering.utils import render_content_badge
+        from unittest.mock import patch
+
+        with patch("victor.config.theme_settings.get_theme_settings") as mock_settings:
+            theme_settings = MagicMock()
+            theme_settings.high_contrast = True
+            mock_settings.return_value = theme_settings
+
+            render_content_badge(mock_console, "thinking")
+
+            assert mock_console.print.called
+
+    def test_render_status_message_normal_mode(self, mock_console):
+        """Status message uses dim colors in normal mode."""
+        from victor.ui.rendering.utils import render_status_message
+        from unittest.mock import patch
+
+        with patch("victor.config.theme_settings.get_theme_settings") as mock_settings:
+            theme_settings = MagicMock()
+            theme_settings.high_contrast = False
+            mock_settings.return_value = theme_settings
+
+            render_status_message(mock_console, "Processing file")
+
+            assert mock_console.print.called
+
+    def test_render_status_message_high_contrast_mode(self, mock_console):
+        """Status message uses bold colors in high contrast mode."""
+        from victor.ui.rendering.utils import render_status_message
+        from unittest.mock import patch
+
+        with patch("victor.config.theme_settings.get_theme_settings") as mock_settings:
+            theme_settings = MagicMock()
+            theme_settings.high_contrast = True
+            mock_settings.return_value = theme_settings
+
+            render_status_message(mock_console, "Processing file")
+
+            assert mock_console.print.called
+
 
 class TestStreamResponse:
     """Tests for stream_response() unified handler."""
@@ -712,6 +1005,91 @@ class TestStreamResponse:
         assert mock_renderer.on_content.call_count == 2
         mock_renderer.on_content.assert_any_call("Hello ")
         mock_renderer.on_content.assert_any_call("World")
+
+    @pytest.mark.asyncio
+    async def test_normalizes_cumulative_content_snapshots(self, mock_agent, mock_renderer):
+        """Cumulative provider snapshots should be reduced to append-only deltas."""
+
+        async def mock_stream():
+            yield StreamChunk(content="I will analyze", metadata=None)
+            yield StreamChunk(content="I will analyze the repository", metadata=None)
+            yield StreamChunk(content="I will analyze the repository", metadata=None)
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+
+        await stream_response(mock_agent, "test message", mock_renderer)
+
+        assert mock_renderer.on_content.call_count == 2
+        mock_renderer.on_content.assert_has_calls(
+            [call("I will analyze"), call(" the repository")]
+        )
+
+    @pytest.mark.asyncio
+    async def test_normalizes_cumulative_reasoning_snapshots(self, mock_agent, mock_renderer):
+        """Accumulated reasoning snapshots should not be printed repeatedly."""
+
+        async def mock_stream():
+            yield StreamChunk(content="", metadata={"reasoning_content": "Plan"})
+            yield StreamChunk(content="", metadata={"reasoning_content": "Plan carefully"})
+            yield StreamChunk(content="Done", metadata=None)
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+
+        await stream_response(mock_agent, "test message", mock_renderer)
+
+        mock_renderer.on_thinking_content.assert_has_calls([call("Plan"), call(" carefully")])
+        assert mock_renderer.on_thinking_content.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_renders_reasoning_and_content_from_same_chunk(self, mock_agent, mock_renderer):
+        """Chunks containing both reasoning metadata and content should render both."""
+
+        async def mock_stream():
+            yield StreamChunk(content="Answer", metadata={"reasoning_content": "Thinking"})
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+
+        result = await stream_response(mock_agent, "test message", mock_renderer)
+
+        mock_renderer.on_thinking_content.assert_called_once_with("Thinking")
+        mock_renderer.on_content.assert_called_once_with("Answer")
+        assert result == mock_renderer.finalize.return_value
+
+    @pytest.mark.asyncio
+    async def test_buffered_renderer_accepts_tool_result_payloads(self, mock_agent):
+        """Buffered non-stream rendering should accept tool result payload metadata."""
+
+        async def mock_stream():
+            yield StreamChunk(
+                content="",
+                metadata={
+                    "tool_start": {
+                        "name": "read",
+                        "arguments": {"path": "file.py"},
+                    }
+                },
+            )
+            yield StreamChunk(
+                content="",
+                metadata={
+                    "tool_result": {
+                        "name": "read",
+                        "success": True,
+                        "elapsed": 0.1,
+                        "arguments": {"path": "file.py"},
+                        "result": "line1\nline2\nline3\nline4",
+                    }
+                },
+            )
+            yield StreamChunk(content="Done", metadata=None)
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+        renderer = BufferedRenderer()
+
+        result = await stream_response(mock_agent, "test message", renderer)
+
+        assert result == "Done"
+        assert renderer._tool_calls[0]["result"]["output"] == "line1\nline2\nline3\nline4"
 
     @pytest.mark.asyncio
     async def test_calls_lifecycle_methods(self, mock_agent, mock_renderer):

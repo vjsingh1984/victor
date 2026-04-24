@@ -32,9 +32,9 @@ logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
+from victor.core.circuit_breaker import CircuitBreakerError
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
-    CircuitBreakerError,
     CircuitBreakerRegistry,
 )
 from victor.providers.runtime_capabilities import ProviderRuntimeCapabilities
@@ -428,6 +428,33 @@ class BaseProvider(ABC):
         """
         return False
 
+    def get_tool_output_format(self) -> Any:
+        """Get preferred tool output format for this provider.
+
+        This method enables provider-specific customization of tool output
+        formatting, following the Strategy pattern. Default implementation
+        returns plain JSON format (token-efficient for cloud providers).
+
+        Providers can override to specify XML, TOON, or custom formats:
+        - Cloud providers (OpenAI, xAI, etc.): Use default plain JSON
+        - Local providers (Ollama, vLLM, llama.cpp): Override to XML format
+        - Experimental: Override to TOON for structured data
+
+        Returns:
+            ToolOutputFormat specification (from victor.agent.format_strategies)
+
+        Example:
+            from victor.agent.format_strategies import ToolOutputFormat, XML_FORMAT
+
+            class OllamaProvider(BaseProvider):
+                def get_tool_output_format(self):
+                    # Local models trained on XML format
+                    return XML_FORMAT
+        """
+        from victor.agent.format_strategies import ToolOutputFormat
+
+        return ToolOutputFormat(style="plain")
+
     def get_circuit_breaker_stats(self) -> Optional[Dict[str, Any]]:
         """Get circuit breaker statistics for monitoring."""
         if self._circuit_breaker:
@@ -819,7 +846,13 @@ class BaseProvider(ABC):
             )
 
             self._retry_strategy = ProviderRetryStrategy(
-                ProviderRetryConfig(max_retries=self.max_retries)
+                ProviderRetryConfig(
+                    max_retries=self.max_retries,
+                    # BaseProvider wraps the call in a circuit breaker before retry.
+                    # Open circuits should fail fast instead of sleeping through
+                    # the recovery timeout and re-entering as half-open.
+                    retryable_exceptions=(ConnectionError, TimeoutError),
+                )
             )
 
         return await self._retry_strategy.execute(_call)

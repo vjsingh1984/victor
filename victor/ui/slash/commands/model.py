@@ -305,8 +305,8 @@ class ModelCommand(BaseSlashCommand):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(
                     f"[green]\u2713[/] Switched to [cyan]{model}[/]\n"
-                    f"  [dim]Native tools: {info['native_tool_calls']}, "
-                    f"Thinking: {info['thinking_mode']}[/]"
+                    f"  [dim]Native tools: {info['supports_tool_calling']}, "
+                    f"Streaming: {info['supports_streaming']}[/]"
                 )
             else:
                 ctx.console.print(f"[red]Failed to switch model to {model}[/]")
@@ -321,8 +321,8 @@ class ModelCommand(BaseSlashCommand):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(
                     f"[green]\u2713[/] Switched to [cyan]{provider}:{model}[/]\n"
-                    f"  [dim]Native tools: {info.get('native_tool_calls', 'N/A')}, "
-                    f"Thinking: {info.get('thinking_mode', 'N/A')}[/]"
+                    f"  [dim]Native tools: {info.get('supports_tool_calling', 'N/A')}, "
+                    f"Streaming: {info.get('supports_streaming', 'N/A')}[/]"
                 )
             else:
                 ctx.console.print(f"[red]Failed to switch to {provider}:{model}[/]")
@@ -374,10 +374,10 @@ class ProfileCommand(BaseSlashCommand):
             ):
                 info = ctx.agent.get_current_provider_info()
                 ctx.console.print(f"[green]Switched to profile:[/] [cyan]{profile_name}[/]")
-                ctx.console.print(f"  [dim]Provider: {info['provider']}, Model: {info['model']}[/]")
+                ctx.console.print(f"  [dim]Provider: {info['provider_name']}, Model: {info['model_name']}[/]")
                 ctx.console.print(
-                    f"  [dim]Native tools: {info['native_tool_calls']}, "
-                    f"Thinking: {info['thinking_mode']}[/]"
+                    f"  [dim]Native tools: {info['supports_tool_calling']}, "
+                    f"Streaming: {info['supports_streaming']}[/]"
                 )
             else:
                 ctx.console.print(f"[red]Failed to switch to profile {profile_name}[/]")
@@ -517,10 +517,10 @@ class ProviderCommand(BaseSlashCommand):
 
         if await ctx.agent.switch_provider(provider_name=provider_name, model=model):
             info = ctx.agent.get_current_provider_info()
-            ctx.console.print(f"[green]Switched to:[/] {info['provider']}:{info['model']}")
+            ctx.console.print(f"[green]Switched to:[/] {info['provider_name']}:{info['model_name']}")
             ctx.console.print(
-                f"  [dim]Native tools: {info['native_tool_calls']}, "
-                f"Thinking: {info['thinking_mode']}[/]"
+                f"  [dim]Native tools: {info['supports_tool_calling']}, "
+                f"Streaming: {info['supports_streaming']}[/]"
             )
         else:
             ctx.console.print(f"[red]Failed to switch to {provider_name}[/]")

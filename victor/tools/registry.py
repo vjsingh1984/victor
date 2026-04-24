@@ -727,67 +727,30 @@ class ToolRegistry(BaseRegistry[str, Any]):
         # Call plugin's register method
         plugin.register(self)
 
-    def discover_plugins(self) -> int:
+    def discover_plugins(self, entry_point_group: str = "victor.plugins") -> int:
         """Discover and register tool plugins from entry points.
 
-        Scans the 'victor.plugins' entry point group for tool plugins
-        and automatically registers them.
+        Uses UnifiedEntryPointRegistry for efficient single-pass discovery
+        instead of redundant importlib.metadata.entry_points() calls.
+
+        Handles multiple plugin formats:
+        - Objects with a ``register`` method (ToolPlugin protocol)
+        - Lists/tuples of tool instances (wrapped via ToolPluginHelper)
+
+        Args:
+            entry_point_group: Entry point group to scan (default: victor.plugins)
 
         Returns:
             Number of plugins discovered and registered
 
         Example:
-            # In setup.py:
-            # setup_entry_points={
-            #     "victor.plugins": [
-            #         "my_vertical = my_vertical.plugin:MyVerticalPlugin"
-            #     ]
-            # }
+            # In setup.py / pyproject.toml:
+            # [project.entry-points."victor.plugins"]
+            # my_plugin = "my_package.plugin:MyPlugin"
 
             # At runtime:
             count = registry.discover_plugins()
             print(f"Registered {count} tool plugins")
-        """
-        from victor.framework.entry_point_registry import get_entry_point_objects
-
-        count = 0
-
-        try:
-            plugin_eps = get_entry_point_objects("victor.plugins")
-
-            for ep in plugin_eps:
-                try:
-                    plugin = ep.load()
-                    self.register_plugin(plugin)
-                    count += 1
-                except Exception as e:
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-                    ep_name = getattr(ep, "name", "unknown")
-                    logger.warning(f"Failed to load tool plugin '{ep_name}': {e}")
-
-        except Exception:
-            pass
-
-        return count
-
-    def register_from_entry_points(
-        self,
-        entry_point_group: str = "victor.plugins",
-        enabled: bool = True,
-    ) -> int:
-        """Discover and register tools from entry points.
-
-        Uses UnifiedEntryPointRegistry for efficient single-pass discovery
-        instead of redundant importlib.metadata.entry_points() calls.
-
-        Args:
-            entry_point_group: Entry point group to scan (default: victor.plugins)
-            enabled: Whether discovered tools are enabled by default (unused, for backward compatibility)
-
-        Returns:
-            Number of entry points discovered and registered
         """
         from victor.framework.entry_point_registry import get_entry_point_objects
 
@@ -822,3 +785,6 @@ class ToolRegistry(BaseRegistry[str, Any]):
             pass
 
         return count
+
+    # Backward-compatible alias for discover_plugins()
+    register_from_entry_points = discover_plugins

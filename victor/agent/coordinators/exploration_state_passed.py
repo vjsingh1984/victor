@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from victor.agent.coordinators.exploration_coordinator import (
+from victor.agent.services.exploration_runtime import (
     ExplorationCoordinator,
     ExplorationResult,
 )

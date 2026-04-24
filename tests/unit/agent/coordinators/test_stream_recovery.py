@@ -60,11 +60,15 @@ def _build_coordinator() -> tuple[StreamingChatCoordinator, MagicMock]:
     provider_ctx.max_tokens = 1024
     provider_ctx.thinking = None
 
-    coord = StreamingChatCoordinator(
-        chat_context=chat_ctx,
-        tool_context=tool_ctx,
-        provider_context=provider_ctx,
-    )
+    with pytest.warns(
+        DeprecationWarning,
+        match="StreamingChatCoordinator without a bound ChatService is deprecated",
+    ):
+        coord = StreamingChatCoordinator(
+            chat_context=chat_ctx,
+            tool_context=tool_ctx,
+            provider_context=provider_ctx,
+        )
     return coord, chat_ctx
 
 
@@ -93,8 +97,12 @@ async def test_partial_content_saved_on_stream_failure() -> None:
 
     collected: list[StreamChunk] = []
     with pytest.raises(ConnectionError, match="provider connection lost"):
-        async for c in coord.stream_chat("hi"):
-            collected.append(c)
+        with pytest.warns(
+            DeprecationWarning,
+            match="StreamingChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+        ):
+            async for c in coord.stream_chat("hi"):
+                collected.append(c)
 
     # Three chunks should have been yielded before the failure
     assert len(collected) == 3
@@ -112,8 +120,12 @@ async def test_normal_completion_no_suffix() -> None:
     provider.stream = MagicMock(return_value=_async_chunks(chunks))
 
     collected: list[StreamChunk] = []
-    async for c in coord.stream_chat("hi"):
-        collected.append(c)
+    with pytest.warns(
+        DeprecationWarning,
+        match="StreamingChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+    ):
+        async for c in coord.stream_chat("hi"):
+            collected.append(c)
 
     assert len(collected) == 2
 
@@ -139,8 +151,12 @@ async def test_failure_on_first_chunk_no_partial_saved() -> None:
 
     collected: list[StreamChunk] = []
     with pytest.raises(ConnectionError, match="provider connection lost"):
-        async for c in coord.stream_chat("hi"):
-            collected.append(c)
+        with pytest.warns(
+            DeprecationWarning,
+            match="StreamingChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+        ):
+            async for c in coord.stream_chat("hi"):
+                collected.append(c)
 
     # Nothing was yielded
     assert len(collected) == 0

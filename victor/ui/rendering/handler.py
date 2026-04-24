@@ -9,8 +9,9 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from victor.agent.response_sanitizer import StreamingContentFilter
+from victor.agent.response_sanitizer import create_streaming_filter
 from victor.ui.rendering.protocol import StreamRenderer
+from victor.ui.rendering.utils import StreamDeltaNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -55,11 +56,50 @@ async def stream_response(
     stream_gen = agent.stream_chat(message)
 
     # Initialize content filter for thinking markers
-    content_filter = StreamingContentFilter(suppress_thinking=suppress_thinking)
+    content_filter = create_streaming_filter(suppress_thinking=suppress_thinking)
+    content_normalizer = StreamDeltaNormalizer()
+    reasoning_normalizer = StreamDeltaNormalizer()
     was_thinking = False
 
     # ENHANCEMENT: Log chunk boundaries for debugging streaming issues
     chunk_count = 0
+
+    def process_content(raw_content: str) -> None:
+        """Normalize and render regular or inline-thinking content."""
+        nonlocal was_thinking
+
+        normalized_content = content_normalizer.consume(raw_content)
+        if not normalized_content:
+            return
+
+        # End API-based thinking state when regular content arrives.
+        if was_thinking and not content_filter.is_thinking:
+            logger.debug("← Exiting thinking mode (API reasoning ended)")
+            renderer.on_thinking_end()
+            reasoning_normalizer.reset()
+            was_thinking = False
+
+        result = content_filter.process_chunk(normalized_content)
+
+        # Log inline thinking state transitions for debugging.
+        if result.entering_thinking and not was_thinking:
+            logger.debug("→ Entering thinking mode (inline markers)")
+            renderer.on_thinking_start()
+            was_thinking = True
+
+        if result.content:
+            if result.is_thinking:
+                thinking_delta = reasoning_normalizer.consume(result.content)
+                if thinking_delta:
+                    renderer.on_thinking_content(thinking_delta)
+            else:
+                renderer.on_content(result.content)
+
+        if result.exiting_thinking and was_thinking:
+            logger.debug("← Exiting thinking mode (inline markers ended)")
+            renderer.on_thinking_end()
+            reasoning_normalizer.reset()
+            was_thinking = False
 
     try:
         async for chunk in stream_gen:
@@ -119,44 +159,49 @@ async def stream_response(
             elif chunk.metadata and "reasoning_content" in chunk.metadata:
                 reasoning = chunk.metadata["reasoning_content"]
                 if reasoning and not suppress_thinking:
+                    # Filter out continuation markers from provider responses
+                    # (e.g., "💭 Thinking...", "🤔 Thinking...") to avoid redundancy with our badge
+                    reasoning = reasoning.lstrip()
+                    for marker in ["💭 Thinking...", "💭", "🤔 Thinking...", "🤔", "Thinking..."]:
+                        if reasoning.startswith(marker):
+                            reasoning = reasoning[len(marker):].lstrip()
+                            break
+
                     # Log state transition for debugging
                     if not was_thinking:
                         logger.debug("→ Entering thinking mode (API reasoning)")
                         renderer.on_thinking_start()
+                        reasoning_normalizer.reset()
                         was_thinking = True
-                    renderer.on_thinking_content(reasoning)
+                    reasoning_delta = reasoning_normalizer.consume(reasoning)
+                    if reasoning_delta:
+                        if logger.isEnabledFor(logging.DEBUG):
+                            logger.debug(
+                                "reasoning_normalizer: input_len=%d, delta_len=%d, "
+                                "input_preview=%r..., delta_preview=%r...",
+                                len(reasoning),
+                                len(reasoning_delta),
+                                reasoning[:60],
+                                reasoning_delta[:60],
+                            )
+                        renderer.on_thinking_content(reasoning_delta)
+                    elif logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            "reasoning_normalizer: filtered duplicate, input_len=%d, "
+                            "input_preview=%r...",
+                            len(reasoning),
+                            reasoning[:60],
+                        )
+                if chunk.content:
+                    process_content(chunk.content)
             # Handle content - filter through StreamingContentFilter
             elif chunk.content:
-                # End API-based thinking state when regular content arrives
-                # This handles the transition from DeepSeek reasoning to regular output
-                if was_thinking and not content_filter.is_thinking:
-                    logger.debug("← Exiting thinking mode (API reasoning ended)")
-                    renderer.on_thinking_end()
-                    was_thinking = False
-                result = content_filter.process_chunk(chunk.content)
+                process_content(chunk.content)
 
-                # Log inline thinking state transitions for debugging
-                if result.entering_thinking and not was_thinking:
-                    logger.debug("→ Entering thinking mode (inline markers)")
-                    renderer.on_thinking_start()
-                    was_thinking = True
-
-                # Render content based on thinking state
-                if result.content:
-                    if result.is_thinking:
-                        renderer.on_thinking_content(result.content)
-                    else:
-                        renderer.on_content(result.content)
-
-                if result.exiting_thinking and was_thinking:
-                    logger.debug("← Exiting thinking mode (inline markers ended)")
-                    renderer.on_thinking_end()
-                    was_thinking = False
-
-                # Check if we should abort due to excessive thinking
-                if content_filter.should_abort():
-                    renderer.on_status(f"⚠️ {content_filter.abort_reason}")
-                    break
+            # Check if we should abort due to excessive thinking
+            if content_filter.should_abort():
+                renderer.on_status(f"⚠️ {content_filter.abort_reason}")
+                break
 
         # Flush any remaining buffered content
         flush_result = content_filter.flush()
@@ -169,19 +214,22 @@ async def stream_response(
         # CRITICAL FIX: Ensure thinking state is properly closed
         if was_thinking:
             renderer.on_thinking_end()
+            reasoning_normalizer.reset()
             was_thinking = False
 
         # CRITICAL FIX: Add comprehensive logging before finalize
         logger.debug(
-            f"stream_response completion - "
-            f"content_buffer_len={len(getattr(renderer, '_content_buffer', ''))}, "
-            f"in_thinking_mode={getattr(renderer, '_in_thinking_mode', False)}, "
-            f"live_active={getattr(renderer, '_live', None) is not None}"
+            "stream_response completion - content_buffer_len=%d, "
+            "in_thinking_mode=%s, live_active=%s",
+            len(getattr(renderer, "_content_buffer", "")),
+            getattr(renderer, "_in_thinking_mode", False),
+            getattr(renderer, "_live", None) is not None,
         )
 
         # Log first 100 chars of content buffer for verification
-        content_preview = getattr(renderer, '_content_buffer', '')[:100]
-        logger.debug(f"Content buffer preview: {repr(content_preview)}...")
+        if logger.isEnabledFor(logging.DEBUG):
+            content_preview = getattr(renderer, "_content_buffer", "")[:100]
+            logger.debug("Content buffer preview: %r...", content_preview)
 
         # FAIL-SAFE: Verify content was displayed
         final_content = renderer.finalize()

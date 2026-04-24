@@ -1,12 +1,15 @@
-"""Example demonstrating protocol-based dependency injection for ChatCoordinator.
+"""Examples for protocol-based injection during the chat migration.
 
-This example shows how protocol-based injection enables clean testing
-with lightweight mocks instead of full orchestrator instances.
+New code should target `ChatServiceProtocol` / `ChatService`. The legacy
+`ChatCoordinator` example remains only to document the compatibility path while
+older tests and integrations migrate.
 """
 
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 
+from victor.agent.services.protocols import ChatServiceProtocol
+from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 from victor.core.async_utils import run_sync
 
 # =============================================================================
@@ -75,13 +78,62 @@ class MockContainer:
         return self._services.get(service_type)
 
 
+@dataclass
+class MockChatService(ChatServiceProtocol):
+    """Lightweight mock satisfying the canonical ChatServiceProtocol."""
+
+    responses: List[Any] = field(default_factory=list)
+    streamed_chunks: List[Any] = field(default_factory=list)
+    reset_calls: int = 0
+
+    async def chat(self, user_message: str, *, stream: bool = False, **kwargs) -> Any:
+        if self.responses:
+            return self.responses.pop(0)
+        return type("MockResponse", (), {"content": f"Echo: {user_message}"})()
+
+    async def stream_chat(self, user_message: str, **kwargs):
+        for chunk in self.streamed_chunks:
+            yield chunk
+
+    async def chat_with_planning(
+        self, user_message: str, use_planning: Optional[bool] = None
+    ) -> Any:
+        return await self.chat(user_message, use_planning=use_planning)
+
+    async def handle_context_and_iteration_limits(
+        self,
+        user_message: str,
+        max_total_iterations: int,
+        max_context: int,
+        total_iterations: int,
+        last_quality_score: float,
+    ) -> tuple[bool, Optional[Any]]:
+        return False, None
+
+    def reset_conversation(self) -> None:
+        self.reset_calls += 1
+
+    @staticmethod
+    def persist_message(
+        role: str,
+        content: str,
+        memory_manager: Optional[Any] = None,
+        memory_session_id: Optional[str] = None,
+        usage_logger: Optional[Any] = None,
+    ) -> None:
+        return None
+
+    def is_healthy(self) -> bool:
+        return True
+
+
 # =============================================================================
-# Mock Orchestrator satisfying ChatOrchestratorProtocol
+# Legacy Mock Orchestrator satisfying ChatOrchestratorProtocol
 # =============================================================================
 
 
 @dataclass
-class MockChatOrchestrator:
+class MockChatOrchestrator(ChatOrchestratorProtocol):
     """Lightweight mock satisfying ChatOrchestratorProtocol.
 
     This mock provides only the attributes that ChatCoordinator actually uses,
@@ -206,9 +258,21 @@ class MockChatOrchestrator:
 # =============================================================================
 
 
-async def example_chat_with_mock_orchestrator():
-    """Example: Using ChatCoordinator with a lightweight mock orchestrator."""
-    from victor.agent.coordinators.chat_coordinator import ChatCoordinator
+async def example_chat_service_protocol_with_mock():
+    """Canonical example: use ChatServiceProtocol with a lightweight mock."""
+    mock_service = MockChatService(
+        responses=[type("MockResponse", (), {"content": "Hello from chat service!"})()]
+    )
+
+    result = await mock_service.chat("Hello, service!")
+
+    print(f"Response: {result.content}")
+    print(f"Healthy: {mock_service.is_healthy()}")
+
+
+async def example_legacy_chat_coordinator_with_mock_orchestrator():
+    """Legacy example: use the deprecated ChatCoordinator compatibility shim."""
+    from victor.agent.services.chat_compat import ChatCoordinator
 
     # Create lightweight mock instead of full AgentOrchestrator
     mock_orchestrator = MockChatOrchestrator(
@@ -222,7 +286,7 @@ async def example_chat_with_mock_orchestrator():
         type("MockResponse", (), {"content": "Hello from mock!"})()
     )
 
-    # Create ChatCoordinator with mock
+    # Create deprecated compatibility shim with mock
     coordinator = ChatCoordinator(orchestrator=mock_orchestrator)
 
     # Use chat method - no LLM calls, fully deterministic
@@ -243,7 +307,7 @@ def print_benefits():
     """Print benefits of protocol-based dependency injection."""
 
     benefits = """
-    Benefits of Protocol-Based Injection for ChatCoordinator
+    Benefits of Protocol-Based Injection During Chat Migration
     ================================================================
 
     1. FAST TESTS
@@ -258,14 +322,14 @@ def print_benefits():
        - Reproducible test scenarios
 
     3. ISOLATED TESTING
-       - Test only ChatCoordinator logic
-       - No dependency on orchestrator correctness
-       - Failures point to ChatCoordinator bugs
+       - Prefer testing ChatServiceProtocol / ChatService directly
+       - Keep ChatCoordinator coverage limited to legacy compatibility
+       - Failures point to the active service runtime, not deprecated shims
 
     4. CLEAR CONTRACTS
-       - ChatOrchestratorProtocol documents exact dependencies
-       - Compile-time checking via @runtime_checkable
-       - IDE autocomplete for all dependencies
+       - ChatServiceProtocol is the canonical contract for new code
+       - ChatOrchestratorProtocol remains useful for legacy shim coverage
+       - @runtime_checkable keeps both boundaries explicit
 
     5. FLEXIBLE MOCKS
        - Override only what you need for the test
@@ -278,17 +342,16 @@ def print_benefits():
     With MockChatOrchestrator:    ~10-50 milliseconds per test
     Speedup:                     40-500x faster
 
-    Before Protocol-Based Injection:
+    Canonical Service-First Example:
     ------------------------------------
-    def test_chat_coordinator():
-        orchestrator = AgentOrchestrator(...)  # Slow initialization
-        coordinator = ChatCoordinator(orchestrator)
-        result = await coordinator.chat("test")
-        assert result.content  # Hard to mock, depends on LLM
+    async def test_chat_service():
+        service = MockChatService()
+        result = await service.chat("test")
+        assert result.content == "Echo: test"
 
-    After Protocol-Based Injection:
+    Legacy Compatibility Example:
     ------------------------------------
-    def test_chat_coordinator():
+    def test_chat_coordinator_shim():
         mock = MockChatOrchestrator()  # Fast, no I/O
         mock.provider.chat_responses.append(MockResponse("test"))
         coordinator = ChatCoordinator(mock)
@@ -304,7 +367,9 @@ def main() -> None:
     """Run the protocol-based injection example."""
     print_benefits()
     print("\n" + "=" * 60 + "\n")
-    run_sync(example_chat_with_mock_orchestrator())
+    run_sync(example_chat_service_protocol_with_mock())
+    print("\n" + "=" * 60 + "\n")
+    run_sync(example_legacy_chat_coordinator_with_mock_orchestrator())
 
 
 if __name__ == "__main__":

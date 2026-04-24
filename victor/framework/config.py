@@ -3,11 +3,11 @@
 .. deprecated::
     AgentConfig is deprecated. For simple cases, use Agent.create()
     keyword arguments directly. For advanced multi-mode configuration,
-    use UnifiedAgentConfig from victor.agent.config.
+    use UnifiedAgentConfig from victor.framework.config.
 
     Migration guide:
     - Simple: agent = await Agent.create(tool_budget=100)
-    - Advanced: from victor.agent.config import UnifiedAgentConfig
+    - Advanced: from victor.framework.config import UnifiedAgentConfig
                config = UnifiedAgentConfig(mode="foreground", tool_budget=100)
                agent = await factory.create_agent(config=config)
 
@@ -16,7 +16,7 @@ Example:
     agent = await Agent.create(provider="anthropic")
 
     # Advanced use case with UnifiedAgentConfig
-    from victor.agent.config import UnifiedAgentConfig
+    from victor.framework.config import UnifiedAgentConfig
     config = UnifiedAgentConfig(
         mode="foreground",
         tool_budget=100,
@@ -32,13 +32,15 @@ import warnings as _warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
+from victor.agent.config import UnifiedAgentConfig
+
 
 @dataclass
 class AgentConfig:
     """Advanced configuration options for agents.
 
     .. deprecated::
-        Use UnifiedAgentConfig from victor.agent.config for advanced
+        Use UnifiedAgentConfig from victor.framework.config for advanced
         multi-mode configuration. For simple foreground agents, use
         Agent.create() keyword arguments directly.
 
@@ -63,7 +65,7 @@ class AgentConfig:
 
     Example:
         # Deprecated - use UnifiedAgentConfig instead
-        from victor.agent.config import UnifiedAgentConfig
+        from victor.framework.config import UnifiedAgentConfig
         config = UnifiedAgentConfig(
             mode="foreground",
             tool_budget=100,
@@ -103,7 +105,7 @@ class AgentConfig:
         """Emit deprecation warning on instantiation."""
         _warnings.warn(
             "AgentConfig is deprecated. Use UnifiedAgentConfig from "
-            "victor.agent.config for advanced configuration, or Agent.create() "
+            "victor.framework.config for advanced configuration, or Agent.create() "
             "keyword arguments for simple cases. This will be removed in v0.10.0.",
             DeprecationWarning,
             stacklevel=2,
@@ -915,6 +917,7 @@ class SafetyEnforcer:
 # Update __all__ to include new classes
 __all__ = [
     # Agent configuration
+    "UnifiedAgentConfig",
     "AgentConfig",
     # Graph configuration
     "ExecutionConfig",

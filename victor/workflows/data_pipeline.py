@@ -41,10 +41,8 @@ NOTIF_QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
 
 # Circuit breaker wrapper using canonical implementation
 # Replaces local implementation with victor.providers.circuit_breaker.CircuitBreaker
-from victor.providers.circuit_breaker import (
-    CircuitBreaker as CanonicalCircuitBreaker,
-    CircuitBreakerConfig,
-)
+from victor.core.circuit_breaker import CircuitBreakerConfig
+from victor.providers.circuit_breaker import CircuitBreaker as CanonicalCircuitBreaker
 
 
 class CircuitBreaker:

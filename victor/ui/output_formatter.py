@@ -39,6 +39,7 @@ import json
 import re
 import sys
 import time
+from rich.markup import escape as _markup_escape
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, TextIO, Tuple
@@ -49,6 +50,13 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 
 from victor.ui.rendering.markdown import render_markdown_with_hooks
+from victor.ui.rendering.utils import (
+    format_duration,
+    format_tool_args,
+    render_status_message,
+    render_tool_preview,
+)
+from victor.ui.rendering.tool_preview import renderer as _tool_preview_renderer
 
 
 class OutputMode(Enum):
@@ -120,7 +128,7 @@ class OutputFormatter:
             return
 
         if self.config.mode == OutputMode.RICH:
-            self._console.print(f"[dim]{message}[/]")
+            render_status_message(self._console, message)
         elif self.config.mode == OutputMode.PLAIN:
             print(f"# {message}", file=self.config.stderr)
             # Flush stderr immediately to ensure status appears before next content
@@ -180,25 +188,7 @@ class OutputFormatter:
         Returns:
             Formatted args string like "path='/file.py', limit=100"
         """
-        parts = []
-        total_len = 0
-        for k, v in arguments.items():
-            if isinstance(v, str):
-                # Truncate long strings - allow up to 60 chars for strings
-                display = v if len(v) <= 60 else v[:57] + "..."
-                part = f"{k}='{display}'"
-            elif isinstance(v, (int, float, bool)):
-                part = f"{k}={v}"
-            elif v is None:
-                continue  # Skip None values
-            else:
-                part = f"{k}=..."
-            if total_len + len(part) > max_width and parts:
-                parts.append("...")
-                break
-            parts.append(part)
-            total_len += len(part) + 2  # +2 for ", "
-        return ", ".join(parts)
+        return format_tool_args(arguments, max_width=max_width)
 
     def tool_start(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Indicate tool execution has started.
@@ -270,14 +260,16 @@ class OutputFormatter:
 
         self._tool_calls.append(tool_record)
 
-        # Calculate duration from pending tool
+        # Calculate duration from pending tool; retain arguments for preview
+        duration: Optional[float] = None
         duration_str = ""
         args_str = ""
+        _tool_arguments: Dict[str, Any] = {}
         if self._pending_tool and self._pending_tool[0] == tool_name:
-            _, arguments, start_time = self._pending_tool
+            _, _tool_arguments, start_time = self._pending_tool
             duration = time.time() - start_time
             duration_str = f"({duration:.1f}s)"
-            args_str = self._format_args(arguments)
+            args_str = self._format_args(_tool_arguments)
             self._pending_tool = None
 
         if not self.config.show_tools:
@@ -294,35 +286,40 @@ class OutputFormatter:
                 file=self.config.stdout,
             )
         elif self.config.mode == OutputMode.RICH:
-            # Compact single-line format: ✓ tool_name(args) (X.XXs)
-            # Use full 90 chars width, 6 chars for elapsed time at end
-            if success:
-                status_icon = "[green]✓[/]"
-            else:
-                status_icon = "[red]✗[/]"
-            # Format: ✓ name(args) (X.XXs) - target ~90 chars
-            base = f"{tool_name}({args_str})" if args_str else tool_name
-            # Elapsed time format: (X.XXs) = 8 chars
-            time_display = f"({duration_str.strip('()')})" if duration_str else ""
-            error_display = f" [red]{error[:30]}[/]" if error else ""
-            self._console.print(f"{status_icon} [bold]{base}[/] {time_display}{error_display}")
+            status_icon = "[green]✓[/]" if success else "[red]✗[/]"
+            status_line = f"{status_icon} [bold]{tool_name}[/]"
+            if args_str:
+                status_line += f" [dim]{args_str}[/]"
+            if duration_str:
+                status_line += f" [dim]• {format_duration(duration)}[/]"
+            if error:
+                status_line += f" [red]{error[:80]}[/]"
+            self._console.print(status_line)
 
-            # Show preview if enabled and result is successful
-            preview_text = ""
-            if show_preview and success and original_result:
-                preview_text = self._generate_preview(original_result, preview_lines)
-                if preview_text:
-                    self._console.print(f"[dim]↳ {preview_text}[/]")
-                    # Show expand hint if output is longer than preview
-                    if original_result and len(original_result.split("\n")) > preview_lines:
-                        try:
-                            from victor.config.tool_settings import get_tool_settings
-                            tool_settings = get_tool_settings()
-                            hotkey = tool_settings.tool_output_expand_hotkey
-                            self._console.print(f"[dim italic]Press {hotkey} to see full output[/]")
-                        except Exception:
-                            # Fallback if settings not available
-                            self._console.print("[dim italic]Press ^O to see full output[/]")
+            # Show per-tool preview using the strategy renderer.
+            # Note: condition does NOT require original_result — some strategies
+            # (e.g. DiffPreviewStrategy) generate output purely from arguments.
+            if show_preview and success:
+                try:
+                    from victor.config.tool_settings import get_tool_settings
+                    hotkey = get_tool_settings().tool_output_expand_hotkey
+                except Exception:
+                    hotkey = "^O"
+
+                preview = _tool_preview_renderer.render(
+                    tool_name, _tool_arguments, original_result or "", max_lines=preview_lines
+                )
+                if preview.header or preview.lines:
+                    if preview.header:
+                        self._console.print(f"[dim]│ {_markup_escape(preview.header)}[/]")
+                    if preview.lines:
+                        render_tool_preview(
+                            self._console,
+                            "\n".join(_markup_escape(l) for l in preview.lines),
+                            total_lines=preview.total_line_count,
+                            preview_lines=preview_lines,
+                            hotkey=hotkey,
+                        )
 
             # Show pruning transparency if enabled
             if was_pruned and self.config.show_tools:
@@ -330,17 +327,22 @@ class OutputFormatter:
                     from victor.config.tool_settings import get_tool_settings
                     tool_settings = get_tool_settings()
                     if tool_settings.tool_output_show_transparency:
-                        self._console.print("[dim yellow]⚠ Output was pruned before sending to LLM[/]")
+                        self._console.print(
+                            "[dim yellow]! Output preview was pruned before sending to the model[/]"
+                        )
                 except Exception:
                     # Fallback if settings not available
-                    self._console.print("[dim yellow]⚠ Output was pruned before sending to LLM[/]")
+                    self._console.print(
+                        "[dim yellow]! Output preview was pruned before sending to the model[/]"
+                    )
 
             # Store full result for potential expansion
             self._last_tool_result = {
                 "tool_name": tool_name,
+                "arguments": _tool_arguments,
                 "success": success,
-                "result": original_result or result,  # Store original for expansion
-                "pruned_result": result,  # What was actually sent to LLM
+                "result": original_result or result,
+                "pruned_result": result,
                 "was_pruned": was_pruned,
                 "error": error,
                 "follow_up_suggestions": follow_up_suggestions,

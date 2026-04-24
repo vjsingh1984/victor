@@ -269,16 +269,19 @@ class TestProcessToolResults:
         assert tool_result_chunks[0].metadata["tool_result"]["success"] is False
         assert tool_result_chunks[0].metadata["tool_result"]["error"] == "file not found"
 
-    def test_includes_thinking_status(self, handler, basic_context):
-        """Includes thinking status chunk."""
+    def test_no_thinking_status_chunk(self, handler, basic_context):
+        """process_tool_results does not emit a separate Thinking status chunk.
+
+        The thinking indicator is handled by the pipeline/provider layer to
+        avoid duplication (providers like z.ai yield reasoning content directly).
+        """
         execution = ToolExecutionResult()
         execution.add_result("test_tool", success=True)
 
         chunks = handler.process_tool_results(execution, basic_context)
 
         status_chunks = [c for c in chunks if c.metadata and c.metadata.get("status")]
-        assert len(status_chunks) == 1
-        assert "Thinking" in status_chunks[0].metadata["status"]
+        assert len(status_chunks) == 0
 
     def test_preserves_follow_up_suggestions(self, handler, basic_context):
         """Preserves tool follow-up suggestions in tool_result metadata."""

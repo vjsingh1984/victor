@@ -13,11 +13,12 @@ class TestLazyLoading:
         from victor.framework import Agent, Task, Tools, State, Stage
         from victor.framework import AgentExecutionEvent, EventType
         from victor.framework import ToolSet, ToolCategory
-        from victor.framework import AgentConfig
+        from victor.framework import AgentConfig, UnifiedAgentConfig
 
         assert Agent is not None
         assert Task is not None
         assert Tools is not None
+        assert UnifiedAgentConfig is not None
 
     def test_core_protocols_available(self):
         """Protocol imports should work."""

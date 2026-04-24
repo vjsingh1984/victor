@@ -29,6 +29,11 @@ Simple API (recommended):
     result = await agent.run("Write a hello world function")
     print(result.content)
 
+Advanced Config:
+    from victor import Agent, UnifiedAgentConfig
+
+    agent = await Agent.create(config=UnifiedAgentConfig.high_budget())
+
 Full API (advanced):
     from victor import AgentOrchestrator, Settings
 

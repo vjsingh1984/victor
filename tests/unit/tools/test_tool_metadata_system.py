@@ -33,10 +33,10 @@ from victor.tools.base import (
     CostTier,
     ToolMetadata,
     ToolMetadataProvider,
-    ToolMetadataRegistry,
     ToolResult,
 )
 from victor.tools.decorators import tool
+from victor.tools.metadata_registry import ToolMetadataRegistry
 
 # =============================================================================
 # Test Fixtures
@@ -340,6 +340,8 @@ class TestToolMetadataRegistry:
 
     def test_register_tool_adds_to_cache(self):
         """register_tool should add metadata to cache."""
+        from victor.tools.metadata_registry import ToolMetadataEntry
+
         registry = ToolMetadataRegistry.get_instance()
         tool = MockTool()
 
@@ -347,7 +349,7 @@ class TestToolMetadataRegistry:
 
         metadata = registry.get_metadata("mock_tool")
         assert metadata is not None
-        assert isinstance(metadata, ToolMetadata)
+        assert isinstance(metadata, ToolMetadataEntry)
 
     def test_register_tool_indexes_by_category(self):
         """register_tool should index by category."""
@@ -366,8 +368,8 @@ class TestToolMetadataRegistry:
 
         registry.register_tool(tool)
 
-        tools_with_keyword = registry.get_tools_by_keyword("explicit")
-        assert "explicit_metadata_tool" in tools_with_keyword
+        tools_with_keyword = registry.get_by_keyword("explicit")
+        assert any(entry.name == "explicit_metadata_tool" for entry in tools_with_keyword)
 
     def test_unregister_tool_removes_from_cache(self):
         """unregister_tool should remove metadata from cache."""
@@ -392,19 +394,19 @@ class TestToolMetadataRegistry:
         assert registry.get_metadata("git_commit") is not None
 
     def test_search_tools_finds_by_name(self):
-        """search_tools should find tools by partial name match."""
+        """get_tools_matching_text should find tools by partial name match."""
         registry = ToolMetadataRegistry.get_instance()
         registry.refresh_from_tools([MockTool(), GitMockTool()], force=True)
 
-        results = registry.search_tools("git")
+        results = registry.get_tools_matching_text("git")
         assert "git_commit" in results
 
     def test_search_tools_finds_by_keyword(self):
-        """search_tools should find tools by keyword match."""
+        """get_tools_matching_text should find tools by keyword match."""
         registry = ToolMetadataRegistry.get_instance()
         registry.register_tool(MockToolWithExplicitMetadata())
 
-        results = registry.search_tools("explicit")
+        results = registry.get_tools_matching_text("explicit")
         assert "explicit_metadata_tool" in results
 
     def test_get_all_categories(self):
@@ -417,16 +419,16 @@ class TestToolMetadataRegistry:
         assert "testing" in categories
         assert "git" in categories
 
-    def test_export_all_returns_dict(self):
-        """export_all should return metadata as dictionaries."""
+    def test_get_all_returns_metadata_entries(self):
+        """get_all should return metadata entries keyed by tool name."""
         registry = ToolMetadataRegistry.get_instance()
         registry.register_tool(MockToolWithExplicitMetadata())
 
-        exported = registry.export_all()
+        exported = registry.get_all()
 
         assert "explicit_metadata_tool" in exported
-        assert exported["explicit_metadata_tool"]["category"] == "testing"
-        assert "explicit" in exported["explicit_metadata_tool"]["keywords"]
+        assert exported["explicit_metadata_tool"].category == "testing"
+        assert "explicit" in exported["explicit_metadata_tool"].keywords
 
     def test_get_statistics(self):
         """get_statistics should return useful stats."""
@@ -439,6 +441,46 @@ class TestToolMetadataRegistry:
         assert stats["total_tools"] == 2
         assert stats["total_categories"] >= 1
         assert stats["total_keywords"] >= 1
+
+    def test_base_reexport_warns_and_uses_canonical_registry(self):
+        """victor.tools.base should lazily expose the canonical registry class."""
+        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+
+        with pytest.deprecated_call(
+            match="Direct import of ToolMetadataRegistry from victor.tools.base is deprecated"
+        ):
+            from victor.tools.base import ToolMetadataRegistry as BaseToolMetadataRegistry
+
+        assert BaseToolMetadataRegistry is CanonicalToolMetadataRegistry
+
+    def test_package_reexport_uses_canonical_registry(self):
+        """victor.tools should re-export the canonical registry class."""
+        from victor.tools import ToolMetadataRegistry as PackageToolMetadataRegistry
+        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+
+        assert PackageToolMetadataRegistry is CanonicalToolMetadataRegistry
+
+    def test_metadata_module_wrapper_warns_and_adapts_legacy_shape(self):
+        """victor.tools.metadata should remain a deprecated compatibility wrapper."""
+        from victor.tools.metadata import ToolMetadataRegistry as LegacyToolMetadataRegistry
+        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+
+        CanonicalToolMetadataRegistry.reset_instance()
+
+        with pytest.deprecated_call(
+            match="Importing ToolMetadataRegistry from victor.tools.metadata is deprecated"
+        ):
+            legacy_registry = LegacyToolMetadataRegistry.get_instance()
+
+        legacy_registry.register_tool(MockToolWithExplicitMetadata())
+
+        metadata = legacy_registry.get_metadata("explicit_metadata_tool")
+        assert isinstance(metadata, ToolMetadata)
+        assert metadata is not None
+        assert metadata.category == "testing"
+        assert (
+            CanonicalToolMetadataRegistry.get_instance().get_metadata("explicit_metadata_tool") is not None
+        )
 
 
 # =============================================================================
@@ -588,8 +630,10 @@ class TestSemanticToolSelectorIntegration:
 
             await selector.initialize_tool_embeddings(tool_registry)
 
-        # Check registry was populated
-        metadata_registry = ToolMetadataRegistry.get_instance()
+        # Check canonical registry was populated
+        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+
+        metadata_registry = CanonicalToolMetadataRegistry.get_instance()
         assert metadata_registry.get_metadata("mock_tool") is not None
         assert metadata_registry.get_metadata("explicit_metadata_tool") is not None
 
@@ -646,8 +690,8 @@ class TestPluginToolSupport:
 
         # Should be searchable
         assert "my_plugin" in registry.get_tools_by_category("plugins")
-        assert "my_plugin" in registry.get_tools_by_keyword("plugin")
-        assert "my_plugin" in registry.search_tools("extension")
+        assert any(entry.name == "my_plugin" for entry in registry.get_by_keyword("plugin"))
+        assert "my_plugin" in registry.get_tools_matching_text("extension")
 
 
 # =============================================================================

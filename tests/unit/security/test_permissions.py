@@ -22,6 +22,8 @@ from victor.security.permissions import (
     PermissionMode,
     PermissionPolicy,
 )
+from victor.tools.enums import AccessMode, CostTier, DangerLevel, ExecutionCategory, Priority
+from victor.tools.metadata_registry import ToolMetadataRegistry
 
 
 class TestPermissionMode:
@@ -118,6 +120,9 @@ class TestAuthorizationDecision:
 
 
 class TestPermissionPolicy:
+    def teardown_method(self):
+        ToolMetadataRegistry.reset_instance()
+
     def test_readonly_allows_read_tools(self):
         policy = PermissionPolicy(PermissionMode.READ_ONLY)
         assert policy.authorize("read").allowed
@@ -203,3 +208,33 @@ class TestPermissionPolicy:
         assert len(DEFAULT_TOOL_PERMISSIONS) > 0
         assert "read" in DEFAULT_TOOL_PERMISSIONS
         assert "bash" in DEFAULT_TOOL_PERMISSIONS
+
+    def test_sync_from_tool_metadata_uses_singleton_registry(self):
+        registry = ToolMetadataRegistry.get_instance()
+
+        class MetadataTool:
+            name = "generated_write_tool"
+            description = "Generated write tool"
+            category = "testing"
+            keywords = ["write"]
+            stages = []
+            priority = Priority.MEDIUM
+            access_mode = AccessMode.WRITE
+            danger_level = DangerLevel.SAFE
+            cost_tier = CostTier.FREE
+            aliases = set()
+            mandatory_keywords = []
+            task_types = []
+            progress_params = []
+            execution_category = ExecutionCategory.WRITE
+
+        registry.refresh_from_tools([MetadataTool()], force=True)
+
+        policy = PermissionPolicy(PermissionMode.READ_ONLY)
+        synced = policy.sync_from_tool_metadata()
+
+        assert synced == 1
+        assert (
+            policy.get_required_permission("generated_write_tool")
+            == PermissionMode.WORKSPACE_WRITE
+        )

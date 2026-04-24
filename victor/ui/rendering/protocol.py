@@ -58,6 +58,7 @@ class StreamRenderer(Protocol):
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
         was_pruned: bool = False,
+        result: Any = None,
     ) -> None:
         """Handle tool execution result event."""
         ...

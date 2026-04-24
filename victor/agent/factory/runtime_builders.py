@@ -148,12 +148,12 @@ class RuntimeBuildersMixin:
         logger.debug(f"StreamingChatHandler created (idle_timeout={session_idle_timeout})")
         return handler
 
-    def create_streaming_chat_pipeline(self, coordinator: Any) -> "StreamingChatPipeline":
-        """Create the canonical StreamingChatPipeline bound to a coordinator."""
+    def create_streaming_chat_pipeline(self, runtime_owner: Any) -> "StreamingChatPipeline":
+        """Create the canonical StreamingChatPipeline bound to a runtime owner."""
         from victor.agent.streaming import create_streaming_chat_pipeline
 
-        pipeline = create_streaming_chat_pipeline(coordinator)
-        logger.debug("StreamingChatPipeline created and bound to coordinator")
+        pipeline = create_streaming_chat_pipeline(runtime_owner)
+        logger.debug("StreamingChatPipeline created and bound to runtime owner")
         return pipeline
 
     def create_streaming_metrics_collector(

@@ -24,12 +24,25 @@ import pytest
 from unittest.mock import MagicMock
 
 from victor.agent.prompt_coordinator import (
+    PromptCoordinator as LegacyPromptCoordinator,
+    PromptCoordinatorConfig as LegacyPromptCoordinatorConfig,
+    TaskContext as LegacyTaskContext,
+    create_prompt_coordinator as legacy_create_prompt_coordinator,
+)
+from victor.agent.services.prompt_compat import (
     PromptCoordinator,
     PromptCoordinatorConfig,
     TaskContext,
     create_prompt_coordinator,
 )
 from victor.framework.prompt_builder import PromptBuilder
+
+
+def test_legacy_prompt_coordinator_module_reexports_service_runtime():
+    assert LegacyPromptCoordinator is PromptCoordinator
+    assert LegacyPromptCoordinatorConfig is PromptCoordinatorConfig
+    assert LegacyTaskContext is TaskContext
+    assert legacy_create_prompt_coordinator is create_prompt_coordinator
 
 
 class TestPromptCoordinatorConfig:

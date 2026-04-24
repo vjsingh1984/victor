@@ -27,7 +27,7 @@ import json
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, AsyncMock, patch
-from victor.agent.coordinators.planning_coordinator import (
+from victor.agent.services.planning_runtime import (
     PlanningCoordinator,
     PlanningConfig,
     PlanningMode,

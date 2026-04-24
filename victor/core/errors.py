@@ -186,6 +186,19 @@ class ProviderError(AgentError):
         if status_code is not None:
             self.details["status_code"] = status_code
 
+    def __str__(self) -> str:
+        details = []
+        if self.provider:
+            details.append(f"provider={self.provider}")
+        if self.model:
+            details.append(f"model={self.model}")
+        if self.status_code is not None:
+            details.append(f"status_code={self.status_code}")
+
+        if not details:
+            return super().__str__()
+        return f"{super().__str__()} ({', '.join(details)})"
+
 
 class ProviderConnectionError(ProviderError):
     """Provider connection failures."""
@@ -336,6 +349,11 @@ class ToolError(AgentError):
         self.arguments = arguments or {}
         self.details["tool_name"] = tool_name
 
+    def __str__(self) -> str:
+        if not self.tool_name:
+            return super().__str__()
+        return f"{super().__str__()} (tool={self.tool_name})"
+
 
 class ToolNotFoundError(ToolError):
     """Tool not found in registry."""
@@ -423,6 +441,7 @@ class ConfigurationError(AgentError):
         invalid_fields: Optional[List[str]] = None,
         **kwargs: Any,
     ):
+        kwargs.setdefault("recoverable", False)
         super().__init__(
             message,
             category=ErrorCategory.CONFIG_INVALID,
@@ -433,6 +452,17 @@ class ConfigurationError(AgentError):
         self.details["config_key"] = config_key
         if self.invalid_fields:
             self.details["invalid_fields"] = self.invalid_fields
+
+    def __str__(self) -> str:
+        details = []
+        if self.config_key:
+            details.append(f"config_key={self.config_key}")
+        if self.invalid_fields:
+            details.append(f"invalid_fields={', '.join(self.invalid_fields)}")
+
+        if not details:
+            return super().__str__()
+        return f"{super().__str__()} ({'; '.join(details)})"
 
 
 class ValidationError(VictorError):

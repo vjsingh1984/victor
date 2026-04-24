@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Unit tests for ChatCoordinator protocol decoupling (Phase 6 DIP Hardening).
+"""Unit tests for chat runtime protocol boundaries during service-first migration.
 
 Tests:
 - Protocol importability and structure
 - runtime_checkable isinstance checks
-- ChatCoordinator instantiation with mock orchestrator
+- explicit legacy ChatCoordinator shim construction with mock orchestrator
 - Protocol completeness (key attributes declared)
 """
 
@@ -31,41 +31,121 @@ from unittest.mock import MagicMock
 
 
 class TestProtocolImports:
-    """Verify all protocols are importable and are Protocol subclasses."""
+    """Verify canonical service-hosted runtime protocols are importable."""
 
     def test_chat_context_protocol_importable(self):
-        from victor.agent.coordinators.chat_protocols import ChatContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatContextProtocol
 
         assert issubclass(ChatContextProtocol, Protocol)
 
     def test_tool_context_protocol_importable(self):
-        from victor.agent.coordinators.chat_protocols import ToolContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ToolContextProtocol
 
         assert issubclass(ToolContextProtocol, Protocol)
 
     def test_provider_context_protocol_importable(self):
-        from victor.agent.coordinators.chat_protocols import ProviderContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ProviderContextProtocol
 
         assert issubclass(ProviderContextProtocol, Protocol)
 
     def test_chat_orchestrator_protocol_importable(self):
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         assert issubclass(ChatOrchestratorProtocol, Protocol)
 
     def test_chat_orchestrator_protocol_is_runtime_checkable(self):
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         # runtime_checkable sets _is_runtime_protocol on the class
         assert getattr(ChatOrchestratorProtocol, "_is_runtime_protocol", False)
 
-    def test_importable_from_coordinators_package(self):
-        from victor.agent.coordinators import (
+    def test_importable_from_service_protocol_package(self):
+        from victor.agent.services.protocols import (
             ChatContextProtocol,
             ChatOrchestratorProtocol,
             ProviderContextProtocol,
             ToolContextProtocol,
         )
+
+        assert ChatContextProtocol is not None
+        assert ChatOrchestratorProtocol is not None
+        assert ProviderContextProtocol is not None
+        assert ToolContextProtocol is not None
+
+    def test_importable_from_legacy_coordinator_module_warns(self):
+        with pytest.warns(
+            DeprecationWarning,
+            match="victor.agent.coordinators.chat_protocols.ChatContextProtocol is deprecated",
+        ):
+            from victor.agent.coordinators.chat_protocols import (
+                ChatContextProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "victor.agent.coordinators.chat_protocols.ChatOrchestratorProtocol is deprecated"
+            ),
+        ):
+            from victor.agent.coordinators.chat_protocols import (
+                ChatOrchestratorProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match=(
+                "victor.agent.coordinators.chat_protocols.ProviderContextProtocol is deprecated"
+            ),
+        ):
+            from victor.agent.coordinators.chat_protocols import (
+                ProviderContextProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="victor.agent.coordinators.chat_protocols.ToolContextProtocol is deprecated",
+        ):
+            from victor.agent.coordinators.chat_protocols import (
+                ToolContextProtocol,
+            )
+
+        assert ChatContextProtocol is not None
+        assert ChatOrchestratorProtocol is not None
+        assert ProviderContextProtocol is not None
+        assert ToolContextProtocol is not None
+
+    def test_importable_from_coordinators_package(self):
+        with pytest.warns(
+            DeprecationWarning,
+            match="victor.agent.coordinators.ChatContextProtocol is deprecated",
+        ):
+            from victor.agent.coordinators import (
+                ChatContextProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="victor.agent.coordinators.ChatOrchestratorProtocol is deprecated",
+        ):
+            from victor.agent.coordinators import (
+                ChatOrchestratorProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="victor.agent.coordinators.ProviderContextProtocol is deprecated",
+        ):
+            from victor.agent.coordinators import (
+                ProviderContextProtocol,
+            )
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="victor.agent.coordinators.ToolContextProtocol is deprecated",
+        ):
+            from victor.agent.coordinators import (
+                ToolContextProtocol,
+            )
 
         assert ChatContextProtocol is not None
         assert ChatOrchestratorProtocol is not None
@@ -82,7 +162,7 @@ class TestProtocolCompleteness:
     """Verify protocols declare the expected key attributes."""
 
     def test_chat_context_declares_conversation(self):
-        from victor.agent.coordinators.chat_protocols import ChatContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatContextProtocol
 
         annotations = {}
         for cls in ChatContextProtocol.__mro__:
@@ -94,12 +174,12 @@ class TestProtocolCompleteness:
         assert "_cumulative_token_usage" in annotations
 
     def test_chat_context_declares_add_message(self):
-        from victor.agent.coordinators.chat_protocols import ChatContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatContextProtocol
 
         assert hasattr(ChatContextProtocol, "add_message")
 
     def test_tool_context_declares_tool_members(self):
-        from victor.agent.coordinators.chat_protocols import ToolContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ToolContextProtocol
 
         annotations = {}
         for cls in ToolContextProtocol.__mro__:
@@ -110,12 +190,12 @@ class TestProtocolCompleteness:
         assert "use_semantic_selection" in annotations
 
     def test_tool_context_declares_handle_tool_calls(self):
-        from victor.agent.coordinators.chat_protocols import ToolContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ToolContextProtocol
 
         assert hasattr(ToolContextProtocol, "_handle_tool_calls")
 
     def test_provider_context_declares_provider_members(self):
-        from victor.agent.coordinators.chat_protocols import ProviderContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ProviderContextProtocol
 
         annotations = {}
         for cls in ProviderContextProtocol.__mro__:
@@ -126,12 +206,12 @@ class TestProtocolCompleteness:
         assert "max_tokens" in annotations
 
     def test_provider_context_declares_check_cancellation(self):
-        from victor.agent.coordinators.chat_protocols import ProviderContextProtocol
+        from victor.agent.services.protocols.chat_runtime import ProviderContextProtocol
 
         assert hasattr(ProviderContextProtocol, "_check_cancellation")
 
     def test_composite_protocol_inherits_all_sub_protocols(self):
-        from victor.agent.coordinators.chat_protocols import (
+        from victor.agent.services.protocols.chat_runtime import (
             ChatContextProtocol,
             ChatOrchestratorProtocol,
             ProviderContextProtocol,
@@ -146,7 +226,7 @@ class TestProtocolCompleteness:
         assert ProviderContextProtocol in mro
 
     def test_composite_protocol_declares_task_members(self):
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         annotations = {}
         for cls in ChatOrchestratorProtocol.__mro__:
@@ -156,7 +236,7 @@ class TestProtocolCompleteness:
         assert "unified_tracker" in annotations
 
     def test_composite_protocol_declares_recovery_members(self):
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         annotations = {}
         for cls in ChatOrchestratorProtocol.__mro__:
@@ -166,7 +246,7 @@ class TestProtocolCompleteness:
         assert hasattr(ChatOrchestratorProtocol, "_record_intelligent_outcome")
 
     def test_composite_protocol_declares_presentation_members(self):
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         annotations = {}
         for cls in ChatOrchestratorProtocol.__mro__:
@@ -183,27 +263,29 @@ class TestProtocolCompleteness:
 
 
 class TestChatCoordinatorWithMock:
-    """Verify ChatCoordinator can be instantiated with a mock orchestrator."""
+    """Verify ChatCoordinator remains available as a deprecated shim."""
 
     def test_instantiation_with_magicmock(self):
         from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
         mock_orch = MagicMock()
-        coordinator = ChatCoordinator(mock_orch)
+        with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):
+            coordinator = ChatCoordinator(mock_orch)
         assert coordinator._orchestrator is mock_orch
 
     def test_lazy_handlers_are_none_initially(self):
         from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 
         mock_orch = MagicMock()
-        coordinator = ChatCoordinator(mock_orch)
+        with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):
+            coordinator = ChatCoordinator(mock_orch)
         assert coordinator._intent_classification_handler is None
         assert coordinator._continuation_handler is None
         assert coordinator._tool_execution_handler is None
 
     def test_mock_missing_attribute_fails_isinstance(self):
         """A mock missing a protocol attribute fails isinstance."""
-        from victor.agent.coordinators.chat_protocols import ChatOrchestratorProtocol
+        from victor.agent.services.protocols.chat_runtime import ChatOrchestratorProtocol
 
         class Incomplete:
             pass

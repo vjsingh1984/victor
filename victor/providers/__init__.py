@@ -31,11 +31,10 @@ from victor.providers.base import (
     is_streaming_provider,
     is_tool_calling_provider,
 )
+from victor.core.circuit_breaker import CircuitBreakerError, CircuitState
 from victor.providers.circuit_breaker import (
     CircuitBreaker,
-    CircuitBreakerError,
     CircuitBreakerRegistry,
-    CircuitState,
 )
 from victor.providers.registry import ProviderRegistry
 

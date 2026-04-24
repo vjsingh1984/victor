@@ -6,8 +6,7 @@ for maintainability.
 """
 
 from victor.framework.agent import Agent, ChatSession
-from victor.framework.config import AgentConfig
-from victor.agent.config import UnifiedAgentConfig
+from victor.framework.config import AgentConfig, UnifiedAgentConfig
 from victor.framework.protocols import (
     ChunkType,
     ConversationStateProtocol,
@@ -105,8 +104,8 @@ PUBLIC_API_NAMES = [
     "progress_event",
     "milestone_event",
     # Config
-    "AgentConfig",
     "UnifiedAgentConfig",
+    "AgentConfig",  # Deprecated compatibility surface
     # Shim
     "FrameworkShim",
     "get_vertical",
