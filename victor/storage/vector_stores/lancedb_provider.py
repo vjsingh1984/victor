@@ -111,30 +111,23 @@ class LanceDBProvider(BaseEmbeddingProvider):
         self.embedding_model = create_embedding_model(embedding_config)
         await self.embedding_model.initialize()
 
-        print("🔧 Initializing LanceDB provider")
-        print("📦 Vector Store: LanceDB")
-        print(f"🤖 Embedding Model: {model_name} ({model_type})")
-
         # Setup LanceDB
         persist_dir = self.config.persist_directory
         if persist_dir:
             persist_dir = Path(persist_dir).expanduser()
             persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Using persistent storage: {persist_dir}")
         else:
             # LanceDB requires a directory, use centralized path
             from victor.config.settings import get_project_paths
 
             persist_dir = get_project_paths().global_embeddings_dir / "lancedb"
             persist_dir.mkdir(parents=True, exist_ok=True)
-            print(f"📁 Using default storage: {persist_dir}")
 
         # Connect to LanceDB
         self.db = lancedb.connect(str(persist_dir))
 
         # Get or create table
         table_name = self.config.extra_config.get("table_name", "embeddings")
-        print(f"📚 Table: {table_name}")
 
         # Check if table exists
         from victor.storage.vector_stores._lancedb_compat import get_table_names
@@ -143,13 +136,16 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if table_name not in existing_tables:
             # Create empty table with schema
             # We'll add data later when indexing
-            print(f"📝 Creating new table: {table_name}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Creating new LanceDB table: {table_name}")
         else:
             self.table = self.db.open_table(table_name)
-            print(f"📖 Opened existing table: {table_name}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Opened existing LanceDB table: {table_name}")
 
         self._initialized = True
-        print("✅ LanceDB provider initialized!")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text.

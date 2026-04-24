@@ -980,6 +980,7 @@ class OrchestratorServiceProvider:
         return SystemPromptBuilder(
             provider_name=provider_name,
             model=model,
+            concise_mode=True,  # Enable concise mode for more focused responses
         )
 
     def _create_tool_selector(self) -> "ToolSelectorProtocol":
@@ -1098,7 +1099,7 @@ class OrchestratorServiceProvider:
         Returns:
             StreamingRecoveryCoordinator instance
         """
-        from victor.agent.recovery_coordinator import StreamingRecoveryCoordinator
+        from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
         from victor.agent.protocols import (
             RecoveryHandlerProtocol,
             StreamingHandlerProtocol,
@@ -1215,7 +1216,7 @@ class OrchestratorServiceProvider:
         Returns:
             ToolCoordinator instance
         """
-        from victor.agent.coordinators.tool_coordinator import (
+        from victor.agent.services.tool_compat import (
             ToolCoordinatorConfig,
             create_tool_coordinator,
         )
@@ -1280,7 +1281,7 @@ class OrchestratorServiceProvider:
         Returns:
             StateCoordinator instance
         """
-        from victor.agent.state_coordinator import (
+        from victor.agent.services.state_compat import (
             StateCoordinator,
             StateCoordinatorConfig,
         )
@@ -1321,7 +1322,7 @@ class OrchestratorServiceProvider:
         Returns:
             PromptCoordinator instance
         """
-        from victor.agent.prompt_coordinator import (
+        from victor.agent.services.prompt_compat import (
             PromptCoordinator,
             PromptCoordinatorConfig,
         )

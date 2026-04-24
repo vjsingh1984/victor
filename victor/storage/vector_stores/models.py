@@ -135,18 +135,26 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Import here to avoid circular imports
         from victor.storage.embeddings.service import EmbeddingService
+        import logging
 
-        print(f"🤖 Loading sentence-transformer model: {self.config.model_name}")
+        logger = logging.getLogger(__name__)
 
         # Use shared EmbeddingService singleton for memory efficiency
         # This shares the model with IntentClassifier and SemanticToolSelector
         self._embedding_service = EmbeddingService.get_instance(model_name=self.config.model_name)
 
+        # Only log if this is the first time loading this model
+        if not self._embedding_service._initialized:
+            logger.info(f"Loading sentence-transformer model: {self.config.model_name}")
+
         # Ensure model is loaded (lazy loading)
         self._embedding_service._ensure_model_loaded()
 
         self._initialized = True
-        print(f"✅ Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}")
+
+        # Only log success once per model
+        if self._embedding_service._initialized:
+            logger.info(f"Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}")
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text."""

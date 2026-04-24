@@ -163,7 +163,7 @@ class ToolDeduplicationTracker:
     def _check_search_redundancy(self, tool_name: str, args: Dict[str, Any]) -> bool:
         """Check if search/grep call is redundant.
 
-        Blocks exact duplicate queries and semantically similar queries.
+        Blocks exact duplicate queries only.
         Different queries (even with overlapping words) are allowed —
         the agent often needs multiple targeted searches to explore a codebase.
         """
@@ -187,12 +187,8 @@ class ToolDeduplicationTracker:
             recent_query_lower = str(recent_query).lower().strip()
             recent_mode = recent.args.get("mode", "")
 
-            # Block exact same query with same mode
+            # Block exact same query with same mode (but NOT synonyms - allow related searches)
             if query_lower == recent_query_lower and mode == recent_mode:
-                return True
-
-            # Block semantically similar queries (synonyms)
-            if self._queries_are_synonyms(query_lower, recent_query_lower):
                 return True
 
         return False
