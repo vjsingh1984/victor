@@ -339,24 +339,14 @@ class TaskCompletionDetector:
         {
             "write",
             "edit",
-            "edit_file",
-            "create_file",
-            "write_file",
-            "save_file",
-            "create",
-            "file_edit",
-            "modify_file",
         }
     )
 
     # Tools that execute code
     EXECUTE_TOOLS: frozenset = frozenset(
         {
-            "execute_bash",
-            "bash",
-            "run_command",
-            "execute_code",
-            "run_python",
+            "shell",
+            "test",
         }
     )
 
