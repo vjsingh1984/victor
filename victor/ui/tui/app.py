@@ -998,6 +998,14 @@ class VictorTUI(App):
                     elif "tool_result" in metadata:
                         tool_data = metadata["tool_result"]
                         try:
+                            tool_name = str(tool_data.get("name", "tool"))
+                            error_message = tool_data.get("error")
+                            if isinstance(error_message, str) and error_message.strip():
+                                self._add_error_message(f"{tool_name}: {error_message.strip()}")
+                            if tool_data.get("was_pruned"):
+                                self._add_system_message(
+                                    f"Tool output for {tool_name} was pruned before sending to the model."
+                                )
                             self._finish_tool_call(
                                 success=tool_data.get("success", True),
                                 elapsed=tool_data.get("elapsed"),

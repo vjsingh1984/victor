@@ -430,6 +430,130 @@ def test_stream_response_handles_metadata_tool_results_with_follow_ups() -> None
     )
 
 
+def test_stream_response_surfaces_tool_result_error_details() -> None:
+    """TUI should surface failed tool-result error text, not just a red widget."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._add_error_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "read",
+                    "success": False,
+                    "elapsed": 0.2,
+                    "arguments": {"path": "/tmp/test.py"},
+                    "error": "Permission denied",
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("trace main"))
+
+    app._add_error_message.assert_called_once_with("read: Permission denied")
+    app._finish_tool_call.assert_called_once_with(
+        success=False,
+        elapsed=0.2,
+        follow_up_suggestions=None,
+    )
+
+
+def test_stream_response_surfaces_pruned_tool_notice() -> None:
+    """TUI should disclose when tool output was pruned before model submission."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "code_search",
+                    "success": True,
+                    "elapsed": 0.5,
+                    "arguments": {"query": "main"},
+                    "was_pruned": True,
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("trace main"))
+
+    app._add_system_message.assert_called_once_with(
+        "Tool output for code_search was pruned before sending to the model."
+    )
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.5,
+        follow_up_suggestions=None,
+    )
+
+
+def test_stream_response_surfaces_file_preview_metadata() -> None:
+    """TUI should surface file preview metadata as a system message."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={"path": "/tmp/test.py", "file_preview": "print('hello')"},
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("preview"))
+
+    app._add_system_message.assert_called_once_with("File preview: /tmp/test.py\nprint('hello')")
+    app._record_message.assert_not_called()
+
+
+def test_stream_response_surfaces_edit_preview_metadata() -> None:
+    """TUI should surface edit preview metadata as a system message."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={"path": "/tmp/test.py", "edit_preview": "-old\n+new"},
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("preview"))
+
+    app._add_system_message.assert_called_once_with("Edit preview: /tmp/test.py\n-old\n+new")
+    app._record_message.assert_not_called()
+
+
 def test_stream_response_normalizes_cumulative_content_snapshots() -> None:
     """TUI streaming should not duplicate cumulative provider content."""
     app = VictorTUI()
@@ -613,6 +737,36 @@ def test_stream_response_handles_inline_thinking_markers() -> None:
     app._hide_thinking.assert_called_once()
     app._conversation_log.update_streaming.assert_called_once_with("Visible")
     app._record_message.assert_called_once_with("assistant", "Visible")
+
+
+def test_stream_response_aborts_excessive_inline_thinking() -> None:
+    """TUI should stop runaway inline-thinking streams and surface a warning."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="<think>", metadata=None)
+        yield StreamChunk(content="123456", metadata=None)
+        yield StreamChunk(content="Visible", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    with patch("victor.agent.response_sanitizer.StreamingContentFilter.MAX_THINKING_CONTENT", 5):
+        asyncio.run(app._stream_response("hello"))
+
+    app._show_thinking.assert_called_once()
+    app._hide_thinking.assert_called_once()
+    app._add_system_message.assert_called_once()
+    assert "Thinking content exceeded 5 chars" in app._add_system_message.call_args[0][0]
+    app._record_message.assert_not_called()
 
 
 def test_input_submit_ignored_while_processing_keeps_draft() -> None:
