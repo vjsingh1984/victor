@@ -689,7 +689,7 @@ async def web_search(
             data=data,
             headers={"User-Agent": _USER_AGENT},
             follow_redirects=True,
-            timeout_seconds=15.0,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
             web_config=config,
         )
 
@@ -780,7 +780,7 @@ async def web_fetch(url: str, _exec_ctx: Optional[Dict[str, Any]] = None) -> Dic
             url,
             headers={"User-Agent": _USER_AGENT},
             follow_redirects=True,
-            timeout_seconds=15.0,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
             web_config=config,
         )
         if status_code != 200:
@@ -891,7 +891,7 @@ async def _summarize_search(
             data=data,
             headers={"User-Agent": _USER_AGENT},
             follow_redirects=True,
-            timeout_seconds=15.0,
+            timeout_seconds=30.0,  # Increased from 15.0 for better reliability
             web_config=config,
         )
         if status_code != 200:
