@@ -139,6 +139,11 @@ DEFAULT_READ_LIMIT = 500
 
 # Canonical tool name for file reading (from centralized registry)
 CANONICAL_READ_TOOL = ToolNames.READ
+CANONICAL_LIST_TOOL = ToolNames.LS
+CANONICAL_WRITE_TOOL = ToolNames.WRITE
+CANONICAL_EDIT_TOOL = ToolNames.EDIT
+CANONICAL_SHELL_TOOL = ToolNames.SHELL
+CANONICAL_TEST_TOOL = ToolNames.TEST
 
 
 # =============================================================================
@@ -441,7 +446,7 @@ class UnifiedTaskConfigLoader:
 
                 # Restructure to match our expected format
                 self._config = {
-                    "task_types": task_config.get("task_types", {}),
+                    "task_types": self._normalize_task_types(task_config.get("task_types", {})),
                     "global": {
                         "max_total_iterations": 50,
                         "min_content_threshold": 150,
@@ -464,6 +469,37 @@ class UnifiedTaskConfigLoader:
         """Force reload configuration."""
         self._config = None
         self._load_config()
+
+    @staticmethod
+    def _normalize_task_types(task_types: Any) -> Dict[str, Any]:
+        """Normalize loaded task types to canonical runtime tool names."""
+        if not isinstance(task_types, dict):
+            return {}
+
+        normalized: Dict[str, Any] = {}
+        for task_name, task_data in task_types.items():
+            if not isinstance(task_data, dict):
+                continue
+            task_copy = dict(task_data)
+            required = task_data.get("required_tools", [])
+            task_copy["required_tools"] = [
+                get_canonical_name(tool) if isinstance(tool, str) else tool for tool in required
+            ]
+
+            raw_stage_tools = task_data.get("stage_tools", {})
+            normalized_stage_tools = {}
+            if isinstance(raw_stage_tools, dict):
+                for stage_name, tools in raw_stage_tools.items():
+                    if isinstance(tools, list):
+                        normalized_stage_tools[stage_name] = [
+                            get_canonical_name(tool) if isinstance(tool, str) else tool
+                            for tool in tools
+                        ]
+                    else:
+                        normalized_stage_tools[stage_name] = []
+            task_copy["stage_tools"] = normalized_stage_tools
+            normalized[task_name] = task_copy
+        return normalized
 
     def get_task_config(self, task_type: TrackerTaskType) -> TaskConfig:
         """Get configuration for a specific task type."""
@@ -794,10 +830,9 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
     # Tools that perform write/modify actions (don't count toward exploration limit)
     WRITE_TOOLS = {
-        "edit_files",
-        "write_file",
-        "shell",
-        "bash",
+        CANONICAL_EDIT_TOOL,
+        CANONICAL_WRITE_TOOL,
+        CANONICAL_SHELL_TOOL,
         "git_commit",
         "git_push",
         "create_file",
@@ -819,12 +854,13 @@ class UnifiedTaskTracker(ModeAwareMixin):
         self._progress.tool_calls += 1
         self._progress.iteration_count += 1
         self._progress.total_turns += 1
+        canonical_tool_name = get_canonical_name(tool_name)
 
         # Classify as exploration vs action
         # Shell commands with write-like operations are actions
-        is_write_operation = tool_name in self.WRITE_TOOLS
-        if tool_name in {"shell", "bash"} and arguments:
-            cmd = arguments.get("cmd", "")
+        is_write_operation = canonical_tool_name in self.WRITE_TOOLS
+        if canonical_tool_name == CANONICAL_SHELL_TOOL and arguments:
+            cmd = arguments.get("cmd") or arguments.get("command", "")
             # Check for write-like shell commands
             write_commands = [
                 "mkdir",
@@ -846,22 +882,22 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
         # Delegate to BudgetManager if available (parallel operation)
         if self._budget_manager:
-            self._budget_manager.record_tool_call(tool_name, is_write_operation)
+            self._budget_manager.record_tool_call(canonical_tool_name, is_write_operation)
 
         # Update milestones
-        self._update_milestones(tool_name, arguments)
+        self._update_milestones(canonical_tool_name, arguments)
 
         # Update loop detection
-        self._update_loop_state(tool_name, arguments)
+        self._update_loop_state(canonical_tool_name, arguments)
 
         # Track resources
-        self._track_resource(tool_name, arguments)
+        self._track_resource(canonical_tool_name, arguments)
 
         # Update stage
-        self._update_stage(tool_name)
+        self._update_stage(canonical_tool_name)
 
         logger.debug(
-            f"UnifiedTaskTracker: tool_call={tool_name}, "
+            f"UnifiedTaskTracker: tool_call={canonical_tool_name}, "
             f"iteration={self._progress.iteration_count}, "
             f"exploration={self._progress.exploration_iterations}, "
             f"action={self._progress.action_iterations}"
@@ -1115,37 +1151,39 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
     def _update_milestones(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Update milestones based on tool call."""
-        if tool_name in {"list_directory", "code_search", "semantic_code_search"}:
+        if tool_name in {CANONICAL_LIST_TOOL, "code_search", "semantic_code_search"}:
             self._progress.milestones.add(Milestone.TARGET_IDENTIFIED)
 
-        elif get_canonical_name(tool_name) == CANONICAL_READ_TOOL:
+        elif tool_name == CANONICAL_READ_TOOL:
             path = arguments.get("path", "")
             if path:
                 self._progress.files_read.add(path)
                 if path in self._progress.target_files:
                     self._progress.milestones.add(Milestone.TARGET_READ)
 
-        elif tool_name in {"edit_files", "write_file"}:
+        elif tool_name in {CANONICAL_EDIT_TOOL, CANONICAL_WRITE_TOOL}:
             self._progress.milestones.add(Milestone.CHANGE_MADE)
-            if tool_name == "edit_files":
-                files = arguments.get("files", [])
-                if isinstance(files, list):
-                    for f in files:
-                        if isinstance(f, dict):
-                            self._progress.files_modified.add(f.get("path", ""))
+            if tool_name == CANONICAL_EDIT_TOOL:
+                ops = arguments.get("ops") or arguments.get("files", [])
+                if isinstance(ops, list):
+                    for op in ops:
+                        if isinstance(op, dict):
+                            path = op.get("path") or op.get("new_path")
+                            if path:
+                                self._progress.files_modified.add(path)
             else:
                 path = arguments.get("path", "")
                 if path:
                     self._progress.files_modified.add(path)
 
-        elif tool_name in {"run_tests", "execute_bash"}:
+        elif tool_name in {CANONICAL_TEST_TOOL, CANONICAL_SHELL_TOOL}:
             if Milestone.CHANGE_MADE in self._progress.milestones:
                 self._progress.milestones.add(Milestone.CHANGE_VERIFIED)
 
     def _update_loop_state(self, tool_name: str, arguments: Dict[str, Any]) -> None:
         """Update loop detection state."""
         # Track file reads with offset-aware detection
-        if get_canonical_name(tool_name) == CANONICAL_READ_TOOL:
+        if tool_name == CANONICAL_READ_TOOL:
             self._track_file_read(arguments)
         else:
             # Track base resources for non-file operations
@@ -1194,15 +1232,14 @@ class UnifiedTaskTracker(ModeAwareMixin):
 
     def _update_stage(self, tool_name: str) -> None:
         """Update conversation stage based on tool usage."""
-        canonical = get_canonical_name(tool_name)
-        if canonical in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.CODE_SEARCH}:
+        if tool_name in {CANONICAL_READ_TOOL, ToolNames.GREP, ToolNames.CODE_SEARCH}:
             if self._progress.stage == ConversationStage.INITIAL:
                 self._progress.stage = ConversationStage.READING
 
-        elif tool_name in {"edit_files", "write_file"}:
+        elif tool_name in {CANONICAL_EDIT_TOOL, CANONICAL_WRITE_TOOL}:
             self._progress.stage = ConversationStage.EXECUTING
 
-        elif tool_name in {"run_tests", "execute_bash"}:
+        elif tool_name in {CANONICAL_TEST_TOOL, CANONICAL_SHELL_TOOL}:
             if Milestone.CHANGE_MADE in self._progress.milestones:
                 self._progress.stage = ConversationStage.VERIFYING
 
@@ -1431,9 +1468,10 @@ class UnifiedTaskTracker(ModeAwareMixin):
             "timeout",
         }
 
-        params = list(get_progress_params(tool_name))
+        canonical_tool_name = get_canonical_name(tool_name)
+        params = list(get_progress_params(canonical_tool_name))
         if params:
-            sig_parts = [tool_name]
+            sig_parts = [canonical_tool_name]
             for param in params:
                 # Skip volatile fields for progressive tools
                 if param in volatile_fields:
@@ -1452,7 +1490,7 @@ class UnifiedTaskTracker(ModeAwareMixin):
             # Filter out volatile fields for non-progressive tools too
             stable_args = {k: v for k, v in arguments.items() if k not in volatile_fields}
             args_str = str(sorted(stable_args.items()))
-            base_sig = f"{tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
+            base_sig = f"{canonical_tool_name}:{hashlib.md5(args_str.encode()).hexdigest()[:8]}"
 
             # Add stage for context-awareness
             if include_stage:
@@ -1475,21 +1513,21 @@ class UnifiedTaskTracker(ModeAwareMixin):
             directory = arguments.get("directory", ".")
             return f"search:{directory}:{query[:50]}" if query else None
         elif canonical == ToolNames.SHELL:
-            command = arguments.get("command", "")
+            command = arguments.get("cmd") or arguments.get("command", "")
             return f"bash:{command[:50]}" if command else None
         return None
 
     def _get_base_resource_key(self, tool_name: str, arguments: Dict[str, Any]) -> Optional[str]:
         """Generate base resource key for loop detection."""
-        if tool_name == "list_directory":
+        if tool_name == CANONICAL_LIST_TOOL:
             path = arguments.get("path", "")
             return f"dir:{path}" if path else None
         elif tool_name in {"code_search", "semantic_code_search"}:
             query = arguments.get("query", "")
             directory = arguments.get("directory", ".")
             return f"search:{directory}:{query[:20]}" if query else None
-        elif tool_name == "execute_bash":
-            command = arguments.get("command", "")
+        elif tool_name == CANONICAL_SHELL_TOOL:
+            command = arguments.get("cmd") or arguments.get("command", "")
             if command:
                 parts = command.strip().split()
                 if parts:
