@@ -14,7 +14,6 @@ Dead‑letter queue stores unrecoverable records.
 
 import json
 import requests
-import requests
 import logging
 import os
 import sqlite3
@@ -22,16 +21,18 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Tuple
 
+from victor.config.settings import VICTOR_DIR_NAME
+
 # Basic configuration
 LOG = logging.getLogger("data_pipeline")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 # Constants
-CHECKPOINT_DIR = Path("victor/data/checkpoints")
-DEAD_LETTER_DIR = Path("victor/data/dead_letter")
+CHECKPOINT_DIR = Path(VICTOR_DIR_NAME) / "data" / "checkpoints"
+DEAD_LETTER_DIR = Path(VICTOR_DIR_NAME) / "data" / "dead_letter"
 CHECKPOINT_FILE = CHECKPOINT_DIR / "pipeline_state.json"
-DB_PATH = Path("victor/data/pipeline.db")
-NOTIF_QUEUE_FILE = Path("victor/data/notification_queue.json")
+DB_PATH = Path(VICTOR_DIR_NAME) / "data" / "pipeline.db"
+NOTIF_QUEUE_FILE = Path(VICTOR_DIR_NAME) / "data" / "notification_queue.json"
 
 # Ensure directories exist
 CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
