@@ -191,9 +191,10 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 "IMPORTANT - TOOL USAGE REQUIRED:",
                 "- You MUST use the provided tools to complete tasks.",
                 "- DO NOT speculate or guess about file contents - READ them with tools.",
-                "- When asked to read a file, call read() or read_file() immediately.",
-                "- When asked to run a command, call shell() or bash() immediately.",
+                "- When asked to read a file, call read() immediately.",
+                "- When asked to run a command, call shell() immediately.",
                 "- Only provide your answer AFTER gathering information with tools.",
+                "- For multiline shell scripts, keep the tool call structured and use a heredoc inside cmd.",
                 "",
                 "TOOL CALL FORMAT:",
                 "- When calling tools, use structured function calls in JSON format.",
@@ -677,7 +678,7 @@ class OllamaToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         if capabilities.native_tool_calls:
             hints = [
                 "TOOL USAGE:",
-                "- Use list_directory and read_file to inspect code.",
+                "- Use ls and read to inspect code.",
                 "- Call tools one at a time, waiting for results.",
                 "- After 2-3 successful tool calls, provide your answer.",
                 "- Do NOT make identical repeated tool calls.",

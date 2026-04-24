@@ -225,6 +225,10 @@ class TestOpenAIToolGuidance:
         )
         assert len(prompt) < 200
 
+    def test_openai_alias_boost_matches_canonical(self, openai_strategy):
+        """Legacy tool aliases should resolve to the canonical boost class."""
+        assert openai_strategy.get_tool_boost("read_file") == openai_strategy.get_tool_boost("read")
+
 
 class TestToolGuidanceRegistry:
     """Tests for the strategy registry/factory."""
@@ -332,6 +336,16 @@ class TestConsolidationDetection:
             {"tool": "read", "args": {"path": "main.py"}},
             {"tool": "symbol", "args": {"file_path": "main.py", "symbol_name": "foo"}},
             {"tool": "read", "args": {"path": "main.py", "offset": 100}},
+        ]
+        assert deepseek_strategy.should_consolidate_calls(tool_history) is True
+
+    def test_detect_legacy_aliases_as_redundant(self, deepseek_strategy):
+        """Legacy aliases should normalize before redundancy checks."""
+        tool_history = [
+            {"tool": "list_directory", "args": {"path": "."}},
+            {"tool": "ls", "args": {"path": "./src"}},
+            {"tool": "list_directory", "args": {"path": "./tests"}},
+            {"tool": "ls", "args": {"path": "./docs"}},
         ]
         assert deepseek_strategy.should_consolidate_calls(tool_history) is True
 
