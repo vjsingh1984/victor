@@ -11,7 +11,11 @@ from typing import TYPE_CHECKING
 
 from victor.agent.response_sanitizer import create_streaming_filter
 from victor.ui.rendering.protocol import StreamRenderer
-from victor.ui.rendering.utils import StreamDeltaNormalizer, normalize_reasoning_content
+from victor.ui.rendering.utils import (
+    StreamDeltaNormalizer,
+    is_thinking_status_message,
+    normalize_reasoning_content,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +145,15 @@ async def stream_response(
                 )
             # Handle status messages (thinking indicator, etc.)
             elif chunk.metadata and "status" in chunk.metadata:
-                renderer.on_status(chunk.metadata["status"])
+                status_message = str(chunk.metadata["status"])
+                if is_thinking_status_message(status_message):
+                    if not suppress_thinking and not was_thinking:
+                        logger.debug("→ Entering thinking mode (status event)")
+                        renderer.on_thinking_start()
+                        reasoning_normalizer.reset()
+                        was_thinking = True
+                else:
+                    renderer.on_status(status_message)
             # Handle file preview
             elif chunk.metadata and "file_preview" in chunk.metadata:
                 renderer.on_file_preview(

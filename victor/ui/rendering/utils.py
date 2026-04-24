@@ -24,6 +24,8 @@ _REASONING_PREFIX_MARKERS = (
     "Thinking...",
 )
 
+_THINKING_STATUS_PREFIXES = ("💭", "🤔", "◌")
+
 
 class StreamDeltaNormalizer:
     """Normalize provider stream chunks to append-only deltas.
@@ -105,6 +107,18 @@ def normalize_reasoning_content(text: str) -> str:
         if normalized.startswith(marker):
             return normalized[len(marker) :].lstrip()
     return normalized
+
+
+def is_thinking_status_message(message: str) -> bool:
+    """Return True for generic thinking-status messages that should use thinking UI."""
+    normalized = message.strip()
+    for prefix in _THINKING_STATUS_PREFIXES:
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix) :].strip()
+            break
+
+    lowered = normalized.lower()
+    return lowered in {"thinking", "thinking...", "thinking…"}
 
 
 def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:

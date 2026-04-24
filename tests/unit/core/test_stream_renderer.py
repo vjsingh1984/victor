@@ -938,13 +938,51 @@ class TestStreamResponse:
         """Test stream_response handles status metadata."""
 
         async def mock_stream():
-            yield StreamChunk(content="", metadata={"status": "Thinking..."})
+            yield StreamChunk(content="", metadata={"status": "Starting..."})
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
 
         await stream_response(mock_agent, "test message", mock_renderer)
 
-        mock_renderer.on_status.assert_called_once_with("Thinking...")
+        mock_renderer.on_status.assert_called_once_with("Starting...")
+
+    @pytest.mark.asyncio
+    async def test_maps_generic_thinking_status_to_thinking_ui(self, mock_agent, mock_renderer):
+        """Generic thinking statuses should use thinking UI instead of a status line."""
+
+        async def mock_stream():
+            yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
+            yield StreamChunk(content="Answer", metadata=None)
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+
+        await stream_response(mock_agent, "test message", mock_renderer)
+
+        mock_renderer.on_thinking_start.assert_called_once()
+        mock_renderer.on_status.assert_not_called()
+        mock_renderer.on_thinking_end.assert_called_once()
+        mock_renderer.on_content.assert_called_once_with("Answer")
+
+    @pytest.mark.asyncio
+    async def test_suppressed_generic_thinking_status_is_hidden(self, mock_agent, mock_renderer):
+        """Suppress-thinking mode should hide generic thinking statuses entirely."""
+
+        async def mock_stream():
+            yield StreamChunk(content="", metadata={"status": "Thinking..."})
+            yield StreamChunk(content="Answer", metadata=None)
+
+        mock_agent.stream_chat = MagicMock(return_value=mock_stream())
+
+        await stream_response(
+            mock_agent,
+            "test message",
+            mock_renderer,
+            suppress_thinking=True,
+        )
+
+        mock_renderer.on_status.assert_not_called()
+        mock_renderer.on_thinking_start.assert_not_called()
+        mock_renderer.on_content.assert_called_once_with("Answer")
 
     @pytest.mark.asyncio
     async def test_processes_file_preview_event(self, mock_agent, mock_renderer):
