@@ -156,6 +156,35 @@ _DEPRECATED_EXPORTS = {
         "victor.agent.protocols.ToolCoordinatorProtocol is deprecated compatibility "
         "surface. Prefer ToolServiceProtocol."
     ),
+    "ChunkGeneratorProtocol": (
+        "victor.agent.protocols.ChunkGeneratorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.ChunkRuntimeProtocol."
+    ),
+    "ToolPlannerProtocol": (
+        "victor.agent.protocols.ToolPlannerProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.ToolPlanningRuntimeProtocol."
+    ),
+    "TaskCoordinatorProtocol": (
+        "victor.agent.protocols.TaskCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.TaskRuntimeProtocol."
+    ),
+    "StateCoordinatorProtocol": (
+        "victor.agent.protocols.StateCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.StateRuntimeProtocol."
+    ),
+    "PromptCoordinatorProtocol": (
+        "victor.agent.protocols.PromptCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.PromptRuntimeProtocol."
+    ),
+    "StreamingRecoveryCoordinatorProtocol": (
+        "victor.agent.protocols.StreamingRecoveryCoordinatorProtocol is deprecated "
+        "compatibility surface. Prefer "
+        "victor.agent.services.protocols.StreamingRecoveryRuntimeProtocol."
+    ),
+    "RLCoordinatorProtocol": (
+        "victor.agent.protocols.RLCoordinatorProtocol is deprecated compatibility "
+        "surface. Prefer victor.agent.services.protocols.RLLearningRuntimeProtocol."
+    ),
 }
 
 

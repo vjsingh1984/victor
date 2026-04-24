@@ -21,7 +21,7 @@ import pytest
 from unittest.mock import Mock
 
 from victor.agent.service_provider import OrchestratorServiceProvider
-from victor.agent.protocols import ChunkGeneratorProtocol
+from victor.agent.services.protocols import ChunkRuntimeProtocol
 from victor.config.settings import Settings
 
 
@@ -100,18 +100,18 @@ class TestChunkGeneratorDI:
     """Tests for ChunkGenerator DI resolution."""
 
     def test_chunk_generator_protocol_registered(self, service_provider):
-        """Test that ChunkGeneratorProtocol is registered in DI container."""
+        """Test that ChunkRuntimeProtocol is registered in DI container."""
         container = service_provider.container
 
         # Check that protocol is registered
-        assert container.is_registered(ChunkGeneratorProtocol)
+        assert container.is_registered(ChunkRuntimeProtocol)
 
     def test_chunk_generator_can_be_resolved(self, service_provider):
         """Test that ChunkGenerator can be resolved from DI container."""
         container = service_provider.container
 
         # Resolve ChunkGenerator
-        chunk_generator = container.get(ChunkGeneratorProtocol)
+        chunk_generator = container.get(ChunkRuntimeProtocol)
 
         # Verify it's not None and has expected attributes
         assert chunk_generator is not None
@@ -123,8 +123,8 @@ class TestChunkGeneratorDI:
         container = service_provider.container
 
         # Resolve ChunkGenerator twice
-        instance1 = container.get(ChunkGeneratorProtocol)
-        instance2 = container.get(ChunkGeneratorProtocol)
+        instance1 = container.get(ChunkRuntimeProtocol)
+        instance2 = container.get(ChunkRuntimeProtocol)
 
         # Verify they are the same instance (SINGLETON)
         assert instance1 is instance2
@@ -134,7 +134,7 @@ class TestChunkGeneratorDI:
         container = service_provider.container
 
         # Resolve ChunkGenerator
-        chunk_generator = container.get(ChunkGeneratorProtocol)
+        chunk_generator = container.get(ChunkRuntimeProtocol)
 
         # Verify required dependencies are injected
         assert chunk_generator.streaming_handler is not None
@@ -144,7 +144,7 @@ class TestChunkGeneratorDI:
         """Test that ChunkGenerator methods are callable."""
         container = service_provider.container
 
-        chunk_generator = container.get(ChunkGeneratorProtocol)
+        chunk_generator = container.get(ChunkRuntimeProtocol)
 
         # Verify key methods are callable
         assert callable(chunk_generator.generate_tool_start_chunk)
@@ -216,7 +216,7 @@ class TestChunkGeneratorDIIntegration:
         assert container.is_registered(StreamingHandlerProtocol)
 
         # Verify ChunkGenerator can be resolved (which depends on above)
-        chunk_generator = container.get(ChunkGeneratorProtocol)
+        chunk_generator = container.get(ChunkRuntimeProtocol)
         assert chunk_generator is not None
 
     def test_chunk_generator_with_all_dependencies(self, service_provider):
@@ -224,7 +224,7 @@ class TestChunkGeneratorDIIntegration:
         container = service_provider.container
 
         # Resolve ChunkGenerator
-        chunk_generator = container.get(ChunkGeneratorProtocol)
+        chunk_generator = container.get(ChunkRuntimeProtocol)
 
         # Verify all expected attributes exist
         expected_attrs = [

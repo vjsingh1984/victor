@@ -175,13 +175,21 @@ class TestCoordinatorIntegration:
 
     def test_state_coordinator_protocol_importable(self):
         """Test StateCoordinatorProtocol can be imported."""
-        from victor.agent.protocols import StateCoordinatorProtocol
+        with pytest.warns(
+            DeprecationWarning,
+            match="StateCoordinatorProtocol is deprecated compatibility surface",
+        ):
+            from victor.agent.protocols import StateCoordinatorProtocol
 
         assert StateCoordinatorProtocol is not None
 
     def test_prompt_coordinator_protocol_importable(self):
         """Test PromptCoordinatorProtocol can be imported."""
-        from victor.agent.protocols import PromptCoordinatorProtocol
+        with pytest.warns(
+            DeprecationWarning,
+            match="PromptCoordinatorProtocol is deprecated compatibility surface",
+        ):
+            from victor.agent.protocols import PromptCoordinatorProtocol
 
         assert PromptCoordinatorProtocol is not None
 

@@ -21,7 +21,7 @@ import pytest
 from unittest.mock import Mock, patch
 
 from victor.agent.service_provider import OrchestratorServiceProvider
-from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
+from victor.agent.services.protocols import StreamingRecoveryRuntimeProtocol
 from victor.config.settings import Settings
 
 
@@ -98,18 +98,18 @@ class TestRecoveryCoordinatorDI:
     """Tests for RecoveryCoordinator DI resolution."""
 
     def test_recovery_coordinator_protocol_registered(self, service_provider):
-        """Test that StreamingRecoveryCoordinatorProtocol is registered in DI container."""
+        """Test that StreamingRecoveryRuntimeProtocol is registered in DI container."""
         container = service_provider.container
 
         # Check that protocol is registered
-        assert container.is_registered(StreamingRecoveryCoordinatorProtocol)
+        assert container.is_registered(StreamingRecoveryRuntimeProtocol)
 
     def test_recovery_coordinator_can_be_resolved(self, service_provider):
         """Test that RecoveryCoordinator can be resolved from DI container."""
         container = service_provider.container
 
         # Resolve RecoveryCoordinator
-        recovery_coordinator = container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify it's not None and has expected attributes
         assert recovery_coordinator is not None
@@ -122,8 +122,8 @@ class TestRecoveryCoordinatorDI:
         container = service_provider.container
 
         # Resolve RecoveryCoordinator twice
-        instance1 = container.get(StreamingRecoveryCoordinatorProtocol)
-        instance2 = container.get(StreamingRecoveryCoordinatorProtocol)
+        instance1 = container.get(StreamingRecoveryRuntimeProtocol)
+        instance2 = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify they are the same instance (SINGLETON)
         assert instance1 is instance2
@@ -133,7 +133,7 @@ class TestRecoveryCoordinatorDI:
         container = service_provider.container
 
         # Resolve RecoveryCoordinator
-        recovery_coordinator = container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify required dependencies are injected
         assert recovery_coordinator.streaming_handler is not None
@@ -145,7 +145,7 @@ class TestRecoveryCoordinatorDI:
         container = service_provider.container
 
         # Resolve RecoveryCoordinator
-        recovery_coordinator = container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify optional dependencies (may be None if not registered)
         # recovery_handler is optional
@@ -161,7 +161,7 @@ class TestRecoveryCoordinatorDI:
         # This is tested implicitly by successful resolution
         container = service_provider.container
 
-        recovery_coordinator = container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify it's the correct type (duck typing check)
         assert hasattr(recovery_coordinator, "check_time_limit")
@@ -174,7 +174,7 @@ class TestRecoveryCoordinatorDI:
         """Test that RecoveryCoordinator methods are callable."""
         container = service_provider.container
 
-        recovery_coordinator = container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify key methods are callable
         assert callable(recovery_coordinator.check_time_limit)
@@ -287,7 +287,7 @@ class TestRecoveryCoordinatorDIIntegration:
         assert container.is_registered(TaskTrackerProtocol)
 
         # Verify RecoveryCoordinator can be resolved (which depends on above)
-        recovery_coordinator = container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
         assert recovery_coordinator is not None
 
     def test_recovery_coordinator_with_all_dependencies(self, service_provider):
@@ -295,7 +295,7 @@ class TestRecoveryCoordinatorDIIntegration:
         container = service_provider.container
 
         # Resolve RecoveryCoordinator
-        recovery_coordinator = container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = container.get(StreamingRecoveryRuntimeProtocol)
 
         # Verify all expected attributes exist (even if some are None)
         expected_attrs = [

@@ -21,7 +21,7 @@ import pytest
 from unittest.mock import Mock, MagicMock
 
 from victor.agent.service_provider import OrchestratorServiceProvider
-from victor.agent.protocols import ToolPlannerProtocol
+from victor.agent.services.protocols import ToolPlanningRuntimeProtocol
 from victor.config.settings import Settings
 
 
@@ -97,18 +97,18 @@ class TestToolPlannerDI:
     """Tests for ToolPlanner DI resolution."""
 
     def test_tool_planner_protocol_registered(self, service_provider):
-        """Test that ToolPlannerProtocol is registered in DI container."""
+        """Test that ToolPlanningRuntimeProtocol is registered in DI container."""
         container = service_provider.container
 
         # Check that protocol is registered
-        assert container.is_registered(ToolPlannerProtocol)
+        assert container.is_registered(ToolPlanningRuntimeProtocol)
 
     def test_tool_planner_can_be_resolved(self, service_provider):
         """Test that ToolPlanner can be resolved from DI container."""
         container = service_provider.container
 
         # Resolve ToolPlanner
-        tool_planner = container.get(ToolPlannerProtocol)
+        tool_planner = container.get(ToolPlanningRuntimeProtocol)
 
         # Verify it's not None and has expected attributes
         assert tool_planner is not None
@@ -120,8 +120,8 @@ class TestToolPlannerDI:
         container = service_provider.container
 
         # Resolve ToolPlanner twice
-        instance1 = container.get(ToolPlannerProtocol)
-        instance2 = container.get(ToolPlannerProtocol)
+        instance1 = container.get(ToolPlanningRuntimeProtocol)
+        instance2 = container.get(ToolPlanningRuntimeProtocol)
 
         # Verify they are the same instance (SINGLETON)
         assert instance1 is instance2
@@ -131,7 +131,7 @@ class TestToolPlannerDI:
         container = service_provider.container
 
         # Resolve ToolPlanner
-        tool_planner = container.get(ToolPlannerProtocol)
+        tool_planner = container.get(ToolPlanningRuntimeProtocol)
 
         # Verify required dependencies are injected
         assert tool_planner.tool_registrar is not None
@@ -141,7 +141,7 @@ class TestToolPlannerDI:
         """Test that ToolPlanner methods are callable."""
         container = service_provider.container
 
-        tool_planner = container.get(ToolPlannerProtocol)
+        tool_planner = container.get(ToolPlanningRuntimeProtocol)
 
         # Verify key methods are callable
         assert callable(tool_planner.plan_tools)
@@ -207,7 +207,7 @@ class TestToolPlannerDIIntegration:
         assert container.is_registered(ToolRegistrarProtocol)
 
         # Verify ToolPlanner can be resolved (which depends on above)
-        tool_planner = container.get(ToolPlannerProtocol)
+        tool_planner = container.get(ToolPlanningRuntimeProtocol)
         assert tool_planner is not None
 
     def test_tool_planner_with_all_dependencies(self, service_provider):
@@ -215,7 +215,7 @@ class TestToolPlannerDIIntegration:
         container = service_provider.container
 
         # Resolve ToolPlanner
-        tool_planner = container.get(ToolPlannerProtocol)
+        tool_planner = container.get(ToolPlanningRuntimeProtocol)
 
         # Verify all expected attributes exist
         expected_attrs = [

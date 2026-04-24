@@ -76,15 +76,29 @@ class TestProtocolDefinitions:
 
     def test_runtime_alias_protocols_match_legacy_protocol_identity(self):
         """Alias protocols should preserve identity with compatibility imports."""
-        from victor.agent.protocols import (
-            ChunkGeneratorProtocol,
-            PromptCoordinatorProtocol,
-            RLCoordinatorProtocol,
-            StateCoordinatorProtocol,
-            StreamingRecoveryCoordinatorProtocol,
-            TaskCoordinatorProtocol,
-            ToolPlannerProtocol,
-        )
+        with pytest.warns(DeprecationWarning, match="ChunkGeneratorProtocol is deprecated"):
+            from victor.agent.protocols import ChunkGeneratorProtocol
+
+        with pytest.warns(DeprecationWarning, match="ToolPlannerProtocol is deprecated"):
+            from victor.agent.protocols import ToolPlannerProtocol
+
+        with pytest.warns(DeprecationWarning, match="TaskCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import TaskCoordinatorProtocol
+
+        with pytest.warns(DeprecationWarning, match="StateCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import StateCoordinatorProtocol
+
+        with pytest.warns(DeprecationWarning, match="PromptCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import PromptCoordinatorProtocol
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="StreamingRecoveryCoordinatorProtocol is deprecated",
+        ):
+            from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
+
+        with pytest.warns(DeprecationWarning, match="RLCoordinatorProtocol is deprecated"):
+            from victor.agent.protocols import RLCoordinatorProtocol
 
         assert ChunkRuntimeProtocol is ChunkGeneratorProtocol
         assert ToolPlanningRuntimeProtocol is ToolPlannerProtocol
