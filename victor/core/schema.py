@@ -712,25 +712,30 @@ class Schema:
 
     CONV_MESSAGE = """
         CREATE TABLE IF NOT EXISTS messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
             role TEXT NOT NULL,
-            content TEXT,
-            tool_calls TEXT,
-            created_at TEXT DEFAULT (datetime('now'))
+            content TEXT NOT NULL,
+            timestamp TIMESTAMP NOT NULL,
+            token_count INTEGER NOT NULL,
+            priority INTEGER NOT NULL,
+            tool_name TEXT,
+            tool_call_id TEXT,
+            metadata TEXT,
+            FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                ON DELETE CASCADE
         )
     """
 
     CONV_SESSION = """
         CREATE TABLE IF NOT EXISTS sessions (
-            id TEXT PRIMARY KEY,
-            name TEXT,
+            session_id TEXT PRIMARY KEY,
+            created_at TIMESTAMP NOT NULL,
+            last_activity TIMESTAMP NOT NULL,
+            project_path TEXT,
             provider TEXT,
             model TEXT,
-            profile TEXT,
-            data TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT
+            profile TEXT
         )
     """
 
@@ -740,7 +745,7 @@ class Schema:
             session_id TEXT,
             token_count INTEGER,
             message_count INTEGER,
-            created_at TEXT DEFAULT (datetime('now'))
+            timestamp TIMESTAMP DEFAULT (datetime('now'))
         )
     """
 
@@ -749,13 +754,19 @@ class Schema:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             session_id TEXT,
             summary TEXT,
-            created_at TEXT DEFAULT (datetime('now'))
+            timestamp TIMESTAMP DEFAULT (datetime('now'))
         )
     """
 
     CONV_INDEXES = """
         CREATE INDEX IF NOT EXISTS idx_messages_session
-            ON messages(session_id, created_at);
+            ON messages(session_id, timestamp);
+        CREATE INDEX IF NOT EXISTS idx_messages_timestamp
+            ON messages(timestamp DESC);
+        CREATE INDEX IF NOT EXISTS idx_sessions_project
+            ON sessions(project_path);
+        CREATE INDEX IF NOT EXISTS idx_sessions_activity
+            ON sessions(last_activity DESC);
     """
 
     # ===========================================
@@ -997,7 +1008,11 @@ class Schema:
 
     @classmethod
     def get_project_schemas(cls) -> List[str]:
-        """Get schema definitions for project-level tables (graph, etc.)."""
+        """Get schema definitions for project-level tables (graph, etc.).
+
+        Note: Conversation tables (messages, sessions, context_sizes, context_summaries)
+        are managed by ConversationStore, not by ProjectDatabaseManager.
+        """
         return [
             # Graph
             cls.GRAPH_NODE,
@@ -1005,11 +1020,6 @@ class Schema:
             cls.GRAPH_FILE_MTIME,
             cls.GRAPH_MODULE_METRIC,
             cls.GRAPH_MODULE_METRIC_HISTORY,
-            # Conversation
-            cls.CONV_MESSAGE,
-            cls.CONV_SESSION,
-            cls.CONV_CONTEXT_SIZE,
-            cls.CONV_CONTEXT_SUMMARY,
             # Mode learning
             cls.MODE_Q_VALUE,
             cls.MODE_TASK_STAT,
@@ -1024,11 +1034,13 @@ class Schema:
 
     @classmethod
     def get_project_indexes(cls) -> List[str]:
-        """Get index definitions for project-level tables."""
+        """Get index definitions for project-level tables.
+
+        Note: Conversation indexes are managed by ConversationStore.
+        """
         return [
             cls.GRAPH_INDEXES,
             cls.GRAPH_MODULE_METRIC_INDEXES,
-            cls.CONV_INDEXES,
             cls.MODE_INDEXES,
             cls.PROFILE_INDEXES,
             cls.CHANGES_INDEXES,
