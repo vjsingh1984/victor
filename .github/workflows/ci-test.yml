@@ -20,7 +20,7 @@ jobs:
   test:
     name: Test (Py${{ matrix.python-version }}, Shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: []  # No dependencies - run in parallel with ci-fast
     env:
       PYTHONPATH: ${{ github.workspace }}
@@ -28,7 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     steps:
       - uses: actions/checkout@v4
 
@@ -83,17 +83,20 @@ jobs:
 
       - name: Run tests (sharded)
         run: |
+          # Coverage only on 3.11 shard 1 (where Codecov upload happens)
+          if [ "${{ matrix.python-version }}" = "3.11" ] && [ "${{ matrix.shard }}" = "1" ]; then
+            COV_FLAGS="--cov=victor --cov-report=xml --cov-report=term-missing"
+          else
+            COV_FLAGS="--no-cov"
+          fi
           python -m pytest tests/unit \
             -m "not slow and not integration" \
             --splitting-algorithm=least_duration \
-            --splits=6 \
+            --splits=12 \
             --group=${{ matrix.shard }} \
             -v \
             --tb=short \
-            --cov=victor \
-            --cov-report=xml \
-            --cov-report=term-missing \
-            --cov-context=test
+            $COV_FLAGS
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
