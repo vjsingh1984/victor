@@ -14,6 +14,8 @@
 
 """Tests for bash tool."""
 
+import asyncio
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -79,7 +81,9 @@ async def test_shell_timeout():
     """Test bash command timeout."""
     with patch("asyncio.create_subprocess_shell") as mock_subprocess:
         mock_process = AsyncMock()
-        mock_process.communicate = AsyncMock(side_effect=TimeoutError())
+        mock_process.communicate = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_process.kill = MagicMock()
+        mock_process.wait = AsyncMock(return_value=None)
         mock_subprocess.return_value = mock_process
 
         result = await shell(cmd="sleep 100", timeout=1)
@@ -112,3 +116,13 @@ async def test_shell_general_exception():
         assert result["success"] is False
         assert "Failed to execute command" in result["error"]
         assert result["return_code"] == -1
+
+
+@pytest.mark.asyncio
+async def test_shell_heredoc_command():
+    """Heredoc commands should execute without extra escaping."""
+    cmd = "cat <<'EOF'\nprint('hello')\nEOF"
+    result = await shell(cmd=cmd)
+
+    assert result["success"] is True
+    assert "print('hello')" in result["stdout"]

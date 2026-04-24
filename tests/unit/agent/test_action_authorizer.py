@@ -111,6 +111,11 @@ class TestIntentDetector:
         result = detector.detect("add this function into helpers.py")
         assert result.intent == ActionIntent.WRITE_ALLOWED
 
+        result = detector.detect(
+            "review and find using tools all information needed to apply fixes"
+        )
+        assert result.intent == ActionIntent.WRITE_ALLOWED
+
     def test_read_only_detection(self):
         """Test detection of read-only signals."""
         detector = IntentDetector()

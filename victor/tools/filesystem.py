@@ -1823,7 +1823,7 @@ async def write(
 
     Args:
         path: File path (creates dirs)
-        content: Full content (overwrites)
+        content: Full raw file content to write verbatim (overwrites)
         validate: Validate with LSP before writing (default: False)
         format_code: Format with language formatter (default: False)
         dry_run: If True, validate/format without writing (default: False)

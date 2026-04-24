@@ -466,6 +466,10 @@ async def shell(
 
     Example: shell(cmd="ls -la") or shell(cmd="git status")
 
+    For multiline scripts or quote-heavy payloads, prefer a heredoc inside
+    `cmd` instead of deeply nested shell escaping. Example:
+        shell(cmd="python - <<'PY'\\nprint('hello')\\nPY")
+
     Args:
         cmd: The shell command string to execute (required)
         cwd: Working directory for the command

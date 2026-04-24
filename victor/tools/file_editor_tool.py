@@ -271,6 +271,8 @@ async def edit(
     Args:
         ops: REQUIRED! List of operations. Each op must have 'type' and 'path'.
              Example: [{"type": "replace", "path": "f.py", "old_str": "x", "new_str": "y"}]
+             Prefer passing a structured list/object. JSON strings are accepted
+             as a compatibility fallback for weaker tool-calling models.
         preview: Show diff without applying (default: False)
         commit: Auto-apply changes (default: True)
         desc: Change description for tracking

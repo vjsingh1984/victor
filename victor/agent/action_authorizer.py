@@ -217,6 +217,11 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
         "analyze_then_fix",
     ),
     (
+        r"\b(review|analyze|find|gather)\b.*\b(apply|implement)\s+(the\s+)?fix(?:es)?\b",
+        1.0,
+        "analyze_then_apply_fixes",
+    ),
+    (
         r"\b(identify|detect|find)\b.*\b(and\s+)?(fix|correct|resolve)\b",
         1.0,
         "find_and_fix",
@@ -230,7 +235,7 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
     (r"\bfix\s+(the\s+)?(bug|issue|error|problem)\s+(in|with)\b", 0.9, "fix_in"),
     # "Apply the fix/changes" patterns
     (
-        r"\b(apply|implement)\s+(the\s+)?(fix|changes?|improvements?)\b",
+        r"\b(apply|implement)\s+(the\s+)?(fix(?:es)?|changes?|improvements?)\b",
         0.9,
         "apply_fix",
     ),
