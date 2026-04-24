@@ -184,7 +184,7 @@ class TestResourceAvailabilityDetector:
 
     def test_is_provider_available_local_without_gpu(self, detector):
         """Test local provider availability without GPU."""
-        gpu = GPUAvailable(available=False, reason="No GPU")
+        gpu = GPUAvailability(available=False, reason="No GPU")
         resources = {"gpu": gpu}
 
         # Local provider should not be available

@@ -47,9 +47,7 @@ async def test_parallel_exploration_uses_injected_coordinator():
     with (
         patch(
             "victor.config.settings.load_settings",
-            return_value=SimpleNamespace(
-                pipeline=SimpleNamespace(parallel_exploration=True)
-            ),
+            return_value=SimpleNamespace(pipeline=SimpleNamespace(parallel_exploration=True)),
         ),
         patch(
             "victor.config.settings.get_project_paths",
@@ -91,9 +89,7 @@ async def test_parallel_exploration_lazily_materializes_shared_coordinator():
     with (
         patch(
             "victor.config.settings.load_settings",
-            return_value=SimpleNamespace(
-                pipeline=SimpleNamespace(parallel_exploration=True)
-            ),
+            return_value=SimpleNamespace(pipeline=SimpleNamespace(parallel_exploration=True)),
         ),
         patch(
             "victor.config.settings.get_project_paths",

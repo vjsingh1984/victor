@@ -169,6 +169,26 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         return None
 
+    def _get_orchestrator_callable(self, name: str) -> Any:
+        """Resolve a real orchestrator callable without MagicMock false-positives."""
+        orch = self._orchestrator
+
+        instance_dict = getattr(orch, "__dict__", None)
+        if instance_dict:
+            helper = instance_dict.get(name)
+            if callable(helper):
+                return helper
+
+        type_helper = getattr(type(orch), name, None)
+        if callable(type_helper):
+
+            def _bound_helper(*args: Any, **kwargs: Any) -> Any:
+                return type_helper(orch, *args, **kwargs)
+
+            return _bound_helper
+
+        return None
+
     # =====================================================================
     # Public API
     # =====================================================================
@@ -411,16 +431,29 @@ class ChatCoordinator(ChatStreamHelperMixin):
             stacklevel=2,
         )
 
+        chat_service = self._resolve_chat_service()
+        if chat_service is not None and hasattr(chat_service, "stream_chat"):
+            async for chunk in chat_service.stream_chat(user_message, **kwargs):
+                yield chunk
+            return
+
+        runtime_getter = self._get_orchestrator_callable("_get_service_streaming_runtime")
+        if callable(runtime_getter):
+            runtime = runtime_getter()
+            if runtime is not None and hasattr(runtime, "stream_chat"):
+                async for chunk in runtime.stream_chat(user_message, **kwargs):
+                    yield chunk
+                return
+
         runtime_helper = self._get_orchestrator_runtime_helper("_stream_chat_runtime")
         if callable(runtime_helper):
             async for chunk in runtime_helper(user_message, **kwargs):
                 yield chunk
             return
 
-        # Fallback path removed — the shim no longer owns pipeline construction.
-        # _stream_chat_runtime is always registered in production via ServiceStreamingRuntime.
         warnings.warn(
-            "ChatCoordinator.stream_chat() called without a wired _stream_chat_runtime. "
+            "ChatCoordinator.stream_chat() called without a bound ChatService, "
+            "service streaming runtime, or legacy _stream_chat_runtime hook. "
             "This shim no longer owns streaming execution. "
             "Ensure ServiceStreamingRuntime is registered on the orchestrator.",
             DeprecationWarning,

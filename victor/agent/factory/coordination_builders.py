@@ -34,6 +34,7 @@ from victor.agent.coordinators.factory_support import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
     from victor.agent.tool_calling import (
@@ -659,7 +660,6 @@ class CoordinationBuildersMixin:
         )
         logger.debug("TurnBoundaryContextAssembler created")
         return assembler
-
 
     def create_referential_intent_resolver(
         self, ledger: Optional["SessionLedger"] = None

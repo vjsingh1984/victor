@@ -197,16 +197,42 @@ async def test_chat_coordinator_context_limits_prefer_orchestrator_runtime_helpe
 
 
 @pytest.mark.asyncio
-async def test_chat_coordinator_streaming_prefers_orchestrator_runtime_helper():
+async def test_chat_coordinator_streaming_prefers_bound_chat_service():
     chunk = StreamChunk(content="service-stream", is_final=True)
     orchestrator = MagicMock()
+    chat_service = MagicMock()
+
+    async def _service_stream_chat(user_message: str, **kwargs):
+        assert user_message == "hello"
+        assert kwargs == {"mode": "test"}
+        yield chunk
+
+    coordinator = _make_deprecated_chat_coordinator(orchestrator)
+    chat_service.stream_chat = _service_stream_chat
+    coordinator.bind_chat_service(chat_service)
+
+    with pytest.warns(
+        DeprecationWarning,
+        match="ChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+    ):
+        chunks = [item async for item in coordinator.stream_chat("hello", mode="test")]
+
+    assert chunks == [chunk]
+
+
+@pytest.mark.asyncio
+async def test_chat_coordinator_streaming_prefers_service_runtime_getter():
+    chunk = StreamChunk(content="service-runtime", is_final=True)
+    orchestrator = MagicMock()
+    runtime = MagicMock()
 
     async def _runtime_stream_chat(user_message: str, **kwargs):
         assert user_message == "hello"
         assert kwargs == {"mode": "test"}
         yield chunk
 
-    orchestrator._stream_chat_runtime = _runtime_stream_chat
+    runtime.stream_chat = _runtime_stream_chat
+    orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
 
     coordinator = _make_deprecated_chat_coordinator(orchestrator)
 
@@ -217,6 +243,7 @@ async def test_chat_coordinator_streaming_prefers_orchestrator_runtime_helper():
         chunks = [item async for item in coordinator.stream_chat("hello", mode="test")]
 
     assert chunks == [chunk]
+    orchestrator._get_service_streaming_runtime.assert_called_once_with()
 
 
 @pytest.mark.asyncio

@@ -137,10 +137,13 @@ class AgentRuntimeBootstrapper:
             mode_workflow_team_coordinator=(orchestrator._mode_workflow_team_coordinator),
         )
 
-        exploration_state_passed = orchestrator._factory.create_exploration_state_passed_coordinator(
+        exploration_state_passed = (
+            orchestrator._factory.create_exploration_state_passed_coordinator()
         )
-        system_prompt_state_passed = orchestrator._factory.create_system_prompt_state_passed_coordinator(
-            task_analyzer=orchestrator._task_analyzer,
+        system_prompt_state_passed = (
+            orchestrator._factory.create_system_prompt_state_passed_coordinator(
+                task_analyzer=orchestrator._task_analyzer,
+            )
         )
         safety_state_passed = orchestrator._factory.create_safety_state_passed_coordinator()
 

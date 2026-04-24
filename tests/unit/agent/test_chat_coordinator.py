@@ -346,11 +346,60 @@ class TestStreamingShimBehavior:
     """Tests for ChatCoordinator.stream_chat shim delegation."""
 
     @pytest.mark.asyncio
-    async def test_stream_chat_delegates_to_runtime_helper(self, mock_orchestrator):
-        """Shim delegates to orchestrator._stream_chat_runtime when wired."""
+    async def test_stream_chat_prefers_bound_chat_service(self, mock_orchestrator):
+        """Shim delegates to bound ChatService before orchestrator helpers."""
         from victor.providers.base import StreamChunk
 
         chunk = StreamChunk(content="streamed", role="assistant")
+        chat_service = MagicMock()
+
+        async def _stream_chat(user_message: str, **kwargs):
+            assert user_message == "hello"
+            yield chunk
+
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
+        chat_service.stream_chat = _stream_chat
+        coordinator.bind_chat_service(chat_service)
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="ChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+        ):
+            results = [c async for c in coordinator.stream_chat("hello")]
+        assert results == [chunk]
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_prefers_service_streaming_runtime_getter(self, mock_orchestrator):
+        """Shim delegates to orchestrator._get_service_streaming_runtime when wired."""
+        from victor.providers.base import StreamChunk
+
+        chunk = StreamChunk(content="runtime", role="assistant")
+        runtime = MagicMock()
+
+        async def _stream_chat(user_message: str, **kwargs):
+            assert user_message == "hello"
+            assert kwargs == {"mode": "test"}
+            yield chunk
+
+        runtime.stream_chat = _stream_chat
+        mock_orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
+        coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
+
+        with pytest.warns(
+            DeprecationWarning,
+            match="ChatCoordinator.stream_chat\\(\\) is deprecated compatibility surface",
+        ):
+            results = [c async for c in coordinator.stream_chat("hello", mode="test")]
+
+        assert results == [chunk]
+        mock_orchestrator._get_service_streaming_runtime.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    async def test_stream_chat_falls_back_to_legacy_runtime_helper(self, mock_orchestrator):
+        """Shim preserves legacy _stream_chat_runtime fallback for compatibility."""
+        from victor.providers.base import StreamChunk
+
+        chunk = StreamChunk(content="legacy", role="assistant")
 
         async def _runtime(user_message: str, **kwargs):
             assert user_message == "hello"
@@ -367,7 +416,7 @@ class TestStreamingShimBehavior:
         assert results == [chunk]
 
     @pytest.mark.asyncio
-    async def test_stream_chat_warns_when_no_runtime_helper(self, mock_orchestrator):
+    async def test_stream_chat_warns_when_no_runtime_path(self, mock_orchestrator):
         """Shim emits DeprecationWarning and yields nothing when runtime not wired."""
         import warnings as _warnings
 
@@ -380,4 +429,4 @@ class TestStreamingShimBehavior:
         deprecation_messages = [
             str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)
         ]
-        assert any("_stream_chat_runtime" in m for m in deprecation_messages)
+        assert any("service streaming runtime" in m for m in deprecation_messages)

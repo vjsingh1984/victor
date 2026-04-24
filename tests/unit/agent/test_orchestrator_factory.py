@@ -369,9 +369,7 @@ class TestCanonicalCoordinatorBuilders:
         assert isinstance(coordinator, ExplorationStatePassedCoordinator)
         assert coordinator._project_root == Path("/tmp/factory-project")
 
-    def test_create_system_prompt_coordinator_binds_task_analyzer(
-        self, factory, mock_container
-    ):
+    def test_create_system_prompt_coordinator_binds_task_analyzer(self, factory, mock_container):
         from victor.agent.protocols import TaskAnalyzerProtocol
 
         analyzer = MagicMock()
