@@ -58,23 +58,39 @@ from victor.agent.services.protocols.context_service import ContextServiceProtoc
 from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
 from victor.agent.services.protocols.provider_service import ProviderServiceProtocol
 from victor.agent.services.protocols.recovery_service import RecoveryServiceProtocol
+from victor.agent.services.protocols.runtime_support import (
+    ChunkRuntimeProtocol,
+    PromptRuntimeProtocol,
+    RLLearningRuntimeProtocol,
+    StateRuntimeProtocol,
+    StreamingRecoveryRuntimeProtocol,
+    TaskRuntimeProtocol,
+    ToolPlanningRuntimeProtocol,
+)
 from victor.agent.services.protocols.session_service import SessionServiceProtocol
 from victor.agent.services.protocols.session_ledger import SessionLedgerProtocol
 from victor.agent.services.protocols.tool_service import ToolServiceProtocol
 
 __all__ = [
     "ChatServiceProtocol",
+    "ChunkRuntimeProtocol",
     "ChatContextProtocol",
     "ChatOrchestratorProtocol",
     "ContextServiceProtocol",
     "ExecutionMode",
     "LLMDecisionServiceProtocol",
     "PlanningContextProtocol",
+    "PromptRuntimeProtocol",
     "ProviderServiceProtocol",
     "ProviderContextProtocol",
+    "RLLearningRuntimeProtocol",
     "RecoveryServiceProtocol",
     "SessionLedgerProtocol",
     "SessionServiceProtocol",
+    "StateRuntimeProtocol",
+    "StreamingRecoveryRuntimeProtocol",
+    "TaskRuntimeProtocol",
     "ToolContextProtocol",
+    "ToolPlanningRuntimeProtocol",
     "ToolServiceProtocol",
 ]

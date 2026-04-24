@@ -122,25 +122,23 @@ if TYPE_CHECKING:
     from victor.agent.argument_normalizer import ArgumentNormalizer
     from victor.agent.conversation.state_machine import ConversationStateMachine
     from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
-    from victor.agent.protocols.streaming_protocols import (
-        StreamingMetricsCollectorProtocol,
-        StreamingRecoveryCoordinatorProtocol as StreamingRecoveryCoordinatorProto,
-        ChunkGeneratorProtocol as ChunkGeneratorProto,
-    )
+    from victor.agent.protocols.streaming_protocols import StreamingMetricsCollectorProtocol
     from victor.agent.protocols.infrastructure_protocols import (
         SafetyCheckerProtocol,
         AutoCommitterProtocol,
         ReminderManagerProtocol,
         TaskTrackerProtocol,
-        RLCoordinatorProtocol,
         CodeExecutionManagerProtocol,
         WorkflowRegistryProtocol,
         ArgumentNormalizerProtocol,
         DebugLoggerProtocol,
     )
-    from victor.agent.protocols.coordination_protocols import (
-        ToolPlannerProtocol,
-        TaskCoordinatorProtocol,
+    from victor.agent.services.protocols import (
+        ChunkRuntimeProtocol as ChunkGeneratorProto,
+        RLLearningRuntimeProtocol as RLCoordinatorProtocol,
+        StreamingRecoveryRuntimeProtocol as StreamingRecoveryCoordinatorProto,
+        TaskRuntimeProtocol as TaskCoordinatorProtocol,
+        ToolPlanningRuntimeProtocol as ToolPlannerProtocol,
     )
     from victor.agent.protocols.budget_protocols import (
         IBudgetManager,

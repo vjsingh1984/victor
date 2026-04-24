@@ -22,11 +22,18 @@ import pytest
 
 from victor.agent.services.protocols import (
     ChatServiceProtocol,
+    ChunkRuntimeProtocol,
     ToolServiceProtocol,
     ContextServiceProtocol,
+    PromptRuntimeProtocol,
     ProviderServiceProtocol,
+    RLLearningRuntimeProtocol,
     RecoveryServiceProtocol,
     SessionServiceProtocol,
+    StateRuntimeProtocol,
+    StreamingRecoveryRuntimeProtocol,
+    TaskRuntimeProtocol,
+    ToolPlanningRuntimeProtocol,
 )
 
 
@@ -56,6 +63,36 @@ class TestProtocolDefinitions:
     def test_session_service_protocol_exists(self):
         """Test SessionServiceProtocol is defined."""
         assert SessionServiceProtocol is not None
+
+    def test_runtime_alias_protocols_exist(self):
+        """Service-owned runtime protocol aliases should be importable."""
+        assert ChunkRuntimeProtocol is not None
+        assert ToolPlanningRuntimeProtocol is not None
+        assert TaskRuntimeProtocol is not None
+        assert StateRuntimeProtocol is not None
+        assert PromptRuntimeProtocol is not None
+        assert StreamingRecoveryRuntimeProtocol is not None
+        assert RLLearningRuntimeProtocol is not None
+
+    def test_runtime_alias_protocols_match_legacy_protocol_identity(self):
+        """Alias protocols should preserve identity with compatibility imports."""
+        from victor.agent.protocols import (
+            ChunkGeneratorProtocol,
+            PromptCoordinatorProtocol,
+            RLCoordinatorProtocol,
+            StateCoordinatorProtocol,
+            StreamingRecoveryCoordinatorProtocol,
+            TaskCoordinatorProtocol,
+            ToolPlannerProtocol,
+        )
+
+        assert ChunkRuntimeProtocol is ChunkGeneratorProtocol
+        assert ToolPlanningRuntimeProtocol is ToolPlannerProtocol
+        assert TaskRuntimeProtocol is TaskCoordinatorProtocol
+        assert StateRuntimeProtocol is StateCoordinatorProtocol
+        assert PromptRuntimeProtocol is PromptCoordinatorProtocol
+        assert StreamingRecoveryRuntimeProtocol is StreamingRecoveryCoordinatorProtocol
+        assert RLLearningRuntimeProtocol is RLCoordinatorProtocol
 
 
 class TestProtocolImplementation:

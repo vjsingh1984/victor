@@ -61,7 +61,6 @@ if TYPE_CHECKING:
         ActionAuthorizerProtocol,
         ArgumentNormalizerProtocol,
         AutoCommitterProtocol,
-        ChunkGeneratorProtocol,
         CodeExecutionManagerProtocol,
         ComplexityClassifierProtocol,
         ContextCompactorProtocol,
@@ -77,24 +76,19 @@ if TYPE_CHECKING:
         ObservabilityProtocol,
         ParallelExecutorProtocol,
         ProjectContextProtocol,
-        PromptCoordinatorProtocol,
         ProviderRegistryProtocol,
         RecoveryHandlerProtocol,
         ReminderManagerProtocol,
         ResponseCompleterProtocol,
         ResponseSanitizerProtocol,
-        RLCoordinatorProtocol,
         SafetyCheckerProtocol,
         SearchRouterProtocol,
         SemanticToolSelectorProtocol,
-        StateCoordinatorProtocol,
         StreamingConfidenceMonitorProtocol,
         StreamingHandlerProtocol,
         StreamingMetricsCollectorProtocol,
-        StreamingRecoveryCoordinatorProtocol,
         SystemPromptBuilderProtocol,
         TaskAnalyzerProtocol,
-        TaskCoordinatorProtocol,
         TaskTrackerProtocol,
         TaskTypeHinterProtocol,
         ToolCacheProtocol,
@@ -102,7 +96,6 @@ if TYPE_CHECKING:
         ToolDependencyGraphProtocol,
         ToolExecutorProtocol,
         ToolOutputFormatterProtocol,
-        ToolPlannerProtocol,
         ToolPluginRegistryProtocol,
         ToolRegistrarProtocol,
         ToolSelectorProtocol,
@@ -110,6 +103,15 @@ if TYPE_CHECKING:
         UsageAnalyticsProtocol,
         UsageLoggerProtocol,
         WorkflowRegistryProtocol,
+    )
+    from victor.agent.services.protocols import (
+        ChunkRuntimeProtocol,
+        PromptRuntimeProtocol,
+        RLLearningRuntimeProtocol,
+        StateRuntimeProtocol,
+        StreamingRecoveryRuntimeProtocol,
+        TaskRuntimeProtocol,
+        ToolPlanningRuntimeProtocol,
     )
 
 logger = logging.getLogger(__name__)
@@ -737,7 +739,7 @@ class OrchestratorServiceProvider:
             tool_budget=tool_budget,
         )
 
-    def _create_rl_coordinator(self) -> "RLCoordinatorProtocol":
+    def _create_rl_coordinator(self) -> "RLLearningRuntimeProtocol":
         """Create RLCoordinator instance."""
         from victor.agent.services.rl_runtime import get_rl_coordinator
 
@@ -1091,7 +1093,7 @@ class OrchestratorServiceProvider:
 
         return StreamingConfidenceMonitor()
 
-    def _create_recovery_coordinator(self) -> "StreamingRecoveryCoordinatorProtocol":
+    def _create_recovery_coordinator(self) -> "StreamingRecoveryRuntimeProtocol":
         """Create RecoveryCoordinator instance.
 
         The RecoveryCoordinator centralizes all recovery and error handling logic
@@ -1134,7 +1136,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
         )
 
-    def _create_chunk_generator(self) -> "ChunkGeneratorProtocol":
+    def _create_chunk_generator(self) -> "ChunkRuntimeProtocol":
         """Create ChunkGenerator instance.
 
         The ChunkGenerator provides a centralized interface for generating streaming
@@ -1154,7 +1156,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
         )
 
-    def _create_tool_planner(self) -> "ToolPlannerProtocol":
+    def _create_tool_planner(self) -> "ToolPlanningRuntimeProtocol":
         """Create ToolPlanner instance.
 
         The ToolPlanner provides a centralized interface for tool planning operations,
@@ -1174,7 +1176,7 @@ class OrchestratorServiceProvider:
             settings=self._settings,
         )
 
-    def _create_task_coordinator(self) -> "TaskCoordinatorProtocol":
+    def _create_task_coordinator(self) -> "TaskRuntimeProtocol":
         """Create TaskCoordinator instance.
 
         The TaskCoordinator provides a centralized interface for task coordination,
@@ -1238,7 +1240,7 @@ class OrchestratorServiceProvider:
             logger.debug("ToolPipeline or ToolRegistry not available for ToolCoordinator")
         return coordinator
 
-    def _create_state_coordinator(self) -> "StateCoordinatorProtocol | None":
+    def _create_state_coordinator(self) -> "StateRuntimeProtocol | None":
         """Create StateCoordinator instance.
 
         The StateCoordinator provides a centralized interface for conversation
@@ -1279,7 +1281,7 @@ class OrchestratorServiceProvider:
             config=config,
         )
 
-    def _create_prompt_coordinator(self) -> "PromptCoordinatorProtocol":
+    def _create_prompt_coordinator(self) -> "PromptRuntimeProtocol":
         """Create PromptCoordinator instance.
 
         The PromptCoordinator provides a centralized interface for system

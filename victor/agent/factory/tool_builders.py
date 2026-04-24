@@ -55,7 +55,7 @@ if TYPE_CHECKING:
     from victor.config.model_capabilities import ToolCallingMatrix
     from victor.agent.protocols.tool_protocols import ToolDependencyGraphProtocol
     from victor.agent.protocols.infrastructure_protocols import SafetyCheckerProtocol
-    from victor.agent.protocols.coordination_protocols import ToolPlannerProtocol
+    from victor.agent.services.protocols import ToolPlanningRuntimeProtocol as ToolPlannerProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -620,9 +620,9 @@ class ToolBuildersMixin:
         Returns:
             ToolPlanner instance for tool planning
         """
-        from victor.agent.protocols import ToolPlannerProtocol
+        from victor.agent.services.protocols import ToolPlanningRuntimeProtocol
 
-        tool_planner = self.container.get(ToolPlannerProtocol)
+        tool_planner = self.container.get(ToolPlanningRuntimeProtocol)
         logger.debug("ToolPlanner created via DI")
         return tool_planner
 
