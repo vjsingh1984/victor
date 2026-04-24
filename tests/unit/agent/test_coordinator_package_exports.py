@@ -126,3 +126,38 @@ def test_chat_protocol_package_exports_warn():
     assert package_chat_orchestrator_protocol is ChatOrchestratorProtocol
     assert package_provider_context_protocol is ProviderContextProtocol
     assert package_tool_context_protocol is ToolContextProtocol
+
+
+def test_state_passed_package_exports_are_first_class():
+    """State-passed exports should be available from the package root without warnings."""
+    from victor.agent.coordinators.exploration_state_passed import (
+        ExplorationStatePassedCoordinator,
+    )
+    from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
+    from victor.agent.coordinators.system_prompt_state_passed import (
+        SystemPromptStatePassedCoordinator,
+    )
+    from victor.agent.coordinators import (
+        ExplorationStatePassedCoordinator as package_exploration_state_passed,
+        SafetyStatePassedCoordinator as package_safety_state_passed,
+        SystemPromptStatePassedCoordinator as package_system_prompt_state_passed,
+    )
+
+    assert package_exploration_state_passed is ExplorationStatePassedCoordinator
+    assert package_system_prompt_state_passed is SystemPromptStatePassedCoordinator
+    assert package_safety_state_passed is SafetyStatePassedCoordinator
+
+
+def test_exploration_runtime_package_exports_are_first_class():
+    """Canonical exploration runtime exports should be available from the package root."""
+    from victor.agent.coordinators.exploration_coordinator import (
+        ExplorationCoordinator,
+        ExplorationResult,
+    )
+    from victor.agent.coordinators import (
+        ExplorationCoordinator as package_exploration_coordinator,
+        ExplorationResult as package_exploration_result,
+    )
+
+    assert package_exploration_coordinator is ExplorationCoordinator
+    assert package_exploration_result is ExplorationResult

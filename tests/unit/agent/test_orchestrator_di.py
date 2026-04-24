@@ -19,7 +19,7 @@ for AgentOrchestrator components.
 """
 
 import pytest
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 # Suppress deprecation warnings for complexity_classifier shim during migration
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -286,23 +286,17 @@ class TestOrchestratorServiceProvider:
                 match="creates a deprecated ToolCoordinator shim",
             ),
             patch(
-                "victor.agent.services.tool_compat.create_tool_coordinator",
+                "victor.agent.services.tool_compat.build_deprecated_tool_coordinator_from_container",
                 return_value=coordinator,
-            ) as create_tool_coordinator,
+            ) as build_tool_coordinator,
         ):
             result = provider._create_tool_coordinator()
 
         assert result is coordinator
-        create_tool_coordinator.assert_called_once_with(
-            tool_pipeline=tool_pipeline,
-            tool_registry=tool_registry,
-            tool_selector=tool_selector,
-            budget_manager=budget_manager,
-            tool_cache=tool_cache,
-            tool_access_controller=tool_access_controller,
-            mode_controller=mode_controller,
-            tool_service=tool_service,
-            config=ANY,
+        build_tool_coordinator.assert_called_once_with(
+            container=container,
+            settings=mock_settings,
+            strict=False,
         )
 
 

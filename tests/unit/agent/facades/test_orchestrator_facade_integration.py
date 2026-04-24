@@ -17,6 +17,13 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from victor.agent.coordinators.exploration_state_passed import (
+    ExplorationStatePassedCoordinator,
+)
+from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
+from victor.agent.coordinators.system_prompt_state_passed import (
+    SystemPromptStatePassedCoordinator,
+)
 from victor.agent.orchestrator import AgentOrchestrator
 from victor.agent.facades.chat_facade import ChatFacade
 from victor.agent.facades.tool_facade import ToolFacade
@@ -70,6 +77,21 @@ class TestFacadeCreation:
         """Orchestrator creates a ToolFacade instance."""
         assert hasattr(orchestrator, "_tool_facade")
         assert isinstance(orchestrator._tool_facade, ToolFacade)
+
+    def test_orchestration_facade_has_state_passed_handles(self, orchestrator):
+        """OrchestrationFacade should expose state-passed coordinator surfaces."""
+        assert isinstance(
+            orchestrator._orchestration_facade.exploration_state_passed,
+            ExplorationStatePassedCoordinator,
+        )
+        assert isinstance(
+            orchestrator._orchestration_facade.system_prompt_state_passed,
+            SystemPromptStatePassedCoordinator,
+        )
+        assert isinstance(
+            orchestrator._orchestration_facade.safety_state_passed,
+            SafetyStatePassedCoordinator,
+        )
 
 
 class TestChatFacadeDelegation:

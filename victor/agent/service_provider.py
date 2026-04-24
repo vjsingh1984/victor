@@ -1141,7 +1141,7 @@ class OrchestratorServiceProvider:
         Returns:
             ChunkGenerator instance
         """
-        from victor.agent.chunk_generator import ChunkGenerator
+        from victor.agent.services.chunk_runtime import ChunkGenerator
         from victor.agent.protocols import StreamingHandlerProtocol
 
         # Get streaming handler from DI container
@@ -1161,7 +1161,7 @@ class OrchestratorServiceProvider:
         Returns:
             ToolPlanner instance
         """
-        from victor.agent.tool_planner import ToolPlanner
+        from victor.agent.services.tool_planning_runtime import ToolPlanner
         from victor.agent.protocols import ToolRegistrarProtocol
 
         # Get tool registrar from DI container
@@ -1184,7 +1184,7 @@ class OrchestratorServiceProvider:
         Returns:
             TaskCoordinator instance
         """
-        from victor.agent.task_coordinator import TaskCoordinator
+        from victor.agent.services.task_runtime import TaskCoordinator
         from victor.agent.protocols import (
             TaskAnalyzerProtocol,
             TaskTrackerProtocol,
@@ -1217,19 +1217,8 @@ class OrchestratorServiceProvider:
             ToolCoordinator instance
         """
         from victor.agent.services.tool_compat import (
-            ToolCoordinatorConfig,
-            create_tool_coordinator,
+            build_deprecated_tool_coordinator_from_container,
         )
-        from victor.agent.protocols import (
-            IToolAccessController,
-            ModeControllerProtocol,
-            ToolPipelineProtocol,
-            ToolRegistryProtocol,
-            ToolSelectorProtocol,
-            IBudgetManager,
-            ToolCacheProtocol,
-        )
-        from victor.agent.services.protocols import ToolServiceProtocol
 
         warnings.warn(
             "OrchestratorServiceProvider._create_tool_coordinator() creates a deprecated "
@@ -1238,39 +1227,14 @@ class OrchestratorServiceProvider:
             stacklevel=2,
         )
 
-        # Get dependencies from DI container (optional for some)
-        tool_pipeline = self.container.get_optional(ToolPipelineProtocol)
-        tool_registry = self.container.get_optional(ToolRegistryProtocol)
-        tool_selector = self.container.get_optional(ToolSelectorProtocol)
-        budget_manager = self.container.get_optional(IBudgetManager)
-        tool_cache = self.container.get_optional(ToolCacheProtocol)
-        mode_controller = self.container.get_optional(ModeControllerProtocol)
-        tool_access_controller = self.container.get_optional(IToolAccessController)
-        tool_service = self.container.get_optional(ToolServiceProtocol)
-
-        # Build config from settings
-        config = ToolCoordinatorConfig(
-            default_budget=getattr(self._settings, "tool_budget", 25),
-            enable_caching=getattr(self._settings, "enable_tool_cache", True),
-            max_tools_per_selection=getattr(self._settings, "max_tools_per_selection", 15),
-            selection_threshold=getattr(self._settings, "tool_selection_threshold", 0.3),
+        coordinator = build_deprecated_tool_coordinator_from_container(
+            container=self.container,
+            settings=self._settings,
+            strict=False,
         )
-
-        if tool_pipeline is None or tool_registry is None:
+        if coordinator is None:
             logger.debug("ToolPipeline or ToolRegistry not available for ToolCoordinator")
-            return None
-
-        return create_tool_coordinator(
-            tool_pipeline=tool_pipeline,
-            tool_registry=tool_registry,
-            tool_selector=tool_selector,
-            budget_manager=budget_manager,
-            tool_cache=tool_cache,
-            tool_access_controller=tool_access_controller,
-            mode_controller=mode_controller,
-            tool_service=tool_service,
-            config=config,
-        )
+        return coordinator
 
     def _create_state_coordinator(self) -> "StateCoordinatorProtocol | None":
         """Create StateCoordinator instance.

@@ -29,6 +29,7 @@ Services:
 """
 
 from victor.agent.services.chat_service import ChatService, ChatServiceConfig
+from victor.agent.services.chunk_runtime import ChunkGenerator
 from victor.agent.services.context_service import ContextService, ContextServiceConfig
 from victor.agent.services.decision_service import (
     LLMDecisionService,
@@ -65,6 +66,7 @@ from victor.agent.services.state_compat import (
     create_state_coordinator,
 )
 from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
+from victor.agent.services.task_runtime import TaskCoordinator
 from victor.agent.services.planning_runtime import (
     PlanningConfig,
     PlanningCoordinator,
@@ -86,12 +88,14 @@ from victor.agent.services.tool_compat import (
     create_tool_coordinator,
 )
 from victor.agent.services.tool_observability import ToolObservabilityHandler
+from victor.agent.services.tool_planning_runtime import ToolPlanner
 from victor.agent.services.tool_retry import ToolRetryExecutor
 from victor.agent.services.turn_execution_runtime import TurnExecutor, TurnResult
 
 __all__ = [
     "ChatService",
     "ChatServiceConfig",
+    "ChunkGenerator",
     "ContextService",
     "ContextServiceConfig",
     "ExplorationCoordinator",
@@ -123,12 +127,14 @@ __all__ = [
     "StageTransition",
     "IStateCoordinator",
     "SystemPromptCoordinator",
+    "TaskCoordinator",
     "IToolCoordinator",
     "TaskContext",
     "ToolBudgetExceededError",
     "ToolCallValidation",
     "ToolCoordinator",
     "ToolCoordinatorConfig",
+    "ToolPlanner",
     "ToolResultContext",
     "ToolService",
     "ToolServiceConfig",

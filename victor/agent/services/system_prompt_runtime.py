@@ -19,6 +19,10 @@
     This class remains a backward-compat wrapper. New code should use
     UnifiedPromptPipeline directly.
 
+For state-passed orchestration boundaries, prefer
+``victor.agent.coordinators.SystemPromptStatePassedCoordinator`` or the
+matching ``OrchestrationFacade.system_prompt_state_passed`` surface.
+
 The legacy `victor.agent.coordinators.system_prompt_coordinator` module now
 re-exports this implementation for compatibility.
 """

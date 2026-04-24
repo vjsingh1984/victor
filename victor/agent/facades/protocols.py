@@ -230,3 +230,18 @@ class OrchestrationFacadeProtocol(Protocol):
     def task_analyzer(self) -> Optional[Any]:
         """Optional task analyzer."""
         ...
+
+    @property
+    def exploration_state_passed(self) -> Optional[Any]:
+        """Optional state-passed exploration coordinator."""
+        ...
+
+    @property
+    def system_prompt_state_passed(self) -> Optional[Any]:
+        """Optional state-passed system prompt coordinator."""
+        ...
+
+    @property
+    def safety_state_passed(self) -> Optional[Any]:
+        """Optional state-passed safety coordinator."""
+        ...

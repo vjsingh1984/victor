@@ -7,6 +7,7 @@ assertions, and session context setup from the orchestrator's __init__.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -26,6 +27,15 @@ class AgentRuntimeBootstrapper:
     @staticmethod
     def create_facades(orchestrator: AgentOrchestrator) -> None:
         """Create all 8 domain facades and set them on the orchestrator."""
+        from victor.agent.coordinators.exploration_state_passed import (
+            ExplorationStatePassedCoordinator,
+        )
+        from victor.agent.coordinators.safety_state_passed import (
+            SafetyStatePassedCoordinator,
+        )
+        from victor.agent.coordinators.system_prompt_state_passed import (
+            SystemPromptStatePassedCoordinator,
+        )
         from victor.agent.facades import (
             ChatFacade,
             MetricsFacade,
@@ -137,6 +147,15 @@ class AgentRuntimeBootstrapper:
             mode_workflow_team_coordinator=(orchestrator._mode_workflow_team_coordinator),
         )
 
+        project_root = getattr(orchestrator.settings, "working_directory", None)
+        exploration_state_passed = ExplorationStatePassedCoordinator(
+            project_root=Path(project_root) if project_root else None,
+        )
+        system_prompt_state_passed = SystemPromptStatePassedCoordinator(
+            task_analyzer=orchestrator._task_analyzer,
+        )
+        safety_state_passed = SafetyStatePassedCoordinator()
+
         orchestrator._orchestration_facade = OrchestrationFacade(
             interaction_runtime=orchestrator._interaction_runtime,
             chat_service=getattr(orchestrator, "_chat_service", None),
@@ -161,6 +180,9 @@ class AgentRuntimeBootstrapper:
             streaming_coordinator=orchestrator._streaming_coordinator,
             iteration_coordinator=getattr(orchestrator, "_iteration_coordinator", None),
             task_analyzer=orchestrator._task_analyzer,
+            exploration_state_passed=exploration_state_passed,
+            system_prompt_state_passed=system_prompt_state_passed,
+            safety_state_passed=safety_state_passed,
             presentation=orchestrator._presentation,
             vertical_integration_adapter=(orchestrator._vertical_integration_adapter),
             vertical_context=orchestrator._vertical_context,

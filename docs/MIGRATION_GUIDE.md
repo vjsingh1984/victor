@@ -207,6 +207,41 @@ container = ensure_bootstrapped(settings)
 chat_service = container.get(ChatServiceProtocol)
 ```
 
+### Canonical Migration Surfaces
+
+Prefer these entry points in new runtime code instead of reaching for legacy
+coordinator shims directly.
+
+| Concern | Preferred surface | Avoid by default |
+|---------|-------------------|------------------|
+| Chat turns | `ChatService` or `OrchestrationFacade.chat_service` | `ChatCoordinator` shims |
+| Tool execution | `ToolService` or `OrchestrationFacade.tool_service` | `ToolCoordinator` shims |
+| Session lifecycle | `SessionService` or `OrchestrationFacade.session_service` | `SessionCoordinator` shims |
+| Read-only exploration | `victor.agent.coordinators.ExplorationCoordinator` | deep submodule imports when package-root works |
+| State-passed exploration | `victor.agent.coordinators.ExplorationStatePassedCoordinator` or `OrchestrationFacade.exploration_state_passed` | direct orchestrator-coupled exploration glue |
+| State-passed system prompt logic | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` or `OrchestrationFacade.system_prompt_state_passed` | `system_prompt_coordinator` compatibility imports |
+| State-passed safety logic | `victor.agent.coordinators.SafetyStatePassedCoordinator` or `OrchestrationFacade.safety_state_passed` | using `SafetyCoordinator` when snapshot/transition flow is intended |
+
+```python
+from victor.agent.coordinators import (
+    ExplorationStatePassedCoordinator,
+    SafetyStatePassedCoordinator,
+    SystemPromptStatePassedCoordinator,
+)
+from victor.agent.facades import OrchestrationFacade
+
+facade = OrchestrationFacade(
+    chat_service=chat_service,
+    tool_service=tool_service,
+    session_service=session_service,
+    exploration_state_passed=ExplorationStatePassedCoordinator(),
+    system_prompt_state_passed=SystemPromptStatePassedCoordinator(
+        task_analyzer=task_analyzer
+    ),
+    safety_state_passed=SafetyStatePassedCoordinator(),
+)
+```
+
 ## Migration Patterns
 
 ### Pattern 1: Gradual Feature Migration

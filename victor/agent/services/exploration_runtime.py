@@ -12,12 +12,22 @@ the project structure and relevant source files.
 Uses direct tool calls — no SubAgent overhead. Tools are called via
 asyncio.gather() for true parallelism.
 
+Preferred imports for orchestration-facing callers:
+    from victor.agent.coordinators import (
+        ExplorationCoordinator,
+        ExplorationStatePassedCoordinator,
+    )
+
 Usage:
     coordinator = ExplorationCoordinator()
     findings = await coordinator.explore_parallel(
         "Fix the bug in separability_matrix",
         project_root=Path("/path/to/repo"),
     )
+
+Use ``ExplorationCoordinator`` for direct read-only discovery and
+``ExplorationStatePassedCoordinator`` when you need snapshot/transition style
+state-passed orchestration.
 
 The legacy `victor.agent.coordinators.exploration_coordinator` module now
 re-exports this implementation for compatibility.

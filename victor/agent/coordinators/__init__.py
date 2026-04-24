@@ -19,6 +19,17 @@ runtime has moved to service-first ownership for chat, tool, session, recovery,
 and provider flows. Deprecated coordinator exports remain available here as
 lazy compatibility shims so existing imports continue to work while making the
 migration boundary explicit.
+
+Preferred surfaces for new code:
+- ``victor.agent.services`` for service-owned chat, tool, and session flows
+- ``victor.agent.coordinators.ExplorationCoordinator`` for read-only exploration
+- ``victor.agent.coordinators.ExplorationStatePassedCoordinator``
+- ``victor.agent.coordinators.SystemPromptStatePassedCoordinator``
+- ``victor.agent.coordinators.SafetyStatePassedCoordinator``
+
+If you already depend on orchestration facades, prefer the matching
+``OrchestrationFacade`` properties instead of reaching into deprecated
+coordinator shims.
 """
 
 from __future__ import annotations
@@ -30,6 +41,13 @@ from typing import Any
 _SUBMODULE_MAP: dict[str, str] = {}
 
 _MODULE_MEMBERS = {
+    "exploration_coordinator": [
+        "ExplorationCoordinator",
+        "ExplorationResult",
+    ],
+    "exploration_state_passed": [
+        "ExplorationStatePassedCoordinator",
+    ],
     "tool_coordinator": [
         "ToolCoordinator",
         "ToolCoordinatorConfig",
@@ -101,6 +119,12 @@ _MODULE_MEMBERS = {
     ],
     "system_prompt_coordinator": [
         "SystemPromptCoordinator",
+    ],
+    "system_prompt_state_passed": [
+        "SystemPromptStatePassedCoordinator",
+    ],
+    "safety_state_passed": [
+        "SafetyStatePassedCoordinator",
     ],
 }
 

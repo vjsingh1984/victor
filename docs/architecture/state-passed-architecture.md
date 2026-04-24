@@ -25,6 +25,46 @@ Coordinators become pure functions:
 - **Output**: `CoordinatorResult` with explicit `StateTransition` objects
 - **No Side Effects**: No direct state mutation during execution
 
+## Current Entry Points
+
+Use the concrete migration surfaces that are already wired into the runtime.
+
+| Need | Preferred surface | Notes |
+|------|-------------------|-------|
+| Chat execution | `ChatService` or `OrchestrationFacade.chat_service` | Service-owned runtime |
+| Tool execution | `ToolService` or `OrchestrationFacade.tool_service` | Service-owned runtime |
+| Session lifecycle | `SessionService` or `OrchestrationFacade.session_service` | Service-owned runtime |
+| Read-only exploration | `victor.agent.coordinators.ExplorationCoordinator` | First-class package-root export |
+| State-passed exploration | `victor.agent.coordinators.ExplorationStatePassedCoordinator` | Snapshot/transition wrapper |
+| State-passed system prompt logic | `victor.agent.coordinators.SystemPromptStatePassedCoordinator` | Prefer over direct shim imports |
+| State-passed safety checks | `victor.agent.coordinators.SafetyStatePassedCoordinator` | Prefer over coordinator shim usage |
+
+```python
+from victor.agent.coordinators import (
+    ExplorationCoordinator,
+    ExplorationStatePassedCoordinator,
+    SafetyStatePassedCoordinator,
+    SystemPromptStatePassedCoordinator,
+)
+from victor.agent.facades import OrchestrationFacade
+
+facade = OrchestrationFacade(
+    chat_service=chat_service,
+    tool_service=tool_service,
+    session_service=session_service,
+    exploration_state_passed=ExplorationStatePassedCoordinator(),
+    system_prompt_state_passed=SystemPromptStatePassedCoordinator(
+        task_analyzer=task_analyzer
+    ),
+    safety_state_passed=SafetyStatePassedCoordinator(),
+)
+
+findings = await ExplorationCoordinator().explore_parallel(
+    "Trace the failing import boundary",
+    project_root=project_root,
+)
+```
+
 ---
 
 ## Core Components

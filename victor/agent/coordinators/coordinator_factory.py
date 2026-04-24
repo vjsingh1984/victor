@@ -33,8 +33,10 @@ Example:
 from __future__ import annotations
 
 import logging
+import os
 import warnings
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 from victor.agent.coordinators.protocol_dependencies import OrchestratorProtocolAdapter
 from victor.agent.orchestrator_protocols import (
@@ -61,11 +63,15 @@ class CoordinatorFactory:
     This factory resolves coordinator dependencies from the DI container
     and provides protocol-based adapters for orchestrator functionality.
 
-    Supported Coordinators:
-        - ToolCoordinator: Tool execution and management
-        - SystemPromptCoordinator: System prompt building
+    Supported surfaces:
+        - ToolCoordinator: Deprecated tool execution shim
+        - ExplorationCoordinator: Canonical read-only exploration runtime
+        - ExplorationStatePassedCoordinator: Snapshot/transition exploration wrapper
+        - SystemPromptCoordinator: Compatibility system prompt wrapper
+        - SystemPromptStatePassedCoordinator: Canonical state-passed prompt classification
         - MetricsCoordinator: Metrics collection
-        - SafetyCoordinator: Safety checks
+        - SafetyCoordinator: Legacy safety coordination
+        - SafetyStatePassedCoordinator: Canonical state-passed safety wrapper
         - ConversationCoordinator: Conversation management
 
     Example:
@@ -74,8 +80,8 @@ class CoordinatorFactory:
         >>> # Create tool coordinator with protocol dependencies
         >>> tool_coordinator = factory.create_tool_coordinator()
         >>>
-        >>> # Create system prompt coordinator
-        >>> prompt_coordinator = factory.create_system_prompt_coordinator()
+        >>> # Create canonical state-passed prompt coordination
+        >>> prompt_coordinator = factory.create_system_prompt_state_passed_coordinator()
     """
 
     def __init__(self, container: "ServiceContainer"):
@@ -99,17 +105,9 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.services.tool_compat import create_tool_coordinator
-            from victor.agent.protocols import (
-                IBudgetManager,
-                IToolAccessController,
-                ModeControllerProtocol,
-                ToolCacheProtocol,
-                ToolPipelineProtocol,
-                ToolRegistryProtocol,
-                ToolSelectorProtocol,
+            from victor.agent.services.tool_compat import (
+                build_deprecated_tool_coordinator_from_container,
             )
-            from victor.agent.services.protocols import ToolServiceProtocol
 
             warnings.warn(
                 "CoordinatorFactory.create_tool_coordinator() returns a deprecated "
@@ -118,27 +116,10 @@ class CoordinatorFactory:
                 stacklevel=2,
             )
 
-            tool_pipeline = self._container.get_optional(ToolPipelineProtocol)
-            tool_registry = self._container.get_optional(ToolRegistryProtocol)
-            tool_selector = self._container.get_optional(ToolSelectorProtocol)
-            budget_manager = self._container.get_optional(IBudgetManager)
-            tool_cache = self._container.get_optional(ToolCacheProtocol)
-            mode_controller = self._container.get_optional(ModeControllerProtocol)
-            tool_access_controller = self._container.get_optional(IToolAccessController)
-            tool_service = self._container.get_optional(ToolServiceProtocol)
-
-            if tool_pipeline is None or tool_registry is None:
-                raise RuntimeError("ToolPipeline and ToolRegistry are required")
-
-            coordinator = create_tool_coordinator(
-                tool_pipeline=tool_pipeline,
-                tool_registry=tool_registry,
-                tool_selector=tool_selector,
-                budget_manager=budget_manager,
-                tool_cache=tool_cache,
-                tool_access_controller=tool_access_controller,
-                mode_controller=mode_controller,
-                tool_service=tool_service,
+            coordinator = build_deprecated_tool_coordinator_from_container(
+                container=self._container,
+                settings=getattr(self._container, "_settings", None),
+                strict=True,
             )
 
             logger.debug("CoordinatorFactory: Created deprecated ToolCoordinator shim")
@@ -148,7 +129,76 @@ class CoordinatorFactory:
             logger.error(f"CoordinatorFactory: Failed to create ToolCoordinator: {e}")
             raise RuntimeError(f"Failed to create ToolCoordinator: {e}") from e
 
-    def create_system_prompt_coordinator(self) -> Any:
+    def create_exploration_coordinator(self) -> Any:
+        """
+        Create the canonical read-only exploration coordinator.
+
+        Returns:
+            ExplorationCoordinator instance
+
+        Raises:
+            RuntimeError: If coordinator creation fails
+        """
+        try:
+            from victor.agent.services.exploration_runtime import ExplorationCoordinator
+
+            coordinator = ExplorationCoordinator()
+
+            logger.debug("CoordinatorFactory: Created ExplorationCoordinator")
+            return coordinator
+
+        except Exception as e:
+            logger.error(f"CoordinatorFactory: Failed to create ExplorationCoordinator: {e}")
+            raise RuntimeError(f"Failed to create ExplorationCoordinator: {e}") from e
+
+    def create_exploration_state_passed_coordinator(
+        self,
+        project_root: Optional[Path] = None,
+        max_results: int = 5,
+    ) -> Any:
+        """
+        Create the canonical state-passed exploration coordinator.
+
+        Returns:
+            ExplorationStatePassedCoordinator instance
+
+        Raises:
+            RuntimeError: If coordinator creation fails
+        """
+        try:
+            from victor.agent.coordinators.exploration_state_passed import (
+                ExplorationStatePassedCoordinator,
+            )
+
+            coordinator = ExplorationStatePassedCoordinator(
+                project_root=project_root or self._resolve_project_root(),
+                max_results=max_results,
+            )
+
+            logger.debug("CoordinatorFactory: Created ExplorationStatePassedCoordinator")
+            return coordinator
+
+        except Exception as e:
+            logger.error(
+                "CoordinatorFactory: Failed to create ExplorationStatePassedCoordinator: %s",
+                e,
+            )
+            raise RuntimeError(
+                f"Failed to create ExplorationStatePassedCoordinator: {e}"
+            ) from e
+
+    def create_system_prompt_coordinator(
+        self,
+        *,
+        prompt_builder: Any = None,
+        get_context_window: Optional[Callable[[], int]] = None,
+        provider_name: str = "",
+        model_name: str = "",
+        get_tools: Optional[Callable[[], Optional[Any]]] = None,
+        get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
+        task_analyzer: Optional[Any] = None,
+        session_id: str = "",
+    ) -> Any:
         """
         Create system prompt coordinator with protocol dependencies.
 
@@ -161,8 +211,16 @@ class CoordinatorFactory:
         try:
             from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
 
-            # SystemPromptCoordinator has minimal dependencies
-            coordinator = SystemPromptCoordinator()
+            coordinator = SystemPromptCoordinator(
+                prompt_builder=prompt_builder,
+                get_context_window=get_context_window,
+                provider_name=provider_name,
+                model_name=model_name,
+                get_tools=get_tools,
+                get_mode_controller=get_mode_controller,
+                task_analyzer=task_analyzer or self._resolve_task_analyzer(),
+                session_id=session_id,
+            )
 
             logger.debug("CoordinatorFactory: Created SystemPromptCoordinator")
             return coordinator
@@ -170,6 +228,40 @@ class CoordinatorFactory:
         except Exception as e:
             logger.error(f"CoordinatorFactory: Failed to create SystemPromptCoordinator: {e}")
             raise RuntimeError(f"Failed to create SystemPromptCoordinator: {e}") from e
+
+    def create_system_prompt_state_passed_coordinator(
+        self,
+        task_analyzer: Optional[Any] = None,
+    ) -> Any:
+        """
+        Create the canonical state-passed system prompt coordinator.
+
+        Returns:
+            SystemPromptStatePassedCoordinator instance
+
+        Raises:
+            RuntimeError: If coordinator creation fails
+        """
+        try:
+            from victor.agent.coordinators.system_prompt_state_passed import (
+                SystemPromptStatePassedCoordinator,
+            )
+
+            coordinator = SystemPromptStatePassedCoordinator(
+                task_analyzer=task_analyzer or self._resolve_task_analyzer(),
+            )
+
+            logger.debug("CoordinatorFactory: Created SystemPromptStatePassedCoordinator")
+            return coordinator
+
+        except Exception as e:
+            logger.error(
+                "CoordinatorFactory: Failed to create SystemPromptStatePassedCoordinator: %s",
+                e,
+            )
+            raise RuntimeError(
+                f"Failed to create SystemPromptStatePassedCoordinator: {e}"
+            ) from e
 
     def create_metrics_coordinator(self) -> Any:
         """
@@ -222,6 +314,33 @@ class CoordinatorFactory:
         except Exception as e:
             logger.error(f"CoordinatorFactory: Failed to create SafetyCoordinator: {e}")
             raise RuntimeError(f"Failed to create SafetyCoordinator: {e}") from e
+
+    def create_safety_state_passed_coordinator(self) -> Any:
+        """
+        Create the canonical state-passed safety coordinator.
+
+        Returns:
+            SafetyStatePassedCoordinator instance
+
+        Raises:
+            RuntimeError: If coordinator creation fails
+        """
+        try:
+            from victor.agent.coordinators.safety_state_passed import (
+                SafetyStatePassedCoordinator,
+            )
+
+            coordinator = SafetyStatePassedCoordinator()
+
+            logger.debug("CoordinatorFactory: Created SafetyStatePassedCoordinator")
+            return coordinator
+
+        except Exception as e:
+            logger.error(
+                "CoordinatorFactory: Failed to create SafetyStatePassedCoordinator: %s",
+                e,
+            )
+            raise RuntimeError(f"Failed to create SafetyStatePassedCoordinator: {e}") from e
 
     def create_conversation_coordinator(self) -> Any:
         """
@@ -315,3 +434,26 @@ class CoordinatorFactory:
             self._orchestrator_adapter = OrchestratorProtocolAdapter(orchestrator)
 
         return self._orchestrator_adapter
+
+    def _resolve_task_analyzer(self) -> Any:
+        """Resolve task analyzer from container or fall back to the singleton."""
+        from victor.agent.protocols import TaskAnalyzerProtocol
+        from victor.agent.task_analyzer import get_task_analyzer
+
+        analyzer = self._container.get_optional(TaskAnalyzerProtocol)
+        if analyzer is not None and hasattr(analyzer, "classify_task_with_context"):
+            return analyzer
+
+        analyzer = get_task_analyzer()
+        if hasattr(analyzer, "classify_task_with_context"):
+            return analyzer
+
+        raise RuntimeError("TaskAnalyzer with classify_task_with_context is required")
+
+    def _resolve_project_root(self) -> Optional[Path]:
+        """Resolve project root from container settings if available."""
+        settings = getattr(self._container, "_settings", None)
+        working_directory = getattr(settings, "working_directory", None)
+        if not working_directory or not isinstance(working_directory, (str, os.PathLike)):
+            return None
+        return Path(working_directory)

@@ -1311,6 +1311,58 @@ def create_tool_coordinator(
     return coordinator
 
 
+def build_deprecated_tool_coordinator_from_container(
+    *,
+    container: Any,
+    settings: Any,
+    strict: bool = False,
+) -> Optional[ToolCoordinator]:
+    """Build the deprecated ToolCoordinator shim from DI container state."""
+    from victor.agent.protocols import (
+        IBudgetManager,
+        IToolAccessController,
+        ModeControllerProtocol,
+        ToolCacheProtocol,
+        ToolPipelineProtocol,
+        ToolRegistryProtocol,
+        ToolSelectorProtocol,
+    )
+    from victor.agent.services.protocols import ToolServiceProtocol
+
+    tool_pipeline = container.get_optional(ToolPipelineProtocol)
+    tool_registry = container.get_optional(ToolRegistryProtocol)
+    tool_selector = container.get_optional(ToolSelectorProtocol)
+    budget_manager = container.get_optional(IBudgetManager)
+    tool_cache = container.get_optional(ToolCacheProtocol)
+    mode_controller = container.get_optional(ModeControllerProtocol)
+    tool_access_controller = container.get_optional(IToolAccessController)
+    tool_service = container.get_optional(ToolServiceProtocol)
+
+    if tool_pipeline is None or tool_registry is None:
+        if strict:
+            raise RuntimeError("ToolPipeline and ToolRegistry are required")
+        return None
+
+    config = ToolCoordinatorConfig(
+        default_budget=getattr(settings, "tool_budget", 25),
+        enable_caching=getattr(settings, "enable_tool_cache", True),
+        max_tools_per_selection=getattr(settings, "max_tools_per_selection", 15),
+        selection_threshold=getattr(settings, "tool_selection_threshold", 0.3),
+    )
+
+    return create_tool_coordinator(
+        tool_pipeline=tool_pipeline,
+        tool_registry=tool_registry,
+        tool_selector=tool_selector,
+        budget_manager=budget_manager,
+        tool_cache=tool_cache,
+        tool_access_controller=tool_access_controller,
+        mode_controller=mode_controller,
+        tool_service=tool_service,
+        config=config,
+    )
+
+
 __all__ = [
     "ToolCoordinator",
     "ToolCoordinatorConfig",
@@ -1320,6 +1372,7 @@ __all__ = [
     "NormalizedArgs",
     "ToolExecutionResult",
     "IToolCoordinator",
+    "build_deprecated_tool_coordinator_from_container",
     "create_tool_coordinator",
     "ToolObservabilityHandler",
     "ToolRetryExecutor",

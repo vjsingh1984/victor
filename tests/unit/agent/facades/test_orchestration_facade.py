@@ -51,6 +51,9 @@ class TestOrchestrationFacadeInit:
             streaming_coordinator=MagicMock(),
             iteration_coordinator=MagicMock(),
             task_analyzer=analyzer,
+            exploration_state_passed=MagicMock(),
+            system_prompt_state_passed=MagicMock(),
+            safety_state_passed=MagicMock(),
             presentation=MagicMock(),
             vertical_integration_adapter=MagicMock(),
             vertical_context=MagicMock(),
@@ -89,6 +92,9 @@ class TestOrchestrationFacadeInit:
         assert facade.streaming_coordinator is None
         assert facade.iteration_coordinator is None
         assert facade.task_analyzer is None
+        assert facade.exploration_state_passed is None
+        assert facade.system_prompt_state_passed is None
+        assert facade.safety_state_passed is None
         assert facade.presentation is None
         assert facade.vertical_integration_adapter is None
         assert facade.vertical_context is None
@@ -127,6 +133,9 @@ class TestOrchestrationFacadeProperties:
             streaming_coordinator=MagicMock(name="coordinator"),
             iteration_coordinator=MagicMock(name="iteration"),
             task_analyzer=MagicMock(name="analyzer"),
+            exploration_state_passed=MagicMock(name="exploration_state_passed"),
+            system_prompt_state_passed=MagicMock(name="system_prompt_state_passed"),
+            safety_state_passed=MagicMock(name="safety_state_passed"),
             presentation=MagicMock(name="presentation"),
             vertical_integration_adapter=MagicMock(name="vertical_adapter"),
             vertical_context=MagicMock(name="vertical_ctx"),
@@ -157,6 +166,18 @@ class TestOrchestrationFacadeProperties:
         facade = OrchestrationFacade(get_chat_stream_runtime=lambda: runtime)
 
         assert facade.chat_stream_runtime is runtime
+
+    def test_exploration_state_passed_property(self, facade):
+        """State-passed exploration coordinator should be exposed directly."""
+        assert facade.exploration_state_passed._mock_name == "exploration_state_passed"
+
+    def test_system_prompt_state_passed_property(self, facade):
+        """State-passed system prompt coordinator should be exposed directly."""
+        assert facade.system_prompt_state_passed._mock_name == "system_prompt_state_passed"
+
+    def test_safety_state_passed_property(self, facade):
+        """State-passed safety coordinator should be exposed directly."""
+        assert facade.safety_state_passed._mock_name == "safety_state_passed"
 
     def test_chat_coordinator_property_is_deprecated(self, facade):
         """ChatCoordinator property remains available as a deprecated shim."""
@@ -514,6 +535,9 @@ class TestOrchestrationFacadeProtocolConformance:
         required = [
             "protocol_adapter",
             "task_analyzer",
+            "exploration_state_passed",
+            "system_prompt_state_passed",
+            "safety_state_passed",
         ]
         facade = OrchestrationFacade()
         for prop in required:

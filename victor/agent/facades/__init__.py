@@ -21,6 +21,12 @@ Orchestration), grouping related components behind a single interface.
 The AgentOrchestrator delegates to these facades rather than managing
 individual components directly, reducing its responsibility to thin
 cross-domain coordination.
+
+``OrchestrationFacade`` is the canonical migration boundary for runtime-facing
+callers:
+- service-first surfaces: ``chat_service``, ``tool_service``, ``session_service``
+- state-passed surfaces: ``exploration_state_passed``,
+  ``system_prompt_state_passed``, ``safety_state_passed``
 """
 
 from victor.agent.facades.chat_facade import ChatFacade

@@ -33,9 +33,9 @@ from typing import Any, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
     from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
-    from victor.agent.chunk_generator import ChunkGenerator
-    from victor.agent.tool_planner import ToolPlanner
-    from victor.agent.task_coordinator import TaskCoordinator
+    from victor.agent.services.chunk_runtime import ChunkGenerator
+    from victor.agent.services.tool_planning_runtime import ToolPlanner
+    from victor.agent.services.task_runtime import TaskCoordinator
     from victor.agent.orchestrator_integration import OrchestratorIntegration
     from victor.agent.conversation.controller import ConversationController
     from victor.agent.tool_pipeline import ToolPipeline

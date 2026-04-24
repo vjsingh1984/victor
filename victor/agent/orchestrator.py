@@ -75,9 +75,9 @@ if TYPE_CHECKING:
     # Type-only imports (created by factory, only used for type hints)
     from victor.agent.orchestrator_integration import OrchestratorIntegration
     from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
-    from victor.agent.chunk_generator import ChunkGenerator
-    from victor.agent.tool_planner import ToolPlanner
-    from victor.agent.task_coordinator import TaskCoordinator
+    from victor.agent.services.chunk_runtime import ChunkGenerator
+    from victor.agent.services.tool_planning_runtime import ToolPlanner
+    from victor.agent.services.task_runtime import TaskCoordinator
     from victor.agent.protocols import ToolAccessContext
     from victor.evaluation.protocol import TokenUsage
 

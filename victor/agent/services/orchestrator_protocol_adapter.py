@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from victor.agent.message_history import MessageHistory
     from victor.agent.session_state_manager import SessionStateManager
     from victor.agent.task_analyzer import TaskAnalyzer
-    from victor.agent.tool_planner import ToolPlanner
+    from victor.agent.services.tool_planning_runtime import ToolPlanner
     from victor.agent.tool_selection import ToolSelector
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider, CompletionResponse, Message
