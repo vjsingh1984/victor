@@ -101,6 +101,14 @@ class TestPythonCallExtractor:
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "read"
 
+    def test_valid_tool_names_require_exact_match(self):
+        """Explicit valid names should disable generic tool-name heuristics."""
+        content = "get_paper(path='paper.py') and read(path='foo.py')"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"read"})
+
+        assert result.success
+        assert [tool_call.name for tool_call in result.tool_calls] == ["read"]
+
     def test_strict_mode(self):
         """Test strict mode only extracts known tools."""
         extractor = PythonCallExtractor(strict_mode=True)
@@ -229,6 +237,24 @@ line3')"""
         assert "read" in names
         assert "print" not in names
         assert "len" not in names
+
+    def test_function_signature_is_ignored_without_parse_warning(self):
+        """Typed Python signatures should not be treated like tool calls."""
+        content = "def get_paper(self, arxiv_id: str) -> Paper | None:\n    pass"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"read", "write"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings == []
+
+    def test_placeholder_identifiers_are_not_parsed_as_literal_arguments(self):
+        """Fallback parsing must reject unresolved identifiers copied from code snippets."""
+        content = "code_search(query=query, top_k=fetch_k, category=category, min_score=min_s)"
+        result = self.extractor.extract_from_text(content, valid_tool_names={"code_search"})
+
+        assert not result.success
+        assert result.tool_calls == []
+        assert result.warnings
 
 
 class TestFallbackParsingMixinIntegration:

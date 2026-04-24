@@ -20,6 +20,8 @@ approach that works for stronger models.
 import logging
 from typing import Any, List
 
+from victor.core.completion_markers import TASK_DONE_MARKER
+
 logger = logging.getLogger(__name__)
 
 
@@ -130,7 +132,7 @@ class CoTDistillationStrategy:
         if tools > 5:
             steps.append(
                 "5. VERIFY: Read the modified file to confirm the edit was "
-                "applied correctly. Signal TASK_DONE when verified."
+                f"applied correctly. Signal {TASK_DONE_MARKER} when verified."
             )
 
         # Limit to max_steps

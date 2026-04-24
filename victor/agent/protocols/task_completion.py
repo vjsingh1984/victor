@@ -54,7 +54,7 @@ class CompletionConfidence(Enum):
     - NONE: No completion signals detected
     """
 
-    HIGH = "high"  # Active signal detected (_DONE_, _TASK_DONE_) - deterministic
+    HIGH = "high"  # Rare active marker detected - deterministic
     MEDIUM = "medium"  # File modifications + passive signal
     LOW = "low"  # Only passive phrase detected
     NONE = "none"  # No completion signal detected

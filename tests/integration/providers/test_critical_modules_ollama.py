@@ -38,6 +38,8 @@ from dataclasses import dataclass
 
 import pytest
 
+from victor.core.completion_markers import FILE_DONE_MARKER, SUMMARY_MARKER, TASK_DONE_MARKER
+
 
 def is_ollama_available() -> bool:
     """Check if Ollama server is running at localhost:11434."""
@@ -111,7 +113,7 @@ class TestTaskCompletionE2E:
         detector.analyze_intent("Explain what this code does")
 
         detector.analyze_response(
-            "SUMMARY: This code implements a hello world function that returns "
+            f"{SUMMARY_MARKER} This code implements a hello world function that returns "
             "a greeting string. The add function performs basic arithmetic."
         )
 
@@ -131,7 +133,7 @@ class TestTaskCompletionE2E:
             "write", {"success": True, "path": str(temp_workspace / "main.py")}
         )
 
-        detector.analyze_response("DONE: Added docstring to hello function")
+        detector.analyze_response(f"{FILE_DONE_MARKER} Added docstring to hello function")
         assert detector.should_stop() is True
 
     @requires_ollama()
@@ -142,11 +144,11 @@ class TestTaskCompletionE2E:
 
         detector = TaskCompletionDetector()
         detector.analyze_intent("Fix the bug in the parser")
-        detector.analyze_response("TASK COMPLETE: Fixed the null check in parser.py")
+        detector.analyze_response(f"{TASK_DONE_MARKER} Fixed the null check in parser.py")
 
         state = detector.get_state()
         has_active = state.active_signal_detected or any(
-            "active:" in s or "TASK COMPLETE" in s.upper() for s in state.completion_signals
+            "active:" in s or TASK_DONE_MARKER.lower() in s for s in state.completion_signals
         )
         assert has_active or len(state.completion_signals) > 0
 
@@ -618,7 +620,7 @@ Actual: Raises ZeroDivisionError
         detector.record_tool_result(
             "write", {"success": True, "path": str(temp_workspace / "buggy.py")}
         )
-        detector.analyze_response("TASK COMPLETE: Added zero check")
+        detector.analyze_response(f"{TASK_DONE_MARKER} Added zero check")
 
         assert detector.should_stop() is True
 
@@ -772,9 +774,9 @@ class TestPerformance:
         from victor.agent.task_completion import TaskCompletionDetector
 
         responses = [
-            "DONE: Created the file",
-            "TASK COMPLETE: Fixed the bug",
-            "SUMMARY: Found 5 issues in the code",
+            f"{FILE_DONE_MARKER} Created the file",
+            f"{TASK_DONE_MARKER} Fixed the bug",
+            f"{SUMMARY_MARKER} Found 5 issues in the code",
             "The file has been created successfully.",
         ]
 

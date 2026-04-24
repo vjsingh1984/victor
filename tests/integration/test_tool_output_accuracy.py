@@ -191,7 +191,7 @@ class TestToolServiceIntegration:
         # CRITICAL ASSERTION: LLM must receive all lines
         assert "Result line 0" in llm_content, "LLM must receive first line"
         assert "Result line 199" in llm_content, "LLM must receive last line"
-        assert llm_content.count("Result line") >= 200, f"LLM must receive all 200 lines"
+        assert llm_content.count("Result line") >= 200, "LLM must receive all 200 lines"
 
         # The result dict may have was_pruned flag
         # But this should indicate preview truncation, not LLM input truncation

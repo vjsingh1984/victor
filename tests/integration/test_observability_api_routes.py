@@ -65,7 +65,7 @@ def mock_events():
     for i in range(10):
         event = Event(
             id=f"event-{i}",
-            event_type=f"tool_call" if i % 2 == 0 else "message",
+            event_type="tool_call" if i % 2 == 0 else "message",
             timestamp=base_time + timedelta(minutes=i * 3),
             session_id="test-session-123",
             data={"index": i, "value": f"test_{i}"},

@@ -209,10 +209,8 @@ class PythonCallExtractor:
         if not content or not content.strip():
             return ExtractionResult(remaining_content=content)
 
-        # Combine known tools with valid names for filtering
-        filter_names = valid_tool_names or self._known_tools
-        if valid_tool_names:
-            filter_names = filter_names | self._known_tools
+        # Explicit valid_tool_names disables generic name heuristics.
+        filter_names = set(valid_tool_names) if valid_tool_names else set(self._known_tools)
 
         tool_calls: List[ExtractedToolCall] = []
         warnings: List[str] = []
@@ -223,12 +221,19 @@ class PythonCallExtractor:
             name = match.group("name")
             args_str = match.group("args")
 
+            if self._is_definition_context(content, match.start()):
+                continue
+
             # Filter by known/valid tool names
             if self._strict_mode and name not in filter_names:
                 continue
 
             # Skip if name doesn't look like a tool
-            if not self._is_likely_tool_name(name, filter_names):
+            if not self._is_likely_tool_name(
+                name,
+                filter_names,
+                exact_match_required=valid_tool_names is not None,
+            ):
                 continue
 
             # Parse arguments
@@ -270,12 +275,24 @@ class PythonCallExtractor:
             warnings=warnings,
         )
 
-    def _is_likely_tool_name(self, name: str, valid_names: Set[str]) -> bool:
+    def _is_definition_context(self, content: str, start_pos: int) -> bool:
+        """Return True when a match occurs inside a Python definition header."""
+        line_start = content.rfind("\n", 0, start_pos) + 1
+        prefix = content[line_start:start_pos].strip()
+        return prefix.endswith("def") or prefix.endswith("async def") or prefix.endswith("class")
+
+    def _is_likely_tool_name(
+        self,
+        name: str,
+        valid_names: Set[str],
+        exact_match_required: bool = False,
+    ) -> bool:
         """Check if a name is likely a tool name.
 
         Args:
             name: Function name to check
             valid_names: Set of valid tool names
+            exact_match_required: When True, only exact valid_names matches count.
 
         Returns:
             True if name looks like a tool name
@@ -283,6 +300,9 @@ class PythonCallExtractor:
         # Direct match
         if name in valid_names:
             return True
+
+        if exact_match_required:
+            return False
 
         # Check against known patterns
         if name in self._known_tools:
@@ -408,12 +428,6 @@ class PythonCallExtractor:
         """
         if isinstance(node, ast.Constant):
             return node.value
-        elif isinstance(node, ast.Str):  # Python 3.7 compat
-            return node.s
-        elif isinstance(node, ast.Num):  # Python 3.7 compat
-            return node.n
-        elif isinstance(node, ast.NameConstant):  # Python 3.7 compat
-            return node.value
         elif isinstance(node, ast.List):
             return [self._ast_to_value(elt) for elt in node.elts]
         elif isinstance(node, ast.Dict):
@@ -429,13 +443,12 @@ class PythonCallExtractor:
                 return False
             elif node.id == "None":
                 return None
-            return node.id  # Return as string
+            raise ValueError(f"Non-literal identifier: {node.id}")
         elif isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
             # Handle negative numbers
             return -self._ast_to_value(node.operand)
         else:
-            # Unknown node type - return string representation
-            return ast.dump(node)
+            raise ValueError(f"Unsupported AST node: {type(node).__name__}")
 
     def _parse_arguments_regex(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse arguments using regex (fallback method).
@@ -459,7 +472,6 @@ class PythonCallExtractor:
                 |"([^"]*)"      # Double-quoted string
                 |(\d+\.?\d*)    # Number
                 |(True|False|None)  # Boolean/None
-                |(\w+)          # Unquoted identifier
             )
             """,
             re.VERBOSE,
@@ -478,21 +490,19 @@ class PythonCallExtractor:
             elif match.group(5) is not None:
                 bool_str = match.group(5)
                 value = {"True": True, "False": False, "None": None}.get(bool_str)
-            elif match.group(6) is not None:
-                value = match.group(6)
             else:
                 continue
 
             args_dict[key] = value
 
         if not args_dict and args_str.strip():
-            # Current warning
             warning = f"Could not parse arguments: {args_str[:50]}..."
-
-            # NEW: Add helpful guidance
-            warning += "\n\nExpected format: JSON object with parameter names and values"
-            warning += '\nExample: {"file_path": "/path/to/file.pdf", "pages": [1, 2, 3]}'
-            warning += "\nDo NOT use: Python syntax (func(arg=value)), YAML syntax, or type hints"
+            warning += "\n\nExpected format: concrete literal keyword arguments"
+            warning += "\nExample: read(path='/path/to/file.py', retries=3)"
+            warning += (
+                "\nDo NOT use: function signatures, type hints, placeholder variables, "
+                "or unresolved identifiers"
+            )
 
             logger.warning(warning)
 
