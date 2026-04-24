@@ -357,8 +357,7 @@ class InitSynthesizer:
         _start = _time.monotonic()
 
         chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
-        if model:
-            chat_kwargs["model"] = model
+        chat_kwargs["model"] = model
         response = await provider_instance.chat(messages=messages, **chat_kwargs)
 
         _elapsed_ms = (_time.monotonic() - _start) * 1000
@@ -423,8 +422,7 @@ class InitSynthesizer:
             # Only pass model when explicitly set — lets provider use its own default
             # when model=None (passing None overrides the method's default parameter)
             chat_kwargs: dict = {"temperature": 0.7, "max_tokens": 4096}
-            if model:
-                chat_kwargs["model"] = model
+            chat_kwargs["model"] = model
             response = await provider_instance.chat(messages=messages, **chat_kwargs)
             _elapsed_ms = (_time.monotonic() - _start) * 1000
             content = response.content if response else ""

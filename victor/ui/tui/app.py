@@ -845,6 +845,12 @@ class VictorTUI(App):
             thinking_buffer += content_delta
             self._update_thinking(thinking_buffer)
 
+        def show_preview(kind: str, path: str, body: str) -> None:
+            """Surface preview metadata as a compact system message."""
+            header = f"{kind}: {path}" if path else kind
+            message = f"{header}\n{body}" if body else header
+            self._add_system_message(message)
+
         def process_content(raw_content: str) -> None:
             """Normalize and route content through the shared inline-thinking filter."""
             nonlocal thinking_visible, thinking_buffer
@@ -959,6 +965,26 @@ class VictorTUI(App):
                         except Exception as e:
                             logger.warning(f"Failed to handle status chunk: {e}")
 
+                    elif "file_preview" in metadata:
+                        try:
+                            show_preview(
+                                "File preview",
+                                str(metadata.get("path", "")),
+                                str(metadata["file_preview"]),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to show file preview: {e}")
+
+                    elif "edit_preview" in metadata:
+                        try:
+                            show_preview(
+                                "Edit preview",
+                                str(metadata.get("path", "")),
+                                str(metadata["edit_preview"]),
+                            )
+                        except Exception as e:
+                            logger.warning(f"Failed to show edit preview: {e}")
+
                     elif "tool_start" in metadata:
                         tool_data = metadata["tool_start"]
                         try:
@@ -1001,6 +1027,11 @@ class VictorTUI(App):
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
                     process_content(chunk.content)
+
+                if content_filter.should_abort():
+                    warning_message = f"Warning: {content_filter.abort_reason}"
+                    self._add_system_message(warning_message)
+                    break
 
         finally:
             flush_result = content_filter.flush()

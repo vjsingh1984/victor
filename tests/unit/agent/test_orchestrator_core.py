@@ -4472,7 +4472,7 @@ class TestToolCacheConfig:
 
     def test_tool_cache_ttl(self, orchestrator):
         """Test tool cache ttl is accessible."""
-        ttl = orchestrator.settings.tool_cache_ttl
+        ttl = orchestrator.settings.tools.tool_cache_ttl
         assert isinstance(ttl, (int, float))
         assert ttl >= 0
 
