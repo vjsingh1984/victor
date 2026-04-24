@@ -1727,10 +1727,19 @@ async def read(
     if info.was_truncated:
         remaining = total_lines - actual_end_line
         if info.truncation_reason == "line_limit":
-            header_parts.append(
-                f"[TRUNCATED: Hit {effective_max_lines} line limit. "
-                f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
-            )
+            # Distinguish between user-requested limit and system limit
+            if limit > 0:
+                # User explicitly requested this limit
+                header_parts.append(
+                    f"[READ {actual_end_line - offset}/{total_lines} lines requested via limit={limit}. "
+                    f"{remaining} more lines available. Use offset={actual_end_line} to continue]"
+                )
+            else:
+                # System-imposed limit
+                header_parts.append(
+                    f"[TRUNCATED: Hit {effective_max_lines} line system limit. "
+                    f"{remaining} lines remaining. Use offset={actual_end_line} to continue]"
+                )
         elif info.truncation_reason == "byte_limit":
             header_parts.append(
                 f"[TRUNCATED: Hit {MAX_BYTES // 1024}KB byte limit at line {actual_end_line}. "
