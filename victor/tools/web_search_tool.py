@@ -300,9 +300,9 @@ def _get_web_config(context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         "http_connection_pool_total_timeout": 60,
         "rate_limiter_enabled": True,
         "rate_limiter_requests_per_minute": 10,
-        "rate_limiter_max_retries": 5,
-        "rate_limiter_initial_delay": 1.0,
-        "rate_limiter_max_delay": 60.0,
+        "rate_limiter_max_retries": 2,  # Reduced from 5 to fail faster on timeout
+        "rate_limiter_initial_delay": 0.5,  # Reduced from 1.0 for faster retries
+        "rate_limiter_max_delay": 10.0,  # Reduced from 60.0 to fail faster
         "rate_limiter_backoff_multiplier": 2.0,
     }
 
