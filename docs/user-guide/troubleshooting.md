@@ -914,6 +914,140 @@ victor chat "Run tests"  # Victor chooses right tool
 victor chat "Execute tool pytest"  # Wrong
 ```
 
+### Issue: Tool Deduplication - Expected Tool Missing
+
+**Symptom**:
+```bash
+victor tools list
+# Expected tool not in list (e.g., lgc_wikipedia missing)
+```
+
+**Solutions**:
+
+**1. Check if tool was deduplicated**:
+```bash
+# Check logs for deduplication messages
+victor logs --tail 100 | grep -i dedup
+# Should show: "Skipped lgc_wikipedia (source=langchain) in favor of wikipedia"
+```
+
+**2. Check deduplication settings**:
+```bash
+# View current deduplication configuration
+victor config show | grep dedup
+```
+
+**3. Add tool to whitelist** (if you need both):
+```yaml
+# ~/.victor/profiles.yaml
+profiles:
+  default:
+    tools:
+      deduplication_whitelist:
+        - wikipedia
+        - lgc_wikipedia
+```
+
+**4. Disable deduplication** (not recommended):
+```yaml
+# ~/.victor/profiles.yaml
+profiles:
+  default:
+    tools:
+      enable_tool_deduplication: false
+```
+
+**5. Check priority order**:
+```bash
+# Native tools have priority over adapters
+# If you have native 'wikipedia', 'lgc_wikipedia' will be skipped
+victor tools list | grep wikipedia
+```
+
+### Issue: Tool Has Unexpected Prefix
+
+**Symptom**:
+```bash
+victor tools list
+# Shows mcp_github_search instead of github_search
+# Or lgc_wikipedia instead of wikipedia
+```
+
+**Solutions**:
+
+**1. Check if naming enforcement is enabled**:
+```bash
+victor config show | grep naming_enforcement
+# Should show: deduplication_naming_enforcement: true
+```
+
+**2. This is expected behavior**:
+```bash
+# LangChain tools get lgc_ prefix
+# MCP tools get mcp_ prefix  
+# Plugin tools get plg_ prefix
+# Native tools have no prefix
+```
+
+**3. Disable naming enforcement** (if needed):
+```yaml
+# ~/.victor/profiles.yaml
+profiles:
+  default:
+    tools:
+      deduplication_naming_enforcement: false
+```
+
+**4. Use full tool name**:
+```bash
+# Reference tool with prefix
+victor chat "Search GitHub using mcp_github_search"
+```
+
+### Issue: Too Many Duplicate Tools
+
+**Symptom**:
+```bash
+victor tools list
+# Shows multiple tools with similar names
+# e.g., search, lgc_search, mcp_search
+```
+
+**Solutions**:
+
+**1. Check if deduplication is enabled**:
+```bash
+victor config show | grep enable_tool_deduplication
+```
+
+**2. Enable deduplication**:
+```yaml
+# ~/.victor/profiles.yaml
+profiles:
+  default:
+    tools:
+      enable_tool_deduplication: true
+```
+
+**3. Check priority order**:
+```yaml
+# ~/.victor/profiles.yaml
+profiles:
+  default:
+    tools:
+      deduplication_priority_order:
+        - native      # Highest priority
+        - langchain
+        - mcp
+        - plugin      # Lowest priority
+```
+
+**4. Verify logs show deduplication**:
+```bash
+victor logs --tail 50 | grep -i "conflict resolved"
+# Should show which tools were kept/skipped
+```
+
 ---
 
 ## Log Analysis

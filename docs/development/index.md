@@ -135,7 +135,10 @@ class MyTool(BaseTool):
         pass
 ```
 
+**Tool Deduplication**: Native tools are automatically preferred over adapter tools (LangChain, MCP) when conflicts are detected. Tools are compared by normalized name (lowercase, separator normalization). Ensure your tool has a unique, descriptive name to avoid conflicts.
+
 [Tool Catalog →](../reference/tools/catalog.md)
+[Tool Deduplication →](../architecture/tool-deduplication.md)
 
 ### Create a Vertical
 
