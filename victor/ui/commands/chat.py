@@ -2058,26 +2058,24 @@ def _check_history_health(history_file) -> None:
         pass
 
 
-def _create_cli_prompt_session():
+def _create_cli_prompt_session(settings=None):
     """Create a prompt_toolkit PromptSession with persistent history.
 
     Loads previous user messages from the conversation database and persists
-    new input to ~/.victor/chat_history for cross-session Up/Down navigation.
+    new input to .victor/chat_history for project-specific history.
+
+    Args:
+        settings: Optional settings object (to avoid redundant load_settings call)
     """
     from prompt_toolkit import PromptSession
     from prompt_toolkit.history import FileHistory, InMemoryHistory
     from prompt_toolkit.key_binding import KeyBindings
 
-    # Use a persistent history file in ~/.victor/
-    try:
-        from victor.config.settings import get_project_paths, load_settings
+    max_entries = 250  # Hard limit for CLI history
 
-        # Load settings to get max_entries configuration
-        try:
-            settings = load_settings()
-            max_entries = 250  # Hard limit for CLI history
-        except Exception:
-            max_entries = 250  # Hard limit
+    # Use a persistent history file in project-specific .victor/
+    try:
+        from victor.config.settings import get_project_paths
 
         history_file = get_project_paths().project_victor_dir / "chat_history"
         history_file.parent.mkdir(parents=True, exist_ok=True)
@@ -2150,7 +2148,7 @@ async def _run_cli_repl(
         _print_interactive_startup_messages(console, startup_messages)
 
     # Set up prompt_toolkit with persistent history for Up/Down arrow navigation
-    prompt_session = _create_cli_prompt_session()
+    prompt_session = _create_cli_prompt_session(settings=settings)
 
     # Add Ctrl+O hotkey to expand last tool output.
     # _active_renderer is updated each turn so the binding always refers to
@@ -2166,6 +2164,7 @@ async def _run_cli_repl(
             _active_renderer.expand_last_output()
 
     while True:
+        renderer = None
         try:
             # Use prompt_async() — prompt_toolkit's native async input.
             # The sync .prompt() internally calls asyncio.run() which crashes
@@ -2302,6 +2301,13 @@ async def _run_cli_repl(
                 )
 
             console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
+
+        finally:
+            # Ensure renderer cleanup happens in ALL exit paths
+            if renderer is not None and hasattr(renderer, "cleanup"):
+                renderer.cleanup()
+                if _active_renderer == renderer:
+                    _active_renderer = None
 
 
 async def run_workflow_mode(
