@@ -18,7 +18,20 @@ import typer
 from rich.console import Console
 from typing import Optional
 
-from victor import __version__
+try:
+    from victor import __version__
+except (ImportError, AttributeError):
+    # Handle shadowing/namespace issues
+    try:
+        from importlib.metadata import version as _v
+
+        __version__ = _v("victor-ai")
+    except Exception:
+        try:
+            from .. import __version__
+        except (ImportError, ValueError):
+            __version__ = "0.0.0"
+
 from victor.core.utils.capability_loader import load_coding_analyze_app
 from victor.ui.commands.benchmark import benchmark_app
 from victor.ui.commands.capabilities import capabilities_app
