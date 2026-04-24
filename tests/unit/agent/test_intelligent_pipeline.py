@@ -435,7 +435,7 @@ class TestLazyModeController:
             "sys.modules",
             {
                 "victor.agent.adaptive_mode_controller": MagicMock(),
-                "victor.framework.rl.coordinator": MagicMock(),
+                "victor.agent.services.rl_runtime": MagicMock(),
             },
         ):
             import sys
@@ -443,7 +443,7 @@ class TestLazyModeController:
             mock_amc_module = sys.modules["victor.agent.adaptive_mode_controller"]
             mock_amc_module.AdaptiveModeController.return_value = mock_controller_instance
 
-            mock_coord_module = sys.modules["victor.framework.rl.coordinator"]
+            mock_coord_module = sys.modules["victor.agent.services.rl_runtime"]
             mock_coord_module.get_rl_coordinator.return_value.get_learner.return_value = (
                 mock_learner
             )
@@ -460,7 +460,7 @@ class TestLazyModeController:
             "sys.modules",
             {
                 "victor.agent.adaptive_mode_controller": MagicMock(),
-                "victor.framework.rl.coordinator": MagicMock(),
+                "victor.agent.services.rl_runtime": MagicMock(),
             },
         ):
             import sys
@@ -468,7 +468,7 @@ class TestLazyModeController:
             mock_amc_module = sys.modules["victor.agent.adaptive_mode_controller"]
             mock_amc_module.AdaptiveModeController.return_value = mock_controller_instance
 
-            mock_coord_module = sys.modules["victor.framework.rl.coordinator"]
+            mock_coord_module = sys.modules["victor.agent.services.rl_runtime"]
             mock_coord_module.get_rl_coordinator.side_effect = Exception("No coordinator")
 
             result = pipeline._get_mode_controller()
@@ -564,7 +564,7 @@ class TestLazyGroundingVerifier:
             "sys.modules",
             {
                 "victor.agent.grounding_verifier": MagicMock(),
-                "victor.framework.rl.coordinator": MagicMock(),
+                "victor.agent.services.rl_runtime": MagicMock(),
             },
         ):
             import sys
@@ -572,7 +572,7 @@ class TestLazyGroundingVerifier:
             mock_gv_module = sys.modules["victor.agent.grounding_verifier"]
             mock_gv_module.GroundingVerifier.return_value = mock_verifier_instance
 
-            mock_coord_module = sys.modules["victor.framework.rl.coordinator"]
+            mock_coord_module = sys.modules["victor.agent.services.rl_runtime"]
             mock_coord_module.get_rl_coordinator.return_value.get_learner.return_value = (
                 mock_learner
             )

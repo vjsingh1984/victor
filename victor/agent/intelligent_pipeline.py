@@ -257,7 +257,7 @@ class IntelligentAgentPipeline:
                 # Get ModeTransitionLearner from RLCoordinator for unified RL
                 mode_transition_learner = None
                 try:
-                    from victor.framework.rl.coordinator import get_rl_coordinator
+                    from victor.agent.services.rl_runtime import get_rl_coordinator
 
                     coordinator = get_rl_coordinator()
                     mode_transition_learner = coordinator.get_learner("mode_transition")
@@ -319,7 +319,7 @@ class IntelligentAgentPipeline:
                 # Get GroundingThresholdLearner from RLCoordinator for adaptive thresholds
                 grounding_threshold_learner = None
                 try:
-                    from victor.framework.rl.coordinator import get_rl_coordinator
+                    from victor.agent.services.rl_runtime import get_rl_coordinator
 
                     coordinator = get_rl_coordinator()
                     grounding_threshold_learner = coordinator.get_learner("grounding_threshold")

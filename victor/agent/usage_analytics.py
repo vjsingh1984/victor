@@ -770,7 +770,7 @@ class UsageAnalytics:
             return False
 
         try:
-            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.agent.services.rl_runtime import get_rl_coordinator
             from victor.framework.rl.base import RLOutcome
             import json
 

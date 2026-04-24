@@ -299,6 +299,22 @@ class TestOrchestratorServiceProvider:
             strict=False,
         )
 
+    def test_create_rl_coordinator_uses_service_runtime_host(self, mock_settings):
+        """RL coordinator factory should resolve through the service runtime host."""
+        from victor.agent.service_provider import OrchestratorServiceProvider
+
+        provider = OrchestratorServiceProvider(mock_settings)
+        coordinator = MagicMock()
+
+        with patch(
+            "victor.agent.services.rl_runtime.get_rl_coordinator",
+            return_value=coordinator,
+        ) as get_rl_coordinator:
+            result = provider._create_rl_coordinator()
+
+        assert result is coordinator
+        get_rl_coordinator.assert_called_once_with()
+
 
 # =============================================================================
 # Convenience Function Tests

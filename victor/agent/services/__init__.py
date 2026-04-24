@@ -38,6 +38,13 @@ from victor.agent.services.decision_service import (
 from victor.agent.services.exploration_runtime import ExplorationCoordinator, ExplorationResult
 from victor.agent.services.metrics_service import MetricsCoordinator, create_metrics_coordinator
 from victor.agent.services.provider_service import ProviderService
+from victor.agent.services.rl_runtime import (
+    AsyncWriterQueue,
+    RLCoordinator,
+    get_rl_coordinator,
+    get_rl_coordinator_async,
+    reset_rl_coordinator,
+)
 from victor.agent.services.orchestrator_protocol_adapter import OrchestratorProtocolAdapter
 from victor.agent.services.prompt_compat import (
     IPromptCoordinator,
@@ -112,7 +119,9 @@ __all__ = [
     "PromptTaskContext",
     "IPromptCoordinator",
     "OrchestratorProtocolAdapter",
+    "AsyncWriterQueue",
     "ProviderService",
+    "RLCoordinator",
     "RecoveryService",
     "RecoveryContextImpl",
     "StreamingRecoveryContext",
@@ -148,4 +157,7 @@ __all__ = [
     "create_state_coordinator",
     "create_tool_coordinator",
     "create_metrics_coordinator",
+    "get_rl_coordinator",
+    "get_rl_coordinator_async",
+    "reset_rl_coordinator",
 ]

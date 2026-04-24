@@ -305,7 +305,7 @@ class OptimizationInjector:
             return None
 
         try:
-            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.agent.services.rl_runtime import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             learner = coordinator.get_learner("prompt_optimizer")

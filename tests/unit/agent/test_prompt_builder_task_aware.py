@@ -123,7 +123,7 @@ class TestGEPAPromptIntegration:
                 return_value=mock_settings,
             ),
             patch(
-                "victor.framework.rl.coordinator.get_rl_coordinator",
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
                 return_value=mock_coordinator,
             ),
         ):
@@ -165,7 +165,7 @@ class TestGEPAPromptIntegration:
                 return_value=mock_settings,
             ),
             patch(
-                "victor.framework.rl.coordinator.get_rl_coordinator",
+                "victor.agent.services.rl_runtime.get_rl_coordinator",
                 return_value=mock_coordinator,
             ),
         ):

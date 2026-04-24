@@ -171,7 +171,7 @@ from victor.agent.context_manager import (
 )
 from victor.agent.continuation_strategy import ContinuationStrategy
 from victor.agent.tool_call_extractor import ExtractedToolCall
-from victor.framework.rl.coordinator import get_rl_coordinator
+from victor.agent.services.rl_runtime import get_rl_coordinator
 from victor.agent.usage_analytics import AnalyticsConfig
 from victor.agent.tool_sequence_tracker import create_sequence_tracker
 from victor.agent.session_state_accessor import SessionStateAccessor
@@ -1466,7 +1466,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # Set RL repo context for per-repo isolation
         try:
-            from victor.framework.rl.coordinator import get_rl_coordinator
+            from victor.agent.services.rl_runtime import get_rl_coordinator
 
             coordinator = get_rl_coordinator()
             coordinator.set_repo_context(workspace_dir.name)
