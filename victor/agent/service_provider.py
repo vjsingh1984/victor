@@ -68,7 +68,6 @@ if TYPE_CHECKING:
         ConversationEmbeddingStoreProtocol,
         ConversationStateMachineProtocol,
         DebugLoggerProtocol,
-        IntentClassifierProtocol,
         MCPBridgeProtocol,
         MessageHistoryProtocol,
         MetricsCollectorProtocol,
@@ -78,15 +77,10 @@ if TYPE_CHECKING:
         ProjectContextProtocol,
         ProviderRegistryProtocol,
         RecoveryHandlerProtocol,
-        ReminderManagerProtocol,
         ResponseCompleterProtocol,
-        ResponseSanitizerProtocol,
         SafetyCheckerProtocol,
         SearchRouterProtocol,
         SemanticToolSelectorProtocol,
-        StreamingConfidenceMonitorProtocol,
-        StreamingHandlerProtocol,
-        StreamingMetricsCollectorProtocol,
         SystemPromptBuilderProtocol,
         TaskAnalyzerProtocol,
         TaskTrackerProtocol,
@@ -106,9 +100,15 @@ if TYPE_CHECKING:
     )
     from victor.agent.services.protocols import (
         ChunkRuntimeProtocol,
+        IntentClassifierProtocol,
         PromptRuntimeProtocol,
         RLLearningRuntimeProtocol,
+        ReminderManagerProtocol,
+        ResponseSanitizerProtocol,
         StateRuntimeProtocol,
+        StreamingConfidenceMonitorProtocol,
+        StreamingHandlerProtocol,
+        StreamingMetricsCollectorProtocol,
         StreamingRecoveryRuntimeProtocol,
         TaskRuntimeProtocol,
         ToolPlanningRuntimeProtocol,
@@ -1106,10 +1106,10 @@ class OrchestratorServiceProvider:
         from victor.agent.services.recovery_compat import StreamingRecoveryCoordinator
         from victor.agent.protocols import (
             RecoveryHandlerProtocol,
-            StreamingHandlerProtocol,
             ContextCompactorProtocol,
             TaskTrackerProtocol,
         )
+        from victor.agent.services.protocols import StreamingHandlerProtocol
 
         # Get recovery handler from DI container (optional)
         recovery_handler = self.container.get_optional(RecoveryHandlerProtocol)
@@ -1146,7 +1146,7 @@ class OrchestratorServiceProvider:
             ChunkGenerator instance
         """
         from victor.agent.services.chunk_runtime import ChunkGenerator
-        from victor.agent.protocols import StreamingHandlerProtocol
+        from victor.agent.services.protocols import StreamingHandlerProtocol
 
         # Get streaming handler from DI container
         streaming_handler = self.container.get(StreamingHandlerProtocol)
