@@ -410,9 +410,14 @@ class ChatCoordinator(ChatStreamHelperMixin):
     async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
-        Delegates to the canonical StreamingChatPipeline that coordinates the
-        streaming lifecycle (context prep, provider streaming, tool execution,
-        continuation handling).
+        Compatibility resolution order:
+        1. Bound ``ChatService.stream_chat()``
+        2. Orchestrator ``_get_service_streaming_runtime()``
+        3. Legacy ``_stream_chat_runtime`` hook
+
+        The shim does not own streaming execution anymore; it only forwards to
+        the canonical service/runtime path and preserves the older hook as a
+        last-resort compatibility fallback.
 
         Args:
             user_message: User's input message
@@ -445,6 +450,8 @@ class ChatCoordinator(ChatStreamHelperMixin):
                     yield chunk
                 return
 
+        # Preserve the coordinator-era hook only for callers that still wire it
+        # directly. The canonical runtime path is the service-owned runtime.
         runtime_helper = self._get_orchestrator_runtime_helper("_stream_chat_runtime")
         if callable(runtime_helper):
             async for chunk in runtime_helper(user_message, **kwargs):
@@ -453,7 +460,8 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         warnings.warn(
             "ChatCoordinator.stream_chat() called without a bound ChatService, "
-            "service streaming runtime, or legacy _stream_chat_runtime hook. "
+            "service streaming runtime, or legacy compatibility hook "
+            "(_stream_chat_runtime). "
             "This shim no longer owns streaming execution. "
             "Ensure ServiceStreamingRuntime is registered on the orchestrator.",
             DeprecationWarning,

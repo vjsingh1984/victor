@@ -217,18 +217,18 @@ class ContinuationHandler:
         """
         # Apply state updates from action result
         self._apply_state_updates(action_result)
+        action = action_result.get("action", "finish")
 
         # AGENTIC LOOP FIX: Check if continuation should be skipped due to forced completion
         # This prevents continuation strategy from overriding task completion detector
-        if getattr(stream_ctx, "skip_continuation", False):
+        recovery_actions = {"execute_extracted_tool", "force_tool_execution"}
+        if getattr(stream_ctx, "skip_continuation", False) and action not in recovery_actions:
             logger.info("Continuation skipped: skip_continuation flag set (completion was forced)")
             return ContinuationResult(
                 chunks=[],
                 should_return=True,
                 should_continue_loop=False,
             )
-
-        action = action_result.get("action", "finish")
 
         # Dispatch to specific handler
         handlers = {

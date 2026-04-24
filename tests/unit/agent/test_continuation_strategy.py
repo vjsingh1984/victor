@@ -301,6 +301,21 @@ class TestDetermineContinuationAction:
         assert result["action"] == "force_tool_execution"
         assert "Hallucinated" in result["reason"]
 
+    def test_force_tool_execution_message_avoids_pseudo_call_examples(self, strategy, base_kwargs):
+        """Recovery guidance should ask for real tool calls, not text pseudo-calls."""
+        base_kwargs["mentioned_tools"] = ["read", "search"]
+
+        mock_intent = MagicMock()
+        mock_intent.intent = IntentType.CONTINUATION
+
+        result = strategy.determine_continuation_action(intent_result=mock_intent, **base_kwargs)
+
+        assert result["action"] == "force_tool_execution"
+        assert "plain text" in result["message"].lower()
+        assert "write(path=" not in result["message"]
+        assert "edit(path=" not in result["message"]
+        assert "shell(command=" not in result["message"]
+
     def test_return_to_user_for_asking_input_one_shot(self, strategy, base_kwargs):
         """Test returns to user when asking input in one-shot mode."""
         base_kwargs["one_shot_mode"] = True

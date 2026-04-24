@@ -398,7 +398,7 @@ class TestCheckNaturalCompletion:
         """Returns None - signal-based completion handles completion, not buffer/size heuristics.
 
         After Phase 5 cleanup, buffer/size heuristics were removed in favor of
-        TaskCompletionDetector's explicit signal-based completion (_DONE_, _TASK_DONE_, etc.).
+        TaskCompletionDetector's explicit rare-marker completion signaling.
         """
         ctx = StreamingChatContext(
             user_message="test",

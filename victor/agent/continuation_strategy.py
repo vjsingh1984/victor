@@ -780,10 +780,8 @@ class ContinuationStrategy:
                 "action": "force_tool_execution",
                 "message": (
                     f"You mentioned calling {', '.join(mentioned_tools)} but didn't actually make the tool call. "
-                    "Please make the ACTUAL tool call now. Use the exact tool format:\n"
-                    "For write: write(path='filename.py', content='...')\n"
-                    "For edit: edit(path='filename.py', old_string='...', new_string='...')\n"
-                    "For shell: shell(command='...')"
+                    "Please make the ACTUAL tool call now via the tool interface, not as plain text. "
+                    "Do not emit pseudo-calls, function signatures, or placeholder arguments like query=query."
                 ),
                 "reason": f"Hallucinated tool calls detected: {mentioned_tools}",
                 "updates": {},

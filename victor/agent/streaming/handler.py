@@ -328,9 +328,9 @@ class StreamingChatHandler:
     ) -> Optional[IterationResult]:
         """Check if the response represents natural completion (substantial content, no tools).
 
-        Signal-based completion detection uses explicit markers (_DONE_, _TASK_DONE_)
+        Signal-based completion detection uses explicit rare completion markers
         instead of buffer/size heuristics. The TaskCompletionDetector handles all
-        completion detection based on explicit signals. This method is kept for
+        completion detection based on explicit markers. This method is kept for
         backward compatibility but always returns None.
 
         Args:
@@ -342,7 +342,7 @@ class StreamingChatHandler:
             IterationResult to break if natural completion, None otherwise
         """
         # Signal-based completion is always active - TaskCompletionDetector handles
-        # completion detection based on explicit signals (_DONE_, _TASK_DONE_, _SUMMARY_)
+        # completion detection based on explicit rare completion markers
         return None
 
     def handle_empty_response(self, ctx: StreamingChatContext) -> Optional[IterationResult]:
