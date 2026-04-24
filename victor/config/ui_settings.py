@@ -17,3 +17,10 @@ class UISettings(BaseModel):
     use_emojis: bool = Field(
         default_factory=lambda: not os.getenv("CI", "false").lower() == "true",
     )
+    cli_history_max_entries: int = Field(
+        default=250,
+        ge=10,
+        le=1000,
+        description="Maximum number of entries in CLI chat history file. "
+        "Larger values provide more history but slow down typing.",
+    )
