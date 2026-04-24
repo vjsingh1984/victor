@@ -148,7 +148,9 @@ async def test_agent_executor_uses_output_key_and_runtime_graph_node_result() ->
             return fake_result
 
     # Use patch context manager for cleaner setup/teardown
-    with patch("victor.agent.subagents.orchestrator.SubAgentOrchestrator", MockSubAgentOrchestrator):
+    with patch(
+        "victor.agent.subagents.orchestrator.SubAgentOrchestrator", MockSubAgentOrchestrator
+    ):
         # Also patch _get_orchestrator to return the mock orchestrator
         with patch.object(executor, "_get_orchestrator", return_value=mock_orchestrator):
             node = AgentNode(

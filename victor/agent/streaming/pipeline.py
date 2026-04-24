@@ -118,9 +118,7 @@ class StreamingChatPipeline:
             self._last_tools = tools
         return tools
 
-    async def run(
-        self, user_message: str, **kwargs: Any
-    ) -> AsyncIterator[StreamChunk]:
+    async def run(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Run the streaming pipeline for the provided message."""
         runtime_owner = self._runtime_owner
         orch = runtime_owner._orchestrator
@@ -364,11 +362,11 @@ class StreamingChatPipeline:
                     from victor.core.feature_flags import FeatureFlag, is_feature_enabled
 
                     if is_feature_enabled(FeatureFlag.USE_CONFIDENCE_MONITOR):
-                        self._confidence_monitor.record(
-                            full_content or "", stream_ctx.total_tokens
-                        )
+                        self._confidence_monitor.record(full_content or "", stream_ctx.total_tokens)
                         if self._confidence_monitor.should_stop():
-                            logger.info("[ConfidenceMonitor] Stopping iteration early — confidence threshold met")
+                            logger.info(
+                                "[ConfidenceMonitor] Stopping iteration early — confidence threshold met"
+                            )
                             break
                 except Exception:
                     pass
@@ -473,7 +471,9 @@ class StreamingChatPipeline:
                         "forcing completion NOW (immediate stop, skip continuation)"
                     )
                     stream_ctx.force_completion = True
-                    stream_ctx.skip_continuation = True  # NEW: Prevent continuation strategy override
+                    stream_ctx.skip_continuation = (
+                        True  # NEW: Prevent continuation strategy override
+                    )
                 elif confidence == CompletionConfidence.MEDIUM:
                     logger.info(
                         "Task completion: MEDIUM confidence detected (file mods + passive signal)"

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 from victor.config.compaction_strategy_settings import (
@@ -23,9 +25,10 @@ class AdaptiveCompactionSettings(BaseModel):
     """
 
     enabled: bool = Field(
-        default_factory=lambda: os.getenv("VICTOR_ADAPTIVE_THRESHOLD_ENABLED", "false").lower() == "true",
+        default_factory=lambda: os.getenv("VICTOR_ADAPTIVE_THRESHOLD_ENABLED", "false").lower()
+        == "true",
         description="Enable adaptive threshold based on conversation pattern analysis. "
-                    "Env: VICTOR_ADAPTIVE_THRESHOLD_ENABLED",
+        "Env: VICTOR_ADAPTIVE_THRESHOLD_ENABLED",
     )
 
     min_threshold: float = Field(
@@ -33,7 +36,7 @@ class AdaptiveCompactionSettings(BaseModel):
         ge=0.10,
         le=0.80,
         description="Minimum adaptive threshold (for rapid topic switches). "
-                    "Default: 0.35 (35%), Env: VICTOR_COMPACTION_MIN_THRESHOLD",
+        "Default: 0.35 (35%), Env: VICTOR_COMPACTION_MIN_THRESHOLD",
     )
 
     max_threshold: float = Field(
@@ -41,7 +44,7 @@ class AdaptiveCompactionSettings(BaseModel):
         ge=0.20,
         le=0.95,
         description="Maximum adaptive threshold (for deep reasoning). "
-                    "Default: 0.70 (70%), Env: VICTOR_COMPACTION_MAX_THRESHOLD",
+        "Default: 0.70 (70%), Env: VICTOR_COMPACTION_MAX_THRESHOLD",
     )
 
     analysis_window: int = Field(
@@ -49,7 +52,7 @@ class AdaptiveCompactionSettings(BaseModel):
         ge=5,
         le=50,
         description="Number of recent messages to analyze for pattern detection. "
-                    "Default: 20, Env: VICTOR_COMPACTION_ANALYSIS_WINDOW",
+        "Default: 20, Env: VICTOR_COMPACTION_ANALYSIS_WINDOW",
     )
 
     update_frequency: int = Field(
@@ -57,7 +60,7 @@ class AdaptiveCompactionSettings(BaseModel):
         ge=1,
         le=20,
         description="Re-analyze conversation pattern every N turns. "
-                    "Default: 5, Env: VICTOR_COMPACTION_UPDATE_FREQUENCY",
+        "Default: 5, Env: VICTOR_COMPACTION_UPDATE_FREQUENCY",
     )
 
     def validate_settings(self) -> None:

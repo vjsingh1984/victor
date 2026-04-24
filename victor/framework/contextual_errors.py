@@ -482,7 +482,6 @@ def format_exception_for_user(
     try:
         from victor.core.errors import (
             ConfigurationError,
-            ProviderError,
             ProviderConnectionError,
             ProviderAuthError,
             ProviderNotFoundError,
@@ -491,8 +490,7 @@ def format_exception_for_user(
             ValidationError,
         )
     except ImportError:
-        # Fallback if errors module not available
-        ConfigurationError = ProviderError = None
+        ConfigurationError = None
 
     # Handle specific Victor error types
     if ConfigurationError is not None:
@@ -535,7 +533,6 @@ def format_exception_for_user(
             )
 
         if isinstance(error, ToolExecutionError):
-            tool_name = context.get("tool_name", "tool")
             return (
                 f"{error}\n\n"
                 f"💡 Suggestions:\n"

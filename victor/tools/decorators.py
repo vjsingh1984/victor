@@ -376,6 +376,7 @@ def tool(
         # CRITICAL FIX: Check if function is async and create appropriate wrapper
         # If the wrapped function is async, the wrapper MUST be async to properly await it
         if inspect.iscoroutinefunction(fn):
+
             @wraps(fn)
             async def async_wrapper(*args, **kwargs) -> Any:  # type: ignore[misc]
                 # This async wrapper properly awaits the underlying async function
@@ -395,6 +396,7 @@ def tool(
 
             return async_wrapper
         else:
+
             @wraps(fn)
             def sync_wrapper(*args, **kwargs) -> Any:
                 # Sync wrapper for sync functions
@@ -515,7 +517,9 @@ def _create_tool_class(
                 prop_type = prop_schema.get("type", "string")
 
                 # Path -> string
-                if "Path" in str(prop_type) or (hasattr(prop_type, "__name__") and prop_type.__name__ == "Path"):
+                if "Path" in str(prop_type) or (
+                    hasattr(prop_type, "__name__") and prop_type.__name__ == "Path"
+                ):
                     prop_schema["type"] = "string"
                     prop_schema["description"] = prop_schema.get("description", "") + " (file path)"
 
@@ -527,7 +531,9 @@ def _create_tool_class(
                         items_schema = prop_schema["items"]
                         # Recursively sanitize items
                         if isinstance(items_schema, dict):
-                            prop_schema["items"] = sanitize_schema_for_llm({"type": "object", "properties": items_schema})
+                            prop_schema["items"] = sanitize_schema_for_llm(
+                                {"type": "object", "properties": items_schema}
+                            )
 
                 # Remove Python-specific annotations
                 for key in list(prop_schema.keys()):
@@ -537,9 +543,7 @@ def _create_tool_class(
         # Clean up required list
         if "required" in sanitized:
             # Remove 'self' from required parameters (LLM sometimes includes it)
-            sanitized["required"] = [
-                r for r in sanitized["required"] if r != "self"
-            ]
+            sanitized["required"] = [r for r in sanitized["required"] if r != "self"]
 
         return sanitized
 
@@ -861,6 +865,7 @@ def _create_tool_class(
             try:
                 # DEBUG: Log tool execution start
                 import logging as _logging
+
                 _logger = _logging.getLogger(__name__)
                 _logger.debug(f"[TOOL_EXEC] 🔧 Executing {self._fn.__name__}")
                 _logger.debug(f"[TOOL_EXEC] Is coroutine: {inspect.iscoroutinefunction(self._fn)}")
@@ -873,13 +878,13 @@ def _create_tool_class(
                     kwargs["_exec_ctx"] = _exec_ctx
 
                 if inspect.iscoroutinefunction(self._fn):
-                    _logger.debug(f"[TOOL_EXEC] ⏳ Awaiting coroutine...")
+                    _logger.debug("[TOOL_EXEC] ⏳ Awaiting coroutine...")
                     result = await self._fn(**kwargs)
                     _logger.debug(f"[TOOL_EXEC] ✓ Coroutine awaited, result type: {type(result)}")
                 else:
                     # Offload sync functions to a thread to avoid blocking
                     # the event loop during CPU-bound or I/O-bound operations.
-                    _logger.debug(f"[TOOL_EXEC] 🔄 Running in thread...")
+                    _logger.debug("[TOOL_EXEC] 🔄 Running in thread...")
                     result = await asyncio.to_thread(self._fn, **kwargs)
                     _logger.debug(f"[TOOL_EXEC] ✓ Thread completed, result type: {type(result)}")
 

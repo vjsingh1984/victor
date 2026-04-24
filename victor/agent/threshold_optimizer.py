@@ -203,9 +203,7 @@ class ThresholdOptimizer:
         self.optimization_interval = optimization_interval
         self.adjustment_rate = adjustment_rate
 
-        self._thresholds: Dict[ThresholdType, ThresholdConfig] = {
-            k: v for k, v in self.DEFAULT_THRESHOLDS.items()
-        }
+        self._thresholds: Dict[ThresholdType, ThresholdConfig] = dict(self.DEFAULT_THRESHOLDS)
         self._outcomes: List[TaskOutcome] = []
         self._optimization_count = 0
 

@@ -25,7 +25,6 @@ from victor.framework.evaluation_nodes import EvaluationDecision
 from victor.framework.perception_integration import RequirementType, Requirement
 from victor.agent.turn_policy import SpinDetector, SpinState
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -114,9 +113,7 @@ class TestEnhancedCompletionIntegration:
         # Enhanced evaluator should be initialized
         assert loop.enhanced_completion_evaluator is not None
 
-    def test_enhanced_completion_can_be_disabled(
-        self, mock_orchestrator, mock_memory_coordinator
-    ):
+    def test_enhanced_completion_can_be_disabled(self, mock_orchestrator, mock_memory_coordinator):
         """Test that enhanced completion can be disabled via config."""
         loop = AgenticLoop(
             orchestrator=mock_orchestrator,
@@ -128,9 +125,7 @@ class TestEnhancedCompletionIntegration:
         assert loop.enhanced_completion_evaluator is None
 
     @pytest.mark.asyncio
-    async def test_evaluate_uses_enhanced_when_enabled(
-        self, loop_with_enhanced_enabled
-    ):
+    async def test_evaluate_uses_enhanced_when_enabled(self, loop_with_enhanced_enabled):
         """Test that _evaluate uses enhanced evaluator when enabled."""
         perception = MockPerception(confidence=0.9, requirements=[])
         action_result = MockTurnResult(response="Complete")
@@ -150,9 +145,7 @@ class TestEnhancedCompletionIntegration:
         assert result.score == 0.85
 
     @pytest.mark.asyncio
-    async def test_evaluate_uses_legacy_when_disabled(
-        self, loop_with_enhanced_disabled
-    ):
+    async def test_evaluate_uses_legacy_when_disabled(self, loop_with_enhanced_disabled):
         """Test that _evaluate uses legacy logic when enhanced disabled."""
         perception = MockPerception(confidence=0.9, task_type="code_generation")
         action_result = MockTurnResult(
@@ -172,9 +165,7 @@ class TestEnhancedCompletionIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_enhanced_evaluator_receives_correct_params(
-        self, loop_with_enhanced_enabled
-    ):
+    async def test_enhanced_evaluator_receives_correct_params(self, loop_with_enhanced_enabled):
         """Test that enhanced evaluator receives correct parameters."""
         perception = MockPerception(confidence=0.8, requirements=[])
         action_result = MockTurnResult(response="Test")
@@ -197,9 +188,7 @@ class TestEnhancedCompletionIntegration:
         assert "spin_detector" in call_args[1]
 
     @pytest.mark.asyncio
-    async def test_graceful_degradation_on_enhanced_error(
-        self, loop_with_enhanced_enabled
-    ):
+    async def test_graceful_degradation_on_enhanced_error(self, loop_with_enhanced_enabled):
         """Test graceful degradation when enhanced evaluator raises error."""
         perception = MockPerception(confidence=0.8, task_type="code_generation")
         action_result = MockTurnResult(
@@ -226,9 +215,7 @@ class TestEnhancedCompletionIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_spin_detector_passed_to_enhanced(
-        self, loop_with_enhanced_enabled
-    ):
+    async def test_spin_detector_passed_to_enhanced(self, loop_with_enhanced_enabled):
         """Test that spin_detector is passed to enhanced evaluator."""
         perception = MockPerception(confidence=0.8, requirements=[])
         action_result = MockTurnResult(response="Test")
@@ -247,9 +234,7 @@ class TestEnhancedCompletionIntegration:
         assert call_args[1]["spin_detector"] == loop_with_enhanced_enabled.spin_detector
 
     @pytest.mark.asyncio
-    async def test_fulfillment_detector_passed_to_enhanced(
-        self, loop_with_enhanced_enabled
-    ):
+    async def test_fulfillment_detector_passed_to_enhanced(self, loop_with_enhanced_enabled):
         """Test that fulfillment_detector is passed to enhanced evaluator."""
         perception = MockPerception(confidence=0.8, requirements=[])
         action_result = MockTurnResult(response="Test")
@@ -291,9 +276,7 @@ class TestEnhancedCompletionIntegration:
         assert loop.enhanced_completion_evaluator.completion_threshold == 0.90
 
     @pytest.mark.asyncio
-    async def test_qa_shortcut_bypasses_enhanced(
-        self, loop_with_enhanced_enabled
-    ):
+    async def test_qa_shortcut_bypasses_enhanced(self, loop_with_enhanced_enabled):
         """Test that Q&A shortcut takes priority over enhanced evaluation."""
         perception = MockPerception(confidence=0.5, requirements=[])
         action_result = MockTurnResult(
@@ -312,9 +295,7 @@ class TestEnhancedCompletionIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_spin_detection_bypasses_enhanced(
-        self, loop_with_enhanced_enabled
-    ):
+    async def test_spin_detection_bypasses_enhanced(self, loop_with_enhanced_enabled):
         """Test that spin detection takes priority over enhanced evaluation."""
         # SpinDetector.state is a property - need to set counters instead
         loop_with_enhanced_enabled.spin_detector.consecutive_all_blocked = 3
@@ -405,7 +386,11 @@ class TestEnhancedCompletionEndToEnd:
         # Create mock perception with requirements
         perception = MockPerception(
             confidence=0.9,
-            requirements=[Requirement(type=RequirementType.FUNCTIONAL, description="Complete task", priority=0)]
+            requirements=[
+                Requirement(
+                    type=RequirementType.FUNCTIONAL, description="Complete task", priority=0
+                )
+            ],
         )
 
         # Create mock action result showing completion
@@ -429,9 +414,7 @@ class TestEnhancedCompletionEndToEnd:
         assert result.score > 0.0
 
     @pytest.mark.asyncio
-    async def test_enhanced_vs_legacy_decision_difference(
-        self, mock_orchestrator, mock_memory
-    ):
+    async def test_enhanced_vs_legacy_decision_difference(self, mock_orchestrator, mock_memory):
         """Test that enhanced can make different decisions than legacy."""
         # Create two loops - one with enhanced, one without
         loop_enhanced = AgenticLoop(

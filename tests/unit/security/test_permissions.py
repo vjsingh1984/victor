@@ -235,6 +235,5 @@ class TestPermissionPolicy:
 
         assert synced == 1
         assert (
-            policy.get_required_permission("generated_write_tool")
-            == PermissionMode.WORKSPACE_WRITE
+            policy.get_required_permission("generated_write_tool") == PermissionMode.WORKSPACE_WRITE
         )

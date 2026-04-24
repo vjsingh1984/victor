@@ -325,7 +325,9 @@ class TestLiveDisplayRendererSimplifiedAPI:
         renderer = LiveDisplayRenderer(console)
 
         # Should not have _thinking_buffer
-        assert not hasattr(renderer, "_thinking_buffer") or not getattr(renderer, "_thinking_buffer", "")
+        assert not hasattr(renderer, "_thinking_buffer") or not getattr(
+            renderer, "_thinking_buffer", ""
+        )
 
     def test_no_last_thinking_rendered_attribute(self):
         """_last_thinking_rendered attribute should not exist (removed in fix)."""
@@ -333,7 +335,9 @@ class TestLiveDisplayRendererSimplifiedAPI:
         renderer = LiveDisplayRenderer(console)
 
         # Should not have _last_thinking_rendered
-        assert not hasattr(renderer, "_last_thinking_rendered") or not getattr(renderer, "_last_thinking_rendered", "")
+        assert not hasattr(renderer, "_last_thinking_rendered") or not getattr(
+            renderer, "_last_thinking_rendered", ""
+        )
 
     def test_single_buffer_for_all_content(self):
         """All content should go through single _content_buffer."""

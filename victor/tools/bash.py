@@ -579,17 +579,11 @@ async def shell(
                 from victor.tools.subprocess_executor import _truncate_output_by_lines
 
                 stdout_str, stdout_truncated, stdout_lines = _truncate_output_by_lines(
-                    stdout_str,
-                    final_stdout_limit,
-                    max_bytes=None,
-                    stream_name="stdout"
+                    stdout_str, final_stdout_limit, max_bytes=None, stream_name="stdout"
                 )
 
                 stderr_str, stderr_truncated, stderr_lines = _truncate_output_by_lines(
-                    stderr_str,
-                    final_stderr_limit,
-                    max_bytes=None,
-                    stream_name="stderr"
+                    stderr_str, final_stderr_limit, max_bytes=None, stream_name="stderr"
                 )
 
                 return {
@@ -647,7 +641,7 @@ async def shell(
             stdout_str,
             final_stdout_limit,
             max_bytes=None,  # Use internal 1MB default
-            stream_name="stdout"
+            stream_name="stdout",
         )
 
         # Truncate stderr
@@ -655,7 +649,7 @@ async def shell(
             stderr_str,
             final_stderr_limit,
             max_bytes=None,  # Use internal 1MB default
-            stream_name="stderr"
+            stream_name="stderr",
         )
 
         was_truncated = stdout_truncated or stderr_truncated
@@ -716,5 +710,3 @@ async def shell(
             "stderr": "",
             "return_code": -1,
         }
-
-

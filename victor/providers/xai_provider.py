@@ -118,6 +118,7 @@ class XAIProvider(HttpxOpenAICompatProvider):
             **kwargs: Additional configuration
         """
         from victor.providers.logging import ProviderLogger as _PL
+
         _logger = _PL("xai", __name__)
 
         resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)

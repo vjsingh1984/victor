@@ -251,9 +251,7 @@ class GraphManager:
                     invalidated += 1
 
         if invalidated > 0:
-            logger.info(
-                f"[GraphManager] Invalidated {invalidated} graph(s) for {root_str}"
-            )
+            logger.info(f"[GraphManager] Invalidated {invalidated} graph(s) for {root_str}")
 
         return invalidated
 
@@ -275,9 +273,7 @@ class GraphManager:
                 logger.info(f"[GraphManager] Cleared all {cleared} graph(s)")
             else:
                 root_str = str(root.resolve())
-                keys_to_remove = [
-                    key for key in self._graph_cache if key.startswith(root_str)
-                ]
+                keys_to_remove = [key for key in self._graph_cache if key.startswith(root_str)]
 
                 for key in keys_to_remove:
                     del self._graph_cache[key]

@@ -61,7 +61,9 @@ class TestAgentRuntimeBootstrapper:
             kwargs["get_streaming_chat_coordinator"]
             is orch._get_deprecated_streaming_chat_coordinator
         )
-        assert kwargs["get_unified_chat_coordinator"] is orch._get_deprecated_unified_chat_coordinator
+        assert (
+            kwargs["get_unified_chat_coordinator"] is orch._get_deprecated_unified_chat_coordinator
+        )
         assert kwargs["protocol_adapter"] is orch._protocol_adapter
         assert kwargs["streaming_handler"] is orch._streaming_handler
         assert kwargs["streaming_controller"] is orch._streaming_controller

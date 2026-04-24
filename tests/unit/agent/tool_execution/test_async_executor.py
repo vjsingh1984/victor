@@ -758,4 +758,3 @@ class TestAsyncToolExecutor:
         stats = executor.get_stats()
         assert stats["embedding_intensive_executions"] == 4
         assert stats["total_executions"] == 8
-

@@ -854,8 +854,6 @@ class Settings(BaseSettings):
             "conversation_embeddings_enabled": "conversation.conversation_embeddings_enabled",
             # Context Configuration
             "max_context_tokens": "context.max_context_tokens",
-            # Agent Configuration (additional)
-            "planning_show_plan": "agent.planning_show_plan",
             # Feature Flags Configuration
             "use_new_chat_service": "feature_flags.use_new_chat_service",
             "use_new_tool_service": "feature_flags.use_new_tool_service",
@@ -893,7 +891,6 @@ class Settings(BaseSettings):
             "intelligent_exploration_rate": "pipeline.intelligent_exploration_rate",
             "intelligent_learning_rate": "pipeline.intelligent_learning_rate",
             "intelligent_discount_factor": "pipeline.intelligent_discount_factor",
-            "tool_exploration_boosts": "tools.tool_exploration_boosts",
             "serialization_include_format_hint": "pipeline.serialization_include_format_hint",
             "serialization_min_rows_for_tabular": "pipeline.serialization_min_rows_for_tabular",
             "serialization_debug_mode": "pipeline.serialization_debug_mode",
@@ -911,12 +908,10 @@ class Settings(BaseSettings):
                 continue
 
             value = None
-            source = None  # 'direct' or 'env'
 
             # Check if this flat field is in the data dict (direct initialization)
             if flat_key in data:
                 value = data[flat_key]
-                source = 'direct'
                 # Remove flat key from data - it will be replaced with nested structure
                 del data[flat_key]
             else:
@@ -926,7 +921,7 @@ class Settings(BaseSettings):
                 if full_env_key in os.environ:
                     # Get value from environment
                     value = os.environ[full_env_key]
-                    source = 'env'
+                    pass  # env value set in `value` above
 
             # If we have a value from either source, map it to nested structure
             if value is not None:
@@ -1877,17 +1872,41 @@ class Settings(BaseSettings):
                 "extension_loader_warn_in_flight_threshold"
             )
         # Cache-related validations (now in nested cache group)
-        if self.cache and self.cache.generic_result_cache_ttl is not None and self.cache.generic_result_cache_ttl < 0:
+        if (
+            self.cache
+            and self.cache.generic_result_cache_ttl is not None
+            and self.cache.generic_result_cache_ttl < 0
+        ):
             raise ValueError("generic_result_cache_ttl must be >= 0")
-        if self.cache and self.cache.tool_selection_cache_ttl is not None and self.cache.tool_selection_cache_ttl < 0:
+        if (
+            self.cache
+            and self.cache.tool_selection_cache_ttl is not None
+            and self.cache.tool_selection_cache_ttl < 0
+        ):
             raise ValueError("tool_selection_cache_ttl must be >= 0")
-        if self.cache and self.cache.http_connection_pool_max_connections is not None and self.cache.http_connection_pool_max_connections < 1:
+        if (
+            self.cache
+            and self.cache.http_connection_pool_max_connections is not None
+            and self.cache.http_connection_pool_max_connections < 1
+        ):
             raise ValueError("http_connection_pool_max_connections must be >= 1")
-        if self.cache and self.cache.http_connection_pool_max_connections_per_host is not None and self.cache.http_connection_pool_max_connections_per_host < 1:
+        if (
+            self.cache
+            and self.cache.http_connection_pool_max_connections_per_host is not None
+            and self.cache.http_connection_pool_max_connections_per_host < 1
+        ):
             raise ValueError("http_connection_pool_max_connections_per_host must be >= 1")
-        if self.cache and self.cache.http_connection_pool_connection_timeout is not None and self.cache.http_connection_pool_connection_timeout <= 0:
+        if (
+            self.cache
+            and self.cache.http_connection_pool_connection_timeout is not None
+            and self.cache.http_connection_pool_connection_timeout <= 0
+        ):
             raise ValueError("http_connection_pool_connection_timeout must be > 0")
-        if self.cache and self.cache.http_connection_pool_total_timeout is not None and self.cache.http_connection_pool_total_timeout <= 0:
+        if (
+            self.cache
+            and self.cache.http_connection_pool_total_timeout is not None
+            and self.cache.http_connection_pool_total_timeout <= 0
+        ):
             raise ValueError("http_connection_pool_total_timeout must be > 0")
         return self
 
@@ -1942,7 +1961,9 @@ class Settings(BaseSettings):
     def validate_hybrid_search_weights(self) -> "Settings":
         """Validate that hybrid search weights sum to 1.0."""
         if self.search and self.search.enable_hybrid_search:
-            total_weight = self.search.hybrid_search_semantic_weight + self.search.hybrid_search_keyword_weight
+            total_weight = (
+                self.search.hybrid_search_semantic_weight + self.search.hybrid_search_keyword_weight
+            )
             if abs(total_weight - 1.0) > 0.01:
                 raise ValueError(f"Hybrid search weights must sum to 1.0, got {total_weight}")
         return self

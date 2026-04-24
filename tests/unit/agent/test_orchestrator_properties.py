@@ -198,8 +198,7 @@ class TestOrchestratorPropertyInstallation:
         with pytest.warns(
             DeprecationWarning,
             match=(
-                "AgentOrchestrator.unified_chat_coordinator is deprecated "
-                "compatibility surface"
+                "AgentOrchestrator.unified_chat_coordinator is deprecated " "compatibility surface"
             ),
         ):
             assert orchestrator.unified_chat_coordinator._mock_name == "unified"

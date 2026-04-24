@@ -257,10 +257,8 @@ class ContinuationHandler:
 
         # AGENTIC LOOP FIX: Check if continuation should be skipped due to forced completion
         # This prevents continuation strategy from overriding task completion detector
-        if getattr(stream_ctx, 'skip_continuation', False):
-            logger.info(
-                "Continuation skipped: skip_continuation flag set (completion was forced)"
-            )
+        if getattr(stream_ctx, "skip_continuation", False):
+            logger.info("Continuation skipped: skip_continuation flag set (completion was forced)")
             return ContinuationResult(
                 chunks=[],
                 should_return=True,

@@ -79,9 +79,7 @@ class CallbackCoordinator:
             )
             return
 
-        raise RuntimeError(
-            "ToolService is unavailable or does not expose on_tool_complete"
-        )
+        raise RuntimeError("ToolService is unavailable or does not expose on_tool_complete")
 
     def on_streaming_session_complete(self, session: "StreamingSession") -> None:
         """Called when streaming session completes (from StreamingController)."""

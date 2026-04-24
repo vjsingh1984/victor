@@ -467,18 +467,9 @@ class ConversationController:
             task_config = TASK_COMPACTION_CONFIGS[task_type]
             target = target_messages or task_config.min_messages_after_compact
             logger.info(f"Using task-specific compaction config for '{task_type}'")
-            # Temporarily override config values for this compaction
-            original_config = self.config
-            # Note: We can't modify self.config directly (frozen dataclass),
-            # so we'll use the task_config values inline below
-            min_messages = task_config.min_messages_after_compact
-            tool_result_weight = task_config.tool_result_retention_weight
-            recent_weight = task_config.recent_message_weight
+            pass  # task_config values used inline below via task_config.*
         else:
             target = target_messages or self.config.min_messages_to_keep
-            min_messages = self.config.min_messages_to_keep
-            tool_result_weight = self.config.tool_result_retention_weight
-            recent_weight = self.config.recent_message_weight
 
         strategy = self.config.compaction_strategy
 

@@ -57,9 +57,7 @@ class ToolServiceAdapter:
                 tool_coordinator = args[1]
 
         if tool_coordinator is not None and deprecated_tool_coordinator is not None:
-            raise TypeError(
-                "Use only one of tool_coordinator or deprecated_tool_coordinator."
-            )
+            raise TypeError("Use only one of tool_coordinator or deprecated_tool_coordinator.")
 
         resolved_deprecated_tool_coordinator = deprecated_tool_coordinator
         if tool_coordinator is not None:

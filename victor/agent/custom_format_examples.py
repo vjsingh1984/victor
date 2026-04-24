@@ -109,7 +109,10 @@ class MarkdownFormatStrategy:
         # Format based on output type
         if isinstance(output, str):
             # Check if it's code
-            if any(output.strip().startswith(prefix) for prefix in ["def ", "class ", "import ", "from "]):
+            if any(
+                output.strip().startswith(prefix)
+                for prefix in ["def ", "class ", "import ", "from "]
+            ):
                 lines.append("```python")
                 lines.append(output)
                 lines.append("```")

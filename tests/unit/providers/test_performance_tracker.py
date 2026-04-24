@@ -98,7 +98,9 @@ class TestProviderPerformanceTracker:
     @pytest.fixture(autouse=True)
     def _disable_db(self):
         """Patch the global DatabaseManager so tracker stays in-memory for unit tests."""
-        with patch("victor.core.database.DatabaseManager", side_effect=RuntimeError("no db in unit tests")):
+        with patch(
+            "victor.core.database.DatabaseManager", side_effect=RuntimeError("no db in unit tests")
+        ):
             yield
 
     def test_tracker_initialization(self):

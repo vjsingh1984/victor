@@ -339,17 +339,19 @@ async def list_traces(
         first_event = min(events, key=lambda e: e.timestamp)
         last_event = max(events, key=lambda e: e.timestamp)
 
-        traces.append({
-            "trace_id": trace_id,
-            "event_count": len(events),
-            "start_time": first_event.timestamp.isoformat(),
-            "end_time": last_event.timestamp.isoformat(),
-            "duration_seconds": (last_event.timestamp - first_event.timestamp).total_seconds(),
-            "has_errors": any(e.severity == "error" for e in events),
-        })
+        traces.append(
+            {
+                "trace_id": trace_id,
+                "event_count": len(events),
+                "start_time": first_event.timestamp.isoformat(),
+                "end_time": last_event.timestamp.isoformat(),
+                "duration_seconds": (last_event.timestamp - first_event.timestamp).total_seconds(),
+                "has_errors": any(e.severity == "error" for e in events),
+            }
+        )
 
     # Apply pagination
-    paginated_traces = traces[offset:offset + limit]
+    paginated_traces = traces[offset : offset + limit]
 
     return {
         "traces": paginated_traces,

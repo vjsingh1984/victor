@@ -382,7 +382,7 @@ class TestCustomFormatStrategies:
         result = strategy.format(
             tool_name="read_file",
             args={"path": "example.py"},
-            output='def hello():\n    pass',
+            output="def hello():\n    pass",
         )
 
         assert "```python" in result

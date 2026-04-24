@@ -89,7 +89,9 @@ class TestEmbeddingSettings:
         assert settings.semantic_similarity_threshold == 1.0
 
         # Invalid threshold (out of range)
-        with pytest.raises(ValueError, match="semantic_similarity_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="semantic_similarity_threshold must be between 0.0 and 1.0"
+        ):
             EmbeddingSettings(semantic_similarity_threshold=1.1)
 
     def test_max_query_expansions_validation(self):

@@ -237,7 +237,9 @@ class XmlFormatStrategy:
         tag_attrs = self._build_tag_attributes(tool_name, args)
 
         # Construct opening tag
-        opening_tag = f"<{self._spec.tag_name} {tag_attrs}>" if tag_attrs else f"<{self._spec.tag_name}>"
+        opening_tag = (
+            f"<{self._spec.tag_name} {tag_attrs}>" if tag_attrs else f"<{self._spec.tag_name}>"
+        )
 
         # Add delimiters if specified
         if self._spec.use_delimiters:

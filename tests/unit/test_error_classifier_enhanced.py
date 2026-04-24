@@ -34,13 +34,29 @@ class TestErrorClassifierAccuracy:
         classifier = ToolErrorClassifier()
 
         # File not found variations
-        assert classifier.classify("No such file or directory: '/tmp/test.txt'") == ErrorType.PERMANENT
-        assert classifier.classify("FileNotFoundError: [Errno 2] No such file or directory: '/tmp/test.txt'") == ErrorType.PERMANENT
-        assert classifier.classify("[Errno 2] No such file or directory: 'config.yaml'") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("No such file or directory: '/tmp/test.txt'") == ErrorType.PERMANENT
+        )
+        assert (
+            classifier.classify(
+                "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/test.txt'"
+            )
+            == ErrorType.PERMANENT
+        )
+        assert (
+            classifier.classify("[Errno 2] No such file or directory: 'config.yaml'")
+            == ErrorType.PERMANENT
+        )
 
         # Directory errors
-        assert classifier.classify("IsADirectoryError: '/tmp/file.txt' is a directory") == ErrorType.PERMANENT
-        assert classifier.classify("NotADirectoryError: '/tmp/dir' is not a directory") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("IsADirectoryError: '/tmp/file.txt' is a directory")
+            == ErrorType.PERMANENT
+        )
+        assert (
+            classifier.classify("NotADirectoryError: '/tmp/dir' is not a directory")
+            == ErrorType.PERMANENT
+        )
         assert classifier.classify("directory not empty: '/tmp/mydir'") == ErrorType.PERMANENT
 
         # File exists
@@ -52,8 +68,13 @@ class TestErrorClassifierAccuracy:
 
         # Permission denied variations
         assert classifier.classify("Permission denied: '/etc/hosts'") == ErrorType.PERMANENT
-        assert classifier.classify("[Errno 13] Permission denied: '/root/.ssh'") == ErrorType.PERMANENT
-        assert classifier.classify("PermissionError: [Errno 13] Permission denied") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("[Errno 13] Permission denied: '/root/.ssh'") == ErrorType.PERMANENT
+        )
+        assert (
+            classifier.classify("PermissionError: [Errno 13] Permission denied")
+            == ErrorType.PERMANENT
+        )
         assert classifier.classify("Access denied: insufficient permissions") == ErrorType.PERMANENT
 
     def test_permanent_module_errors(self):
@@ -61,7 +82,10 @@ class TestErrorClassifierAccuracy:
         classifier = ToolErrorClassifier()
 
         # Module not found
-        assert classifier.classify("ModuleNotFoundError: No module named 'requests'") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("ModuleNotFoundError: No module named 'requests'")
+            == ErrorType.PERMANENT
+        )
         assert classifier.classify("ImportError: No module named 'numpy'") == ErrorType.PERMANENT
         assert classifier.classify("cannot import name 'foo' from 'bar'") == ErrorType.PERMANENT
 
@@ -70,7 +94,9 @@ class TestErrorClassifierAccuracy:
         classifier = ToolErrorClassifier()
 
         assert classifier.classify("command not found: git") == ErrorType.PERMANENT
-        assert classifier.classify("executable not found: /usr/local/bin/foo") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("executable not found: /usr/local/bin/foo") == ErrorType.PERMANENT
+        )
         assert classifier.classify("[Errno 8] Exec format error") == ErrorType.PERMANENT
 
     def test_transient_network_errors(self):
@@ -105,7 +131,9 @@ class TestErrorClassifierAccuracy:
 
         # "permission" in other contexts should not be permanent
         result = classifier.classify("User has permission to access the resource")
-        assert result != ErrorType.PERMANENT, "False positive: 'permission' matched in wrong context"
+        assert (
+            result != ErrorType.PERMANENT
+        ), "False positive: 'permission' matched in wrong context"
 
         # "file not found" in description should not trigger
         result = classifier.classify("This error occurs when file not found in the search path")
@@ -120,16 +148,25 @@ class TestErrorClassifierAccuracy:
         classifier = ToolErrorClassifier()
 
         # Different error formats
-        assert classifier.classify("No such file or directory: '/tmp/test.txt'") == ErrorType.PERMANENT
-        assert classifier.classify("No such file or directory:'/tmp/test.txt'") == ErrorType.PERMANENT  # No space after colon
-        assert classifier.classify("NO SUCH FILE OR DIRECTORY: '/tmp/test.txt'") == ErrorType.PERMANENT  # Uppercase
+        assert (
+            classifier.classify("No such file or directory: '/tmp/test.txt'") == ErrorType.PERMANENT
+        )
+        assert (
+            classifier.classify("No such file or directory:'/tmp/test.txt'") == ErrorType.PERMANENT
+        )  # No space after colon
+        assert (
+            classifier.classify("NO SUCH FILE OR DIRECTORY: '/tmp/test.txt'") == ErrorType.PERMANENT
+        )  # Uppercase
 
         # Mixed case
         assert classifier.classify("Permission Denied: '/etc/hosts'") == ErrorType.PERMANENT
         assert classifier.classify("PERMISSION DENIED: file.txt") == ErrorType.PERMANENT
 
         # With error codes
-        assert classifier.classify("[Errno 2] No such file or directory: 'test.txt'") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("[Errno 2] No such file or directory: 'test.txt'")
+            == ErrorType.PERMANENT
+        )
         assert classifier.classify("[Errno 13] Permission denied") == ErrorType.PERMANENT
 
     def test_unknown_errors_default_to_retryable(self):
@@ -202,10 +239,13 @@ class TestErrorClassifierFailureTracking:
 
         assert error_type == ErrorType.PERMANENT
         assert classifier.failed_call_count == 1
-        assert classifier.should_skip(
-            tool_name="read_file",
-            arguments={"path": "/tmp/nonexistent.txt"},
-        ) is True
+        assert (
+            classifier.should_skip(
+                tool_name="read_file",
+                arguments={"path": "/tmp/nonexistent.txt"},
+            )
+            is True
+        )
 
     def test_record_failure_transient(self):
         """Test that transient failures are not recorded."""
@@ -220,10 +260,13 @@ class TestErrorClassifierFailureTracking:
 
         assert error_type == ErrorType.TRANSIENT
         assert classifier.failed_call_count == 0, "Transient failures should not be recorded"
-        assert classifier.should_skip(
-            tool_name="http_get",
-            arguments={"url": "https://example.com"},
-        ) is False, "Transient failures should not cause skipping"
+        assert (
+            classifier.should_skip(
+                tool_name="http_get",
+                arguments={"url": "https://example.com"},
+            )
+            is False
+        ), "Transient failures should not cause skipping"
 
     def test_skip_reason(self):
         """Test skip reason message."""
@@ -258,10 +301,13 @@ class TestErrorClassifierFailureTracking:
         )
 
         # Same tool, different arguments - should not skip
-        assert classifier.should_skip(
-            tool_name="read_file",
-            arguments={"path": "/tmp/different.txt"},
-        ) is False
+        assert (
+            classifier.should_skip(
+                tool_name="read_file",
+                arguments={"path": "/tmp/different.txt"},
+            )
+            is False
+        )
 
 
 class TestErrorClassifierPerformance:
@@ -328,8 +374,15 @@ class TestErrorClassifierRealWorldErrors:
         classifier = ToolErrorClassifier()
 
         # Fatal errors (permanent)
-        assert classifier.classify("fatal: not a git repository: '/tmp/test'") == ErrorType.RETRYABLE
-        assert classifier.classify("error: pathspec 'README.md' did not match any file(s) known to git") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("fatal: not a git repository: '/tmp/test'") == ErrorType.RETRYABLE
+        )
+        assert (
+            classifier.classify(
+                "error: pathspec 'README.md' did not match any file(s) known to git"
+            )
+            == ErrorType.PERMANENT
+        )
 
     def test_docker_errors(self):
         """Test classification of docker-related errors."""
@@ -340,7 +393,10 @@ class TestErrorClassifierRealWorldErrors:
         assert classifier.classify("Error: No such image: foo:bar") == ErrorType.PERMANENT
 
         # Network issues (transient)
-        assert classifier.classify("Error: Network timeout while connecting to daemon") == ErrorType.TRANSIENT
+        assert (
+            classifier.classify("Error: Network timeout while connecting to daemon")
+            == ErrorType.TRANSIENT
+        )
 
     def test_python_errors(self):
         """Test classification of Python exception messages."""
@@ -351,17 +407,25 @@ class TestErrorClassifierRealWorldErrors:
         assert classifier.classify("IndentationError: unexpected indent") == ErrorType.PERMANENT
 
         # Import errors (permanent)
-        assert classifier.classify("ImportError: cannot import name 'foo' from 'bar'") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("ImportError: cannot import name 'foo' from 'bar'")
+            == ErrorType.PERMANENT
+        )
 
         # Type errors (permanent)
-        assert classifier.classify("TypeError: unsupported operand type(s) for +: 'int' and 'str'") == ErrorType.PERMANENT
+        assert (
+            classifier.classify("TypeError: unsupported operand type(s) for +: 'int' and 'str'")
+            == ErrorType.PERMANENT
+        )
 
     def test_http_errors(self):
         """Test classification of HTTP error messages."""
         classifier = ToolErrorClassifier()
 
         # 4xx errors (permanent)
-        assert classifier.classify("HTTP 404: Not Found") == ErrorType.RETRYABLE  # 404 might be retryable with different URL
+        assert (
+            classifier.classify("HTTP 404: Not Found") == ErrorType.RETRYABLE
+        )  # 404 might be retryable with different URL
         assert classifier.classify("HTTP 403: Forbidden") == ErrorType.PERMANENT
 
         # 5xx errors (transient)

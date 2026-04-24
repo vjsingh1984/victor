@@ -60,29 +60,28 @@ class TestPlanningCoordinatorApproval:
         mock_orchestrator.model = "test-model"
         mock_orchestrator.max_tokens = 1000
         mock_orchestrator.provider = MagicMock()
-        mock_orchestrator.provider.chat = AsyncMock(return_value=MagicMock(
-            content="Plan was rejected. Would you like to try a different approach?"
-        ))
+        mock_orchestrator.provider.chat = AsyncMock(
+            return_value=MagicMock(
+                content="Plan was rejected. Would you like to try a different approach?"
+            )
+        )
 
         # Mock renderer
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         # Create a simple plan
         plan = ReadableTaskPlan(
             name="Test Plan",
             desc="A test plan",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "research", "Test step", "read"]]
+            steps=[[1, "research", "Test step", "read"]],
         )
 
         # Mock user rejection
-        with patch('rich.prompt.Confirm') as mock_confirm:
+        with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = False
 
             # This should handle rejection gracefully
@@ -99,20 +98,17 @@ class TestPlanningCoordinatorApproval:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         plan = ReadableTaskPlan(
             name="Test Plan",
             desc="A test plan",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "research", "Test step", "read"]]
+            steps=[[1, "research", "Test step", "read"]],
         )
 
         # Mock user approval
-        with patch('rich.prompt.Confirm') as mock_confirm:
+        with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
             approved = coordinator._show_plan_to_user(plan)
@@ -129,10 +125,7 @@ class TestPlanningCoordinatorRendererIntegration:
         mock_orchestrator = MagicMock()
         mock_renderer = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         assert coordinator.renderer == mock_renderer
 
@@ -140,10 +133,7 @@ class TestPlanningCoordinatorRendererIntegration:
         """PlanningCoordinator should work without renderer."""
         mock_orchestrator = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=None  # No renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=None)  # No renderer
 
         assert coordinator.renderer is None
 
@@ -153,19 +143,16 @@ class TestPlanningCoordinatorRendererIntegration:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         plan = ReadableTaskPlan(
             name="Test Plan",
             desc="A test plan",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "research", "Test step", "read"]]
+            steps=[[1, "research", "Test step", "read"]],
         )
 
-        with patch('rich.prompt.Confirm') as mock_confirm:
+        with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
             approved = coordinator._show_plan_to_user(plan)
@@ -179,19 +166,16 @@ class TestPlanningCoordinatorRendererIntegration:
         """Should fallback to Rich console when renderer not available."""
         mock_orchestrator = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=None  # No renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=None)  # No renderer
 
         plan = ReadableTaskPlan(
             name="Test Plan",
             desc="A test plan",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "research", "Test step", "read"]]
+            steps=[[1, "research", "Test step", "read"]],
         )
 
-        with patch('rich.prompt.Confirm') as mock_confirm:
+        with patch("rich.prompt.Confirm") as mock_confirm:
             mock_confirm.ask.return_value = True
 
             # Should not raise error
@@ -208,10 +192,7 @@ class TestPlanPersistence:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         plan = ReadableTaskPlan(
             name="Test Plan for Persistence",
@@ -219,13 +200,13 @@ class TestPlanPersistence:
             complexity=TaskComplexity.SIMPLE,
             steps=[
                 [1, "research", "Read documentation", "read"],
-                [2, "analysis", "Analyze code", "code_search"]
-            ]
+                [2, "analysis", "Analyze code", "code_search"],
+            ],
         )
 
         # Use temporary directory for testing
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch('os.path.expanduser', return_value=tmpdir):
+            with patch("os.path.expanduser", return_value=tmpdir):
                 coordinator._save_plan_to_disk(plan, mock_renderer.console)
 
                 # Verify file was created
@@ -236,12 +217,12 @@ class TestPlanPersistence:
                 with files[0].open() as f:
                     saved_plan = json.load(f)
 
-                assert saved_plan['name'] == 'Test Plan for Persistence'
-                assert saved_plan['step_count'] == 2
-                assert saved_plan['complexity'] == 'simple'
-                assert len(saved_plan['steps']) == 2
-                assert saved_plan['steps'][0]['type'] == 'research'
-                assert saved_plan['steps'][1]['type'] == 'analysis'
+                assert saved_plan["name"] == "Test Plan for Persistence"
+                assert saved_plan["step_count"] == 2
+                assert saved_plan["complexity"] == "simple"
+                assert len(saved_plan["steps"]) == 2
+                assert saved_plan["steps"][0]["type"] == "research"
+                assert saved_plan["steps"][1]["type"] == "analysis"
 
     def test_plan_saved_with_metadata(self):
         """Plan should include metadata like timestamp and step count."""
@@ -249,20 +230,17 @@ class TestPlanPersistence:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         plan = ReadableTaskPlan(
             name="Metadata Test Plan",
             desc="A test plan for metadata fields",
             complexity=TaskComplexity.COMPLEX,
-            steps=[[1, "test", "Test step", "test_tool"]]
+            steps=[[1, "test", "Test step", "test_tool"]],
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch('os.path.expanduser', return_value=tmpdir):
+            with patch("os.path.expanduser", return_value=tmpdir):
                 coordinator._save_plan_to_disk(plan, mock_renderer.console)
 
                 # Verify metadata
@@ -271,11 +249,11 @@ class TestPlanPersistence:
                     saved_plan = json.load(f)
 
                 # Check required fields
-                assert 'generated_at' in saved_plan
-                assert 'step_count' in saved_plan
-                assert saved_plan['step_count'] == 1
-                assert 'complexity' in saved_plan
-                assert saved_plan['complexity'] == 'complex'
+                assert "generated_at" in saved_plan
+                assert "step_count" in saved_plan
+                assert saved_plan["step_count"] == 1
+                assert "complexity" in saved_plan
+                assert saved_plan["complexity"] == "complex"
 
     def test_plan_save_error_handling(self):
         """Plan save should handle errors gracefully."""
@@ -283,20 +261,17 @@ class TestPlanPersistence:
         mock_renderer = MagicMock()
         mock_renderer.console = MagicMock()
 
-        coordinator = PlanningCoordinator(
-            mock_orchestrator,
-            renderer=mock_renderer
-        )
+        coordinator = PlanningCoordinator(mock_orchestrator, renderer=mock_renderer)
 
         plan = ReadableTaskPlan(
             name="Error Test Plan",
             desc="A test plan for error handling",
             complexity=TaskComplexity.SIMPLE,
-            steps=[[1, "test", "Test", "test"]]
+            steps=[[1, "test", "Test", "test"]],
         )
 
         # Mock filesystem error
-        with patch('os.makedirs', side_effect=OSError("Permission denied")):
+        with patch("os.makedirs", side_effect=OSError("Permission denied")):
             # Should not raise error
             coordinator._save_plan_to_disk(plan, mock_renderer.console)
 

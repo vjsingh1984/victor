@@ -27,7 +27,6 @@ from victor.framework.requirement_validator import (
 )
 from victor.framework.perception_integration import RequirementType, Requirement
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -77,7 +76,9 @@ class TestRequirementValidator:
 
         requirements = [
             Requirement(
-                type=RequirementType.FUNCTIONAL, description="Create a new file for authentication", priority=0
+                type=RequirementType.FUNCTIONAL,
+                description="Create a new file for authentication",
+                priority=0,
             )
         ]
 
@@ -98,7 +99,9 @@ class TestRequirementValidator:
 
         requirements = [
             Requirement(
-                type=RequirementType.FUNCTIONAL, description="Create a new file for authentication", priority=0
+                type=RequirementType.FUNCTIONAL,
+                description="Create a new file for authentication",
+                priority=0,
             )
         ]
 
@@ -118,7 +121,9 @@ class TestRequirementValidator:
 
         requirements = [
             Requirement(
-                type=RequirementType.FUNCTIONAL, description="Explain how authentication works", priority=1
+                type=RequirementType.FUNCTIONAL,
+                description="Explain how authentication works",
+                priority=1,
             )
         ]
 
@@ -139,7 +144,9 @@ class TestRequirementValidator:
 
         requirements = [
             Requirement(
-                type=RequirementType.FUNCTIONAL, description="Explain how authentication works", priority=1
+                type=RequirementType.FUNCTIONAL,
+                description="Explain how authentication works",
+                priority=1,
             )
         ]
 
@@ -158,7 +165,11 @@ class TestRequirementValidator:
         validator = RequirementValidator()
 
         requirements = [
-            Requirement(type=RequirementType.FUNCTIONAL, description="Fix the authentication bug", priority=0)
+            Requirement(
+                type=RequirementType.FUNCTIONAL,
+                description="Fix the authentication bug",
+                priority=0,
+            )
         ]
 
         # Test with tools used
@@ -196,7 +207,11 @@ class TestRequirementValidator:
         validator = RequirementValidator()
 
         requirements = [
-            Requirement(type=RequirementType.QUALITY, description="Code should be well-documented", priority=2)
+            Requirement(
+                type=RequirementType.QUALITY,
+                description="Code should be well-documented",
+                priority=2,
+            )
         ]
 
         # Test with quality keywords in response
@@ -214,7 +229,9 @@ class TestRequirementValidator:
         validator = RequirementValidator()
 
         requirements = [
-            Requirement(type=RequirementType.FUNCTIONAL, description="Critical requirement", priority=0),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="Critical requirement", priority=0
+            ),
             Requirement(type=RequirementType.FUNCTIONAL, description="Nice to have", priority=3),
         ]
 
@@ -292,7 +309,9 @@ class TestRequirementValidator:
         validator = RequirementValidator()
 
         requirements = [
-            Requirement(type=RequirementType.FUNCTIONAL, description="Critical requirement", priority=0),
+            Requirement(
+                type=RequirementType.FUNCTIONAL, description="Critical requirement", priority=0
+            ),
         ]
 
         result = validator.validate_completion(

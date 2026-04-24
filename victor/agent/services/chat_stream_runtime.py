@@ -59,15 +59,15 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
             )
         return self._streaming_pipeline
 
-    async def stream_chat(
-        self, user_message: str, **kwargs: Any
-    ) -> AsyncIterator["StreamChunk"]:
+    async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator["StreamChunk"]:
         """Stream a response through the canonical service-owned pipeline."""
         _ = kwargs.pop("_preserve_iteration", None)
         fallback_iteration = kwargs.pop("_fallback_iteration", 0)
 
         if fallback_iteration > 0:
-            logger.info("[ServiceStreamingRuntime] Using fallback iteration: %s", fallback_iteration)
+            logger.info(
+                "[ServiceStreamingRuntime] Using fallback iteration: %s", fallback_iteration
+            )
             kwargs["_fallback_iteration"] = fallback_iteration
 
         orch = self._orchestrator

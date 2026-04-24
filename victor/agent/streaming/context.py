@@ -63,7 +63,9 @@ class StreamingChatContext:
     total_iterations: int = 0
     force_completion: bool = False
     force_completion_warning_shown: bool = False  # Prevent duplicate warnings
-    skip_continuation: bool = False  # Skip continuation strategy when completion is forced (agentic loop fix)
+    skip_continuation: bool = (
+        False  # Skip continuation strategy when completion is forced (agentic loop fix)
+    )
 
     # Task classification
     unified_task_type: ClassifierTaskType = ClassifierTaskType.DEFAULT
@@ -103,7 +105,9 @@ class StreamingChatContext:
     mentioned_tools_detected: List[str] = field(default_factory=list)
 
     # Thinking/reasoning content accumulation
-    reasoning_buffer: str = ""  # Accumulate LLM reasoning/thinking content separately from regular content
+    reasoning_buffer: str = (
+        ""  # Accumulate LLM reasoning/thinking content separately from regular content
+    )
 
     # Recovery tracking
     consecutive_empty_responses: int = 0

@@ -155,12 +155,12 @@ class _DatabaseManagerBase:
                     last_error = e
                     if "locked" in str(e).lower() and attempt < max_retries - 1:
                         # Brief wait before retry (exponential backoff)
-                        wait_time = 0.1 * (2 ** attempt)
+                        wait_time = 0.1 * (2**attempt)
                         logger.debug(
                             "Database locked (attempt %d/%d), retrying in %.2fs",
                             attempt + 1,
                             max_retries,
-                            wait_time
+                            wait_time,
                         )
                         time.sleep(wait_time)
                         continue

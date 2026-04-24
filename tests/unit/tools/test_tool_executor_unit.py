@@ -622,6 +622,7 @@ class TestToolExecutorErrorHandling:
     def reset_globals(self):
         """Reset global singletons before each test for isolation."""
         from victor.core.errors import get_error_handler
+
         safety_module = _safety_module
 
         # Clear error history to ensure test isolation
@@ -790,6 +791,7 @@ class TestToolExecutorWithErrorHandler:
     def reset_globals(self):
         """Reset global singletons before each test for isolation."""
         from victor.core.errors import get_error_handler
+
         safety_module = _safety_module
 
         # Clear error history to ensure test isolation
@@ -1669,6 +1671,7 @@ class TestToolExecutorTimeoutHandling:
     def reset_globals(self):
         """Reset global singletons before each test."""
         from victor.core.errors import get_error_handler
+
         safety_module = _safety_module
 
         handler = get_error_handler()

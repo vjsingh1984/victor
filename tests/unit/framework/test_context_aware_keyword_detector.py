@@ -26,7 +26,6 @@ from victor.framework.context_aware_keyword_detector import (
 )
 from victor.framework.completion_scorer import TaskType
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -137,7 +136,10 @@ class TestContextAwareKeywordDetector:
         )
 
         assert signal.has_completion_indicator is True
-        assert any("summary" in evidence.lower() or "conclusion" in evidence.lower() for evidence in signal.evidence)
+        assert any(
+            "summary" in evidence.lower() or "conclusion" in evidence.lower()
+            for evidence in signal.evidence
+        )
 
     def test_detect_complete_code_blocks(self):
         """Test detection of complete code blocks."""
@@ -336,9 +338,7 @@ The code above resolves the issue. In conclusion, the system is now working.
         """Test when response doesn't address requirements."""
         detector = ContextAwareKeywordDetector()
 
-        requirements = [
-            MockRequirement(type="functional", description="Add authentication system")
-        ]
+        requirements = [MockRequirement(type="functional", description="Add authentication system")]
 
         # Response that doesn't mention the requirement
         response = "I've created a simple file for testing."

@@ -45,6 +45,7 @@ def _get_embedding_config():
     """
     try:
         from victor.config.tool_settings import get_tool_settings
+
         settings = get_tool_settings()
         return (
             settings.max_embedding_concurrent,
@@ -53,6 +54,7 @@ def _get_embedding_config():
     except Exception:
         # Fallback if settings not available
         return 2, {"code_search"}
+
 
 logger = logging.getLogger(__name__)
 
@@ -256,22 +258,30 @@ class ParallelToolExecutor:
             # Build batch respecting both concurrency limits
             # Count currently running embedding-intensive and regular tools
             running_embedding = sum(
-                1 for i in pending
-                if i not in ready and tool_calls[i].get("name", "") in self.config.embedding_intensive_tools
+                1
+                for i in pending
+                if i not in ready
+                and tool_calls[i].get("name", "") in self.config.embedding_intensive_tools
             )
             running_regular = sum(
-                1 for i in pending
-                if i not in ready and tool_calls[i].get("name", "") not in self.config.embedding_intensive_tools
+                1
+                for i in pending
+                if i not in ready
+                and tool_calls[i].get("name", "") not in self.config.embedding_intensive_tools
             )
 
             # Calculate how many of each type we can add
-            available_embedding_slots = max(0, self.config.max_embedding_concurrent - running_embedding)
-            available_regular_slots = max(0, self.config.max_concurrent - running_embedding - running_regular)
+            available_embedding_slots = max(
+                0, self.config.max_embedding_concurrent - running_embedding
+            )
+            available_regular_slots = max(
+                0, self.config.max_concurrent - running_embedding - running_regular
+            )
 
             # Select tools for batch
             batch = []
             batch.extend(embedding_ready[:available_embedding_slots])
-            batch.extend(regular_ready[:available_regular_slots - len(batch)])
+            batch.extend(regular_ready[: available_regular_slots - len(batch)])
 
             # If batch is empty but we have ready tasks, we're at capacity
             if not batch and ready:

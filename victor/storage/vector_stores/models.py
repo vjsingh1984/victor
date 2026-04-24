@@ -154,7 +154,9 @@ class SentenceTransformerModel(BaseEmbeddingModel):
 
         # Only log success once per model
         if self._embedding_service._initialized:
-            logger.info(f"Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}")
+            logger.info(
+                f"Model loaded (shared via EmbeddingService)! Dimension: {self.get_dimension()}"
+            )
 
     async def embed_text(self, text: str) -> List[float]:
         """Generate embedding for single text."""

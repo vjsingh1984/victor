@@ -491,14 +491,14 @@ class PythonCallExtractor:
 
             # NEW: Add helpful guidance
             warning += "\n\nExpected format: JSON object with parameter names and values"
-            warning += "\nExample: {\"file_path\": \"/path/to/file.pdf\", \"pages\": [1, 2, 3]}"
+            warning += '\nExample: {"file_path": "/path/to/file.pdf", "pages": [1, 2, 3]}'
             warning += "\nDo NOT use: Python syntax (func(arg=value)), YAML syntax, or type hints"
 
             logger.warning(warning)
 
             # Log for debugging
             logger.debug(f"Failed parse - original args_str: {args_str}")
-            logger.debug(f"Tool: {name}, Attempted parse methods: regex, ast")
+            logger.debug("Attempted parse methods: regex, ast")
 
         return args_dict, warning
 

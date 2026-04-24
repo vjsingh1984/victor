@@ -315,9 +315,7 @@ def render_tool_preview(
     if total_lines > preview_lines:
         remaining = total_lines - preview_lines
         suffix = "s" if remaining != 1 else ""
-        console.print(
-            f"[dim italic]└ {remaining} more line{suffix} • press {hotkey} to expand[/]"
-        )
+        console.print(f"[dim italic]└ {remaining} more line{suffix} • press {hotkey} to expand[/]")
 
 
 # Tools whose names map to valid Pygments lexer identifiers.

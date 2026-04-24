@@ -87,9 +87,7 @@ async def warmup_graph_tool(
 
     for i, query in enumerate(warmup_queries, 1):
         try:
-            logger.info(
-                f"[warmup] Query {i}/{len(warmup_queries)}: {query.get('mode', 'unknown')}"
-            )
+            logger.info(f"[warmup] Query {i}/{len(warmup_queries)}: {query.get('mode', 'unknown')}")
 
             # Execute graph query
             result = await graph(
@@ -139,33 +137,24 @@ def _get_default_warmup_queries() -> List[Dict[str, Any]]:
     return [
         # Stats mode (safest - always works if graph loaded)
         {"mode": "stats"},
-
         # Find mode with well-known symbols
         {"mode": "find", "query": "Agent", "top_k": 5},
         {"mode": "find", "query": "StateGraph", "top_k": 5},
-
         # Neighbors mode with core symbols
         {"mode": "neighbors", "node": "Agent", "depth": 1},
         {"mode": "neighbors", "node": "graph", "depth": 1},
-
         # PageRank (core analysis)
         {"mode": "pagerank", "top_k": 5},
-
         # Centrality
         {"mode": "centrality", "top_k": 5},
-
         # Stats again (reinforce success)
         {"mode": "stats"},
-
         # File deps (safe - no specific node needed)
         {"mode": "file_deps"},
-
         # Module-level analysis
         {"mode": "module_pagerank", "top_k": 5},
-
         # Call flow with simple node
         {"mode": "call_flow", "node": "run", "depth": 1},
-
         # Final stats
         {"mode": "stats"},
     ]
@@ -247,12 +236,12 @@ async def main_async():
 
     if args.tool == "graph":
         result = await warmup_graph_tool(project_root=args.path)
-        print(f"\nGraph tool warm-up results:")
+        print("\nGraph tool warm-up results:")
         print(f"  Successful: {result['success']}/{result['total']}")
         print(f"  Failed: {result['failed']}/{result['total']}")
-        if result['errors']:
-            print(f"\nErrors:")
-            for error in result['errors']:
+        if result["errors"]:
+            print("\nErrors:")
+            for error in result["errors"]:
                 print(f"  - {error}")
     else:
         print(f"Warm-up for {args.tool} not yet implemented")

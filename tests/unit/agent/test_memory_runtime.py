@@ -14,7 +14,9 @@
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from victor.agent.coordinators.session_coordinator import SessionCoordinator as LegacySessionCoordinator
+from victor.agent.coordinators.session_coordinator import (
+    SessionCoordinator as LegacySessionCoordinator,
+)
 from victor.agent.runtime.memory_runtime import (
     create_memory_runtime_components,
     initialize_conversation_embedding_store,

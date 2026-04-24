@@ -156,7 +156,11 @@ class TestAggregationService:
 
                 # Verify percentiles are ordered correctly
                 if tool_stat["p50_duration_ms"]:
-                    assert tool_stat["p50_duration_ms"] <= tool_stat["p95_duration_ms"] <= tool_stat["p99_duration_ms"]
+                    assert (
+                        tool_stat["p50_duration_ms"]
+                        <= tool_stat["p95_duration_ms"]
+                        <= tool_stat["p99_duration_ms"]
+                    )
 
     @pytest.mark.asyncio
     async def test_get_performance_metrics(self, aggregation_service, mock_events):

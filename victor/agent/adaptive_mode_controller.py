@@ -304,27 +304,45 @@ class QLearningStore:
 
             # Add profile_name column if missing
             if "profile_name" not in columns:
-                logger.info(f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding profile_name column")
-                conn.execute(f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN profile_name TEXT DEFAULT 'default'")
-                conn.execute(f"UPDATE {_HISTORY_TABLE} SET profile_name = 'default' WHERE profile_name IS NULL")
-                logger.info(f"[AdaptiveModeController] Migration complete: profile_name column added to {_HISTORY_TABLE}")
+                logger.info(
+                    f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding profile_name column"
+                )
+                conn.execute(
+                    f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN profile_name TEXT DEFAULT 'default'"
+                )
+                conn.execute(
+                    f"UPDATE {_HISTORY_TABLE} SET profile_name = 'default' WHERE profile_name IS NULL"
+                )
+                logger.info(
+                    f"[AdaptiveModeController] Migration complete: profile_name column added to {_HISTORY_TABLE}"
+                )
 
             # Add trigger column if missing (old schema used task_type instead)
             if "trigger" not in columns:
-                logger.info(f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding trigger column")
+                logger.info(
+                    f"[AdaptiveModeController] Migrating {_HISTORY_TABLE} table: adding trigger column"
+                )
 
                 # If task_type exists and has NOT NULL constraint, make it nullable first
                 if "task_type" in columns:
                     # SQLite doesn't support ALTER COLUMN directly, need to recreate table
                     # For simplicity, we'll just provide a default value for task_type in new inserts
                     # and make trigger NOT NULL with a default
-                    conn.execute(f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'")
+                    conn.execute(
+                        f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'"
+                    )
                     # Migrate existing task_type values to trigger
-                    conn.execute(f"UPDATE {_HISTORY_TABLE} SET trigger = task_type WHERE trigger = 'unknown'")
+                    conn.execute(
+                        f"UPDATE {_HISTORY_TABLE} SET trigger = task_type WHERE trigger = 'unknown'"
+                    )
                 else:
-                    conn.execute(f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'")
+                    conn.execute(
+                        f"ALTER TABLE {_HISTORY_TABLE} ADD COLUMN trigger TEXT DEFAULT 'unknown'"
+                    )
 
-                logger.info(f"[AdaptiveModeController] Migration complete: trigger column added to {_HISTORY_TABLE}")
+                logger.info(
+                    f"[AdaptiveModeController] Migration complete: trigger column added to {_HISTORY_TABLE}"
+                )
 
         except Exception as e:
             logger.warning(f"[AdaptiveModeController] Migration failed (non-critical): {e}")

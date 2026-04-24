@@ -89,11 +89,10 @@ class MigrationRunner:
             if cursor.fetchone() is None:
                 # Create schema_version table if it doesn't exist
                 from victor.agent.conversation.migrations import ensure_schema_version_table
+
                 ensure_schema_version_table(conn)
 
-            cursor.execute(
-                "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
-            )
+            cursor.execute("SELECT version FROM schema_version ORDER BY version DESC LIMIT 1")
             result = cursor.fetchone()
             return result[0] if result else None
         finally:
@@ -105,9 +104,7 @@ class MigrationRunner:
 
         for migration in self.migrations:
             if current_version is None or migration.version > current_version:
-                logger.info(
-                    f"Running migration {migration.version}: {migration.description}"
-                )
+                logger.info(f"Running migration {migration.version}: {migration.description}")
                 self._apply_migration(migration)
 
     def _apply_migration(self, migration: Migration) -> None:
@@ -183,7 +180,12 @@ def apply_migration_0_3_0(db_path: str) -> bool:
         context_sizes_migrated = _migrate_context_sizes_table(cursor)
 
         # Commit if any migration was applied
-        if messages_migrated or model_families_migrated or model_sizes_migrated or context_sizes_migrated:
+        if (
+            messages_migrated
+            or model_families_migrated
+            or model_sizes_migrated
+            or context_sizes_migrated
+        ):
             conn.commit()
             return True
 
@@ -238,7 +240,8 @@ def _migrate_messages_table(cursor: sqlite3.Cursor) -> bool:
 
     # Check if we need a full table recreation (schema is too different)
     needs_recreation = (
-        "id" in columns and columns["id"] == "INTEGER"  # Wrong type
+        "id" in columns
+        and columns["id"] == "INTEGER"  # Wrong type
         or "created_at" in columns  # Old column name
         or "tool_calls" in columns  # Old column name
     )
@@ -318,7 +321,7 @@ def _migrate_model_sizes_table(cursor: sqlite3.Cursor) -> bool:
             midpoint = int((min_params + max_params) / 2) if min_params is not None else 0
             cursor.execute(
                 "INSERT INTO model_sizes (id, name, family_id, num_parameters) VALUES (?, ?, ?, ?)",
-                (row_id, name, None, midpoint)
+                (row_id, name, None, midpoint),
             )
 
         # Drop old table
@@ -380,7 +383,7 @@ def _migrate_model_families_table(cursor: sqlite3.Cursor) -> bool:
         for row_id, name in existing_rows:
             cursor.execute(
                 "INSERT INTO model_families (id, name, provider_id) VALUES (?, ?, ?)",
-                (row_id, name, None)
+                (row_id, name, None),
             )
 
         # Drop old table
@@ -473,11 +476,13 @@ def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> N
     else:
         select_parts.append("id")
 
-    select_parts.extend([
-        "session_id",
-        "role",
-        "content",
-    ])
+    select_parts.extend(
+        [
+            "session_id",
+            "role",
+            "content",
+        ]
+    )
 
     # Add timestamp source
     if "timestamp" in current_columns:
@@ -529,10 +534,18 @@ def _recreate_messages_table(cursor: sqlite3.Cursor, current_columns: dict) -> N
     cursor.execute("ALTER TABLE messages_new RENAME TO messages")
 
     # Recreate indexes
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_time ON messages(session_id, timestamp)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_priority ON messages(session_id, priority DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_tool_results ON messages(session_id, role, tool_name, timestamp DESC) WHERE role IN ('tool_call', 'tool_result')")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_messages_exchange ON messages(session_id, role, timestamp) WHERE role IN ('user', 'assistant')")
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_session_time ON messages(session_id, timestamp)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_priority ON messages(session_id, priority DESC)"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_tool_results ON messages(session_id, role, tool_name, timestamp DESC) WHERE role IN ('tool_call', 'tool_result')"
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_messages_exchange ON messages(session_id, role, timestamp) WHERE role IN ('user', 'assistant')"
+    )
 
 
 def migrate_database(db_path: str) -> None:
@@ -558,19 +571,14 @@ def migrate_database(db_path: str) -> None:
 
         # Only record the version if the core tables already exist (existing DB)
         cursor = conn.cursor()
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
-        )
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'")
         if cursor.fetchone() is None:
             # Fresh DB — schema version will be set by _apply_normalized_schema
             logger.debug("Skipping schema version record for fresh database (no tables yet)")
             return
 
         # Check if version 0.3.0 is already recorded
-        cursor.execute(
-            "SELECT version FROM schema_version WHERE version = ?",
-            ("0.3.0",)
-        )
+        cursor.execute("SELECT version FROM schema_version WHERE version = ?", ("0.3.0",))
         if cursor.fetchone() is None:
             # Insert version record for existing DB that was just migrated
             cursor.execute(
@@ -589,11 +597,9 @@ def ensure_schema_version_table(conn: sqlite3.Connection) -> None:
     Args:
         conn: Database connection
     """
-    conn.execute(
-        """
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS schema_version (
             version TEXT PRIMARY KEY,
             applied_at TIMESTAMP NOT NULL
         );
-        """
-    )
+        """)

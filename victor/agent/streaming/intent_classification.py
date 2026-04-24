@@ -342,7 +342,9 @@ class IntentClassificationHandler:
 
         return intent_result
 
-    def _build_task_completion_signals(self, tracking_state: TrackingState, stream_ctx: Optional[Any] = None) -> Dict[str, Any]:
+    def _build_task_completion_signals(
+        self, tracking_state: TrackingState, stream_ctx: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """Build task completion signals for early termination detection.
 
         Args:
@@ -369,7 +371,7 @@ class IntentClassificationHandler:
 
         # AGENTIC LOOP FIX: Include current iteration for loop detection
         current_iteration = 0
-        if stream_ctx and hasattr(stream_ctx, 'total_iterations'):
+        if stream_ctx and hasattr(stream_ctx, "total_iterations"):
             current_iteration = stream_ctx.total_iterations
 
         return {

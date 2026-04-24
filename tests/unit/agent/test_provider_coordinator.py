@@ -327,7 +327,9 @@ class TestProviderCoordinator:
         assert coordinator._is_monitoring is True
 
     @pytest.mark.asyncio
-    async def test_start_health_monitoring_delegates_to_bound_service(self, coordinator, mock_manager):
+    async def test_start_health_monitoring_delegates_to_bound_service(
+        self, coordinator, mock_manager
+    ):
         """When bound, coordinator delegates health monitoring to ProviderService."""
         service = MagicMock()
         service.start_health_monitoring = AsyncMock()

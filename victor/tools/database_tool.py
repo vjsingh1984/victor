@@ -55,6 +55,7 @@ class DatabaseConnection:
     Consolidates all connection parameters into a single object.
     Reduces parameter count from 6 to 1 for database operations.
     """
+
     db_type: str = "sqlite"
     database: Optional[str] = None
     host: Optional[str] = None
@@ -598,7 +599,7 @@ async def database(
         if connection is None:
             return {
                 "success": False,
-                "error": "Missing required parameter: connection (DatabaseConnection object)"
+                "error": "Missing required parameter: connection (DatabaseConnection object)",
             }
         return await _do_connect(
             connection.database,
@@ -607,7 +608,7 @@ async def database(
             connection.port,
             connection.username,
             connection.password,
-            pool
+            pool,
         )
 
     elif action_lower == "query":

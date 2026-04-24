@@ -487,9 +487,7 @@ class TurnExecutor:
 
                     _container = getattr(_orch, "_container", None)
                     _dep_graph = (
-                        _container.get_optional(ToolDependencyGraphProtocol)
-                        if _container
-                        else None
+                        _container.get_optional(ToolDependencyGraphProtocol) if _container else None
                     )
                     if _dep_graph:
                         _names = [tc.get("name", "") for tc in response.tool_calls]
@@ -509,9 +507,7 @@ class TurnExecutor:
 
                 _container = getattr(_orch, "_container", None)
                 _dep_graph = (
-                    _container.get_optional(ToolDependencyGraphProtocol)
-                    if _container
-                    else None
+                    _container.get_optional(ToolDependencyGraphProtocol) if _container else None
                 )
                 if _dep_graph and len(tool_results) > 1:
                     _task_type = (
@@ -519,7 +515,9 @@ class TurnExecutor:
                         if task_classification
                         else "general"
                     )
-                    _tool_names = [r.get("tool_name", "") for r in tool_results if r.get("tool_name")]
+                    _tool_names = [
+                        r.get("tool_name", "") for r in tool_results if r.get("tool_name")
+                    ]
                     for i in range(len(_tool_names) - 1):
                         _dep_graph.record_transition(_tool_names[i], _tool_names[i + 1], _task_type)
             except Exception:

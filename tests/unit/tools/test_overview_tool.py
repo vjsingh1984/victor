@@ -239,9 +239,7 @@ class TestDirectorySummaries:
 
                 with caplog.at_level(logging.WARNING):
                     # Call _get_directory_summaries directly
-                    result = await _get_directory_summaries(
-                        Path(tmpdir), ["src"]
-                    )
+                    result = await _get_directory_summaries(Path(tmpdir), ["src"])
 
                 # Should return empty dict on error
                 assert result == {}
@@ -281,9 +279,7 @@ class TestDirectorySummaries:
                 mock_get_db.return_value = mock_db
 
                 # Call with 3 directories
-                result = await _get_directory_summaries(
-                    Path(tmpdir), ["dir1", "dir2", "dir3"]
-                )
+                result = await _get_directory_summaries(Path(tmpdir), ["dir1", "dir2", "dir3"])
 
                 # Should return partial results (not empty dict)
                 # Note: The actual implementation returns empty on any exception

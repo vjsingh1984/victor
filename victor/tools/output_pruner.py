@@ -190,7 +190,10 @@ class ToolOutputPruner:
         re.compile(r"^\s*\+\+\+ [^\n]+", re.MULTILINE),
         re.compile(r"Traceback \(most recent call last\):"),
         re.compile(r"^\s*[A-Za-z0-9_./\\-]+:\d+:\d+:\s+(error|warning):", re.MULTILINE),
-        re.compile(r"^\s*(error|fatal error|syntaxerror|typeerror|nameerror|referenceerror)\b", re.MULTILINE | re.IGNORECASE),
+        re.compile(
+            r"^\s*(error|fatal error|syntaxerror|typeerror|nameerror|referenceerror)\b",
+            re.MULTILINE | re.IGNORECASE,
+        ),
         re.compile(r"^\s*=+ FAILURES =+\s*$", re.MULTILINE),
         re.compile(r"^\s*FAILED\b", re.MULTILINE),
         re.compile(r"AssertionError"),
@@ -511,7 +514,9 @@ class ToolOutputPruner:
                     f"Rerun {tool_name}(path={path!r}, query={query!r}) "
                     "with a narrower path or query to recover omitted matches."
                 )
-            return f"Rerun {tool_name}(path={path!r}) with narrower scope to recover omitted matches."
+            return (
+                f"Rerun {tool_name}(path={path!r}) with narrower scope to recover omitted matches."
+            )
 
         return "Rerun the tool with narrower scope to recover omitted content."
 

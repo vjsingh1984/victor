@@ -48,7 +48,7 @@ class LiveDisplayRenderer:
 
     # Class-level constants for buffer management (Fix 3 & 5)
     _MAX_CONTENT_BUFFER_SIZE = 50_000  # 50K chars — prevents unbounded memory growth
-    _THINKING_BUFFER_LIMIT = 10_000    # Discard thinking content beyond this
+    _THINKING_BUFFER_LIMIT = 10_000  # Discard thinking content beyond this
 
     def __init__(self, console: Console):
         """Initialize LiveDisplayRenderer.
@@ -235,7 +235,9 @@ class LiveDisplayRenderer:
 
         # Show pruning transparency
         if was_pruned and tool_settings.tool_output_show_transparency:
-            self.console.print("[dim yellow]! Output preview was pruned before sending to the model[/]")
+            self.console.print(
+                "[dim yellow]! Output preview was pruned before sending to the model[/]"
+            )
 
         # Store result for potential expansion
         self._last_tool_result = {
@@ -347,7 +349,7 @@ class LiveDisplayRenderer:
         """
         t0 = time.monotonic() * 1000
         if self._live:
-            visible = self._content_buffer[len(self._content_shown_before_pause):]
+            visible = self._content_buffer[len(self._content_shown_before_pause) :]
             self._live.update(Markdown(visible))
         duration_ms = time.monotonic() * 1000 - t0
         self._metrics.record_content_chunk(duration_ms)
@@ -435,7 +437,7 @@ class LiveDisplayRenderer:
 
         # FAIL-SAFE: Ensure content buffer is displayed to user
         # Only print the portion not already shown directly (e.g., via thinking-mode print)
-        unshown = self._content_buffer[len(self._content_shown_before_pause):]
+        unshown = self._content_buffer[len(self._content_shown_before_pause) :]
         if unshown and not self._live:
             self.console.print(Markdown(unshown))
         elif self._live and self._content_buffer:
@@ -447,7 +449,9 @@ class LiveDisplayRenderer:
                 time.sleep(0.1)
 
         # Add section separator before final response if we have content
-        if self._content_buffer.strip() and (self._thinking_indicator_shown or self._tool_section_shown):
+        if self._content_buffer.strip() and (
+            self._thinking_indicator_shown or self._tool_section_shown
+        ):
             self._print_section_separator("Response")
             # Show content type badge
             render_content_badge(self.console, "response")

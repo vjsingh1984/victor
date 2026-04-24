@@ -49,30 +49,18 @@ class TestConsoleRenderingE2E:
             # Simulate DeepSeek thinking pattern
             yield StreamChunk(
                 content="",
-                metadata={"reasoning_content": "Let me think about this step by step..."}
+                metadata={"reasoning_content": "Let me think about this step by step..."},
             )
-            yield StreamChunk(
-                content="Here's my analysis:",
-                metadata=None
-            )
-            yield StreamChunk(
-                content="**Step 1:** Analyze the problem",
-                metadata=None
-            )
-            yield StreamChunk(
-                content="**Step 2:** Provide solution",
-                metadata=None
-            )
+            yield StreamChunk(content="Here's my analysis:", metadata=None)
+            yield StreamChunk(content="**Step 1:** Analyze the problem", metadata=None)
+            yield StreamChunk(content="**Step 2:** Provide solution", metadata=None)
             # Stream ends without explicit thinking_end marker
 
         mock_agent.stream_chat = MagicMock(return_value=mock_stream())
 
         # Stream and verify
         content_buffer = await stream_response(
-            mock_agent,
-            "Explain quantum computing",
-            mock_renderer,
-            suppress_thinking=False
+            mock_agent, "Explain quantum computing", mock_renderer, suppress_thinking=False
         )
 
         # Verify all content was captured
@@ -97,13 +85,9 @@ class TestConsoleRenderingE2E:
         async def broken_stream():
             # Stream starts thinking but never calls on_thinking_end
             yield StreamChunk(
-                content="Let me think...",
-                metadata={"reasoning_content": "Thinking..."}
+                content="Let me think...", metadata={"reasoning_content": "Thinking..."}
             )
-            yield StreamChunk(
-                content="Here's my answer:",
-                metadata=None
-            )
+            yield StreamChunk(content="Here's my answer:", metadata=None)
             # Stream ends abruptly without thinking_end marker
             # (this was causing content to be lost)
 
@@ -111,10 +95,7 @@ class TestConsoleRenderingE2E:
 
         # Stream should handle this gracefully
         content_buffer = await stream_response(
-            mock_agent,
-            "What is machine learning?",
-            mock_renderer,
-            suppress_thinking=False
+            mock_agent, "What is machine learning?", mock_renderer, suppress_thinking=False
         )
 
         # Content should still be visible
@@ -151,7 +132,7 @@ class TestConsoleRenderingE2E:
             # Tool call
             yield StreamChunk(
                 content="",
-                metadata={"tool_start": {"name": "read", "arguments": {"path": "/tmp/test.txt"}}}
+                metadata={"tool_start": {"name": "read", "arguments": {"path": "/tmp/test.txt"}}},
             )
 
             # Content after tool call (THIS WAS BEING LOST)
@@ -161,10 +142,7 @@ class TestConsoleRenderingE2E:
 
         # Stream the response
         content_buffer = await stream_response(
-            mock_agent,
-            "Read /tmp/test.txt and analyze",
-            mock_renderer,
-            suppress_thinking=False
+            mock_agent, "Read /tmp/test.txt and analyze", mock_renderer, suppress_thinking=False
         )
 
         # Verify ALL content was forwarded to renderer
@@ -194,7 +172,7 @@ class TestConsoleRenderingE2E:
             # First thinking block
             yield StreamChunk(
                 content="First thinking: ",
-                metadata={"reasoning_content": "Analyzing requirements..."}
+                metadata={"reasoning_content": "Analyzing requirements..."},
             )
             yield StreamChunk(content="Requirements understood", metadata=None)
 
@@ -204,7 +182,7 @@ class TestConsoleRenderingE2E:
             # Second thinking block
             yield StreamChunk(
                 content="Second thinking: ",
-                metadata={"reasoning_content": "Considering options..."}
+                metadata={"reasoning_content": "Considering options..."},
             )
             yield StreamChunk(content="Option chosen", metadata=None)
 
@@ -214,10 +192,7 @@ class TestConsoleRenderingE2E:
         mock_agent.stream_chat = MagicMock(return_value=stream_with_multiple_thinking())
 
         content_buffer = await stream_response(
-            mock_agent,
-            "Design a system architecture",
-            mock_renderer,
-            suppress_thinking=False
+            mock_agent, "Design a system architecture", mock_renderer, suppress_thinking=False
         )
 
         # All content should be present
@@ -243,10 +218,7 @@ class TestConsoleRenderingE2E:
 
         # Should not raise error
         content_buffer = await stream_response(
-            mock_agent,
-            "Hello",
-            mock_renderer,
-            suppress_thinking=False
+            mock_agent, "Hello", mock_renderer, suppress_thinking=False
         )
 
         # Should return empty string
@@ -287,10 +259,7 @@ class TestThinkingModeTransitions:
 
         async def stream_ending_in_thinking():
             # Start thinking
-            yield StreamChunk(
-                content="",
-                metadata={"reasoning_content": "Thinking..."}
-            )
+            yield StreamChunk(content="", metadata={"reasoning_content": "Thinking..."})
             # Stream ends WITHOUT calling on_thinking_end
             # (this was the bug)
 
@@ -298,10 +267,7 @@ class TestThinkingModeTransitions:
 
         # Stream should handle this and force thinking mode closed
         content_buffer = await stream_response(
-            mock_agent,
-            "Test question",
-            mock_renderer,
-            suppress_thinking=False
+            mock_agent, "Test question", mock_renderer, suppress_thinking=False
         )
 
         # Verify thinking mode was closed
@@ -345,10 +311,7 @@ class TestContentBufferSize:
         mock_agent.stream_chat = MagicMock(return_value=large_stream())
 
         content_buffer = await stream_response(
-            mock_agent,
-            "Generate large response",
-            mock_renderer,
-            suppress_thinking=False
+            mock_agent, "Generate large response", mock_renderer, suppress_thinking=False
         )
 
         # Should handle large content

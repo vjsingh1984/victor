@@ -198,7 +198,7 @@ class OpenAIToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
                 "TOOL CALL FORMAT:",
                 "- When calling tools, use structured function calls in JSON format.",
                 "- NEVER mix JSON tool calls with Python-style syntax in the same response.",
-                "- Correct example: Call the 'read' tool with arguments {\"path\": \"file.py\"}",
+                '- Correct example: Call the \'read\' tool with arguments {"path": "file.py"}',
                 "- Incorrect example: read(path='file.py')  # Do NOT use this format in JSON tool calls",
                 "- If you need to explain tool usage, do so in natural language after the JSON tool call.",
             ]

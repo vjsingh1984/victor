@@ -215,9 +215,7 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 "This usually indicates a conversation initialization issue."
             )
 
-        provider_params = self._get_provider_params(
-            model, temperature, max_tokens, **kwargs
-        )
+        provider_params = self._get_provider_params(model, temperature, max_tokens, **kwargs)
 
         payload: Dict[str, Any] = {
             "model": model,
@@ -310,14 +308,18 @@ class HttpxOpenAICompatProvider(BaseProvider):
                 if tc.get("name"):
                     args_str = tc.get("arguments", "{}")
                     try:
-                        parsed_args = json.loads(args_str) if isinstance(args_str, str) else args_str
+                        parsed_args = (
+                            json.loads(args_str) if isinstance(args_str, str) else args_str
+                        )
                     except json.JSONDecodeError:
                         parsed_args = {}
-                    final_tool_calls.append({
-                        "id": tc.get("id"),
-                        "name": tc["name"],
-                        "arguments": parsed_args,
-                    })
+                    final_tool_calls.append(
+                        {
+                            "id": tc.get("id"),
+                            "name": tc["name"],
+                            "arguments": parsed_args,
+                        }
+                    )
 
         # Parse usage from final chunk (when finish_reason is set)
         usage = None

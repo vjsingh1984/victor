@@ -99,23 +99,19 @@ def _are_tools_semantically_similar(name1: str, name2: str) -> bool:
     file_keywords = {"file", "read", "write", "edit", "directory"}
 
     # Both are search tools
-    if (any(kw in norm1 for kw in search_keywords) and
-        any(kw in norm2 for kw in search_keywords)):
+    if any(kw in norm1 for kw in search_keywords) and any(kw in norm2 for kw in search_keywords):
         return True
 
     # Both are fetch tools
-    if (any(kw in norm1 for kw in fetch_keywords) and
-        any(kw in norm2 for kw in fetch_keywords)):
+    if any(kw in norm1 for kw in fetch_keywords) and any(kw in norm2 for kw in fetch_keywords):
         return True
 
     # Both are shell tools
-    if (any(kw in norm1 for kw in shell_keywords) and
-        any(kw in norm2 for kw in shell_keywords)):
+    if any(kw in norm1 for kw in shell_keywords) and any(kw in norm2 for kw in shell_keywords):
         return True
 
     # Both are file tools
-    if (any(kw in norm1 for kw in file_keywords) and
-        any(kw in norm2 for kw in file_keywords)):
+    if any(kw in norm1 for kw in file_keywords) and any(kw in norm2 for kw in file_keywords):
         return True
 
     return False
@@ -155,7 +151,7 @@ def _check_langchain_tool_allowed(
         logger.warning(
             "LangChain tool '%s' is not in whitelist. "
             "Consider using built-in Victor tools for better integration.",
-            tool_name
+            tool_name,
         )
         # Still allow, but log warning
 
@@ -389,7 +385,9 @@ class LangChainToolProjector:
                     )
 
                     if not allowed:
-                        logger.warning("Skipping renamed LangChain tool '%s': %s", tool_name, reason)
+                        logger.warning(
+                            "Skipping renamed LangChain tool '%s': %s", tool_name, reason
+                        )
                         blocked_count += 1
                         continue
 

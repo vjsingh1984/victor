@@ -706,7 +706,10 @@ class TestChatChromePolicy:
             tool_output_pruning_safe_only=True,
             tool_output_preview_enabled=False,
         )
-        assert _summarize_tool_output_mode(settings) == "Tool output: safe read-heavy pruning, preview off"
+        assert (
+            _summarize_tool_output_mode(settings)
+            == "Tool output: safe read-heavy pruning, preview off"
+        )
 
     def test_print_interactive_startup_messages_handles_queue(self):
         """Queued startup notices should render through the shared status style."""
@@ -751,7 +754,9 @@ class TestChatReplRendering:
         profile_config = MagicMock(provider="test-provider", model="test-model")
 
         with (
-            patch.object(chat_module, "_create_cli_prompt_session", return_value=FakePromptSession()),
+            patch.object(
+                chat_module, "_create_cli_prompt_session", return_value=FakePromptSession()
+            ),
             patch.object(chat_module.console, "print") as mock_print,
             patch("victor.ui.rendering.stream_response", new=AsyncMock(return_value="dup content")),
         ):
@@ -764,7 +769,9 @@ class TestChatReplRendering:
                 renderer_choice="text",
             )
 
-        rendered = [str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args]
+        rendered = [
+            str(call_args.args[0]) for call_args in mock_print.call_args_list if call_args.args
+        ]
         assert not any("dup content" in item for item in rendered)
 
 

@@ -462,7 +462,7 @@ class PlanningCoordinator:
                 table.add_row(step_id, step_type, step_desc, step_tools)
 
             # Get console from renderer (if available)
-            console = getattr(self.renderer, 'console', None)
+            console = getattr(self.renderer, "console", None)
             if console:
                 console.print(table)
                 if plan.duration:
@@ -543,11 +543,7 @@ class PlanningCoordinator:
         from rich.prompt import Confirm
 
         console.print()
-        approved = Confirm.ask(
-            "[bold yellow]Execute this plan?[/]",
-            default=False,
-            console=console
-        )
+        approved = Confirm.ask("[bold yellow]Execute this plan?[/]", default=False, console=console)
 
         if approved:
             console.print("[green]✓ Plan approved. Executing...[/]")
@@ -577,8 +573,7 @@ class PlanningCoordinator:
             # Generate filename from plan name and timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             safe_name = "".join(
-                c if c.isalnum() or c in (' ', '-', '_') else '_'
-                for c in plan.name
+                c if c.isalnum() or c in (" ", "-", "_") else "_" for c in plan.name
             )
             safe_name = safe_name[:50]  # Truncate long names
             filename = f"{timestamp}_{safe_name}.json"
@@ -588,23 +583,23 @@ class PlanningCoordinator:
             plan_dict = {
                 "name": plan.name,
                 "complexity": plan.complexity.value,
-                "description": plan.description if hasattr(plan, 'description') else "",
-                "duration": plan.duration if hasattr(plan, 'duration') else "",
+                "description": plan.description if hasattr(plan, "description") else "",
+                "duration": plan.duration if hasattr(plan, "duration") else "",
                 "steps": [
                     {
                         "id": step[0],
                         "type": step[1],
                         "description": step[2] if len(step) > 2 else "",
-                        "tools": step[3] if len(step) > 3 else []
+                        "tools": step[3] if len(step) > 3 else [],
                     }
                     for step in plan.steps
                 ],
                 "generated_at": timestamp,
-                "step_count": len(plan.steps)
+                "step_count": len(plan.steps),
             }
 
             # Save to file
-            with open(filepath, 'w') as f:
+            with open(filepath, "w") as f:
                 json.dump(plan_dict, f, indent=2)
 
             logger.info(f"Plan saved to {filepath}")

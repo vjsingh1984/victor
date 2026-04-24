@@ -141,9 +141,7 @@ class TestTaskPreparation:
             calls = [
                 call
                 for call in mock_conversation_controller.add_message.call_args_list
-                if len(call[0]) >= 2
-                and call[0][0] == "user"
-                and "[TASK-HINT:" in str(call[0][1])
+                if len(call[0]) >= 2 and call[0][0] == "user" and "[TASK-HINT:" in str(call[0][1])
             ]
             assert len(calls) > 0
 

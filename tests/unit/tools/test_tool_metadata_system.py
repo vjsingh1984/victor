@@ -444,7 +444,9 @@ class TestToolMetadataRegistry:
 
     def test_base_reexport_warns_and_uses_canonical_registry(self):
         """victor.tools.base should lazily expose the canonical registry class."""
-        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+        from victor.tools.metadata_registry import (
+            ToolMetadataRegistry as CanonicalToolMetadataRegistry,
+        )
 
         with pytest.deprecated_call(
             match="Direct import of ToolMetadataRegistry from victor.tools.base is deprecated"
@@ -456,14 +458,18 @@ class TestToolMetadataRegistry:
     def test_package_reexport_uses_canonical_registry(self):
         """victor.tools should re-export the canonical registry class."""
         from victor.tools import ToolMetadataRegistry as PackageToolMetadataRegistry
-        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+        from victor.tools.metadata_registry import (
+            ToolMetadataRegistry as CanonicalToolMetadataRegistry,
+        )
 
         assert PackageToolMetadataRegistry is CanonicalToolMetadataRegistry
 
     def test_metadata_module_wrapper_warns_and_adapts_legacy_shape(self):
         """victor.tools.metadata should remain a deprecated compatibility wrapper."""
         from victor.tools.metadata import ToolMetadataRegistry as LegacyToolMetadataRegistry
-        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+        from victor.tools.metadata_registry import (
+            ToolMetadataRegistry as CanonicalToolMetadataRegistry,
+        )
 
         CanonicalToolMetadataRegistry.reset_instance()
 
@@ -479,7 +485,8 @@ class TestToolMetadataRegistry:
         assert metadata is not None
         assert metadata.category == "testing"
         assert (
-            CanonicalToolMetadataRegistry.get_instance().get_metadata("explicit_metadata_tool") is not None
+            CanonicalToolMetadataRegistry.get_instance().get_metadata("explicit_metadata_tool")
+            is not None
         )
 
 
@@ -631,7 +638,9 @@ class TestSemanticToolSelectorIntegration:
             await selector.initialize_tool_embeddings(tool_registry)
 
         # Check canonical registry was populated
-        from victor.tools.metadata_registry import ToolMetadataRegistry as CanonicalToolMetadataRegistry
+        from victor.tools.metadata_registry import (
+            ToolMetadataRegistry as CanonicalToolMetadataRegistry,
+        )
 
         metadata_registry = CanonicalToolMetadataRegistry.get_instance()
         assert metadata_registry.get_metadata("mock_tool") is not None

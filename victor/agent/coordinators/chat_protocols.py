@@ -47,7 +47,9 @@ def __getattr__(name: str) -> Any:
             stacklevel=2,
         )
         return getattr(_chat_runtime, name)
-    raise AttributeError(f"module 'victor.agent.coordinators.chat_protocols' has no attribute {name!r}")
+    raise AttributeError(
+        f"module 'victor.agent.coordinators.chat_protocols' has no attribute {name!r}"
+    )
 
 
 def __dir__() -> list[str]:

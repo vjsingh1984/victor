@@ -163,7 +163,7 @@ def _truncate_output_by_lines(
     text: str,
     max_lines: Optional[int],
     max_bytes: Optional[int] = None,
-    stream_name: str = "output"
+    stream_name: str = "output",
 ) -> Tuple[str, bool, int]:
     """Truncate output by lines with byte limit fallback.
 
@@ -195,9 +195,15 @@ def _truncate_output_by_lines(
         # Still enforce byte limit (safety)
         text_bytes = len(text.encode("utf-8", errors="replace"))
         if text_bytes > max_bytes:
-            truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
-            return truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]", True, text.count('\n') + 1
-        return text, False, text.count('\n') + 1
+            truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode(
+                "utf-8", errors="ignore"
+            )
+            return (
+                truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
+                True,
+                text.count("\n") + 1,
+            )
+        return text, False, text.count("\n") + 1
 
     # Split into lines (preserving line endings)
     lines = text.splitlines(keepends=True)
@@ -209,27 +215,44 @@ def _truncate_output_by_lines(
         if max_bytes is not None:
             text_bytes = len(text.encode("utf-8", errors="replace"))
             if text_bytes > max_bytes:
-                truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
+                truncated = text.encode("utf-8", errors="replace")[:max_bytes].decode(
+                    "utf-8", errors="ignore"
+                )
                 # Recount lines after byte truncation
-                new_line_count = truncated.count('\n') + 1
-                return truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]", True, new_line_count
+                new_line_count = truncated.count("\n") + 1
+                return (
+                    truncated + f"\n... [{stream_name} truncated: {text_bytes}→{max_bytes} bytes]",
+                    True,
+                    new_line_count,
+                )
         return text, False, line_count
 
     # Truncate by lines
     truncated_lines = lines[:max_lines]
-    truncated = ''.join(truncated_lines)
+    truncated = "".join(truncated_lines)
 
     # Enforce byte limit on truncated text (if specified)
     if max_bytes is not None:
         truncated_bytes = len(truncated.encode("utf-8", errors="replace"))
         if truncated_bytes > max_bytes:
             # Byte limit exceeded, truncate further
-            truncated = truncated.encode("utf-8", errors="replace")[:max_bytes].decode("utf-8", errors="ignore")
+            truncated = truncated.encode("utf-8", errors="replace")[:max_bytes].decode(
+                "utf-8", errors="ignore"
+            )
             # Recount lines after byte truncation
-            new_line_count = truncated.count('\n') + 1
-            return truncated + f"\n... [{stream_name} truncated: {line_count}→{new_line_count} lines, {truncated_bytes}→{max_bytes} bytes]", True, new_line_count
+            new_line_count = truncated.count("\n") + 1
+            return (
+                truncated
+                + f"\n... [{stream_name} truncated: {line_count}→{new_line_count} lines, {truncated_bytes}→{max_bytes} bytes]",
+                True,
+                new_line_count,
+            )
 
-    return truncated + f"\n... [{stream_name} truncated: {line_count}→{max_lines} lines]", True, max_lines
+    return (
+        truncated + f"\n... [{stream_name} truncated: {line_count}→{max_lines} lines]",
+        True,
+        max_lines,
+    )
 
 
 # =============================================================================
@@ -388,8 +411,6 @@ def run_command(
         stdout_text = result.stdout
         stderr_text = result.stderr
         was_truncated = False
-        stdout_lines = 0
-        stderr_lines = 0
 
         # Truncate output with separate limits for stdout and stderr
         if max_output_bytes > 0:
@@ -398,16 +419,10 @@ def run_command(
             stdout_text, t1 = _truncate_output(stdout_text, max_output_bytes)
             stderr_text, t2 = _truncate_output(stderr_text, max_output_bytes)
             was_truncated = t1 or t2
-            stdout_lines = stdout_text.count('\n') + 1
-            stderr_lines = stderr_text.count('\n') + 1
         elif max_output_bytes == 0:
-            # No limit (unlimited output)
-            stdout_lines = stdout_text.count('\n') + 1
-            stderr_lines = stderr_text.count('\n') + 1
+            pass  # No limit (unlimited output)
         else:
-            # Negative limit means unlimited
-            stdout_lines = stdout_text.count('\n') + 1
-            stderr_lines = stderr_text.count('\n') + 1
+            pass  # Negative limit means unlimited
 
         return CommandResult(
             success=result.returncode == 0,

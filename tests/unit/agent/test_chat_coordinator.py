@@ -24,6 +24,7 @@ from typing import Any
 from victor.agent.coordinators.chat_coordinator import ChatCoordinator
 from victor.core.errors import ProviderRateLimitError
 
+
 def _make_deprecated_chat_coordinator(mock_orchestrator):
     """Construct the deprecated ChatCoordinator shim with an explicit warning assertion."""
     with pytest.warns(DeprecationWarning, match="ChatCoordinator is deprecated"):
@@ -250,12 +251,15 @@ class TestChatServiceShim:
     def test_turn_executor_warns_when_materializing_legacy_fallback(self, mock_orchestrator):
         fake_executor = MagicMock(name="legacy_executor")
 
-        with patch(
-            "victor.agent.services.orchestrator_protocol_adapter.OrchestratorProtocolAdapter",
-            return_value=MagicMock(name="adapter"),
-        ), patch(
-            "victor.agent.services.turn_execution_runtime.TurnExecutor",
-            return_value=fake_executor,
+        with (
+            patch(
+                "victor.agent.services.orchestrator_protocol_adapter.OrchestratorProtocolAdapter",
+                return_value=MagicMock(name="adapter"),
+            ),
+            patch(
+                "victor.agent.services.turn_execution_runtime.TurnExecutor",
+                return_value=fake_executor,
+            ),
         ):
             coordinator = _make_deprecated_chat_coordinator(mock_orchestrator)
 
@@ -373,5 +377,7 @@ class TestStreamingShimBehavior:
             results = [c async for c in coordinator.stream_chat("hello")]
 
         assert results == []
-        deprecation_messages = [str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)]
+        deprecation_messages = [
+            str(w.message) for w in caught if issubclass(w.category, DeprecationWarning)
+        ]
         assert any("_stream_chat_runtime" in m for m in deprecation_messages)

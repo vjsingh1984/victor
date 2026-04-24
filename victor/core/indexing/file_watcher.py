@@ -164,9 +164,7 @@ class FileWatcherService:
             callback: Function to call on file changes (can be sync or async)
         """
         self._subscribers.add(callback)
-        logger.info(
-            f"[FileWatcher] Subscriber added (total: {len(self._subscribers)})"
-        )
+        logger.info(f"[FileWatcher] Subscriber added (total: {len(self._subscribers)})")
 
     def unsubscribe(
         self,
@@ -178,9 +176,7 @@ class FileWatcherService:
             callback: Previously subscribed callback
         """
         self._subscribers.discard(callback)
-        logger.info(
-            f"[FileWatcher] Subscriber removed (total: {len(self._subscribers)})"
-        )
+        logger.info(f"[FileWatcher] Subscriber removed (total: {len(self._subscribers)})")
 
     async def start(self) -> None:
         """Start watching file system for changes."""
@@ -193,9 +189,7 @@ class FileWatcherService:
         # Initial scan
         self._file_mtimes = await self._scan_directory()
         self._stats["files_watched"] = len(self._file_mtimes)
-        logger.info(
-            f"[FileWatcher] Initial scan: {len(self._file_mtimes)} files in {self.root}"
-        )
+        logger.info(f"[FileWatcher] Initial scan: {len(self._file_mtimes)} files in {self.root}")
 
         # Start polling loop
         self._task = asyncio.create_task(self._poll_loop())
@@ -242,9 +236,7 @@ class FileWatcherService:
                         if self._debounce_task:
                             self._debounce_task.cancel()
 
-                        self._debounce_task = asyncio.create_task(
-                            self._debounce_and_publish()
-                        )
+                        self._debounce_task = asyncio.create_task(self._debounce_and_publish())
 
                 await asyncio.sleep(self.poll_interval)
 
@@ -319,9 +311,7 @@ class FileWatcherService:
         debounced_count = len(changes_to_publish)
         if debounced_count > 0:
             self._stats["events_debounced"] += debounced_count
-            logger.debug(
-                f"[FileWatcher] Published {debounced_count} debounced events"
-            )
+            logger.debug(f"[FileWatcher] Published {debounced_count} debounced events")
 
     async def _publish_event(self, event: FileChangeEvent) -> None:
         """Publish event to all subscribers.
@@ -367,9 +357,7 @@ class FileWatcherService:
                     mtime = file_path.stat().st_mtime
                     mtimes[str(file_path)] = mtime
                 except Exception as e:
-                    logger.warning(
-                        f"[FileWatcher] Error getting mtime for {file_path}: {e}"
-                    )
+                    logger.warning(f"[FileWatcher] Error getting mtime for {file_path}: {e}")
         except Exception as e:
             logger.error(f"[FileWatcher] Error scanning directory {self.root}: {e}")
 
@@ -518,7 +506,6 @@ class FileWatcherRegistry:
         return {
             "total_watchers": len(self._watchers),
             "watcher_details": {
-                root: watcher.get_stats()
-                for root, watcher in self._watchers.items()
+                root: watcher.get_stats() for root, watcher in self._watchers.items()
             },
         }

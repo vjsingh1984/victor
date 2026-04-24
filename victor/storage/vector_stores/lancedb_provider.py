@@ -137,11 +137,13 @@ class LanceDBProvider(BaseEmbeddingProvider):
             # Create empty table with schema
             # We'll add data later when indexing
             import logging
+
             logger = logging.getLogger(__name__)
             logger.info(f"Creating new LanceDB table: {table_name}")
         else:
             self.table = self.db.open_table(table_name)
             import logging
+
             logger = logging.getLogger(__name__)
             logger.debug(f"Opened existing LanceDB table: {table_name}")
 

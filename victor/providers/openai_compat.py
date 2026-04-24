@@ -321,11 +321,13 @@ def build_openai_messages(messages: List[Message]) -> List[Dict[str, Any]]:
                         tc_args = tc.get("arguments", {})
                         if isinstance(tc_args, dict):
                             tc_args = json.dumps(tc_args)
-                        openai_tcs.append({
-                            "id": tc_id,
-                            "type": "function",
-                            "function": {"name": tc_name, "arguments": tc_args},
-                        })
+                        openai_tcs.append(
+                            {
+                                "id": tc_id,
+                                "type": "function",
+                                "function": {"name": tc_name, "arguments": tc_args},
+                            }
+                        )
                         valid_tool_call_ids.add(tc_id)
                 if openai_tcs:
                     entry["tool_calls"] = openai_tcs

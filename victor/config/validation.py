@@ -25,6 +25,7 @@ from enum import Enum
 
 class ValidationSeverity(Enum):
     """Severity level for validation issues."""
+
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
@@ -76,13 +77,15 @@ class ConfigValidationResult:
         setting_path: Optional[str] = None,
     ) -> None:
         """Add an error to the validation result."""
-        self.errors.append(ValidationIssue(
-            category=category,
-            severity=ValidationSeverity.ERROR,
-            message=message,
-            suggestion=suggestion,
-            setting_path=setting_path,
-        ))
+        self.errors.append(
+            ValidationIssue(
+                category=category,
+                severity=ValidationSeverity.ERROR,
+                message=message,
+                suggestion=suggestion,
+                setting_path=setting_path,
+            )
+        )
 
     def add_warning(
         self,
@@ -92,13 +95,15 @@ class ConfigValidationResult:
         setting_path: Optional[str] = None,
     ) -> None:
         """Add a warning to the validation result."""
-        self.warnings.append(ValidationIssue(
-            category=category,
-            severity=ValidationSeverity.WARNING,
-            message=message,
-            suggestion=suggestion,
-            setting_path=setting_path,
-        ))
+        self.warnings.append(
+            ValidationIssue(
+                category=category,
+                severity=ValidationSeverity.WARNING,
+                message=message,
+                suggestion=suggestion,
+                setting_path=setting_path,
+            )
+        )
 
     def add_info(
         self,
@@ -108,13 +113,15 @@ class ConfigValidationResult:
         setting_path: Optional[str] = None,
     ) -> None:
         """Add an info message to the validation result."""
-        self.info.append(ValidationIssue(
-            category=category,
-            severity=ValidationSeverity.INFO,
-            message=message,
-            suggestion=suggestion,
-            setting_path=setting_path,
-        ))
+        self.info.append(
+            ValidationIssue(
+                category=category,
+                severity=ValidationSeverity.INFO,
+                message=message,
+                suggestion=suggestion,
+                setting_path=setting_path,
+            )
+        )
 
     def is_valid(self) -> bool:
         """Check if configuration is valid (no errors).
@@ -244,10 +251,23 @@ class ConfigValidator:
         """
         # Check if default_provider is known
         known_providers = [
-            "ollama", "anthropic", "openai", "google", "cohere",
-            "groq", "deepseek", "openrouter", "zhipu", "mistral",
-            "azure", "aws", "lambdalabs", "replicate", "together",
-            "xai", "wangrui"
+            "ollama",
+            "anthropic",
+            "openai",
+            "google",
+            "cohere",
+            "groq",
+            "deepseek",
+            "openrouter",
+            "zhipu",
+            "mistral",
+            "azure",
+            "aws",
+            "lambdalabs",
+            "replicate",
+            "together",
+            "xai",
+            "wangrui",
         ]
 
         if settings.provider and settings.provider.default_provider:
@@ -278,7 +298,9 @@ class ConfigValidator:
                 # Check for API key in flat fields
                 key_field = f"{provider}_api_key"
                 api_key = getattr(settings, key_field, None)
-                if api_key is None or (hasattr(api_key, 'get_secret_value') and not api_key.get_secret_value()):
+                if api_key is None or (
+                    hasattr(api_key, "get_secret_value") and not api_key.get_secret_value()
+                ):
                     result.add_error(
                         category="api_key",
                         message=f"API key not set for provider '{provider}'",
@@ -294,7 +316,7 @@ class ConfigValidator:
             result: Validation result to add issues to
         """
         # Check if profile exists
-        if hasattr(settings, 'profile'):
+        if hasattr(settings, "profile"):
             profile = settings.profile
             # Profile validation would go here
             # For now, just add info about which profile is active
@@ -315,7 +337,7 @@ class ConfigValidator:
         # Check common paths
         paths_to_check = []
 
-        if hasattr(settings, 'codebase_persist_directory'):
+        if hasattr(settings, "codebase_persist_directory"):
             path = settings.codebase_persist_directory
             if path:
                 paths_to_check.append(("codebase_persist_directory", path))
@@ -363,5 +385,3 @@ def format_validation_result(result: ConfigValidationResult) -> str:
         Formatted string for display
     """
     return result.format_for_display()
-
-

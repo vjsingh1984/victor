@@ -183,9 +183,7 @@ class CoordinatorFactory:
                 "CoordinatorFactory: Failed to create ExplorationStatePassedCoordinator: %s",
                 e,
             )
-            raise RuntimeError(
-                f"Failed to create ExplorationStatePassedCoordinator: {e}"
-            ) from e
+            raise RuntimeError(f"Failed to create ExplorationStatePassedCoordinator: {e}") from e
 
     def create_system_prompt_coordinator(
         self,
@@ -259,9 +257,7 @@ class CoordinatorFactory:
                 "CoordinatorFactory: Failed to create SystemPromptStatePassedCoordinator: %s",
                 e,
             )
-            raise RuntimeError(
-                f"Failed to create SystemPromptStatePassedCoordinator: {e}"
-            ) from e
+            raise RuntimeError(f"Failed to create SystemPromptStatePassedCoordinator: {e}") from e
 
     def create_metrics_coordinator(self) -> Any:
         """

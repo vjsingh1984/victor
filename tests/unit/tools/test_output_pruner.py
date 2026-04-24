@@ -361,7 +361,7 @@ class TestFormattedOutputPruning:
         formatted = (
             '<TOOL_OUTPUT tool="read" path="artifacts/test.log">\n'
             "Traceback (most recent call last):\n"
-            "  File \"runner.py\", line 10, in <module>\n"
+            '  File "runner.py", line 10, in <module>\n'
             "AssertionError: expected 1 == 2\n"
             "</TOOL_OUTPUT>"
         )

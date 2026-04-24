@@ -116,9 +116,7 @@ class FileLock:
                 # Write PID to lock file for debugging
                 os.write(self._lock_fd, str(current_pid).encode())
 
-                logger.debug(
-                    f"[FileLock] Acquired lock {self.lock_file} (PID: {current_pid})"
-                )
+                logger.debug(f"[FileLock] Acquired lock {self.lock_file} (PID: {current_pid})")
                 return True
 
             except IOError as e:
@@ -126,9 +124,7 @@ class FileLock:
                 if e.errno == errno.EWOULDBLOCK:
                     # Check timeout
                     if time.time() - start_time >= timeout:
-                        logger.warning(
-                            f"[FileLock] Timeout waiting for lock {self.lock_file}"
-                        )
+                        logger.warning(f"[FileLock] Timeout waiting for lock {self.lock_file}")
                         if self._lock_fd is not None:
                             os.close(self._lock_fd)
                             self._lock_fd = None
@@ -286,9 +282,7 @@ class IndexLockRegistry:
                     )
 
                 self._file_locks[path_str] = file_lock
-                logger.info(
-                    f"[IndexLockRegistry] Acquired cross-process lock for {path_str}"
-                )
+                logger.info(f"[IndexLockRegistry] Acquired cross-process lock for {path_str}")
 
             # Create new in-process lock
             self._path_locks[path_str] = asyncio.Lock()
@@ -339,8 +333,7 @@ class IndexLockRegistry:
             idle_paths = [
                 path_str
                 for path_str, stats in self._lock_stats.items()
-                if current_time - stats.get("last_used", stats["created_at"])
-                > max_idle_seconds
+                if current_time - stats.get("last_used", stats["created_at"]) > max_idle_seconds
             ]
 
             # Remove idle locks

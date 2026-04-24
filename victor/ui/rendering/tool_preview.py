@@ -74,6 +74,7 @@ def _first_lines(text: str, n: int, max_width: int = 120) -> List[str]:
 # Strategy base and concrete implementations
 # ---------------------------------------------------------------------------
 
+
 class _ToolPreviewStrategy(ABC):
     @abstractmethod
     def render(
@@ -102,7 +103,9 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                 )
             )
             # Skip the --- / +++ header lines for compactness
-            content_lines = [l for l in diff_lines if not l.startswith("---") and not l.startswith("+++")]
+            content_lines = [
+                l for l in diff_lines if not l.startswith("---") and not l.startswith("+++")
+            ]
             added = sum(1 for l in content_lines if l.startswith("+"))
             removed = sum(1 for l in content_lines if l.startswith("-"))
             header = f"+{added} -{removed} lines"
@@ -119,9 +122,7 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
         if isinstance(parsed, dict):
             applied = parsed.get("operations_applied", parsed.get("ops_applied", "?"))
             file_path = (
-                arguments.get("file_path")
-                or arguments.get("path")
-                or parsed.get("file_path", "")
+                arguments.get("file_path") or arguments.get("path") or parsed.get("file_path", "")
             )
             summary = f"{applied} operation(s) applied"
             if file_path:
@@ -139,7 +140,9 @@ class _WritePreviewStrategy(_ToolPreviewStrategy):
         file_path = arguments.get("file_path") or arguments.get("path", "")
         if content:
             line_count = content.count("\n") + 1
-            header = f"{line_count} lines → {file_path}" if file_path else f"{line_count} lines written"
+            header = (
+                f"{line_count} lines → {file_path}" if file_path else f"{line_count} lines written"
+            )
             preview = _first_lines(content, max_lines)
             return RenderedPreview(
                 lines=preview,
@@ -234,9 +237,7 @@ class _SearchPreviewStrategy(_ToolPreviewStrategy):
                 count = len(matches)
                 header = f"{count} match{'es' if count != 1 else ''}"
                 visible_items = [str(m) for m in matches[:max_lines]]
-                return RenderedPreview(
-                    lines=visible_items, header=header, total_line_count=count
-                )
+                return RenderedPreview(lines=visible_items, header=header, total_line_count=count)
 
         # Plain text result (grep-style: file:line:content)
         lines = [l for l in raw_result.splitlines() if l.strip()]
@@ -331,11 +332,24 @@ def _ext_hint(path: str) -> str:
         return "text"
     ext = path.rsplit(".", 1)[-1].lower()
     _EXT_TO_LEXER = {
-        "py": "python", "js": "javascript", "ts": "typescript",
-        "json": "json", "yaml": "yaml", "yml": "yaml",
-        "sh": "bash", "bash": "bash", "md": "markdown",
-        "toml": "toml", "sql": "sql", "html": "html", "css": "css",
-        "rs": "rust", "go": "go", "java": "java", "cpp": "cpp", "c": "c",
+        "py": "python",
+        "js": "javascript",
+        "ts": "typescript",
+        "json": "json",
+        "yaml": "yaml",
+        "yml": "yaml",
+        "sh": "bash",
+        "bash": "bash",
+        "md": "markdown",
+        "toml": "toml",
+        "sql": "sql",
+        "html": "html",
+        "css": "css",
+        "rs": "rust",
+        "go": "go",
+        "java": "java",
+        "cpp": "cpp",
+        "c": "c",
     }
     return _EXT_TO_LEXER.get(ext, "text")
 
@@ -366,7 +380,9 @@ class ToolPreviewRenderer:
         try:
             return strategy.render(tool_name, arguments, raw_result, max_lines)
         except Exception as exc:
-            logger.debug("ToolPreviewRenderer: strategy %s failed: %s", type(strategy).__name__, exc)
+            logger.debug(
+                "ToolPreviewRenderer: strategy %s failed: %s", type(strategy).__name__, exc
+            )
             return _GENERIC.render(tool_name, arguments, raw_result, max_lines)
 
 

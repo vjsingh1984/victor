@@ -1252,14 +1252,16 @@ class ContextCompactor:
         if self._adaptive_enabled and self._adaptive_threshold:
             analysis = self._adaptive_threshold.get_current_analysis()
             if analysis:
-                stats.update({
-                    "adaptive_pattern": analysis.pattern.value,
-                    "adaptive_confidence": analysis.confidence,
-                    "adaptive_topic_coherence": analysis.topic_coherence,
-                    "adaptive_context_dependency": analysis.context_dependency,
-                    "adaptive_threshold": analysis.recommended_threshold,
-                    "adaptive_reasoning": analysis.reasoning,
-                })
+                stats.update(
+                    {
+                        "adaptive_pattern": analysis.pattern.value,
+                        "adaptive_confidence": analysis.confidence,
+                        "adaptive_topic_coherence": analysis.topic_coherence,
+                        "adaptive_context_dependency": analysis.context_dependency,
+                        "adaptive_threshold": analysis.recommended_threshold,
+                        "adaptive_reasoning": analysis.reasoning,
+                    }
+                )
 
         return stats
 
@@ -1296,6 +1298,7 @@ class ContextCompactor:
         global AdaptiveCompactionThreshold
         if AdaptiveCompactionThreshold is None:
             from victor.agent.adaptive_compaction import AdaptiveCompactionThreshold as ACT
+
             AdaptiveCompactionThreshold = ACT
 
         self._adaptive_threshold = adaptive_threshold
@@ -1367,11 +1370,9 @@ class ContextCompactor:
         """
         import asyncio
 
-        # Get messages for adaptive threshold
-        messages = None
         if self._adaptive_enabled:
             try:
-                messages = self.controller.get_messages()
+                self.controller.get_messages()
             except Exception as e:
                 logger.debug(f"Could not get messages for adaptive threshold: {e}")
 

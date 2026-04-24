@@ -398,11 +398,7 @@ class EnhancedCompletionEvaluator:
                 )
 
             # Detect final answers
-            if (
-                not turn.has_tool_calls
-                and turn.has_content
-                and len(turn.response.strip()) > 100
-            ):
+            if not turn.has_tool_calls and turn.has_content and len(turn.response.strip()) > 100:
                 return EvaluationResult(
                     decision=EvaluationDecision.COMPLETE,
                     score=0.8,

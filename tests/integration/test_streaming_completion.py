@@ -39,6 +39,7 @@ class TestStreamingCompletion:
 
         Expected: All content including final response is rendered.
         """
+
         # Mock provider that sends tool calls then content
         async def mock_provider_stream(*args, **kwargs):
             # First chunk: tool call
@@ -82,7 +83,7 @@ class TestStreamingCompletion:
             if chunk.tool_calls:
                 tool_calls = chunk.tool_calls
 
-            if getattr(chunk, 'is_final', False):
+            if getattr(chunk, "is_final", False):
                 break
 
         # Verify: Content after tool calls was accumulated
@@ -133,6 +134,7 @@ class TestStreamingCompletion:
 
         Expected: All chunks are accumulated and rendered.
         """
+
         # Mock provider
         async def mock_provider_stream(*args, **kwargs):
             # Tool call chunk

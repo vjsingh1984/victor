@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
@@ -48,6 +49,8 @@ from textual.widgets import (
 )
 from textual.reactive import reactive
 from textual import work
+
+logger = logging.getLogger(__name__)
 
 
 class EventStats(Static):

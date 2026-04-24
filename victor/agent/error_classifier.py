@@ -100,64 +100,52 @@ class ToolErrorClassifier:
         re.compile(r"directory not empty\b", re.IGNORECASE),
         re.compile(r"File exists:?\s*.+?", re.IGNORECASE),
         re.compile(r"read-only file system", re.IGNORECASE),
-
         # Permission errors
         re.compile(r"Permission denied:?\s*.+?", re.IGNORECASE),
         re.compile(r"PermissionError:?\s*.+?", re.IGNORECASE),
         re.compile(r"\[Errno 13\]\s*Permission denied", re.IGNORECASE),
         re.compile(r"Access denied\b", re.IGNORECASE),
         re.compile(r"403\b.*?Forbidden", re.IGNORECASE),  # HTTP 403 Forbidden
-
         # Module/import errors
         re.compile(r"ModuleNotFoundError:?\s*No module named\s+[\'\"].*?[\'\"]", re.IGNORECASE),
         re.compile(r"ImportError:?\s*No module named\s+[\'\"].*?[\'\"]", re.IGNORECASE),
         re.compile(r"cannot import name\s+[\'\"].*?[\'\"]\s+from\s+[\'\"].*?[\'\"]", re.IGNORECASE),
-
         # Command errors
         re.compile(r"command not found:?\s*\S+", re.IGNORECASE),
         re.compile(r"executable not found:?\s*\S+", re.IGNORECASE),
         re.compile(r"\[Errno 8\]\s*Exec format error", re.IGNORECASE),
-
         # Syntax errors (permanent without code changes)
         re.compile(r"SyntaxError:?\s*.+?", re.IGNORECASE),
         re.compile(r"IndentationError:?\s*.+?", re.IGNORECASE),
-
         # Type/conversion errors
         re.compile(r"TypeError:?\s*.+?", re.IGNORECASE),
         re.compile(r"ValueError:?\s*.+?", re.IGNORECASE),
-
         # Configuration errors
         re.compile(r"ConfigurationError:?\s*.+?", re.IGNORECASE),
         re.compile(r"ValidationError:?\s*.+?", re.IGNORECASE),
-
         # Docker/container errors
         re.compile(r"No such container\b", re.IGNORECASE),
         re.compile(r"No such image\b", re.IGNORECASE),
         re.compile(r"Container .*? not found\b", re.IGNORECASE),
-
         # Git errors
         re.compile(r"pathspec .*? did not match any file", re.IGNORECASE),
-
-
         # Edge case: errno names not found
         re.compile(r"\[Errno -2\]\s*No such file or directory", re.IGNORECASE),
         re.compile(r"getaddrinfo failed:?\s*Name or service not known", re.IGNORECASE),
         re.compile(r"nodename nor servname provided", re.IGNORECASE),
-
         # Edge case: SSL/TLS certificate errors
         re.compile(r"SSL: CERTIFICATE_VERIFY_FAILED", re.IGNORECASE),
         re.compile(r"certificate verify failed", re.IGNORECASE),
         re.compile(r"SSL: WRONG_VERSION_NUMBER", re.IGNORECASE),
         re.compile(r"TLS: wrong version number", re.IGNORECASE),
         re.compile(r"handshake failure", re.IGNORECASE),
-
         # Edge case: Windows-specific errors
         re.compile(r"\[WinError \d+\]", re.IGNORECASE),
         re.compile(r"\[Error \d+\]", re.IGNORECASE),
     )
-        # Edge case: ECONNREFUSED (errno name not found) - TRANSIENT not permanent
-        # These are in TRANSIENT_PATTERNS below
-        # Edge case: SSL/TLS certificate errors
+    # Edge case: ECONNREFUSED (errno name not found) - TRANSIENT not permanent
+    # These are in TRANSIENT_PATTERNS below
+    # Edge case: SSL/TLS certificate errors
 
     # Compiled regex patterns for transient errors
     # These errors might succeed later (network issues, rate limits, etc.)
@@ -169,7 +157,6 @@ class ToolErrorClassifier:
         re.compile(r"Network is unreachable\b", re.IGNORECASE),
         re.compile(r"Host unreachable\b", re.IGNORECASE),
         re.compile(r"No route to host\b", re.IGNORECASE),
-
         # HTTP errors
         re.compile(r"rate limit(?:ed)?\b", re.IGNORECASE),
         re.compile(r"too many requests\b", re.IGNORECASE),
@@ -182,23 +169,19 @@ class ToolErrorClassifier:
         re.compile(r"Gateway Timeout\b", re.IGNORECASE),
         re.compile(r"Bad Gateway\b", re.IGNORECASE),
         re.compile(r"Internal Server Error\b", re.IGNORECASE),
-
         # Timeout errors
         re.compile(r"Request timed out\b", re.IGNORECASE),
         re.compile(r"Timeout exceeded\b", re.IGNORECASE),
         re.compile(r"timed out\b", re.IGNORECASE),
         re.compile(r"Network timeout\b", re.IGNORECASE),
         re.compile(r"timeout while connecting\b", re.IGNORECASE),
-
         # Temporary errors
         re.compile(r"temporary fail(?:ure|ed)?\b", re.IGNORECASE),
         re.compile(r"try again later\b", re.IGNORECASE),
         re.compile(r"temporarily unavailable\b", re.IGNORECASE),
-
         # SSL/TLS errors
         re.compile(r"SSL:?\s*.*?certificate verify failed", re.IGNORECASE),
         re.compile(r"TLS:?\s*.*?handshake failure", re.IGNORECASE),
-
         # Edge case: errno names not found (but still TRANSIENT)
         re.compile(r"\[Errno 111\]\s*Connection refused", re.IGNORECASE),
         re.compile(r"\[Errno 61\]\s*Connection refused", re.IGNORECASE),

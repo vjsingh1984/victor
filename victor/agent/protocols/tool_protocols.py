@@ -449,9 +449,7 @@ class ToolDependencyGraphProtocol(Protocol):
         """
         ...
 
-    def predict_next(
-        self, current_tool: str, task_type: str, top_k: int = 3
-    ) -> List[tuple]:
+    def predict_next(self, current_tool: str, task_type: str, top_k: int = 3) -> List[tuple]:
         """Predict the most likely next tools from transition history.
 
         Args:

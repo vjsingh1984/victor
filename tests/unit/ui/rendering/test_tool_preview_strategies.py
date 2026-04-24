@@ -22,10 +22,10 @@ from victor.ui.rendering.tool_preview import (
     renderer,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _shell_repr(stdout: str = "", stderr: str = "", rc: int = 0) -> str:
     """Return a Python repr string matching the real shell tool output format."""
@@ -41,6 +41,7 @@ def _ls_repr(names: list[str]) -> str:
 # TestRenderedPreview
 # ---------------------------------------------------------------------------
 
+
 class TestRenderedPreview:
     def test_defaults(self):
         p = RenderedPreview()
@@ -50,7 +51,9 @@ class TestRenderedPreview:
         assert p.syntax_hint == "text"
 
     def test_explicit_values(self):
-        p = RenderedPreview(lines=["a", "b"], header="hdr", total_line_count=10, syntax_hint="python")
+        p = RenderedPreview(
+            lines=["a", "b"], header="hdr", total_line_count=10, syntax_hint="python"
+        )
         assert p.lines == ["a", "b"]
         assert p.header == "hdr"
         assert p.total_line_count == 10
@@ -60,6 +63,7 @@ class TestRenderedPreview:
 # ---------------------------------------------------------------------------
 # TestDiffPreviewStrategy
 # ---------------------------------------------------------------------------
+
 
 class TestDiffPreviewStrategy:
     strategy = _DiffPreviewStrategy()
@@ -114,6 +118,7 @@ class TestDiffPreviewStrategy:
 # TestWritePreviewStrategy
 # ---------------------------------------------------------------------------
 
+
 class TestWritePreviewStrategy:
     strategy = _WritePreviewStrategy()
 
@@ -165,6 +170,7 @@ class TestWritePreviewStrategy:
 # TestReadPreviewStrategy
 # ---------------------------------------------------------------------------
 
+
 class TestReadPreviewStrategy:
     strategy = _ReadPreviewStrategy()
 
@@ -208,6 +214,7 @@ class TestReadPreviewStrategy:
 # ---------------------------------------------------------------------------
 # TestShellPreviewStrategy
 # ---------------------------------------------------------------------------
+
 
 class TestShellPreviewStrategy:
     strategy = _ShellPreviewStrategy()
@@ -259,6 +266,7 @@ class TestShellPreviewStrategy:
 # TestSearchPreviewStrategy
 # ---------------------------------------------------------------------------
 
+
 class TestSearchPreviewStrategy:
     strategy = _SearchPreviewStrategy()
 
@@ -294,6 +302,7 @@ class TestSearchPreviewStrategy:
 # ---------------------------------------------------------------------------
 # TestDirectoryPreviewStrategy
 # ---------------------------------------------------------------------------
+
 
 class TestDirectoryPreviewStrategy:
     strategy = _DirectoryPreviewStrategy()
@@ -331,6 +340,7 @@ class TestDirectoryPreviewStrategy:
 # TestGenericPreviewStrategy
 # ---------------------------------------------------------------------------
 
+
 class TestGenericPreviewStrategy:
     strategy = _GenericPreviewStrategy()
 
@@ -366,6 +376,7 @@ class TestGenericPreviewStrategy:
 # TestToolPreviewRenderer
 # ---------------------------------------------------------------------------
 
+
 class TestToolPreviewRenderer:
     def test_dispatch_edit_to_diff_strategy(self):
         r = ToolPreviewRenderer()
@@ -395,7 +406,9 @@ class TestToolPreviewRenderer:
     def test_custom_strategy_registration(self):
         r = ToolPreviewRenderer()
         mock_strategy = MagicMock()
-        mock_strategy.render.return_value = RenderedPreview(lines=["custom"], header="custom header")
+        mock_strategy.render.return_value = RenderedPreview(
+            lines=["custom"], header="custom header"
+        )
         r.register("my_custom_tool", mock_strategy)
         p = r.render("my_custom_tool", {}, "raw", max_lines=3)
         assert p.header == "custom header"
@@ -427,4 +440,6 @@ class TestToolPreviewRenderer:
         r = ToolPreviewRenderer()
         for tool_name in r._strategies:
             p = r.render(tool_name, {}, "sample output", max_lines=3)
-            assert isinstance(p, RenderedPreview), f"Strategy for {tool_name!r} returned non-RenderedPreview"
+            assert isinstance(
+                p, RenderedPreview
+            ), f"Strategy for {tool_name!r} returned non-RenderedPreview"

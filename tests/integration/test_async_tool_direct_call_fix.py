@@ -148,7 +148,9 @@ class TestAsyncToolDirectCall:
 
         # The result should be the actual return value, NOT a stringified coroutine
         assert result == "This is the actual result"
-        assert not result.startswith("<coroutine object"), "Result should not be stringified coroutine"
+        assert not result.startswith(
+            "<coroutine object"
+        ), "Result should not be stringified coroutine"
 
         # Stringified coroutine would be ~75 chars like "<coroutine object async_tool at 0x...>"
         assert len(result) > 75 or len(result) < 50, "Result length doesn't match coroutine pattern"

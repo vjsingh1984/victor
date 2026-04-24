@@ -285,10 +285,15 @@ def onboarding_command(
 # Backward Compatibility Aliases
 # =============================================================================
 
+
 @app.command("profile")
 def profile_alias(
-    verb: str = typer.Argument(..., help="Subcommand (list, show, apply, current, create, edit, delete, set-default)"),
-    args: Optional[list[str]] = typer.Argument(None, help="Additional arguments for the subcommand"),
+    verb: str = typer.Argument(
+        ..., help="Subcommand (list, show, apply, current, create, edit, delete, set-default)"
+    ),
+    args: Optional[list[str]] = typer.Argument(
+        None, help="Additional arguments for the subcommand"
+    ),
 ) -> None:
     """Backward-compatible alias for 'victor profiles' commands.
 

@@ -278,9 +278,7 @@ class DebugLogger:
             return f"[{items_preview}{more}]"
         elif isinstance(value, dict):
             # Show first few keys
-            items_preview = ", ".join(
-                f"{k!r}: {repr(v)[:50]}" for k, v in list(value.items())[:2]
-            )
+            items_preview = ", ".join(f"{k!r}: {repr(v)[:50]}" for k, v in list(value.items())[:2])
             more = f", ... (+{len(value)-2} more)" if len(value) > 2 else ""
             return f"{{{items_preview}{more}}}"
         else:

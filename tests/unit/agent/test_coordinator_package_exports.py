@@ -40,8 +40,7 @@ def test_specialized_chat_package_exports_warn():
     with pytest.warns(
         DeprecationWarning,
         match=(
-            "victor.agent.coordinators.SyncChatCoordinator is deprecated "
-            "compatibility surface"
+            "victor.agent.coordinators.SyncChatCoordinator is deprecated " "compatibility surface"
         ),
     ):
         from victor.agent.coordinators import SyncChatCoordinator as package_sync_chat_coordinator
@@ -85,8 +84,7 @@ def test_chat_protocol_package_exports_warn():
     with pytest.warns(
         DeprecationWarning,
         match=(
-            "victor.agent.coordinators.ChatContextProtocol is deprecated "
-            "compatibility surface"
+            "victor.agent.coordinators.ChatContextProtocol is deprecated " "compatibility surface"
         ),
     ):
         from victor.agent.coordinators import ChatContextProtocol as package_chat_context_protocol
@@ -116,8 +114,7 @@ def test_chat_protocol_package_exports_warn():
     with pytest.warns(
         DeprecationWarning,
         match=(
-            "victor.agent.coordinators.ToolContextProtocol is deprecated "
-            "compatibility surface"
+            "victor.agent.coordinators.ToolContextProtocol is deprecated " "compatibility surface"
         ),
     ):
         from victor.agent.coordinators import ToolContextProtocol as package_tool_context_protocol

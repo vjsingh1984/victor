@@ -387,9 +387,7 @@ class ChatCoordinator(ChatStreamHelperMixin):
 
         return response
 
-    async def stream_chat(
-        self, user_message: str, **kwargs: Any
-    ) -> AsyncIterator[StreamChunk]:
+    async def stream_chat(self, user_message: str, **kwargs: Any) -> AsyncIterator[StreamChunk]:
         """Stream a chat response (public entrypoint).
 
         Delegates to the canonical StreamingChatPipeline that coordinates the

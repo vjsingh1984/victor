@@ -244,6 +244,7 @@ class ConversationStore:
         # Run database migrations first (before schema version check)
         try:
             from victor.agent.conversation.migrations import migrate_database
+
             migrate_database(str(self.db_path))
             logger.debug(f"Database migrations completed for {self.db_path}")
         except Exception as e:
@@ -262,6 +263,7 @@ class ConversationStore:
 
             # Create schema version tracking table (stores semver strings)
             from victor.agent.conversation.migrations import ensure_schema_version_table
+
             ensure_schema_version_table(conn)
 
             # Check if current schema version is applied

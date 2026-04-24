@@ -422,9 +422,7 @@ class TestOrchestrationFacadeProperties:
             DeprecationWarning,
             match="OrchestrationFacade\\(unified_chat_coordinator=...\\) is deprecated",
         ):
-            facade = OrchestrationFacade(
-                unified_chat_coordinator=MagicMock(name="unified")
-            )
+            facade = OrchestrationFacade(unified_chat_coordinator=MagicMock(name="unified"))
 
         with pytest.warns(
             DeprecationWarning,

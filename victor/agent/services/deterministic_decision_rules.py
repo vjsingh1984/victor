@@ -935,7 +935,9 @@ class EnsembleVoter:
                 # If model_copy fails, just use the original decision
                 pass
 
-        agree_label = f"{agreement_count}/{len(votes)} signals agree" if agreement_count > 1 else "1 signal"
+        agree_label = (
+            f"{agreement_count}/{len(votes)} signals agree" if agreement_count > 1 else "1 signal"
+        )
         return LookupResult(
             decision=decision,
             confidence=boosted_confidence,

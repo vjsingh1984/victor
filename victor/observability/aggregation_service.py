@@ -144,7 +144,9 @@ class AggregationService:
         Returns:
             Dict with time-series metrics
         """
-        cache_key = self._get_cache_key("metrics_history", time_window=time_window, bucket_size=bucket_size)
+        cache_key = self._get_cache_key(
+            "metrics_history", time_window=time_window, bucket_size=bucket_size
+        )
         cached = self._get_cached(cache_key)
         if cached:
             return cached
@@ -192,7 +194,9 @@ class AggregationService:
         for event in events:
             # Find bucket
             event_time = event.datetime
-            bucket_idx = int((event_time - start_time).total_seconds() / bucket_delta.total_seconds())
+            bucket_idx = int(
+                (event_time - start_time).total_seconds() / bucket_delta.total_seconds()
+            )
             bucket_keys = list(buckets.keys())
             if 0 <= bucket_idx < len(bucket_keys):
                 bucket_key = bucket_keys[bucket_idx]
@@ -278,15 +282,21 @@ class AggregationService:
         tools = []
         for tool_name, stats in sorted(tool_stats.items()):
             durations = stats["durations"]
-            tools.append({
-                "tool_name": tool_name,
-                "total_calls": stats["total_calls"],
-                "success_rate": stats["successful_calls"] / stats["total_calls"] if stats["total_calls"] > 0 else 0,
-                "avg_duration_ms": statistics.mean(durations) if durations else None,
-                "p50_duration_ms": percentile(durations, 0.50),
-                "p95_duration_ms": percentile(durations, 0.95),
-                "p99_duration_ms": percentile(durations, 0.99),
-            })
+            tools.append(
+                {
+                    "tool_name": tool_name,
+                    "total_calls": stats["total_calls"],
+                    "success_rate": (
+                        stats["successful_calls"] / stats["total_calls"]
+                        if stats["total_calls"] > 0
+                        else 0
+                    ),
+                    "avg_duration_ms": statistics.mean(durations) if durations else None,
+                    "p50_duration_ms": percentile(durations, 0.50),
+                    "p95_duration_ms": percentile(durations, 0.95),
+                    "p99_duration_ms": percentile(durations, 0.99),
+                }
+            )
 
         response = {"tools": tools}
         self._set_cache(cache_key, response)

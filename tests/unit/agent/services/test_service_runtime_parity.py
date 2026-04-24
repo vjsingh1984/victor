@@ -39,7 +39,9 @@ async def test_tool_service_execute_tool_with_retry_uses_bound_retry_executor():
 async def test_tool_service_execute_tool_with_retry_uses_service_owned_retry_runtime():
     service = _make_tool_service()
     pipeline = MagicMock()
-    pipeline._execute_single_tool = AsyncMock(return_value=SimpleNamespace(success=True, error=None))
+    pipeline._execute_single_tool = AsyncMock(
+        return_value=SimpleNamespace(success=True, error=None)
+    )
 
     service.bind_runtime_components(tool_pipeline=pipeline)
 
@@ -60,7 +62,7 @@ def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
     service.bind_runtime_components(tool_call_parser=parser)
     service.set_enabled_tools({"read"})
 
-    tool_call = SimpleNamespace(to_dict=lambda: {"name": "read", "arguments": "{\"path\": \"a.py\"}"})
+    tool_call = SimpleNamespace(to_dict=lambda: {"name": "read", "arguments": '{"path": "a.py"}'})
     parse_result = SimpleNamespace(
         tool_calls=[tool_call],
         warnings=[],
@@ -77,7 +79,9 @@ def test_tool_service_parse_and_validate_tool_calls_matches_runtime_contract():
 
 def test_tool_service_validate_tool_call_matches_legacy_contract():
     service = _make_tool_service()
-    service.bind_runtime_components(tool_registry=SimpleNamespace(get_registered_tools=lambda: {"read"}))
+    service.bind_runtime_components(
+        tool_registry=SimpleNamespace(get_registered_tools=lambda: {"read"})
+    )
     sanitizer = SimpleNamespace(is_valid_tool_name=lambda name: name == "read")
 
     validation = service.validate_tool_call({"name": "read", "arguments": {}}, sanitizer)

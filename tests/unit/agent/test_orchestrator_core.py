@@ -95,9 +95,7 @@ def orchestrator(mock_provider, orchestrator_settings):
     mock_provider_svc.switch_provider = AsyncMock(
         side_effect=ProviderNotFoundError("not configured")
     )
-    mock_provider_svc.switch_model = AsyncMock(
-        side_effect=ProviderNotFoundError("not configured")
-    )
+    mock_provider_svc.switch_model = AsyncMock(side_effect=ProviderNotFoundError("not configured"))
     mock_provider_svc.get_current_provider = MagicMock(return_value=mock_provider)
     mock_provider_svc.get_current_provider_info.return_value = MagicMock(
         provider_name="mock_provider",

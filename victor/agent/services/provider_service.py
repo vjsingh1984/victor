@@ -126,7 +126,9 @@ class ProviderService:
             model: Optional model name
             validate: If True, validate provider before switching
         """
-        if self._provider_manager is not None and hasattr(self._provider_manager, "switch_provider"):
+        if self._provider_manager is not None and hasattr(
+            self._provider_manager, "switch_provider"
+        ):
             switched = await self._provider_manager.switch_provider(provider, model)
             if not switched:
                 raise ValueError(f"Provider switch failed: {provider}")

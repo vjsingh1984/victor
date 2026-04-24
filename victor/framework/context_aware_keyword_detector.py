@@ -303,9 +303,7 @@ class ContextAwareKeywordDetector:
 
         # 7. Check if requirements are addressed
         if requirements:
-            requirements_addressed = self._check_requirements_addressed(
-                response, requirements
-            )
+            requirements_addressed = self._check_requirements_addressed(response, requirements)
             if requirements_addressed:
                 evidence.append(f"Addressed {len(requirements)} requirement(s)")
                 indicator_types.append(CompletionIndicatorType.REQUIREMENT)
@@ -412,15 +410,12 @@ class ContextAwareKeywordDetector:
 
         # Check for lists (1., -, *)
         has_list = any(
-            marker in response
-            for marker in ["\n1.", "\n-", "\n*", "  - ", "  * ", "  1. "]
+            marker in response for marker in ["\n1.", "\n-", "\n*", "  - ", "  * ", "  1. "]
         )
 
         return has_heading or has_list
 
-    def _check_requirements_addressed(
-        self, response: str, requirements: List[Any]
-    ) -> bool:
+    def _check_requirements_addressed(self, response: str, requirements: List[Any]) -> bool:
         """Check if response addresses extracted requirements."""
         if not requirements:
             return False

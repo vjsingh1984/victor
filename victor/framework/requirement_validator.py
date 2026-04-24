@@ -195,18 +195,14 @@ class RequirementValidator:
 
         # Find critical gaps (P0 requirements not satisfied)
         critical_gaps = [
-            s
-            for s in missing
-            if s.requirement.priority == RequirementPriority.P0.value
+            s for s in missing if s.requirement.priority == RequirementPriority.P0.value
         ]
 
         # Calculate satisfaction score (priority-weighted)
         satisfaction_score = self._calculate_satisfaction_score(requirement_statuses)
 
         # Determine if satisfied (all P0 met + overall threshold)
-        is_satisfied = (
-            len(critical_gaps) == 0 and satisfaction_score >= self.overall_threshold
-        )
+        is_satisfied = len(critical_gaps) == 0 and satisfaction_score >= self.overall_threshold
 
         # Generate summary
         summary = self._generate_summary(
@@ -284,8 +280,7 @@ class RequirementValidator:
 
         # Check for answers/explanations
         if any(
-            word in description_lower
-            for word in ["explain", "describe", "analyze", "summarize"]
+            word in description_lower for word in ["explain", "describe", "analyze", "summarize"]
         ):
             # Check if response has substantial content
             response = self._extract_response(action_result)
@@ -429,9 +424,7 @@ class RequirementValidator:
             gap_description="Could not verify requirement was addressed",
         )
 
-    def _calculate_satisfaction_score(
-        self, requirement_statuses: List[RequirementStatus]
-    ) -> float:
+    def _calculate_satisfaction_score(self, requirement_statuses: List[RequirementStatus]) -> float:
         """Calculate priority-weighted satisfaction score.
 
         P0 requirements: 40% weight

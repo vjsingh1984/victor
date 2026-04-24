@@ -141,15 +141,13 @@ class TestExecuteWithCache:
         """Clear cache before each test."""
         clear_shell_cache()
 
-    @patch('victor.tools.shell_command_cache.subprocess.run')
+    @patch("victor.tools.shell_command_cache.subprocess.run")
     def test_execute_with_cache_miss(self, mock_run):
         """Test execution when cache miss."""
         # Create a proper mock result
-        mock_result = type('CompletedProcess', (), {
-            'returncode': 0,
-            'stdout': 'output',
-            'stderr': ''
-        })()
+        mock_result = type(
+            "CompletedProcess", (), {"returncode": 0, "stdout": "output", "stderr": ""}
+        )()
         mock_run.return_value = mock_result
 
         returncode, stdout, stderr = execute_with_cache("echo test")
@@ -158,15 +156,13 @@ class TestExecuteWithCache:
         assert stdout == "output"
         assert mock_run.call_count == 1
 
-    @patch('victor.tools.shell_command_cache.subprocess.run')
+    @patch("victor.tools.shell_command_cache.subprocess.run")
     def test_execute_with_cache_hit(self, mock_run):
         """Test execution when cache hit."""
         # Create a proper mock result
-        mock_result = type('CompletedProcess', (), {
-            'returncode': 0,
-            'stdout': 'output',
-            'stderr': ''
-        })()
+        mock_result = type(
+            "CompletedProcess", (), {"returncode": 0, "stdout": "output", "stderr": ""}
+        )()
         mock_run.return_value = mock_result
 
         # First call - cache miss
@@ -177,15 +173,13 @@ class TestExecuteWithCache:
 
         assert mock_run.call_count == 1  # Called only once
 
-    @patch('victor.tools.shell_command_cache.subprocess.run')
+    @patch("victor.tools.shell_command_cache.subprocess.run")
     def test_execute_with_cache_disabled(self, mock_run):
         """Test execution with caching disabled."""
         # Create a proper mock result
-        mock_result = type('CompletedProcess', (), {
-            'returncode': 0,
-            'stdout': 'output',
-            'stderr': ''
-        })()
+        mock_result = type(
+            "CompletedProcess", (), {"returncode": 0, "stdout": "output", "stderr": ""}
+        )()
         mock_run.return_value = mock_result
 
         # Execute with cache disabled

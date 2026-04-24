@@ -31,14 +31,10 @@ class UsageSettings(BaseModel):
     # Usage log semantic sampling (reduces disk I/O for noisy events)
     usage_sampling_enabled: bool = True
     usage_content_sample_rate: int = Field(
-        default=10,
-        gt=0,
-        description="Emit 1 in N content-chunk events"
+        default=10, gt=0, description="Emit 1 in N content-chunk events"
     )
     usage_dedup_window_seconds: float = Field(
-        default=5.0,
-        gt=0,
-        description="Dedup window for progress events"
+        default=5.0, gt=0, description="Dedup window for progress events"
     )
 
     @field_validator("usage_content_sample_rate")

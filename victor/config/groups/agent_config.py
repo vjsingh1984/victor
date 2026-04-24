@@ -30,7 +30,9 @@ class PlanningConfig(BaseModel):
     """Configuration for autonomous planning mode."""
 
     enabled: bool = False
-    min_complexity: str = Field(default="moderate", description="Minimum complexity: simple, moderate, complex")
+    min_complexity: str = Field(
+        default="moderate", description="Minimum complexity: simple, moderate, complex"
+    )
     show_plan: bool = True
 
     @field_validator("min_complexity")
@@ -79,4 +81,3 @@ class AgentSettings(BaseModel):
                 f"Valid levels: {', '.join(sorted(valid_levels))}"
             )
         return v
-

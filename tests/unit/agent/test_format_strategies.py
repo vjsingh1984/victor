@@ -230,7 +230,7 @@ class TestXmlFormatStrategy:
         # Short arg should be in attributes
         assert 'short="value"' in result
         # Long arg should NOT be in attributes
-        assert 'long_param=' not in result
+        assert "long_param=" not in result
 
     def test_estimate_tokens_includes_overhead(self):
         """Token estimation should include XML tag overhead."""
@@ -341,6 +341,7 @@ class TestFormatStrategyFactory:
 
     def test_register_custom_strategy(self):
         """Factory should support registering custom strategies."""
+
         # First register the custom style
         class CustomStrategy:
             def format(self, tool_name, args, output, format_hint=None):
@@ -367,6 +368,7 @@ class TestFormatStrategyFactory:
 
     def test_register_strategy_without_format_raises_error(self):
         """Registering strategy without format method should raise TypeError."""
+
         class InvalidStrategy:
             pass
 

@@ -425,7 +425,9 @@ Generate ONLY the commit message, nothing else."""
                     end = content.find(">>>>>>> ", start)
                     if end != -1:
                         conflict_section = content[start : end + 50]
-                        analysis.append(f"   First conflict preview:\n   {conflict_section[:200]}...")
+                        analysis.append(
+                            f"   First conflict preview:\n   {conflict_section[:200]}..."
+                        )
 
             except Exception as e:
                 analysis.append(f"   Error reading file: {e}")
@@ -501,7 +503,6 @@ Be concise and practical."""
             "success": False,
             "error": f"Unknown operation: {operation}. Valid operations: status, diff, stage, commit, log, branch, commit_msg, conflicts",
         }
-
 
 
 @tool(

@@ -118,5 +118,6 @@ class ServerSettings(BaseModel):
         """
         if v is None:
             import secrets as _secrets
+
             return SecretStr(_secrets.token_urlsafe(32))
         return v

@@ -245,7 +245,9 @@ class TaskCoordinator:
 
         if intent_result.intent in (ActionIntent.DISPLAY_ONLY, ActionIntent.READ_ONLY):
             if intent_result.prompt_guard:
-                conversation_controller.add_message("user", f"[INTENT-GUARD: {intent_result.prompt_guard.strip()}]")
+                conversation_controller.add_message(
+                    "user", f"[INTENT-GUARD: {intent_result.prompt_guard.strip()}]"
+                )
                 logger.info(f"Intent: {intent_result.intent.value}, injected prompt guard")
         elif intent_result.intent == ActionIntent.WRITE_ALLOWED:
             logger.info("Intent: write_allowed, no prompt guard needed")
@@ -338,7 +340,6 @@ class TaskCoordinator:
                     "Minimize exploration and proceed directly to creating what was requested. "
                     "Only explore if absolutely necessary to complete the task.]",
                 )
-
 
     # =====================================================================
     # Property Accessors

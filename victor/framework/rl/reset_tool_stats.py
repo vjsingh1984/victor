@@ -84,9 +84,7 @@ def reset_tool_stats(tool_name: str, confirm: bool = False) -> bool:
             )
 
         # Delete from rl_tool_q
-        q_deleted = db.execute(
-            "DELETE FROM rl_tool_q WHERE tool_name = ?", (tool_name,)
-        ).rowcount
+        q_deleted = db.execute("DELETE FROM rl_tool_q WHERE tool_name = ?", (tool_name,)).rowcount
 
         if q_deleted > 0:
             logger.info(f"[reset_tool_stats] Cleared rl_tool_q record for '{tool_name}'")
@@ -105,7 +103,9 @@ def reset_tool_stats(tool_name: str, confirm: bool = False) -> bool:
         ).rowcount
 
         if task_deleted > 0:
-            logger.info(f"[reset_tool_stats] Cleared {task_deleted} rl_tool_task records for '{tool_name}'")
+            logger.info(
+                f"[reset_tool_stats] Cleared {task_deleted} rl_tool_task records for '{tool_name}'"
+            )
 
         logger.info(f"[reset_tool_stats] Tool '{tool_name}' statistics reset successfully")
         return True
@@ -215,15 +215,19 @@ def main():
             summary = get_tool_stats_summary(tool_name)
             if summary:
                 print(f"\n{summary['tool_name']}:")
-                print(f"  Q-value: {summary['q_value']:.4f}" if summary['q_value'] else "  Q-value: N/A")
+                print(
+                    f"  Q-value: {summary['q_value']:.4f}"
+                    if summary["q_value"]
+                    else "  Q-value: N/A"
+                )
                 print(f"  Selections: {summary['selection_count']}")
                 print(f"  Successes: {summary['success_count']}")
                 print(f"  Outcomes: {summary['outcome_count']}")
-                if summary['success_rate'] is not None:
+                if summary["success_rate"] is not None:
                     print(f"  Success rate: {summary['success_rate']:.1%}")
-                if summary['avg_success'] is not None:
+                if summary["avg_success"] is not None:
                     print(f"  Avg success score: {summary['avg_success']:.3f}")
-                if summary['avg_quality'] is not None:
+                if summary["avg_quality"] is not None:
                     print(f"  Avg quality score: {summary['avg_quality']:.3f}")
             else:
                 print(f"\n{tool_name}: No statistics found")

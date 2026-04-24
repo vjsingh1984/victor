@@ -141,12 +141,14 @@ class TestConfigValidator:
     def test_returns_result(self):
         """validate() always returns a ConfigValidationResult."""
         from victor.config.settings import Settings
+
         result = ConfigValidator().validate(Settings())
         assert isinstance(result, ConfigValidationResult)
 
     def test_unknown_provider_warns(self):
         """An unrecognised default_provider produces a warning."""
         from victor.config.settings import Settings
+
         settings = Settings()
         settings.provider.default_provider = "totally_unknown_provider_xyz"
         result = ConfigValidator().validate(settings)
@@ -159,12 +161,11 @@ class TestConfigValidator:
     def test_known_provider_no_unknown_warning(self):
         """A known provider like 'ollama' does not trigger unknown-provider warning."""
         from victor.config.settings import Settings
+
         settings = Settings()
         settings.provider.default_provider = "ollama"
         result = ConfigValidator().validate(settings)
-        has_unknown_warn = any(
-            "Unknown provider" in issue.message for issue in result.warnings
-        )
+        has_unknown_warn = any("Unknown provider" in issue.message for issue in result.warnings)
         assert not has_unknown_warn
 
     def test_validator_errors_become_warnings(self):
@@ -182,12 +183,14 @@ class TestValidateSettings:
     def test_validate_settings_returns_result(self):
         """validate_settings returns ConfigValidationResult."""
         from victor.config.settings import Settings
+
         result = validate_settings(Settings())
         assert isinstance(result, ConfigValidationResult)
 
     def test_validate_configuration_alias(self):
         """validate_configuration is an alias for validate_settings."""
         from victor.config.settings import Settings
+
         settings = Settings()
         assert type(validate_configuration(settings)) is type(validate_settings(settings))
 

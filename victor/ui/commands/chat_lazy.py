@@ -53,36 +53,49 @@ if TYPE_CHECKING:
     from victor.config.settings import ProfileConfig
     from victor.framework.shim import FrameworkShim
 
+
 # Lazy import helpers
 def _get_orchestrator():
     """Lazy import AgentOrchestrator only when needed."""
     from victor.agent.orchestrator import AgentOrchestrator
+
     return AgentOrchestrator
+
 
 def _get_load_settings():
     """Lazy import load_settings only when needed."""
     from victor.config.settings import load_settings
+
     return load_settings
+
 
 def _get_framework_shim():
     """Lazy import FrameworkShim only when needed."""
     from victor.framework.shim import FrameworkShim
+
     return FrameworkShim
+
 
 def _get_verticals():
     """Lazy import vertical functions only when needed."""
     from victor.core.verticals import get_vertical, list_verticals
+
     return get_vertical, list_verticals
+
 
 def _get_output_formatter():
     """Lazy import output formatter only when needed."""
     from victor.ui.output_formatter import InputReader, create_formatter
+
     return InputReader, create_formatter
+
 
 def _get_render_utils():
     """Lazy import rendering utils only when needed."""
     from victor.ui.rendering.utils import render_status_message
+
     return render_status_message
+
 
 def _get_command_utils():
     """Lazy import command utils only when needed."""
@@ -94,14 +107,16 @@ def _get_command_utils():
         setup_logging,
         graceful_shutdown,
     )
+
     return {
-        'preload_semantic_index': preload_semantic_index,
-        'check_codebase_index': check_codebase_index,
-        'get_rl_profile_suggestion': get_rl_profile_suggestion,
-        'setup_safety_confirmation': setup_safety_confirmation,
-        'setup_logging': setup_logging,
-        'graceful_shutdown': graceful_shutdown,
+        "preload_semantic_index": preload_semantic_index,
+        "check_codebase_index": check_codebase_index,
+        "get_rl_profile_suggestion": get_rl_profile_suggestion,
+        "setup_safety_confirmation": setup_safety_confirmation,
+        "setup_logging": setup_logging,
+        "graceful_shutdown": graceful_shutdown,
     }
+
 
 def _get_workflow_modules():
     """Lazy import workflow modules only when needed."""
@@ -117,21 +132,25 @@ def _get_workflow_modules():
         RenderBackend,
         get_available_backends,
     )
+
     return {
-        'load_workflow_from_file': load_workflow_from_file,
-        'YAMLWorkflowError': YAMLWorkflowError,
-        'StateGraphExecutor': StateGraphExecutor,
-        'ExecutorConfig': ExecutorConfig,
-        'WorkflowVisualizer': WorkflowVisualizer,
-        'VizFormat': VizFormat,
-        'RenderBackend': RenderBackend,
-        'get_available_backends': get_available_backends,
+        "load_workflow_from_file": load_workflow_from_file,
+        "YAMLWorkflowError": YAMLWorkflowError,
+        "StateGraphExecutor": StateGraphExecutor,
+        "ExecutorConfig": ExecutorConfig,
+        "WorkflowVisualizer": WorkflowVisualizer,
+        "VizFormat": VizFormat,
+        "RenderBackend": RenderBackend,
+        "get_available_backends": get_available_backends,
     }
+
 
 def _get_async_utils():
     """Lazy import async utils only when needed."""
     from victor.core.async_utils import run_sync
+
     return run_sync
+
 
 # Contextual error formatting (lazy import)
 try:
@@ -161,6 +180,7 @@ console = Console()
 
 # ... rest of the chat command implementation
 # All functions that need heavy modules should call the lazy import helpers
+
 
 # Example of how to use lazy imports in command handlers:
 @chat_app.command()

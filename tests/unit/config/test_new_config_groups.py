@@ -193,7 +193,9 @@ class TestCacheSettings:
         assert settings.http_connection_pool_max_connections_per_host == 1
 
         # Invalid max connections per host (zero)
-        with pytest.raises(ValueError, match="http_connection_pool_max_connections_per_host must be >= 1"):
+        with pytest.raises(
+            ValueError, match="http_connection_pool_max_connections_per_host must be >= 1"
+        ):
             CacheSettings(http_connection_pool_max_connections_per_host=0)
 
     def test_connection_timeout_validation(self):

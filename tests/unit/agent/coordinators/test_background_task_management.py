@@ -6,7 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from victor.agent.coordinators.session_coordinator import SessionCoordinator as LegacySessionCoordinator
+from victor.agent.coordinators.session_coordinator import (
+    SessionCoordinator as LegacySessionCoordinator,
+)
 from victor.agent.services.session_compat import SessionCoordinator
 
 

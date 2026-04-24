@@ -1476,7 +1476,7 @@ class EnhancedConversationLog(VerticalScroll):
         if self._streaming_message:
             self._streaming_message.finish_streaming()
             self._streaming_message = None
-        self._maybe_scroll_end()
+        self._maybe_scroll_end(bypass_throttle=True)
 
     # -- tool / code helpers -------------------------------------------------
 
@@ -1650,17 +1650,19 @@ class EnhancedConversationLog(VerticalScroll):
 
     # -- internal helpers ----------------------------------------------------
 
-    def _maybe_scroll_end(self, force: bool = False) -> None:
+    def _maybe_scroll_end(self, force: bool = False, bypass_throttle: bool = False) -> None:
         """Conditionally scroll to end.
 
-        Throttled during streaming to avoid triggering a full layout
-        recalculation on every chunk (max once per _SCROLL_THROTTLE_SECONDS).
+        ``force=True``: scroll regardless of _auto_scroll (anchors new messages).
+        ``bypass_throttle=True``: skip the rate-limit but still respect _auto_scroll.
+        Both ``force`` and ``bypass_throttle`` are combined with OR for throttle bypass.
         Sets a short guard window to suppress transient UpdateScroll events.
         """
         if not (force or self._auto_scroll):
             return
         now = time.monotonic()
-        if not force and (now - self._last_scroll_end_time) < self._SCROLL_THROTTLE_SECONDS:
+        skip_throttle = force or bypass_throttle
+        if not skip_throttle and (now - self._last_scroll_end_time) < self._SCROLL_THROTTLE_SECONDS:
             return
         self._last_scroll_end_time = now
         self.scroll_end(animate=False)

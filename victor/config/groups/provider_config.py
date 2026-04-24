@@ -127,15 +127,12 @@ class ProviderSettings(BaseModel):
     ollama_base_url: str = "http://localhost:11434"
     # LMStudio tiered endpoints (try in order) - defaults to localhost only
     # Set LMSTUDIO_BASE_URLS env var to add LAN servers
-    lmstudio_base_urls: List[str] = Field(
-        default_factory=lambda: ["http://127.0.0.1:1234"]
-    )
+    lmstudio_base_urls: List[str] = Field(default_factory=lambda: ["http://127.0.0.1:1234"])
     vllm_base_url: str = "http://localhost:8000"
 
     # LMStudio resource guard
     lmstudio_max_vram_gb: Optional[float] = Field(
-        default=48.0,
-        description="Cap model selection to this budget (GB); override via env/config"
+        default=48.0, description="Cap model selection to this budget (GB); override via env/config"
     )
 
     # Provider configurations (dict keyed by provider name)
@@ -161,21 +158,51 @@ class ProviderSettings(BaseModel):
         # All registered providers from victor.providers.registry
         known_providers = {
             # Core providers
-            "ollama", "anthropic", "openai", "google",
+            "ollama",
+            "anthropic",
+            "openai",
+            "google",
             # Cloud providers
-            "xai", "grok", "zai", "zhipuai", "zhipu", "qwen", "alibaba", "dashscope",
-            "moonshot", "kimi", "deepseek", "groqcloud", "mistral", "together",
-            "openrouter", "fireworks", "cerebras", "vertex", "vertexai",
-            "azure", "azure-openai", "bedrock", "aws", "huggingface", "hf", "replicate",
+            "xai",
+            "grok",
+            "zai",
+            "zhipuai",
+            "zhipu",
+            "qwen",
+            "alibaba",
+            "dashscope",
+            "moonshot",
+            "kimi",
+            "deepseek",
+            "groqcloud",
+            "mistral",
+            "together",
+            "openrouter",
+            "fireworks",
+            "cerebras",
+            "vertex",
+            "vertexai",
+            "azure",
+            "azure-openai",
+            "bedrock",
+            "aws",
+            "huggingface",
+            "hf",
+            "replicate",
             # Local backends
-            "lmstudio", "vllm", "llamacpp", "llama-cpp", "llama.cpp",
-            "mlx", "mlx-lm", "applesilicon",
+            "lmstudio",
+            "vllm",
+            "llamacpp",
+            "llama-cpp",
+            "llama.cpp",
+            "mlx",
+            "mlx-lm",
+            "applesilicon",
         }
 
         if v not in known_providers:
             raise ValueError(
-                f"Unknown provider '{v}'. "
-                f"Known providers: {', '.join(sorted(known_providers))}"
+                f"Unknown provider '{v}'. " f"Known providers: {', '.join(sorted(known_providers))}"
             )
 
         return v

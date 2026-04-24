@@ -206,14 +206,15 @@ class ToolOutputFormatter:
         """
         # CRITICAL GUARD: Check if output is a coroutine (indicates tool not awaited)
         import inspect as _inspect
+
         if _inspect.iscoroutine(output):
             logger.error(
                 f"[FORMATTER] ❌ COROUTINE OBJECT RECEIVED: tool={tool_name}, "
                 f"output={output}, type={type(output)}"
             )
             logger.error(
-                f"[FORMATTER] This indicates the tool function was called directly "
-                f"instead of being awaited through the executor."
+                "[FORMATTER] This indicates the tool function was called directly "
+                "instead of being awaited through the executor."
             )
             raise RuntimeError(
                 f"Tool '{tool_name}' returned coroutine object. "
@@ -263,7 +264,9 @@ class ToolOutputFormatter:
         # Use strategy pattern for ALL tools (provider-specific optimization)
         # This ensures cloud providers get Plain JSON (token-efficient)
         # and local providers get XML format (cognition-optimized)
-        return self._format_with_strategy(tool_name, args, output_str, truncated, format_hint, context)
+        return self._format_with_strategy(
+            tool_name, args, output_str, truncated, format_hint, context
+        )
 
     def _format_with_strategy(
         self,
@@ -328,7 +331,9 @@ class ToolOutputFormatter:
             return formatted
 
         except Exception as e:
-            logger.warning(f"Strategy formatting failed for {tool_name}, falling back to generic: {e}")
+            logger.warning(
+                f"Strategy formatting failed for {tool_name}, falling back to generic: {e}"
+            )
             return self._format_generic(tool_name, output_str, truncated, format_hint)
 
     def _record_format_metric(

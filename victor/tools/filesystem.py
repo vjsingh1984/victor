@@ -67,9 +67,7 @@ def _list_available_directories(base_path: Path, max_count: int = 10) -> List[st
 
     try:
         return [
-            d.name
-            for d in sorted(base_path.iterdir())
-            if d.is_dir() and not d.name.startswith(".")
+            d.name for d in sorted(base_path.iterdir()) if d.is_dir() and not d.name.startswith(".")
         ][:max_count]
     except PermissionError:
         return []
@@ -2679,7 +2677,7 @@ async def _get_directory_summaries(root: Path, directory_paths: List[str]) -> Di
 
             # Query for top symbols (prioritizing classes then functions)
             # This is a lightweight query that avoids full graph traversal
-            query = f"""
+            query = """
                 SELECT type, name
                 FROM graph_node
                 WHERE (file LIKE ? OR file = ?)
@@ -2725,11 +2723,11 @@ async def _get_directory_summaries(root: Path, directory_paths: List[str]) -> Di
         logger.warning(
             "Failed to get directory summaries from symbol graph: %s "
             "(this is OK during init - will retry on next tool call)",
-            error_msg
+            error_msg,
         )
 
         # Return partial results if available
-        return summaries if 'summaries' in locals() else {}
+        return summaries if "summaries" in locals() else {}
 
 
 @tool(
@@ -2916,9 +2914,7 @@ async def overview(
         dir_summaries = {}
 
         for attempt in range(max_retries):
-            dir_summaries = await _get_directory_summaries(
-                root, [d["path"] for d in directories]
-            )
+            dir_summaries = await _get_directory_summaries(root, [d["path"] for d in directories])
 
             if dir_summaries:
                 break  # Success

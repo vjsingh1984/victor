@@ -60,7 +60,7 @@ class CodebaseSettings(BaseModel):
         default=0.25,
         ge=0.0,
         le=1.0,
-        description="Min score [0.1-0.9], lowered from 0.5 for better recall on technical queries"
+        description="Min score [0.1-0.9], lowered from 0.5 for better recall on technical queries",
     )
     semantic_query_expansion_enabled: bool = True  # Expand queries with synonyms/related terms
     semantic_max_query_expansions: int = 5  # Max query variations to try (including original)
@@ -73,8 +73,7 @@ class CodebaseSettings(BaseModel):
     # RL-based threshold learning per (embedding_model, task_type, tool_context)
     enable_semantic_threshold_rl_learning: bool = False  # Enable automatic threshold learning
     semantic_threshold_overrides: dict = Field(
-        default_factory=dict,
-        description="Format: {'model:task:tool': threshold}"
+        default_factory=dict, description="Format: {'model:task:tool': threshold}"
     )
 
     @field_validator("codebase_dimension")

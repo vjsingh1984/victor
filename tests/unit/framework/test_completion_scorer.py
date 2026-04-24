@@ -28,7 +28,6 @@ from victor.framework.completion_scorer import (
 )
 from victor.framework.perception_integration import RequirementType, Requirement
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================

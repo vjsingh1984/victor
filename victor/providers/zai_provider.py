@@ -224,6 +224,7 @@ class ZAIProvider(HttpxOpenAICompatProvider):
 
         # Resolve API key
         from victor.providers.logging import ProviderLogger as _PL
+
         _logger = _PL("zai", __name__)
         resolver = UnifiedApiKeyResolver(non_interactive=non_interactive)
         key_result = resolver.get_api_key("zai", explicit_key=api_key)

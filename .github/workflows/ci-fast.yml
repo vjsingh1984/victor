@@ -336,7 +336,7 @@ jobs:
           val=$(python - <<'PY'
           from pathlib import Path
           import re
-          text = Path("victor/config/settings.py").read_text()
+          text = Path("victor/config/groups/tool_selection_config.py").read_text()
           m = re.search(r"fallback_max_tools:\s*int\s*=\s*(\d+)", text)
           print(m.group(1) if m else "")
           PY

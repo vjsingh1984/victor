@@ -326,7 +326,7 @@ class FormatPerformanceMonitor:
 
             lines.extend(
                 [
-                    f"Plain vs XML Efficiency:",
+                    "Plain vs XML Efficiency:",
                     f"  Plain format avg: {plain_avg:.1f} tokens/call",
                     f"  XML format avg: {xml_avg:.1f} tokens/call",
                     f"  Savings with Plain: {savings_pct:.1f}%",

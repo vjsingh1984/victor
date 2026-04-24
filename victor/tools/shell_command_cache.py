@@ -58,15 +58,12 @@ class ShellCommandCache:
             "az": timedelta(minutes=10),
             "gitlab": timedelta(minutes=10),
             "kubectl": timedelta(minutes=5),
-
             # Git commands - medium cache
             "git": timedelta(minutes=5),
-
             # System info - longer cache
             "uname": timedelta(minutes=30),
             "whoami": timedelta(minutes=30),
             "hostname": timedelta(minutes=30),
-
             # File listings - short cache (may change)
             "ls": timedelta(minutes=1),
             "find": timedelta(minutes=2),
@@ -96,10 +93,7 @@ class ShellCommandCache:
         return self._default_ttl
 
     def _generate_key(
-        self,
-        command: str,
-        cwd: Optional[str] = None,
-        env: Optional[Dict[str, str]] = None
+        self, command: str, cwd: Optional[str] = None, env: Optional[Dict[str, str]] = None
     ) -> str:
         """Generate cache key from command, cwd, and environment.
 
@@ -127,11 +121,7 @@ class ShellCommandCache:
         key_str = json.dumps(key_data, sort_keys=True)
         return hashlib.sha256(key_str.encode()).hexdigest()
 
-    def get(
-        self,
-        command: str,
-        cwd: Optional[str] = None
-    ) -> Optional[Tuple[int, str, str]]:
+    def get(self, command: str, cwd: Optional[str] = None) -> Optional[Tuple[int, str, str]]:
         """Get cached command result if available and not expired.
 
         Args:
@@ -158,12 +148,7 @@ class ShellCommandCache:
 
         return None
 
-    def set(
-        self,
-        command: str,
-        result: Tuple[int, str, str],
-        cwd: Optional[str] = None
-    ) -> None:
+    def set(self, command: str, result: Tuple[int, str, str], cwd: Optional[str] = None) -> None:
         """Cache a command result.
 
         Args:
@@ -216,9 +201,8 @@ class ShellCommandCache:
                 "entries": len(self._cache),
                 "default_ttl_minutes": int(self._default_ttl.total_seconds() / 60),
                 "command_ttls": {
-                    cmd: int(ttl.total_seconds() / 60)
-                    for cmd, ttl in self._command_ttls.items()
-                }
+                    cmd: int(ttl.total_seconds() / 60) for cmd, ttl in self._command_ttls.items()
+                },
             }
 
 
@@ -249,7 +233,7 @@ def execute_with_cache(
     shell: bool = True,
     timeout: Optional[float] = None,
     env: Optional[Dict[str, str]] = None,
-    use_cache: bool = True
+    use_cache: bool = True,
 ) -> Tuple[int, str, str]:
     """Execute shell command with caching.
 
@@ -276,7 +260,7 @@ def execute_with_cache(
     try:
         result = subprocess.run(
             command,
-            shell=shell,
+            shell=shell,  # nosec B602 — shell param is caller-controlled, not user input
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -292,7 +276,7 @@ def execute_with_cache(
 
         return output
 
-    except subprocess.TimeoutExpired as e:
+    except subprocess.TimeoutExpired:
         error_msg = f"Command timed out after {timeout}s"
         logger.error(f"{error_msg}: {command[:60]}...")
         return (1, "", error_msg)

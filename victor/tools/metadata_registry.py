@@ -350,7 +350,9 @@ class ToolMetadataEntry:
             try:
                 explicit_metadata = get_metadata()
             except Exception:
-                logger.debug("Tool '%s' metadata generation failed during registry indexing", tool.name)
+                logger.debug(
+                    "Tool '%s' metadata generation failed during registry indexing", tool.name
+                )
 
         # Get properties with defaults for tools that don't have the new attributes
         priority = getattr(explicit_metadata, "priority", None) or getattr(
@@ -365,9 +367,9 @@ class ToolMetadataEntry:
         aliases = getattr(tool, "aliases", set())
         category = getattr(explicit_metadata, "category", None) or getattr(tool, "category", None)
         # Extract keywords from tool decorator metadata, filtering short keywords
-        raw_keywords = getattr(explicit_metadata, "keywords", None) or getattr(
-            tool, "keywords", None
-        ) or []
+        raw_keywords = (
+            getattr(explicit_metadata, "keywords", None) or getattr(tool, "keywords", None) or []
+        )
         keywords = (
             {k.lower() for k in raw_keywords if len(k) >= MIN_KEYWORD_LENGTH}
             if raw_keywords
@@ -383,25 +385,33 @@ class ToolMetadataEntry:
             )
 
         # Extract stages from tool decorator (lowercased for consistency)
-        raw_stages = getattr(explicit_metadata, "stages", None) or getattr(tool, "stages", None) or []
+        raw_stages = (
+            getattr(explicit_metadata, "stages", None) or getattr(tool, "stages", None) or []
+        )
         stages = {s.lower() for s in raw_stages} if raw_stages else set()
 
         # NEW: Extract mandatory keywords (lowercased for matching)
-        raw_mandatory = getattr(explicit_metadata, "mandatory_keywords", None) or getattr(
-            tool, "mandatory_keywords", None
-        ) or []
+        raw_mandatory = (
+            getattr(explicit_metadata, "mandatory_keywords", None)
+            or getattr(tool, "mandatory_keywords", None)
+            or []
+        )
         mandatory_keywords = {k.lower() for k in raw_mandatory} if raw_mandatory else set()
 
         # NEW: Extract task types (lowercased for consistency)
-        raw_task_types = getattr(explicit_metadata, "task_types", None) or getattr(
-            tool, "task_types", None
-        ) or []
+        raw_task_types = (
+            getattr(explicit_metadata, "task_types", None)
+            or getattr(tool, "task_types", None)
+            or []
+        )
         task_types = {t.lower() for t in raw_task_types} if raw_task_types else set()
 
         # NEW: Extract progress params
-        raw_progress_params = getattr(explicit_metadata, "progress_params", None) or getattr(
-            tool, "progress_params", None
-        ) or []
+        raw_progress_params = (
+            getattr(explicit_metadata, "progress_params", None)
+            or getattr(tool, "progress_params", None)
+            or []
+        )
         progress_params = set(raw_progress_params) if raw_progress_params else set()
 
         # NEW: Extract execution category
@@ -545,9 +555,7 @@ class ToolMetadataRegistry:
                     "keywords": sorted(getattr(tool, "keywords", None) or []),
                     "aliases": sorted(getattr(tool, "aliases", None) or []),
                     "stages": sorted(getattr(tool, "stages", None) or []),
-                    "mandatory_keywords": sorted(
-                        getattr(tool, "mandatory_keywords", None) or []
-                    ),
+                    "mandatory_keywords": sorted(getattr(tool, "mandatory_keywords", None) or []),
                     "task_types": sorted(getattr(tool, "task_types", None) or []),
                     "progress_params": sorted(getattr(tool, "progress_params", None) or []),
                     "priority": str(getattr(tool, "priority", "")),

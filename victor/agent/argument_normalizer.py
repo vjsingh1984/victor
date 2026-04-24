@@ -437,11 +437,15 @@ class ArgumentNormalizer:
                                 # Complex structure - keep as Python object, don't convert to string
                                 # Verify it's JSON-serializable for provider compatibility
                                 try:
-                                    json.dumps(python_obj)  # Verify serializable (will raise if not)
+                                    json.dumps(
+                                        python_obj
+                                    )  # Verify serializable (will raise if not)
                                     normalized[key] = python_obj  # Keep as dict/list
                                 except (TypeError, ValueError) as e:
                                     # Not serializable - convert to string as fallback
-                                    logger.warning(f"Parameter {key} contains non-serializable value: {e}")
+                                    logger.warning(
+                                        f"Parameter {key} contains non-serializable value: {e}"
+                                    )
                                     normalized[key] = json.dumps(python_obj, default=str)
                         else:
                             # Primitive value - keep as-is
@@ -535,12 +539,12 @@ class ArgumentNormalizer:
 
         # Remove standalone type annotations
         # Example: "tuple[str, ...]" → ""
-        if re.match(r'^[a-z_]+\[[^\]]+\]$', value.strip()):
+        if re.match(r"^[a-z_]+\[[^\]]+\]$", value.strip()):
             return ""
 
         # Remove type annotations at end of value
         # Example: "'file.txt' : str" → "'file.txt'"
-        value = re.sub(r'\s*:\s*[a-z_]+\[[^\]]*\]', '', value)
+        value = re.sub(r"\s*:\s*[a-z_]+\[[^\]]*\]", "", value)
 
         return value
 

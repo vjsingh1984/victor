@@ -54,7 +54,9 @@ def tool_adapter(mock_tool_service, mock_tool_coordinator):
     )
 
 
-def test_get_available_tools_prefers_service(tool_adapter, mock_tool_service, mock_tool_coordinator):
+def test_get_available_tools_prefers_service(
+    tool_adapter, mock_tool_service, mock_tool_coordinator
+):
     result = tool_adapter.get_available_tools()
 
     mock_tool_service.get_available_tools.assert_called_once()
@@ -158,7 +160,9 @@ def test_normalize_tool_arguments_prefers_service(
     assert result == ({"path": "a.py"}, "direct")
 
 
-def test_process_tool_results_prefers_service(tool_adapter, mock_tool_service, mock_tool_coordinator):
+def test_process_tool_results_prefers_service(
+    tool_adapter, mock_tool_service, mock_tool_coordinator
+):
     result = tool_adapter.process_tool_results(MagicMock(), MagicMock())
 
     mock_tool_service.process_tool_results.assert_called_once()

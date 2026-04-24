@@ -51,9 +51,9 @@ class SubprocessSettings(BaseModel):
             return None
 
         limit_str = self.code_executor_memory_limit.lower()
-        if limit_str.endswith('m'):
+        if limit_str.endswith("m"):
             return int(limit_str[:-1])
-        elif limit_str.endswith('g'):
+        elif limit_str.endswith("g"):
             return int(limit_str[:-1]) * 1024
         else:
             # Assume MB if no unit

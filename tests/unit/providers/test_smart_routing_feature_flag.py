@@ -111,15 +111,10 @@ class TestSmartRoutingFeatureFlag:
         assert FeatureFlag.USE_SMART_ROUTING in FeatureFlag
 
         # Check env var name
-        assert (
-            FeatureFlag.USE_SMART_ROUTING.get_env_var_name()
-            == "VICTOR_USE_SMART_ROUTING"
-        )
+        assert FeatureFlag.USE_SMART_ROUTING.get_env_var_name() == "VICTOR_USE_SMART_ROUTING"
 
         # Check yaml key
-        assert (
-            FeatureFlag.USE_SMART_ROUTING.get_yaml_key() == "use_smart_routing"
-        )
+        assert FeatureFlag.USE_SMART_ROUTING.get_yaml_key() == "use_smart_routing"
 
     def test_feature_flag_default_disabled(self, reset_feature_flag):
         """Test that smart routing is disabled by default."""
@@ -132,9 +127,7 @@ class TestSmartRoutingFeatureFlag:
         # Should be disabled by default
         assert not manager.is_enabled(FeatureFlag.USE_SMART_ROUTING)
 
-    def test_feature_flag_enabled_via_env(
-        self, reset_feature_flag, monkeypatch
-    ):
+    def test_feature_flag_enabled_via_env(self, reset_feature_flag, monkeypatch):
         """Test that feature flag can be enabled via environment variable."""
         # Set environment variable
         monkeypatch.setenv("VICTOR_USE_SMART_ROUTING", "true")
@@ -148,9 +141,7 @@ class TestSmartRoutingFeatureFlag:
         # Should be enabled
         assert manager.is_enabled(FeatureFlag.USE_SMART_ROUTING)
 
-    def test_feature_flag_enabled_via_yaml(
-        self, reset_feature_flag, tmp_path
-    ):
+    def test_feature_flag_enabled_via_yaml(self, reset_feature_flag, tmp_path):
         """Test that feature flag can be enabled via YAML config."""
         import yaml
 
@@ -192,9 +183,7 @@ class TestSmartRoutingFeatureFlag:
         assert not manager.is_enabled(FeatureFlag.USE_SMART_ROUTING)
 
     @pytest.mark.asyncio
-    async def test_smart_routing_respects_feature_flag(
-        self, reset_feature_flag, mock_providers
-    ):
+    async def test_smart_routing_respects_feature_flag(self, reset_feature_flag, mock_providers):
         """Test that smart routing provider works correctly."""
         # Create smart routing provider
         config = SmartRoutingConfig(
@@ -223,9 +212,7 @@ class TestSmartRoutingFeatureFlag:
         assert response.model == "test-model"
         assert "Response from" in response.content
 
-    def test_feature_flag_env_var_parsing(
-        self, reset_feature_flag, monkeypatch
-    ):
+    def test_feature_flag_env_var_parsing(self, reset_feature_flag, monkeypatch):
         """Test that various environment variable values work."""
         test_cases = [
             ("true", True),
@@ -254,9 +241,7 @@ class TestSmartRoutingFeatureFlag:
                 manager.is_enabled(FeatureFlag.USE_SMART_ROUTING) == expected
             ), f"Failed for env value: {env_value}"
 
-    def test_multiple_feature_flags_independent(
-        self, reset_feature_flag, monkeypatch
-    ):
+    def test_multiple_feature_flags_independent(self, reset_feature_flag, monkeypatch):
         """Test that smart routing flag is independent of other flags."""
         # Enable smart routing
         monkeypatch.setenv("VICTOR_USE_SMART_ROUTING", "true")

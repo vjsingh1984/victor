@@ -410,7 +410,9 @@ def config_from_settings() -> SerializationConfig:
         preferred_format = None
         if settings.pipeline.serialization_default_format:
             try:
-                preferred_format = SerializationFormat(settings.pipeline.serialization_default_format)
+                preferred_format = SerializationFormat(
+                    settings.pipeline.serialization_default_format
+                )
             except ValueError:
                 logger.warning(
                     f"Unknown serialization format: {settings.pipeline.serialization_default_format}"

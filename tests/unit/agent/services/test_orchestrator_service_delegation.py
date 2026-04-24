@@ -280,7 +280,9 @@ class TestChatServiceBootstrapLaziness:
 
             def __getattr__(self, name):
                 self.touched = True
-                raise AssertionError(f"chat coordinator should remain lazy during bootstrap: {name}")
+                raise AssertionError(
+                    f"chat coordinator should remain lazy during bootstrap: {name}"
+                )
 
         trap_chat = TrapChatCoordinator()
         obj._deprecated_chat_coordinator = LazyRuntimeProxy(
@@ -293,7 +295,9 @@ class TestChatServiceBootstrapLaziness:
 
             def __getattr__(self, name):
                 self.touched = True
-                raise AssertionError(f"tool coordinator should remain lazy during bootstrap: {name}")
+                raise AssertionError(
+                    f"tool coordinator should remain lazy during bootstrap: {name}"
+                )
 
         trap_tool = TrapToolCoordinator()
         obj._deprecated_tool_coordinator = LazyRuntimeProxy(
@@ -417,9 +421,7 @@ class TestChatServiceBootstrapLaziness:
         with (
             patch.object(AgentOrchestrator, "_register_coordinators_for_services"),
             patch.object(AgentOrchestrator, "_bootstrap_service_layer"),
-            patch(
-                "victor.agent.services.planning_runtime.PlanningCoordinator"
-            ) as planning_cls,
+            patch("victor.agent.services.planning_runtime.PlanningCoordinator") as planning_cls,
         ):
             planning_instance = MagicMock()
             planning_instance.chat_with_planning = AsyncMock(return_value=planning_response)
@@ -502,7 +504,9 @@ class TestChatServiceBootstrapLaziness:
 
             def __getattr__(self, name):
                 self.touched = True
-                raise AssertionError(f"chat coordinator should remain lazy during streaming: {name}")
+                raise AssertionError(
+                    f"chat coordinator should remain lazy during streaming: {name}"
+                )
 
         trap_chat = TrapChatCoordinator()
 

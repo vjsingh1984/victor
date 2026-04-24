@@ -150,14 +150,16 @@ class ExportService:
         writer = csv.writer(output)
 
         # Write header
-        writer.writerow([
-            "timestamp",
-            "topic",
-            "category",
-            "source",
-            "correlation_id",
-            "data",
-        ])
+        writer.writerow(
+            [
+                "timestamp",
+                "topic",
+                "category",
+                "source",
+                "correlation_id",
+                "data",
+            ]
+        )
 
         yield output.getvalue().encode("utf-8")
         output.seek(0)
@@ -165,14 +167,16 @@ class ExportService:
 
         # Write events
         for event in events:
-            writer.writerow([
-                event.datetime.isoformat(),
-                event.topic,
-                event.category,
-                event.source,
-                event.correlation_id or "",
-                json.dumps(event.data) if event.data else "",
-            ])
+            writer.writerow(
+                [
+                    event.datetime.isoformat(),
+                    event.topic,
+                    event.category,
+                    event.source,
+                    event.correlation_id or "",
+                    json.dumps(event.data) if event.data else "",
+                ]
+            )
 
             # Yield chunk if buffer is large
             if output.tell() > 10240:  # 10KB chunks

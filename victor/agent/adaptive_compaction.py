@@ -174,8 +174,7 @@ class AdaptiveCompactionThreshold:
 
         # Log for debugging
         logger.info(
-            "[AdaptiveCompaction] Pattern=%s confidence=%.2f "
-            "threshold=%.2f (%s)",
+            "[AdaptiveCompaction] Pattern=%s confidence=%.2f " "threshold=%.2f (%s)",
             analysis.pattern.value,
             analysis.confidence,
             threshold,
@@ -183,9 +182,7 @@ class AdaptiveCompactionThreshold:
         )
 
         # Track history
-        self._threshold_history.append(
-            (datetime.now(), threshold, analysis.pattern.value)
-        )
+        self._threshold_history.append((datetime.now(), threshold, analysis.pattern.value))
 
         return threshold
 
@@ -211,7 +208,7 @@ class AdaptiveCompactionThreshold:
             )
 
         # Extract recent messages for analysis
-        recent_messages = messages[-self.analysis_window:]
+        recent_messages = messages[-self.analysis_window :]
         user_messages = [m for m in recent_messages if getattr(m, "role", None) == "user"]
 
         if len(user_messages) < 2:
@@ -291,15 +288,75 @@ class AdaptiveCompactionThreshold:
             words = set(content.lower().split())
             # Remove common stop words
             stop_words = {
-                "the", "a", "an", "is", "are", "was", "were", "what",
-                "how", "can", "could", "would", "should", "why", "where",
-                "when", "who", "which", "that", "this", "it", "to", "for",
-                "in", "on", "at", "by", "with", "from", "of", "and", "or",
-                "but", "so", "if", "then", "than", "about", "into", "through",
-                "during", "before", "after", "above", "below", "between", "under",
-                "again", "further", "once", "here", "there", "why", "how", "all",
-                "each", "few", "more", "most", "other", "some", "such", "no", "nor",
-                "not", "only", "own", "same", "too", "very", "just", "and"
+                "the",
+                "a",
+                "an",
+                "is",
+                "are",
+                "was",
+                "were",
+                "what",
+                "how",
+                "can",
+                "could",
+                "would",
+                "should",
+                "why",
+                "where",
+                "when",
+                "who",
+                "which",
+                "that",
+                "this",
+                "it",
+                "to",
+                "for",
+                "in",
+                "on",
+                "at",
+                "by",
+                "with",
+                "from",
+                "of",
+                "and",
+                "or",
+                "but",
+                "so",
+                "if",
+                "then",
+                "than",
+                "about",
+                "into",
+                "through",
+                "during",
+                "before",
+                "after",
+                "above",
+                "below",
+                "between",
+                "under",
+                "again",
+                "further",
+                "once",
+                "here",
+                "there",
+                "all",
+                "each",
+                "few",
+                "more",
+                "most",
+                "other",
+                "some",
+                "such",
+                "no",
+                "nor",
+                "not",
+                "only",
+                "own",
+                "same",
+                "too",
+                "very",
+                "just",
             }
             keywords = words - stop_words
             keywords_list.append(keywords)
@@ -341,16 +398,27 @@ class AdaptiveCompactionThreshold:
             return 0.5
 
         # Focus on assistant responses (they show if they understood context)
-        assistant_messages = [
-            m for m in messages
-            if getattr(m, "role", None) == "assistant"
-        ]
+        assistant_messages = [m for m in messages if getattr(m, "role", None) == "assistant"]
 
         reference_markers = [
-            "mentioned", "earlier", "above", "previous", "that", "it",
-            "the file", "the code", "as you said", "you asked", "regarding",
-            "continuing", "building on", "following up", "as discussed",
-            "based on", "referring to", "going back"
+            "mentioned",
+            "earlier",
+            "above",
+            "previous",
+            "that",
+            "it",
+            "the file",
+            "the code",
+            "as you said",
+            "you asked",
+            "regarding",
+            "continuing",
+            "building on",
+            "following up",
+            "as discussed",
+            "based on",
+            "referring to",
+            "going back",
         ]
 
         dependent_count = 0

@@ -608,11 +608,11 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def _initialize_interaction_runtime(self) -> None:
         """Initialize interaction runtime boundaries with canonical services first."""
         from victor.agent.runtime.interaction_runtime import (
-        create_chat_coordinator_shim,
-        create_session_coordinator_shim,
-        create_tool_coordinator_shim,
-        create_interaction_runtime_components,
-    )
+            create_chat_coordinator_shim,
+            create_session_coordinator_shim,
+            create_tool_coordinator_shim,
+            create_interaction_runtime_components,
+        )
 
         self._interaction_runtime = create_interaction_runtime_components(
             orchestrator=self,
@@ -796,7 +796,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                 tool_registry=getattr(self, "tools", None),
                 tool_pipeline=getattr(self, "_tool_pipeline", None),
                 tool_cache=getattr(self, "tool_cache", None),
-                mode_controller=(self.mode_controller if hasattr(self, "mode_controller") else None),
+                mode_controller=(
+                    self.mode_controller if hasattr(self, "mode_controller") else None
+                ),
                 tool_planner=getattr(self, "_tool_planner", None),
                 argument_normalizer=getattr(self, "argument_normalizer", None),
             )

@@ -862,6 +862,7 @@ class ToolPipeline:
             A 16-character hex string tool_call_id
         """
         import hashlib
+
         timestamp = int(time.time() * 1000)
         hash_input = f"{tool_name}_{timestamp}"
         return hashlib.md5(hash_input.encode()).hexdigest()[:16]
@@ -1231,7 +1232,9 @@ class ToolPipeline:
             if tc_id is not None:
                 call_result.tool_call_id = tc_id
             elif not call_result.skipped:
-                tool_name = tool_call.get("name", "unknown") if isinstance(tool_call, dict) else "unknown"
+                tool_name = (
+                    tool_call.get("name", "unknown") if isinstance(tool_call, dict) else "unknown"
+                )
                 tc_id = self._generate_tool_call_id(tool_name)
                 call_result.tool_call_id = tc_id
             result.results.append(call_result)

@@ -407,7 +407,9 @@ def create_streaming_filter(
         StreamingContentFilter (native or Python implementation)
     """
     if _NATIVE_AVAILABLE:
-        return _NativeFilterWrapper(_native.StreamingFilter(suppress_thinking, max_thinking_content))
+        return _NativeFilterWrapper(
+            _native.StreamingFilter(suppress_thinking, max_thinking_content)
+        )
     return StreamingContentFilter(suppress_thinking)
 
 

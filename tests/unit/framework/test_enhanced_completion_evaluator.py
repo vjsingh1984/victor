@@ -28,7 +28,6 @@ from victor.framework.perception_integration import RequirementType, Requirement
 from victor.framework.completion_scorer import TaskType
 from victor.agent.turn_policy import SpinState
 
-
 # =============================================================================
 # Test Fixtures
 # =============================================================================
@@ -212,7 +211,9 @@ class TestEnhancedCompletionEvaluator:
         """Test enhanced evaluation with fulfillment detector."""
         perception = MockPerception(
             confidence=0.8,
-            requirements=[Requirement(type=RequirementType.FUNCTIONAL, description="Test", priority=0)]
+            requirements=[
+                Requirement(type=RequirementType.FUNCTIONAL, description="Test", priority=0)
+            ],
         )
         action_result = MockTurnResult(response="Testing complete")
         state = {}
@@ -344,6 +345,7 @@ class TestEnhancedCompletionEvaluator:
     @pytest.mark.asyncio
     async def test_extract_response_from_content(self, evaluator):
         """Test extracting response from content attribute."""
+
         # Create a simple object with content attribute but no response
         class ActionResultWithContent:
             content = "Content response"

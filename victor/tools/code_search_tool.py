@@ -27,10 +27,11 @@ class SearchFilters:
     Consolidates filter parameters into a single object.
     Reduces parameter count from 5 to 1 for code_search.
     """
+
     file_pattern: Optional[str] = None  # Search by filename pattern
-    symbol: Optional[str] = None         # Search by symbol name
-    language: Optional[str] = None       # Filter by programming language
-    test_only: Optional[bool] = None      # Only search test files
+    symbol: Optional[str] = None  # Search by symbol name
+    language: Optional[str] = None  # Filter by programming language
+    test_only: Optional[bool] = None  # Only search test files
     extensions: Optional[List[str]] = None  # Filter by file extensions
 
 
@@ -171,23 +172,24 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
 
         # Don't rebuild for common init-time / transient errors
         transient_keywords = [
-            "locked", "timeout", "timed out", "not ready", "unavailable",
-            "initializing", "building", "in progress",
-            "not have attribute", "has no attribute",  # missing attr = code bug, not corruption
+            "locked",
+            "timeout",
+            "timed out",
+            "not ready",
+            "unavailable",
+            "initializing",
+            "building",
+            "in progress",
+            "not have attribute",
+            "has no attribute",  # missing attr = code bug, not corruption
         ]
 
         if any(kw in error_msg.lower() for kw in transient_keywords):
-            logger.debug(
-                "Transient init issue detected (%s), skipping rebuild",
-                error_msg
-            )
+            logger.debug("Transient init issue detected (%s), skipping rebuild", error_msg)
             return False  # Don't rebuild for transient issues
 
         # Log with full error details for debugging
-        logger.warning(
-            "Persistent index corrupt (%s); scheduling background rebuild",
-            error_msg
-        )
+        logger.warning("Persistent index corrupt (%s); scheduling background rebuild", error_msg)
 
         if hasattr(index, "_is_indexed"):
             index._is_indexed = False
@@ -200,20 +202,19 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
 async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> None:
     """Rebuild a corrupt index in the background without blocking callers."""
     import time
+
     start_time = time.time()
     try:
         index_path = getattr(index, "root", "unknown")
         logger.info(
-            "Background index rebuild started (timeout=%ds, index=%s)",
-            rebuild_timeout,
-            index_path
+            "Background index rebuild started (timeout=%ds, index=%s)", rebuild_timeout, index_path
         )
         await asyncio.wait_for(index.index_codebase(), timeout=rebuild_timeout)
         elapsed = time.time() - start_time
         logger.info(
             "Background index rebuild completed successfully in %.2fs (index=%s)",
             elapsed,
-            index_path
+            index_path,
         )
     except asyncio.TimeoutError:
         logger.warning(
@@ -380,9 +381,7 @@ async def _subscribe_to_file_watcher(
         file_watcher = await watcher_registry.get_watcher(root)
 
         # Subscribe to file changes (synchronous method)
-        file_watcher.subscribe(
-            lambda e: asyncio.create_task(_on_file_change(e, root, exec_ctx))
-        )
+        file_watcher.subscribe(lambda e: asyncio.create_task(_on_file_change(e, root, exec_ctx)))
 
         logger.info(f"[code_search] Subscribed to file watcher for {root}")
     except Exception as e:
@@ -1432,7 +1431,9 @@ async def code_search(
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []
 
-        if filters and any([filters.file_pattern, filters.symbol, filters.language, filters.test_only is not None]):
+        if filters and any(
+            [filters.file_pattern, filters.symbol, filters.language, filters.test_only is not None]
+        ):
             filter_metadata = {}
             if filters.file_pattern:
                 filter_metadata["file_path"] = filters.file_pattern
@@ -1500,7 +1501,11 @@ async def code_search(
             if filters:
                 ignored_filters = [
                     name
-                    for name, value in (("file", filters.file_pattern), ("symbol", filters.symbol), ("test", filters.test_only))
+                    for name, value in (
+                        ("file", filters.file_pattern),
+                        ("symbol", filters.symbol),
+                        ("test", filters.test_only),
+                    )
                     if value is not None
                 ]
             try:
@@ -1550,7 +1555,11 @@ async def code_search(
             if filters:
                 ignored_filters = [
                     name
-                    for name, value in (("file", filters.file_pattern), ("symbol", filters.symbol), ("test", filters.test_only))
+                    for name, value in (
+                        ("file", filters.file_pattern),
+                        ("symbol", filters.symbol),
+                        ("test", filters.test_only),
+                    )
                     if value is not None
                 ]
             try:
@@ -1602,7 +1611,11 @@ async def code_search(
             if filters:
                 ignored_filters = [
                     name
-                    for name, value in (("file", filters.file_pattern), ("symbol", filters.symbol), ("test", filters.test_only))
+                    for name, value in (
+                        ("file", filters.file_pattern),
+                        ("symbol", filters.symbol),
+                        ("test", filters.test_only),
+                    )
                     if value is not None
                 ]
             try:

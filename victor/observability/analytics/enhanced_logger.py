@@ -395,7 +395,7 @@ class EnhancedUsageLogger:
         elif inspect.isgenerator(data):
             # Generators can't be serialized
             return "<generator>"
-        elif hasattr(data, '__dict__'):
+        elif hasattr(data, "__dict__"):
             # For objects, try to serialize their dict representation
             return self._sanitize_log_data(data.__dict__)
         else:

@@ -59,9 +59,7 @@ class ChatStreamHelperMixin:
 
         return False, None
 
-    async def _prepare_stream(
-        self, user_message: str, **kwargs: Any
-    ) -> tuple[
+    async def _prepare_stream(self, user_message: str, **kwargs: Any) -> tuple[
         Any,
         float,
         float,
@@ -398,9 +396,7 @@ class ChatStreamHelperMixin:
                             f"Rate limit hit (attempt {attempt + 1}/{max_retries + 1}). "
                             f"Waiting {wait_time:.1f}s before retry..."
                         )
-                        logger.debug(
-                            f"Rate limit detail: {type(exc).__name__}: {str(exc)[:200]}"
-                        )
+                        logger.debug(f"Rate limit detail: {type(exc).__name__}: {str(exc)[:200]}")
                         await asyncio.sleep(wait_time)
                     else:
                         logger.error(f"Rate limit persisted after {max_retries + 1} attempts")

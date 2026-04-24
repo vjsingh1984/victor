@@ -134,6 +134,7 @@ class ProviderPerformanceTracker:
         if db is None:
             try:
                 from victor.core.database import DatabaseManager
+
                 self._db: Optional["DatabaseManager"] = DatabaseManager()
                 self._ensure_table()
             except Exception:
@@ -160,6 +161,7 @@ class ProviderPerformanceTracker:
             return
         try:
             from victor.core.schema import Schema
+
             conn = self._db.get_connection()
             conn.executescript(Schema.RL_PROVIDER_STAT)
             for stmt in Schema.RL_PROVIDER_STAT_INDEXES.strip().split(";"):

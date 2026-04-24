@@ -59,7 +59,6 @@ except ImportError:
         return str(e)
 
 
-
 chat_app = typer.Typer(
     name="chat",
     help="""Start interactive chat or send a one-shot message.
@@ -163,7 +162,9 @@ def _print_interactive_startup_messages(con: Console, messages: list[str]) -> No
         render_status_message(con, message)
 
 
-def _summarize_smart_routing(settings: Any, enable_smart_routing: bool, routing_profile: str) -> list[str]:
+def _summarize_smart_routing(
+    settings: Any, enable_smart_routing: bool, routing_profile: str
+) -> list[str]:
     """Return startup messages describing smart-routing state."""
     if not enable_smart_routing:
         return []
@@ -223,7 +224,9 @@ def _build_cli_panel(
     meta = Text()
     meta.append("Provider ", style="dim")
     # Handle None profile_config (default settings)
-    provider_name = profile_config.provider if profile_config else settings.provider.default_provider
+    provider_name = (
+        profile_config.provider if profile_config else settings.provider.default_provider
+    )
     model_name = profile_config.model if profile_config else settings.provider.default_model
     meta.append(str(provider_name), style="bold cyan")
     meta.append("  •  ", style="dim")
@@ -318,9 +321,7 @@ def _configure_agent_compaction(
             )
             compactor.set_adaptive_threshold(adaptive)
             if show_status:
-                con.print(
-                    f"[dim]Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})[/]"
-                )
+                con.print(f"[dim]Adaptive threshold enabled ({min_thresh:.0%}-{max_thresh:.0%})[/]")
         else:
             compactor.disable_adaptive_threshold()
             if show_status:
@@ -1072,9 +1073,7 @@ def _configure_smart_routing(
         settings.smart_routing_enabled = True
         settings.smart_routing_profile = routing_profile
         if fallback_chain:
-            settings.smart_routing_fallback_chain = [
-                p.strip() for p in fallback_chain.split(",")
-            ]
+            settings.smart_routing_fallback_chain = [p.strip() for p in fallback_chain.split(",")]
         if show_status:
             console.print(f"[green]✓[/] Smart routing enabled (profile={routing_profile})")
     else:
@@ -1222,7 +1221,10 @@ async def run_oneshot(
 
             # Configuration validation (P1-6: Display configuration validation status)
             try:
-                from victor.config.validation import validate_configuration, format_validation_result
+                from victor.config.validation import (
+                    validate_configuration,
+                    format_validation_result,
+                )
 
                 status.update("Validating configuration...")
                 validation_result = validate_configuration(settings)
@@ -1245,7 +1247,9 @@ async def run_oneshot(
                     # Configuration has warnings but is valid - show summary
                     warning_count = len(validation_result.warnings)
                     if show_cli_chrome and warning_count > 0:
-                        console.print(f"[dim]✓ Configuration valid with {warning_count} warning(s)[/]")
+                        console.print(
+                            f"[dim]✓ Configuration valid with {warning_count} warning(s)[/]"
+                        )
                 else:
                     # Configuration is completely valid
                     if show_cli_chrome:
@@ -1255,6 +1259,7 @@ async def run_oneshot(
             except Exception as e:
                 # If validation itself fails, log it but don't block startup
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.warning(f"Configuration validation skipped due to error: {e}")
                 if show_cli_chrome:
@@ -1325,6 +1330,7 @@ async def run_oneshot(
                 console.print("  • Try default profile: victor chat --profile default\n")
                 if os.getenv("VICTOR_DEBUG"):
                     import traceback
+
                     console.print(traceback.format_exc())
                 raise typer.Exit(code=1)
 
@@ -1355,6 +1361,7 @@ async def run_oneshot(
                 console.print("  • Try a different profile: victor profile list\n")
                 if os.getenv("VICTOR_DEBUG"):
                     import traceback
+
                     console.print(traceback.format_exc())
                 raise typer.Exit(code=1)
 
@@ -1400,7 +1407,9 @@ async def run_oneshot(
                     await preload_semantic_index(os.getcwd(), settings, console)
                 except Exception as e:
                     if show_cli_chrome:
-                        console.print(f"\n[yellow]Warning:[/] Failed to preload semantic index: {e}")
+                        console.print(
+                            f"\n[yellow]Warning:[/] Failed to preload semantic index: {e}"
+                        )
                         console.print(
                             "  Continuing without preindex (first search will be slower).\n"
                         )
@@ -1412,7 +1421,9 @@ async def run_oneshot(
             except Exception as e:
                 if show_cli_chrome:
                     console.print(f"\n[yellow]Warning:[/] Failed to start embedding preload: {e}")
-                    console.print("  Continuing without embeddings (some features may be slower).\n")
+                    console.print(
+                        "  Continuing without embeddings (some features may be slower).\n"
+                    )
 
             # Planning mode requires non-streaming (plan generation → step execution → summary)
             use_streaming = stream and agent.provider.supports_streaming() and not enable_planning
@@ -1652,8 +1663,10 @@ async def run_interactive(
                     for profile_name in sorted(profiles.keys()):
                         profile_info = profiles[profile_name]
                         # ProfileConfig is a Pydantic model with direct attributes
-                        provider = getattr(profile_info, 'provider', settings.provider.default_provider)
-                        model = getattr(profile_info, 'model', settings.provider.default_model)
+                        provider = getattr(
+                            profile_info, "provider", settings.provider.default_provider
+                        )
+                        model = getattr(profile_info, "model", settings.provider.default_model)
                         console.print(
                             f"  • [cyan]{profile_name}[/] (provider: {provider}, model: {model})"
                         )
@@ -1770,9 +1783,7 @@ async def run_interactive(
                         "Continuing without automatic file watching."
                     )
                 else:
-                    console.print(
-                        f"[yellow]Warning:[/] Failed to initialize file watchers: {e}"
-                    )
+                    console.print(f"[yellow]Warning:[/] Failed to initialize file watchers: {e}")
                     console.print("  Continuing without automatic file watching.\n")
         except InitializationError as e:
             console.print(f"[red]Error ({e.stage}):[/] {e.message}")
@@ -1908,6 +1919,7 @@ async def run_interactive(
 
         # Show traceback in debug mode only
         import os
+
         if os.getenv("VICTOR_DEBUG"):
             import traceback
 
@@ -1972,7 +1984,7 @@ def _prune_history_file(history_file, max_entries: int = 250) -> None:
         return
 
     try:
-        with open(history_file, 'r') as f:
+        with open(history_file, "r") as f:
             lines = f.readlines()
 
         # If file is small enough, no pruning needed
@@ -1983,11 +1995,12 @@ def _prune_history_file(history_file, max_entries: int = 250) -> None:
         pruned_lines = lines[-max_entries:]
 
         # Write back to file
-        with open(history_file, 'w') as f:
+        with open(history_file, "w") as f:
             f.writelines(pruned_lines)
 
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.debug(f"Failed to prune history file {history_file}: {e}")
 
@@ -2009,7 +2022,7 @@ def _maybe_rotate_history_file(history_file, max_entries: int = 250) -> None:
         import time
 
         # Only check once per session
-        rotation_marker = history_file.with_suffix('.last_rotation')
+        rotation_marker = history_file.with_suffix(".last_rotation")
 
         if rotation_marker.exists():
             last_rotation = rotation_marker.stat().st_mtime
@@ -2018,7 +2031,7 @@ def _maybe_rotate_history_file(history_file, max_entries: int = 250) -> None:
                 return
 
         # Count lines
-        with open(history_file, 'r') as f:
+        with open(history_file, "r") as f:
             line_count = sum(1 for _ in f)
 
         # If too large, prune
@@ -2030,6 +2043,7 @@ def _maybe_rotate_history_file(history_file, max_entries: int = 250) -> None:
 
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.debug(f"Failed to rotate history file: {e}")
 
@@ -2134,7 +2148,7 @@ def _create_cli_prompt_session(settings=None):
     from prompt_toolkit.key_binding import KeyBindings
 
     # Get max_entries from settings or use default
-    if settings and hasattr(settings, 'ui'):
+    if settings and hasattr(settings, "ui"):
         max_entries = settings.ui.cli_history_max_entries
     else:
         max_entries = 250  # Default limit for CLI history
@@ -2306,6 +2320,7 @@ async def _run_cli_repl(
 
             # Show traceback in debug mode only
             import os  # Import os for getenv
+
             if os.getenv("VICTOR_DEBUG"):
                 import traceback
 
@@ -2618,6 +2633,7 @@ async def run_workflow_mode(
         console.print("\n[yellow]💡 Run 'victor doctor' for diagnostics[/]")
         if os.getenv("VICTOR_DEBUG"):
             import traceback
+
             console.print(traceback.format_exc())
         raise typer.Exit(1)
     except Exception as e:
@@ -2628,6 +2644,7 @@ async def run_workflow_mode(
         console.print("  • Run 'victor doctor' for diagnostics")
         console.print("  • Enable debug mode: VICTOR_DEBUG=1 victor chat\n")
         import traceback
+
         if os.getenv("VICTOR_DEBUG"):
             console.print(traceback.format_exc())
         raise typer.Exit(1)

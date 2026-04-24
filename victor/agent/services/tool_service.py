@@ -1183,10 +1183,7 @@ class ToolService:
             )
 
         validator = self._tool_call_validator
-        if (
-            validator is not None
-            and canonical in validator._tool_schemas
-        ):
+        if validator is not None and canonical in validator._tool_schemas:
             schema_result = validator.validate(canonical, tool_call.get("arguments", {}))
             if not schema_result.valid:
                 self._logger.warning("Schema validation: %s: %s", canonical, schema_result.errors)
@@ -1576,7 +1573,9 @@ class ToolService:
                     valid_tool_calls.append(tc)
                     self._logger.debug("Marked invalid tool for error response: %s", name)
             if invalid_count:
-                self._logger.warning("Marked %s invalid tool calls for error responses", invalid_count)
+                self._logger.warning(
+                    "Marked %s invalid tool calls for error responses", invalid_count
+                )
             tool_calls = valid_tool_calls or None
             self._logger.debug("After filtering: %s valid tool_calls", len(tool_calls or []))
 
@@ -1828,6 +1827,7 @@ class ToolService:
         try:
             effective_executor = tool_executor
             if effective_executor is None and hasattr(self._executor, "execute"):
+
                 async def _default_execute(
                     name: str,
                     arguments: Dict[str, Any],

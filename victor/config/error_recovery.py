@@ -15,7 +15,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "victor profile show {profile_name}",
         ],
     },
-
     # Provider Connection Errors
     "provider_connection": {
         "error_patterns": ["connection refused", "connection timeout", "unreachable"],
@@ -30,7 +29,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "ping {provider_host}",
         ],
     },
-
     # Model Not Found Errors
     "model_not_found": {
         "error_patterns": ["model not found", "no such model", "model does not exist"],
@@ -45,7 +43,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "{provider_cmd} list models",  # e.g., ollama list
         ],
     },
-
     # File System Errors
     "file_not_found": {
         "error_patterns": ["no such file", "file not found", "[errno 2]"],
@@ -60,7 +57,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "find . -name {filename}",
         ],
     },
-
     "permission_denied": {
         "error_patterns": ["permission denied", "[errno 13]", "access denied"],
         "suggestions": [
@@ -74,7 +70,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "whoami",
         ],
     },
-
     # Network Errors
     "network_timeout": {
         "error_patterns": ["timeout", "timed out", "network unreachable"],
@@ -89,7 +84,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "victor config set timeout 600",
         ],
     },
-
     # Rate Limit Errors
     "rate_limit": {
         "error_patterns": ["rate limit", "429", "too many requests"],
@@ -103,7 +97,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "victor doctor --usage",
         ],
     },
-
     # Docker Errors
     "docker_not_running": {
         "error_patterns": ["docker daemon", "docker not running", "connection refused to docker"],
@@ -118,7 +111,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "docker info",
         ],
     },
-
     # Memory Errors
     "out_of_memory": {
         "error_patterns": ["out of memory", "oom", "memory", "cannot allocate"],
@@ -133,7 +125,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "victor config set max_tokens 2048",
         ],
     },
-
     # Configuration Errors
     "config_invalid": {
         "error_patterns": ["configuration error", "invalid config", "yaml error"],
@@ -148,7 +139,6 @@ ERROR_RECOVERY_SUGGESTIONS = {
             "cat ~/.victor/profiles.yaml",
         ],
     },
-
     # Tool Execution Errors
     "tool_execution_failed": {
         "error_patterns": ["tool execution failed", "tool error", "tool failed"],

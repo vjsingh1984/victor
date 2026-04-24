@@ -419,14 +419,20 @@ class AgenticLoop:
         self.enhanced_completion_evaluator = None
         if not disable_enhanced_completion:
             self.enhanced_completion_evaluator = EnhancedCompletionEvaluator(
-                enable_requirement_validation=self.config.get("enable_requirement_validation", True),
+                enable_requirement_validation=self.config.get(
+                    "enable_requirement_validation", True
+                ),
                 enable_completion_scoring=self.config.get("enable_completion_scoring", True),
                 enable_context_keywords=self.config.get("enable_context_keywords", True),
                 completion_threshold=self.config.get("completion_threshold", 0.80),
             )
-            logger.info("[EnhancedCompletion] ENABLED by default - requirement-driven completion detection active (use disable_enhanced_completion=True to opt-out)")
+            logger.info(
+                "[EnhancedCompletion] ENABLED by default - requirement-driven completion detection active (use disable_enhanced_completion=True to opt-out)"
+            )
         else:
-            logger.warning("[EnhancedCompletion] DISABLED via config - using legacy completion detection")
+            logger.warning(
+                "[EnhancedCompletion] DISABLED via config - using legacy completion detection"
+            )
 
         # Initialize planning gate for fast-slow architecture
         self.planning_gate = PlanningGate(enabled=self.config.get("enable_planning_gate", True))
@@ -641,7 +647,9 @@ class AgenticLoop:
 
                     # Get current stage from perception
                     current_stage = None
-                    if hasattr(perception, "action_intent") and hasattr(perception.action_intent, "stage"):
+                    if hasattr(perception, "action_intent") and hasattr(
+                        perception.action_intent, "stage"
+                    ):
                         current_stage = perception.action_intent.stage
 
                     # Enforce stage transition if needed
@@ -684,17 +692,17 @@ class AgenticLoop:
                     # Check content lengths from recent iterations
                     recent_lengths = []
                     for iter_obj in iterations[-3:]:
-                        if iter_obj.action_result and hasattr(iter_obj.action_result, 'content'):
+                        if iter_obj.action_result and hasattr(iter_obj.action_result, "content"):
                             content_length = len(iter_obj.action_result.content)
                             recent_lengths.append(content_length)
-                        elif iter_obj.action_result and hasattr(iter_obj.action_result, 'response'):
+                        elif iter_obj.action_result and hasattr(iter_obj.action_result, "response"):
                             content_length = len(iter_obj.action_result.response)
                             recent_lengths.append(content_length)
 
                     # If all 3 recent iterations have same content length, likely looping
-                    if len(recent_lengths) >= 3 and \
-                       len(set(recent_lengths)) == 1 and \
-                       i >= 5:  # Only check after 5 iterations to avoid false positives
+                    if (
+                        len(recent_lengths) >= 3 and len(set(recent_lengths)) == 1 and i >= 5
+                    ):  # Only check after 5 iterations to avoid false positives
                         logger.warning(
                             f"Content degradation detected: same content length ({recent_lengths[0]}) "
                             f"repeated for 3 iterations - stopping loop"
@@ -1019,7 +1027,9 @@ class AgenticLoop:
 
         return phase_map.get(task_phase, "discover")
 
-    def _count_papers_found(self, conversation_history: Optional[List[Dict[str, Any]]] = None) -> int:
+    def _count_papers_found(
+        self, conversation_history: Optional[List[Dict[str, Any]]] = None
+    ) -> int:
         """Count unique arXiv papers mentioned in conversation.
 
         Args:
@@ -1038,7 +1048,7 @@ class AgenticLoop:
             for msg in conversation_history:
                 content = msg.get("content", "") if isinstance(msg, dict) else str(msg)
                 # Match arXiv IDs like 1234.56789 or arXiv:1234.56789
-                arxiv_pattern = r'\b(\d{4}\.\d{5,})\b'
+                arxiv_pattern = r"\b(\d{4}\.\d{5,})\b"
                 for match in re.findall(arxiv_pattern, content):
                     papers.add(match)
 
@@ -1174,14 +1184,19 @@ class AgenticLoop:
 
         # Completion indicators
         completion_patterns = [
-            "here is", "here's", "the answer is", "the solution is",
-            "in conclusion", "to summarize", "in summary",
-            "the code above", "the following code", "as shown",
+            "here is",
+            "here's",
+            "the answer is",
+            "the solution is",
+            "in conclusion",
+            "to summarize",
+            "in summary",
+            "the code above",
+            "the following code",
+            "as shown",
         ]
 
-        has_completion_indicator = any(
-            pattern in response_lower for pattern in completion_patterns
-        )
+        has_completion_indicator = any(pattern in response_lower for pattern in completion_patterns)
 
         # Check for complete code blocks
         has_complete_code = "```" in response and response.count("```") >= 2
@@ -1191,9 +1206,9 @@ class AgenticLoop:
 
         # Complete if: has indicators OR (has code/structure + sufficient length)
         return (
-            has_completion_indicator or
-            (has_complete_code and len(response) > 300) or
-            (has_structure and len(response) > 400)
+            has_completion_indicator
+            or (has_complete_code and len(response) > 300)
+            or (has_structure and len(response) > 400)
         )
 
     def _is_continuation_request(self, response: str) -> bool:
@@ -1258,7 +1273,9 @@ class AgenticLoop:
                 return enhanced_result
             except Exception as e:
                 # Graceful degradation: fall back to legacy evaluation on error
-                logger.warning(f"[EnhancedCompletion] Evaluation failed: {e}, falling back to legacy")
+                logger.warning(
+                    f"[EnhancedCompletion] Evaluation failed: {e}, falling back to legacy"
+                )
 
         # LEGACY: Original evaluation logic (preserved for backward compatibility)
         # Check for TurnResult-specific signals (single-turn mode)

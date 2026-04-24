@@ -520,6 +520,7 @@ class TestLiveDisplayRenderer:
     def test_calculate_adaptive_preview_lines_with_error_shows_all(self, renderer):
         """Adaptive preview with error shows all lines."""
         from unittest.mock import MagicMock
+
         tool_settings = MagicMock()
         tool_settings.tool_output_preview_lines_min = 1
         tool_settings.tool_output_preview_lines_max = 10
@@ -533,63 +534,57 @@ class TestLiveDisplayRenderer:
     def test_calculate_adaptive_preview_lines_small_output_shows_all(self, renderer):
         """Adaptive preview with small output (≤5 lines) shows all."""
         from unittest.mock import MagicMock
+
         tool_settings = MagicMock()
         tool_settings.tool_output_preview_lines_min = 1
         tool_settings.tool_output_preview_lines_max = 10
 
         output = "line1\nline2\nline3"
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 3  # All lines shown for small output
 
     def test_calculate_adaptive_preview_lines_medium_output_shows_moderate(self, renderer):
         """Adaptive preview with medium output (5-50 lines) shows 3-5 lines."""
         from unittest.mock import MagicMock
+
         tool_settings = MagicMock()
         tool_settings.tool_output_preview_lines_min = 1
         tool_settings.tool_output_preview_lines_max = 10
 
         # 20 lines → should show 5 lines (max for medium)
         output = "\n".join([f"line{i}" for i in range(20)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 5  # Moderate preview for medium output
 
     def test_calculate_adaptive_preview_lines_large_output_shows_minimal(self, renderer):
         """Adaptive preview with large output (>50 lines) shows 1-2 lines."""
         from unittest.mock import MagicMock
+
         tool_settings = MagicMock()
         tool_settings.tool_output_preview_lines_min = 1
         tool_settings.tool_output_preview_lines_max = 10
 
         # 100 lines → should show 2 lines (max for large)
         output = "\n".join([f"line{i}" for i in range(100)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 2  # Minimal preview for large output
 
     def test_calculate_adaptive_preview_lines_respects_min_max_bounds(self, renderer):
         """Adaptive preview respects configured min/max bounds."""
         from unittest.mock import MagicMock
+
         tool_settings = MagicMock()
         tool_settings.tool_output_preview_lines_min = 3  # Higher minimum
         tool_settings.tool_output_preview_lines_max = 8  # Lower maximum
 
         # Large output that would normally show 2 lines
         output = "\n".join([f"line{i}" for i in range(100)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 3  # Respects minimum bound
 
         # Small output that would show 5 lines
         output = "\n".join([f"line{i}" for i in range(20)])
-        lines = renderer._calculate_adaptive_preview_lines(
-            output, None, 3, tool_settings
-        )
+        lines = renderer._calculate_adaptive_preview_lines(output, None, 3, tool_settings)
         assert lines == 5  # Within bounds
 
     def test_categorize_tool_groups_filesystem_tools(self, renderer):
@@ -622,6 +617,7 @@ class TestLiveDisplayRenderer:
     ):
         """Group header is shown when tool category changes."""
         from unittest.mock import MagicMock
+
         mock_live_class.return_value = MagicMock()
         renderer.start()
 
@@ -659,6 +655,7 @@ class TestLiveDisplayRenderer:
     ):
         """Group header is not shown when grouping is disabled."""
         from unittest.mock import MagicMock
+
         mock_live_class.return_value = MagicMock()
         renderer.start()
 
@@ -1058,9 +1055,7 @@ class TestStreamResponse:
         await stream_response(mock_agent, "test message", mock_renderer)
 
         assert mock_renderer.on_content.call_count == 2
-        mock_renderer.on_content.assert_has_calls(
-            [call("I will analyze"), call(" the repository")]
-        )
+        mock_renderer.on_content.assert_has_calls([call("I will analyze"), call(" the repository")])
 
     @pytest.mark.asyncio
     async def test_normalizes_cumulative_reasoning_snapshots(self, mock_agent, mock_renderer):
@@ -1326,6 +1321,7 @@ class TestStreamingMetrics:
 
     def test_initial_state_all_zero(self):
         from victor.ui.rendering.metrics import StreamingMetrics
+
         m = StreamingMetrics()
         assert m.pause_count == 0
         assert m.resume_count == 0
@@ -1337,10 +1333,12 @@ class TestStreamingMetrics:
 
     def test_avg_content_ms_no_chunks(self):
         from victor.ui.rendering.metrics import StreamingMetrics
+
         assert StreamingMetrics().avg_content_ms == 0.0
 
     def test_avg_content_ms_multiple_chunks(self):
         from victor.ui.rendering.metrics import StreamingMetrics
+
         m = StreamingMetrics()
         m.record_content_chunk(10.0)
         m.record_content_chunk(30.0)
@@ -1348,13 +1346,15 @@ class TestStreamingMetrics:
 
     def test_slow_render_counted_above_threshold(self):
         from victor.ui.rendering.metrics import StreamingMetrics
+
         m = StreamingMetrics()
-        m.record_content_chunk(50.0)   # fast
+        m.record_content_chunk(50.0)  # fast
         m.record_content_chunk(150.0)  # slow
         assert m.slow_renders == 1
 
     def test_record_pause_accumulates_time(self):
         from victor.ui.rendering.metrics import StreamingMetrics
+
         m = StreamingMetrics()
         m.record_pause(20.0)
         m.record_pause(30.0)
@@ -1364,6 +1364,7 @@ class TestStreamingMetrics:
     def test_formatter_renderer_get_metrics(self):
         """FormatterRenderer.get_metrics() returns a StreamingMetrics instance."""
         from victor.ui.rendering.metrics import StreamingMetrics
+
         mock_formatter = MagicMock()
         mock_console = MagicMock(spec=Console)
         renderer = FormatterRenderer(mock_formatter, mock_console)
@@ -1401,6 +1402,7 @@ class TestStreamingMetrics:
     def test_live_display_renderer_get_metrics(self):
         """LiveDisplayRenderer.get_metrics() returns a StreamingMetrics instance."""
         from victor.ui.rendering.metrics import StreamingMetrics
+
         mock_console = MagicMock(spec=Console)
         renderer = LiveDisplayRenderer(mock_console)
         assert isinstance(renderer.get_metrics(), StreamingMetrics)
@@ -1409,8 +1411,10 @@ class TestStreamingMetrics:
         """on_tool_result() increments tool_results counter in LiveDisplayRenderer."""
         mock_console = MagicMock(spec=Console)
         renderer = LiveDisplayRenderer(mock_console)
-        with patch("victor.ui.rendering.live_renderer.Live"), \
-             patch("victor.config.tool_settings.get_tool_settings") as mock_ts:
+        with (
+            patch("victor.ui.rendering.live_renderer.Live"),
+            patch("victor.config.tool_settings.get_tool_settings") as mock_ts,
+        ):
             mock_ts.return_value = MagicMock(
                 tool_output_preview_enabled=False,
                 tool_output_show_transparency=False,
@@ -1453,6 +1457,7 @@ class TestFormatterRendererPauseDepth:
     def test_resume_without_pause_is_noop(self, renderer, mock_formatter, caplog):
         """resume() with no prior pause() logs a warning and is a no-op."""
         import logging
+
         with caplog.at_level(logging.WARNING, logger="victor.ui.rendering.formatter_renderer"):
             renderer.resume()
         mock_formatter.start_streaming.assert_not_called()
@@ -1544,6 +1549,7 @@ class TestFormatterRendererExpandLastOutput:
     def test_expand_shows_rich_panel(self, renderer, mock_console):
         """expand_last_output() calls console.print with a Rich Panel."""
         from rich.panel import Panel
+
         renderer._last_tool_result = {
             "name": "code_search",
             "success": True,
@@ -1610,6 +1616,7 @@ class TestLiveDisplayRendererPauseDepth:
     def test_resume_without_pause_is_noop(self, renderer, caplog):
         """resume() with no prior pause() logs a warning and is a no-op."""
         import logging
+
         with caplog.at_level(logging.WARNING, logger="victor.ui.rendering.live_renderer"):
             renderer.resume()
         assert "no matching pause" in caplog.text
@@ -1665,6 +1672,7 @@ class TestLiveDisplayRendererExpandLastOutput:
     def test_expand_shows_rich_panel(self, renderer, mock_console):
         """expand_last_output() calls console.print with a Rich Panel."""
         from rich.panel import Panel
+
         renderer._last_tool_result = {
             "name": "code_search",
             "success": True,
@@ -1677,8 +1685,7 @@ class TestLiveDisplayRendererExpandLastOutput:
             renderer.expand_last_output()
         # Console.print should have been called with a Panel
         panel_calls = [
-            c for c in mock_console.print.call_args_list
-            if c[0] and isinstance(c[0][0], Panel)
+            c for c in mock_console.print.call_args_list if c[0] and isinstance(c[0][0], Panel)
         ]
         assert len(panel_calls) == 1
 
@@ -1695,7 +1702,8 @@ class TestLiveDisplayRendererExpandLastOutput:
         with patch("victor.ui.rendering.live_renderer.Live"):
             renderer.expand_last_output()
         warning_calls = [
-            c for c in mock_console.print.call_args_list
+            c
+            for c in mock_console.print.call_args_list
             if "chars" in str(c[0][0]) or "10000" in str(c[0][0])
         ]
         assert len(warning_calls) == 1

@@ -302,6 +302,7 @@ class OutputFormatter:
             if show_preview and success:
                 try:
                     from victor.config.tool_settings import get_tool_settings
+
                     hotkey = get_tool_settings().tool_output_expand_hotkey
                 except Exception:
                     hotkey = "^O"
@@ -325,6 +326,7 @@ class OutputFormatter:
             if was_pruned and self.config.show_tools:
                 try:
                     from victor.config.tool_settings import get_tool_settings
+
                     tool_settings = get_tool_settings()
                     if tool_settings.tool_output_show_transparency:
                         self._console.print(

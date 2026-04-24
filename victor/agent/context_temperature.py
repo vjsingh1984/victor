@@ -112,7 +112,9 @@ class ContextTemperatureClassifier:
         if age <= cfg.hot_max_age_turns and hot_count < cfg.hot_max_items:
             content = getattr(msg, "content", "") or ""
             is_tool_result = role == "tool"
-            is_referenced = any(name in content for name in recent_tool_names) if recent_tool_names else False
+            is_referenced = (
+                any(name in content for name in recent_tool_names) if recent_tool_names else False
+            )
             if is_tool_result or is_referenced or age <= 1:
                 return ContextTemperature.HOT
 

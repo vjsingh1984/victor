@@ -861,7 +861,9 @@ async def _find_semantic_relationships(
     # Get existing structural neighbors (OUT only for dependency-like relationships)
     neighbors = loaded.analyzer.get_neighbors(node_id, direction=GraphDirection.OUT, max_depth=1)
     existing_neighbor_ids = {
-        item["node_id"] for depth_items in neighbors["neighbors_by_depth"].values() for item in depth_items
+        item["node_id"]
+        for depth_items in neighbors["neighbors_by_depth"].values()
+        for item in depth_items
     }
     # Also ignore self
     existing_neighbor_ids.add(node_id)
@@ -877,7 +879,9 @@ async def _find_semantic_relationships(
             continue
 
         # Find corresponding node ID in graph analyzer
-        match_id = loaded.analyzer.resolve_node_id(res_name, preferred_types={result.get("symbol_type") or "function"})
+        match_id = loaded.analyzer.resolve_node_id(
+            res_name, preferred_types={result.get("symbol_type") or "function"}
+        )
         if not match_id or match_id in existing_neighbor_ids:
             continue
 
@@ -902,7 +906,9 @@ async def _find_semantic_relationships(
 
     return {
         "focus_node": _node_payload(target_node),
-        "potential_relationships": sorted(relationships, key=lambda x: x["similarity"], reverse=True),
+        "potential_relationships": sorted(
+            relationships, key=lambda x: x["similarity"], reverse=True
+        ),
         "threshold_used": threshold,
         "total_discovered": len(relationships),
     }
@@ -966,8 +972,6 @@ def _build_stats(loaded: LoadedGraph) -> Dict[str, Any]:
     aliases=["graph_tool"],
     timeout=60.0,
 )
-
-
 async def _handle_multi_mode(
     loaded: Any,
     mode_str: str,
@@ -1011,9 +1015,19 @@ async def _handle_multi_mode(
             # We replicate the graph function logic here for single modes
             default_edge_types = _default_edge_types(single_mode, only_runtime=only_runtime)
             effective_edge_types = edge_types or default_edge_types
-            node_types = _node_type_filter(single_mode, files_only=files_only, modules_only=modules_only)
+            node_types = _node_type_filter(
+                single_mode, files_only=files_only, modules_only=modules_only
+            )
 
-            if single_mode in {"callers", "callees", "trace", "call_flow", "neighbors", "impact", "subgraph"}:
+            if single_mode in {
+                "callers",
+                "callees",
+                "trace",
+                "call_flow",
+                "neighbors",
+                "impact",
+                "subgraph",
+            }:
                 target_ref = node or source
                 if not target_ref:
                     raise ValueError(f"{single_mode} mode requires node")
@@ -1028,7 +1042,9 @@ async def _handle_multi_mode(
                     suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
                     error_msg = f"Could not resolve graph node '{target_ref}'"
                     if suggestions:
-                        error_msg += f"\n\nDid you mean one of these?\n  - " + "\n  - ".join(suggestions[:5])
+                        error_msg += "\n\nDid you mean one of these?\n  - " + "\n  - ".join(
+                            suggestions[:5]
+                        )
                     raise ValueError(error_msg)
 
                 effective_direction = direction
@@ -1210,7 +1226,9 @@ async def graph(
                 suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
                 error_msg = f"Could not resolve graph node '{target_ref}'"
                 if suggestions:
-                    error_msg += f"\n\nDid you mean one of these?\n  - " + "\n  - ".join(suggestions[:5])
+                    error_msg += "\n\nDid you mean one of these?\n  - " + "\n  - ".join(
+                        suggestions[:5]
+                    )
                 raise ValueError(error_msg)
 
             effective_direction = direction
@@ -1362,7 +1380,9 @@ async def graph(
                 suggestions = _find_similar_node_names(loaded.analyzer, target_ref)
                 error_msg = f"Could not resolve graph node '{target_ref}'"
                 if suggestions:
-                    error_msg += f"\n\nDid you mean one of these?\n  - " + "\n  - ".join(suggestions[:5])
+                    error_msg += "\n\nDid you mean one of these?\n  - " + "\n  - ".join(
+                        suggestions[:5]
+                    )
                 raise ValueError(error_msg)
 
             result = await _find_semantic_relationships(
@@ -1427,6 +1447,7 @@ async def graph(
 # =============================================================================
 # Focused Graph Tools (Split from monolithic graph function)
 # =============================================================================
+
 
 @tool(
     category="search",
