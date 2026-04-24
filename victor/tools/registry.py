@@ -14,6 +14,7 @@
 
 """Tool registry for managing available tools."""
 
+import logging
 import threading
 from contextlib import contextmanager
 from typing import (
@@ -30,6 +31,8 @@ from typing import (
 
 from victor.core.registry import BaseRegistry
 from victor.tools.enums import CostTier
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from victor.tools.registration.strategies import ToolRegistrationStrategy
@@ -117,6 +120,33 @@ class ToolRegistry(BaseRegistry[str, Any]):
         self._batch_mode: bool = False
         self._batch_dirty: bool = False
 
+        # Tool deduplication (optional, based on settings)
+        self._deduplicator: Optional[Any] = None
+        self._deduplication_enabled: bool = False
+        try:
+            from victor.config.tool_settings import get_tool_settings
+
+            tool_settings = get_tool_settings()
+            if tool_settings.enable_tool_deduplication:
+                from victor.tools.deduplication import (
+                    DeduplicationConfig,
+                    ToolDeduplicator,
+                )
+
+                config = DeduplicationConfig(
+                    enabled=tool_settings.enable_tool_deduplication,
+                    priority_order=tool_settings.deduplication_priority_order,
+                    whitelist=tool_settings.deduplication_whitelist,
+                    blacklist=tool_settings.deduplication_blacklist,
+                    strict_mode=tool_settings.deduplication_strict_mode,
+                    naming_enforcement=tool_settings.deduplication_naming_enforcement,
+                    semantic_similarity_threshold=tool_settings.deduplication_semantic_threshold,
+                )
+                self._deduplicator = ToolDeduplicator(config)
+                self._deduplication_enabled = True
+        except ImportError:
+            pass  # Deduplication not available
+
         # Strategy pattern support (when flag enabled)
         # Initialize strategy registry if flag is enabled
         self._strategy_registry: Optional["ToolRegistrationStrategyRegistry"] = None
@@ -143,6 +173,126 @@ class ToolRegistry(BaseRegistry[str, Any]):
     def _tools(self, value: Dict[str, Any]) -> None:
         """Setter for _tools alias."""
         self._items = value
+
+    def _extract_tool_name(self, tool: Any) -> str:
+        """Extract tool name from various tool types.
+
+        Args:
+            tool: Tool object (BaseTool, decorated function, etc.)
+
+        Returns:
+            Tool name
+        """
+        if hasattr(tool, "name"):
+            return tool.name
+        elif hasattr(tool, "__name__"):
+            return tool.__name__
+        else:
+            return str(tool)
+
+    def _should_register_tool(self, tool: Any, tool_name: str) -> bool:
+        """Check if tool should be registered based on deduplication rules.
+
+        Args:
+            tool: Tool to check
+            tool_name: Extracted tool name
+
+        Returns:
+            True if tool should be registered, False if it should be skipped
+        """
+        if not self._deduplication_enabled or not self._deduplicator:
+            return True
+
+        # Check if tool with same normalized name already exists
+        # Import here to avoid circular dependency
+        from victor.tools.deduplication import ToolSource
+
+        # Detect source of new tool
+        new_tool_source = self._detect_tool_source(tool)
+
+        # Check for existing tools with same normalized name
+        for existing_name, existing_tool in self._tools.items():
+            # Normalize names for comparison
+            if self._normalize_name(tool_name) == self._normalize_name(existing_name):
+                # Found a conflict - check priorities
+                existing_source = self._detect_tool_source(existing_tool)
+
+                # Compare sources (higher priority = should be kept)
+                if self._compare_sources(existing_source, new_tool_source) > 0:
+                    # Existing tool has higher priority, skip new tool
+                    logger.debug(
+                        f"Skipping '{tool_name}' (source={new_tool_source.value}) "
+                        f"in favor of '{existing_name}' (source={existing_source.value})"
+                    )
+                    return False
+
+        # No conflict or new tool has higher priority
+        return True
+
+    def _detect_tool_source(self, tool: Any) -> Any:
+        """Detect tool source from metadata or heuristics.
+
+        Args:
+            tool: Tool to analyze
+
+        Returns:
+            Detected ToolSource
+        """
+        # Import here to avoid circular dependency
+        from victor.tools.deduplication import ToolSource
+
+        # Check for source metadata
+        if hasattr(tool, "_tool_source"):
+            return ToolSource(tool._tool_source)
+
+        # Heuristic detection based on tool name
+        tool_name = self._extract_tool_name(tool).lower()
+
+        if tool_name.startswith("lgc_") or tool_name.startswith("langchain_"):
+            return ToolSource.LANGCHAIN
+        elif tool_name.startswith("mcp_"):
+            return ToolSource.MCP
+        elif tool_name.startswith("plg_"):
+            return ToolSource.PLUGIN
+        else:
+            return ToolSource.NATIVE
+
+    def _normalize_name(self, name: str) -> str:
+        """Normalize tool name for conflict detection.
+
+        Args:
+            name: Tool name to normalize
+
+        Returns:
+            Normalized name
+        """
+        normalized = name.lower()
+
+        # Remove source prefixes
+        for prefix in ["lgc_", "langchain_", "mcp_", "plg_", "plugin_"]:
+            if normalized.startswith(prefix):
+                normalized = normalized[len(prefix) :]
+                break
+
+        # Normalize separators
+        normalized = normalized.replace("_", " ").replace("-", " ")
+
+        # Remove extra whitespace
+        normalized = " ".join(normalized.split())
+
+        return normalized
+
+    def _compare_sources(self, source1: Any, source2: Any) -> int:
+        """Compare two tool sources by priority.
+
+        Args:
+            source1: First tool source
+            source2: Second tool source
+
+        Returns:
+            Positive if source1 has higher priority, negative if source2 has higher priority, 0 if equal
+        """
+        return source1.priority_weight - source2.priority_weight
 
     def _invalidate_schema_cache(self) -> None:
         """Invalidate the schema cache by bumping the version counter.
@@ -218,6 +368,10 @@ class ToolRegistry(BaseRegistry[str, Any]):
         this method uses the strategy pattern to automatically determine the
         appropriate registration strategy based on the tool type.
 
+        When tool deduplication is enabled, this method checks for conflicts
+        with already-registered tools and skips registration if a higher-priority
+        tool with the same normalized name exists.
+
         Args:
             *args: Either (tool,) or (key, value)
             enabled: Whether the tool is enabled by default (default: True)
@@ -230,6 +384,14 @@ class ToolRegistry(BaseRegistry[str, Any]):
         if len(args) == 1:
             # Single argument: register(tool) - extract name automatically
             tool = args[0]
+
+            # Extract tool name for deduplication check
+            tool_name = self._extract_tool_name(tool)
+
+            # Check for conflicts with already-registered tools
+            if self._deduplication_enabled and not self._should_register_tool(tool, tool_name):
+                logger.debug(f"Tool '{tool_name}' skipped due to deduplication")
+                return
 
             # LazyToolProxy — register directly (bypass strategy pattern)
             if hasattr(tool, "is_loaded") and hasattr(tool, "execute"):
@@ -271,6 +433,12 @@ class ToolRegistry(BaseRegistry[str, Any]):
         elif len(args) == 2:
             # Two arguments: register(key, value) - LSP-compatible
             key, value = args
+
+            # Check for conflicts with already-registered tools
+            if self._deduplication_enabled and not self._should_register_tool(value, key):
+                logger.debug(f"Tool '{key}' skipped due to deduplication")
+                return
+
             super().register(key, value)
             self._tool_enabled[key] = enabled
         else:
