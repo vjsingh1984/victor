@@ -549,10 +549,12 @@ class TaskCompletionDetector:
             if active_marker == SUMMARY_MARKER:
                 marker_pos = response_text.find(SUMMARY_MARKER)
                 if marker_pos != -1:
-                    summary_text = response_text[marker_pos + len(SUMMARY_MARKER):].strip()
+                    summary_text = response_text[marker_pos + len(SUMMARY_MARKER) :].strip()
                     if summary_text:
                         self._state.last_summary = summary_text
-                        logger.info(f"Persisted VICTOR_SUMMARY for next-turn injection ({len(summary_text)} chars)")
+                        logger.info(
+                            f"Persisted VICTOR_SUMMARY for next-turn injection ({len(summary_text)} chars)"
+                        )
             return
 
         # Priority 3: Passive phrase detection (fallback)

@@ -98,9 +98,7 @@ class _DiffPreviewStrategy(_ToolPreviewStrategy):
                 if not isinstance(op, dict):
                     continue
                 if op.get("type") == "replace":
-                    pairs.append(
-                        (op.get("old_str", ""), op.get("new_str", ""), op.get("path", ""))
-                    )
+                    pairs.append((op.get("old_str", ""), op.get("new_str", ""), op.get("path", "")))
             return pairs
         # Legacy / other tools: top-level old_str/new_str or old_string/new_string
         old = arguments.get("old_str") or arguments.get("old_string", "")

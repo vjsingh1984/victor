@@ -145,7 +145,9 @@ class ConflictDetector:
         except Exception as e:
             logger.warning(f"Semantic similarity detection failed: {e}")
 
-        return ConflictResult(is_conflict=False, confidence=0.0, reason="Semantic similarity below threshold")
+        return ConflictResult(
+            is_conflict=False, confidence=0.0, reason="Semantic similarity below threshold"
+        )
 
     def _capability_overlap(self, tool1: Any, tool2: Any) -> ConflictResult:
         """Check capability overlap based on keywords and parameters."""
@@ -181,7 +183,9 @@ class ConflictDetector:
                         reason=f"Both tools appear to handle {capability_name} with similar parameters",
                     )
 
-        return ConflictResult(is_conflict=False, confidence=0.0, reason="No significant capability overlap")
+        return ConflictResult(
+            is_conflict=False, confidence=0.0, reason="No significant capability overlap"
+        )
 
     def _parameter_similarity(self, tool1: Any, tool2: Any) -> float:
         """Calculate parameter similarity between two tools (0.0-1.0)."""

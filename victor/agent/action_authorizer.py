@@ -465,9 +465,22 @@ class IntentDetector:
         # Short-circuit: bare continuation commands resume an in-progress task and
         # must not receive a DISPLAY_ONLY guard that blocks tool use and file writes.
         _CONTINUATION_KEYWORDS = {
-            "continue", "go", "proceed", "next", "yes", "ok", "okay",
-            "go ahead", "keep going", "carry on", "resume", "do it",
-            "continue please", "yes please", "go on", "keep it up",
+            "continue",
+            "go",
+            "proceed",
+            "next",
+            "yes",
+            "ok",
+            "okay",
+            "go ahead",
+            "keep going",
+            "carry on",
+            "resume",
+            "do it",
+            "continue please",
+            "yes please",
+            "go on",
+            "keep it up",
         }
         if message.strip().lower() in _CONTINUATION_KEYWORDS:
             return IntentClassification(

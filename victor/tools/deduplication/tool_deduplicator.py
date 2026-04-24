@@ -80,7 +80,9 @@ class DeduplicationConfig(BaseModel):
 
     def get_priority_map(self) -> Dict[str, int]:
         """Get priority weights for each source based on priority_order."""
-        return {source: len(self.priority_order) - i for i, source in enumerate(self.priority_order)}
+        return {
+            source: len(self.priority_order) - i for i, source in enumerate(self.priority_order)
+        }
 
 
 @dataclass
@@ -229,7 +231,9 @@ class ToolDeduplicator:
 
         return normalized
 
-    def _resolve_group_conflict(self, group: List[Any], result: DeduplicationResult) -> Optional[Any]:
+    def _resolve_group_conflict(
+        self, group: List[Any], result: DeduplicationResult
+    ) -> Optional[Any]:
         """Resolve conflicts within a group of tools with the same normalized name.
 
         Args:

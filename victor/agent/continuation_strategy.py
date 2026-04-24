@@ -1014,8 +1014,16 @@ class ContinuationStrategy:
         # typically because context compaction erased the pending task state.
         # "Let me verify the files I need to modify:" is 164 chars — a classic symptom.
         _PREAMBLE_PREFIXES = (
-            "let me ", "i'll ", "i will ", "i need to ", "first, ", "first i ",
-            "to implement", "to complete", "to continue", "next, i",
+            "let me ",
+            "i'll ",
+            "i will ",
+            "i need to ",
+            "first, ",
+            "first i ",
+            "to implement",
+            "to complete",
+            "to continue",
+            "next, i",
         )
         if (
             not is_completion

@@ -75,9 +75,7 @@ class NamingEnforcer:
 
         # Add prefix
         new_name = f"{expected_prefix}{tool_name}"
-        logger.debug(
-            f"Naming enforcement: {tool_name} → {new_name} (source={source.value})"
-        )
+        logger.debug(f"Naming enforcement: {tool_name} → {new_name} (source={source.value})")
         return new_name
 
     def strip_prefix(self, tool_name: str) -> str:

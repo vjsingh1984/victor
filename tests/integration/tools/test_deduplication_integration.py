@@ -298,7 +298,10 @@ class TestAdapterNamingConventions:
 
     def test_langchain_adapter_lgc_prefix(self):
         """Test that LangChainAdapterTool uses lgc_ prefix."""
-        from victor.tools.langchain_adapter_tool import LangChainAdapterTool, DEFAULT_LANGCHAIN_PREFIX
+        from victor.tools.langchain_adapter_tool import (
+            LangChainAdapterTool,
+            DEFAULT_LANGCHAIN_PREFIX,
+        )
 
         lc_tool = MockLangChainTool(name="wikipedia", description="Wikipedia")
         adapter = LangChainAdapterTool(lc_tool)
