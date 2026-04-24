@@ -57,13 +57,13 @@ class TestIntentClassification:
             intent=ActionIntent.WRITE_ALLOWED,
             confidence=0.9,
             matched_signals=["save_to_file", "create_file"],
-            safe_actions={"write_file", "read_file"},
+            safe_actions={"write", "read"},
             prompt_guard="",
         )
         assert classification.intent == ActionIntent.WRITE_ALLOWED
         assert classification.confidence == 0.9
         assert len(classification.matched_signals) == 2
-        assert "write_file" in classification.safe_actions
+        assert "write" in classification.safe_actions
 
 
 class TestIntentDetector:
@@ -240,14 +240,14 @@ class TestIntentDetector:
 
         # Display only should have read + generate but not write
         result = detector.detect("show me a function")
-        assert "read_file" in result.safe_actions
+        assert "read" in result.safe_actions
         assert "generate_response" in result.safe_actions
-        assert "write_file" not in result.safe_actions
+        assert "write" not in result.safe_actions
 
         # Write allowed should have all actions
         result = detector.detect("save this to file.py")
-        assert "write_file" in result.safe_actions
-        assert "edit_file" in result.safe_actions
+        assert "write" in result.safe_actions
+        assert "edit" in result.safe_actions
 
     def test_prompt_guard_assignment(self):
         """Test that prompt guards are correctly assigned."""
@@ -255,7 +255,7 @@ class TestIntentDetector:
 
         result = detector.detect("show me a function")
         assert "IMPORTANT" in result.prompt_guard
-        assert "write_file" in result.prompt_guard or "NOT" in result.prompt_guard
+        assert "write" in result.prompt_guard or "NOT" in result.prompt_guard
 
         result = detector.detect("save this to file.py")
         assert result.prompt_guard == ""  # No guard for write
@@ -336,17 +336,17 @@ class TestSafeActionsMapping:
     def test_read_only_actions(self):
         """Test read-only has minimal actions."""
         actions = SAFE_ACTIONS[ActionIntent.READ_ONLY]
-        assert "read_file" in actions
-        assert "write_file" not in actions
-        assert "execute_bash" not in actions
+        assert "read" in actions
+        assert "write" not in actions
+        assert "shell" not in actions
 
     def test_write_allowed_actions(self):
         """Test write-allowed has all actions."""
         actions = SAFE_ACTIONS[ActionIntent.WRITE_ALLOWED]
-        assert "read_file" in actions
-        assert "write_file" in actions
-        assert "edit_file" in actions
-        assert "execute_bash" in actions
+        assert "read" in actions
+        assert "write" in actions
+        assert "edit" in actions
+        assert "shell" in actions
 
 
 class TestPromptGuards:
@@ -763,6 +763,16 @@ class TestGetSafeToolsFunction:
         assert "code_search" in safe
         assert "semantic_code_search" in safe
 
+    def test_get_safe_tools_accepts_canonical_tool_sets(self):
+        """Canonical safe actions should map cleanly to canonical tool inventories."""
+        all_tools = {"read", "write", "edit", "ls", "shell", "code_search"}
+        safe = get_safe_tools("save this to config.py", all_tools)
+        assert "read" in safe
+        assert "write" in safe
+        assert "edit" in safe
+        assert "ls" in safe
+        assert "shell" in safe
+
 
 class TestInitializationCoverage:
     """Tests for IntentDetector initialization coverage."""
@@ -839,9 +849,9 @@ class TestToolCategories:
         """Test WRITE_TOOLS constant contains expected tools."""
         from victor.agent.action_authorizer import WRITE_TOOLS
 
-        assert "write_file" in WRITE_TOOLS
-        assert "edit_files" in WRITE_TOOLS
-        assert "execute_bash" in WRITE_TOOLS
+        assert "write" in WRITE_TOOLS
+        assert "edit" in WRITE_TOOLS
+        assert "shell" in WRITE_TOOLS
         assert "git" in WRITE_TOOLS
         assert isinstance(WRITE_TOOLS, frozenset)
 
@@ -849,8 +859,8 @@ class TestToolCategories:
         """Test READ_ONLY_TOOLS constant contains expected tools."""
         from victor.agent.action_authorizer import READ_ONLY_TOOLS
 
-        assert "read_file" in READ_ONLY_TOOLS
-        assert "list_directory" in READ_ONLY_TOOLS
+        assert "read" in READ_ONLY_TOOLS
+        assert "ls" in READ_ONLY_TOOLS
         assert "code_search" in READ_ONLY_TOOLS
         assert isinstance(READ_ONLY_TOOLS, frozenset)
 

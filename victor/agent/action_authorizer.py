@@ -39,7 +39,16 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, List, Optional, Set, Tuple
 
+from victor.tools.tool_names import ToolNames
+
 logger = logging.getLogger(__name__)
+
+
+READ_TOOL_ALIASES = frozenset({ToolNames.READ, "read_file"})
+LIST_TOOL_ALIASES = frozenset({ToolNames.LS, "list_directory"})
+WRITE_TOOL_ALIASES = frozenset({ToolNames.WRITE, "write_file", "create_file"})
+EDIT_TOOL_ALIASES = frozenset({ToolNames.EDIT, "edit_files", "edit_file", "patch_file"})
+SHELL_TOOL_ALIASES = frozenset({ToolNames.SHELL, "execute_bash", "bash"})
 
 
 class ActionIntent(Enum):
@@ -69,12 +78,12 @@ class ActionIntent(Enum):
 WRITE_TOOLS: frozenset[str] = frozenset(
     {
         # Direct file modifications
-        "write_file",  # filesystem.py
-        "edit_files",  # file_editor_tool.py
+        ToolNames.WRITE,
+        ToolNames.EDIT,
         # Patch/diff application
         "apply_patch",  # patch_tool.py
         # Bash execution (can modify files)
-        "execute_bash",  # bash.py
+        ToolNames.SHELL,
         # Git write operations
         "git",  # git_tool.py (commit, push, etc.)
         # Refactoring (modifies files)
@@ -93,8 +102,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
 # Tools that are safe for all intents (read-only operations)
 READ_ONLY_TOOLS: frozenset[str] = frozenset(
     {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "semantic_code_search",
         "grep_search",
@@ -326,32 +335,31 @@ COMPOUND_WRITE_SIGNALS: List[Tuple[str, float, str]] = [
 # Safe actions by intent type
 SAFE_ACTIONS: dict[ActionIntent, Set[str]] = {
     ActionIntent.READ_ONLY: {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "git_status",
     },
     ActionIntent.DISPLAY_ONLY: {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "git_status",
         "generate_response",  # Can generate code in response, just not write
     },
     ActionIntent.WRITE_ALLOWED: {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "git_status",
         "generate_response",
-        "write_file",
-        "edit_file",
-        "create_file",
-        "execute_bash",
+        ToolNames.WRITE,
+        ToolNames.EDIT,
+        ToolNames.SHELL,
     },
     ActionIntent.AMBIGUOUS: {
-        "read_file",
-        "list_directory",
+        ToolNames.READ,
+        ToolNames.LS,
         "code_search",
         "git_status",
         "generate_response",
@@ -363,7 +371,7 @@ PROMPT_GUARDS: dict[ActionIntent, str] = {
     ActionIntent.DISPLAY_ONLY: """
 IMPORTANT: The user wants to SEE code, not save it to a file.
 - Generate and DISPLAY the requested code directly in your response
-- Do NOT use write_file or create_file tools
+- Do NOT use write or edit tools
 - Do NOT modify any existing files
 - Present code in markdown code blocks
 - Be concise and complete the task in one response
@@ -372,7 +380,7 @@ IMPORTANT: The user wants to SEE code, not save it to a file.
 """,
     ActionIntent.READ_ONLY: """
 IMPORTANT: This is a read-only query.
-- Only use read operations (read_file, list_directory, code_search)
+- Only use read operations (read, ls, code_search)
 - Be concise and answer directly
 - Do NOT ask follow-up questions - just provide the information requested
 - Do NOT write, create, or modify any files
@@ -397,7 +405,7 @@ class IntentDetector:
         detector = IntentDetector()
         result = detector.detect("Show me a function that calculates factorial")
         print(result.intent)  # ActionIntent.DISPLAY_ONLY
-        print(result.safe_actions)  # {"read_file", "generate_response", ...}
+        print(result.safe_actions)  # {"read", "generate_response", ...}
     """
 
     def __init__(
@@ -628,15 +636,14 @@ def get_safe_tools(message: str, all_tools: Set[str]) -> Set[str]:
     # Map safe action categories to actual tool names
     # This is a simple mapping - can be extended
     action_to_tools = {
-        "read_file": {"read_file"},
-        "list_directory": {"list_directory"},
+        ToolNames.READ: READ_TOOL_ALIASES,
+        ToolNames.LS: LIST_TOOL_ALIASES,
         "code_search": {"code_search", "semantic_code_search"},
-        "git_status": {"execute_bash"},  # Only for git read commands
+        "git_status": SHELL_TOOL_ALIASES | {"git_status"},
         "generate_response": set(),  # Not a tool, just allow text response
-        "write_file": {"write_file", "create_file"},
-        "edit_file": {"edit_file", "patch_file"},
-        "create_file": {"write_file", "create_file"},
-        "execute_bash": {"execute_bash"},
+        ToolNames.WRITE: WRITE_TOOL_ALIASES,
+        ToolNames.EDIT: EDIT_TOOL_ALIASES,
+        ToolNames.SHELL: SHELL_TOOL_ALIASES,
     }
 
     safe = set()
