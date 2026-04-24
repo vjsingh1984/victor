@@ -308,19 +308,29 @@ fn check_partial_pattern(text: &str, patterns: &[&str]) -> Option<usize> {
     }
 
     // Check last N characters where N is max pattern length
-    let max_pattern_len = patterns.iter().map(|p| p.len()).max().unwrap_or(0);
-    let check_len = text.len().min(max_pattern_len - 1);
+    // Use character counting for multi-byte UTF-8 safety
+    let max_pattern_len = patterns.iter().map(|p| p.chars().count()).max().unwrap_or(0);
+
+    // Get character positions for safe UTF-8 indexing
+    let char_indices: Vec<usize> = text.char_indices().map(|(i, _)| i).collect();
+    let char_count = char_indices.len();
+
+    let check_len = char_count.min(max_pattern_len - 1);
 
     if check_len == 0 {
         return None;
     }
 
     // Check if any pattern starts with text suffix
-    for suffix_len in (1..=check_len).rev() {
-        let suffix = &text[text.len() - suffix_len..];
+    for suffix_chars in (1..=check_len).rev() {
+        // Get the byte index at the character position (safe for UTF-8)
+        let start_byte_idx = char_indices[char_count - suffix_chars];
+        let suffix = &text[start_byte_idx..];
+
         for pattern in patterns {
-            if pattern.starts_with(suffix) && suffix.len() < pattern.len() {
-                return Some(suffix_len);
+            // Use character counting for comparison
+            if pattern.starts_with(suffix) && suffix.chars().count() < pattern.chars().count() {
+                return Some(start_byte_idx);
             }
         }
     }
