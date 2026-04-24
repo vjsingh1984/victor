@@ -589,10 +589,10 @@ providers:
             server_session_secret="session-secret",
         )
 
-        assert isinstance(settings.server_api_key, SecretStr)
-        assert settings.server_api_key.get_secret_value() == "server-token"
-        assert isinstance(settings.server_session_secret, SecretStr)
-        assert settings.server_session_secret.get_secret_value() == "session-secret"
+        assert isinstance(settings.server.server_api_key, SecretStr)
+        assert settings.server.server_api_key.get_secret_value() == "server-token"
+        assert isinstance(settings.server.server_session_secret, SecretStr)
+        assert settings.server.server_session_secret.get_secret_value() == "session-secret"
         assert settings.security.server_api_key.get_secret_value() == "server-token"
         assert settings.security.server_session_secret.get_secret_value() == "session-secret"
 
@@ -757,13 +757,13 @@ class TestSettingsExtra:
         assert settings.airgapped_mode is True
 
     def test_settings_tool_cache_settings(self):
-        """Test tool cache settings."""
+        """Test tool cache settings — stored in tools nested group."""
         settings = Settings(
             tool_cache_enabled=True,
             tool_cache_ttl=600,
         )
-        assert settings.tool_cache_enabled is True
-        assert settings.tool_cache_ttl == 600
+        assert settings.tools.tool_cache_enabled is True
+        assert settings.tools.tool_cache_ttl == 600
 
     def test_settings_analytics_disabled(self):
         """Test analytics disabled setting."""
