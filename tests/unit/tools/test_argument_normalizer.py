@@ -133,6 +133,14 @@ class TestNormalizeParameterAliases:
         assert result == {"path": "test.py", "offset": 10, "max_lines": 100}
         assert was_aliased is True
 
+    def test_edit_operations_alias_applied(self):
+        """Canonical edit should accept the legacy operations key."""
+        normalizer = ArgumentNormalizer()
+        args = {"operations": []}
+        result, was_aliased = normalizer.normalize_parameter_aliases(args, "edit")
+        assert result == {"ops": []}
+        assert was_aliased is True
+
 
 class TestNormalizeArgumentsDirectPath:
     """Tests for normalize_arguments - direct valid JSON path."""
@@ -167,6 +175,22 @@ class TestNormalizeArgumentsDirectPath:
         normalizer.normalize_arguments({"path": "test.py"}, "read")
         assert normalizer.stats["total_calls"] == 1
         assert normalizer.stats["normalizations"]["direct"] == 1
+
+    def test_write_content_preserves_json_like_string(self):
+        """Write content should remain a raw string even if it looks like JSON."""
+        normalizer = ArgumentNormalizer()
+        args = {"path": "config.json", "content": '{"enabled": false, "count": 3}\n'}
+        result, strategy = normalizer.normalize_arguments(args, "write")
+        assert result == args
+        assert strategy == NormalizationStrategy.DIRECT
+
+    def test_shell_cmd_with_heredoc_preserved(self):
+        """Shell heredoc commands should survive normalization unchanged."""
+        normalizer = ArgumentNormalizer()
+        cmd = "python - <<'PY'\nprint('hello')\nPY"
+        result, strategy = normalizer.normalize_arguments({"cmd": cmd}, "shell")
+        assert result["cmd"] == cmd
+        assert strategy == NormalizationStrategy.DIRECT
 
 
 class TestNormalizeArgumentsAST:
@@ -211,6 +235,15 @@ class TestNormalizeArgumentsAST:
         args = {"data": "[{'nested': {'key': 'value'}}]"}
         result, strategy = normalizer.normalize_arguments(args, "process")
         assert strategy == NormalizationStrategy.PYTHON_AST
+
+    def test_edit_ops_python_syntax_normalized_for_canonical_tool(self):
+        """Canonical edit should normalize Python-syntax ops payloads."""
+        normalizer = ArgumentNormalizer()
+        args = {"ops": "[{'type': 'create', 'path': 'test.txt', 'content': 'hi'}]"}
+        result, strategy = normalizer.normalize_arguments(args, "edit")
+        assert strategy == NormalizationStrategy.PYTHON_AST
+        assert isinstance(result["ops"], list)
+        assert result["ops"][0]["type"] == "create"
 
 
 class TestNormalizeArgumentsRegex:
@@ -790,6 +823,18 @@ class TestCoercePrimitiveTypes:
         result = normalizer._coerce_primitive_types(args, "read")
 
         assert result["line_start"] == 10
+
+    def test_shell_cmd_true_not_coerced(self):
+        """Shell commands are raw strings even when they look boolean-like."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._coerce_primitive_types({"cmd": "true"}, "shell")
+        assert result["cmd"] == "true"
+
+    def test_write_content_false_not_coerced(self):
+        """Write content is raw text even when it looks boolean-like."""
+        normalizer = ArgumentNormalizer()
+        result = normalizer._coerce_primitive_types({"content": "false"}, "write")
+        assert result["content"] == "false"
 
 
 class TestTryCoerceString:

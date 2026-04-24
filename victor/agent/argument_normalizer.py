@@ -118,6 +118,26 @@ class ArgumentNormalizer:
         )
     """
 
+    # These arguments are semantically "opaque text" and must survive provider
+    # fallback normalization untouched. Parsing or coercing them corrupts shell
+    # commands, file contents, search queries, and replacement strings.
+    _RAW_STRING_ARGUMENT_NAMES = frozenset(
+        {
+            "cmd",
+            "cwd",
+            "path",
+            "content",
+            "old_str",
+            "new_str",
+            "new_path",
+            "query",
+            "desc",
+            "message",
+            "text",
+            "pattern",
+        }
+    )
+
     def __init__(self, provider_name: str = "unknown", config: Optional[Dict[str, Any]] = None):
         """
         Initialize argument normalizer.
@@ -132,10 +152,23 @@ class ArgumentNormalizer:
         # Built-in aliases for common model hallucinations (LLMs use wrong param names)
         _builtin_aliases: Dict[str, Dict[str, str]] = {
             "shell": {"command": "cmd"},
+            "shell_readonly": {"command": "cmd"},
             "execute_bash": {"command": "cmd"},
             "read": {"file_path": "path", "filename": "path"},
             "read_file": {"file_path": "path", "filename": "path"},
-            "write": {"file_path": "path", "filename": "path"},
+            "write": {
+                "file_path": "path",
+                "filename": "path",
+                "text": "content",
+                "data": "content",
+            },
+            "write_file": {
+                "file_path": "path",
+                "filename": "path",
+                "text": "content",
+                "data": "content",
+            },
+            "edit": {"operations": "ops"},
             "ls": {"directory": "path", "dir": "path"},
             "list_directory": {"directory": "path", "dir": "path"},
         }
@@ -202,6 +235,21 @@ class ArgumentNormalizer:
 
         return normalized, was_aliased
 
+    def _is_raw_string_argument(self, tool_name: str, key: str) -> bool:
+        """Return True when a string argument should be preserved verbatim."""
+        return key in self._RAW_STRING_ARGUMENT_NAMES
+
+    def _looks_like_structured_string(self, value: str) -> bool:
+        """Return True when a string likely encodes structured data, not raw text."""
+        stripped = value.strip()
+        return (
+            stripped.startswith(("[", "{"))
+            or "Path(" in value
+            or "tuple[" in value
+            or "list[" in value
+            or ("\\'" in value and any(token in value for token in ("{", "[", ":")))
+        )
+
     def normalize_arguments(
         self, arguments: Dict[str, Any], tool_name: str
     ) -> Tuple[Dict[str, Any], NormalizationStrategy]:
@@ -242,7 +290,10 @@ class ArgumentNormalizer:
         # AGGRESSIVE APPROACH: Check if any values look like JSON and try normalization FIRST
         # This ensures we catch malformed JSON even if basic validation passes
         has_json_like_strings = any(
-            isinstance(v, str) and v.strip().startswith(("[", "{")) for v in arguments.values()
+            isinstance(v, str)
+            and not self._is_raw_string_argument(tool_name, k)
+            and v.strip().startswith(("[", "{"))
+            for k, v in arguments.items()
         )
         logger.debug(
             f"[{self.provider_name}] {tool_name}: has_json_like_strings={has_json_like_strings}"
@@ -254,7 +305,7 @@ class ArgumentNormalizer:
                 logger.debug(
                     f"[{self.provider_name}] {tool_name}: Trying preemptive AST normalization"
                 )
-                normalized = self._normalize_via_ast(arguments)
+                normalized = self._normalize_via_ast(arguments, tool_name)
                 changed = normalized != arguments
                 logger.debug(
                     f"[{self.provider_name}] {tool_name}: AST normalization changed={changed}"
@@ -298,7 +349,7 @@ class ArgumentNormalizer:
         # Layer 2: Try Python AST conversion for string values (if not already tried)
         if not has_json_like_strings:
             try:
-                normalized = self._normalize_via_ast(arguments)
+                normalized = self._normalize_via_ast(arguments, tool_name)
                 if self._is_valid_json_dict(normalized):
                     self.stats.normalizations[NormalizationStrategy.PYTHON_AST.value] += 1
                     logger.info(
@@ -310,7 +361,7 @@ class ArgumentNormalizer:
 
         # Layer 3: Regex-based quote replacement
         try:
-            normalized = self._normalize_via_regex(arguments)
+            normalized = self._normalize_via_regex(arguments, tool_name)
             if self._is_valid_json_dict(normalized):
                 self.stats.normalizations[NormalizationStrategy.REGEX_QUOTES.value] += 1
                 logger.info(f"[{self.provider_name}] Normalized {tool_name} arguments via regex")
@@ -393,7 +444,7 @@ class ArgumentNormalizer:
             logger.debug("_is_valid_json_dict: Exception in validation: %s", e)
             return False
 
-    def _normalize_via_ast(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_via_ast(self, arguments: Dict[str, Any], tool_name: str = "") -> Dict[str, Any]:
         """
         Convert Python syntax to JSON via AST.
 
@@ -419,6 +470,10 @@ class ArgumentNormalizer:
         normalized: Dict[str, Any] = {}
         for key, value in arguments.items():
             if isinstance(value, str):
+                if self._is_raw_string_argument(tool_name, key):
+                    normalized[key] = value
+                    continue
+
                 # First, check if the string LOOKS like JSON but may need normalization
                 stripped = value.strip()
                 if stripped.startswith(("[", "{")):
@@ -461,7 +516,9 @@ class ArgumentNormalizer:
                 normalized[key] = value
         return normalized
 
-    def _normalize_via_regex(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_via_regex(
+        self, arguments: Dict[str, Any], tool_name: str = ""
+    ) -> Dict[str, Any]:
         """
         Enhanced regex-based normalization with fallback for malformed patterns.
 
@@ -490,6 +547,14 @@ class ArgumentNormalizer:
         normalized = {}
         for key, value in arguments.items():
             if isinstance(value, str):
+                if self._is_raw_string_argument(tool_name, key):
+                    normalized[key] = value
+                    continue
+
+                if not self._looks_like_structured_string(value):
+                    normalized[key] = value
+                    continue
+
                 # Handle Python type hints in values
                 # Example: "tuple[str, ...]" → "" (remove)
                 # Example: "Path(...)" → string value
@@ -565,7 +630,7 @@ class ArgumentNormalizer:
             Normalized arguments with tool-specific repairs applied
         """
         # Tool-specific repairs
-        if tool_name == "edit_files":
+        if tool_name in {"edit", "edit_files"}:
             return self._repair_edit_files_args(arguments)
 
         # Add more tool-specific repairs here as needed
@@ -589,17 +654,25 @@ class ArgumentNormalizer:
         Returns:
             Repaired arguments
         """
-        if "operations" in arguments:
-            ops = arguments["operations"]
-            if isinstance(ops, str):
-                try:
-                    # Try AST first (most robust)
-                    python_obj = ast.literal_eval(ops)
-                    arguments["operations"] = json.dumps(python_obj)
-                except Exception:
-                    # Fallback to regex
-                    # This is a last resort for very malformed input
-                    pass
+        for field in ("operations", "ops"):
+            if field not in arguments:
+                continue
+
+            ops = arguments[field]
+            if not isinstance(ops, str):
+                continue
+
+            try:
+                # Keep legacy edit_files semantics (JSON string in "operations")
+                # while letting canonical edit/ops use the native Python object.
+                python_obj = ast.literal_eval(ops)
+                if field == "operations":
+                    arguments[field] = json.dumps(python_obj)
+                else:
+                    arguments[field] = python_obj
+            except Exception:
+                # Fallback to original string when repair fails
+                pass
         return arguments
 
     def _coerce_primitive_types(self, arguments: Dict[str, Any], tool_name: str) -> Dict[str, Any]:
@@ -627,6 +700,10 @@ class ArgumentNormalizer:
 
         for key, value in arguments.items():
             if isinstance(value, str):
+                if self._is_raw_string_argument(tool_name, key):
+                    coerced[key] = value
+                    continue
+
                 coerced_value = self._try_coerce_string(value)
                 if coerced_value is not value:  # Identity check - was actually coerced
                     coerced[key] = coerced_value
