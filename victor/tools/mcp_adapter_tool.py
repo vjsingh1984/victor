@@ -31,6 +31,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Import ToolSource for metadata
+try:
+    from victor.tools.deduplication import ToolSource
+except ImportError:
+    # Fallback if deduplication not available
+    class ToolSource:
+        MCP = "mcp"
+
+# Default prefix for all MCP tools (unified naming convention)
+DEFAULT_MCP_PREFIX = "mcp"
+
 
 def _mcp_param_to_json_schema(param: "MCPParameter") -> Dict[str, Any]:
     """Convert a single MCPParameter to JSON Schema property."""
@@ -68,6 +79,9 @@ class MCPAdapterTool(BaseTool):
     Makes MCP tools indistinguishable from native tools in the agent's
     toolset. The LLM sees proper name, description, and JSON Schema
     parameters. Execution routes through MCPRegistry.call_tool().
+
+    All MCP tools are automatically prefixed with 'mcp_' for unified
+    naming convention and tagged with ToolSource.MCP for deduplication.
     """
 
     def __init__(
@@ -75,16 +89,23 @@ class MCPAdapterTool(BaseTool):
         mcp_tool: "MCPTool",
         mcp_registry: "MCPRegistry",
         server_name: str,
-        name_prefix: str = "",
+        name_prefix: str = DEFAULT_MCP_PREFIX,
     ):
         self._mcp_tool = mcp_tool
         self._registry = mcp_registry
         self._server_name = server_name
-        self._name_prefix = name_prefix
+        self._name_prefix = name_prefix or DEFAULT_MCP_PREFIX
         self._json_schema = _mcp_params_to_json_schema(mcp_tool.parameters)
+
+        # Set tool source metadata for deduplication
+        try:
+            self._tool_source = ToolSource.MCP
+        except Exception:
+            self._tool_source = "mcp"  # Fallback
 
     @property
     def name(self) -> str:
+        """Return tool name with mcp_ prefix for unified naming convention."""
         if self._name_prefix:
             return f"{self._name_prefix}_{self._mcp_tool.name}"
         return self._mcp_tool.name
@@ -162,7 +183,7 @@ class MCPToolProjector:
     @staticmethod
     def project(
         registry: "MCPRegistry",
-        prefix: str = "",
+        prefix: str = DEFAULT_MCP_PREFIX,
         conflict_strategy: str = "prefix_server",
         user_message: Optional[str] = None,
         max_mcp_tools: int = 12,
@@ -171,7 +192,7 @@ class MCPToolProjector:
 
         Args:
             registry: MCPRegistry with connected servers
-            prefix: Optional prefix for all tool names (e.g., "mcp")
+            prefix: Optional prefix for all tool names (default: "mcp")
             conflict_strategy: How to handle name collisions:
                 "prefix_server" — prepend server name (default)
                 "skip" — skip duplicates, keep first
@@ -184,6 +205,10 @@ class MCPToolProjector:
 
         Returns:
             List of MCPAdapterTool instances ready for registration
+
+        Note:
+            Actual deduplication is handled by ToolDeduplicator in ToolRegistry.
+            Prefix strategy here is for distinguishing tools from different MCP servers.
         """
         tools: List[MCPAdapterTool] = []
         seen_names: Dict[str, str] = {}  # name -> server_name
@@ -193,11 +218,13 @@ class MCPToolProjector:
                 continue
 
             for mcp_tool in entry.tools_cache:
+                # Use default prefix if none provided
+                effective_prefix = prefix or DEFAULT_MCP_PREFIX
                 adapter = MCPAdapterTool(
                     mcp_tool=mcp_tool,
                     mcp_registry=registry,
                     server_name=server_name,
-                    name_prefix=prefix,
+                    name_prefix=effective_prefix,
                 )
                 tool_name = adapter.name
 
@@ -215,7 +242,7 @@ class MCPToolProjector:
                         mcp_tool=mcp_tool,
                         mcp_registry=registry,
                         server_name=server_name,
-                        name_prefix=f"{prefix}_{server_name}" if prefix else server_name,
+                        name_prefix=f"{effective_prefix}_{server_name}",
                     )
                     tool_name = adapter.name
                     logger.info(
