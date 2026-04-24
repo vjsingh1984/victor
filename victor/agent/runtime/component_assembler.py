@@ -227,12 +227,9 @@ class ComponentAssembler:
 
         # Task analyzer and system prompt coordinator
         from victor.agent.task_analyzer import get_task_analyzer
-        from victor.agent.services.system_prompt_runtime import (
-            SystemPromptCoordinator,
-        )
 
         orchestrator._task_analyzer = get_task_analyzer()
-        orchestrator._system_prompt_coordinator = SystemPromptCoordinator(
+        orchestrator._system_prompt_coordinator = factory.create_system_prompt_coordinator(
             prompt_builder=orchestrator.prompt_builder,
             get_context_window=orchestrator._get_model_context_window,
             provider_name=orchestrator.provider_name,

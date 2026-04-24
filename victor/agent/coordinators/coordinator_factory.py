@@ -33,11 +33,19 @@ Example:
 from __future__ import annotations
 
 import logging
-import os
 import warnings
-from pathlib import Path
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+from victor.agent.coordinators.factory_support import (
+    create_exploration_coordinator as build_exploration_coordinator,
+    create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
+    create_safety_state_passed_coordinator as build_safety_state_passed_coordinator,
+    create_system_prompt_coordinator as build_system_prompt_coordinator,
+    create_system_prompt_state_passed_coordinator as build_system_prompt_state_passed_coordinator,
+)
 from victor.agent.coordinators.protocol_dependencies import OrchestratorProtocolAdapter
 from victor.agent.orchestrator_protocols import (
     IAgentOrchestrator,
@@ -140,9 +148,7 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.services.exploration_runtime import ExplorationCoordinator
-
-            coordinator = ExplorationCoordinator()
+            coordinator = build_exploration_coordinator()
 
             logger.debug("CoordinatorFactory: Created ExplorationCoordinator")
             return coordinator
@@ -153,7 +159,7 @@ class CoordinatorFactory:
 
     def create_exploration_state_passed_coordinator(
         self,
-        project_root: Optional[Path] = None,
+        project_root: Optional["Path"] = None,
         max_results: int = 5,
     ) -> Any:
         """
@@ -166,12 +172,9 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.exploration_state_passed import (
-                ExplorationStatePassedCoordinator,
-            )
-
-            coordinator = ExplorationStatePassedCoordinator(
-                project_root=project_root or self._resolve_project_root(),
+            coordinator = build_exploration_state_passed_coordinator(
+                settings=getattr(self._container, "_settings", None),
+                project_root=project_root,
                 max_results=max_results,
             )
 
@@ -207,16 +210,15 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.services.system_prompt_runtime import SystemPromptCoordinator
-
-            coordinator = SystemPromptCoordinator(
+            coordinator = build_system_prompt_coordinator(
+                container=self._container,
                 prompt_builder=prompt_builder,
                 get_context_window=get_context_window,
                 provider_name=provider_name,
                 model_name=model_name,
                 get_tools=get_tools,
                 get_mode_controller=get_mode_controller,
-                task_analyzer=task_analyzer or self._resolve_task_analyzer(),
+                task_analyzer=task_analyzer,
                 session_id=session_id,
             )
 
@@ -241,12 +243,9 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.system_prompt_state_passed import (
-                SystemPromptStatePassedCoordinator,
-            )
-
-            coordinator = SystemPromptStatePassedCoordinator(
-                task_analyzer=task_analyzer or self._resolve_task_analyzer(),
+            coordinator = build_system_prompt_state_passed_coordinator(
+                container=self._container,
+                task_analyzer=task_analyzer,
             )
 
             logger.debug("CoordinatorFactory: Created SystemPromptStatePassedCoordinator")
@@ -322,11 +321,7 @@ class CoordinatorFactory:
             RuntimeError: If coordinator creation fails
         """
         try:
-            from victor.agent.coordinators.safety_state_passed import (
-                SafetyStatePassedCoordinator,
-            )
-
-            coordinator = SafetyStatePassedCoordinator()
+            coordinator = build_safety_state_passed_coordinator()
 
             logger.debug("CoordinatorFactory: Created SafetyStatePassedCoordinator")
             return coordinator
@@ -430,26 +425,3 @@ class CoordinatorFactory:
             self._orchestrator_adapter = OrchestratorProtocolAdapter(orchestrator)
 
         return self._orchestrator_adapter
-
-    def _resolve_task_analyzer(self) -> Any:
-        """Resolve task analyzer from container or fall back to the singleton."""
-        from victor.agent.protocols import TaskAnalyzerProtocol
-        from victor.agent.task_analyzer import get_task_analyzer
-
-        analyzer = self._container.get_optional(TaskAnalyzerProtocol)
-        if analyzer is not None and hasattr(analyzer, "classify_task_with_context"):
-            return analyzer
-
-        analyzer = get_task_analyzer()
-        if hasattr(analyzer, "classify_task_with_context"):
-            return analyzer
-
-        raise RuntimeError("TaskAnalyzer with classify_task_with_context is required")
-
-    def _resolve_project_root(self) -> Optional[Path]:
-        """Resolve project root from container settings if available."""
-        settings = getattr(self._container, "_settings", None)
-        working_directory = getattr(settings, "working_directory", None)
-        if not working_directory or not isinstance(working_directory, (str, os.PathLike)):
-            return None
-        return Path(working_directory)

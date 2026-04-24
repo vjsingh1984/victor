@@ -7,7 +7,6 @@ assertions, and session context setup from the orchestrator's __init__.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -27,15 +26,6 @@ class AgentRuntimeBootstrapper:
     @staticmethod
     def create_facades(orchestrator: AgentOrchestrator) -> None:
         """Create all 8 domain facades and set them on the orchestrator."""
-        from victor.agent.coordinators.exploration_state_passed import (
-            ExplorationStatePassedCoordinator,
-        )
-        from victor.agent.coordinators.safety_state_passed import (
-            SafetyStatePassedCoordinator,
-        )
-        from victor.agent.coordinators.system_prompt_state_passed import (
-            SystemPromptStatePassedCoordinator,
-        )
         from victor.agent.facades import (
             ChatFacade,
             MetricsFacade,
@@ -147,14 +137,12 @@ class AgentRuntimeBootstrapper:
             mode_workflow_team_coordinator=(orchestrator._mode_workflow_team_coordinator),
         )
 
-        project_root = getattr(orchestrator.settings, "working_directory", None)
-        exploration_state_passed = ExplorationStatePassedCoordinator(
-            project_root=Path(project_root) if project_root else None,
+        exploration_state_passed = orchestrator._factory.create_exploration_state_passed_coordinator(
         )
-        system_prompt_state_passed = SystemPromptStatePassedCoordinator(
+        system_prompt_state_passed = orchestrator._factory.create_system_prompt_state_passed_coordinator(
             task_analyzer=orchestrator._task_analyzer,
         )
-        safety_state_passed = SafetyStatePassedCoordinator()
+        safety_state_passed = orchestrator._factory.create_safety_state_passed_coordinator()
 
         orchestrator._orchestration_facade = OrchestrationFacade(
             interaction_runtime=orchestrator._interaction_runtime,

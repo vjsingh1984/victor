@@ -2,13 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-from victor.agent.coordinators.exploration_state_passed import (
-    ExplorationStatePassedCoordinator,
-)
-from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
-from victor.agent.coordinators.system_prompt_state_passed import (
-    SystemPromptStatePassedCoordinator,
-)
 from victor.agent.runtime.bootstrapper import AgentRuntimeBootstrapper
 
 
@@ -37,6 +30,16 @@ class TestAgentRuntimeBootstrapper:
 
     def test_create_facades_uses_explicit_tool_coordinator_compat_getter(self):
         orch = self._make_mock_orchestrator()
+        exploration_state_passed = MagicMock(name="exploration_state_passed")
+        system_prompt_state_passed = MagicMock(name="system_prompt_state_passed")
+        safety_state_passed = MagicMock(name="safety_state_passed")
+        orch._factory.create_exploration_state_passed_coordinator.return_value = (
+            exploration_state_passed
+        )
+        orch._factory.create_system_prompt_state_passed_coordinator.return_value = (
+            system_prompt_state_passed
+        )
+        orch._factory.create_safety_state_passed_coordinator.return_value = safety_state_passed
 
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
@@ -70,9 +73,9 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["streaming_coordinator"] is orch._streaming_coordinator
         assert kwargs["iteration_coordinator"] is getattr(orch, "_iteration_coordinator", None)
         assert kwargs["task_analyzer"] is orch._task_analyzer
-        assert isinstance(kwargs["exploration_state_passed"], ExplorationStatePassedCoordinator)
-        assert isinstance(kwargs["system_prompt_state_passed"], SystemPromptStatePassedCoordinator)
-        assert isinstance(kwargs["safety_state_passed"], SafetyStatePassedCoordinator)
+        assert kwargs["exploration_state_passed"] is exploration_state_passed
+        assert kwargs["system_prompt_state_passed"] is system_prompt_state_passed
+        assert kwargs["safety_state_passed"] is safety_state_passed
         assert kwargs["presentation"] is orch._presentation
         assert kwargs["vertical_integration_adapter"] is orch._vertical_integration_adapter
         assert kwargs["vertical_context"] is orch._vertical_context
@@ -81,6 +84,11 @@ class TestAgentRuntimeBootstrapper:
         assert kwargs["tool_call_tracer"] is getattr(orch, "_tool_call_tracer", None)
         assert kwargs["intelligent_integration"] is orch._intelligent_integration
         assert kwargs["subagent_orchestrator"] is orch._subagent_orchestrator
+        orch._factory.create_exploration_state_passed_coordinator.assert_called_once_with()
+        orch._factory.create_system_prompt_state_passed_coordinator.assert_called_once_with(
+            task_analyzer=orch._task_analyzer
+        )
+        orch._factory.create_safety_state_passed_coordinator.assert_called_once_with()
 
     def test_wire_lifecycle_calls_setters(self):
         orch = self._make_mock_orchestrator()

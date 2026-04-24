@@ -17,8 +17,10 @@
 Part of CRITICAL-001: Monolithic Orchestrator decomposition.
 """
 
-import pytest
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Suppress deprecation warnings for complexity_classifier shim during migration
 pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -36,6 +38,14 @@ from victor.agent.orchestrator_factory import (
     RecoveryComponents,
     WorkflowOptimizationComponents,
 )
+from victor.agent.coordinators.exploration_state_passed import (
+    ExplorationStatePassedCoordinator,
+)
+from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
+from victor.agent.coordinators.system_prompt_state_passed import (
+    SystemPromptStatePassedCoordinator,
+)
+from victor.agent.services.exploration_runtime import ExplorationCoordinator
 
 
 @pytest.fixture
@@ -325,6 +335,59 @@ class TestCreateRecoveryHandler:
         # Handler is always returned from DI container (may be null implementation)
         # In production, this would be _NullRecoveryHandler when disabled
         assert handler is not None
+
+
+class TestCanonicalCoordinatorBuilders:
+    """Tests for canonical coordination helper surfaces on OrchestratorFactory."""
+
+    def test_create_exploration_coordinator_returns_runtime(self, factory):
+        coordinator = factory.create_exploration_coordinator()
+
+        assert isinstance(coordinator, ExplorationCoordinator)
+
+    def test_create_exploration_state_passed_coordinator_uses_settings_root(
+        self, factory, mock_settings
+    ):
+        mock_settings.working_directory = "/tmp/factory-project"
+
+        coordinator = factory.create_exploration_state_passed_coordinator()
+
+        assert isinstance(coordinator, ExplorationStatePassedCoordinator)
+        assert coordinator._project_root == Path("/tmp/factory-project")
+
+    def test_create_system_prompt_coordinator_binds_task_analyzer(
+        self, factory, mock_container
+    ):
+        from victor.agent.protocols import TaskAnalyzerProtocol
+
+        analyzer = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            analyzer if protocol is TaskAnalyzerProtocol else None
+        )
+
+        coordinator = factory.create_system_prompt_coordinator()
+
+        assert coordinator._task_analyzer is analyzer
+
+    def test_create_system_prompt_state_passed_coordinator_binds_task_analyzer(
+        self, factory, mock_container
+    ):
+        from victor.agent.protocols import TaskAnalyzerProtocol
+
+        analyzer = MagicMock()
+        mock_container.get_optional.side_effect = lambda protocol: (
+            analyzer if protocol is TaskAnalyzerProtocol else None
+        )
+
+        coordinator = factory.create_system_prompt_state_passed_coordinator()
+
+        assert isinstance(coordinator, SystemPromptStatePassedCoordinator)
+        assert coordinator._task_analyzer is analyzer
+
+    def test_create_safety_state_passed_coordinator_returns_wrapper(self, factory):
+        coordinator = factory.create_safety_state_passed_coordinator()
+
+        assert isinstance(coordinator, SafetyStatePassedCoordinator)
 
 
 class TestCreateObservability:

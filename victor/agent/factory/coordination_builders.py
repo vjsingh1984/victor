@@ -25,6 +25,14 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
 
+from victor.agent.coordinators.factory_support import (
+    create_exploration_coordinator as build_exploration_coordinator,
+    create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
+    create_safety_state_passed_coordinator as build_safety_state_passed_coordinator,
+    create_system_prompt_coordinator as build_system_prompt_coordinator,
+    create_system_prompt_state_passed_coordinator as build_system_prompt_state_passed_coordinator,
+)
+
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
@@ -57,12 +65,12 @@ if TYPE_CHECKING:
         CodeExecutionManagerProtocol,
         WorkflowRegistryProtocol,
     )
-    from victor.agent.protocols.coordination_protocols import TaskCoordinatorProtocol
-    from victor.agent.protocols.streaming_protocols import (
-        StreamingRecoveryCoordinatorProtocol as StreamingRecoveryCoordinatorProto,
-        ChunkGeneratorProtocol as ChunkGeneratorProto,
+    from victor.agent.services.protocols import (
+        ChunkRuntimeProtocol as ChunkGeneratorProto,
+        RLLearningRuntimeProtocol as RLCoordinatorProtocol,
+        StreamingRecoveryRuntimeProtocol as StreamingRecoveryCoordinatorProto,
+        TaskRuntimeProtocol as TaskCoordinatorProtocol,
     )
-    from victor.agent.protocols.infrastructure_protocols import RLCoordinatorProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +85,71 @@ class CoordinationBuildersMixin:
         - self.provider_name: Optional[str]
         - self.container: DI container
     """
+
+    def create_exploration_coordinator(self) -> Any:
+        """Create the canonical read-only exploration runtime."""
+        coordinator = build_exploration_coordinator()
+        logger.debug("ExplorationCoordinator created")
+        return coordinator
+
+    def create_exploration_state_passed_coordinator(
+        self,
+        project_root: Optional["Path"] = None,
+        max_results: int = 5,
+    ) -> Any:
+        """Create the state-passed exploration wrapper."""
+        coordinator = build_exploration_state_passed_coordinator(
+            settings=self.settings,
+            project_root=project_root,
+            max_results=max_results,
+        )
+        logger.debug("ExplorationStatePassedCoordinator created")
+        return coordinator
+
+    def create_system_prompt_coordinator(
+        self,
+        *,
+        prompt_builder: Any = None,
+        get_context_window: Optional[Callable[[], int]] = None,
+        provider_name: str = "",
+        model_name: str = "",
+        get_tools: Optional[Callable[[], Optional[Any]]] = None,
+        get_mode_controller: Optional[Callable[[], Optional[object]]] = None,
+        task_analyzer: Optional[Any] = None,
+        session_id: str = "",
+    ) -> Any:
+        """Create the compatibility system prompt runtime."""
+        coordinator = build_system_prompt_coordinator(
+            container=self.container,
+            prompt_builder=prompt_builder,
+            get_context_window=get_context_window,
+            provider_name=provider_name,
+            model_name=model_name,
+            get_tools=get_tools,
+            get_mode_controller=get_mode_controller,
+            task_analyzer=task_analyzer,
+            session_id=session_id,
+        )
+        logger.debug("SystemPromptCoordinator created")
+        return coordinator
+
+    def create_system_prompt_state_passed_coordinator(
+        self,
+        task_analyzer: Optional[Any] = None,
+    ) -> Any:
+        """Create the canonical state-passed system prompt coordinator."""
+        coordinator = build_system_prompt_state_passed_coordinator(
+            container=self.container,
+            task_analyzer=task_analyzer,
+        )
+        logger.debug("SystemPromptStatePassedCoordinator created")
+        return coordinator
+
+    def create_safety_state_passed_coordinator(self) -> Any:
+        """Create the canonical state-passed safety wrapper."""
+        coordinator = build_safety_state_passed_coordinator()
+        logger.debug("SafetyStatePassedCoordinator created")
+        return coordinator
 
     def create_recovery_handler(self) -> Optional["RecoveryHandler"]:
         """Create recovery handler (from DI container)."""
@@ -110,9 +183,9 @@ class CoordinationBuildersMixin:
         Returns:
             StreamingRecoveryCoordinator instance for recovery coordination
         """
-        from victor.agent.protocols import StreamingRecoveryCoordinatorProtocol
+        from victor.agent.services.protocols import StreamingRecoveryRuntimeProtocol
 
-        recovery_coordinator = self.container.get(StreamingRecoveryCoordinatorProtocol)
+        recovery_coordinator = self.container.get(StreamingRecoveryRuntimeProtocol)
         logger.debug("StreamingRecoveryCoordinator created via DI")
         return recovery_coordinator
 
@@ -122,9 +195,9 @@ class CoordinationBuildersMixin:
         Returns:
             ChunkGenerator instance for chunk generation
         """
-        from victor.agent.protocols import ChunkGeneratorProtocol
+        from victor.agent.services.protocols import ChunkRuntimeProtocol
 
-        chunk_generator = self.container.get(ChunkGeneratorProtocol)
+        chunk_generator = self.container.get(ChunkRuntimeProtocol)
         logger.debug("ChunkGenerator created via DI")
         return chunk_generator
 
@@ -325,9 +398,9 @@ class CoordinationBuildersMixin:
             return None
 
         try:
-            from victor.agent.protocols import RLCoordinatorProtocol
+            from victor.agent.services.protocols import RLLearningRuntimeProtocol
 
-            coordinator = self.container.get(RLCoordinatorProtocol)
+            coordinator = self.container.get(RLLearningRuntimeProtocol)
             logger.info("RL: Coordinator initialized with unified database")
             return coordinator
         except Exception as e:
@@ -361,9 +434,9 @@ class CoordinationBuildersMixin:
         Returns:
             TaskCoordinator instance for task coordination
         """
-        from victor.agent.protocols import TaskCoordinatorProtocol
+        from victor.agent.services.protocols import TaskRuntimeProtocol
 
-        task_coordinator = self.container.get(TaskCoordinatorProtocol)
+        task_coordinator = self.container.get(TaskRuntimeProtocol)
         logger.debug("TaskCoordinator created via DI")
         return task_coordinator
 
@@ -395,9 +468,9 @@ class CoordinationBuildersMixin:
 
         team_learner = None
         try:
-            from victor.agent.protocols import RLCoordinatorProtocol
+            from victor.agent.services.protocols import RLLearningRuntimeProtocol
 
-            rl_coordinator = self.container.get_optional(RLCoordinatorProtocol)
+            rl_coordinator = self.container.get_optional(RLLearningRuntimeProtocol)
             if rl_coordinator:
                 team_learner = rl_coordinator.get_learner("team_composition")
         except Exception as e:
@@ -586,6 +659,7 @@ class CoordinationBuildersMixin:
         )
         logger.debug("TurnBoundaryContextAssembler created")
         return assembler
+
 
     def create_referential_intent_resolver(
         self, ledger: Optional["SessionLedger"] = None
