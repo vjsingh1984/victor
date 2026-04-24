@@ -462,6 +462,22 @@ class IntentDetector:
             if result is not None:
                 return result
 
+        # Short-circuit: bare continuation commands resume an in-progress task and
+        # must not receive a DISPLAY_ONLY guard that blocks tool use and file writes.
+        _CONTINUATION_KEYWORDS = {
+            "continue", "go", "proceed", "next", "yes", "ok", "okay",
+            "go ahead", "keep going", "carry on", "resume", "do it",
+            "continue please", "yes please", "go on", "keep it up",
+        }
+        if message.strip().lower() in _CONTINUATION_KEYWORDS:
+            return IntentClassification(
+                intent=ActionIntent.WRITE_ALLOWED,
+                confidence=0.9,
+                matched_signals=["continuation_keyword"],
+                safe_actions=SAFE_ACTIONS[ActionIntent.WRITE_ALLOWED].copy(),
+                prompt_guard=PROMPT_GUARDS[ActionIntent.WRITE_ALLOWED],
+            )
+
         # Score each intent type
         display_score, display_matched = self._score_patterns(message, self._display_patterns)
         write_score, write_matched = self._score_patterns(message, self._write_patterns)
