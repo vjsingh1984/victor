@@ -2,6 +2,13 @@
 
 from unittest.mock import MagicMock, patch
 
+from victor.agent.coordinators.exploration_state_passed import (
+    ExplorationStatePassedCoordinator,
+)
+from victor.agent.coordinators.safety_state_passed import SafetyStatePassedCoordinator
+from victor.agent.coordinators.system_prompt_state_passed import (
+    SystemPromptStatePassedCoordinator,
+)
 from victor.agent.runtime.bootstrapper import AgentRuntimeBootstrapper
 
 
@@ -34,37 +41,44 @@ class TestAgentRuntimeBootstrapper:
         with patch("victor.agent.facades.OrchestrationFacade") as facade_cls:
             AgentRuntimeBootstrapper.create_facades(orch)
 
-        facade_cls.assert_called_once_with(
-            interaction_runtime=orch._interaction_runtime,
-            chat_service=getattr(orch, "_chat_service", None),
-            get_chat_stream_runtime=orch._get_service_streaming_runtime,
-            tool_service=getattr(orch, "_tool_service", None),
-            session_service=getattr(orch, "_session_service", None),
-            context_service=getattr(orch, "_context_service", None),
-            provider_service=getattr(orch, "_provider_service", None),
-            recovery_service=getattr(orch, "_recovery_service", None),
-            get_chat_coordinator=orch._get_deprecated_chat_coordinator,
-            get_tool_coordinator=orch._get_deprecated_tool_coordinator,
-            get_session_coordinator=orch._get_deprecated_session_coordinator,
-            turn_executor=orch._turn_executor,
-            get_sync_chat_coordinator=orch._get_deprecated_sync_chat_coordinator,
-            get_streaming_chat_coordinator=orch._get_deprecated_streaming_chat_coordinator,
-            get_unified_chat_coordinator=orch._get_deprecated_unified_chat_coordinator,
-            protocol_adapter=orch._protocol_adapter,
-            streaming_handler=orch._streaming_handler,
-            streaming_controller=orch._streaming_controller,
-            streaming_coordinator=orch._streaming_coordinator,
-            iteration_coordinator=getattr(orch, "_iteration_coordinator", None),
-            task_analyzer=orch._task_analyzer,
-            presentation=orch._presentation,
-            vertical_integration_adapter=orch._vertical_integration_adapter,
-            vertical_context=orch._vertical_context,
-            observability=orch._observability,
-            execution_tracer=getattr(orch, "_execution_tracer", None),
-            tool_call_tracer=getattr(orch, "_tool_call_tracer", None),
-            intelligent_integration=orch._intelligent_integration,
-            subagent_orchestrator=orch._subagent_orchestrator,
+        facade_cls.assert_called_once()
+        kwargs = facade_cls.call_args.kwargs
+
+        assert kwargs["interaction_runtime"] is orch._interaction_runtime
+        assert kwargs["chat_service"] is getattr(orch, "_chat_service", None)
+        assert kwargs["get_chat_stream_runtime"] is orch._get_service_streaming_runtime
+        assert kwargs["tool_service"] is getattr(orch, "_tool_service", None)
+        assert kwargs["session_service"] is getattr(orch, "_session_service", None)
+        assert kwargs["context_service"] is getattr(orch, "_context_service", None)
+        assert kwargs["provider_service"] is getattr(orch, "_provider_service", None)
+        assert kwargs["recovery_service"] is getattr(orch, "_recovery_service", None)
+        assert kwargs["get_chat_coordinator"] is orch._get_deprecated_chat_coordinator
+        assert kwargs["get_tool_coordinator"] is orch._get_deprecated_tool_coordinator
+        assert kwargs["get_session_coordinator"] is orch._get_deprecated_session_coordinator
+        assert kwargs["turn_executor"] is orch._turn_executor
+        assert kwargs["get_sync_chat_coordinator"] is orch._get_deprecated_sync_chat_coordinator
+        assert (
+            kwargs["get_streaming_chat_coordinator"]
+            is orch._get_deprecated_streaming_chat_coordinator
         )
+        assert kwargs["get_unified_chat_coordinator"] is orch._get_deprecated_unified_chat_coordinator
+        assert kwargs["protocol_adapter"] is orch._protocol_adapter
+        assert kwargs["streaming_handler"] is orch._streaming_handler
+        assert kwargs["streaming_controller"] is orch._streaming_controller
+        assert kwargs["streaming_coordinator"] is orch._streaming_coordinator
+        assert kwargs["iteration_coordinator"] is getattr(orch, "_iteration_coordinator", None)
+        assert kwargs["task_analyzer"] is orch._task_analyzer
+        assert isinstance(kwargs["exploration_state_passed"], ExplorationStatePassedCoordinator)
+        assert isinstance(kwargs["system_prompt_state_passed"], SystemPromptStatePassedCoordinator)
+        assert isinstance(kwargs["safety_state_passed"], SafetyStatePassedCoordinator)
+        assert kwargs["presentation"] is orch._presentation
+        assert kwargs["vertical_integration_adapter"] is orch._vertical_integration_adapter
+        assert kwargs["vertical_context"] is orch._vertical_context
+        assert kwargs["observability"] is orch._observability
+        assert kwargs["execution_tracer"] is getattr(orch, "_execution_tracer", None)
+        assert kwargs["tool_call_tracer"] is getattr(orch, "_tool_call_tracer", None)
+        assert kwargs["intelligent_integration"] is orch._intelligent_integration
+        assert kwargs["subagent_orchestrator"] is orch._subagent_orchestrator
 
     def test_wire_lifecycle_calls_setters(self):
         orch = self._make_mock_orchestrator()
