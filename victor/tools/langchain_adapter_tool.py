@@ -38,11 +38,23 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Import ToolSource for metadata
+try:
+    from victor.tools.deduplication import ToolSource
+except ImportError:
+    # Fallback if deduplication not available
+    class ToolSource:
+        LANGCHAIN = "langchain"
+
 
 # Constants for LangChain tool safeguards
 MAX_LANGCHAIN_TOOLS = 10
 
+# Default prefix for all LangChain tools (unified naming convention)
+DEFAULT_LANGCHAIN_PREFIX = "lgc"
+
 # Whitelist of allowed LangChain tools (unique functionality not available in Victor)
+# Note: This is now used only for logging warnings - actual deduplication is handled by ToolDeduplicator
 ALLOWED_LANGCHAIN_TOOLS = {
     "wikipedia",  # Unique functionality
     "wolfram_alpha",  # Unique functionality
@@ -52,6 +64,7 @@ ALLOWED_LANGCHAIN_TOOLS = {
 }
 
 # Blacklist of banned LangChain tools (duplicates of Victor built-in tools)
+# Note: This is now used only for logging warnings - actual deduplication is handled by ToolDeduplicator
 BANNED_LANGCHAIN_TOOLS = {
     "duckduckgo",  # Duplicate: web_search
     "google_search",  # Duplicate: web_search
@@ -217,21 +230,31 @@ class LangChainAdapterTool(BaseTool):
     Makes LangChain tools first-class citizens in Victor's tool ecosystem.
     The LLM sees native names, descriptions, and JSON Schema parameters.
     Execution routes through LangChain's ainvoke() for async compatibility.
+
+    All LangChain tools are automatically prefixed with 'lgc_' for unified
+    naming convention and tagged with ToolSource.LANGCHAIN for deduplication.
     """
 
     def __init__(
         self,
         langchain_tool: "LCBaseTool",
-        name_prefix: str = "",
+        name_prefix: str = DEFAULT_LANGCHAIN_PREFIX,
         source: str = "langchain",
     ):
         self._lc_tool = langchain_tool
-        self._name_prefix = name_prefix
+        self._name_prefix = name_prefix or DEFAULT_LANGCHAIN_PREFIX
         self._source = source
         self._json_schema = _pydantic_to_json_schema(getattr(langchain_tool, "args_schema", None))
 
+        # Set tool source metadata for deduplication
+        try:
+            self._tool_source = ToolSource.LANGCHAIN
+        except Exception:
+            self._tool_source = "langchain"  # Fallback
+
     @property
     def name(self) -> str:
+        """Return tool name with lgc_ prefix for unified naming convention."""
         base_name = self._lc_tool.name
         if self._name_prefix:
             return f"{self._name_prefix}_{base_name}"
@@ -304,7 +327,7 @@ class LangChainToolProjector:
     @staticmethod
     def project(
         tools: List["LCBaseTool"],
-        prefix: str = "",
+        prefix: str = DEFAULT_LANGCHAIN_PREFIX,
         conflict_strategy: str = "prefix_source",
         existing_tool_names: Optional[List[str]] = None,
         enable_safeguards: bool = True,
@@ -313,7 +336,7 @@ class LangChainToolProjector:
 
         Args:
             tools: List of LangChain BaseTool instances
-            prefix: Optional prefix for all tool names
+            prefix: Optional prefix for all tool names (default: "lgc")
             conflict_strategy: How to handle name collisions:
                 "prefix_source" — prepend source index (default)
                 "skip" — skip duplicates, keep first
@@ -325,6 +348,10 @@ class LangChainToolProjector:
 
         Raises:
             ValueError: If count limit is exceeded and safeguards are enabled
+
+        Note:
+            Actual deduplication is handled by ToolDeduplicator in ToolRegistry.
+            Safeguards here are lightweight checks (count limit, blacklist logging).
         """
         adapted: List[LangChainAdapterTool] = []
         seen_names: Dict[str, int] = {}
@@ -335,33 +362,49 @@ class LangChainToolProjector:
             existing_tool_names = []
 
         for tool in tools:
-            adapter = LangChainAdapterTool(tool, name_prefix=prefix)
+            # Use default prefix if none provided
+            effective_prefix = prefix or DEFAULT_LANGCHAIN_PREFIX
+            adapter = LangChainAdapterTool(tool, name_prefix=effective_prefix)
             tool_name = adapter.name
 
-            # Apply safeguards if enabled
+            # Apply lightweight safeguards if enabled
             if enable_safeguards:
-                # Check against existing tools + already adapted tools
-                all_existing = existing_tool_names + [a.name for a in adapted]
-                allowed, reason = _check_langchain_tool_allowed(
-                    tool_name,
-                    all_existing,
-                    len(adapted),
-                )
+                # Check blacklist (for logging only - actual blocking done by ToolDeduplicator)
+                if tool_name.lower() in BANNED_LANGCHAIN_TOOLS:
+                    logger.warning(
+                        "LangChain tool '%s' is blacklisted (duplicate of built-in tool). "
+                        "ToolDeduplicator will handle deduplication during registration.",
+                        tool_name,
+                    )
 
-                if not allowed:
-                    logger.warning("Skipping LangChain tool '%s': %s", tool_name, reason)
+                # Check whitelist (for logging only)
+                if ALLOWED_LANGCHAIN_TOOLS and tool_name.lower() not in ALLOWED_LANGCHAIN_TOOLS:
+                    logger.info(
+                        "LangChain tool '%s' is not in recommended whitelist. "
+                        "Consider using built-in Victor tools for better integration.",
+                        tool_name,
+                    )
+
+                # Check count limit (still enforced here)
+                if len(adapted) >= MAX_LANGCHAIN_TOOLS:
+                    logger.error(
+                        "Maximum LangChain tools (%d) reached. Cannot register '%s'.",
+                        MAX_LANGCHAIN_TOOLS,
+                        tool_name,
+                    )
                     blocked_count += 1
                     continue
 
-                # Log successful registration
+                # Log successful projection
                 logger.info(
-                    "Registering LangChain tool '%s' (via LangChain). "
-                    "LangChain tools registered: %d/%d",
+                    "Projecting LangChain tool '%s' (via LangChain). "
+                    "LangChain tools projected: %d/%d",
                     tool_name,
                     len(adapted) + 1,
                     MAX_LANGCHAIN_TOOLS,
                 )
 
+            # Handle name conflicts within this batch
             if tool_name in seen_names:
                 if conflict_strategy == "skip":
                     logger.debug("Skipping duplicate LangChain tool: %s", tool_name)
@@ -371,32 +414,16 @@ class LangChainToolProjector:
                 idx = seen_names[tool_name]
                 adapter = LangChainAdapterTool(
                     tool,
-                    name_prefix=f"{prefix}_{idx}" if prefix else f"lc_{idx}",
+                    name_prefix=f"{effective_prefix}_{idx}",
                 )
                 tool_name = adapter.name
-
-                # Re-check safeguards with new name
-                if enable_safeguards:
-                    all_existing = existing_tool_names + [a.name for a in adapted]
-                    allowed, reason = _check_langchain_tool_allowed(
-                        tool_name,
-                        all_existing,
-                        len(adapted),
-                    )
-
-                    if not allowed:
-                        logger.warning(
-                            "Skipping renamed LangChain tool '%s': %s", tool_name, reason
-                        )
-                        blocked_count += 1
-                        continue
 
             seen_names[tool_name] = seen_names.get(tool_name, 0) + 1
             adapted.append(adapter)
 
         if blocked_count > 0:
             logger.warning(
-                "Blocked %d LangChain tool(s) due to safeguards (duplicates, limits, or blacklist)",
+                "Blocked %d LangChain tool(s) due to safeguards (count limit)",
                 blocked_count,
             )
 
@@ -407,19 +434,20 @@ class LangChainToolProjector:
 def register_langchain_tools(
     tools: List["LCBaseTool"],
     tool_registry: Any,
-    prefix: str = "",
+    prefix: str = DEFAULT_LANGCHAIN_PREFIX,
     conflict_strategy: str = "prefix_source",
     enable_safeguards: bool = True,
 ) -> int:
-    """Register LangChain tools with automatic safeguards.
+    """Register LangChain tools with automatic safeguards and deduplication.
 
     Convenience function that projects tools and registers them,
-    applying all safeguards by default.
+    applying all safeguards by default. ToolDeduplicator in ToolRegistry
+    will handle cross-source deduplication automatically.
 
     Args:
         tools: List of LangChain BaseTool instances
         tool_registry: Victor tool registry instance
-        prefix: Optional prefix for all tool names
+        prefix: Optional prefix for all tool names (default: "lgc")
         conflict_strategy: How to handle name collisions
         enable_safeguards: Whether to enforce LangChain safeguards (default: True)
 
@@ -454,7 +482,7 @@ def register_langchain_tools(
         enable_safeguards=enable_safeguards,
     )
 
-    # Register adapters
+    # Register adapters (ToolDeduplicator will handle conflicts)
     registered_count = 0
     for adapter in adapters:
         try:
