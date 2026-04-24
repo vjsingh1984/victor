@@ -666,20 +666,22 @@ async def edit(
 
     operations_queued = len(ops)
 
-    # Handle preview mode
-    if preview:
-        import io
-        import sys
+    import io
+    import sys
 
-        # Capture preview output
+    def _capture_stdout(fn):
+        """Call fn() while capturing any stdout it writes; return captured text."""
         old_stdout = sys.stdout
-        sys.stdout = captured_output = io.StringIO()
-
+        sys.stdout = buf = io.StringIO()
         try:
-            editor.preview_diff(context_lines=ctx)
-            preview_text = captured_output.getvalue()
+            fn()
         finally:
             sys.stdout = old_stdout
+        return buf.getvalue()
+
+    # Handle preview mode
+    if preview:
+        preview_text = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
 
         if not commit:
             editor.abort()
@@ -692,8 +694,15 @@ async def edit(
                 "message": f"Preview generated for {operations_queued} operations (not applied)",
             }
         else:
-            # Preview but still commit
-            success = editor.commit(dry_run=False)
+            # Preview but still commit (suppress FileEditor's commit stdout)
+            _capture_stdout(lambda: None)  # discard; real commit captured below
+            success_ref = [False]
+
+            def _do_commit():
+                success_ref[0] = editor.commit(dry_run=False)
+
+            _capture_stdout(_do_commit)
+            success = success_ref[0]
             if success:
                 return {
                     "success": True,
@@ -709,9 +718,15 @@ async def edit(
                     "error": "Failed to commit changes. Transaction rolled back.",
                 }
 
-    # Handle commit
+    # Handle commit (suppress FileEditor's transaction stdout — Victor formats its own output)
     if commit:
-        success = editor.commit(dry_run=False)
+        success_ref = [False]
+
+        def _do_commit():
+            success_ref[0] = editor.commit(dry_run=False)
+
+        _capture_stdout(_do_commit)
+        success = success_ref[0]
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()

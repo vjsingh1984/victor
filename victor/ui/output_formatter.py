@@ -40,6 +40,18 @@ import re
 import sys
 import time
 from rich.markup import escape as _markup_escape
+
+
+def _colorize_diff_line(line: str) -> str:
+    """Return Rich markup for a unified-diff line (colors + and - lines)."""
+    escaped = _markup_escape(line)
+    if line.startswith("+"):
+        return f"[green]{escaped}[/]"
+    if line.startswith("-"):
+        return f"[red]{escaped}[/]"
+    if line.startswith("@@"):
+        return f"[cyan]{escaped}[/]"
+    return f"[dim]{escaped}[/]"
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, TextIO, Tuple
@@ -314,13 +326,24 @@ class OutputFormatter:
                     if preview.header:
                         self._console.print(f"[dim]│ {_markup_escape(preview.header)}[/]")
                     if preview.lines:
-                        render_tool_preview(
-                            self._console,
-                            "\n".join(_markup_escape(line) for line in preview.lines),
-                            total_lines=preview.total_line_count,
-                            preview_lines=preview_lines,
-                            hotkey=hotkey,
-                        )
+                        if preview.syntax_hint == "diff":
+                            render_tool_preview(
+                                self._console,
+                                "\n".join(
+                                    _colorize_diff_line(line) for line in preview.lines
+                                ),
+                                total_lines=preview.total_line_count,
+                                preview_lines=preview_lines,
+                                hotkey=hotkey,
+                            )
+                        else:
+                            render_tool_preview(
+                                self._console,
+                                "\n".join(_markup_escape(line) for line in preview.lines),
+                                total_lines=preview.total_line_count,
+                                preview_lines=preview_lines,
+                                hotkey=hotkey,
+                            )
 
             # Show pruning transparency if enabled
             if was_pruned and self.config.show_tools:

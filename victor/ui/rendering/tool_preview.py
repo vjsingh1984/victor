@@ -89,31 +89,60 @@ class _ToolPreviewStrategy(ABC):
 class _DiffPreviewStrategy(_ToolPreviewStrategy):
     """Edit / patch / replace operations — show a unified diff."""
 
-    def render(self, tool_name, arguments, raw_result, max_lines) -> RenderedPreview:
-        old = arguments.get("old_string", "")
-        new = arguments.get("new_string", "")
-
+    def _extract_replace_pairs(self, arguments: Dict[str, Any]) -> List[tuple]:
+        """Extract (old, new, path) tuples from edit tool's ops list or legacy flat args."""
+        ops = arguments.get("ops")
+        if isinstance(ops, list):
+            pairs = []
+            for op in ops:
+                if not isinstance(op, dict):
+                    continue
+                if op.get("type") == "replace":
+                    pairs.append(
+                        (op.get("old_str", ""), op.get("new_str", ""), op.get("path", ""))
+                    )
+            return pairs
+        # Legacy / other tools: top-level old_str/new_str or old_string/new_string
+        old = arguments.get("old_str") or arguments.get("old_string", "")
+        new = arguments.get("new_str") or arguments.get("new_string", "")
+        path = arguments.get("path") or arguments.get("file_path", "")
         if old or new:
-            diff_lines = list(
-                difflib.unified_diff(
-                    old.splitlines(),
-                    new.splitlines(),
-                    lineterm="",
-                    n=1,
+            return [(old, new, path)]
+        return []
+
+    def render(self, tool_name, arguments, raw_result, max_lines) -> RenderedPreview:
+        pairs = self._extract_replace_pairs(arguments)
+
+        if pairs:
+            all_content_lines: List[str] = []
+            file_labels: List[str] = []
+            for old, new, path in pairs:
+                diff_lines = list(
+                    difflib.unified_diff(
+                        old.splitlines(),
+                        new.splitlines(),
+                        fromfile=path,
+                        tofile=path,
+                        lineterm="",
+                        n=1,
+                    )
                 )
-            )
-            # Skip the --- / +++ header lines for compactness
-            content_lines = [
-                l for l in diff_lines if not l.startswith("---") and not l.startswith("+++")
-            ]
-            added = sum(1 for l in content_lines if l.startswith("+"))
-            removed = sum(1 for l in content_lines if l.startswith("-"))
-            header = f"+{added} -{removed} lines"
-            visible = content_lines[:max_lines]
+                content_lines = [
+                    l for l in diff_lines if not l.startswith("---") and not l.startswith("+++")
+                ]
+                all_content_lines.extend(content_lines)
+                if path:
+                    file_labels.append(path)
+
+            added = sum(1 for l in all_content_lines if l.startswith("+"))
+            removed = sum(1 for l in all_content_lines if l.startswith("-"))
+            file_part = f" {', '.join(file_labels)}" if file_labels else ""
+            header = f"+{added} -{removed}{file_part}"
+            visible = all_content_lines[:max_lines]
             return RenderedPreview(
                 lines=visible,
                 header=header,
-                total_line_count=len(content_lines),
+                total_line_count=len(all_content_lines),
                 syntax_hint="diff",
             )
 

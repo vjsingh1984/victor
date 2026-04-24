@@ -2051,10 +2051,9 @@ class Settings(BaseSettings):
                 # Extract profile if specified
                 if profile_name and profile_name in profiles_data.get("profiles", {}):
                     profile_config = profiles_data["profiles"][profile_name]
-                    # Only take settings that exist in Settings
+                    # Accept flat keys — LEGACY_ENV_MAPPINGS routes them to nested groups
                     for key, value in profile_config.items():
-                        if key in cls.model_fields:
-                            settings_dict[key] = value
+                        settings_dict[key] = value
             except Exception as e:
                 logger.warning("Failed to load profiles.yaml: %s", e)
 
@@ -2064,10 +2063,9 @@ class Settings(BaseSettings):
             try:
                 with open(settings_path) as f:
                     user_settings = yaml.safe_load(f) or {}
-                    # Override with user settings
+                    # Override with user settings — accept flat keys for LEGACY_ENV_MAPPINGS routing
                     for key, value in user_settings.items():
-                        if key in cls.model_fields:
-                            settings_dict[key] = value
+                        settings_dict[key] = value
             except Exception as e:
                 logger.warning("Failed to load settings.yaml: %s", e)
 
@@ -2078,13 +2076,11 @@ class Settings(BaseSettings):
         settings = cls(**settings_dict)
 
         # Layer 1: Apply CLI overrides (highest priority)
+        # Re-create from merged dict so LEGACY_ENV_MAPPINGS routes flat keys to nested groups
         if cli_args:
-            # Filter out None values and non-field keys
-            filtered_args = {
-                k: v for k, v in cli_args.items() if v is not None and k in cls.model_fields
-            }
-            if filtered_args:
-                settings = settings.model_copy(update=filtered_args)
+            cli_overrides = {k: v for k, v in cli_args.items() if v is not None}
+            if cli_overrides:
+                settings = cls(**{**settings_dict, **cli_overrides})
 
         return settings
 

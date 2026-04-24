@@ -145,6 +145,16 @@ def format_tool_args(arguments: dict[str, Any], max_width: int = 80) -> str:
             part = f"{k}={v}"
         elif v is None:
             continue
+        elif isinstance(v, list):
+            # Summarize list args meaningfully (e.g. edit's ops=[{type,path,...}])
+            if v and isinstance(v[0], dict):
+                first = v[0]
+                op_type = first.get("type", "")
+                op_path = first.get("path", "")
+                summary = f"{op_type}:{op_path}" if op_type and op_path else str(len(v))
+                part = f"{k}=[{summary}]" if len(v) == 1 else f"{k}=[{summary} +{len(v)-1}]"
+            else:
+                part = f"{k}=[{len(v)}]"
         else:
             part = f"{k}=..."
         if total_len + len(part) > max_width and parts:

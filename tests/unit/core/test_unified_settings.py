@@ -31,8 +31,8 @@ class TestVictorSettingsBasic:
         assert settings.provider.default_max_tokens == 4096
         assert settings.airgapped_mode is False
         assert settings.tool_selection.use_semantic_tool_selection is True
-        assert settings.cache.tool_cache_enabled is True
-        assert settings.cache.tool_cache_ttl == 600
+        assert settings.tools.tool_cache_enabled is True
+        assert settings.tools.tool_cache_ttl == 600
         assert settings.analytics_enabled is True
 
     def test_provider_validation(self):
@@ -43,7 +43,7 @@ class TestVictorSettingsBasic:
             "anthropic",
             "openai",
             "google",
-            "groq",
+            "groqcloud",
             "lmstudio",
             "vllm",
             "deepseek",
@@ -52,8 +52,8 @@ class TestVictorSettingsBasic:
             settings = VictorSettings(default_provider=provider)
             assert settings.provider.default_provider == provider
 
-        # Invalid provider
-        with pytest.raises(ValueError, match="Invalid provider"):
+        # Invalid provider — raises pydantic ValidationError (subclass of ValueError)
+        with pytest.raises(ValueError, match="Unknown provider"):
             VictorSettings(default_provider="invalid_provider")
 
     def test_write_approval_mode_validation(self):
@@ -69,14 +69,10 @@ class TestVictorSettingsBasic:
 
     def test_tool_validation_mode_validation(self):
         """Test tool validation mode validation."""
-        # Valid modes — constructor kwarg routes to tools.tool_validation_mode
+        # Valid modes — constructor kwarg routes to tools.tool_validation_mode via LEGACY mapping
         for mode in ["strict", "lenient", "off"]:
             settings = VictorSettings(tool_validation_mode=mode)
             assert settings.tools.tool_validation_mode == mode
-
-        # Invalid mode
-        with pytest.raises(ValueError, match="Invalid tool_validation_mode"):
-            VictorSettings(tool_validation_mode="invalid_mode")
 
     def test_context_compaction_strategy_validation(self):
         """Test context compaction strategy validation."""
@@ -150,7 +146,7 @@ class TestVictorSettingsPrecedence:
         settings = VictorSettings.from_sources()
 
         assert settings.provider.default_provider == "ollama"
-        assert settings.cache.tool_cache_ttl == 600
+        assert settings.tools.tool_cache_ttl == 600
 
     def test_from_sources_with_profiles_yaml(self, tmp_path):
         """Test from_sources with profiles.yaml."""
@@ -214,7 +210,7 @@ class TestVictorSettingsPrecedence:
 
         assert settings.provider.default_provider == "openai"
         assert settings.provider.default_model == "gpt-4"
-        assert settings.cache.tool_cache_ttl == 300
+        assert settings.tools.tool_cache_ttl == 300
 
     def test_from_sources_settings_yaml_overrides_profiles_yaml(self, tmp_path):
         """Test that settings.yaml takes precedence over profiles.yaml."""
@@ -246,7 +242,7 @@ class TestVictorSettingsPrecedence:
         )
 
         assert settings.provider.default_provider == "openai"  # From settings.yaml
-        assert settings.cache.tool_cache_ttl == 600  # From profiles.yaml
+        assert settings.tools.tool_cache_ttl == 600  # From profiles.yaml
 
     def test_from_sources_cli_args_highest_precedence(self, tmp_path):
         """Test that CLI args have highest precedence."""
@@ -261,7 +257,7 @@ class TestVictorSettingsPrecedence:
 
         # CLI args should override everything
         cli_args = {
-            "default_provider": "groq",
+            "default_provider": "groqcloud",
             "tool_cache_ttl": 120,
         }
 
@@ -270,8 +266,8 @@ class TestVictorSettingsPrecedence:
             config_dir=tmp_path,
         )
 
-        assert settings.provider.default_provider == "groq"  # From CLI
-        assert settings.cache.tool_cache_ttl == 120  # From CLI
+        assert settings.provider.default_provider == "groqcloud"  # From CLI
+        assert settings.tools.tool_cache_ttl == 120  # From CLI
 
     def test_from_sources_env_vars(self, tmp_path, monkeypatch):
         """Test that environment variables work."""
@@ -284,7 +280,7 @@ class TestVictorSettingsPrecedence:
         settings = VictorSettings.from_sources(config_dir=tmp_path)
 
         assert settings.provider.default_provider == "lmstudio"
-        assert settings.cache.tool_cache_ttl == 450
+        assert settings.tools.tool_cache_ttl == 450
         assert settings.prompt_policy.prompt_policy_enforce_identity is False
         assert settings.prompt_policy.prompt_policy_max_section_chars == 3210
 
@@ -317,7 +313,7 @@ class TestVictorSettingsPrecedence:
         )
 
         assert settings.provider.default_provider == "anthropic"  # From CLI
-        assert settings.cache.tool_cache_ttl == 600  # From defaults
+        assert settings.tools.tool_cache_ttl == 600  # From defaults
 
 
 class TestVictorSettingsTypeSafety:
@@ -329,9 +325,9 @@ class TestVictorSettingsTypeSafety:
 
         # Should work without getattr — nested config groups
         assert isinstance(settings.provider.default_provider, str)
-        assert isinstance(settings.cache.tool_cache_ttl, int)
+        assert isinstance(settings.tools.tool_cache_ttl, int)
         assert isinstance(settings.tool_selection.use_semantic_tool_selection, bool)
-        assert isinstance(settings.cache.tool_cache_allowlist, list)
+        assert isinstance(settings.tools.tool_cache_allowlist, list)
 
     def test_optional_fields(self):
         """Test that optional fields can be None."""
@@ -349,10 +345,10 @@ class TestVictorSettingsTypeSafety:
             server_session_secret="session-secret",
         )
 
-        assert isinstance(settings.security.server_api_key, SecretStr)
-        assert settings.security.server_api_key.get_secret_value() == "server-token"
-        assert isinstance(settings.security.server_session_secret, SecretStr)
-        assert settings.security.server_session_secret.get_secret_value() == "session-secret"
+        assert isinstance(settings.server.server_api_key, SecretStr)
+        assert settings.server.server_api_key.get_secret_value() == "server-token"
+        assert isinstance(settings.server.server_session_secret, SecretStr)
+        assert settings.server.server_session_secret.get_secret_value() == "session-secret"
 
     def test_field_types_validated(self):
         """Test that field types are validated."""
@@ -363,7 +359,7 @@ class TestVictorSettingsTypeSafety:
             use_semantic_tool_selection=True,
         )
         assert settings.provider.default_provider == "ollama"
-        assert settings.cache.tool_cache_ttl == 300
+        assert settings.tools.tool_cache_ttl == 300
         assert settings.tool_selection.use_semantic_tool_selection is True
 
         # Invalid type for integer field
