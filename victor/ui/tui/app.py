@@ -20,7 +20,12 @@ from textual.binding import Binding
 from textual.containers import Container, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Input, Label
-from victor.ui.rendering.utils import StreamDeltaNormalizer, normalize_reasoning_content
+from victor.agent.response_sanitizer import create_streaming_filter
+from victor.ui.rendering.utils import (
+    StreamDeltaNormalizer,
+    is_thinking_status_message,
+    normalize_reasoning_content,
+)
 from victor.ui.tui.session import Message
 from victor.ui.tui.theme import THEME_CSS
 from victor.ui.tui.widgets import (
@@ -809,24 +814,16 @@ class VictorTUI(App):
         content_buffer = ""
         thinking_buffer = ""
         thinking_visible = False
+        content_filter = create_streaming_filter(suppress_thinking=False)
         content_normalizer = StreamDeltaNormalizer()
         thinking_normalizer = StreamDeltaNormalizer()
 
-        def update_content(raw_content: str) -> None:
-            """Normalize content and update the streaming transcript."""
-            nonlocal content_buffer, thinking_visible
+        def append_content(content_delta: str) -> None:
+            """Append normalized response content to the transcript."""
+            nonlocal content_buffer
 
-            content_delta = content_normalizer.consume(raw_content)
             if not content_delta:
                 return
-
-            if thinking_visible:
-                try:
-                    thinking_visible = False
-                    self._hide_thinking()
-                except Exception as e:
-                    logger.warning(f"Failed to hide thinking panel: {e}")
-
             content_buffer += content_delta
             if self._conversation_log:
                 try:
@@ -837,6 +834,58 @@ class VictorTUI(App):
                     self._update_jump_to_bottom()
                 except Exception as e:
                     logger.warning(f"Failed to update jump button: {e}")
+
+        def append_thinking(content_delta: str) -> None:
+            """Append normalized thinking content to the thinking panel."""
+            nonlocal thinking_buffer
+
+            if not content_delta:
+                return
+
+            thinking_buffer += content_delta
+            self._update_thinking(thinking_buffer)
+
+        def process_content(raw_content: str) -> None:
+            """Normalize and route content through the shared inline-thinking filter."""
+            nonlocal thinking_visible, thinking_buffer
+
+            content_delta = content_normalizer.consume(raw_content)
+            if not content_delta:
+                return
+
+            if thinking_visible and not content_filter.is_thinking:
+                try:
+                    thinking_visible = False
+                    self._hide_thinking()
+                except Exception as e:
+                    logger.warning(f"Failed to hide thinking panel: {e}")
+
+            result = content_filter.process_chunk(content_delta)
+
+            if result.entering_thinking and not thinking_visible:
+                try:
+                    thinking_buffer = ""
+                    thinking_normalizer.reset()
+                    thinking_visible = True
+                    self._show_thinking()
+                except Exception as e:
+                    logger.warning(f"Failed to show thinking panel: {e}")
+
+            if result.content:
+                if result.is_thinking:
+                    try:
+                        append_thinking(thinking_normalizer.consume(result.content))
+                    except Exception as e:
+                        logger.warning(f"Failed to update thinking content: {e}")
+                else:
+                    append_content(result.content)
+
+            if result.exiting_thinking and thinking_visible:
+                try:
+                    thinking_visible = False
+                    self._hide_thinking()
+                except Exception as e:
+                    logger.warning(f"Failed to hide thinking panel: {e}")
 
         # Start streaming display
         await self._start_streaming_ui()
@@ -849,7 +898,7 @@ class VictorTUI(App):
                     chunk_type = chunk.type
 
                     if chunk_type == "content":
-                        update_content(chunk.content or "")
+                        process_content(chunk.content or "")
 
                     elif chunk_type == "thinking_start":
                         try:
@@ -864,8 +913,7 @@ class VictorTUI(App):
                         try:
                             thinking_delta = thinking_normalizer.consume(chunk.content or "")
                             if thinking_delta:
-                                thinking_buffer += thinking_delta
-                                self._update_thinking(thinking_buffer)
+                                append_thinking(thinking_delta)
                         except Exception as e:
                             logger.warning(f"Failed to update thinking content: {e}")
 
@@ -897,7 +945,21 @@ class VictorTUI(App):
                 elif isinstance(getattr(chunk, "metadata", None), dict):
                     metadata = chunk.metadata or {}
 
-                    if "tool_start" in metadata:
+                    if "status" in metadata:
+                        try:
+                            status_message = str(metadata["status"])
+                            if is_thinking_status_message(status_message):
+                                if not thinking_visible:
+                                    thinking_buffer = ""
+                                    thinking_normalizer.reset()
+                                    thinking_visible = True
+                                    self._show_thinking()
+                            else:
+                                self._set_status(status_message, "streaming")
+                        except Exception as e:
+                            logger.warning(f"Failed to handle status chunk: {e}")
+
+                    elif "tool_start" in metadata:
                         tool_data = metadata["tool_start"]
                         try:
                             self._show_tool_call(
@@ -930,18 +992,32 @@ class VictorTUI(App):
                                 self._show_thinking()
                             thinking_delta = thinking_normalizer.consume(reasoning)
                             if thinking_delta:
-                                thinking_buffer += thinking_delta
-                                self._update_thinking(thinking_buffer)
+                                append_thinking(thinking_delta)
                             if chunk.content:
-                                update_content(chunk.content)
+                                process_content(chunk.content)
                         except Exception as e:
                             logger.warning(f"Failed to update thinking content: {e}")
 
                 elif hasattr(chunk, "content") and chunk.content:
                     # Simple content chunk
-                    update_content(chunk.content)
+                    process_content(chunk.content)
 
         finally:
+            flush_result = content_filter.flush()
+            if flush_result.content:
+                if flush_result.is_thinking:
+                    try:
+                        if not thinking_visible:
+                            thinking_buffer = ""
+                            thinking_normalizer.reset()
+                            thinking_visible = True
+                            self._show_thinking()
+                        append_thinking(thinking_normalizer.consume(flush_result.content))
+                    except Exception as e:
+                        logger.warning(f"Failed to flush thinking content: {e}")
+                else:
+                    append_content(flush_result.content)
+
             # Finish streaming
             if self._conversation_log:
                 try:

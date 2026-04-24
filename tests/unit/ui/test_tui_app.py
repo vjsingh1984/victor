@@ -534,6 +534,87 @@ def test_stream_response_strips_provider_reasoning_prefix() -> None:
     app._record_message.assert_called_once_with("assistant", "Answer")
 
 
+def test_stream_response_maps_generic_thinking_status_to_panel() -> None:
+    """TUI should treat generic thinking statuses as thinking-panel transitions."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"status": "💭 Thinking..."})
+        yield StreamChunk(content="Answer", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._show_thinking.assert_called_once()
+    app._hide_thinking.assert_called_once()
+    app._conversation_log.update_streaming.assert_called_once_with("Answer")
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
+def test_stream_response_routes_non_thinking_status_to_status_bar() -> None:
+    """TUI should surface non-thinking status chunks in the status bar."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="", metadata={"status": "Starting..."})
+        yield StreamChunk(content="Answer", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._set_status.assert_any_call("Starting...", "streaming")
+    app._show_thinking.assert_not_called()
+    app._record_message.assert_called_once_with("assistant", "Answer")
+
+
+def test_stream_response_handles_inline_thinking_markers() -> None:
+    """TUI should route inline thinking markers through the thinking panel."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._show_thinking = MagicMock()
+    app._update_thinking = MagicMock()
+    app._hide_thinking = MagicMock()
+    app._record_message = MagicMock()
+    app._update_jump_to_bottom = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(content="<think>", metadata=None)
+        yield StreamChunk(content="Analyzing...", metadata=None)
+        yield StreamChunk(content="</think>", metadata=None)
+        yield StreamChunk(content="Visible", metadata=None)
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("hello"))
+
+    app._show_thinking.assert_called_once()
+    app._update_thinking.assert_called_once_with("Analyzing...")
+    app._hide_thinking.assert_called_once()
+    app._conversation_log.update_streaming.assert_called_once_with("Visible")
+    app._record_message.assert_called_once_with("assistant", "Visible")
+
+
 def test_input_submit_ignored_while_processing_keeps_draft() -> None:
     """Submitting while busy should not clear input or enqueue a second send."""
     app = VictorTUI()
