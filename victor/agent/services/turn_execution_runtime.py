@@ -139,6 +139,7 @@ class TurnExecutor:
         provider_context: "ProviderContextProtocol",
         execution_provider: Any,  # ExecutionProvider protocol
         token_tracker: Optional["TokenTracker"] = None,
+        exploration_coordinator: Optional[Any] = None,
     ) -> None:
         """Initialize the TurnExecutor.
 
@@ -150,12 +151,16 @@ class TurnExecutor:
             token_tracker: Optional centralized token tracker. When provided,
                 token usage is accumulated through the tracker instead of
                 direct dict mutation on chat_context.
+            exploration_coordinator: Optional shared exploration runtime.
+                When omitted, TurnExecutor lazily creates the canonical
+                ExplorationCoordinator on first use.
         """
         self._chat_context = chat_context
         self._tool_context = tool_context
         self._provider_context = provider_context
         self._execution_provider = execution_provider
         self._token_tracker = token_tracker
+        self._exploration_coordinator = exploration_coordinator
         self._exploration_done = False  # Instance-level: fires once per conversation
 
     # =====================================================================
@@ -780,13 +785,16 @@ class TurnExecutor:
         try:
             from pathlib import Path
 
-            from victor.agent.services.exploration_runtime import (
-                ExplorationCoordinator,
+            from victor.agent.coordinators.factory_support import (
+                create_exploration_coordinator,
             )
             from victor.config.settings import get_project_paths
 
             project_root = Path(get_project_paths().project_root)
-            explorer = ExplorationCoordinator()
+            explorer = self._exploration_coordinator
+            if explorer is None:
+                explorer = create_exploration_coordinator()
+                self._exploration_coordinator = explorer
 
             # Calculate resource-aware exploration budget
             from victor.agent.budget.resource_calculator import (
