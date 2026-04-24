@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from typing import Any, AsyncIterator, List, Optional, Protocol
+from typing import Any, AsyncIterator, List, Optional
 
+from victor.agent.services.protocols.streaming_runtime import StreamingPipelineRuntimeProtocol
 from victor.providers.base import StreamChunk
 
 logger = logging.getLogger(__name__)
@@ -43,35 +44,6 @@ def _get_decision_service(orchestrator: object) -> object | None:
     return None
 
 
-class StreamingPipelineRuntime(Protocol):
-    """Structural runtime contract consumed by ``StreamingChatPipeline``."""
-
-    _orchestrator: Any
-    _intent_classification_handler: Any
-    _continuation_handler: Any
-    _tool_execution_handler: Any
-
-    async def _create_stream_context(self, user_message: str, **kwargs: Any) -> Any: ...
-
-    def _run_iteration_pre_checks(
-        self,
-        *args: Any,
-        **kwargs: Any,
-    ) -> AsyncIterator[StreamChunk]: ...
-
-    async def _stream_provider_response(
-        self,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any: ...
-
-    async def _handle_empty_response_recovery(
-        self,
-        *args: Any,
-        **kwargs: Any,
-    ) -> Any: ...
-
-
 class StreamingChatPipeline:
     """Canonical streaming pipeline wired to a runtime owner.
 
@@ -82,7 +54,7 @@ class StreamingChatPipeline:
 
     def __init__(
         self,
-        runtime_owner: StreamingPipelineRuntime,
+        runtime_owner: StreamingPipelineRuntimeProtocol,
         perception: Optional[Any] = None,
         fulfillment: Optional[Any] = None,
         confidence_monitor: Optional[Any] = None,
@@ -895,7 +867,7 @@ class StreamingChatPipeline:
 
 
 def create_streaming_chat_pipeline(
-    runtime_owner: StreamingPipelineRuntime,
+    runtime_owner: StreamingPipelineRuntimeProtocol,
     perception: Optional[Any] = None,
     fulfillment: Optional[Any] = None,
 ) -> StreamingChatPipeline:

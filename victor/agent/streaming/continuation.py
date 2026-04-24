@@ -64,10 +64,15 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
     TYPE_CHECKING,
 )
 
+from victor.agent.services.protocols.streaming_runtime import (
+    StreamingChunkRuntimeProtocol,
+    StreamingMessageAdderProtocol,
+    StreamingProviderRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+)
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
 
@@ -78,48 +83,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-# =============================================================================
-# Protocols for Dependencies
-# =============================================================================
-
-
-class ChunkGeneratorProtocol(Protocol):
-    """Protocol for chunk generation."""
-
-    def generate_content_chunk(
-        self, content: str, is_final: bool = False, suffix: str = ""
-    ) -> StreamChunk: ...
-
-    def generate_final_marker_chunk(self) -> StreamChunk: ...
-
-    def generate_metrics_chunk(
-        self, metrics_line: str, is_final: bool = False, prefix: str = "\n\n"
-    ) -> StreamChunk: ...
-
-    def format_completion_metrics(
-        self,
-        ctx: StreamingChatContext,
-        elapsed_time: float,
-        cost_str: Optional[str] = None,
-    ) -> str: ...
-
-
-class SanitizerProtocol(Protocol):
-    """Protocol for content sanitization."""
-
-    def sanitize(self, content: str) -> str: ...
-
-
-class MessageAdderProtocol(Protocol):
-    """Protocol for adding messages to conversation."""
-
-    def add_message(self, role: str, content: str) -> None: ...
-
-
-# ProviderProtocol imported from core.protocols for consistency
-# Uses **kwargs which accepts model, temperature, max_tokens
-from victor.core.protocols import ProviderProtocol
 
 # =============================================================================
 # Result Types
@@ -184,11 +147,11 @@ class ContinuationHandler:
 
     def __init__(
         self,
-        message_adder: MessageAdderProtocol,
-        chunk_generator: ChunkGeneratorProtocol,
-        sanitizer: SanitizerProtocol,
+        message_adder: StreamingMessageAdderProtocol,
+        chunk_generator: StreamingChunkRuntimeProtocol,
+        sanitizer: StreamingSanitizerRuntimeProtocol,
         settings: "Settings",
-        provider: Optional[ProviderProtocol] = None,
+        provider: Optional[StreamingProviderRuntimeProtocol] = None,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,

@@ -59,11 +59,18 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
     Set,
     TYPE_CHECKING,
 )
 
+from victor.agent.services.protocols.streaming_runtime import (
+    StreamingChunkRuntimeProtocol,
+    StreamingConversationStateProtocol,
+    StreamingIntentClassifierRuntimeProtocol,
+    StreamingRLRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+    StreamingTrackerRuntimeProtocol,
+)
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
 
@@ -72,50 +79,6 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# Protocols for Dependencies
-# =============================================================================
-
-
-class IntentClassifierProtocol(Protocol):
-    """Protocol for intent classification."""
-
-    def classify_intent_sync(self, text: str) -> Any: ...
-
-
-class UnifiedTrackerProtocol(Protocol):
-    """Protocol for unified task tracking."""
-
-    def check_response_loop(self, content: str) -> bool: ...
-
-    @property
-    def config(self) -> Dict[str, Any]: ...
-
-
-class ConversationStateProtocol(Protocol):
-    """Protocol for conversation state access."""
-
-    def get_state_summary(self) -> Dict[str, Any]: ...
-
-
-class SanitizerProtocol(Protocol):
-    """Protocol for content sanitization."""
-
-    def sanitize(self, content: str) -> str: ...
-
-
-class ChunkGeneratorProtocol(Protocol):
-    """Protocol for chunk generation."""
-
-    def generate_content_chunk(self, content: str, is_final: bool = False) -> StreamChunk: ...
-
-
-class RLCoordinatorProtocol(Protocol):
-    """Protocol for RL coordinator."""
-
-    pass  # Used as opaque dependency
 
 
 # =============================================================================
@@ -203,13 +166,13 @@ class IntentClassificationHandler:
 
     def __init__(
         self,
-        intent_classifier: IntentClassifierProtocol,
-        unified_tracker: UnifiedTrackerProtocol,
-        sanitizer: SanitizerProtocol,
-        chunk_generator: ChunkGeneratorProtocol,
+        intent_classifier: StreamingIntentClassifierRuntimeProtocol,
+        unified_tracker: StreamingTrackerRuntimeProtocol,
+        sanitizer: StreamingSanitizerRuntimeProtocol,
+        chunk_generator: StreamingChunkRuntimeProtocol,
         settings: "Settings",
-        rl_coordinator: Optional[RLCoordinatorProtocol] = None,
-        conversation_state: Optional[ConversationStateProtocol] = None,
+        rl_coordinator: Optional[StreamingRLRuntimeProtocol] = None,
+        conversation_state: Optional[StreamingConversationStateProtocol] = None,
         provider_name: str = "",
         model: str = "",
         tool_budget: int = 20,

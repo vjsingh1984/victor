@@ -69,6 +69,19 @@ from victor.agent.services.protocols.runtime_support import (
 )
 from victor.agent.services.protocols.session_service import SessionServiceProtocol
 from victor.agent.services.protocols.session_ledger import SessionLedgerProtocol
+from victor.agent.services.protocols.streaming_runtime import (
+    StreamingChunkRuntimeProtocol,
+    StreamingConversationStateProtocol,
+    StreamingIntentClassifierRuntimeProtocol,
+    StreamingMessageAdderProtocol,
+    StreamingPipelineRuntimeProtocol,
+    StreamingProviderRuntimeProtocol,
+    StreamingReminderRuntimeProtocol,
+    StreamingRLRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+    StreamingTrackerRuntimeProtocol,
+    ToolExecutionRecoveryRuntimeProtocol,
+)
 from victor.agent.services.protocols.tool_service import ToolServiceProtocol
 
 __all__ = [
@@ -87,9 +100,20 @@ __all__ = [
     "RecoveryServiceProtocol",
     "SessionLedgerProtocol",
     "SessionServiceProtocol",
+    "StreamingChunkRuntimeProtocol",
+    "StreamingConversationStateProtocol",
+    "StreamingIntentClassifierRuntimeProtocol",
+    "StreamingMessageAdderProtocol",
+    "StreamingPipelineRuntimeProtocol",
+    "StreamingProviderRuntimeProtocol",
+    "StreamingReminderRuntimeProtocol",
+    "StreamingRLRuntimeProtocol",
     "StateRuntimeProtocol",
+    "StreamingSanitizerRuntimeProtocol",
     "StreamingRecoveryRuntimeProtocol",
+    "StreamingTrackerRuntimeProtocol",
     "TaskRuntimeProtocol",
+    "ToolExecutionRecoveryRuntimeProtocol",
     "ToolContextProtocol",
     "ToolPlanningRuntimeProtocol",
     "ToolServiceProtocol",

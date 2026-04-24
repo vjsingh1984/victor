@@ -62,12 +62,18 @@ from typing import (
     Dict,
     List,
     Optional,
-    Protocol,
     Set,
     Tuple,
     TYPE_CHECKING,
 )
 
+from victor.agent.services.protocols.streaming_runtime import (
+    StreamingChunkRuntimeProtocol,
+    StreamingMessageAdderProtocol,
+    StreamingReminderRuntimeProtocol,
+    StreamingTrackerRuntimeProtocol,
+    ToolExecutionRecoveryRuntimeProtocol,
+)
 from victor.agent.streaming.context import StreamingChatContext
 from victor.providers.base import StreamChunk
 
@@ -76,69 +82,6 @@ if TYPE_CHECKING:
     from victor.config.settings import Settings
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# Protocols for Dependencies
-# =============================================================================
-
-
-class RecoveryRuntimeProtocol(Protocol):
-    """Protocol for recovery runtime delegation."""
-
-    def check_tool_budget(
-        self, recovery_ctx: Any, warning_threshold: int
-    ) -> Optional[StreamChunk]: ...
-
-    def truncate_tool_calls(
-        self, recovery_ctx: Any, tool_calls: List[Dict], remaining: int
-    ) -> Tuple[List[Dict], Any]: ...
-
-    def filter_blocked_tool_calls(
-        self, recovery_ctx: Any, tool_calls: List[Dict]
-    ) -> Tuple[List[Dict], List[StreamChunk], int]: ...
-
-    def check_blocked_threshold(
-        self, recovery_ctx: Any, all_blocked: bool
-    ) -> Optional[Tuple[StreamChunk, bool]]: ...
-
-
-class ChunkGeneratorProtocol(Protocol):
-    """Protocol for chunk generation."""
-
-    def generate_tool_start_chunk(
-        self, tool_name: str, tool_args: Dict, status_msg: str
-    ) -> StreamChunk: ...
-
-    def generate_tool_result_chunks(self, result: Dict[str, Any]) -> List[StreamChunk]: ...
-
-    def generate_thinking_status_chunk(self) -> StreamChunk: ...
-
-
-class MessageAdderProtocol(Protocol):
-    """Protocol for adding messages to conversation."""
-
-    def add_message(self, role: str, content: str) -> None: ...
-
-
-class ReminderManagerProtocol(Protocol):
-    """Protocol for reminder management."""
-
-    def update_state(
-        self,
-        observed_files: Set[str],
-        executed_tool: Optional[str],
-        tool_calls: int,
-    ) -> None: ...
-
-    def get_consolidated_reminder(self) -> Optional[str]: ...
-
-
-class UnifiedTrackerProtocol(Protocol):
-    """Protocol for unified task tracking."""
-
-    @property
-    def unique_resources(self) -> Set[str]: ...
 
 
 # =============================================================================
@@ -204,11 +147,11 @@ class ToolExecutionHandler:
 
     def __init__(
         self,
-        recovery_runtime: RecoveryRuntimeProtocol,
-        chunk_generator: ChunkGeneratorProtocol,
-        message_adder: MessageAdderProtocol,
-        reminder_manager: ReminderManagerProtocol,
-        unified_tracker: UnifiedTrackerProtocol,
+        recovery_runtime: ToolExecutionRecoveryRuntimeProtocol,
+        chunk_generator: StreamingChunkRuntimeProtocol,
+        message_adder: StreamingMessageAdderProtocol,
+        reminder_manager: StreamingReminderRuntimeProtocol,
+        unified_tracker: StreamingTrackerRuntimeProtocol,
         settings: "Settings",
         create_recovery_context: Callable[[StreamingChatContext], Any],
         check_progress_with_handler: Callable[[StreamingChatContext], None],

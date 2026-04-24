@@ -30,9 +30,20 @@ from victor.agent.services.protocols import (
     RLLearningRuntimeProtocol,
     RecoveryServiceProtocol,
     SessionServiceProtocol,
+    StreamingChunkRuntimeProtocol,
+    StreamingConversationStateProtocol,
+    StreamingIntentClassifierRuntimeProtocol,
+    StreamingMessageAdderProtocol,
+    StreamingPipelineRuntimeProtocol,
+    StreamingProviderRuntimeProtocol,
+    StreamingReminderRuntimeProtocol,
+    StreamingRLRuntimeProtocol,
+    StreamingSanitizerRuntimeProtocol,
+    StreamingTrackerRuntimeProtocol,
     StateRuntimeProtocol,
     StreamingRecoveryRuntimeProtocol,
     TaskRuntimeProtocol,
+    ToolExecutionRecoveryRuntimeProtocol,
     ToolPlanningRuntimeProtocol,
 )
 
@@ -74,6 +85,20 @@ class TestProtocolDefinitions:
         assert StreamingRecoveryRuntimeProtocol is not None
         assert RLLearningRuntimeProtocol is not None
 
+    def test_streaming_runtime_support_protocols_exist(self):
+        """Service-owned streaming helper protocols should be importable."""
+        assert StreamingChunkRuntimeProtocol is not None
+        assert StreamingConversationStateProtocol is not None
+        assert StreamingIntentClassifierRuntimeProtocol is not None
+        assert StreamingMessageAdderProtocol is not None
+        assert StreamingPipelineRuntimeProtocol is not None
+        assert StreamingProviderRuntimeProtocol is not None
+        assert StreamingReminderRuntimeProtocol is not None
+        assert StreamingRLRuntimeProtocol is not None
+        assert StreamingSanitizerRuntimeProtocol is not None
+        assert StreamingTrackerRuntimeProtocol is not None
+        assert ToolExecutionRecoveryRuntimeProtocol is not None
+
     def test_runtime_alias_protocols_match_legacy_protocol_identity(self):
         """Alias protocols should preserve identity with compatibility imports."""
         with pytest.warns(DeprecationWarning, match="ChunkGeneratorProtocol is deprecated"):
@@ -107,6 +132,26 @@ class TestProtocolDefinitions:
         assert PromptRuntimeProtocol is PromptCoordinatorProtocol
         assert StreamingRecoveryRuntimeProtocol is StreamingRecoveryCoordinatorProtocol
         assert RLLearningRuntimeProtocol is RLCoordinatorProtocol
+
+    def test_streaming_runtime_support_aliases_match_canonical_identity(self):
+        """Streaming support aliases should preserve identity where canonical hosts exist."""
+        from victor.agent.protocols.analysis_protocols import IntentClassifierProtocol
+        from victor.agent.protocols.infrastructure_protocols import (
+            RLCoordinatorProtocol,
+            ReminderManagerProtocol,
+            ResponseSanitizerProtocol,
+        )
+        from victor.agent.protocols.streaming_protocols import ChunkGeneratorProtocol
+        from victor.core.protocols import ProviderProtocol
+
+        assert StreamingChunkRuntimeProtocol is ChunkRuntimeProtocol
+        assert StreamingChunkRuntimeProtocol is ChunkGeneratorProtocol
+        assert StreamingIntentClassifierRuntimeProtocol is IntentClassifierProtocol
+        assert StreamingReminderRuntimeProtocol is ReminderManagerProtocol
+        assert StreamingRLRuntimeProtocol is RLLearningRuntimeProtocol
+        assert StreamingRLRuntimeProtocol is RLCoordinatorProtocol
+        assert StreamingSanitizerRuntimeProtocol is ResponseSanitizerProtocol
+        assert StreamingProviderRuntimeProtocol is ProviderProtocol
 
 
 class TestProtocolImplementation:
