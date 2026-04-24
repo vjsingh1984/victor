@@ -160,6 +160,79 @@ MCP tools default to STUB schema level. When relevance filtering is active, only
 | `tool_selection_cache_enabled` | `true` | Cache selection results across turns |
 | `tool_selection_cache_ttl` | `300` | Selection cache TTL (seconds) |
 
+## Tool Deduplication
+
+Automatically removes duplicate tools across native, LangChain, and MCP sources with priority-based resolution.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `enable_tool_deduplication` | `true` | Enable cross-source tool deduplication |
+| `deduplication_priority_order` | `["native", "langchain", "mcp", "plugin"]` | Priority order (highest to lowest) |
+| `deduplication_whitelist` | `[]` | Tools to always allow (bypass deduplication) |
+| `deduplication_blacklist` | `[]` | Tools to always skip (force deduplication) |
+| `deduplication_strict_mode` | `false` | Fail on conflicts instead of logging and skipping |
+| `deduplication_naming_enforcement` | `true` | Enforce naming conventions (lgc_*, mcp_*, plg_*) |
+| `deduplication_semantic_threshold` | `0.85` | Threshold for semantic similarity detection (0.0-1.0) |
+
+### Priority System
+
+Tools are prioritized by source when conflicts are detected:
+
+| Priority | Source | Prefix | Examples |
+|----------|--------|--------|----------|
+| 1 (highest) | Native | none | `read`, `write`, `edit`, `search` |
+| 2 | LangChain | `lgc_` | `lgc_wikipedia`, `lgc_wolfram_alpha` |
+| 3 | MCP | `mcp_` | `mcp_github_search`, `mcp_filesystem_read` |
+| 4 (lowest) | Plugin | `plg_` | `plg_custom_tool` |
+
+When two tools have the same normalized name (e.g., `search` vs `lgc_search`), the higher priority source is kept and the lower priority tool is automatically skipped during registration.
+
+### Token Savings
+
+Deduplication provides token savings through two mechanisms:
+
+1. **Native tool preference**: No wrapper overhead, full schema control
+2. **Adapter tool STUB schemas**: LangChain and MCP tools use STUB schemas (57% reduction vs FULL)
+
+### Configuration Examples
+
+```yaml
+# ~/.victor/profiles.yaml
+profiles:
+  default:
+    tools:
+      enable_tool_deduplication: true
+      deduplication_priority_order:
+        - native
+        - langchain
+        - mcp
+        - plugin
+      deduplication_naming_enforcement: true
+
+  # Disable deduplication (allow all tools)
+  no_dedup:
+    tools:
+      enable_tool_deduplication: false
+
+  # Custom whitelist (always allow specific tools)
+  custom:
+    tools:
+      deduplication_whitelist:
+        - special_tool
+        - custom_search
+```
+
+### Usage
+
+```bash
+# Enable/disable via environment variable
+export VICTOR_ENABLE_TOOL_DEDUPLICATION=true
+export VICTOR_DEDUPLICATION_NAMING_ENFORCEMENT=true
+
+# Check deduplication status
+victor tools list  # Shows deduplicated tool set
+```
+
 ### Adaptive Selection by Model Size
 
 | Model Size | Threshold | Max Tools |
