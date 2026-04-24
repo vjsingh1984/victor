@@ -2240,8 +2240,13 @@ async def _run_cli_repl(
     @prompt_session.key_bindings.add(Keys.ControlO)
     def _expand_output(event):
         """Expand last tool output to show full content."""
-        if _active_renderer is not None and hasattr(_active_renderer, "expand_last_output"):
-            _active_renderer.expand_last_output()
+        if _active_renderer is None or not hasattr(_active_renderer, "expand_last_output"):
+            return
+        renderer_ref = _active_renderer
+        # run_in_terminal temporarily suspends the prompt, prints, then restores it —
+        # without this, console.print() inside a key binding gets overwritten immediately
+        # by prompt_toolkit's own prompt re-render.
+        event.app.run_in_terminal(renderer_ref.expand_last_output)
 
     while True:
         renderer = None
@@ -2257,6 +2262,13 @@ async def _run_cli_repl(
             if user_input.strip().lower() in ("exit", "quit", "/exit", "/quit"):
                 console.print("[dim]Goodbye![/]")
                 break
+
+            if user_input.strip().lower() in ("/expand", "/e"):
+                if _active_renderer is not None and hasattr(_active_renderer, "expand_last_output"):
+                    _active_renderer.expand_last_output()
+                else:
+                    console.print("[dim]No tool output to expand[/]")
+                continue
 
             if cmd_handler.is_command(user_input):
                 await cmd_handler.execute(user_input)
