@@ -26,14 +26,13 @@ class TestVictorSettingsBasic:
         """Test that default values are set correctly."""
         settings = VictorSettings()
 
-        assert settings.default_provider == "ollama"
-        assert settings.default_model == "qwen3-coder:30b"
+        assert settings.provider.default_provider == "ollama"
         assert settings.provider.default_temperature == 0.7
         assert settings.provider.default_max_tokens == 4096
         assert settings.airgapped_mode is False
         assert settings.tool_selection.use_semantic_tool_selection is True
-        assert settings.tool_cache_enabled is True
-        assert settings.tool_cache_ttl == 600
+        assert settings.cache.tool_cache_enabled is True
+        assert settings.cache.tool_cache_ttl == 600
         assert settings.analytics_enabled is True
 
     def test_provider_validation(self):
@@ -51,7 +50,7 @@ class TestVictorSettingsBasic:
         ]
         for provider in valid_providers:
             settings = VictorSettings(default_provider=provider)
-            assert settings.default_provider == provider
+            assert settings.provider.default_provider == provider
 
         # Invalid provider
         with pytest.raises(ValueError, match="Invalid provider"):
@@ -70,10 +69,10 @@ class TestVictorSettingsBasic:
 
     def test_tool_validation_mode_validation(self):
         """Test tool validation mode validation."""
-        # Valid modes
+        # Valid modes — constructor kwarg routes to tools.tool_validation_mode
         for mode in ["strict", "lenient", "off"]:
             settings = VictorSettings(tool_validation_mode=mode)
-            assert settings.tool_validation_mode == mode
+            assert settings.tools.tool_validation_mode == mode
 
         # Invalid mode
         with pytest.raises(ValueError, match="Invalid tool_validation_mode"):
@@ -133,10 +132,10 @@ class TestVictorSettingsBasic:
         """Prompt policy fields should have sensible defaults."""
         settings = VictorSettings()
 
-        assert settings.prompt_policy_enforce_identity is True
-        assert settings.prompt_policy_enforce_guidelines is True
-        assert settings.prompt_policy_max_section_chars == 18000
-        assert settings.prompt_policy_protected_sections == [
+        assert settings.prompt_policy.prompt_policy_enforce_identity is True
+        assert settings.prompt_policy.prompt_policy_enforce_guidelines is True
+        assert settings.prompt_policy.prompt_policy_max_section_chars == 18000
+        assert settings.prompt_policy.prompt_policy_protected_sections == [
             "identity",
             "guidelines",
             "operating_mode",
@@ -150,9 +149,8 @@ class TestVictorSettingsPrecedence:
         """Test from_sources with no overrides (uses defaults)."""
         settings = VictorSettings.from_sources()
 
-        assert settings.default_provider == "ollama"
-        assert settings.default_model == "qwen3-coder:30b"
-        assert settings.tool_cache_ttl == 600
+        assert settings.provider.default_provider == "ollama"
+        assert settings.cache.tool_cache_ttl == 600
 
     def test_from_sources_with_profiles_yaml(self, tmp_path):
         """Test from_sources with profiles.yaml."""
@@ -175,8 +173,8 @@ class TestVictorSettingsPrecedence:
             config_dir=tmp_path,
         )
 
-        assert settings.default_provider == "anthropic"
-        assert settings.default_model == "claude-opus-4"
+        assert settings.provider.default_provider == "anthropic"
+        assert settings.provider.default_model == "claude-opus-4"
         assert settings.provider.default_temperature == 0.5
 
     def test_prompt_policy_profile_override(self, tmp_path):
@@ -196,9 +194,9 @@ class TestVictorSettingsPrecedence:
 
         settings = VictorSettings.from_sources(profile_name="secure", config_dir=tmp_path)
 
-        assert settings.prompt_policy_identity == "Secure Victor"
-        assert settings.prompt_policy_max_section_chars == 9000
-        assert settings.prompt_policy_protected_sections == ["identity", "runbook"]
+        assert settings.prompt_policy.prompt_policy_identity == "Secure Victor"
+        assert settings.prompt_policy.prompt_policy_max_section_chars == 9000
+        assert settings.prompt_policy.prompt_policy_protected_sections == ["identity", "runbook"]
 
     def test_from_sources_with_settings_yaml(self, tmp_path):
         """Test from_sources with settings.yaml."""
@@ -214,9 +212,9 @@ class TestVictorSettingsPrecedence:
 
         settings = VictorSettings.from_sources(config_dir=tmp_path)
 
-        assert settings.default_provider == "openai"
-        assert settings.default_model == "gpt-4"
-        assert settings.tool_cache_ttl == 300
+        assert settings.provider.default_provider == "openai"
+        assert settings.provider.default_model == "gpt-4"
+        assert settings.cache.tool_cache_ttl == 300
 
     def test_from_sources_settings_yaml_overrides_profiles_yaml(self, tmp_path):
         """Test that settings.yaml takes precedence over profiles.yaml."""
@@ -247,8 +245,8 @@ class TestVictorSettingsPrecedence:
             config_dir=tmp_path,
         )
 
-        assert settings.default_provider == "openai"  # From settings.yaml
-        assert settings.tool_cache_ttl == 600  # From profiles.yaml
+        assert settings.provider.default_provider == "openai"  # From settings.yaml
+        assert settings.cache.tool_cache_ttl == 600  # From profiles.yaml
 
     def test_from_sources_cli_args_highest_precedence(self, tmp_path):
         """Test that CLI args have highest precedence."""
@@ -272,8 +270,8 @@ class TestVictorSettingsPrecedence:
             config_dir=tmp_path,
         )
 
-        assert settings.default_provider == "groq"  # From CLI
-        assert settings.tool_cache_ttl == 120  # From CLI
+        assert settings.provider.default_provider == "groq"  # From CLI
+        assert settings.cache.tool_cache_ttl == 120  # From CLI
 
     def test_from_sources_env_vars(self, tmp_path, monkeypatch):
         """Test that environment variables work."""
@@ -285,10 +283,10 @@ class TestVictorSettingsPrecedence:
 
         settings = VictorSettings.from_sources(config_dir=tmp_path)
 
-        assert settings.default_provider == "lmstudio"
-        assert settings.tool_cache_ttl == 450
-        assert settings.prompt_policy_enforce_identity is False
-        assert settings.prompt_policy_max_section_chars == 3210
+        assert settings.provider.default_provider == "lmstudio"
+        assert settings.cache.tool_cache_ttl == 450
+        assert settings.prompt_policy.prompt_policy_enforce_identity is False
+        assert settings.prompt_policy.prompt_policy_max_section_chars == 3210
 
     def test_from_sources_cli_overrides_env(self, tmp_path, monkeypatch):
         """Test that CLI args override environment variables."""
@@ -303,7 +301,7 @@ class TestVictorSettingsPrecedence:
             config_dir=tmp_path,
         )
 
-        assert settings.default_provider == "vllm"  # From CLI, not env
+        assert settings.provider.default_provider == "vllm"  # From CLI, not env
 
     def test_from_sources_filters_none_values(self, tmp_path):
         """Test that None values in CLI args are filtered out."""
@@ -318,9 +316,8 @@ class TestVictorSettingsPrecedence:
             config_dir=tmp_path,
         )
 
-        assert settings.default_provider == "anthropic"  # From CLI
-        assert settings.default_model == "qwen3-coder:30b"  # From defaults
-        assert settings.tool_cache_ttl == 600  # From defaults
+        assert settings.provider.default_provider == "anthropic"  # From CLI
+        assert settings.cache.tool_cache_ttl == 600  # From defaults
 
 
 class TestVictorSettingsTypeSafety:
@@ -330,20 +327,20 @@ class TestVictorSettingsTypeSafety:
         """Test that attributes can be accessed directly without getattr."""
         settings = VictorSettings()
 
-        # Should work without getattr
-        assert isinstance(settings.default_provider, str)
-        assert isinstance(settings.tool_cache_ttl, int)
+        # Should work without getattr — nested config groups
+        assert isinstance(settings.provider.default_provider, str)
+        assert isinstance(settings.cache.tool_cache_ttl, int)
         assert isinstance(settings.tool_selection.use_semantic_tool_selection, bool)
-        assert isinstance(settings.tool_cache_allowlist, list)
+        assert isinstance(settings.cache.tool_cache_allowlist, list)
 
     def test_optional_fields(self):
         """Test that optional fields can be None."""
         settings = VictorSettings()
 
         assert settings.provider.anthropic_api_key is None
-        assert settings.openai_api_key is None
+        assert settings.provider.openai_api_key is None
         assert settings.log_file is None
-        assert settings.codebase_persist_directory is None
+        assert settings.codebase.codebase_persist_directory is None
 
     def test_server_secrets_are_redacted_types(self):
         """Server-facing secrets should use SecretStr for safe repr/logging."""
@@ -352,10 +349,10 @@ class TestVictorSettingsTypeSafety:
             server_session_secret="session-secret",
         )
 
-        assert isinstance(settings.server_api_key, SecretStr)
-        assert settings.server_api_key.get_secret_value() == "server-token"
-        assert isinstance(settings.server_session_secret, SecretStr)
-        assert settings.server_session_secret.get_secret_value() == "session-secret"
+        assert isinstance(settings.security.server_api_key, SecretStr)
+        assert settings.security.server_api_key.get_secret_value() == "server-token"
+        assert isinstance(settings.security.server_session_secret, SecretStr)
+        assert settings.security.server_session_secret.get_secret_value() == "session-secret"
 
     def test_field_types_validated(self):
         """Test that field types are validated."""
@@ -365,8 +362,8 @@ class TestVictorSettingsTypeSafety:
             tool_cache_ttl=300,
             use_semantic_tool_selection=True,
         )
-        assert settings.default_provider == "ollama"
-        assert settings.tool_cache_ttl == 300
+        assert settings.provider.default_provider == "ollama"
+        assert settings.cache.tool_cache_ttl == 300
         assert settings.tool_selection.use_semantic_tool_selection is True
 
         # Invalid type for integer field
@@ -400,7 +397,7 @@ class TestVictorSettingsEdgeCases:
             config_dir=tmp_path,
         )
 
-        assert settings.default_provider == "ollama"  # Default, not from profile
+        assert settings.provider.default_provider == "ollama"  # Default, not from profile
 
     def test_invalid_yaml_graceful_handling(self, tmp_path):
         """Test that invalid YAML is handled gracefully."""
@@ -411,7 +408,7 @@ class TestVictorSettingsEdgeCases:
 
         # Should not crash, should use defaults
         settings = VictorSettings.from_sources(config_dir=tmp_path)
-        assert settings.default_provider == "ollama"
+        assert settings.provider.default_provider == "ollama"
 
     def test_extra_fields_allowed(self):
         """Test that extra fields are allowed (for forward compatibility)."""
@@ -421,12 +418,11 @@ class TestVictorSettingsEdgeCases:
         assert hasattr(settings, "unknown_field")
 
     def test_model_copy(self):
-        """Test that model_copy works for overriding values."""
+        """Test that model_copy works for overriding values via provider group."""
         original = VictorSettings(default_provider="ollama")
-        updated = original.model_copy(update={"default_provider": "anthropic"})
-
-        assert original.default_provider == "ollama"
-        assert updated.default_provider == "anthropic"
+        assert original.provider.default_provider == "ollama"
+        updated_provider = original.provider.model_copy(update={"default_provider": "anthropic"})
+        assert updated_provider.default_provider == "anthropic"
 
 
 if __name__ == "__main__":

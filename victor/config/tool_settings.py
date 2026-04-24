@@ -150,6 +150,39 @@ class ToolSettings(BaseModel):
         description="Tool names that require embedding concurrency limits (default: code_search,semantic_code_search, env: VICTOR_EMBEDDING_INTENSIVE_TOOLS)",
     )
 
+    # Tool deduplication configuration
+    # Unified deduplication across native, LangChain, and MCP tools
+    enable_tool_deduplication: bool = Field(
+        default=True,
+        description="Enable cross-source tool deduplication (default: True)",
+    )
+    deduplication_priority_order: List[str] = Field(
+        default_factory=lambda: ["native", "langchain", "mcp", "plugin"],
+        description="Priority order for tool sources (highest to lowest) (default: native,langchain,mcp,plugin)",
+    )
+    deduplication_whitelist: List[str] = Field(
+        default_factory=list,
+        description="Tools to always allow (bypass deduplication) (default: [])",
+    )
+    deduplication_blacklist: List[str] = Field(
+        default_factory=list,
+        description="Tools to always skip (force deduplication) (default: [])",
+    )
+    deduplication_strict_mode: bool = Field(
+        default=False,
+        description="If True, fail on conflicts instead of logging and skipping (default: False)",
+    )
+    deduplication_naming_enforcement: bool = Field(
+        default=True,
+        description="Enforce naming conventions (lgc_*, mcp_*, plg_*) (default: True)",
+    )
+    deduplication_semantic_threshold: float = Field(
+        default=0.85,
+        ge=0.0,
+        le=1.0,
+        description="Threshold for semantic similarity detection (0.0-1.0) (default: 0.85)",
+    )
+
 
 def get_tool_settings() -> ToolSettings:
     """Get the current tool settings from the global settings singleton.
