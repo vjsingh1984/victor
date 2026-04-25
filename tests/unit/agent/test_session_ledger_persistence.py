@@ -1,10 +1,14 @@
 """Tests for session ledger persistence and merge functionality."""
 
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
+from victor.agent.message_history import MessageHistory
+from victor.agent.sqlite_session_persistence import SQLiteSessionPersistence
 from victor.agent.session_ledger import SessionLedger, LedgerEntry
+from victor.core.database import reset_project_database
 
 
 @pytest.fixture
@@ -95,3 +99,55 @@ class TestLedgerPersistence:
 
         sig = inspect.signature(SQLiteSessionPersistence.save_session)
         assert "session_ledger" in sig.parameters
+
+
+@pytest.fixture
+def temp_project_db_path(tmp_path: Path):
+    """Provide an isolated project DB path for SQLite session tests."""
+    db_path = tmp_path / "project.db"
+    yield db_path
+    reset_project_database(db_path)
+
+
+class TestSQLiteSessionPersistenceCompatibility:
+    def test_sqlite_roundtrip_preserves_preview_sidecar(self, temp_project_db_path: Path):
+        """Deprecated SQLite adapter should preserve replay-only preview messages."""
+        persistence = SQLiteSessionPersistence(db_path=temp_project_db_path)
+        conversation = MessageHistory()
+        conversation.add_user_message("Show app.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: app.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "app.py",
+                "preview_language": "python",
+                "preview_body": "print('hello')\n",
+            },
+        )
+
+        session_id = persistence.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            profile="default",
+            session_id="myproj-preview01",
+            title="Preview Session",
+        )
+        loaded = persistence.load_session(session_id)
+
+        assert loaded is not None
+        assert loaded["conversation"]["preview_messages"] == [
+            {
+                "role": "system",
+                "content": "FILE PREVIEW: app.py",
+                "metadata": {
+                    "preview_kind": "file_preview",
+                    "preview_path": "app.py",
+                    "preview_language": "python",
+                    "preview_body": "print('hello')\n",
+                },
+                "after_message_index": 2,
+            }
+        ]
