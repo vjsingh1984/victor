@@ -129,6 +129,16 @@ class FeatureFlag(Enum):
     # Tool Broadcasting Optimization (context-aware, economy-first)
     TOOL_STRATEGY_V2 = "tool_strategy_v2"
 
+    # Phase 13 - Agentic rollout controls (default: False — opt-in only)
+    USE_AGENTIC_BENCH_GATES = "use_agentic_bench_gates"
+    USE_CALIBRATED_COMPLETION = "use_calibrated_completion"
+    USE_AGENTIC_RETRIEVAL_REPAIR = "use_agentic_retrieval_repair"
+    USE_UTILITY_RETRIEVAL = "use_utility_retrieval"
+    USE_PROMPT_COMPLETENESS_GUARD = "use_prompt_completeness_guard"
+    USE_PROMPT_DICTIONARY_COMPRESSION = "use_prompt_dictionary_compression"
+    USE_PRIME_MEMORY_EVOLUTION = "use_prime_memory_evolution"
+    USE_EXTERNAL_AGENTIC_BENCHMARKS = "use_external_agentic_benchmarks"
+
     # Phase 9 - Prompt Optimization (controlled via settings.prompt_optimization)
     # USE_PROMPT_OPTIMIZER → settings.prompt_optimization.enabled
     # USE_GEPA_V2          → settings.prompt_optimization.gepa.enabled
@@ -157,6 +167,30 @@ class FeatureFlag(Enum):
             YAML key (e.g., use_new_chat_service)
         """
         return self.value
+
+    def is_opt_in_by_default(self) -> bool:
+        """Whether the flag should stay disabled unless explicitly enabled."""
+        return self in {
+            FeatureFlag.USE_SEMANTIC_RESPONSE_CACHE,
+            FeatureFlag.USE_CONTEXT_TEMPERATURE,
+            FeatureFlag.USE_CONFIDENCE_MONITOR,
+            FeatureFlag.USE_LEARNING_FROM_EXECUTION,
+            FeatureFlag.TOOL_STRATEGY_V2,
+            FeatureFlag.USE_AGENTIC_BENCH_GATES,
+            FeatureFlag.USE_CALIBRATED_COMPLETION,
+            FeatureFlag.USE_AGENTIC_RETRIEVAL_REPAIR,
+            FeatureFlag.USE_UTILITY_RETRIEVAL,
+            FeatureFlag.USE_PROMPT_COMPLETENESS_GUARD,
+            FeatureFlag.USE_PROMPT_DICTIONARY_COMPRESSION,
+            FeatureFlag.USE_PRIME_MEMORY_EVOLUTION,
+            FeatureFlag.USE_EXTERNAL_AGENTIC_BENCHMARKS,
+        }
+
+    def get_default_enabled(self, fallback: bool) -> bool:
+        """Return the effective default state for this flag."""
+        if self.is_opt_in_by_default():
+            return False
+        return fallback
 
 
 @dataclass
@@ -243,7 +277,7 @@ class FeatureFlagManager:
                 return self._flags[flag]
 
             # Return default
-            return self._config.default_enabled
+            return flag.get_default_enabled(self._config.default_enabled)
 
     def enable(self, flag: FeatureFlag) -> None:
         """Enable a feature flag at runtime.

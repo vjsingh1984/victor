@@ -57,7 +57,7 @@ Example:
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.framework.completion_scorer import (
@@ -82,6 +82,31 @@ if TYPE_CHECKING:
     from victor.framework.agentic_loop import SpinState
     from victor.framework.fulfillment import FulfillmentDetector
     from victor.framework.perception_integration import Perception
+
+
+@dataclass
+class CompletionCalibration:
+    """Post-processing view of raw completion score grounded in execution support."""
+
+    raw_score: float
+    calibrated_score: float
+    evidence_score: float
+    threshold: float
+    requires_additional_support: bool
+    support_penalty: float = 0.0
+    reasons: List[str] = field(default_factory=list)
+
+    def to_metadata(self) -> Dict[str, Any]:
+        """Serialize for logging and benchmark traces."""
+        return {
+            "raw_score": round(self.raw_score, 4),
+            "calibrated_score": round(self.calibrated_score, 4),
+            "evidence_score": round(self.evidence_score, 4),
+            "threshold": round(self.threshold, 4),
+            "support_penalty": round(self.support_penalty, 4),
+            "requires_additional_support": self.requires_additional_support,
+            "reasons": list(self.reasons),
+        }
 
 
 class EnhancedCompletionEvaluator:
@@ -111,6 +136,7 @@ class EnhancedCompletionEvaluator:
         enable_completion_scoring: bool = True,
         enable_context_keywords: bool = True,
         completion_threshold: float = 0.80,
+        enable_calibrated_completion: Optional[bool] = None,
     ):
         """Initialize enhanced evaluator.
 
@@ -119,11 +145,23 @@ class EnhancedCompletionEvaluator:
             enable_completion_scoring: Enable multi-signal scoring
             enable_context_keywords: Enable context-aware keyword detection
             completion_threshold: Threshold for completion decision (0.0-1.0)
+            enable_calibrated_completion: Whether to require execution support
+                before accepting strong completion scores. Defaults to feature flag.
         """
         self.enable_requirement_validation = enable_requirement_validation
         self.enable_completion_scoring = enable_completion_scoring
         self.enable_context_keywords = enable_context_keywords
         self.completion_threshold = completion_threshold
+        if enable_calibrated_completion is None:
+            try:
+                from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+                enable_calibrated_completion = get_feature_flag_manager().is_enabled(
+                    FeatureFlag.USE_CALIBRATED_COMPLETION
+                )
+            except Exception:
+                enable_calibrated_completion = False
+        self.enable_calibrated_completion = enable_calibrated_completion
 
         # Initialize components
         self.requirement_validator = RequirementValidator()
@@ -277,24 +315,52 @@ class EnhancedCompletionEvaluator:
                 task_type=self._map_to_task_type(perception),
             )
 
+            threshold = completion_score.threshold
+            score = completion_score.total_score
+            metadata: Dict[str, Any] = {}
+
+            if self.enable_calibrated_completion:
+                calibration = self._calibrate_completion(
+                    completion_score=completion_score,
+                    perception=perception,
+                    action_result=action_result,
+                    state=state,
+                    requirement_result=requirement_result,
+                    keyword_result=keyword_result,
+                )
+                metadata["calibration"] = calibration.to_metadata()
+                threshold = calibration.threshold
+                score = calibration.calibrated_score
+
+                if calibration.requires_additional_support:
+                    return EvaluationResult(
+                        decision=EvaluationDecision.CONTINUE,
+                        score=score,
+                        reason="Completion score is high but needs stronger execution support",
+                        metadata=metadata,
+                    )
+
             # Step 5: Make decision based on score
-            if completion_score.is_complete:
+            if score >= threshold:
                 return EvaluationResult(
                     decision=EvaluationDecision.COMPLETE,
-                    score=completion_score.total_score,
-                    reason=f"Requirements satisfied: {completion_score.total_score:.2f} >= {completion_score.threshold:.2f}",
+                    score=score,
+                    reason=f"Requirements satisfied: {score:.2f} >= {threshold:.2f}",
+                    metadata=metadata,
                 )
-            elif completion_score.total_score >= 0.5:
+            elif score >= 0.5:
                 return EvaluationResult(
                     decision=EvaluationDecision.CONTINUE,
-                    score=completion_score.total_score,
-                    reason=f"Progress: {completion_score.total_score:.2f} (threshold: {completion_score.threshold:.2f})",
+                    score=score,
+                    reason=f"Progress: {score:.2f} (threshold: {threshold:.2f})",
+                    metadata=metadata,
                 )
             else:
                 return EvaluationResult(
                     decision=EvaluationDecision.RETRY,
-                    score=completion_score.total_score,
-                    reason=f"Insufficient progress: {completion_score.total_score:.2f}",
+                    score=score,
+                    reason=f"Insufficient progress: {score:.2f}",
+                    metadata=metadata,
                 )
 
         except Exception as e:
@@ -490,3 +556,102 @@ class EnhancedCompletionEvaluator:
         elif isinstance(action_result, str):
             return action_result
         return None
+
+    def _calibrate_completion(
+        self,
+        completion_score: CompletionScore,
+        perception: Perception,
+        action_result: Any,
+        state: Dict[str, Any],
+        requirement_result: Optional[ValidationResult],
+        keyword_result: Optional[CompletionSignal],
+    ) -> CompletionCalibration:
+        """Adjust raw completion score using support and execution signals."""
+        evidence_score, reasons = self._estimate_evidence_support(
+            perception=perception,
+            action_result=action_result,
+            state=state,
+        )
+        support_penalty = 0.0
+
+        if keyword_result is not None and keyword_result.is_continuation_request:
+            support_penalty += 0.10
+            reasons.append("continuation_requested")
+
+        if (
+            requirement_result is not None
+            and not requirement_result.is_satisfied
+            and evidence_score < 0.75
+        ):
+            support_penalty += 0.10
+            reasons.append("requirements_not_fully_satisfied")
+
+        raw_score = completion_score.total_score
+        threshold = completion_score.threshold
+        calibrated_score = max(
+            0.0,
+            min(1.0, (raw_score * 0.75) + (evidence_score * 0.25) - support_penalty),
+        )
+
+        requires_additional_support = raw_score >= threshold and calibrated_score < threshold
+
+        return CompletionCalibration(
+            raw_score=raw_score,
+            calibrated_score=calibrated_score,
+            evidence_score=evidence_score,
+            threshold=threshold,
+            requires_additional_support=requires_additional_support,
+            support_penalty=support_penalty,
+            reasons=reasons,
+        )
+
+    def _estimate_evidence_support(
+        self,
+        perception: Perception,
+        action_result: Any,
+        state: Dict[str, Any],
+    ) -> tuple[float, List[str]]:
+        """Estimate how well the current answer is supported by execution evidence."""
+        reasons: List[str] = []
+        task_type = self._map_to_task_type(perception)
+
+        if self._state_has_artifacts(state):
+            reasons.append("state_artifacts_present")
+            return 0.90, reasons
+
+        if getattr(action_result, "has_tool_calls", False):
+            successful = max(0, int(getattr(action_result, "successful_tool_count", 0) or 0))
+            total = int(getattr(action_result, "tool_calls_count", 0) or 0)
+            if total <= 0 and hasattr(action_result, "tool_calls"):
+                total = len(action_result.tool_calls or [])
+            if total <= 0 and hasattr(action_result, "tool_results"):
+                total = len(action_result.tool_results or [])
+            total = max(total, successful, 1)
+            reasons.append("tool_backed_execution")
+            return min(1.0, 0.65 + 0.25 * (successful / total)), reasons
+
+        if getattr(action_result, "is_qa_response", False) and task_type in {
+            TaskType.SEARCH,
+            TaskType.ANALYSIS,
+            TaskType.DOCUMENTATION,
+        }:
+            reasons.append("qa_shortcut_allowed")
+            return 0.75, reasons
+
+        reasons.append("direct_answer_without_execution_evidence")
+        if getattr(perception, "requirements", None):
+            reasons.append("requirements_present")
+        return 0.30, reasons
+
+    def _state_has_artifacts(self, state: Dict[str, Any]) -> bool:
+        """Detect durable evidence that work was executed."""
+        if state.get("files_modified"):
+            return True
+        if state.get("tests_passed") or state.get("tests_total"):
+            return True
+        if state.get("source_count", 0) > 0:
+            return True
+        sources = state.get("sources")
+        if isinstance(sources, list) and len(sources) > 0:
+            return True
+        return False

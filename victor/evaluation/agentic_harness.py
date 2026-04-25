@@ -110,6 +110,7 @@ class AgenticExecutionTrace:
     # Validation results
     validations: dict[str, bool] = field(default_factory=dict)
     validation_errors: dict[str, str] = field(default_factory=dict)
+    completion_signals: dict[str, Any] = field(default_factory=dict)
 
     # Correction/self-correction metrics
     correction_metrics: dict[str, Any] = field(default_factory=dict)
@@ -201,6 +202,7 @@ class AgenticExecutionTrace:
             "generated_code": self.generated_code,
             "validations": self.validations,
             "validation_errors": self.validation_errors,
+            "completion_signals": self.completion_signals,
             "total_tool_calls": self.total_tool_calls,
             "successful_tool_calls": self.successful_tool_calls,
             "code_search_calls": self.code_search_calls,
@@ -234,6 +236,8 @@ class AgenticTaskResult:
     test_score: float = 0.0  # Test pass rate
     edit_accuracy: float = 0.0  # File edit accuracy
     tool_efficiency: float = 0.0  # Tool usage efficiency
+    completion_precision: float = 0.0  # Completion detector accuracy
+    unsupported_claim_rate: float = 0.0  # Share of unsupported completion claims
     overall_score: float = 0.0  # Weighted overall score
 
     # Error info
@@ -282,6 +286,8 @@ class AgenticMetrics:
     avg_test_score: float = 0.0
     avg_edit_accuracy: float = 0.0
     avg_tool_efficiency: float = 0.0
+    avg_completion_precision: float = 0.0
+    avg_unsupported_claim_rate: float = 0.0
     avg_overall_score: float = 0.0
 
     # Per-task results
@@ -351,6 +357,8 @@ class AgenticMetrics:
                 "avg_test_score": round(self.avg_test_score, 4),
                 "avg_edit_accuracy": round(self.avg_edit_accuracy, 4),
                 "avg_tool_efficiency": round(self.avg_tool_efficiency, 4),
+                "avg_completion_precision": round(self.avg_completion_precision, 4),
+                "avg_unsupported_claim_rate": round(self.avg_unsupported_claim_rate, 4),
                 "avg_overall_score": round(self.avg_overall_score, 4),
             },
             "correction": {
@@ -372,6 +380,8 @@ class AgenticMetrics:
                     "tests_total": r.tests_total,
                     "patch_score": round(r.patch_score, 4),
                     "test_score": round(r.test_score, 4),
+                    "completion_precision": round(r.completion_precision, 4),
+                    "unsupported_claim_rate": round(r.unsupported_claim_rate, 4),
                     "overall_score": round(r.overall_score, 4),
                 }
                 for r in self.task_results
@@ -1066,6 +1076,12 @@ class AgenticBenchmarkRunner:
             result.test_score = scores.get(AgenticValidationType.TESTS_PASS.value, 0.0)
             result.edit_accuracy = scores.get(AgenticValidationType.FILE_EDITS.value, 0.0)
             result.tool_efficiency = scores.get(AgenticValidationType.TOOL_USAGE.value, 0.0)
+            result.completion_precision = float(
+                trace.completion_signals.get("completion_precision", 0.0) or 0.0
+            )
+            result.unsupported_claim_rate = float(
+                trace.completion_signals.get("unsupported_claim_rate", 0.0) or 0.0
+            )
             result.calculate_overall_score()
 
             # Determine pass/fail
@@ -1136,6 +1152,12 @@ class AgenticBenchmarkRunner:
             metrics.avg_test_score = sum(r.test_score for r in metrics.task_results) / n
             metrics.avg_edit_accuracy = sum(r.edit_accuracy for r in metrics.task_results) / n
             metrics.avg_tool_efficiency = sum(r.tool_efficiency for r in metrics.task_results) / n
+            metrics.avg_completion_precision = (
+                sum(r.completion_precision for r in metrics.task_results) / n
+            )
+            metrics.avg_unsupported_claim_rate = (
+                sum(r.unsupported_claim_rate for r in metrics.task_results) / n
+            )
             metrics.avg_overall_score = sum(r.overall_score for r in metrics.task_results) / n
 
         return metrics

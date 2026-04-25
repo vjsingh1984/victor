@@ -25,7 +25,7 @@ from victor.framework.enhanced_completion_evaluation import (
 )
 from victor.framework.evaluation_nodes import EvaluationDecision
 from victor.framework.perception_integration import RequirementType, Requirement
-from victor.framework.completion_scorer import TaskType
+from victor.framework.completion_scorer import CompletionScore, TaskType
 from victor.agent.turn_policy import SpinState
 
 # =============================================================================
@@ -468,3 +468,82 @@ class TestEnhancedCompletionEvaluator:
         )
 
         assert evaluator.enable_context_keywords is False
+
+    @pytest.mark.asyncio
+    async def test_calibrated_completion_penalizes_unsupported_direct_answer(self, evaluator):
+        """Direct answers without support should not prematurely complete."""
+        evaluator.enable_calibrated_completion = True
+        evaluator.completion_scorer.calculate_completion_score = Mock(
+            return_value=CompletionScore(
+                total_score=0.92,
+                requirement_score=0.9,
+                fulfillment_score=0.8,
+                keyword_score=0.9,
+                confidence_score=0.8,
+                complexity_adjustment=0.0,
+                is_complete=True,
+                threshold=0.85,
+            )
+        )
+
+        perception = MockPerception(
+            confidence=0.9,
+            requirements=[
+                Requirement(type=RequirementType.FUNCTIONAL, description="Modify auth flow")
+            ],
+        )
+        action_result = MockTurnResult(
+            response="The task is complete.",
+            has_tool_calls=False,
+            successful_tool_count=0,
+        )
+
+        result = await evaluator.evaluate(
+            perception=perception,
+            action_result=action_result,
+            state={},
+        )
+
+        assert result.decision == EvaluationDecision.CONTINUE
+        assert result.metadata["calibration"]["requires_additional_support"] is True
+        assert result.metadata["calibration"]["calibrated_score"] < 0.85
+
+    @pytest.mark.asyncio
+    async def test_calibrated_completion_allows_tool_backed_answer(self, evaluator):
+        """Tool-backed answers should preserve strong completion scores."""
+        evaluator.enable_calibrated_completion = True
+        evaluator.completion_scorer.calculate_completion_score = Mock(
+            return_value=CompletionScore(
+                total_score=0.91,
+                requirement_score=0.9,
+                fulfillment_score=0.9,
+                keyword_score=0.8,
+                confidence_score=0.8,
+                complexity_adjustment=0.0,
+                is_complete=True,
+                threshold=0.85,
+            )
+        )
+
+        perception = MockPerception(
+            confidence=0.9,
+            requirements=[
+                Requirement(type=RequirementType.FUNCTIONAL, description="Write patch")
+            ],
+        )
+        action_result = MockTurnResult(
+            response="Applied the patch and updated tests.",
+            has_tool_calls=True,
+            successful_tool_count=2,
+            tool_calls=["edit_file", "run_tests"],
+        )
+
+        result = await evaluator.evaluate(
+            perception=perception,
+            action_result=action_result,
+            state={"files_modified": ["auth.py"], "tests_passed": 4},
+        )
+
+        assert result.decision == EvaluationDecision.COMPLETE
+        assert result.metadata["calibration"]["requires_additional_support"] is False
+        assert result.metadata["calibration"]["calibrated_score"] >= 0.85

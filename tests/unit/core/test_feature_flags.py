@@ -63,6 +63,16 @@ class TestFeatureFlagEnum:
         values = [flag.value for flag in FeatureFlag]
         assert len(values) == len(set(values))
 
+    def test_rollout_flags_are_opt_in_by_default(self):
+        """New rollout flags should stay disabled unless explicitly enabled."""
+        config = FeatureFlagConfig(default_enabled=True)
+        manager = FeatureFlagManager(config)
+
+        assert not manager.is_enabled(FeatureFlag.USE_AGENTIC_BENCH_GATES)
+        assert not manager.is_enabled(FeatureFlag.USE_CALIBRATED_COMPLETION)
+        assert not manager.is_enabled(FeatureFlag.USE_AGENTIC_RETRIEVAL_REPAIR)
+        assert not manager.is_enabled(FeatureFlag.USE_PROMPT_DICTIONARY_COMPRESSION)
+
 
 class TestFeatureFlagManager:
     """Tests for FeatureFlagManager."""
@@ -82,7 +92,8 @@ class TestFeatureFlagManager:
         manager = FeatureFlagManager(config)
 
         for flag in FeatureFlag:
-            assert manager.is_enabled(flag)
+            expected = not flag.is_opt_in_by_default()
+            assert manager.is_enabled(flag) is expected
 
     def test_enable_flag_at_runtime(self):
         """Test enabling a flag at runtime."""

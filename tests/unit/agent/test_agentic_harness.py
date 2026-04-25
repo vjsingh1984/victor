@@ -125,6 +125,7 @@ class TestAgenticExecutionTrace:
         assert trace.turns == 0
         assert trace.generated_patch == ""
         assert trace.validation_errors == {}
+        assert trace.completion_signals == {}
 
     def test_duration_calculation(self):
         """Test trace duration calculation."""
@@ -276,6 +277,8 @@ class TestAgenticMetrics:
         assert metrics.pass_rate == 0.0
         assert metrics.avg_tool_calls == 0.0
         assert metrics.avg_turns == 0.0
+        assert metrics.avg_completion_precision == 0.0
+        assert metrics.avg_unsupported_claim_rate == 0.0
 
     def test_pass_rate(self):
         """Test pass rate calculation."""
@@ -294,11 +297,19 @@ class TestAgenticMetrics:
 
     def test_to_dict(self):
         """Test metrics export to dict."""
-        metrics = AgenticMetrics(total_tasks=2, passed=1, failed=1)
+        metrics = AgenticMetrics(
+            total_tasks=2,
+            passed=1,
+            failed=1,
+            avg_completion_precision=0.75,
+            avg_unsupported_claim_rate=0.1,
+        )
         d = metrics.to_dict()
         assert "summary" in d
         assert d["summary"]["total_tasks"] == 2
         assert d["summary"]["pass_rate"] == 0.5
+        assert d["quality"]["avg_completion_precision"] == 0.75
+        assert d["quality"]["avg_unsupported_claim_rate"] == 0.1
 
 
 class TestPatchApplicationValidator:
