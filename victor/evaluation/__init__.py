@@ -57,6 +57,8 @@ Example usage:
 
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
+    FailureDiagnosis,
+    FailureStage,
     BenchmarkMetadata,
     BenchmarkTask,
     BenchmarkType,
@@ -212,6 +214,8 @@ from victor.evaluation.evaluation_orchestrator import (
 __all__ = [
     # Protocol types
     "BenchmarkFailureCategory",
+    "FailureDiagnosis",
+    "FailureStage",
     "BenchmarkMetadata",
     "BenchmarkTask",
     "BenchmarkType",

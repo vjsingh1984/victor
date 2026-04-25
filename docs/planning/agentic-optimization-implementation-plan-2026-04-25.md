@@ -95,7 +95,7 @@ Planned slices:
 |---|---|---|---|
 | 5.1 Deep-research benchmark adapter | Done | Added catalog + harness tests first | Added a dedicated DR3-style deep-research runner under `victor/evaluation/benchmarks`, with manifest loading plus claim/citation/unsupported-claim scoring integrated into the shared benchmark catalog |
 | 5.2 Browser / web-task benchmark adapter | Done | Added benchmark catalog + browser-runner tests first | Added a dedicated browser-task runner for `clawbench` / `guide` / `vlaa-gui`, updated the shared catalog and CLI routing, and evaluate action traces plus final-answer coverage through local manifests |
-| 5.3 Hierarchical failure taxonomy | Not started | Add evaluator diagnosis tests | GUIDE-aligned |
+| 5.3 Hierarchical failure taxonomy | Done | Added evaluator diagnosis + persistence tests first | Added a structured failure diagnosis layer on `TaskResult`, aggregate stage/path metrics in `EvaluationResult`, and persisted taxonomy output in the benchmark harness while preserving the existing flat failure-category contract |
 
 ## Immediate Execution Order
 
@@ -116,3 +116,4 @@ Planned slices:
 | 2026-04-25 | Phase 3.2 completed via TDD in `codingagent`: repeated long guidance blocks can now be dictionary-compressed losslessly, and `UnifiedPromptPipeline` uses the compressor for repeated per-turn reminder content when it produces real savings. |
 | 2026-04-25 | Prompt architecture refactor inserted before Phase 3.3. Roadmap resume point remains Phase 3.3; details tracked in `docs/planning/prompt-canonical-architecture-refactor-2026-04-25.md`. |
 | 2026-04-25 | Phase 3.3 completed via TDD in `codingagent`: read-only tool results now default to pruned user previews while keeping full model-visible output intact and preserving full output for expansion/debug in streaming renderers. |
+| 2026-04-25 | Phase 5.3 completed via TDD in `codingagent`: benchmark results now derive and persist a hierarchical failure diagnosis with stage + subtype paths, and aggregate metrics report both flat categories and taxonomy breakdowns across DR3/browser/external benchmark adapters. |

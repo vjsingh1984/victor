@@ -23,6 +23,7 @@ from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
     BenchmarkType,
     EvaluationConfig,
+    FailureStage,
     TaskStatus,
 )
 
@@ -153,9 +154,14 @@ class TestBrowserTaskBenchmarkRunner:
             EvaluationConfig(benchmark=BenchmarkType.VLAA_GUI, model="test"),
         )
 
+        diagnosis = result.get_failure_diagnosis()
+
         assert result.status == TaskStatus.FAILED
         assert result.failure_category == BenchmarkFailureCategory.TOOL_USAGE
         assert result.failure_details["forbidden_action_hits"] == ["delete"]
+        assert diagnosis is not None
+        assert diagnosis.stage == FailureStage.ACTION
+        assert diagnosis.subtype == "forbidden_action"
 
     @pytest.mark.asyncio
     async def test_run_task_scores_partial_completion_when_action_missing(self, tmp_path):

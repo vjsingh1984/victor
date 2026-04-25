@@ -566,6 +566,40 @@ class TestBenchmarkToolUsageMetrics:
         assert loaded["tasks"][0]["failure_category"] == "test_failure"
         assert loaded["tasks"][0]["failure_details"] == {"stage": "pytest"}
 
+    def test_save_results_persists_structured_failure_diagnosis(self, tmp_path):
+        """Saved results should include the derived hierarchical failure taxonomy."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="test",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-3",
+                    status=TaskStatus.FAILED,
+                    failure_category=BenchmarkFailureCategory.TASK_COMPLETION,
+                    failure_details={"missing_actions": ["click"]},
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["summary"]["failure_stages"] == {"action": 1}
+        assert loaded["summary"]["failure_taxonomy"] == {
+            "action.task_completion.missing_required_actions": 1
+        }
+        assert loaded["tasks"][0]["failure_diagnosis"] == {
+            "stage": "action",
+            "category": "task_completion",
+            "subtype": "missing_required_actions",
+            "path": "action.task_completion.missing_required_actions",
+            "retryable": True,
+            "metadata": {"missing_actions": ["click"]},
+        }
+
     def test_save_results_persists_dataset_metadata(self, tmp_path):
         """Saved results should carry manifest metadata into persisted artifacts."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)

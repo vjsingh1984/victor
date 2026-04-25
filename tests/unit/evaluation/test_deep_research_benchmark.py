@@ -23,6 +23,7 @@ from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
     BenchmarkType,
     EvaluationConfig,
+    FailureStage,
     TaskStatus,
 )
 
@@ -151,11 +152,16 @@ class TestDeepResearchBenchmarkRunner:
             EvaluationConfig(benchmark=BenchmarkType.DR3_EVAL, model="test"),
         )
 
+        diagnosis = result.get_failure_diagnosis()
+
         assert result.status == TaskStatus.FAILED
         assert result.failure_category == BenchmarkFailureCategory.UNSUPPORTED_CLAIM
         assert result.failure_details["forbidden_claim_hits"] == [
             "The vendor fully solved hallucinations."
         ]
+        assert diagnosis is not None
+        assert diagnosis.stage == FailureStage.GROUNDING
+        assert diagnosis.subtype == "forbidden_claim"
 
     @pytest.mark.asyncio
     async def test_run_task_tracks_partial_completion_for_missing_citations(self, tmp_path):

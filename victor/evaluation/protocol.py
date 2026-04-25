@@ -145,6 +145,57 @@ class BenchmarkFailureCategory(Enum):
     UNKNOWN = "unknown"
 
 
+class FailureStage(Enum):
+    """Hierarchical failure stage aligned to agentic benchmark workflows."""
+
+    PERCEPTION = "perception"
+    ACTION = "action"
+    GROUNDING = "grounding"
+    VALIDATION = "validation"
+    EXECUTION = "execution"
+    ENVIRONMENT = "environment"
+    COMPLETION = "completion"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class FailureDiagnosis:
+    """Structured failure diagnosis preserving stage and subtype detail."""
+
+    stage: FailureStage
+    category: BenchmarkFailureCategory
+    subtype: str = "generic"
+    retryable: bool = False
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def path(self) -> str:
+        """Stable taxonomy path for reporting and aggregation."""
+        return f"{self.stage.value}.{self.category.value}.{self.subtype}"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to a report-friendly dictionary."""
+        return {
+            "stage": self.stage.value,
+            "category": self.category.value,
+            "subtype": self.subtype,
+            "path": self.path,
+            "retryable": self.retryable,
+            "metadata": dict(self.metadata),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "FailureDiagnosis":
+        """Reconstruct a structured diagnosis from serialized data."""
+        return cls(
+            stage=FailureStage(payload["stage"]),
+            category=BenchmarkFailureCategory(payload["category"]),
+            subtype=str(payload.get("subtype") or "generic"),
+            retryable=bool(payload.get("retryable", False)),
+            metadata=dict(payload.get("metadata") or {}),
+        )
+
+
 class EvaluationMetric(Enum):
     """Standard evaluation metrics."""
 
@@ -294,6 +345,7 @@ class TaskResult:
     traceback: str = ""
     failure_category: Optional[BenchmarkFailureCategory] = None
     failure_details: dict[str, Any] = field(default_factory=dict)
+    failure_diagnosis: Optional[FailureDiagnosis] = None
 
     # Detailed output
     stdout: str = ""
@@ -345,6 +397,22 @@ class TaskResult:
     def used_code_intelligence(self) -> bool:
         """Whether the task used either `code_search` or `graph`."""
         return self.code_intelligence_calls > 0
+
+    def get_failure_diagnosis(self) -> Optional[FailureDiagnosis]:
+        """Return a structured failure diagnosis, deriving one when needed."""
+        if self.failure_diagnosis is not None:
+            return self.failure_diagnosis
+        if self.failure_category is None:
+            return None
+        return derive_failure_diagnosis(self)
+
+    @property
+    def failure_taxonomy_path(self) -> Optional[str]:
+        """Stable hierarchical taxonomy path for this task failure."""
+        diagnosis = self.get_failure_diagnosis()
+        if diagnosis is None:
+            return None
+        return diagnosis.path
 
     def calculate_completion_score(self) -> float:
         """Calculate partial completion score based on tests and quality."""
@@ -504,11 +572,16 @@ class EvaluationResult:
         code_search_calls = self.total_code_search_calls
         graph_calls = self.total_graph_calls
         code_intelligence_tasks = self.tasks_using_code_intelligence
-        failure_categories = Counter(
-            result.failure_category.value
-            for result in self.task_results
-            if result.failure_category is not None
-        )
+        failure_categories = Counter()
+        failure_stages = Counter()
+        failure_taxonomy = Counter()
+        for task_result in self.task_results:
+            if task_result.failure_category is not None:
+                failure_categories[task_result.failure_category.value] += 1
+            diagnosis = task_result.get_failure_diagnosis()
+            if diagnosis is not None:
+                failure_stages[diagnosis.stage.value] += 1
+                failure_taxonomy[diagnosis.path] += 1
         return {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
@@ -533,7 +606,156 @@ class EvaluationResult:
             "reasoning_tokens": reasoning,
             "cost_usd_micros": cost_micros,
             "failure_categories": dict(failure_categories),
+            "failure_stages": dict(failure_stages),
+            "failure_taxonomy": dict(failure_taxonomy),
         }
+
+
+def derive_failure_diagnosis(result: TaskResult) -> FailureDiagnosis:
+    """Infer a structured failure diagnosis from a task result."""
+    if result.failure_category is None:
+        raise ValueError("Cannot derive failure diagnosis without a failure category")
+
+    details = dict(result.failure_details)
+    error_message = result.error_message.lower()
+
+    def subset(*keys: str) -> dict[str, Any]:
+        return {key: details[key] for key in keys if key in details and details[key]}
+
+    if result.failure_category == BenchmarkFailureCategory.TOOL_USAGE:
+        if details.get("forbidden_action_hits"):
+            return FailureDiagnosis(
+                stage=FailureStage.ACTION,
+                category=result.failure_category,
+                subtype="forbidden_action",
+                retryable=False,
+                metadata=subset("forbidden_action_hits"),
+            )
+        return FailureDiagnosis(
+            stage=FailureStage.ACTION,
+            category=result.failure_category,
+            subtype="tool_policy_violation",
+            retryable=True,
+            metadata=dict(details),
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.TASK_COMPLETION:
+        if details.get("missing_actions"):
+            return FailureDiagnosis(
+                stage=FailureStage.ACTION,
+                category=result.failure_category,
+                subtype="missing_required_actions",
+                retryable=True,
+                metadata=subset("missing_actions"),
+            )
+        if details.get("missing_claims") or details.get("missing_citations"):
+            return FailureDiagnosis(
+                stage=FailureStage.GROUNDING,
+                category=result.failure_category,
+                subtype="missing_required_evidence",
+                retryable=True,
+                metadata=subset("missing_claims", "missing_citations"),
+            )
+        if details.get("missing_answer_phrases"):
+            return FailureDiagnosis(
+                stage=FailureStage.COMPLETION,
+                category=result.failure_category,
+                subtype="missing_answer_coverage",
+                retryable=True,
+                metadata=subset("missing_answer_phrases"),
+            )
+        if "no generated report" in error_message or "no generated output" in error_message:
+            return FailureDiagnosis(
+                stage=FailureStage.COMPLETION,
+                category=result.failure_category,
+                subtype="empty_output",
+                retryable=True,
+                metadata={},
+            )
+        return FailureDiagnosis(
+            stage=FailureStage.COMPLETION,
+            category=result.failure_category,
+            subtype="incomplete_task",
+            retryable=True,
+            metadata=dict(details),
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.UNSUPPORTED_CLAIM:
+        if details.get("forbidden_claim_hits"):
+            return FailureDiagnosis(
+                stage=FailureStage.GROUNDING,
+                category=result.failure_category,
+                subtype="forbidden_claim",
+                retryable=True,
+                metadata=subset("forbidden_claim_hits"),
+            )
+        return FailureDiagnosis(
+            stage=FailureStage.GROUNDING,
+            category=result.failure_category,
+            subtype="unsupported_claim",
+            retryable=True,
+            metadata=dict(details),
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.PATCH_APPLICATION:
+        return FailureDiagnosis(
+            stage=FailureStage.EXECUTION,
+            category=result.failure_category,
+            subtype="patch_did_not_apply",
+            retryable=True,
+            metadata={},
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.TEST_FAILURE:
+        subtype = "partial_test_failure" if result.tests_passed > 0 else "all_tests_failed"
+        return FailureDiagnosis(
+            stage=FailureStage.VALIDATION,
+            category=result.failure_category,
+            subtype=subtype,
+            retryable=True,
+            metadata={
+                "tests_passed": result.tests_passed,
+                "tests_failed": result.tests_failed,
+                "tests_total": result.tests_total,
+            },
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.TIMEOUT:
+        subtype = "test_timeout" if "test" in error_message else "task_timeout"
+        return FailureDiagnosis(
+            stage=FailureStage.EXECUTION,
+            category=result.failure_category,
+            subtype=subtype,
+            retryable=True,
+            metadata={},
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.EXECUTION_ERROR:
+        return FailureDiagnosis(
+            stage=FailureStage.EXECUTION,
+            category=result.failure_category,
+            subtype="runtime_exception",
+            retryable=True,
+            metadata={},
+        )
+
+    if result.failure_category == BenchmarkFailureCategory.ENVIRONMENT_ERROR:
+        subtype = "test_runner_error" if "test runner" in error_message else "environment_setup"
+        return FailureDiagnosis(
+            stage=FailureStage.ENVIRONMENT,
+            category=result.failure_category,
+            subtype=subtype,
+            retryable=True,
+            metadata={},
+        )
+
+    return FailureDiagnosis(
+        stage=FailureStage.UNKNOWN,
+        category=result.failure_category,
+        subtype="unknown",
+        retryable=False,
+        metadata=dict(details),
+    )
 
 
 @dataclass

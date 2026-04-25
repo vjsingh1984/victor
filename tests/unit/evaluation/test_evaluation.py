@@ -17,6 +17,7 @@
 import pytest
 
 from victor.evaluation import (
+    BenchmarkFailureCategory,
     BenchmarkType,
     CodeQualityMetrics,
     EvaluationConfig,
@@ -33,6 +34,7 @@ from victor.evaluation.pass_at_k import (
     generate_report,
 )
 from victor.evaluation.analyzers import AnalyzerRegistry
+from victor.evaluation.protocol import FailureStage
 
 
 class TestPassAtK:
@@ -281,6 +283,25 @@ class TestTaskResult:
         assert result.used_graph is True
         assert result.used_code_intelligence is True
 
+    def test_get_failure_diagnosis_derives_hierarchical_taxonomy(self):
+        """Structured diagnosis should infer stage and subtype from failure details."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.FAILED,
+            failure_category=BenchmarkFailureCategory.TASK_COMPLETION,
+            failure_details={
+                "missing_actions": ["click"],
+                "missing_answer_phrases": ["settings page"],
+            },
+        )
+
+        diagnosis = result.get_failure_diagnosis()
+
+        assert diagnosis is not None
+        assert diagnosis.stage == FailureStage.ACTION
+        assert diagnosis.subtype == "missing_required_actions"
+        assert diagnosis.path == "action.task_completion.missing_required_actions"
+
 
 class TestEvaluationResult:
     """Tests for EvaluationResult aggregate metrics."""
@@ -320,6 +341,44 @@ class TestEvaluationResult:
         assert metrics["tasks_using_graph"] == 1
         assert metrics["tasks_using_code_intelligence"] == 1
         assert metrics["code_intelligence_task_coverage"] == pytest.approx(0.5)
+
+    def test_get_metrics_includes_failure_taxonomy_breakdown(self):
+        """Aggregate metrics should count failure stages and taxonomy paths."""
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="test-model",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-1",
+                    status=TaskStatus.FAILED,
+                    failure_category=BenchmarkFailureCategory.TASK_COMPLETION,
+                    failure_details={"missing_actions": ["click"]},
+                ),
+                TaskResult(
+                    task_id="task-2",
+                    status=TaskStatus.FAILED,
+                    failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+                    failure_details={"forbidden_claim_hits": ["invented claim"]},
+                ),
+            ],
+        )
+
+        metrics = result.get_metrics()
+
+        assert metrics["failure_categories"] == {
+            "task_completion": 1,
+            "unsupported_claim": 1,
+        }
+        assert metrics["failure_stages"] == {
+            "action": 1,
+            "grounding": 1,
+        }
+        assert metrics["failure_taxonomy"] == {
+            "action.task_completion.missing_required_actions": 1,
+            "grounding.unsupported_claim.forbidden_claim": 1,
+        }
 
 
 class TestPassAtKResult:

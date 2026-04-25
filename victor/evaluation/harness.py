@@ -32,6 +32,7 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
+    FailureDiagnosis,
     BenchmarkTask,
     BenchmarkType,
     EvaluationConfig,
@@ -555,6 +556,11 @@ class EvaluationHarness:
                         r.failure_category.value if r.failure_category else None
                     ),
                     "failure_details": r.failure_details,
+                    "failure_diagnosis": (
+                        r.get_failure_diagnosis().to_dict()
+                        if r.get_failure_diagnosis() is not None
+                        else None
+                    ),
                     "generated_code": r.generated_code,
                 }
                 for r in completed_results
@@ -612,6 +618,11 @@ class EvaluationHarness:
                         else None
                     ),
                     failure_details=r.get("failure_details", {}),
+                    failure_diagnosis=(
+                        FailureDiagnosis.from_dict(r["failure_diagnosis"])
+                        if r.get("failure_diagnosis")
+                        else None
+                    ),
                     generated_code=r.get("generated_code"),
                 )
                 completed_results.append(result)
@@ -1019,6 +1030,7 @@ class EvaluationHarness:
                 task_result.traceback = eval_result.traceback
                 task_result.failure_category = eval_result.failure_category
                 task_result.failure_details = dict(eval_result.failure_details)
+                task_result.failure_diagnosis = eval_result.get_failure_diagnosis()
 
                 # Calculate completion score
                 task_result.completion_score = task_result.calculate_completion_score()
@@ -1228,6 +1240,11 @@ class EvaluationHarness:
                         r.failure_category.value if r.failure_category else None
                     ),
                     "failure_details": r.failure_details,
+                    "failure_diagnosis": (
+                        r.get_failure_diagnosis().to_dict()
+                        if r.get_failure_diagnosis() is not None
+                        else None
+                    ),
                     "code_quality": (
                         {
                             "syntax_valid": r.code_quality.syntax_valid,
