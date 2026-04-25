@@ -2016,9 +2016,11 @@ async def code_search(
     - "impact": Change-impact / blast-radius analysis using graph expansion when available.
     """
     query = query.strip()
+    query_from_file_pattern = False
     filters = _normalize_search_filters(filters)
     if not query and filters and filters.file_pattern:
         query = filters.file_pattern
+        query_from_file_pattern = True
     if not query:
         return {
             "success": False,
@@ -2033,7 +2035,7 @@ async def code_search(
 
     # Auto-detect filename search mode
     if mode == "semantic":
-        if filters and filters.file_pattern and not filters.symbol:
+        if query_from_file_pattern and filters and filters.file_pattern and not filters.symbol:
             # If only file_pattern is provided, treat as filename search.
             mode = "filename"
         elif _looks_like_filename_query(query) and not (filters and filters.symbol):

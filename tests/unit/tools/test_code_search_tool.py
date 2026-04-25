@@ -470,42 +470,46 @@ async def test_code_search_filename_mode_uses_literal_filename_search(tmp_path) 
 
 
 @pytest.mark.asyncio
-async def test_code_search_auto_detected_filename_mode_uses_file_pattern_query(tmp_path) -> None:
-    """file_pattern-only searches should route through filename search with the pattern."""
-    literal_result = {
-        "success": True,
-        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
-        "count": 1,
-        "mode": "filename",
-    }
+async def test_code_search_semantic_query_respects_file_pattern_filter(tmp_path) -> None:
+    """A real semantic query plus file_pattern should stay on the semantic path."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return json.loads(data)",
+                    "score": 0.74,
+                }
+            ]
+        )
+    )
     filters = SearchFilters(file_pattern="parser.py")
 
     with patch(
         "victor.tools.code_search_tool._get_or_build_index",
-        new=AsyncMock(),
+        new=AsyncMock(return_value=(mock_index, False)),
     ) as get_index, patch(
         "victor.tools.code_search_tool._literal_search",
-        new=AsyncMock(return_value=dict(literal_result)),
+        new=AsyncMock(),
     ) as literal_search:
         result = await code_search(
-            query="ignored semantic query",
+            query="json parsing",
             path=str(tmp_path),
             k=3,
             filters=filters,
             _exec_ctx={"settings": _settings()},
         )
 
-    literal_search.assert_awaited_once_with(
-        "parser.py",
-        str(tmp_path),
-        3,
-        None,
-        filename_only=True,
-        allow_filename_autodetect=True,
-        file_pattern="parser.py",
+    literal_search.assert_not_awaited()
+    get_index.assert_awaited_once()
+    mock_index.semantic_search.assert_awaited_once_with(
+        query="json parsing",
+        max_results=3,
+        filter_metadata={"file_path": "parser.py"},
+        similarity_threshold=0.25,
+        expand_query=True,
     )
-    get_index.assert_not_awaited()
-    assert result["mode"] == "filename"
+    assert result["mode"] == "semantic"
     assert result["count"] == 1
 
 
@@ -906,7 +910,7 @@ async def test_code_search_strips_whitespace_from_file_pattern_before_filename_s
         new=AsyncMock(return_value=dict(literal_result)),
     ) as literal_search:
         result = await code_search(
-            query="ignored semantic query",
+            query="   ",
             path=str(tmp_path),
             k=3,
             filters=filters,
