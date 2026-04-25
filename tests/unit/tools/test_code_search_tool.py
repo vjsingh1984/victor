@@ -1072,6 +1072,37 @@ async def test_code_search_literal_fallback_preserves_requested_mode_on_index_bu
 
 
 @pytest.mark.asyncio
+async def test_code_search_literal_escalation_preserves_requested_mode_on_index_build_failure(
+    tmp_path,
+) -> None:
+    """Literal auto-escalation should keep its original mode when index build fails."""
+    exec_ctx = {"settings": _settings()}
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(side_effect=RuntimeError("index build failed")),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="main entrypoint",
+            path=str(tmp_path),
+            k=3,
+            mode="literal",
+            _exec_ctx=exec_ctx,
+        )
+
+    assert literal_search.await_count == 2
+    assert result["fallback"] == "semantic_index_error"
+    assert result["metadata"]["requested_mode"] == "literal"
+    assert result["metadata"]["fallback_mode"] == "semantic"
+    assert result["metadata"]["fallback_reason"] == "literal_no_results"
+    assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
+
+
+@pytest.mark.asyncio
 async def test_code_search_skips_semantic_search_when_cached_index_is_stale(tmp_path) -> None:
     """Known-stale semantic indexes should fall back immediately to literal search."""
     mock_index = SimpleNamespace(semantic_search=AsyncMock())
@@ -1099,6 +1130,43 @@ async def test_code_search_skips_semantic_search_when_cached_index_is_stale(tmp_
     mock_index.semantic_search.assert_not_awaited()
     literal_search.assert_awaited_once()
     assert result["fallback"] == "semantic_index_stale"
+
+
+@pytest.mark.asyncio
+async def test_code_search_literal_escalation_preserves_requested_mode_when_cached_index_is_stale(
+    tmp_path,
+) -> None:
+    """Literal auto-escalation should keep its original mode when semantic index is stale."""
+    mock_index = SimpleNamespace(semantic_search=AsyncMock())
+    exec_ctx = {"settings": _settings()}
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+    fake_cache = {str(tmp_path): {"stale": True}}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._get_index_cache",
+        new=lambda exec_ctx=None: fake_cache,
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="main entrypoint",
+            path=str(tmp_path),
+            k=3,
+            mode="literal",
+            _exec_ctx=exec_ctx,
+        )
+
+    assert literal_search.await_count == 2
+    mock_index.semantic_search.assert_not_awaited()
+    assert result["fallback"] == "semantic_index_stale"
+    assert result["metadata"]["requested_mode"] == "literal"
+    assert result["metadata"]["fallback_mode"] == "semantic"
+    assert result["metadata"]["fallback_reason"] == "literal_no_results"
+    assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
 
 
 def test_get_index_build_failure_cache_ignores_mock_cache_manager_fallback(monkeypatch) -> None:

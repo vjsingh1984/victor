@@ -580,6 +580,18 @@ def _requested_mode_literal_fallback_metadata(mode: str) -> Dict[str, Any]:
     return {}
 
 
+def _early_semantic_fallback_metadata(
+    mode: str,
+    *,
+    literal_escalation_metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Preserve the original caller intent across early semantic fallbacks."""
+
+    if literal_escalation_metadata:
+        return dict(literal_escalation_metadata)
+    return _requested_mode_literal_fallback_metadata(mode)
+
+
 _FILENAME_QUERY_EXTENSIONS = (
     ".py",
     ".js",
@@ -1932,7 +1944,10 @@ async def code_search(
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_disabled",
-                metadata=_requested_mode_literal_fallback_metadata(mode),
+                metadata=_early_semantic_fallback_metadata(
+                    mode,
+                    literal_escalation_metadata=literal_escalation_metadata,
+                ),
             )
 
         # Build metadata filter from optional parameters
@@ -1995,7 +2010,10 @@ async def code_search(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_index"),
                 filters_applied=filters_applied,
-                metadata=_requested_mode_literal_fallback_metadata(mode),
+                metadata=_early_semantic_fallback_metadata(
+                    mode,
+                    literal_escalation_metadata=literal_escalation_metadata,
+                ),
             )
 
         if _is_cached_index_stale(root_path, _exec_ctx):
@@ -2009,7 +2027,10 @@ async def code_search(
                 result,
                 fallback="semantic_index_stale",
                 filters_applied=filters_applied,
-                metadata=_requested_mode_literal_fallback_metadata(mode),
+                metadata=_early_semantic_fallback_metadata(
+                    mode,
+                    literal_escalation_metadata=literal_escalation_metadata,
+                ),
             )
 
         backend_metadata = _collect_code_search_backend_metadata(index, settings)
