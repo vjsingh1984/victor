@@ -16,12 +16,14 @@
 
 import asyncio
 import time
+from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
-from pathlib import Path
 
 import pytest
 
+from victor.core.indexing.file_watcher import FileChangeEvent, FileChangeType
 from victor.framework.search.codebase_embedding_bridge import (
     build_codebase_index_manifest,
     write_codebase_index_manifest,
@@ -32,6 +34,7 @@ from victor.tools.code_search_tool import (
     _finalize_index_storage,
     _get_or_build_index,
     _latest_mtime,
+    _on_file_change,
     _probe_index_integrity,
     clear_index_cache,
 )
@@ -867,3 +870,49 @@ class TestStructuralIndexPersistence:
         await _finalize_index_storage(index)
 
         provider.get_stats.assert_not_awaited()
+
+
+class TestFileWatcherIncrementalUpdates:
+    """Tests for watcher-driven incremental code_search refreshes."""
+
+    @pytest.mark.asyncio
+    async def test_on_file_change_finalizes_structural_provider_after_incremental_reindex(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        changed_file = root / "main.py"
+        changed_file.write_text("print('hello')\n", encoding="utf-8")
+
+        provider = SimpleNamespace(
+            config=SimpleNamespace(vector_store="victor_structural_bridge"),
+            get_stats=AsyncMock(return_value={"total_documents": 1}),
+        )
+        index = SimpleNamespace(
+            incremental_reindex=AsyncMock(),
+            embedding_provider=provider,
+        )
+        cache_entry = {
+            "index": index,
+            "latest_mtime": 0.0,
+            "stale": True,
+        }
+        fake_cache = {str(root): cache_entry}
+
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+
+        await _on_file_change(
+            FileChangeEvent(
+                path=changed_file,
+                change_type=FileChangeType.MODIFIED,
+                timestamp=datetime.now(),
+            ),
+            root,
+        )
+
+        index.incremental_reindex.assert_awaited_once()
+        provider.get_stats.assert_awaited_once()
+        assert cache_entry["latest_mtime"] >= _latest_mtime(root)
+        assert cache_entry["stale"] is False

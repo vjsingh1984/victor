@@ -650,6 +650,7 @@ async def _on_file_change(
             # Check if index supports incremental updates
             if hasattr(index, "incremental_reindex"):
                 await index.incremental_reindex()
+                await _finalize_index_storage(index)
 
                 # Update mtime
                 latest = _latest_mtime(root)
