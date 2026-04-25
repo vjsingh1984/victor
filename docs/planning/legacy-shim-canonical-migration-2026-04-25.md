@@ -50,10 +50,12 @@ The target state is:
 - Keep `*_compat.py` modules public, but ensure runtime code reaches services
   and state-passed boundaries directly.
 - Collapse the provider migration seam in the right order:
-  1. migrate internal imports off `victor.agent.provider_coordinator`
-  2. introduce a canonical provider-switch boundary to replace direct
+  1. migrate internal orchestrator switching off the coordinator fallback and
+     onto `ProviderService` only
+  2. migrate internal imports off `victor.agent.provider_coordinator`
+  3. introduce a canonical provider-switch boundary to replace direct
      `provider_switch_coordinator` construction
-  3. only then retire the coordinator-path provider shims
+  4. only then retire the coordinator-path provider shims
 
 ### Phase 3
 - Migrate workflow runtime imports off `victor.workflows.executor` legacy types.
@@ -75,6 +77,6 @@ For each batch:
 
 ## Current Batch
 
-Phase 1 is still the current implementation batch, but the validated audit
-shows that the next highest-risk migration seam after Phase 1 is provider
-compatibility, not the coordinator package generally.
+Phase 1 is complete. The active implementation batch is now Phase 2.1:
+internal provider switching is service-first in `AgentOrchestrator`, while the
+legacy provider coordinator remains available only as a compatibility surface.

@@ -2245,6 +2245,30 @@ class TestSwitchProvider:
             assert orchestrator.provider_name == "new_provider"
             assert orchestrator.model == "new-model"
 
+    @pytest.mark.asyncio
+    async def test_switch_provider_does_not_use_legacy_coordinator_when_service_exists(
+        self, orchestrator
+    ):
+        """Canonical provider switching should not fall back to the legacy coordinator."""
+        provider_service = MagicMock()
+        provider_service.switch_provider = AsyncMock()
+        provider_service.get_current_provider = MagicMock(return_value=MagicMock())
+        provider_service.get_current_provider_info.return_value = MagicMock(
+            provider_name="openai",
+            model_name="gpt-4.1",
+        )
+        orchestrator._provider_service = provider_service
+        orchestrator._provider_coordinator = MagicMock()
+        orchestrator._provider_coordinator.switch_provider_async = AsyncMock(
+            side_effect=AssertionError("legacy coordinator path should not be used")
+        )
+
+        result = await orchestrator.switch_provider("openai", "gpt-4.1")
+
+        assert result is True
+        provider_service.switch_provider.assert_awaited_once_with("openai", "gpt-4.1")
+        orchestrator._provider_coordinator.switch_provider_async.assert_not_called()
+
 
 class TestSwitchModel:
     """Tests for switch_model method."""
@@ -2267,6 +2291,29 @@ class TestSwitchModel:
         else:
             # If failed, model should be unchanged
             assert orchestrator.model == old_model
+
+    def test_switch_model_does_not_use_legacy_coordinator_when_service_exists(self, orchestrator):
+        """Canonical model switching should not fall back to the legacy coordinator."""
+        import asyncio
+
+        provider_service = MagicMock()
+        provider_service.switch_model = AsyncMock()
+        provider_service.get_current_provider = MagicMock(return_value=MagicMock())
+        provider_service.get_current_provider_info.return_value = MagicMock(
+            provider_name="anthropic",
+            model_name="claude-3-7-sonnet",
+        )
+        orchestrator._provider_service = provider_service
+        orchestrator._provider_coordinator = MagicMock()
+        orchestrator._provider_coordinator.switch_model_async = AsyncMock(
+            side_effect=AssertionError("legacy coordinator path should not be used")
+        )
+
+        result = asyncio.run(orchestrator.switch_model("claude-3-7-sonnet"))
+
+        assert result is True
+        provider_service.switch_model.assert_awaited_once_with("claude-3-7-sonnet")
+        orchestrator._provider_coordinator.switch_model_async.assert_not_called()
 
 
 class TestIntelligentIntegration:

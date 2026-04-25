@@ -5171,18 +5171,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             on_switch: Optional callback after switch
         """
         try:
-            # [CANONICAL] Switch via state-passed service
-            if self._provider_service is not None:
-                await self._provider_service.switch_provider(provider_name, model)
-                info = self._provider_service.get_current_provider_info()
-                self.provider = self._provider_service.get_current_provider()
-                self.provider_name = info.provider_name
-                self.model = info.model_name
-            else:
-                await self._provider_coordinator.switch_provider_async(provider_name, model)
-                self.provider = self._provider_coordinator.provider
-                self.model = self._provider_coordinator.model
-                self.provider_name = self._provider_coordinator.provider_name
+            provider_service = getattr(self, "_provider_service", None)
+            if provider_service is None:
+                logger.error("Provider switch failed: canonical provider service is not initialized")
+                return False
+
+            await provider_service.switch_provider(provider_name, model)
+            info = provider_service.get_current_provider_info()
+            self.provider = provider_service.get_current_provider()
+            self.provider_name = info.provider_name
+            self.model = info.model_name
 
             if on_switch:
                 on_switch(self.provider_name, self.model)
@@ -5194,17 +5192,16 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     async def switch_model(self, model: str) -> bool:
         """[CANONICAL] Switch model via ProviderService."""
         try:
-            if self._provider_service is not None:
-                await self._provider_service.switch_model(model)
-                info = self._provider_service.get_current_provider_info()
-                self.provider = self._provider_service.get_current_provider()
-                self.provider_name = info.provider_name
-                self.model = info.model_name
-            else:
-                await self._provider_coordinator.switch_model_async(model)
-                self.provider = self._provider_coordinator.provider
-                self.provider_name = self._provider_coordinator.provider_name
-                self.model = self._provider_coordinator.model
+            provider_service = getattr(self, "_provider_service", None)
+            if provider_service is None:
+                logger.error("Model switch failed: canonical provider service is not initialized")
+                return False
+
+            await provider_service.switch_model(model)
+            info = provider_service.get_current_provider_info()
+            self.provider = provider_service.get_current_provider()
+            self.provider_name = info.provider_name
+            self.model = info.model_name
             return True
         except Exception as e:
             logger.error(f"Model switch failed: {e}")
