@@ -265,16 +265,19 @@ class TestProcessToolResults:
             from victor.config.tool_settings import ToolSettings
 
             mock_settings.return_value = ToolSettings(
+                tool_output_preview_enabled=True,
                 tool_output_pruning_enabled=True,
                 tool_output_pruning_safe_only=True,
             )
             results = coord.process_tool_results(pipeline_result, ctx)
 
         assert results[0]["was_pruned"] is True
-        assert results[0]["result"] == formatted
+        assert results[0]["result"] != formatted
+        assert "[PRUNED PREVIEW:" in results[0]["result"]
+        assert results[0]["full_result"] == formatted
         # LLM always receives the full output — accuracy-first architecture
         assert results[0]["content"] == formatted
-        assert "[PRUNED FOR LLM:" not in results[0]["content"]
+        assert "[PRUNED PREVIEW:" not in results[0]["content"]
         added_content = ctx.add_message.call_args.args[1]
         assert added_content == results[0]["content"]
         assert results[0]["pruning_info"].recovery_hint.startswith("Use read(")
@@ -307,6 +310,7 @@ class TestProcessToolResults:
             from victor.config.tool_settings import ToolSettings
 
             mock_settings.return_value = ToolSettings(
+                tool_output_preview_enabled=True,
                 tool_output_pruning_enabled=True,
                 tool_output_pruning_safe_only=True,
             )
@@ -314,3 +318,5 @@ class TestProcessToolResults:
 
         assert results[0]["was_pruned"] is False
         assert results[0]["content"] == diff_like_output
+        assert results[0]["result"] == diff_like_output
+        assert results[0]["full_result"] == diff_like_output

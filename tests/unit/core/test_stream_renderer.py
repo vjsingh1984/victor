@@ -83,7 +83,6 @@ class TestFormatterRenderer:
             success=True,
             error=None,
             follow_up_suggestions=None,
-            original_result=None,
         )
         mock_formatter.start_streaming.assert_called_once()
 
@@ -102,7 +101,6 @@ class TestFormatterRenderer:
             success=False,
             error="Permission denied",
             follow_up_suggestions=None,
-            original_result=None,
         )
 
     def test_on_tool_result_forwards_follow_up_suggestions(self, renderer, mock_formatter):
@@ -127,7 +125,28 @@ class TestFormatterRenderer:
             success=True,
             error=None,
             follow_up_suggestions=follow_ups,
-            original_result=None,
+        )
+
+    def test_on_tool_result_forwards_preview_and_full_output(self, renderer, mock_formatter):
+        """Pruned previews forward both preview and full output to formatter."""
+        renderer.on_tool_result(
+            name="read",
+            success=True,
+            elapsed=0.5,
+            arguments={"path": "/tmp/test.py"},
+            was_pruned=True,
+            original_result="full line 1\nfull line 2\nfull line 3",
+            result="full line 1\n[PRUNED PREVIEW: omitted 2 lines]",
+        )
+
+        mock_formatter.tool_result.assert_called_once_with(
+            tool_name="read",
+            success=True,
+            error=None,
+            follow_up_suggestions=None,
+            original_result="full line 1\nfull line 2\nfull line 3",
+            result="full line 1\n[PRUNED PREVIEW: omitted 2 lines]",
+            was_pruned=True,
         )
 
     def test_on_status(self, renderer, mock_formatter):

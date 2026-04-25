@@ -116,6 +116,7 @@ class FormatterRenderer:
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
         was_pruned: bool = False,
+        original_result: Any = None,
         result: Any = None,  # Tool output for preview
     ) -> None:
         """Handle tool execution result.
@@ -129,11 +130,12 @@ class FormatterRenderer:
             follow_up_suggestions: Optional follow-up suggestions
             result: Tool output (for preview display)
         """
-        tool_output = str(result) if result is not None else None
+        preview_output = str(result) if result is not None else None
+        full_output = original_result or preview_output
         self._last_tool_result = {
             "name": name,
             "success": success,
-            "result": tool_output or "",
+            "result": full_output or "",
             "arguments": arguments,
             "elapsed": elapsed,
         }
@@ -144,8 +146,11 @@ class FormatterRenderer:
             "success": success,
             "error": error,
             "follow_up_suggestions": follow_up_suggestions,
-            "original_result": tool_output,
         }
+        if full_output is not None:
+            formatter_kwargs["original_result"] = full_output
+        if preview_output is not None:
+            formatter_kwargs["result"] = preview_output
         if was_pruned:
             formatter_kwargs["was_pruned"] = True
         self.formatter.tool_result(**formatter_kwargs)

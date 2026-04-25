@@ -1053,6 +1053,7 @@ class StreamingChatHandler:
         follow_up_suggestions: Optional[List[Dict[str, Any]]] = None,
         was_pruned: bool = False,
         result: Any = None,  # Tool output for preview
+        original_result: Any = None,  # Full tool output for expansion/debug
     ) -> StreamChunk:
         """Generate a StreamChunk for a tool result.
 
@@ -1085,6 +1086,8 @@ class StreamingChatHandler:
         if result is not None:
             # Include tool output for preview (will be truncated by formatter)
             metadata["tool_result"]["result"] = str(result)[:2000]  # Limit to 2000 chars
+        if original_result is not None:
+            metadata["tool_result"]["original_result"] = str(original_result)
         return StreamChunk(content="", metadata=metadata)
 
     def generate_file_preview_chunk(
@@ -1183,6 +1186,7 @@ class StreamingChatHandler:
 
         # Main tool result chunk
         tool_output = result.get("result") or result.get("content")
+        full_tool_output = result.get("full_result") or result.get("content") or tool_output
         chunks.append(
             self.generate_tool_result_chunk(
                 tool_name,
@@ -1193,6 +1197,7 @@ class StreamingChatHandler:
                 follow_up_suggestions=follow_up_suggestions,
                 was_pruned=was_pruned,
                 result=tool_output,  # Pass result for preview
+                original_result=full_tool_output if was_pruned else None,
             )
         )
 

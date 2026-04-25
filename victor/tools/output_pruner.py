@@ -331,7 +331,7 @@ class ToolOutputPruner:
         tool_name: str,
         context: Dict[str, Any],
     ) -> Tuple[str, PruningInfo]:
-        """Conservatively prune already-formatted tool output for LLM injection."""
+        """Conservatively prune already-formatted tool output for user preview."""
         original_lines = tool_output.count("\n") + 1
         safe_only = bool(context.get("safe_only", True))
 
@@ -467,7 +467,7 @@ class ToolOutputPruner:
         )
 
     def _build_omission_note(self, omitted_lines: int, recovery_hint: str) -> str:
-        note = f"[PRUNED FOR LLM: omitted {omitted_lines} lines."
+        note = f"[PRUNED PREVIEW: omitted {omitted_lines} lines."
         if recovery_hint:
             note += f" {recovery_hint}"
         return note + "]"

@@ -595,7 +595,7 @@ class ChatService:
                 try:
                     from victor.agent.services.tool_service import format_and_prune_tool_output
 
-                    _, formatted_content, _, _ = format_and_prune_tool_output(
+                    _, formatted_content, _, _, _ = format_and_prune_tool_output(
                         tool_name=tool_name,
                         arguments=arguments,
                         output=result.output,

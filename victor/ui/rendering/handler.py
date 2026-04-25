@@ -138,6 +138,8 @@ async def stream_response(
                     "follow_up_suggestions": tool_data.get("follow_up_suggestions"),
                     "result": tool_data.get("result"),
                 }
+                if "original_result" in tool_data:
+                    tool_result_kwargs["original_result"] = tool_data.get("original_result")
                 if tool_data.get("was_pruned"):
                     tool_result_kwargs["was_pruned"] = True
                 renderer.on_tool_result(

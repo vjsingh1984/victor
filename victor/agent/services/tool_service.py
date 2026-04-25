@@ -130,7 +130,7 @@ def format_and_prune_tool_output(
     *,
     task_type: str = "unknown",
     formatter: Optional[Any] = None,
-) -> tuple[str, str, bool, Optional[Any]]:
+) -> tuple[str, str, str, bool, Optional[Any]]:
     """Format tool output for display and LLM injection.
 
     CRITICAL: LLM receives FULL output for accuracy. Pruning only affects user preview.
@@ -194,7 +194,7 @@ def format_and_prune_tool_output(
     from victor.tools.output_pruner import get_output_pruner
 
     tool_settings = get_tool_settings()
-    if tool_settings.tool_output_preview_enabled:
+    if tool_settings.tool_output_preview_enabled and tool_settings.tool_output_pruning_enabled:
         pruner = get_output_pruner()
         # Prune only for user preview, NOT for LLM input
         preview_output, pruning_info = pruner.prune(
@@ -209,9 +209,15 @@ def format_and_prune_tool_output(
         )
         was_pruned = pruning_info.was_pruned
 
-    # Return: formatted (full), llm_output (full), was_pruned (preview status), pruning_info
-    # Note: was_pruned now indicates whether user preview was truncated (NOT LLM input)
-    return formatted_output, llm_output, was_pruned, pruning_info
+    if not isinstance(preview_output, str):
+        preview_output = str(preview_output)
+
+    # Return:
+    # - preview_output: user-facing preview payload (may be pruned)
+    # - llm_output: full output sent to the model
+    # - formatted_output: full display output retained for expansion/debug
+    # - was_pruned / pruning_info: preview pruning metadata
+    return preview_output, llm_output, formatted_output, was_pruned, pruning_info
 
 
 def process_tool_results_with_context(
@@ -286,7 +292,7 @@ def process_tool_results_with_context(
             )
 
         if semantic_success:
-            formatted_output, llm_output, was_pruned, pruning_info = format_and_prune_tool_output(
+            preview_output, llm_output, full_output, was_pruned, pruning_info = format_and_prune_tool_output(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 output=output,
@@ -308,7 +314,8 @@ def process_tool_results_with_context(
                     "success": True,
                     "elapsed": elapsed_ms / 1000,
                     "args": normalized_args,
-                    "result": formatted_output,  # Full output for display
+                    "result": preview_output,  # Pruned preview for display when applicable
+                    "full_result": full_output,  # Full display output for expansion/debug
                     "follow_up_suggestions": follow_up_suggestions,
                     "was_pruned": was_pruned,  # Indicates user preview was truncated (not LLM input)
                     "pruning_info": pruning_info,
@@ -337,7 +344,7 @@ def process_tool_results_with_context(
         if ctx.format_tool_output:
             formatted_error = ctx.format_tool_output(tool_name, normalized_args, error_output)
         else:
-            formatted_error, _, _, _ = format_and_prune_tool_output(
+            formatted_error, _, _, _, _ = format_and_prune_tool_output(
                 tool_name=tool_name,
                 arguments=normalized_args,
                 output=error_output,
@@ -357,6 +364,7 @@ def process_tool_results_with_context(
                 "elapsed": elapsed_ms / 1000,
                 "error": error_display,
                 "result": formatted_error,
+                "full_result": formatted_error,
                 "was_pruned": False,
                 "tool_call_id": call_result.tool_call_id,
                 "content": formatted_error,

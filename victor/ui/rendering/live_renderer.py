@@ -190,8 +190,8 @@ class LiveDisplayRenderer:
                 self.console.print(f"[dim bold]▸ {tool_category}[/]")
                 self._current_tool_category = tool_category
 
-        # Use result parameter if original_result not provided
-        tool_output = original_result or (str(result) if result is not None else None)
+        preview_output = str(result) if result is not None else original_result
+        full_output = original_result or (str(result) if result is not None else None)
 
         self.pause()
 
@@ -207,11 +207,11 @@ class LiveDisplayRenderer:
         self.console.print(status_line)
 
         # Show preview if enabled
-        if show_preview and success and tool_output:
+        if show_preview and success and preview_output:
             # Calculate adaptive preview lines if enabled
             if tool_settings.tool_output_preview_adaptive:
                 adaptive_lines = self._calculate_adaptive_preview_lines(
-                    tool_output, error, preview_lines, tool_settings
+                    preview_output, error, preview_lines, tool_settings
                 )
             else:
                 adaptive_lines = preview_lines
@@ -219,7 +219,7 @@ class LiveDisplayRenderer:
             from victor.ui.rendering.tool_preview import renderer as _tool_preview_renderer
 
             preview = _tool_preview_renderer.render(
-                name, arguments, tool_output, max_lines=adaptive_lines
+                name, arguments, preview_output, max_lines=adaptive_lines
             )
             if preview.header or preview.lines:
                 if preview.header:
@@ -250,7 +250,7 @@ class LiveDisplayRenderer:
         self._last_tool_result = {
             "name": name,
             "success": success,
-            "result": tool_output or "",
+            "result": full_output or "",
             "arguments": arguments,
             "elapsed": elapsed,
         }

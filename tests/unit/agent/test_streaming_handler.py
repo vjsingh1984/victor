@@ -1307,6 +1307,26 @@ class TestGenerateToolResultChunks:
             preview_path="/test.py",
         )
 
+    def test_pruned_read_chunk_preserves_full_result_for_renderer(self, handler):
+        """Pruned read results expose preview and full output separately."""
+        result = {
+            "name": "read",
+            "elapsed": 0.3,
+            "args": {"path": "/test.py"},
+            "success": True,
+            "was_pruned": True,
+            "result": "preview line 1\npreview line 2\n[PRUNED PREVIEW: omitted 200 lines]",
+            "full_result": "preview line 1\npreview line 2\nfull line 3\nfull line 4",
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 1
+        tool_metadata = chunks[0].metadata["tool_result"]
+        assert tool_metadata["result"] == result["result"]
+        assert tool_metadata["original_result"] == result["full_result"]
+        assert tool_metadata["was_pruned"] is True
+
     def test_edit_with_preview(self, handler):
         """Canonical edit generates result and edit preview chunks."""
         result = {

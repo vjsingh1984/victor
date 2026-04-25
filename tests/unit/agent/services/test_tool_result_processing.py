@@ -93,6 +93,7 @@ def test_safe_default_pruning_runs_on_formatted_read_output():
     with patch(
         "victor.config.tool_settings.get_tool_settings",
         return_value=MagicMock(
+            tool_output_preview_enabled=True,
             tool_output_pruning_enabled=True,
             tool_output_pruning_safe_only=True,
         ),
@@ -100,7 +101,9 @@ def test_safe_default_pruning_runs_on_formatted_read_output():
         results = service.process_tool_results(pipeline_result, ctx)
 
     assert results[0]["was_pruned"] is True
-    assert results[0]["result"] == formatted_output
+    assert results[0]["result"] != formatted_output
+    assert "[PRUNED PREVIEW:" in results[0]["result"]
+    assert results[0]["full_result"] == formatted_output
     assert results[0]["content"] == formatted_output
     ctx.add_message.assert_called_once_with(
         "tool",
@@ -139,6 +142,7 @@ def test_no_regression_for_safety_critical_diff_like_output():
     with patch(
         "victor.config.tool_settings.get_tool_settings",
         return_value=MagicMock(
+            tool_output_preview_enabled=True,
             tool_output_pruning_enabled=True,
             tool_output_pruning_safe_only=True,
         ),
@@ -148,3 +152,43 @@ def test_no_regression_for_safety_critical_diff_like_output():
     assert results[0]["was_pruned"] is False
     assert results[0]["content"] == diff_like_output
     assert results[0]["result"] == diff_like_output
+    assert results[0]["full_result"] == diff_like_output
+
+
+def test_mutating_tools_keep_full_display_output_even_when_preview_pruning_enabled():
+    service = _make_service()
+    formatted_output = "\n".join(
+        [
+            '<TOOL_OUTPUT tool="write" path="src/main.py">',
+            "Wrote src/main.py",
+            "Created 220 lines of code",
+            "</TOOL_OUTPUT>",
+        ]
+    )
+    ctx = _make_ctx(format_tool_output=MagicMock(return_value=formatted_output))
+    pipeline_result = FakePipelineResult(
+        results=[
+            FakeCallResult(
+                tool_name="write",
+                success=True,
+                result="raw result",
+                arguments={"path": "src/main.py", "content": "print('hello')"},
+                tool_call_id="call_write_1",
+            )
+        ]
+    )
+
+    with patch(
+        "victor.config.tool_settings.get_tool_settings",
+        return_value=MagicMock(
+            tool_output_preview_enabled=True,
+            tool_output_pruning_enabled=True,
+            tool_output_pruning_safe_only=True,
+        ),
+    ):
+        results = service.process_tool_results(pipeline_result, ctx)
+
+    assert results[0]["was_pruned"] is False
+    assert results[0]["result"] == formatted_output
+    assert results[0]["full_result"] == formatted_output
+    assert results[0]["content"] == formatted_output

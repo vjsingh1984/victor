@@ -257,12 +257,15 @@ class OutputFormatter:
             was_pruned: Whether output was pruned before sending to LLM
             show_preview: Whether to show preview (controlled by settings)
         """
+        preview_result = result or original_result
+        full_result = original_result or result
+
         tool_record = {
             "tool": tool_name,
             "success": success,
         }
-        if result:
-            tool_record["result"] = result[:500]  # Truncate for JSON
+        if preview_result:
+            tool_record["result"] = preview_result[:500]  # Truncate for JSON
         if error:
             tool_record["error"] = error
         if follow_up_suggestions:
@@ -322,7 +325,7 @@ class OutputFormatter:
                     hotkey = "^O"
 
                 preview = _tool_preview_renderer.render(
-                    tool_name, _tool_arguments, original_result or "", max_lines=preview_lines
+                    tool_name, _tool_arguments, preview_result or "", max_lines=preview_lines
                 )
                 if preview.header or preview.lines:
                     if preview.header:
@@ -366,8 +369,8 @@ class OutputFormatter:
                 "tool_name": tool_name,
                 "arguments": _tool_arguments,
                 "success": success,
-                "result": original_result or result,
-                "pruned_result": result,
+                "result": full_result,
+                "pruned_result": preview_result,
                 "was_pruned": was_pruned,
                 "error": error,
                 "follow_up_suggestions": follow_up_suggestions,

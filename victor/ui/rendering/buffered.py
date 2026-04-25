@@ -52,16 +52,19 @@ class BufferedRenderer:
         error: str | None = None,
         follow_up_suggestions: list[dict[str, Any]] | None = None,
         was_pruned: bool = False,
+        original_result: Any = None,
         result: Any = None,
     ) -> None:
         """Record tool execution result."""
         tool_output = str(result) if result is not None else ""
+        full_output = str(original_result) if original_result is not None else tool_output
         result_data = {
             "success": success,
             "elapsed": elapsed,
             "error": error,
             "was_pruned": was_pruned,
             "output": tool_output,
+            "full_output": full_output,
             "follow_up_suggestions": follow_up_suggestions or [],
         }
 
