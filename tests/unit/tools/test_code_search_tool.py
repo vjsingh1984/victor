@@ -588,6 +588,69 @@ async def test_code_search_hybrid_mode_preserves_extension_filter_for_keyword_si
 
 
 @pytest.mark.asyncio
+async def test_code_search_hybrid_mode_uses_keyword_results_when_semantic_is_empty(
+    tmp_path,
+) -> None:
+    """Hybrid mode should still return keyword hits when semantic retrieval is empty."""
+    mock_index = SimpleNamespace(semantic_search=AsyncMock(return_value=[]))
+    exec_ctx = {"settings": _settings(enable_hybrid_search=True)}
+
+    literal_search = AsyncMock(
+        return_value={
+            "success": True,
+            "results": [
+                {
+                    "file_path": "src/main.py",
+                    "content": "def main(): return run_app()",
+                    "score": 1.0,
+                    "line_number": 3,
+                    "metadata": {},
+                }
+            ],
+        }
+    )
+
+    class _HybridEngine:
+        def combine_results(self, semantic_results, keyword_results, max_results):
+            assert semantic_results == []
+            assert len(keyword_results) == 1
+            return [
+                SimpleNamespace(
+                    file_path="src/main.py",
+                    content="def main(): return run_app()",
+                    combined_score=0.4,
+                    semantic_score=0.0,
+                    keyword_score=1.0,
+                    line_number=3,
+                    metadata={},
+                )
+            ]
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=literal_search,
+    ), patch(
+        "victor.framework.search.create_hybrid_search_engine",
+        new=lambda semantic_weight, keyword_weight: _HybridEngine(),
+    ):
+        result = await code_search(
+            query="main entrypoint",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    literal_search.assert_awaited_once_with("main entrypoint", str(tmp_path), 6, exts=None)
+    assert result["success"] is True
+    assert result["count"] == 1
+    assert result["results"][0]["file_path"] == "src/main.py"
+    assert result["results"][0]["search_mode"] == "hybrid"
+
+
+@pytest.mark.asyncio
 async def test_code_search_semantic_mode_applies_bounded_utility_reranking(tmp_path) -> None:
     """Semantic results should lift implementation code ahead of weaker duplicate/test hits."""
     source_dir = tmp_path / "victor"

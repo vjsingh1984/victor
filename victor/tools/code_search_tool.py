@@ -2199,7 +2199,7 @@ async def code_search(
                 logger.debug(f"Failed to record threshold learning outcome: {e}")
 
         # Optionally combine with keyword search using hybrid RRF
-        if enable_hybrid and results:
+        if enable_hybrid:
             try:
                 from victor.framework.search import create_hybrid_search_engine
 
