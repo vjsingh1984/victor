@@ -580,6 +580,44 @@ def _requested_mode_literal_fallback_metadata(mode: str) -> Dict[str, Any]:
     return {}
 
 
+_FILENAME_QUERY_EXTENSIONS = (
+    ".py",
+    ".js",
+    ".ts",
+    ".go",
+    ".java",
+    ".c",
+    ".cpp",
+    ".rs",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".toml",
+    ".md",
+    ".txt",
+    ".sh",
+    ".rb",
+    ".php",
+    ".swift",
+    ".kt",
+    ".scala",
+    ".r",
+    ".sql",
+)
+
+
+def _looks_like_filename_query(query: str) -> bool:
+    """Return True when a query is more likely a filename than semantic text."""
+
+    query = query.strip()
+    query_lower = query.lower()
+    return (
+        any(query_lower.endswith(ext) for ext in _FILENAME_QUERY_EXTENSIONS)
+        and " " not in query
+        and len(query) < 100
+    )
+
+
 # Directories that indicate non-core code (lower importance)
 NON_CORE_DIRS = {
     "test",
@@ -1465,37 +1503,8 @@ async def _literal_search(
         )
 
         # Filename detection: if query looks like a filename (has extension),
-        # use find/rg --files instead of content search
-        filename_exts = (
-            ".py",
-            ".js",
-            ".ts",
-            ".go",
-            ".java",
-            ".c",
-            ".cpp",
-            ".rs",
-            ".yaml",
-            ".yml",
-            ".json",
-            ".toml",
-            ".md",
-            ".txt",
-            ".sh",
-            ".rb",
-            ".php",
-            ".swift",
-            ".kt",
-            ".scala",
-            ".r",
-            ".sql",
-        )
-        query_lower = search_query.lower()
-        is_filename_query = (
-            any(query_lower.endswith(ext) for ext in filename_exts)
-            and " " not in search_query
-            and len(search_query) < 100
-        )
+        # use find/rg --files instead of content search.
+        is_filename_query = _looks_like_filename_query(search_query)
 
         if is_filename_query:
             import platform
@@ -1771,9 +1780,11 @@ async def code_search(
     mode_fallback_to_semantic = False
 
     # Auto-detect filename search mode
-    if filters and filters.file_pattern and not filters.symbol:
-        # If only file_pattern is provided, treat as filename search
-        if mode == "semantic":
+    if mode == "semantic":
+        if filters and filters.file_pattern and not filters.symbol:
+            # If only file_pattern is provided, treat as filename search.
+            mode = "filename"
+        elif _looks_like_filename_query(query) and not (filters and filters.symbol):
             mode = "filename"
 
     filename_query = query
