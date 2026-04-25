@@ -2204,7 +2204,7 @@ async def code_search(
                 from victor.framework.search import create_hybrid_search_engine
 
                 # Get keyword search results
-                keyword_results = await _literal_search(query, str(root_path), k * 2, exts=None)
+                keyword_results = await _literal_search(query, str(root_path), k * 2, exts=exts)
 
                 if keyword_results.get("success"):
                     # Convert semantic results to dict format for hybrid engine
