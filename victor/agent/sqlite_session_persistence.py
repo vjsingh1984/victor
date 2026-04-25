@@ -400,6 +400,9 @@ class SQLiteSessionPersistence:
                             metadata_payload = {}
 
                     session_metadata = metadata_payload.get("metadata", {})
+                    preview_messages = metadata_payload.get("conversation", {}).get(
+                        "preview_messages", []
+                    )
                     count_result = self._db.query(
                         "SELECT COUNT(*) FROM messages WHERE session_id = ?",
                         (row[0],),
@@ -418,6 +421,9 @@ class SQLiteSessionPersistence:
                             "created_at": row[4],
                             "updated_at": session_metadata.get("updated_at", row[5]),
                             "message_count": message_count,
+                            "preview_count": (
+                                len(preview_messages) if isinstance(preview_messages, list) else 0
+                            ),
                         }
                     )
 

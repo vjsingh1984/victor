@@ -126,6 +126,7 @@ def sessions_list(
             table.add_column("Model", style="yellow")
             table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
             table.add_column("Created", style="dim")
 
             for session in sessions:
@@ -148,6 +149,7 @@ def sessions_list(
                     session["model"],
                     session["provider"],
                     str(session["message_count"]),
+                    str(session.get("preview_count", 0)),
                     date_str,
                 )
 
@@ -259,6 +261,7 @@ def sessions_search(
             table.add_column("Model", style="yellow")
             table.add_column("Provider", style="blue")
             table.add_column("Messages", justify="right")
+            table.add_column("Previews", justify="right")
 
             for session in sessions:
                 title = (
@@ -272,6 +275,7 @@ def sessions_search(
                     session["model"],
                     session["provider"],
                     str(session["message_count"]),
+                    str(session.get("preview_count", 0)),
                 )
 
             console.print(table)

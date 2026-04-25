@@ -49,6 +49,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
+import re
 import time
 from abc import abstractmethod
 from dataclasses import dataclass, field
@@ -163,6 +164,31 @@ class MemoryQuery:
     min_relevance: float = 0.0
     session_id: Optional[str] = None
     include_metadata: bool = True
+
+
+@dataclass
+class MemoryEvolutionTrace:
+    """Stored trace from a successful memory-backed interaction."""
+
+    query: str
+    result_ids: List[str]
+    source_types: List[str]
+    timestamp: float
+    session_id: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class MemoryTransferHint:
+    """Reusable hint derived from prior successful traces."""
+
+    matched_query: str
+    score: float
+    preferred_result_ids: List[str] = field(default_factory=list)
+    preferred_source_types: List[str] = field(default_factory=list)
+    session_id: Optional[str] = None
+    cross_session: bool = False
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 # =============================================================================
@@ -450,16 +476,36 @@ class UnifiedMemoryCoordinator:
     def __init__(
         self,
         ranking_strategy: Optional[RankingStrategyProtocol] = None,
+        enable_memory_evolution: Optional[bool] = None,
+        max_evolution_traces: int = 200,
+        trace_ttl_hours: float = 24.0 * 7,
+        transfer_boost: float = 0.08,
     ):
         """Initialize coordinator.
 
         Args:
             ranking_strategy: Strategy for ranking results (default: HybridRankingStrategy)
         """
+        if enable_memory_evolution is None:
+            try:
+                from victor.core.feature_flags import FeatureFlag, get_feature_flag_manager
+
+                enable_memory_evolution = get_feature_flag_manager().is_enabled(
+                    FeatureFlag.USE_PRIME_MEMORY_EVOLUTION
+                )
+            except Exception:
+                enable_memory_evolution = False
         self._providers: Dict[MemoryType, MemoryProviderProtocol] = {}
         self._ranking_strategy = ranking_strategy or HybridRankingStrategy()
         self._query_count = 0
         self._error_count = 0
+        self._enable_memory_evolution = enable_memory_evolution
+        self._max_evolution_traces = max(1, max_evolution_traces)
+        self._trace_ttl_hours = max(0.0, trace_ttl_hours)
+        self._transfer_boost = max(0.0, transfer_boost)
+        self._evolution_traces: List[MemoryEvolutionTrace] = []
+        self._last_transfer_hints: List[MemoryTransferHint] = []
+        self._memory_reuse_hits = 0
 
     def register_provider(self, provider: MemoryProviderProtocol) -> None:
         """Register a memory provider.
@@ -518,6 +564,11 @@ class UnifiedMemoryCoordinator:
         """
         self._ranking_strategy = strategy
 
+    @property
+    def last_transfer_hints(self) -> List[MemoryTransferHint]:
+        """Latest transfer hints applied during search."""
+        return list(self._last_transfer_hints)
+
     async def search_all(
         self,
         query: str,
@@ -567,6 +618,9 @@ class UnifiedMemoryCoordinator:
             logger.warning("No available providers for query")
             return []
 
+        transfer_hints = self.suggest_transfer(query, session_id=session_id, limit=min(limit, 3))
+        self._last_transfer_hints = transfer_hints
+
         # Parallel search
         search_tasks = [
             self._search_provider(provider, memory_query) for provider in target_providers
@@ -582,6 +636,10 @@ class UnifiedMemoryCoordinator:
                 logger.warning(f"Provider {target_providers[i].memory_type.name} failed: {results}")
             else:
                 all_results.extend(results)
+
+        if transfer_hints and all_results:
+            all_results = self._apply_transfer_hints(all_results, transfer_hints)
+            self._memory_reuse_hits += 1
 
         # Rank and deduplicate
         ranked_results = self._ranking_strategy.rank(all_results, memory_query, limit)
@@ -681,6 +739,145 @@ class UnifiedMemoryCoordinator:
             logger.error(f"Failed to store in {memory_type.name}: {e}")
             return False
 
+    async def record_outcome(
+        self,
+        query: str,
+        results: List[MemoryResult],
+        success: bool,
+        session_id: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Record a successful query outcome for future transfer hints."""
+        if not self._enable_memory_evolution or not success or not query.strip() or not results:
+            return False
+
+        trace = MemoryEvolutionTrace(
+            query=query.strip(),
+            result_ids=[result.id for result in results if result.id][:10],
+            source_types=sorted({result.source.name for result in results}),
+            timestamp=time.time(),
+            session_id=session_id,
+            metadata=dict(metadata or {}),
+        )
+        self._evolution_traces.append(trace)
+        if len(self._evolution_traces) > self._max_evolution_traces:
+            self._evolution_traces = self._evolution_traces[-self._max_evolution_traces :]
+        return True
+
+    def suggest_transfer(
+        self,
+        query: str,
+        session_id: Optional[str] = None,
+        limit: int = 3,
+    ) -> List[MemoryTransferHint]:
+        """Suggest transferable memory hints from prior successful traces."""
+        if not self._enable_memory_evolution or not query.strip() or limit <= 0:
+            return []
+
+        query_tokens = self._tokenize_query(query)
+        if not query_tokens:
+            return []
+
+        freshness_cutoff = time.time() - (self._trace_ttl_hours * 3600)
+        hints: List[MemoryTransferHint] = []
+        for trace in reversed(self._evolution_traces):
+            if trace.timestamp < freshness_cutoff:
+                continue
+
+            trace_tokens = self._tokenize_query(trace.query)
+            if not trace_tokens:
+                continue
+
+            overlap = query_tokens & trace_tokens
+            if not overlap:
+                continue
+
+            similarity = len(overlap) / max(1, len(query_tokens | trace_tokens))
+            cross_session = bool(session_id and trace.session_id and session_id != trace.session_id)
+            if similarity < 0.2 and not cross_session:
+                continue
+
+            score = similarity + (0.05 if cross_session else 0.0)
+            hints.append(
+                MemoryTransferHint(
+                    matched_query=trace.query,
+                    score=score,
+                    preferred_result_ids=list(trace.result_ids),
+                    preferred_source_types=list(trace.source_types),
+                    session_id=trace.session_id,
+                    cross_session=cross_session,
+                    metadata=dict(trace.metadata),
+                )
+            )
+
+        hints.sort(key=lambda hint: hint.score, reverse=True)
+        return hints[:limit]
+
+    def _apply_transfer_hints(
+        self,
+        results: List[MemoryResult],
+        transfer_hints: List[MemoryTransferHint],
+    ) -> List[MemoryResult]:
+        """Boost matching results using prior successful traces."""
+        result_boosts: Dict[str, float] = {}
+        source_boosts: Dict[str, float] = {}
+        query_map: Dict[str, List[str]] = {}
+
+        for hint in transfer_hints:
+            for result_id in hint.preferred_result_ids:
+                result_boosts[result_id] = max(result_boosts.get(result_id, 0.0), self._transfer_boost)
+                query_map.setdefault(result_id, []).append(hint.matched_query)
+            for source_type in hint.preferred_source_types:
+                source_boosts[source_type] = max(
+                    source_boosts.get(source_type, 0.0), self._transfer_boost * 0.5
+                )
+
+        boosted_results: List[MemoryResult] = []
+        for result in results:
+            boost = result_boosts.get(result.id, 0.0)
+            boost += source_boosts.get(result.source.name, 0.0)
+            if boost <= 0:
+                boosted_results.append(result)
+                continue
+
+            metadata = dict(result.metadata)
+            metadata["memory_transfer_boost"] = round(boost, 4)
+            metadata["memory_transfer_queries"] = query_map.get(result.id, [])
+            boosted_results.append(
+                MemoryResult(
+                    source=result.source,
+                    content=result.content,
+                    relevance=min(1.0, result.relevance + boost),
+                    id=result.id,
+                    metadata=metadata,
+                    timestamp=result.timestamp,
+                )
+            )
+
+        return boosted_results
+
+    def _tokenize_query(self, query: str) -> Set[str]:
+        """Extract stable lexical tokens for simple transfer matching."""
+        stopwords = {
+            "the",
+            "and",
+            "for",
+            "with",
+            "this",
+            "that",
+            "from",
+            "into",
+            "your",
+            "about",
+            "have",
+            "has",
+        }
+        return {
+            token
+            for token in re.findall(r"[a-z0-9_]+", query.lower())
+            if len(token) > 2 and token not in stopwords
+        }
+
     def get_stats(self) -> Dict[str, Any]:
         """Get coordinator statistics.
 
@@ -691,6 +888,10 @@ class UnifiedMemoryCoordinator:
             "query_count": self._query_count,
             "error_count": self._error_count,
             "error_rate": (self._error_count / max(1, self._query_count)),
+            "memory_evolution_enabled": self._enable_memory_evolution,
+            "memory_reuse_hits": self._memory_reuse_hits,
+            "evolution_trace_count": len(self._evolution_traces),
+            "last_transfer_hint_count": len(self._last_transfer_hints),
             "providers": {
                 t.name: {
                     "available": p.is_available(),
@@ -710,6 +911,10 @@ _coordinator_instance: Optional[UnifiedMemoryCoordinator] = None
 
 def create_memory_coordinator(
     ranking_strategy: Optional[RankingStrategyProtocol] = None,
+    enable_memory_evolution: Optional[bool] = None,
+    max_evolution_traces: int = 200,
+    trace_ttl_hours: float = 24.0 * 7,
+    transfer_boost: float = 0.08,
 ) -> UnifiedMemoryCoordinator:
     """Create a new memory coordinator.
 
@@ -719,7 +924,13 @@ def create_memory_coordinator(
     Returns:
         New UnifiedMemoryCoordinator instance
     """
-    return UnifiedMemoryCoordinator(ranking_strategy=ranking_strategy)
+    return UnifiedMemoryCoordinator(
+        ranking_strategy=ranking_strategy,
+        enable_memory_evolution=enable_memory_evolution,
+        max_evolution_traces=max_evolution_traces,
+        trace_ttl_hours=trace_ttl_hours,
+        transfer_boost=transfer_boost,
+    )
 
 
 def get_memory_coordinator() -> UnifiedMemoryCoordinator:
@@ -746,6 +957,8 @@ __all__ = [
     # Data types
     "MemoryResult",
     "MemoryQuery",
+    "MemoryEvolutionTrace",
+    "MemoryTransferHint",
     # Protocols
     "MemoryProviderProtocol",
     "RankingStrategyProtocol",
