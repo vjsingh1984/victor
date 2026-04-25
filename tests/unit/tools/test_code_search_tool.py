@@ -558,6 +558,35 @@ async def test_code_search_strips_whitespace_before_filename_auto_detection(tmp_
 
 
 @pytest.mark.asyncio
+async def test_code_search_auto_detected_uppercase_filename_query_uses_filename_search(
+    tmp_path,
+) -> None:
+    """Uppercase filenames should not be misread as dotted notation."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    target = source_dir / "SQLCompiler.py"
+    target.write_text("class SQLCompiler:\n    pass\n", encoding="utf-8")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index:
+        result = await code_search(
+            query="SQLCompiler.py",
+            path=str(tmp_path),
+            k=3,
+            mode="semantic",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    get_index.assert_not_awaited()
+    assert result["success"] is True
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+    assert result["results"][0]["path"].endswith("SQLCompiler.py")
+
+
+@pytest.mark.asyncio
 async def test_code_search_rejects_blank_query_before_searching(tmp_path) -> None:
     """Blank queries should fail fast instead of matching arbitrary files or content."""
 

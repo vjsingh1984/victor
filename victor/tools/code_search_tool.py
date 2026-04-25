@@ -1524,7 +1524,13 @@ async def _literal_search(
         # "class SQLCompiler:" and "def get_order_by(self):" on separate lines.
         search_query = query
         dotted_class = None
-        if "." in query and not query.startswith(".") and " " not in query:
+        should_preserve_filename_query = filename_only or _looks_like_filename_query(query)
+        if (
+            not should_preserve_filename_query
+            and "." in query
+            and not query.startswith(".")
+            and " " not in query
+        ):
             parts = query.rsplit(".", 1)
             if len(parts) == 2 and parts[0][0].isupper():
                 dotted_class, method = parts
