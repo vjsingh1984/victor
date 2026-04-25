@@ -377,7 +377,63 @@ class TestCreditDedup:
 
 
 # ============================================================================
-# 6. Backward Compatibility (3 tests)
+# 6. Prompt Completeness Guard (2 tests)
+# ============================================================================
+
+
+class TestPromptCompletenessGuard:
+    """Verify prompt completeness guard summarizes scope and gaps."""
+
+    def _make_turn_context(self, **overrides):
+        from victor.agent.prompt_pipeline import TurnContext
+
+        defaults = {
+            "provider_name": "test",
+            "model": "test-model",
+            "task_type": "default",
+        }
+        defaults.update(overrides)
+        return TurnContext(**defaults)
+
+    def test_guard_summarizes_execution_contract_for_clear_request(self):
+        """Clear prompts should produce a compact execution contract."""
+        pipeline = _make_pipeline(enable_prompt_completeness_guard=True)
+        ctx = self._make_turn_context(task_type="review")
+
+        prefix = pipeline.compose_turn_prefix(
+            "Review src/auth/login.py and provide a findings table summary without changing code.",
+            ctx,
+        )
+
+        assert "Prompt execution contract" in prefix
+        assert "src/auth/login.py" in prefix
+        assert "findings table" in prefix
+        assert "without changing code" in prefix
+        assert "Ask one targeted clarification" not in prefix
+
+        assessment = pipeline.last_prompt_completeness_assessment
+        assert assessment is not None
+        assert assessment.needs_clarification is False
+
+    def test_guard_requests_clarification_for_ambiguous_request(self):
+        """Ambiguous action requests should surface missing scope before execution."""
+        pipeline = _make_pipeline(enable_prompt_completeness_guard=True)
+        ctx = self._make_turn_context(task_type="implementation")
+
+        prefix = pipeline.compose_turn_prefix("Fix it and add tests.", ctx)
+
+        assert "Prompt execution contract" in prefix
+        assert "Missing: target artifact or scope" in prefix
+        assert "Ask one targeted clarification" in prefix
+
+        assessment = pipeline.last_prompt_completeness_assessment
+        assert assessment is not None
+        assert assessment.needs_clarification is True
+        assert "target artifact or scope" in assessment.missing_elements
+
+
+# ============================================================================
+# 7. Backward Compatibility (3 tests)
 # ============================================================================
 
 
