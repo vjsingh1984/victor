@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from victor.agent.streaming.intent_classification import IntentClassificationResult
+from victor.core.completion_markers import SUMMARY_MARKER
 from victor.agent.streaming.pipeline import StreamingChatPipeline
 from victor.providers.base import StreamChunk
 from .streaming_pipeline_stubs import (
@@ -239,3 +240,55 @@ async def test_pipeline_yields_recovery_fallback_when_empty():
         chunks.append(chunk.content)
 
     assert any("fallback" in chunk for chunk in chunks)
+
+
+def test_prepare_visible_content_strips_completion_markers():
+    pipeline = StreamingChatPipeline(DummyCoordinator())
+
+    prepared = pipeline._prepare_visible_content(f"{SUMMARY_MARKER} Key findings")
+
+    assert prepared == "Key findings"
+
+
+def test_prepare_visible_content_keeps_new_block_while_suppressing_repeated_block():
+    pipeline = StreamingChatPipeline(DummyCoordinator())
+    repeated = (
+        "Now I have enough data to produce the complete analysis based on the "
+        "evidence collected from the repository."
+    )
+    first = pipeline._prepare_visible_content(f"{repeated}\n\nFirst unique detail.")
+    second = pipeline._prepare_visible_content(f"{repeated}\n\nSecond unique detail.")
+
+    assert "First unique detail." in first
+    assert second == "Second unique detail."
+
+
+@pytest.mark.asyncio
+async def test_pipeline_persists_normalized_visible_content_but_classifies_raw_content():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._provider_response = (f"{SUMMARY_MARKER} Key findings", None, None, False)
+    added_messages = []
+
+    def add_message(role, content, **kwargs):
+        added_messages.append((role, content, kwargs))
+
+    coordinator._orchestrator.add_message = add_message
+    intent_result = IntentClassificationResult(
+        chunks=[],
+        action_result={"reason": "finish"},
+        action="finish",
+    )
+    coordinator._intent_classification_handler = StubIntentHandler(intent_result)
+    coordinator._continuation_handler = StubContinuationHandler(
+        StubContinuationResult(chunks=[], state_updates={}, should_return=True)
+    )
+
+    pipeline = StreamingChatPipeline(coordinator)
+    async for _ in pipeline.run("summarize"):
+        pass
+
+    assert ("assistant", "Key findings", {"tool_calls": None}) in added_messages
+    assert (
+        coordinator._intent_classification_handler.calls[0]["full_content"]
+        == f"{SUMMARY_MARKER} Key findings"
+    )

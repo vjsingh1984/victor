@@ -7,8 +7,9 @@ import logging
 import re
 from typing import Any, AsyncIterator, List, Optional
 
+from victor.agent.output_deduplicator import OutputDeduplicator
 from victor.agent.services.protocols.streaming_runtime import StreamingPipelineRuntimeProtocol
-from victor.core.completion_markers import FILE_DONE_MARKER
+from victor.core.completion_markers import FILE_DONE_MARKER, strip_active_completion_markers
 from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 from victor.providers.base import StreamChunk
 
@@ -81,6 +82,44 @@ class StreamingChatPipeline:
         self._content_hashes: List[str] = []  # Rolling window of last N content hashes
         self._prev_full_content: str = ""  # Previous iteration's full_content for overlap check
         self._repetition_count: int = 0  # Consecutive iterations with highly similar content
+        # User-visible output normalization to suppress repeated completion blocks
+        # without changing the raw text used for tool parsing or completion detection.
+        self._visible_output_deduplicator = OutputDeduplicator(min_block_length=40)
+        self._prev_visible_content: str = ""
+
+    @staticmethod
+    def _normalize_visible_content_key(content: str) -> str:
+        """Return a stable comparison key for visible content suppression."""
+        return re.sub(r"\s+", " ", content).strip().lower()
+
+    def _prepare_visible_content(self, content: str) -> str:
+        """Normalize model output for display and conversation history.
+
+        This removes internal completion marker tokens, deduplicates repeated
+        output blocks across iterations in the same turn, and suppresses exact
+        visible-content repeats. The raw model content is still preserved for
+        completion detection, loop handling, and tool parsing.
+        """
+        if not content or not content.strip():
+            return ""
+
+        display_content = strip_active_completion_markers(content)
+        if not display_content:
+            return ""
+
+        display_content = self._visible_output_deduplicator.process(display_content).strip()
+        if not display_content:
+            return ""
+
+        normalized_key = self._normalize_visible_content_key(display_content)
+        if not normalized_key:
+            return ""
+        if normalized_key == self._prev_visible_content:
+            logger.info("Suppressing repeated visible output block")
+            return ""
+
+        self._prev_visible_content = normalized_key
+        return display_content
 
     async def _get_tools_cached(self, orch: Any, context_msg: str, goals: Any) -> Any:
         """Select tools with per-turn caching.
@@ -292,6 +331,8 @@ class StreamingChatPipeline:
         self._content_hashes.clear()
         self._prev_full_content = ""
         self._repetition_count = 0
+        self._visible_output_deduplicator.reset()
+        self._prev_visible_content = ""
 
         while True:
             # Yield separator between iterations when content was emitted
@@ -583,9 +624,11 @@ class StreamingChatPipeline:
                     return
 
             if full_content:
-                _prev_iteration_had_content = True
+                visible_content = self._prepare_visible_content(full_content)
+                if visible_content:
+                    _prev_iteration_had_content = True
                 # Sanitize response to remove malformed patterns from local models
-                sanitized = orch.sanitizer.sanitize(full_content)
+                sanitized = orch.sanitizer.sanitize(visible_content)
                 if sanitized:
                     orch.add_message("assistant", sanitized, tool_calls=tool_calls)
                     # Only yield here when tool_calls are present — the intent
@@ -596,7 +639,7 @@ class StreamingChatPipeline:
                     if tool_calls:
                         yield orch._chunk_generator.generate_content_chunk(sanitized)
                 else:
-                    plain_text = orch.sanitizer.strip_markup(full_content)
+                    plain_text = orch.sanitizer.strip_markup(visible_content)
                     if plain_text:
                         orch.add_message("assistant", plain_text, tool_calls=tool_calls)
                         if tool_calls:

@@ -38,3 +38,30 @@ def detect_active_completion_marker(text: str) -> str | None:
         if ACTIVE_COMPLETION_MARKER_PATTERNS[marker].search(text):
             return marker
     return None
+
+
+def strip_active_completion_markers(text: str) -> str:
+    """Remove visible completion marker tokens while preserving their payload text.
+
+    These markers are runtime coordination tokens, not user-facing prose. The
+    returned text is suitable for display while still allowing the raw response
+    to be used for completion detection elsewhere.
+    """
+    if not text:
+        return text
+
+    cleaned_lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        replaced = False
+        for marker in ACTIVE_COMPLETION_MARKERS:
+            if stripped.upper().startswith(marker):
+                payload = stripped[len(marker) :].strip()
+                if payload:
+                    cleaned_lines.append(payload)
+                replaced = True
+                break
+        if not replaced:
+            cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines).strip()
