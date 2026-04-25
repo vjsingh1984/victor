@@ -1095,7 +1095,9 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         # Uses explicit rare completion markers for deterministic completion
         from victor.agent.task_completion import TaskCompletionDetector
 
-        self._task_completion_detector = TaskCompletionDetector()
+        self._task_completion_detector = TaskCompletionDetector(
+            runtime_intelligence=self._runtime_intelligence
+        )
         logger.info("TaskCompletionDetector initialized (signal-based completion)")
 
         # Context reminder manager for intelligent system message injection (via factory, DI)

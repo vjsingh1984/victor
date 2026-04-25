@@ -354,15 +354,18 @@ class TaskCompletionDetector:
         self,
         presentation: Optional["PresentationProtocol"] = None,
         decision_service: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize the task completion detector.
 
         Args:
             presentation: Optional presentation adapter for icons (creates default if None)
             decision_service: Optional LLMDecisionService for low-confidence augmentation
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self._state = TaskCompletionState()
         self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
         # Lazy init for backward compatibility
         if presentation is None:
             from victor.agent.presentation import create_presentation_adapter
@@ -400,6 +403,37 @@ class TaskCompletionDetector:
             "test": [DeliverableType.CODE_EXECUTED],
         }
 
+    def _has_decision_support(self) -> bool:
+        """Return whether LLM decision augmentation is available."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Route LLM-backed decisions through the canonical runtime service when present."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
+
     def analyze_intent(self, user_message: str) -> List[DeliverableType]:
         """Infer expected deliverables from user request.
 
@@ -414,7 +448,7 @@ class TaskCompletionDetector:
             List of expected deliverable types
         """
         # Priority 1: LLM classification via decision service
-        if self._decision_service is not None:
+        if self._has_decision_support():
             try:
                 from victor.agent.decisions.chain import should_use_llm
 
@@ -423,13 +457,15 @@ class TaskCompletionDetector:
 
                 from victor.agent.decisions.schemas import DecisionType
 
-                decision = self._decision_service.decide_sync(
+                decision = self._decide_sync(
                     DecisionType.TASK_TYPE_CLASSIFICATION,
                     context={"message_excerpt": user_message[:500]},
                     heuristic_confidence=0.0,
                 )
                 if (
-                    decision.source == "llm"
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
                     and decision.confidence >= 0.6
                     and hasattr(decision.result, "deliverables")
                 ):
@@ -567,7 +603,7 @@ class TaskCompletionDetector:
         if (
             not self._state.active_signal_detected
             and not self._state.completion_signals
-            and self._decision_service is not None
+            and self._has_decision_support()
         ):
             try:
                 from victor.agent.decisions.chain import should_use_llm
@@ -577,7 +613,7 @@ class TaskCompletionDetector:
 
                 from victor.agent.decisions.schemas import DecisionType
 
-                decision = self._decision_service.decide_sync(
+                decision = self._decide_sync(
                     DecisionType.TASK_COMPLETION,
                     context={
                         "response_tail": response_text[-500:],
@@ -586,7 +622,12 @@ class TaskCompletionDetector:
                     },
                     heuristic_confidence=0.0,
                 )
-                if decision.source == "llm" and hasattr(decision.result, "is_complete"):
+                if (
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
+                    and hasattr(decision.result, "is_complete")
+                ):
                     if decision.result.is_complete and decision.confidence >= 0.7:
                         self._state.completion_signals.add("llm:task_complete")
                         logger.debug("LLM detected task completion")
@@ -908,7 +949,7 @@ class TaskCompletionDetector:
         # LLM augmentation: if confidence is LOW or NONE and service is available
         if (
             heuristic_confidence in (CompletionConfidence.LOW, CompletionConfidence.NONE)
-            and self._decision_service is not None
+            and self._has_decision_support()
         ):
             try:
                 from victor.agent.decisions.chain import should_use_llm
@@ -919,7 +960,7 @@ class TaskCompletionDetector:
                 from victor.agent.decisions.schemas import DecisionType
 
                 conf_value = 0.3 if heuristic_confidence == CompletionConfidence.LOW else 0.0
-                decision = self._decision_service.decide_sync(
+                decision = self._decide_sync(
                     DecisionType.TASK_COMPLETION,
                     context={
                         "response_tail": "",  # Caller can set via analyze_response
@@ -929,7 +970,12 @@ class TaskCompletionDetector:
                     heuristic_result=heuristic_confidence,
                     heuristic_confidence=conf_value,
                 )
-                if decision.source == "llm" and hasattr(decision.result, "is_complete"):
+                if (
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
+                    and hasattr(decision.result, "is_complete")
+                ):
                     if decision.result.is_complete and decision.confidence >= 0.7:
                         return CompletionConfidence.MEDIUM
             except Exception:
@@ -938,10 +984,12 @@ class TaskCompletionDetector:
         return heuristic_confidence
 
 
-def create_task_completion_detector() -> TaskCompletionDetector:
+def create_task_completion_detector(
+    runtime_intelligence: Optional[Any] = None,
+) -> TaskCompletionDetector:
     """Factory function for creating TaskCompletionDetector.
 
     Returns:
         Configured TaskCompletionDetector instance
     """
-    return TaskCompletionDetector()
+    return TaskCompletionDetector(runtime_intelligence=runtime_intelligence)

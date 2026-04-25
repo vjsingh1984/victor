@@ -64,6 +64,20 @@ class TestTaskCompletionWithoutService:
 class TestTaskCompletionWithLLMService:
     """Test LLM augmentation in task completion detection."""
 
+    def test_runtime_intelligence_delegates_completion_decision(self):
+        """RuntimeIntelligenceService is preferred over direct decision service wiring."""
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.TASK_COMPLETION,
+            result=TaskCompletionDecision(is_complete=True, confidence=0.9, phase="done"),
+            source="llm",
+            confidence=0.9,
+        )
+        detector = TaskCompletionDetector(runtime_intelligence=runtime_intelligence)
+
+        assert detector.get_completion_confidence() == CompletionConfidence.MEDIUM
+        runtime_intelligence.decide_sync.assert_called_once()
+
     def test_llm_upgrades_none_to_medium(self):
         """When heuristic is NONE but LLM says complete, upgrades to MEDIUM."""
         service = _make_decision_service(is_complete=True, confidence=0.9, phase="done")

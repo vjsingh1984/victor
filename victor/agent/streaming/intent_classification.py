@@ -176,6 +176,7 @@ class IntentClassificationHandler:
         provider_name: str = "",
         model: str = "",
         tool_budget: int = 20,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize the intent classification handler.
 
@@ -190,6 +191,7 @@ class IntentClassificationHandler:
             provider_name: Name of the LLM provider.
             model: Model name.
             tool_budget: Tool call budget.
+            runtime_intelligence: Optional canonical runtime-intelligence service.
         """
         self._intent_classifier = intent_classifier
         self._unified_tracker = unified_tracker
@@ -201,6 +203,7 @@ class IntentClassificationHandler:
         self._provider_name = provider_name
         self._model = model
         self._tool_budget = tool_budget
+        self._runtime_intelligence = runtime_intelligence
 
         # Intent cache for reducing embedding calls
         self._intent_cache: Dict[int, Any] = {}
@@ -365,7 +368,7 @@ class IntentClassificationHandler:
         from victor.agent.continuation_strategy import ContinuationStrategy
 
         one_shot_mode = getattr(self._settings, "one_shot_mode", False)
-        strategy = ContinuationStrategy()
+        strategy = ContinuationStrategy(runtime_intelligence=self._runtime_intelligence)
 
         return strategy.determine_continuation_action(
             intent_result=intent_result,
@@ -446,6 +449,12 @@ def create_intent_classification_handler(
     Returns:
         Configured IntentClassificationHandler.
     """
+    runtime_intelligence = getattr(
+        getattr(orchestrator, "__dict__", {}),
+        "get",
+        lambda *_args, **_kwargs: None,
+    )("_runtime_intelligence")
+
     return IntentClassificationHandler(
         intent_classifier=orchestrator.intent_classifier,
         unified_tracker=orchestrator.unified_tracker,
@@ -457,6 +466,7 @@ def create_intent_classification_handler(
         provider_name=orchestrator.provider.name,
         model=orchestrator.model,
         tool_budget=orchestrator.tool_budget,
+        runtime_intelligence=runtime_intelligence,
     )
 
 

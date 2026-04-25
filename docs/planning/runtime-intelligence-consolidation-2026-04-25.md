@@ -62,10 +62,15 @@ Phase 2:
 Phase 3:
 - Decision-service lookup consolidation in secondary consumers:
   - `task_completion.py`
-  - `tool_selection.py`
   - `thinking_detector.py`
   - `continuation_strategy.py`
+  - `streaming/intent_classification.py`
+  - `agent/factory/coordination_builders.py`
+- Remaining direct decision consumers after this slice:
   - `error_classifier.py`
+  - `unified_classifier.py`
+  - `context_compactor.py`
+  - `tool_selection.py`
   - `conversation/state_machine.py`
 
 Phase 4:
@@ -91,3 +96,28 @@ After Phase 1:
 - Prompt optimization, perception, and decision-budget handling will have one canonical service seam.
 - The three highest-value runtime consumers will depend on a shared abstraction instead of stitching low-level collaborators together independently.
 - Future work on GEPA/MiPRO/CoT/credit-driven policies can attach to the runtime-intelligence service without growing more cross-cutting constructor clutter.
+
+## Progress Checkpoint
+
+Completed on 2026-04-25:
+- Phase 1 and 2 migrations:
+  - `UnifiedPromptPipeline`
+  - `StreamingChatPipeline`
+  - `ServiceStreamingRuntime`
+  - `AgenticLoop`
+  - orchestrator/factory runtime-intelligence wiring
+- Phase 3.1 secondary decision-consumer migration:
+  - `task_completion.py`
+  - `thinking_detector.py`
+  - `continuation_strategy.py`
+  - `streaming/intent_classification.py`
+  - `agent/factory/coordination_builders.py`
+  - direct orchestrator task-completion initialization
+
+Next recommended slice:
+- Phase 3.2: migrate the remaining classifier/compaction decision consumers:
+  - `error_classifier.py`
+  - `unified_classifier.py`
+  - `context_compactor.py`
+  - `tool_selection.py`
+  - `conversation/state_machine.py`

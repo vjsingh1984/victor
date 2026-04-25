@@ -640,6 +640,24 @@ class TestWorkflowOptimizationComponents:
 
         assert isinstance(detector, TaskCompletionDetector)
 
+    def test_create_task_completion_detector_uses_runtime_intelligence(
+        self, factory, mock_container
+    ):
+        """Task completion detector should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = (
+            lambda protocol: decision_service
+            if protocol is LLMDecisionServiceProtocol
+            else None
+        )
+
+        detector = factory.create_task_completion_detector()
+
+        assert detector._runtime_intelligence is not None
+        assert detector._runtime_intelligence._decision_service is decision_service
+
     def test_create_read_cache(self, factory, mock_settings):
         """create_read_cache returns ReadResultCache with settings."""
         mock_settings.read_cache_ttl = 120.0
@@ -703,6 +721,26 @@ class TestWorkflowOptimizationComponents:
         assert isinstance(detector, ThinkingPatternDetector)
         assert detector._repetition_threshold == 4
         assert detector._similarity_threshold == 0.7
+
+    def test_create_thinking_detector_uses_runtime_intelligence(
+        self, factory, mock_settings, mock_container
+    ):
+        """Thinking detector should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        mock_settings.thinking_repetition_threshold = 4
+        mock_settings.thinking_similarity_threshold = 0.7
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = (
+            lambda protocol: decision_service
+            if protocol is LLMDecisionServiceProtocol
+            else None
+        )
+
+        detector = factory.create_thinking_detector()
+
+        assert detector._runtime_intelligence is not None
+        assert detector._runtime_intelligence._decision_service is decision_service
 
     def test_create_resource_manager(self, factory):
         """create_resource_manager returns singleton ResourceManager."""

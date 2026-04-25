@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from victor.agent.decisions.schemas import DecisionType
 from victor.agent.services.runtime_intelligence import (
     PromptOptimizationBundle,
     RuntimeIntelligenceService,
@@ -79,3 +80,28 @@ def test_reset_decision_budget_delegates_to_service():
     service.reset_decision_budget()
 
     decision_service.reset_budget.assert_called_once_with()
+
+
+def test_decide_sync_delegates_to_decision_service():
+    decision_service = MagicMock()
+    expected = MagicMock()
+    decision_service.decide_sync.return_value = expected
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=decision_service,
+    )
+
+    result = service.decide_sync(
+        DecisionType.TASK_COMPLETION,
+        {"response_tail": "done"},
+        heuristic_confidence=0.4,
+    )
+
+    assert result is expected
+    decision_service.decide_sync.assert_called_once_with(
+        DecisionType.TASK_COMPLETION,
+        {"response_tail": "done"},
+        heuristic_confidence=0.4,
+    )

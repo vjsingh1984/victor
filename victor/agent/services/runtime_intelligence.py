@@ -74,27 +74,54 @@ class RuntimeIntelligenceService:
         optimization_injector: Optional[OptimizationInjector] = None,
     ) -> "RuntimeIntelligenceService":
         """Create a service instance by resolving the decision service from an orchestrator."""
-        decision_service = None
-        try:
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
+        container = getattr(orchestrator, "_container", None)
+        if container is None:
+            return cls(
+                task_analyzer=task_analyzer,
+                perception_integration=perception_integration,
+                optimization_injector=optimization_injector,
             )
 
-            container = getattr(orchestrator, "_container", None)
-            if container is not None:
-                if hasattr(container, "get_optional"):
-                    decision_service = container.get_optional(LLMDecisionServiceProtocol)
-                elif hasattr(container, "get"):
-                    decision_service = container.get(LLMDecisionServiceProtocol)
-        except Exception as exc:
-            logger.debug("Runtime intelligence could not resolve decision service: %s", exc)
+        return cls.from_container(
+            container,
+            task_analyzer=task_analyzer,
+            perception_integration=perception_integration,
+            optimization_injector=optimization_injector,
+        )
 
+    @classmethod
+    def from_container(
+        cls,
+        container: Any,
+        *,
+        task_analyzer: Optional[TaskAnalyzer] = None,
+        perception_integration: Optional[PerceptionIntegration] = None,
+        optimization_injector: Optional[OptimizationInjector] = None,
+    ) -> "RuntimeIntelligenceService":
+        """Create a service instance by resolving the decision service from a container."""
+        decision_service = cls._resolve_decision_service(container)
         return cls(
             task_analyzer=task_analyzer,
             perception_integration=perception_integration,
             optimization_injector=optimization_injector,
             decision_service=decision_service,
         )
+
+    @staticmethod
+    def _resolve_decision_service(container: Any) -> Optional["LLMDecisionServiceProtocol"]:
+        """Resolve the decision service from a DI container when available."""
+        try:
+            from victor.agent.services.protocols.decision_service import (
+                LLMDecisionServiceProtocol,
+            )
+
+            if hasattr(container, "get_optional"):
+                return container.get_optional(LLMDecisionServiceProtocol)
+            if hasattr(container, "get"):
+                return container.get(LLMDecisionServiceProtocol)
+        except Exception as exc:
+            logger.debug("Runtime intelligence could not resolve decision service: %s", exc)
+        return None
 
     @property
     def perception_integration(self) -> PerceptionIntegration:
@@ -106,6 +133,10 @@ class RuntimeIntelligenceService:
         """Expose the task analyzer for compatibility."""
         return self._task_analyzer
 
+    def has_decision_service(self) -> bool:
+        """Return whether the runtime has an attached decision service."""
+        return self._decision_service is not None
+
     def clear_session_cache(self) -> None:
         """Clear cached prompt-optimization state when the session changes."""
         if self._optimization_injector is not None:
@@ -115,6 +146,26 @@ class RuntimeIntelligenceService:
         """Reset the decision-service per-turn budget when available."""
         if self._decision_service is not None and hasattr(self._decision_service, "reset_budget"):
             self._decision_service.reset_budget()
+
+    def decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Delegate a synchronous decision to the underlying decision service."""
+        if self._decision_service is None or not hasattr(self._decision_service, "decide_sync"):
+            return None
+        kwargs = {"heuristic_confidence": heuristic_confidence}
+        if heuristic_result is not None:
+            kwargs["heuristic_result"] = heuristic_result
+        return self._decision_service.decide_sync(
+            decision_type,
+            context,
+            **kwargs,
+        )
 
     async def analyze_turn(
         self,
@@ -144,7 +195,7 @@ class RuntimeIntelligenceService:
             query=query,
             perception=perception,
             task_analysis=task_analysis,
-            decision_service_available=self._decision_service is not None,
+            decision_service_available=self.has_decision_service(),
             metadata={
                 "has_context": bool(context),
                 "history_length": len(conversation_history or []),

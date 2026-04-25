@@ -162,15 +162,18 @@ class ContinuationStrategy:
         self,
         event_bus: Optional[ObservabilityBus] = None,
         decision_service: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize continuation strategy.
 
         Args:
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
             decision_service: Optional LLMDecisionService for ambiguous continuation decisions
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self._event_bus = event_bus or self._get_default_bus()
         self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
 
     def _get_default_bus(self) -> Optional[ObservabilityBus]:
         """Get default ObservabilityBus from DI container.
@@ -218,6 +221,37 @@ class ContinuationStrategy:
                     logger.debug(f"No event loop, skipping event emission for {topic}")
             except Exception as e:
                 logger.debug(f"Failed to emit continuation event: {e}")
+
+    def _has_decision_support(self) -> bool:
+        """Return whether LLM-backed continuation decisions are available."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Route continuation decisions through the canonical runtime service when present."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
 
     @staticmethod
     def detect_mentioned_tools(
@@ -960,30 +994,35 @@ class ContinuationStrategy:
 
         # LLM augmentation: before defaulting to finish, consult LLM if task has been
         # running for 3+ turns without clear resolution
-        if self._decision_service is not None and continuation_prompts >= 3:
+        if self._has_decision_support() and continuation_prompts >= 3:
             try:
                 from victor.agent.decisions.chain import should_use_llm
 
                 if not should_use_llm("continuation_action"):
-                    return "finish"
+                    decision = None
+                else:
+                    from victor.agent.decisions.schemas import DecisionType
 
-                from victor.agent.decisions.schemas import DecisionType
-
-                response_excerpt = (full_content or "")[-500:]
-                decision = self._decision_service.decide_sync(
-                    DecisionType.CONTINUATION_ACTION,
-                    context={
-                        "response_excerpt": response_excerpt,
-                        "continuation_prompts": str(continuation_prompts),
-                        "task_type": (
-                            "analysis"
-                            if is_analysis_task
-                            else ("action" if is_action_task else "default")
-                        ),
-                    },
-                    heuristic_confidence=0.5,
-                )
-                if decision.source == "llm" and hasattr(decision.result, "action"):
+                    response_excerpt = (full_content or "")[-500:]
+                    decision = self._decide_sync(
+                        DecisionType.CONTINUATION_ACTION,
+                        context={
+                            "response_excerpt": response_excerpt,
+                            "continuation_prompts": str(continuation_prompts),
+                            "task_type": (
+                                "analysis"
+                                if is_analysis_task
+                                else ("action" if is_action_task else "default")
+                            ),
+                        },
+                        heuristic_confidence=0.5,
+                    )
+                if (
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
+                    and hasattr(decision.result, "action")
+                ):
                     llm_action = decision.result.action
                     llm_reason = getattr(decision.result, "reason", "LLM decision")
                     if llm_action != "finish":

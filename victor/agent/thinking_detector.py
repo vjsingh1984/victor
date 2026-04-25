@@ -263,6 +263,7 @@ class ThinkingPatternDetector:
         stalling_threshold: int = STALLING_THRESHOLD,
         presentation: Optional["PresentationProtocol"] = None,
         decision_service: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize the thinking detector.
 
@@ -273,6 +274,7 @@ class ThinkingPatternDetector:
             stalling_threshold: Count for consecutive stalling detection
             presentation: Optional presentation adapter for icons (creates default if None)
             decision_service: Optional LLMDecisionService for ambiguous loop detection
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self._history: Deque[ThinkingPattern] = deque(maxlen=window_size)
         self._pattern_counts: Dict[str, int] = {}
@@ -282,6 +284,7 @@ class ThinkingPatternDetector:
         self._iteration = 0
         self._consecutive_stalls = 0  # Track consecutive stalling
         self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
 
         # Statistics
         self._total_analyzed = 0
@@ -297,6 +300,37 @@ class ThinkingPatternDetector:
             self._presentation = create_presentation_adapter()
         else:
             self._presentation = presentation
+
+    def _has_decision_support(self) -> bool:
+        """Return whether LLM-backed loop detection is available."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Route decisions through the canonical runtime-intelligence service when present."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
 
     def _extract_keywords(self, text: str) -> Set[str]:
         """Extract significant keywords from thinking block.
@@ -510,11 +544,11 @@ class ThinkingPatternDetector:
                 logger.debug("Circular phrases detected but not yet a loop")
 
         # LLM augmentation: if ambiguous (near threshold), consult LLM
-        if self._decision_service is not None and len(self._history) > 2:
+        if self._has_decision_support() and len(self._history) > 2:
             try:
                 from victor.agent.decisions.schemas import DecisionType
 
-                decision = self._decision_service.decide_sync(
+                decision = self._decide_sync(
                     DecisionType.LOOP_DETECTION,
                     context={
                         "content_excerpt": content[:300],
@@ -522,7 +556,12 @@ class ThinkingPatternDetector:
                     },
                     heuristic_confidence=0.4,
                 )
-                if decision.source == "llm" and hasattr(decision.result, "is_loop"):
+                if (
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
+                    and hasattr(decision.result, "is_loop")
+                ):
                     if decision.result.is_loop:
                         self._loops_detected += 1
                         guidance = self._generate_guidance(
@@ -555,6 +594,9 @@ class ThinkingPatternDetector:
         Returns:
             Guidance message string
         """
+        loop_type = getattr(loop_type, "value", loop_type)
+        category = getattr(category, "value", category)
+
         # Different base message for stalling vs repetition
         if loop_type == "stalling":
             warning_icon = self._presentation.icon("warning", with_color=False)
@@ -680,6 +722,7 @@ def create_thinking_detector(
     repetition_threshold: int = 3,
     similarity_threshold: float = 0.65,
     prefer_native: bool = True,
+    runtime_intelligence: Optional[Any] = None,
 ) -> ThinkingPatternDetector:
     """Factory function for creating ThinkingPatternDetector.
 
@@ -702,6 +745,7 @@ def create_thinking_detector(
     return ThinkingPatternDetector(
         repetition_threshold=repetition_threshold,
         similarity_threshold=similarity_threshold,
+        runtime_intelligence=runtime_intelligence,
     )
 
 

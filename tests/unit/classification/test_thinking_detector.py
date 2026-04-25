@@ -14,13 +14,17 @@
 
 """Tests for thinking pattern detection."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
+from victor.agent.decisions.schemas import DecisionType, LoopDetection, LoopType
+from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.agent.thinking_detector import (
-    ThinkingPatternDetector,
-    create_thinking_detector,
     CIRCULAR_PATTERNS,
     STALLING_PATTERNS,
+    ThinkingPatternDetector,
+    create_thinking_detector,
 )
 
 
@@ -242,6 +246,25 @@ class TestRecordThinking:
         # Another stall - should not trigger (counter was reset)
         is_loop, guidance = detector.record_thinking("Let me check the database")
         assert not is_loop
+
+    def test_record_thinking_uses_runtime_intelligence_for_ambiguous_loop(self):
+        """RuntimeIntelligenceService is the canonical LLM loop-decision path."""
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.LOOP_DETECTION,
+            result=LoopDetection(is_loop=True, loop_type=LoopType.CIRCULAR),
+            source="llm",
+            confidence=0.8,
+        )
+        detector = ThinkingPatternDetector(runtime_intelligence=runtime_intelligence)
+
+        detector.record_thinking("Inspecting service boundaries")
+        detector.record_thinking("Reviewing remaining loop heuristics")
+        is_loop, guidance = detector.record_thinking("Comparing runtime decision branches")
+
+        assert is_loop is True
+        assert "circular" in guidance
+        runtime_intelligence.decide_sync.assert_called_once()
 
     def test_record_thinking_semantic_similarity_loop(self):
         """Test semantic similarity detection."""

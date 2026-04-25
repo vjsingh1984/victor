@@ -18,6 +18,12 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from victor.agent.continuation_strategy import ContinuationStrategy
+from victor.agent.decisions.schemas import (
+    ContinuationAction,
+    ContinuationDecision,
+    DecisionType,
+)
+from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.storage.embeddings.intent_classifier import IntentType
 from victor.storage.embeddings.question_classifier import (
     QuestionType,
@@ -288,6 +294,39 @@ class TestDetermineContinuationAction:
 
         assert result["action"] == "request_summary"
         assert "STUCK_LOOP" in result["reason"]
+
+    def test_runtime_intelligence_guides_low_confidence_continuation(
+        self, mock_settings, base_kwargs
+    ):
+        """Low-confidence continuation decisions should use runtime intelligence."""
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.CONTINUATION_ACTION,
+            result=ContinuationDecision(
+                action=ContinuationAction.REQUEST_SUMMARY,
+                reason="Need a concise handoff",
+            ),
+            source="llm",
+            confidence=0.8,
+        )
+        strategy = ContinuationStrategy(
+            event_bus=MagicMock(),
+            runtime_intelligence=runtime_intelligence,
+        )
+        mock_intent = MagicMock()
+        mock_intent.intent = "other"
+        base_kwargs["continuation_prompts"] = 3
+        mock_settings.max_continuation_prompts_default = 6
+
+        with patch("victor.agent.decisions.chain.should_use_llm", return_value=True):
+            result = strategy.determine_continuation_action(
+                intent_result=mock_intent,
+                **base_kwargs,
+            )
+
+        assert result["action"] == "request_summary"
+        assert result["reason"] == "LLM: Need a concise handoff"
+        runtime_intelligence.decide_sync.assert_called_once()
 
     def test_force_tool_execution_on_hallucinated_calls(self, strategy, base_kwargs):
         """Test forces tool execution when tools mentioned but not called."""

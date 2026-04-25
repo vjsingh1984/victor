@@ -93,6 +93,23 @@ class CoordinationBuildersMixin:
         logger.debug("ExplorationCoordinator created")
         return coordinator
 
+    def _get_runtime_intelligence_service(self) -> Any:
+        """Get or create the canonical runtime-intelligence service for factory-built components."""
+        runtime_intelligence = getattr(self, "_runtime_intelligence_service", None)
+        if runtime_intelligence is not None:
+            return runtime_intelligence
+
+        try:
+            from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+
+            runtime_intelligence = RuntimeIntelligenceService.from_container(self.container)
+        except Exception as exc:
+            logger.debug("Could not create runtime intelligence service: %s", exc)
+            runtime_intelligence = None
+
+        self._runtime_intelligence_service = runtime_intelligence
+        return runtime_intelligence
+
     def create_exploration_state_passed_coordinator(
         self,
         project_root: Optional["Path"] = None,
@@ -543,7 +560,9 @@ class CoordinationBuildersMixin:
         """
         from victor.agent.task_completion import create_task_completion_detector
 
-        detector = create_task_completion_detector()
+        detector = create_task_completion_detector(
+            runtime_intelligence=self._get_runtime_intelligence_service()
+        )
         logger.debug("TaskCompletionDetector created")
         return detector
 
@@ -599,6 +618,7 @@ class CoordinationBuildersMixin:
         detector = create_thinking_detector(
             repetition_threshold=repetition_threshold,
             similarity_threshold=similarity_threshold,
+            runtime_intelligence=self._get_runtime_intelligence_service(),
         )
         logger.debug(
             f"ThinkingPatternDetector created "
