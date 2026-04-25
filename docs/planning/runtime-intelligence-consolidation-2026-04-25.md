@@ -276,9 +276,18 @@ Next recommended slice:
     than failing outright when emitter-specific capture goes wrong
 
 Next recommended slice:
-- Phase 5.15: make artifact naming policy explicit inside the validated
-  session-truth subsystem so future emitters cannot silently diverge in file
-  layout conventions
-  - Keep current filenames backward-compatible by default
-  - Centralize naming decisions behind one small policy/helper instead of
-    leaving them partially distributed across emitters
+- Phase 5.15 completed: make artifact naming policy explicit inside the
+  validated session-truth subsystem so future emitters cannot silently diverge
+  in file layout conventions
+  - `validated_session_truth_naming.py` now owns the canonical, backward-
+    compatible artifact path policy
+  - Browser, research, and coding emitters now route artifact path generation
+    through that policy instead of open-coding filenames inside emitter logic
+
+Next recommended slice:
+- Phase 5.16: make validated session-truth service construction canonical so
+  runtime constructors no longer need to expose both service and registry
+  wiring paths as permanent peers
+  - Preserve backward compatibility at the edge, but move default construction
+    behind one small factory/helper
+  - Keep the runtime-facing API centered on the service, not the registry

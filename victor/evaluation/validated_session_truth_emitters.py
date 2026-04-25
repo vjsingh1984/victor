@@ -23,6 +23,10 @@ from victor.evaluation.runtime_feedback import (
     build_deep_research_validated_session_feedback_payload,
     build_swe_bench_validated_session_feedback_payload,
 )
+from victor.evaluation.validated_session_truth_naming import (
+    ValidatedSessionTruthArtifactNamingPolicy,
+    create_default_validated_session_truth_artifact_naming_policy,
+)
 
 
 @dataclass(frozen=True)
@@ -62,21 +66,9 @@ class ValidatedSessionTruthEmitter(Protocol):
     ) -> Optional[ValidatedSessionTruthArtifact]:
         """Build a persisted validated session-truth artifact when evidence is strong enough."""
 
-
-def _safe_task_id(task_id: str) -> str:
-    return str(task_id).replace("/", "_").replace("\\", "_").replace(" ", "_")
-
-
-def _feedback_artifact_path(
-    *,
-    results_dir: Path,
-    benchmark: BenchmarkType,
-    task_id: str,
-    source_result_path: Optional[Path],
-) -> Path:
-    safe_task_id = _safe_task_id(task_id)
-    source_stem = source_result_path.stem if source_result_path is not None else "session"
-    return results_dir / f"eval_session_{benchmark.value}_{safe_task_id}_{source_stem}.json"
+DEFAULT_VALIDATED_SESSION_TRUTH_ARTIFACT_NAMING_POLICY = (
+    create_default_validated_session_truth_artifact_naming_policy()
+)
 
 
 def _session_feedback_input(
@@ -129,6 +121,14 @@ def _artifact_record_from_task_result(
 class BrowserValidatedSessionTruthEmitter:
     """Validated session-truth emitter for browser-task benchmark families."""
 
+    def __init__(
+        self,
+        naming_policy: ValidatedSessionTruthArtifactNamingPolicy = (
+            DEFAULT_VALIDATED_SESSION_TRUTH_ARTIFACT_NAMING_POLICY
+        ),
+    ):
+        self._naming_policy = naming_policy
+
     def supports(self, benchmark: BenchmarkType) -> bool:
         return is_browser_task_benchmark(benchmark)
 
@@ -140,7 +140,7 @@ class BrowserValidatedSessionTruthEmitter:
         if payload_input is None:
             return None
 
-        artifact_path = _feedback_artifact_path(
+        artifact_path = self._naming_policy.path_for_evaluation_task(
             results_dir=context.results_dir,
             benchmark=context.benchmark,
             task_id=context.task_id,
@@ -149,7 +149,10 @@ class BrowserValidatedSessionTruthEmitter:
         payload = build_browser_validated_session_feedback_payload(
             payload_input,
             source_result_path=artifact_path,
-            metadata={"source_evaluation_path": str(context.source_result_path), **context.metadata},
+            metadata={
+                "source_evaluation_path": str(context.source_result_path),
+                **context.metadata,
+            },
         )
         if payload is None:
             return None
@@ -162,6 +165,14 @@ class BrowserValidatedSessionTruthEmitter:
 class DeepResearchValidatedSessionTruthEmitter:
     """Validated session-truth emitter for DR3-style deep-research benchmarks."""
 
+    def __init__(
+        self,
+        naming_policy: ValidatedSessionTruthArtifactNamingPolicy = (
+            DEFAULT_VALIDATED_SESSION_TRUTH_ARTIFACT_NAMING_POLICY
+        ),
+    ):
+        self._naming_policy = naming_policy
+
     def supports(self, benchmark: BenchmarkType) -> bool:
         return benchmark == BenchmarkType.DR3_EVAL
 
@@ -173,7 +184,7 @@ class DeepResearchValidatedSessionTruthEmitter:
         if payload_input is None:
             return None
 
-        artifact_path = _feedback_artifact_path(
+        artifact_path = self._naming_policy.path_for_evaluation_task(
             results_dir=context.results_dir,
             benchmark=context.benchmark,
             task_id=context.task_id,
@@ -182,7 +193,10 @@ class DeepResearchValidatedSessionTruthEmitter:
         payload = build_deep_research_validated_session_feedback_payload(
             payload_input,
             source_result_path=artifact_path,
-            metadata={"source_evaluation_path": str(context.source_result_path), **context.metadata},
+            metadata={
+                "source_evaluation_path": str(context.source_result_path),
+                **context.metadata,
+            },
         )
         if payload is None:
             return None
@@ -195,6 +209,14 @@ class DeepResearchValidatedSessionTruthEmitter:
 class SWEBenchValidatedSessionTruthEmitter:
     """Validated session-truth emitter for objective SWE-bench validation output."""
 
+    def __init__(
+        self,
+        naming_policy: ValidatedSessionTruthArtifactNamingPolicy = (
+            DEFAULT_VALIDATED_SESSION_TRUTH_ARTIFACT_NAMING_POLICY
+        ),
+    ):
+        self._naming_policy = naming_policy
+
     def supports(self, benchmark: BenchmarkType) -> bool:
         return benchmark == BenchmarkType.SWE_BENCH
 
@@ -206,7 +228,12 @@ class SWEBenchValidatedSessionTruthEmitter:
         if validation_result is None:
             return None
 
-        artifact_path = context.results_dir / f"eval_session_{context.task_id}.json"
+        artifact_path = self._naming_policy.path_for_validation_task(
+            results_dir=context.results_dir,
+            benchmark=context.benchmark,
+            task_id=context.task_id,
+            source_result_path=context.source_result_path,
+        )
         payload = build_swe_bench_validated_session_feedback_payload(
             validation_result,
             score=context.score,
