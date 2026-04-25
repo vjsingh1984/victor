@@ -7,6 +7,8 @@ import pytest
 
 from victor.evaluation.runtime_feedback import (
     RuntimeEvaluationFeedbackScope,
+    build_browser_validated_session_feedback_payload,
+    build_deep_research_validated_session_feedback_payload,
     build_swe_bench_validated_session_feedback_payload,
     build_validated_session_feedback_payload,
     derive_runtime_evaluation_feedback,
@@ -399,3 +401,169 @@ def test_build_swe_bench_validated_session_feedback_payload_uses_real_validator_
     }
     assert payload["completion_threshold"] is not None
     assert payload["minimum_supported_evidence_score"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.9: browser and deep-research post-hoc validator session-truth tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_browser_validated_session_feedback_payload_full_pass():
+    """Browser task with full action and answer coverage emits strong session-truth."""
+    evaluation_result = {
+        "task_id": "clawbench_001",
+        "status": "PASSED",
+        "completion_score": 1.0,
+        "failure_details": {
+            "action_coverage": 1.0,
+            "answer_coverage": 1.0,
+            "matched_actions": ["click", "fill"],
+            "missing_actions": [],
+            "forbidden_action_hits": [],
+            "matched_answer_phrases": ["success"],
+            "missing_answer_phrases": [],
+        },
+        "benchmark": "clawbench",
+        "total_tasks": 10,
+        "passed_tasks": 9,
+        "failed_tasks": 1,
+    }
+    payload = build_browser_validated_session_feedback_payload(evaluation_result)
+
+    assert payload is not None
+    assert payload["metadata"]["source"] == "validated_session_truth_feedback"
+    assert payload["metadata"]["truth_validation_mode"] == "browser_posthoc_validation"
+    assert payload["metadata"]["scope"]["vertical"] == "browser"
+    assert payload["metadata"]["scope"]["benchmark"] == "clawbench"
+    assert payload["metadata"]["scope"]["task_type"] == "interaction"
+    assert 0.5 <= payload["completion_threshold"] <= 1.0
+    assert 0.5 <= payload["minimum_supported_evidence_score"] <= 1.0
+
+
+def test_build_browser_validated_session_feedback_payload_partial():
+    """Browser task with partial coverage produces calibrated thresholds."""
+    evaluation_result = {
+        "task_id": "vlaa_002",
+        "status": "FAILED",
+        "completion_score": 0.55,
+        "failure_details": {
+            "action_coverage": 0.5,
+            "answer_coverage": 0.6,
+            "matched_actions": ["click"],
+            "missing_actions": ["fill", "submit"],
+            "forbidden_action_hits": [],
+            "matched_answer_phrases": [],
+            "missing_answer_phrases": ["confirm"],
+        },
+        "benchmark": "vlaa",
+        "total_tasks": 5,
+        "passed_tasks": 2,
+        "failed_tasks": 3,
+    }
+    payload = build_browser_validated_session_feedback_payload(evaluation_result)
+
+    assert payload is not None
+    assert payload["metadata"]["validation_summary"]["action_coverage"] == 0.5
+    assert payload["metadata"]["validation_summary"]["answer_coverage"] == 0.6
+    assert payload["completion_threshold"] > 0.6
+
+
+def test_build_browser_validated_session_feedback_payload_returns_none_for_empty():
+    """Returns None when evaluation_result has no usable coverage data."""
+    payload = build_browser_validated_session_feedback_payload({})
+    assert payload is None
+
+
+def test_build_browser_validated_session_feedback_payload_forbidden_action():
+    """Forbidden action hit raises the evidence threshold."""
+    evaluation_result = {
+        "completion_score": 0.3,
+        "failure_details": {
+            "action_coverage": 0.3,
+            "answer_coverage": 0.0,
+            "forbidden_action_hits": ["delete_all"],
+        },
+        "benchmark": "guide",
+    }
+    payload = build_browser_validated_session_feedback_payload(evaluation_result)
+    assert payload is not None
+    assert payload["minimum_supported_evidence_score"] >= 0.75
+
+
+def test_build_deep_research_validated_session_feedback_payload_full_pass():
+    """Deep-research with full claim and citation coverage emits strong session-truth."""
+    evaluation_result = {
+        "task_id": "dr3_001",
+        "status": "PASSED",
+        "completion_score": 1.0,
+        "failure_details": {
+            "claim_coverage": 1.0,
+            "citation_coverage": 1.0,
+            "matched_claims": ["market growing"],
+            "missing_claims": [],
+            "matched_citations": ["Smith 2024"],
+            "missing_citations": [],
+            "forbidden_claim_hits": [],
+            "report_length_chars": 4500,
+        },
+        "benchmark": "dr3",
+        "total_tasks": 8,
+        "passed_tasks": 7,
+        "failed_tasks": 1,
+    }
+    payload = build_deep_research_validated_session_feedback_payload(evaluation_result)
+
+    assert payload is not None
+    assert payload["metadata"]["source"] == "validated_session_truth_feedback"
+    assert payload["metadata"]["truth_validation_mode"] == "deep_research_posthoc_validation"
+    assert payload["metadata"]["scope"]["vertical"] == "research"
+    assert payload["metadata"]["scope"]["benchmark"] == "dr3"
+    assert payload["metadata"]["scope"]["task_type"] == "analysis"
+    assert 0.5 <= payload["completion_threshold"] <= 1.0
+
+
+def test_build_deep_research_validated_session_feedback_payload_partial():
+    """Deep-research with partial coverage produces calibrated thresholds."""
+    evaluation_result = {
+        "status": "FAILED",
+        "completion_score": 0.45,
+        "failure_details": {
+            "claim_coverage": 0.4,
+            "citation_coverage": 0.5,
+            "matched_claims": ["growing trend"],
+            "missing_claims": ["market size", "competition"],
+            "matched_citations": [],
+            "missing_citations": ["Jones 2023"],
+            "forbidden_claim_hits": [],
+            "report_length_chars": 800,
+        },
+        "benchmark": "dr3",
+    }
+    payload = build_deep_research_validated_session_feedback_payload(evaluation_result)
+
+    assert payload is not None
+    assert payload["metadata"]["validation_summary"]["claim_coverage"] == 0.4
+    assert payload["metadata"]["validation_summary"]["citation_coverage"] == 0.5
+    assert payload["completion_threshold"] > 0.6
+
+
+def test_build_deep_research_validated_session_feedback_payload_returns_none_for_empty():
+    """Returns None when evaluation_result has no usable coverage data."""
+    payload = build_deep_research_validated_session_feedback_payload({})
+    assert payload is None
+
+
+def test_build_deep_research_validated_session_feedback_payload_forbidden_claim():
+    """Forbidden claim hit raises the evidence threshold."""
+    evaluation_result = {
+        "completion_score": 0.2,
+        "failure_details": {
+            "claim_coverage": 0.2,
+            "citation_coverage": 0.0,
+            "forbidden_claim_hits": ["unverified stat"],
+        },
+        "benchmark": "dr3",
+    }
+    payload = build_deep_research_validated_session_feedback_payload(evaluation_result)
+    assert payload is not None
+    assert payload["minimum_supported_evidence_score"] >= 0.75

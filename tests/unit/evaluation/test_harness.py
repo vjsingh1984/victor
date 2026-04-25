@@ -17,6 +17,7 @@
 Tests for BaseBenchmarkRunner, TaskEnvironment, and EvaluationHarness.
 """
 
+import json
 import pytest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -686,6 +687,7 @@ class TestBenchmarkToolUsageMetrics:
         loaded = harness.load_results(saved_path)
         feedback_path = tmp_path / "runtime_evaluation_feedback.json"
         feedback = load_runtime_evaluation_feedback(feedback_path)
+        session_feedback_files = sorted(tmp_path.glob("eval_session_dr3_eval_*.json"))
 
         assert (
             loaded["runtime_evaluation_feedback"]["metadata"]["source"]
@@ -712,10 +714,73 @@ class TestBenchmarkToolUsageMetrics:
             "source_name": "DR3-Eval",
             "version": "2026.04",
         }
-        assert feedback.metadata["source_result_path"] == str(saved_path)
-        assert feedback.metadata["aggregated_artifact_count"] == 1
-        assert feedback.completion_threshold == pytest.approx(
-            loaded["runtime_evaluation_feedback"]["completion_threshold"]
+        assert len(session_feedback_files) == 2
+        assert feedback.metadata["aggregated_artifact_count"] == 3
+        assert sorted(feedback.metadata["validation_sources"]) == [
+            "benchmark_truth_feedback",
+            "validated_session_truth_feedback",
+        ]
+        assert str(tmp_path) in str(feedback.metadata["source_result_path"])
+        assert 0.0 < feedback.completion_threshold < 1.0
+
+        session_record = json.loads(session_feedback_files[0].read_text())
+        assert (
+            session_record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
+            == "deep_research_posthoc_validation"
+        )
+        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
+            "research"
+        )
+
+    def test_save_results_persists_browser_validated_session_feedback(self, tmp_path):
+        """Browser-task results should emit validated session-truth artifacts."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        harness._results_dir = tmp_path
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.GUIDE,
+                model="test",
+                dataset_metadata={"source_name": "GUIDE", "version": "2026.04"},
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="guide-1",
+                    status=TaskStatus.FAILED,
+                    completion_score=0.45,
+                    failure_category=BenchmarkFailureCategory.TASK_COMPLETION,
+                    failure_details={
+                        "action_coverage": 0.5,
+                        "answer_coverage": 0.35,
+                        "matched_actions": ["open_url"],
+                        "missing_actions": ["click"],
+                        "matched_answer_phrases": [],
+                        "missing_answer_phrases": ["settings"],
+                        "forbidden_action_hits": [],
+                    },
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        feedback = load_runtime_evaluation_feedback(tmp_path / "runtime_evaluation_feedback.json")
+        session_feedback_files = sorted(tmp_path.glob("eval_session_guide_*.json"))
+
+        assert saved_path.exists()
+        assert feedback is not None
+        assert len(session_feedback_files) == 1
+        assert feedback.metadata["aggregated_artifact_count"] == 2
+        assert "validated_session_truth_feedback" in feedback.metadata["validation_sources"]
+
+        session_record = json.loads(session_feedback_files[0].read_text())
+        assert (
+            session_record["runtime_evaluation_feedback"]["metadata"]["truth_validation_mode"]
+            == "browser_posthoc_validation"
+        )
+        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"]["benchmark"] == (
+            "guide"
+        )
+        assert session_record["runtime_evaluation_feedback"]["metadata"]["scope"]["vertical"] == (
+            "browser"
         )
 
 

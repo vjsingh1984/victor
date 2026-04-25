@@ -204,8 +204,24 @@ Completed on 2026-04-25:
     remain ineligible
 
 Next recommended slice:
-- Phase 5.9: connect browser and research post-hoc validators to the same
-  validated session-truth emitter path so non-coding workflows can contribute
-  scoped calibration evidence under the same trust and gating rules
-  - Reuse the canonical scope schema and aggregation path from `runtime_feedback.py`
-  - Keep the "strong enough to emit" contract explicit for each workflow family
+- Phase 5.9 completed: connect browser and research post-hoc validators to the
+  same validated session-truth emitter path so non-coding workflows can
+  contribute scoped calibration evidence under the same trust and gating rules
+  - `runtime_feedback.py` now exposes canonical browser and deep-research
+    validated session-truth builders on top of the shared scope schema and
+    aggregation path
+  - `EvaluationHarness` now persists per-task `eval_session_*` artifacts for
+    browser-task and DR3-style runs, then refreshes the canonical aggregate from
+    the same results directory without introducing a second persistence path
+  - The non-coding admission contract remains explicit: only tasks with concrete
+    post-hoc coverage evidence emit session truth; empty or heuristic-only runs
+    still remain ineligible
+
+Next recommended slice:
+- Phase 5.10: extract a registry-backed validated session-truth emitter
+  strategy so future benchmark families can register their own evidence gates
+  without growing benchmark-specific conditionals inside `EvaluationHarness`
+  - Keep the trust, freshness, and scope weighting centralized in
+    `runtime_feedback.py`
+  - Move benchmark-family routing behind a small canonical emitter interface so
+    later browser/research/coding additions do not reopen the harness design

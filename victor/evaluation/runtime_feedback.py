@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -475,6 +476,300 @@ def build_swe_bench_validated_session_feedback_payload(
         metadata=payload_metadata,
         source_result_path=source_result_path,
         saved_at=saved_at,
+    )
+
+
+def _extract_value(value: Any, key: str, default: Any = None) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(key, default)
+    return getattr(value, key, default)
+
+
+def _extract_mapping(value: Any, key: str) -> dict[str, Any]:
+    raw_value = _extract_value(value, key, {})
+    return dict(raw_value) if isinstance(raw_value, Mapping) else {}
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_int(value: Any) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        items = value
+    else:
+        items = [value]
+    return [str(item).strip() for item in items if str(item).strip()]
+
+
+def _normalized_status(value: Any) -> str:
+    raw_status = _extract_value(value, "status", "")
+    return str(getattr(raw_status, "value", raw_status or "")).strip().lower()
+
+
+def _validated_requirement_count(*items: list[str]) -> int:
+    return max(1, sum(len(item) for item in items))
+
+
+def _sanitize_runtime_feedback_tag(tag: str) -> str:
+    return re.sub(r"[^a-z0-9_.-]+", "-", tag.strip().lower()).strip("-")
+
+
+def _build_coverage_validated_session_feedback_payload(
+    evaluation_result: Any,
+    *,
+    validation_label: str,
+    benchmark_default: str,
+    vertical: str,
+    task_type: str,
+    workflow: str,
+    primary_coverage_key: str,
+    secondary_coverage_key: str,
+    primary_matched_key: str,
+    primary_missing_key: str,
+    secondary_matched_key: str,
+    secondary_missing_key: str,
+    blocked_hits_key: str,
+    primary_weight: float,
+    secondary_weight: float,
+    source_result_path: Optional[Path] = None,
+    saved_at: Optional[datetime] = None,
+    metadata: Optional[Mapping[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Build validated session-truth payloads for coverage-based evaluators."""
+    failure_details = _extract_mapping(evaluation_result, "failure_details")
+    completion_score = _coerce_float(_extract_value(evaluation_result, "completion_score"))
+    primary_coverage = _coerce_float(failure_details.get(primary_coverage_key))
+    secondary_coverage = _coerce_float(failure_details.get(secondary_coverage_key))
+
+    if primary_coverage is None and secondary_coverage is None and (
+        completion_score is None or completion_score <= 0.0
+    ):
+        return None
+
+    if primary_coverage is None:
+        primary_coverage = completion_score or 0.0
+    if secondary_coverage is None:
+        secondary_coverage = completion_score or 0.0
+
+    combined_completion = (
+        completion_score
+        if completion_score is not None and completion_score > 0.0
+        else (primary_coverage * primary_weight) + (secondary_coverage * secondary_weight)
+    )
+    combined_completion = _clamp(combined_completion, 0.0, 1.0)
+    primary_gap = _clamp(1.0 - primary_coverage, 0.0, 1.0)
+    secondary_gap = _clamp(1.0 - secondary_coverage, 0.0, 1.0)
+    blocked_hits = _coerce_text_list(failure_details.get(blocked_hits_key))
+    blocked_penalty = min(0.18, len(blocked_hits) * 0.08)
+    status = _normalized_status(evaluation_result)
+    passed = status == "passed"
+
+    completion_threshold = _clamp(
+        0.58
+        + ((1.0 - combined_completion) * 0.18)
+        + (primary_gap * 0.11)
+        + (secondary_gap * 0.08)
+        + blocked_penalty
+        - (0.06 if passed else 0.0),
+        0.5,
+        0.92,
+    )
+    progress_threshold = _clamp(
+        completion_threshold - 0.17 - (0.03 if not passed and combined_completion < 0.6 else 0.0),
+        0.35,
+        completion_threshold,
+    )
+    evidence_threshold = _clamp(
+        0.68 + (primary_gap * 0.08) + (secondary_gap * 0.06) + blocked_penalty,
+        0.6,
+        0.95,
+    )
+
+    matched_primary = _coerce_text_list(failure_details.get(primary_matched_key))
+    missing_primary = _coerce_text_list(failure_details.get(primary_missing_key))
+    matched_secondary = _coerce_text_list(failure_details.get(secondary_matched_key))
+    missing_secondary = _coerce_text_list(failure_details.get(secondary_missing_key))
+    task_count = _validated_requirement_count(
+        matched_primary,
+        missing_primary,
+        matched_secondary,
+        missing_secondary,
+    )
+
+    total_tasks = _coerce_int(_extract_value(evaluation_result, "total_tasks"))
+    passed_tasks = _coerce_int(_extract_value(evaluation_result, "passed_tasks"))
+    failed_tasks = _coerce_int(_extract_value(evaluation_result, "failed_tasks"))
+    if total_tasks and passed_tasks is not None:
+        truth_alignment_rate = _clamp(
+            (passed_tasks / max(1, total_tasks)) - (blocked_penalty * 0.15),
+            0.4,
+            0.99,
+        )
+    else:
+        truth_alignment_rate = _clamp(
+            0.58 + (combined_completion * 0.32) - (blocked_penalty * 0.25),
+            0.4,
+            0.99,
+        )
+
+    dataset_metadata = _extract_value(evaluation_result, "dataset_metadata")
+    if not isinstance(dataset_metadata, Mapping):
+        dataset_metadata = {}
+    benchmark = _coerce_optional_text(_extract_value(evaluation_result, "benchmark")) or benchmark_default
+    provider = _coerce_optional_text(_extract_value(evaluation_result, "provider"))
+    model = _coerce_optional_text(_extract_value(evaluation_result, "model"))
+    project = _coerce_optional_text(_extract_value(evaluation_result, "project"))
+    task_id = _coerce_optional_text(_extract_value(evaluation_result, "task_id"))
+    failure_category = _extract_value(evaluation_result, "failure_category")
+    failure_category_value = _coerce_optional_text(
+        getattr(failure_category, "value", failure_category)
+    )
+    raw_tags = _coerce_text_list(_extract_value(evaluation_result, "tags"))
+    scope_tags = tuple(
+        tag
+        for tag in dict.fromkeys(
+            [
+                "agentic",
+                vertical,
+                "validated-session",
+                *(
+                    _sanitize_runtime_feedback_tag(tag)
+                    for tag in raw_tags
+                    if _sanitize_runtime_feedback_tag(tag)
+                ),
+            ]
+        )
+        if tag
+    )
+
+    payload_metadata = dict(metadata or {})
+    payload_metadata.update(
+        {
+            "benchmark": benchmark,
+            "model": model,
+            "dataset_metadata": dict(dataset_metadata),
+            "truth_alignment_rate": round(truth_alignment_rate, 4),
+            "task_count": task_count,
+            "task_id": task_id,
+            "status": status or None,
+            "failure_category": failure_category_value,
+            "validation_summary": {
+                primary_coverage_key: round(primary_coverage, 4),
+                secondary_coverage_key: round(secondary_coverage, 4),
+                primary_matched_key: matched_primary,
+                primary_missing_key: missing_primary,
+                secondary_matched_key: matched_secondary,
+                secondary_missing_key: missing_secondary,
+                blocked_hits_key: blocked_hits,
+                "completion_score": round(combined_completion, 4),
+                "status": status or None,
+            },
+        }
+    )
+    if total_tasks is not None:
+        payload_metadata["suite_summary"] = {
+            "total_tasks": total_tasks,
+            "passed_tasks": passed_tasks or 0,
+            "failed_tasks": failed_tasks or 0,
+        }
+
+    return build_validated_session_feedback_payload(
+        RuntimeEvaluationFeedback(
+            completion_threshold=round(completion_threshold, 4),
+            enhanced_progress_threshold=round(progress_threshold, 4),
+            minimum_supported_evidence_score=round(evidence_threshold, 4),
+        ),
+        scope=RuntimeEvaluationFeedbackScope(
+            project=project,
+            provider=provider,
+            model=model,
+            task_type=task_type,
+            benchmark=benchmark,
+            vertical=vertical,
+            workflow=workflow,
+            tags=scope_tags,
+        ),
+        validation_label=validation_label,
+        metadata=payload_metadata,
+        source_result_path=source_result_path,
+        saved_at=saved_at,
+    )
+
+
+def build_browser_validated_session_feedback_payload(
+    evaluation_result: Any,
+    *,
+    source_result_path: Optional[Path] = None,
+    saved_at: Optional[datetime] = None,
+    metadata: Optional[Mapping[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Build validated session-truth payloads from browser-task post-hoc validation."""
+    return _build_coverage_validated_session_feedback_payload(
+        evaluation_result,
+        validation_label="browser_posthoc_validation",
+        benchmark_default="browser_task",
+        vertical="browser",
+        task_type="interaction",
+        workflow="evaluation_harness",
+        primary_coverage_key="action_coverage",
+        secondary_coverage_key="answer_coverage",
+        primary_matched_key="matched_actions",
+        primary_missing_key="missing_actions",
+        secondary_matched_key="matched_answer_phrases",
+        secondary_missing_key="missing_answer_phrases",
+        blocked_hits_key="forbidden_action_hits",
+        primary_weight=0.65,
+        secondary_weight=0.35,
+        source_result_path=source_result_path,
+        saved_at=saved_at,
+        metadata=metadata,
+    )
+
+
+def build_deep_research_validated_session_feedback_payload(
+    evaluation_result: Any,
+    *,
+    source_result_path: Optional[Path] = None,
+    saved_at: Optional[datetime] = None,
+    metadata: Optional[Mapping[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Build validated session-truth payloads from deep-research post-hoc validation."""
+    return _build_coverage_validated_session_feedback_payload(
+        evaluation_result,
+        validation_label="deep_research_posthoc_validation",
+        benchmark_default="dr3_eval",
+        vertical="research",
+        task_type="analysis",
+        workflow="evaluation_harness",
+        primary_coverage_key="claim_coverage",
+        secondary_coverage_key="citation_coverage",
+        primary_matched_key="matched_claims",
+        primary_missing_key="missing_claims",
+        secondary_matched_key="matched_citations",
+        secondary_missing_key="missing_citations",
+        blocked_hits_key="forbidden_claim_hits",
+        primary_weight=0.6,
+        secondary_weight=0.4,
+        source_result_path=source_result_path,
+        saved_at=saved_at,
+        metadata=metadata,
     )
 
 

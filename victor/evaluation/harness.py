@@ -40,8 +40,11 @@ from victor.evaluation.protocol import (
     EvaluationResult,
     TaskResult,
     TaskStatus,
+    is_browser_task_benchmark,
 )
 from victor.evaluation.runtime_feedback import (
+    build_browser_validated_session_feedback_payload,
+    build_deep_research_validated_session_feedback_payload,
     build_runtime_evaluation_feedback_payload,
     derive_runtime_evaluation_feedback,
     refresh_runtime_evaluation_feedback_aggregate,
@@ -1221,6 +1224,7 @@ class EvaluationHarness:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"eval_{result.config.benchmark.value}_{timestamp}.json"
         output_path = self._results_dir / filename
+        summary = result.get_metrics()
         runtime_feedback = derive_runtime_evaluation_feedback(result)
         runtime_feedback_payload = build_runtime_evaluation_feedback_payload(
             runtime_feedback,
@@ -1236,7 +1240,7 @@ class EvaluationHarness:
                 "timeout_per_task": result.config.timeout_per_task,
                 "dataset_metadata": result.config.dataset_metadata,
             },
-            "summary": result.get_metrics(),
+            "summary": summary,
             "runtime_evaluation_feedback": runtime_feedback_payload,
             "start_time": result.start_time.isoformat() if result.start_time else None,
             "end_time": result.end_time.isoformat() if result.end_time else None,
@@ -1286,10 +1290,88 @@ class EvaluationHarness:
         with open(output_path, "w") as f:
             json.dump(data, f, indent=2)
 
+        self._save_validated_session_feedbacks(
+            result,
+            source_result_path=output_path,
+            summary=summary,
+        )
         refresh_runtime_evaluation_feedback_aggregate(self._results_dir)
 
         logger.info(f"Results saved to: {output_path}")
         return output_path
+
+    def _save_validated_session_feedbacks(
+        self,
+        result: EvaluationResult,
+        *,
+        source_result_path: Path,
+        summary: Optional[dict[str, Any]] = None,
+    ) -> list[Path]:
+        """Persist per-task validated session-truth artifacts for supported workflows."""
+        if is_browser_task_benchmark(result.config.benchmark):
+            builder = build_browser_validated_session_feedback_payload
+        elif result.config.benchmark == BenchmarkType.DR3_EVAL:
+            builder = build_deep_research_validated_session_feedback_payload
+        else:
+            return []
+
+        import json
+
+        summary_payload = summary or result.get_metrics()
+        saved_paths: list[Path] = []
+
+        for task_result in result.task_results:
+            safe_task_id = (
+                str(task_result.task_id)
+                .replace("/", "_")
+                .replace("\\", "_")
+                .replace(" ", "_")
+            )
+            feedback_file = self._results_dir / (
+                f"eval_session_{result.config.benchmark.value}_{safe_task_id}_{source_result_path.stem}.json"
+            )
+            payload = builder(
+                {
+                    "task_id": task_result.task_id,
+                    "status": task_result.status.value,
+                    "completion_score": task_result.completion_score,
+                    "failure_category": (
+                        task_result.failure_category.value
+                        if task_result.failure_category is not None
+                        else None
+                    ),
+                    "failure_details": dict(task_result.failure_details),
+                    "benchmark": result.config.benchmark.value,
+                    "model": result.config.model,
+                    "dataset_metadata": dict(result.config.dataset_metadata),
+                    "total_tasks": summary_payload.get("total_tasks"),
+                    "passed_tasks": summary_payload.get("passed"),
+                    "failed_tasks": summary_payload.get("failed"),
+                },
+                source_result_path=feedback_file,
+                metadata={"source_evaluation_path": str(source_result_path)},
+            )
+            if payload is None:
+                continue
+
+            record = {
+                "task_id": task_result.task_id,
+                "benchmark": result.config.benchmark.value,
+                "model": result.config.model,
+                "runtime_evaluation_feedback": payload,
+                "status": task_result.status.value,
+                "completion_score": task_result.completion_score,
+                "failure_category": (
+                    task_result.failure_category.value
+                    if task_result.failure_category is not None
+                    else None
+                ),
+                "failure_details": dict(task_result.failure_details),
+            }
+            feedback_file.write_text(json.dumps(record, indent=2))
+            saved_paths.append(feedback_file)
+
+        return saved_paths
 
     def load_results(self, path: Path) -> dict:
         """Load evaluation results from disk."""
