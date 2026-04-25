@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
+from victor.framework.enrichment.file_patterns import CODE_PATTERNS
 from victor.framework.search import (
     CODEBASE_INDEX_MANIFEST_NAME,
     DEFAULT_CODEBASE_CHUNKING_STRATEGY,
@@ -733,6 +734,13 @@ def _matches_literal_file_pattern(file_path: str, file_pattern: str, *, search_r
     return basename == normalized_pattern
 
 
+def _is_test_file_path(file_path: str) -> bool:
+    """Return whether a path looks like a test file."""
+
+    normalized_path = _normalize_code_search_path(file_path).lower()
+    return any(pattern in normalized_path for pattern in _TEST_FILE_PATH_PATTERNS)
+
+
 def _file_pattern_has_glob(file_pattern: str) -> bool:
     """Return whether a file pattern uses glob syntax rather than exact matching."""
 
@@ -786,6 +794,68 @@ def _filter_search_results_by_extensions(
     return filtered_results
 
 
+def _canonicalize_language_name(language: str) -> str:
+    """Normalize a language name or alias for result filtering."""
+
+    normalized = language.strip().lower()
+    return _LANGUAGE_ALIASES.get(normalized, normalized)
+
+
+def _result_matches_language_filter(result: Any, language: str) -> bool:
+    """Return whether a search result matches the requested language."""
+
+    canonical_language = _canonicalize_language_name(language)
+    result_dict = _normalize_result_dict(result)
+    metadata = result_dict.get("metadata")
+    if isinstance(metadata, dict):
+        metadata_language = metadata.get("language")
+        if isinstance(metadata_language, str):
+            if _canonicalize_language_name(metadata_language) == canonical_language:
+                return True
+
+    file_path = result_dict.get("file_path") or result_dict.get("path")
+    if not isinstance(file_path, str):
+        return False
+
+    suffix = Path(file_path).suffix.lower()
+    known_extensions = _LANGUAGE_EXTENSION_MAP.get(canonical_language)
+    if known_extensions:
+        return suffix in known_extensions
+
+    return suffix == f".{canonical_language}"
+
+
+def _filter_search_results_by_language(
+    results: List[Any],
+    language: str,
+) -> List[Any]:
+    """Filter result objects by normalized language."""
+
+    return [result for result in results if _result_matches_language_filter(result, language)]
+
+
+def _filter_search_results_by_test_only(
+    results: List[Any],
+    test_only: bool,
+) -> List[Any]:
+    """Filter result objects by test-file status."""
+
+    filtered_results: List[Any] = []
+    for result in results:
+        result_dict = _normalize_result_dict(result)
+        metadata = result_dict.get("metadata")
+        if isinstance(metadata, dict) and isinstance(metadata.get("is_test_file"), bool):
+            is_test_file = metadata["is_test_file"]
+        else:
+            file_path = result_dict.get("file_path") or result_dict.get("path")
+            if not isinstance(file_path, str):
+                continue
+            is_test_file = _is_test_file_path(file_path)
+        if is_test_file == test_only:
+            filtered_results.append(result)
+    return filtered_results
+
+
 def _build_literal_search_kwargs(
     *,
     allow_filename_autodetect: bool,
@@ -814,6 +884,65 @@ _EXTRA_FILENAME_QUERY_EXTENSIONS = {
 _FILENAME_QUERY_EXTENSIONS = tuple(
     sorted(set(DEFAULT_CODE_EXTENSIONS) | _EXTRA_FILENAME_QUERY_EXTENSIONS)
 )
+_EXTRA_LANGUAGE_EXTENSION_MAP: Dict[str, Set[str]] = {
+    "shell": {".sh", ".bash", ".zsh", ".fish"},
+    "markdown": {".md"},
+    "yaml": {".yaml", ".yml"},
+    "json": {".json"},
+    "toml": {".toml"},
+    "html": {".html"},
+    "css": {".css", ".scss"},
+    "csharp": {".cs", ".csx", ".csproj", ".sln", ".xaml"},
+    "vb": {".vb", ".vbproj"},
+    "fsharp": {".fs", ".fsx", ".fsproj"},
+}
+_LANGUAGE_ALIASES = {
+    "py": "python",
+    "python3": "python",
+    "js": "javascript",
+    "jsx": "javascript",
+    "mjs": "javascript",
+    "cjs": "javascript",
+    "ts": "typescript",
+    "tsx": "typescript",
+    "mts": "typescript",
+    "cts": "typescript",
+    "golang": "go",
+    "rs": "rust",
+    "c++": "cpp",
+    "cc": "cpp",
+    "cxx": "cpp",
+    "hh": "cpp",
+    "hpp": "cpp",
+    "sh": "shell",
+    "bash": "shell",
+    "zsh": "shell",
+    "md": "markdown",
+    "yml": "yaml",
+}
+_TEST_FILE_PATH_PATTERNS = ("test_", "_test.", ".test.", "/test/", "/tests/")
+
+
+def _build_language_extension_map() -> Dict[str, Set[str]]:
+    """Build a canonical language-to-extension map from shared code patterns."""
+
+    mapping: Dict[str, Set[str]] = {}
+    for language, patterns in CODE_PATTERNS.items():
+        extensions = {
+            pattern[1:].lower()
+            for pattern in patterns
+            if pattern.startswith("*.")
+            and "/" not in pattern
+            and not any(token in pattern[2:] for token in "*?[]")
+        }
+        if extensions:
+            mapping[language] = extensions
+    for language, extensions in _EXTRA_LANGUAGE_EXTENSION_MAP.items():
+        mapping.setdefault(language, set()).update(ext.lower() for ext in extensions)
+    return mapping
+
+
+_LANGUAGE_EXTENSION_MAP = _build_language_extension_map()
 
 
 def _looks_like_filename_query(query: str) -> bool:
@@ -911,7 +1040,7 @@ def _calculate_importance_score(file_path: str, symbol_type: Optional[str] = Non
         score -= 0.4
 
     # Explicit test file patterns
-    if any(p in path_lower for p in ["test_", "_test.", ".test.", "/test/", "/tests/"]):
+    if _is_test_file_path(path_lower):
         score -= 0.3
 
     # Symbol type bonus
@@ -2235,6 +2364,8 @@ async def code_search(
         filters_applied = []
         manual_file_pattern_filter: Optional[str] = None
         manual_extension_filter: Optional[List[str]] = None
+        manual_language_filter: Optional[str] = None
+        manual_test_only_filter: Optional[bool] = None
         if mode_fallback_to_semantic:
             filters_applied.append("mode_fallback=semantic")
 
@@ -2258,10 +2389,10 @@ async def code_search(
                 filter_metadata["symbol_type"] = filters.symbol
                 filters_applied.append(f"symbol={filters.symbol}")
             if filters.language:
-                filter_metadata["language"] = filters.language
+                manual_language_filter = filters.language
                 filters_applied.append(f"lang={filters.language}")
             if filters.test_only is not None:
-                filter_metadata["is_test_file"] = filters.test_only
+                manual_test_only_filter = filters.test_only
                 filters_applied.append(f"test={filters.test_only}")
             if filters.extensions:
                 manual_extension_filter = filters.extensions
@@ -2561,7 +2692,12 @@ async def code_search(
         # Perform semantic search with timeout and literal fallback
         try:
             semantic_max_results = k * 2 if enable_hybrid else k
-            if manual_file_pattern_filter or manual_extension_filter:
+            if (
+                manual_file_pattern_filter
+                or manual_extension_filter
+                or manual_language_filter
+                or manual_test_only_filter is not None
+            ):
                 semantic_max_results = max(semantic_max_results, k * 4)
             results = await asyncio.wait_for(
                 index.semantic_search(
@@ -2604,6 +2740,10 @@ async def code_search(
             )
         if manual_extension_filter:
             results = _filter_search_results_by_extensions(results, manual_extension_filter)
+        if manual_language_filter:
+            results = _filter_search_results_by_language(results, manual_language_filter)
+        if manual_test_only_filter is not None:
+            results = _filter_search_results_by_test_only(results, manual_test_only_filter)
 
         # Record outcome for RL threshold learning if enabled
         if getattr(settings, "enable_semantic_threshold_rl_learning", False):

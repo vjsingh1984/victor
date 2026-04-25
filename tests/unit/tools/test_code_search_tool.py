@@ -226,7 +226,7 @@ async def test_code_search_localize_mode_falls_back_to_semantic_when_unsupported
 
     mock_index.semantic_search.assert_awaited_once_with(
         query="which files should I edit to add a logger parameter to BaseRepository",
-        max_results=3,
+        max_results=12,
         filter_metadata=None,
         similarity_threshold=0.25,
         expand_query=True,
@@ -328,7 +328,7 @@ async def test_code_search_impact_mode_falls_back_to_semantic_when_unsupported(
 
     mock_index.semantic_search.assert_awaited_once_with(
         query="what breaks if I change BaseRepository.save",
-        max_results=3,
+        max_results=12,
         filter_metadata=None,
         similarity_threshold=0.25,
         expand_query=True,
@@ -378,8 +378,8 @@ async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(
 
     mock_index.semantic_search.assert_awaited_once_with(
         query="json parsing crash on empty payload",
-        max_results=2,
-        filter_metadata=None,  # "language" stripped (not in index schema)
+        max_results=8,
+        filter_metadata=None,
         similarity_threshold=0.25,
         expand_query=True,
     )
@@ -663,6 +663,106 @@ async def test_code_search_semantic_extension_filter_applies_after_search(tmp_pa
     assert result["count"] == 1
     assert result["results"][0]["file_path"] == "src/parser.py"
     assert "ext=py" in result["metadata"]["filters_applied"]
+
+
+@pytest.mark.asyncio
+async def test_code_search_semantic_language_filter_applies_after_search(tmp_path) -> None:
+    """Semantic searches should honor language filters even when the backend cannot filter on language."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.js",
+                    "content": "export function parseJson(data) { return JSON.parse(data); }",
+                    "score": 0.91,
+                },
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return json.loads(data)",
+                    "score": 0.74,
+                },
+            ]
+        )
+    )
+    filters = SearchFilters(language="python")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(),
+    ) as literal_search:
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=2,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_not_awaited()
+    mock_index.semantic_search.assert_awaited_once_with(
+        query="json parsing",
+        max_results=8,
+        filter_metadata=None,
+        similarity_threshold=0.25,
+        expand_query=True,
+    )
+    assert result["mode"] == "semantic"
+    assert result["count"] == 1
+    assert result["results"][0]["file_path"] == "src/parser.py"
+    assert "lang=python" in result["metadata"]["filters_applied"]
+
+
+@pytest.mark.asyncio
+async def test_code_search_semantic_test_only_filter_applies_after_search(tmp_path) -> None:
+    """Semantic searches should honor test_only filters even when the backend cannot filter on test status."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return json.loads(data)",
+                    "score": 0.91,
+                },
+                {
+                    "file_path": "tests/test_parser.py",
+                    "content": "def test_parse_json_handles_empty_payload(): ...",
+                    "score": 0.74,
+                },
+            ]
+        )
+    )
+    filters = SearchFilters(test_only=True)
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(),
+    ) as literal_search:
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=2,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_not_awaited()
+    mock_index.semantic_search.assert_awaited_once_with(
+        query="json parsing",
+        max_results=8,
+        filter_metadata=None,
+        similarity_threshold=0.25,
+        expand_query=True,
+    )
+    assert result["mode"] == "semantic"
+    assert result["count"] == 1
+    assert result["results"][0]["file_path"] == "tests/test_parser.py"
+    assert "test=True" in result["metadata"]["filters_applied"]
 
 
 @pytest.mark.asyncio
