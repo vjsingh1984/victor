@@ -46,9 +46,18 @@ class TestAgentCapabilities:
             can_modify_files=True,
         )
 
-        assert "read_file" in caps.tools
+        assert "read" in caps.tools
+        assert "edit" in caps.tools
         assert caps.can_execute_code is True
         assert caps.can_browse_web is False  # Default
+
+    def test_canonicalizes_legacy_tool_names(self):
+        """Legacy aliases should normalize to canonical internal tool names."""
+        caps = AgentCapabilities(
+            tools={"read_file", "write_file", "edit_file", "execute_bash", "list_directory"}
+        )
+
+        assert caps.tools == {"read", "write", "edit", "shell", "ls"}
 
     def test_allows_tool(self):
         """Test tool permission checking."""
@@ -61,6 +70,15 @@ class TestAgentCapabilities:
         assert caps.allows_tool("git_status") is True
         assert caps.allows_tool("git_commit") is True
         assert caps.allows_tool("delete_file") is False
+
+    def test_allows_tool_accepts_legacy_or_canonical_names(self):
+        """Capability checks should resolve aliases to the canonical tool surface."""
+        caps = AgentCapabilities(tools={"read", "write", "shell"})
+
+        assert caps.allows_tool("read") is True
+        assert caps.allows_tool("read_file") is True
+        assert caps.allows_tool("write_file") is True
+        assert caps.allows_tool("execute_bash") is True
 
     def test_serialization(self):
         """Test capabilities to_dict/from_dict."""
@@ -113,7 +131,7 @@ class TestAgentConstraints:
         restored = AgentConstraints.from_dict(data)
 
         assert restored.max_iterations == 30
-        assert restored.required_tools == {"read_file", "write_file"}
+        assert restored.required_tools == {"read", "write"}
 
 
 class TestAgentSpec:
@@ -131,7 +149,7 @@ class TestAgentSpec:
         assert agent.name == "my_agent"
         assert agent.description == "A test agent"
         assert agent.model_preference == ModelPreference.REASONING
-        assert "read_file" in agent.capabilities.tools
+        assert "read" in agent.capabilities.tools
 
     def test_agent_id_generation(self):
         """Test that agent ID is deterministic."""
@@ -161,8 +179,8 @@ class TestAgentSpec:
         assert "write_file" not in base.capabilities.tools
 
         # Extended has both
-        assert "read_file" in extended.capabilities.tools
-        assert "write_file" in extended.capabilities.tools
+        assert "read" in extended.capabilities.tools
+        assert "write" in extended.capabilities.tools
         assert extended.capabilities.can_execute_code is True
 
     def test_with_constraints(self):
@@ -326,7 +344,7 @@ class TestPresets:
         """Test coder preset configuration."""
         assert coder_agent.name == "coder"
         assert coder_agent.model_preference == ModelPreference.CODING
-        assert "edit_file" in coder_agent.capabilities.tools
+        assert "edit" in coder_agent.capabilities.tools
         assert coder_agent.capabilities.can_modify_files is True
 
     def test_reviewer_preset(self):
@@ -371,7 +389,8 @@ class TestAgentConfig:
         config = load_agents_from_dict(data)
 
         assert "custom" in config.agents
-        assert "read_file" in config.agents["custom"].capabilities.tools
+        assert "read" in config.agents["custom"].capabilities.tools
+        assert "write" in config.agents["custom"].capabilities.tools
 
     def test_load_with_preset_extension(self):
         """Test extending preset agents."""
@@ -392,7 +411,7 @@ class TestAgentConfig:
 
         custom = config.agents["custom_coder"]
         # Should have coder's tools plus new one
-        assert "edit_file" in custom.capabilities.tools
+        assert "edit" in custom.capabilities.tools
         assert "deploy_script" in custom.capabilities.tools
 
     def test_load_with_ensemble(self):

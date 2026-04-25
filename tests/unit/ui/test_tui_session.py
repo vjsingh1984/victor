@@ -105,6 +105,27 @@ def test_message_history_roundtrips_preview_sidecar() -> None:
     assert restored.preview_messages == data["preview_messages"]
 
 
+def test_message_history_clear_resets_preview_sidecar() -> None:
+    """Clearing history should also clear replay-only preview sidecar state."""
+    history = MessageHistory(system_prompt="system")
+    history.add_message("user", "hi")
+    history.add_preview_message(
+        "system",
+        "File preview: /tmp/test.py",
+        {
+            "preview_body": "print('hello')",
+            "preview_kind": "file",
+            "preview_language": "py",
+            "preview_path": "/tmp/test.py",
+        },
+    )
+
+    history.clear()
+
+    assert history.messages == []
+    assert history.preview_messages == []
+
+
 def test_session_manager_export_markdown_includes_preview_code_block(
     temp_session_manager: SessionManager,
     tmp_path: Path,

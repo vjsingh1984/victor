@@ -1371,6 +1371,48 @@ class TestGenerateToolResultChunks:
         assert len(chunks) == 1
         assert chunks[0].metadata["tool_result"]["success"] is False
 
+    def test_preview_message_falls_back_when_adder_rejects_kwargs(self, mock_settings):
+        """Preview recording should retry without kwargs for legacy adders."""
+
+        class RejectingAdder:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def add_message(self, role: str, content: str, **kwargs):
+                self.calls.append((role, content, kwargs))
+                if kwargs:
+                    raise TypeError("legacy adder")
+
+        adder = RejectingAdder()
+        handler = StreamingChatHandler(
+            settings=mock_settings,
+            message_adder=adder,
+            session_idle_timeout=60.0,
+        )
+        result = {
+            "name": "write",
+            "elapsed": 0.3,
+            "args": {"path": "/test.py", "content": "line1\nline2\nline3"},
+            "success": True,
+        }
+
+        chunks = handler.generate_tool_result_chunks(result)
+
+        assert len(chunks) == 2
+        assert adder.calls == [
+            (
+                "system",
+                "File preview: /test.py",
+                {
+                    "preview_body": "line1\nline2\nline3",
+                    "preview_kind": "file",
+                    "preview_language": "py",
+                    "preview_path": "/test.py",
+                },
+            ),
+            ("system", "File preview: /test.py", {}),
+        ]
+
     def test_max_files_limit(self, handler):
         """Respects max_files limit for edit_files."""
         result = {

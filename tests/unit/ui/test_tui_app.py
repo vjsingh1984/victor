@@ -388,6 +388,71 @@ def test_load_project_session_async_replays_preview_sidecar_messages() -> None:
     }
 
 
+def test_load_project_session_replays_preview_sidecar_messages() -> None:
+    """Sync project-session restore should merge preview sidecar messages into the TUI log."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._add_system_message = MagicMock()
+    app._add_error_message = MagicMock()
+    app.agent = None
+
+    history = MagicMock()
+    history.messages = [ProviderMessage(role="assistant", content="done")]
+    persistence = MagicMock()
+    persistence.load_session.return_value = {
+        "conversation": {
+            "messages": [],
+            "preview_messages": [
+                {
+                    "role": "system",
+                    "content": "File preview: /tmp/test.py",
+                    "metadata": {
+                        "preview_body": "print('hello')",
+                        "preview_kind": "file",
+                        "preview_language": "py",
+                        "preview_path": "/tmp/test.py",
+                    },
+                    "after_message_index": 1,
+                }
+            ],
+        },
+        "metadata": {"title": "P"},
+    }
+
+    with (
+        patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ),
+        patch(
+            "victor.agent.message_history.MessageHistory.from_dict",
+            return_value=history,
+        ),
+    ):
+        app._load_project_session("project-session-1")
+
+    assert app._conversation_log.clear.call_count == 1
+    assert app._conversation_log.add_assistant_message.call_args_list == [call("done")]
+    assert app._conversation_log.add_system_message.call_args_list == [
+        call("File preview: /tmp/test.py")
+    ]
+    assert app._conversation_log.add_code_block.call_args_list == [call("print('hello')", "py")]
+    assert [(msg.role, msg.content, msg.metadata) for msg in app._session_messages] == [
+        ("assistant", "done", {}),
+        (
+            "system",
+            "File preview: /tmp/test.py",
+            {
+                "preview_body": "print('hello')",
+                "preview_kind": "file",
+                "preview_language": "py",
+                "preview_path": "/tmp/test.py",
+            },
+        ),
+    ]
+    app._add_system_message.assert_called_once_with("Project session loaded: P (2 messages)")
+
+
 def test_load_session_uses_status_and_single_completion_message() -> None:
     """Large restore should report progress in status bar, not transcript spam."""
     app = VictorTUI()
