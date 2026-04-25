@@ -535,6 +535,13 @@ def _failure_cache_delete(failure_cache: Any, key: str) -> None:
         failure_cache.pop(key, None)
 
 
+def _is_cached_index_stale(root: Path, exec_ctx: Optional[Dict[str, Any]] = None) -> bool:
+    """Return True when the current cached semantic index for a root is marked stale."""
+
+    cache_entry = _get_index_cache(exec_ctx).get(str(root), {})
+    return bool(cache_entry.get("stale", False))
+
+
 def _classify_semantic_fallback(exc: BaseException, *, scope: str) -> str:
     """Return a precise fallback reason for semantic code-search failures."""
 
@@ -1897,6 +1904,16 @@ async def code_search(
             exts = filters.extensions if filters else None
             result = await _literal_search(query, path, k, exts)
             result["fallback"] = _classify_semantic_fallback(exc, scope="semantic_index")
+            return result
+
+        if _is_cached_index_stale(root_path, _exec_ctx):
+            logger.warning(
+                "Semantic index for %s remains stale after integrity recovery; falling back to literal search",
+                root_path,
+            )
+            exts = filters.extensions if filters else None
+            result = await _literal_search(query, path, k, exts)
+            result["fallback"] = "semantic_index_stale"
             return result
 
         backend_metadata = _collect_code_search_backend_metadata(index, settings)

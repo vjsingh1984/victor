@@ -668,6 +668,36 @@ async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(t
     assert result["fallback"] == "semantic_search_error"
 
 
+@pytest.mark.asyncio
+async def test_code_search_skips_semantic_search_when_cached_index_is_stale(tmp_path) -> None:
+    """Known-stale semantic indexes should fall back immediately to literal search."""
+    mock_index = SimpleNamespace(semantic_search=AsyncMock())
+    exec_ctx = {"settings": _settings()}
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+    fake_cache = {str(tmp_path): {"stale": True}}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._get_index_cache",
+        new=lambda exec_ctx=None: fake_cache,
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parse json entrypoint",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    mock_index.semantic_search.assert_not_awaited()
+    literal_search.assert_awaited_once()
+    assert result["fallback"] == "semantic_index_stale"
+
+
 def test_get_index_build_failure_cache_ignores_mock_cache_manager_fallback(monkeypatch) -> None:
     """Bare mocks should not fabricate a cache manager for failure-cache resolution."""
     sentinel_cache = {}
