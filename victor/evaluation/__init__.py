@@ -76,6 +76,7 @@ from victor.evaluation.harness import (
     get_harness,
 )
 from victor.evaluation.benchmarks import (
+    BrowserTaskBenchmarkRunner,
     DeepResearchBenchmarkRunner,
     ExternalAgenticBenchmarkRunner,
     HumanEvalRunner,
@@ -228,6 +229,7 @@ __all__ = [
     "TaskEnvironment",
     "get_harness",
     # Benchmark runners
+    "BrowserTaskBenchmarkRunner",
     "DeepResearchBenchmarkRunner",
     "ExternalAgenticBenchmarkRunner",
     "HumanEvalRunner",

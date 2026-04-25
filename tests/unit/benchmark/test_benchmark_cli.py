@@ -65,9 +65,10 @@ class TestBenchmarkList:
         result = runner.invoke(benchmark_app, ["list"])
         assert result.exit_code == 0
         assert "clawbench" in result.stdout
+        assert "dr3-eval" in result.stdout
         assert "guide" in result.stdout
         assert "vlaa-gui" in result.stdout
-        assert "benchmark-only" in result.stdout
+        assert "implemented" in result.stdout
 
 
 class TestBenchmarkRun:

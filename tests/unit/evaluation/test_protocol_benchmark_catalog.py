@@ -18,7 +18,9 @@ from victor.evaluation.protocol import (
     BenchmarkType,
     get_benchmark_catalog,
     get_benchmark_metadata,
+    is_browser_task_benchmark,
     is_external_agentic_benchmark,
+    requires_local_manifest_benchmark,
     normalize_benchmark_name,
 )
 
@@ -35,7 +37,8 @@ class TestBenchmarkCatalog:
         assert catalog["guide"].type == BenchmarkType.GUIDE
         assert catalog["vlaa-gui"].type == BenchmarkType.VLAA_GUI
         assert catalog["dr3-eval"].runner_status == "implemented"
-        assert catalog["guide"].runner_status == "benchmark-only"
+        assert catalog["guide"].runner_status == "implemented"
+        assert catalog["clawbench"].runner_status == "implemented"
 
     def test_benchmark_alias_resolution(self):
         """CLI aliases should resolve to the same benchmark metadata."""
@@ -50,3 +53,9 @@ class TestBenchmarkCatalog:
         assert is_external_agentic_benchmark(BenchmarkType.CLAW_BENCH) is True
         assert is_external_agentic_benchmark("guide") is True
         assert is_external_agentic_benchmark(BenchmarkType.SWE_BENCH) is False
+        assert is_browser_task_benchmark(BenchmarkType.CLAW_BENCH) is True
+        assert is_browser_task_benchmark("guide") is True
+        assert is_browser_task_benchmark(BenchmarkType.DR3_EVAL) is False
+        assert requires_local_manifest_benchmark(BenchmarkType.CLAW_BENCH) is True
+        assert requires_local_manifest_benchmark("dr3-eval") is True
+        assert requires_local_manifest_benchmark(BenchmarkType.SWE_BENCH) is False

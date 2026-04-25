@@ -36,6 +36,9 @@ from victor.evaluation.benchmarks.swe_bench import (
 from victor.evaluation.benchmarks.external_agentic import (
     ExternalAgenticBenchmarkRunner,
 )
+from victor.evaluation.benchmarks.browser_tasks import (
+    BrowserTaskBenchmarkRunner,
+)
 from victor.evaluation.benchmarks.deep_research import (
     DeepResearchBenchmarkRunner,
 )
@@ -61,6 +64,7 @@ __all__ = [
     "MBPPRunner",
     "SWEBenchRunner",
     "ExternalAgenticBenchmarkRunner",
+    "BrowserTaskBenchmarkRunner",
     "DeepResearchBenchmarkRunner",
     # Framework comparison
     "ComparisonMetrics",

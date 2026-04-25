@@ -450,6 +450,7 @@ def run_benchmark(
         EvaluationConfig,
         get_benchmark_catalog,
         get_benchmark_metadata,
+        requires_local_manifest_benchmark,
         normalize_benchmark_name,
     )
 
@@ -462,13 +463,14 @@ def run_benchmark(
         raise typer.Exit(1)
 
     from victor.evaluation.benchmarks import (
-        ExternalAgenticBenchmarkRunner,
+        BrowserTaskBenchmarkRunner,
+        DeepResearchBenchmarkRunner,
         SWEBenchRunner,
         HumanEvalRunner,
         MBPPRunner,
     )
 
-    if metadata.runner_status == "benchmark-only" and dataset_path is None:
+    if requires_local_manifest_benchmark(metadata.type) and dataset_path is None:
         console.print(
             f"[bold red]Error:[/] Benchmark '{metadata.name}' requires --dataset-path "
             "to load a local adapter manifest."
@@ -487,17 +489,21 @@ def run_benchmark(
         "humaneval": (BenchmarkType.HUMAN_EVAL, HumanEvalRunner),
         "mbpp": (BenchmarkType.MBPP, MBPPRunner),
         "mbpp-test": (BenchmarkType.MBPP, lambda: MBPPRunner(split="test")),
+        "dr3-eval": (
+            BenchmarkType.DR3_EVAL,
+            lambda: DeepResearchBenchmarkRunner(dataset_path),
+        ),
         "clawbench": (
             BenchmarkType.CLAW_BENCH,
-            lambda: ExternalAgenticBenchmarkRunner(BenchmarkType.CLAW_BENCH, dataset_path),
+            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.CLAW_BENCH, dataset_path),
         ),
         "guide": (
             BenchmarkType.GUIDE,
-            lambda: ExternalAgenticBenchmarkRunner(BenchmarkType.GUIDE, dataset_path),
+            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.GUIDE, dataset_path),
         ),
         "vlaa-gui": (
             BenchmarkType.VLAA_GUI,
-            lambda: ExternalAgenticBenchmarkRunner(BenchmarkType.VLAA_GUI, dataset_path),
+            lambda: BrowserTaskBenchmarkRunner(BenchmarkType.VLAA_GUI, dataset_path),
         ),
     }
 

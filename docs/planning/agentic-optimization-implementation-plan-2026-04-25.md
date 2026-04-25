@@ -94,7 +94,7 @@ Planned slices:
 | Slice | Status | TDD plan | Notes |
 |---|---|---|---|
 | 5.1 Deep-research benchmark adapter | Done | Added catalog + harness tests first | Added a dedicated DR3-style deep-research runner under `victor/evaluation/benchmarks`, with manifest loading plus claim/citation/unsupported-claim scoring integrated into the shared benchmark catalog |
-| 5.2 Browser / web-task benchmark adapter | Not started | Add benchmark catalog tests | ClawBench-aligned |
+| 5.2 Browser / web-task benchmark adapter | Done | Added benchmark catalog + browser-runner tests first | Added a dedicated browser-task runner for `clawbench` / `guide` / `vlaa-gui`, updated the shared catalog and CLI routing, and evaluate action traces plus final-answer coverage through local manifests |
 | 5.3 Hierarchical failure taxonomy | Not started | Add evaluator diagnosis tests | GUIDE-aligned |
 
 ## Immediate Execution Order

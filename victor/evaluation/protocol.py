@@ -672,7 +672,7 @@ BENCHMARK_CATALOG: tuple[BenchmarkMetadata, ...] = (
         source_name="Research",
         aliases=("claw-bench", "claw_bench"),
         evaluation_mode="agentic-perception",
-        runner_status="benchmark-only",
+        runner_status="implemented",
     ),
     BenchmarkMetadata(
         name="guide",
@@ -684,7 +684,7 @@ BENCHMARK_CATALOG: tuple[BenchmarkMetadata, ...] = (
         description="External grounded UI agent benchmark coverage.",
         source_name="Research",
         evaluation_mode="agentic-perception",
-        runner_status="benchmark-only",
+        runner_status="implemented",
     ),
     BenchmarkMetadata(
         name="vlaa-gui",
@@ -697,7 +697,7 @@ BENCHMARK_CATALOG: tuple[BenchmarkMetadata, ...] = (
         source_name="Research",
         aliases=("vlaa_gui",),
         evaluation_mode="agentic-perception",
-        runner_status="benchmark-only",
+        runner_status="implemented",
     ),
 )
 
@@ -712,6 +712,14 @@ EXTERNAL_AGENTIC_BENCHMARK_TYPES = frozenset(
         BenchmarkType.CLAW_BENCH,
         BenchmarkType.GUIDE,
         BenchmarkType.VLAA_GUI,
+    }
+)
+
+BROWSER_TASK_BENCHMARK_TYPES = EXTERNAL_AGENTIC_BENCHMARK_TYPES
+LOCAL_MANIFEST_BENCHMARK_TYPES = frozenset(
+    {
+        BenchmarkType.DR3_EVAL,
+        *BROWSER_TASK_BENCHMARK_TYPES,
     }
 )
 
@@ -739,3 +747,19 @@ def is_external_agentic_benchmark(benchmark: BenchmarkType | str) -> bool:
     if metadata is None:
         return False
     return metadata.type in EXTERNAL_AGENTIC_BENCHMARK_TYPES
+
+
+def is_browser_task_benchmark(benchmark: BenchmarkType | str) -> bool:
+    """Return True for browser/web-task benchmarks with action-trace evaluation."""
+    metadata = get_benchmark_metadata(benchmark)
+    if metadata is None:
+        return False
+    return metadata.type in BROWSER_TASK_BENCHMARK_TYPES
+
+
+def requires_local_manifest_benchmark(benchmark: BenchmarkType | str) -> bool:
+    """Return True when a benchmark runner requires a local dataset manifest."""
+    metadata = get_benchmark_metadata(benchmark)
+    if metadata is None:
+        return False
+    return metadata.type in LOCAL_MANIFEST_BENCHMARK_TYPES
