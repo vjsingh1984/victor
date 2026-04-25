@@ -51,7 +51,7 @@ class TestOptionState:
         """Test creating option state."""
         state = OptionState(
             current_mode="explore",
-            tools_used=["read_file", "code_search"],
+            tools_used=["read", "code_search"],
             iterations=5,
             context_size=10000,
             task_progress=0.3,
@@ -131,7 +131,7 @@ class TestExploreOption:
         state = OptionState(tools_used=["semantic_code_search", "code_search"])
 
         action = option.get_action(state)
-        assert action == "read_file"
+        assert action == "read"
 
 
 class TestImplementOption:
@@ -160,7 +160,7 @@ class TestImplementOption:
 
     def test_get_action_after_write_runs_tests(self, option: ImplementOption) -> None:
         """Test running tests after writing."""
-        state = OptionState(tools_used=["read_file", "edit_file"])
+        state = OptionState(tools_used=["read", "edit"])
 
         action = option.get_action(state)
         assert action == "run_tests"

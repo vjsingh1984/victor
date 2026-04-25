@@ -38,6 +38,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from victor.framework.tool_naming import ToolNames, get_canonical_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -102,6 +104,11 @@ class OptionResult:
     steps: int = 0
     final_state: Optional[OptionState] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+def _canonicalize_recent_tools(tools_used: List[str], limit: int) -> List[str]:
+    """Normalize recent tool history for policy decisions."""
+    return [get_canonical_name(tool) for tool in tools_used[-limit:]]
 
 
 class Option(ABC):
@@ -258,10 +265,10 @@ class ExploreOption(Option):
             description="Explore and understand the codebase structure",
         )
         self._explore_tools = {
-            "read_file",
+            ToolNames.READ,
             "code_search",
             "semantic_code_search",
-            "list_directory",
+            ToolNames.LS,
             "find_definition",
         }
 
@@ -284,19 +291,19 @@ class ExploreOption(Option):
     def get_action(self, state: OptionState) -> str:
         """Get exploration action based on state."""
         # Prioritize based on what we've done
-        used_set = set(state.tools_used[-5:]) if state.tools_used else set()
+        used_set = set(_canonicalize_recent_tools(state.tools_used, limit=5))
 
         # If we haven't searched yet, search first
         if "code_search" not in used_set and "semantic_code_search" not in used_set:
             return "semantic_code_search"
 
         # If we haven't read files, read
-        if "read_file" not in used_set:
-            return "read_file"
+        if ToolNames.READ not in used_set:
+            return ToolNames.READ
 
         # Default to listing directory
-        if "list_directory" not in used_set:
-            return "list_directory"
+        if ToolNames.LS not in used_set:
+            return ToolNames.LS
 
         # Cycle through explore tools
         return "code_search"
@@ -319,11 +326,11 @@ class ImplementOption(Option):
             description="Implement code changes for the task",
         )
         self._implement_tools = {
-            "write_file",
-            "edit_file",
+            ToolNames.WRITE,
+            ToolNames.EDIT,
             "execute_code",
             "run_tests",
-            "bash",
+            ToolNames.SHELL,
         }
 
     def can_initiate(self, state: OptionState) -> bool:
@@ -344,18 +351,18 @@ class ImplementOption(Option):
 
     def get_action(self, state: OptionState) -> str:
         """Get implementation action based on state."""
-        recent_tools = state.tools_used[-3:] if state.tools_used else []
+        recent_tools = _canonicalize_recent_tools(state.tools_used, limit=3)
 
         # If we just wrote code, run tests
-        if any(t in ["write_file", "edit_file"] for t in recent_tools):
+        if any(t in {ToolNames.WRITE, ToolNames.EDIT} for t in recent_tools):
             return "run_tests"
 
         # If tests failed, edit to fix
         if not state.last_tool_success and "run_tests" in recent_tools:
-            return "edit_file"
+            return ToolNames.EDIT
 
         # Default to editing
-        return "edit_file"
+        return ToolNames.EDIT
 
 
 class DebugOption(Option):
@@ -384,15 +391,15 @@ class DebugOption(Option):
 
     def get_action(self, state: OptionState) -> str:
         """Get debug action based on state."""
-        recent_tools = state.tools_used[-3:] if state.tools_used else []
+        recent_tools = _canonicalize_recent_tools(state.tools_used, limit=3)
 
         # First, analyze the error
         if self._steps == 0:
-            return "read_file"
+            return ToolNames.READ
 
         # Then try to fix
-        if "read_file" in recent_tools:
-            return "edit_file"
+        if ToolNames.READ in recent_tools:
+            return ToolNames.EDIT
 
         # Verify fix
         return "run_tests"
@@ -427,7 +434,7 @@ class ReviewOption(Option):
         if self._steps == 0:
             return "run_tests"
         elif self._steps == 1:
-            return "read_file"
+            return ToolNames.READ
         else:
             return "code_search"
 
