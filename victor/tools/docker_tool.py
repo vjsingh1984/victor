@@ -29,6 +29,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
 from victor.tools.subprocess_executor import run_command_async, check_docker_available
+from victor.tools.formatters import format_docker_output
 
 SAFE_OPERATIONS = frozenset(
     {
@@ -193,6 +194,10 @@ async def docker(
             "success": True,
             "result": {"containers": containers, "count": len(containers)},
             "message": f"Found {len(containers)} container(s)",
+            "formatted_output": format_docker_output({
+                "containers": containers,
+            }, operation="ps").content,
+            "contains_markup": True,
         }
 
     elif operation in ["start", "stop", "restart", "rm"]:

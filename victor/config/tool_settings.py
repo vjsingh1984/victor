@@ -131,6 +131,69 @@ class ToolSettings(BaseModel):
         description="Group related tools by category with visual headers (default: enabled)",
     )
 
+    # Rich formatting configuration
+    rich_formatting_enabled: bool = Field(
+        default=True,
+        description="Enable Rich markup formatting for tool outputs (default: True)",
+    )
+    rich_formatting_tools: List[str] = Field(
+        default_factory=lambda: [
+            "test",
+            "pytest",
+            "run_tests",
+            "code_search",
+            "semantic_code_search",
+            "git",
+            "http",
+            "https",
+            "database",
+            "db",
+            "sql",
+            "refactor",
+            "refactoring",
+            "docker",
+            "security",
+            "security_scan",
+        ],
+        description="Tools that use Rich formatting (default: major tools with formatters)",
+    )
+    rich_formatting_max_output_size: int = Field(
+        default=1_000_000,
+        ge=100_000,
+        le=10_000_000,
+        description="Maximum formatted output size in bytes (default: 1MB)",
+    )
+    rich_formatting_max_time_ms: int = Field(
+        default=200,
+        ge=50,
+        le=5000,
+        description="Maximum formatting time in milliseconds (default: 200ms)",
+    )
+    rich_formatting_cache_enabled: bool = Field(
+        default=True,
+        description="Enable caching of formatted outputs (default: True)",
+    )
+    rich_formatting_cache_ttl: int = Field(
+        default=300,
+        ge=60,
+        le=3600,
+        description="Formatted output cache TTL in seconds (default: 300s = 5 minutes)",
+    )
+    rich_formatting_cache_size: int = Field(
+        default=100,
+        ge=10,
+        le=1000,
+        description="Maximum number of formatted outputs to cache (default: 100)",
+    )
+    rich_formatting_fallback_enabled: bool = Field(
+        default=True,
+        description="Enable fallback to plain text on formatting errors (default: True)",
+    )
+    rich_formatting_validation_enabled: bool = Field(
+        default=True,
+        description="Enable input validation before formatting (default: True)",
+    )
+
     # Embedding-intensive tool concurrency configuration
     # These tools use embedding models and need lower concurrency limits
     # to prevent resource exhaustion (memory, CPU, embedding model contention)
@@ -181,6 +244,36 @@ class ToolSettings(BaseModel):
         ge=0.0,
         le=1.0,
         description="Threshold for semantic similarity detection (0.0-1.0) (default: 0.85)",
+    )
+
+    # Provider-specific tool broadcasting optimization
+    enable_provider_optimization: bool = Field(
+        default=True,
+        description="Enable provider-specific tool broadcasting optimization (default: True)",
+    )
+    cloud_core_tool_set: str = Field(
+        default="default",
+        description="Cloud provider core tool set: default, expanded, or minimal (default: default)",
+    )
+    local_core_tool_set: str = Field(
+        default="minimal",
+        description="Local provider core tool set: minimal or expanded (default: minimal)",
+    )
+    schema_optimization_level: str = Field(
+        default="aggressive",
+        description="Schema optimization level: aggressive, moderate, or conservative (default: aggressive)",
+    )
+    max_dynamic_tools_local: int = Field(
+        default=12,
+        ge=0,
+        le=20,
+        description="Maximum dynamic tools per turn for local providers (default: 12)",
+    )
+    min_dynamic_tools_local: int = Field(
+        default=8,
+        ge=0,
+        le=15,
+        description="Minimum dynamic tools per turn for local providers (default: 8)",
     )
 
 

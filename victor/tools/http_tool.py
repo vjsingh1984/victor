@@ -30,6 +30,7 @@ import httpx
 
 from victor.tools.base import AccessMode, CostTier, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.formatters import format_http_response
 
 
 async def _make_request(
@@ -97,6 +98,20 @@ async def _http_request(
     )
     response = result["response"]
 
+    # Build response data
+    response_data = {
+        "success": True,
+        "status_code": response.status_code,
+        "status": response.reason_phrase,
+        "headers": dict(response.headers),
+        "body": (result["response_json"] if result["response_json"] else response.text[:1000]),
+        "duration_ms": int(result["duration"] * 1000),
+        "url": str(response.url),
+    }
+
+    # Use unified formatter system
+    formatted_result = format_http_response(response_data)
+
     return {
         "success": True,
         "status_code": response.status_code,
@@ -105,6 +120,8 @@ async def _http_request(
         "body": (result["response_json"] if result["response_json"] else response.text[:1000]),
         "duration_ms": int(result["duration"] * 1000),
         "url": str(response.url),
+        "formatted_output": formatted_result.content,
+        "contains_markup": formatted_result.contains_markup,
     }
 
 

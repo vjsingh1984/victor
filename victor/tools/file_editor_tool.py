@@ -679,9 +679,56 @@ async def edit(
             sys.stdout = old_stdout
         return buf.getvalue()
 
+    def _format_diff_for_console(preview_text: str) -> str:
+        """Format diff output for Rich console with syntax highlighting.
+
+        Converts unified diff format to Rich-compatible markdown with
+        proper syntax highlighting for additions/deletions.
+
+        Args:
+            preview_text: Raw unified diff output from FileEditor
+
+        Returns:
+            Formatted diff string with Rich markup
+        """
+        if not preview_text:
+            return ""
+
+        lines = preview_text.splitlines()
+        formatted_lines = []
+
+        for line in lines:
+            # Unified diff markers
+            if line.startswith("---") or line.startswith("+++"):
+                # File paths - show in cyan
+                formatted_lines.append(f"[cyan]{line}[/]")
+            elif line.startswith("@@"):
+                # Line numbers - show in dim
+                formatted_lines.append(f"[dim]{line}[/]")
+            elif line.startswith("+"):
+                # Additions - show in green
+                formatted_lines.append(f"[green]{line}[/]")
+            elif line.startswith("-"):
+                # Deletions - show in red
+                formatted_lines.append(f"[red]{line}[/]")
+            elif line.startswith(" "):
+                # Context lines - show in dim
+                formatted_lines.append(f"[dim]{line}[/]")
+            else:
+                # Other lines (headers, etc.)
+                formatted_lines.append(line)
+
+        return "\n".join(formatted_lines)
+
+    # Always capture diff for preview (after successful operations)
+    # This ensures the preview shows actual changes, not just requested changes
+    diff_output = None
+    formatted_diff = None
+
     # Handle preview mode
     if preview:
         preview_text = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
+        formatted_diff = _format_diff_for_console(preview_text)
 
         if not commit:
             editor.abort()
@@ -691,6 +738,8 @@ async def edit(
                 "operations_applied": 0,
                 "by_type": by_type,
                 "preview_output": preview_text,
+                "diff": preview_text,  # Raw diff for programmatic use
+                "diff_formatted": formatted_diff,  # Rich-formatted diff for console
                 "message": f"Preview generated for {operations_queued} operations (not applied)",
             }
         else:
@@ -704,12 +753,17 @@ async def edit(
             _capture_stdout(_do_commit)
             success = success_ref[0]
             if success:
+                # Capture actual diff after commit for preview
+                diff_output = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
+                formatted_diff = _format_diff_for_console(diff_output)
                 return {
                     "success": True,
                     "operations_queued": operations_queued,
                     "operations_applied": operations_queued,
                     "by_type": by_type,
                     "preview_output": preview_text,
+                    "diff": diff_output,  # Raw diff for programmatic use
+                    "diff_formatted": formatted_diff,  # Rich-formatted diff for console
                     "message": f"Applied {operations_queued} operations successfully",
                 }
             else:
@@ -730,7 +784,13 @@ async def edit(
         if success:
             # Commit the change group for undo/redo
             tracker.commit_change_group()
-            return {
+
+            # Capture actual diff after commit for preview renderer
+            # This shows what actually changed, not just what was requested
+            diff_output = _capture_stdout(lambda: editor.preview_diff(context_lines=ctx))
+            formatted_diff = _format_diff_for_console(diff_output) if diff_output else None
+
+            result = {
                 "success": True,
                 "operations_queued": operations_queued,
                 "operations_applied": operations_queued,
@@ -738,6 +798,14 @@ async def edit(
                 "message": f"Successfully applied {operations_queued} operations. Use /undo to revert.",
                 "transaction_id": transaction_id,
             }
+
+            # Include diff if available (for preview renderer)
+            if diff_output:
+                result["diff"] = diff_output
+            if formatted_diff:
+                result["diff_formatted"] = formatted_diff
+
+            return result
         else:
             # Clear change group on failure
             tracker._current_group = None

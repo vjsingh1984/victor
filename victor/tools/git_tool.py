@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 from victor.config.timeouts import ProcessTimeouts
+from victor.tools.formatters import format_git_output
 from victor.tools.base import (
     AccessMode,
     DangerLevel,
@@ -204,10 +205,21 @@ async def git(
         # Also get longer status for summary
         _, long_status, _ = await _run_git_async("status")
 
+        # Use unified formatter system
+        formatted_result = format_git_output(
+            {
+                "output": stdout,
+                "operation": "status",
+            },
+            operation="status",
+        )
+
         return {
             "success": True,
             "output": f"Short status:\n{stdout}\n\nFull status:\n{long_status}",
             "error": "",
+            "formatted_output": formatted_result.content,  # Rich-formatted for console
+            "contains_markup": formatted_result.contains_markup,
         }
 
     # Diff operation
@@ -225,13 +237,37 @@ async def git(
             return {"success": False, "output": "", "error": stderr}
 
         if not stdout:
+            formatted_result = format_git_output(
+                {
+                    "output": "",
+                    "operation": "diff",
+                },
+                operation="diff",
+            )
             return {
                 "success": True,
                 "output": "No changes to show" if not staged else "No staged changes",
                 "error": "",
+                "formatted_output": formatted_result.content,  # Rich-formatted for console
+                "contains_markup": formatted_result.contains_markup,
             }
 
-        return {"success": True, "output": stdout, "error": ""}
+        # Use unified formatter system
+        formatted_result = format_git_output(
+            {
+                "output": stdout,
+                "operation": "diff",
+            },
+            operation="diff",
+        )
+
+        return {
+            "success": True,
+            "output": stdout,
+            "error": "",
+            "formatted_output": formatted_result.content,  # Rich-formatted for console
+            "contains_markup": formatted_result.contains_markup,
+        }
 
     # Stage operation
     elif operation == "stage":
@@ -673,3 +709,10 @@ DESCRIPTION:
             "output": "",
             "error": f"Failed to create PR: {result.stderr}",
         }
+
+
+# ============================================================================
+# Rich Formatting Functions for Git Operations
+# ============================================================================
+
+

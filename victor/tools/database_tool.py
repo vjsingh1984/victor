@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.decorators import tool
+from victor.tools.formatters import format_database_results
 
 if TYPE_CHECKING:
     from victor.tools.cache_manager import CacheNamespace
@@ -355,6 +356,12 @@ async def _do_query(
                 "rows": results,
                 "count": len(results),
                 "limited": len(rows) == query_limit,
+                "formatted_output": format_database_results({
+                    "columns": columns,
+                    "rows": results,
+                    "count": len(results),
+                }).content,
+                "contains_markup": True,
             }
         else:
             # Non-SELECT query (INSERT, UPDATE, DELETE)

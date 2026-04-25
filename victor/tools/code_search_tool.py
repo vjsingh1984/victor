@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
 from victor.tools.decorators import tool
+from victor.tools.formatters import format_search_results
 
 if TYPE_CHECKING:
     from victor.tools.cache_manager import CacheNamespace
@@ -663,6 +664,14 @@ def _build_search_response(
     if follow_up_suggestions:
         metadata["follow_up_suggestions"] = follow_up_suggestions
 
+    # Use unified formatter system
+    formatted_result = format_search_results(
+        {
+            "results": results,
+            "mode": mode,
+        }
+    )
+
     return {
         "success": True,
         "results": results,
@@ -671,6 +680,8 @@ def _build_search_response(
         "hint": hint,
         "ranking_note": ranking_note,
         "metadata": metadata,
+        "formatted_results": formatted_result.content,  # Rich-formatted for console
+        "contains_markup": formatted_result.contains_markup,
     }
 
 

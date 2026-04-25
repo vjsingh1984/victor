@@ -509,17 +509,34 @@ async def shell(
         # Allow targeted searches: grep on a specific file path (not recursive)
         _is_recursive = bool(_re.search(r"\s-[a-zA-Z]*r[a-zA-Z]*\s", _base_cmd))
         _targets_file = bool(
-            _re.search(r"\s[\w./\-]+\.\w{1,10}\s*$", _base_cmd)
-            or _re.search(r"\s[\w./\-]+\.\w{1,10}\s*\|", cmd.strip())
+            _re.search(r"\s[\w./~\-]+\.\w{1,10}\s*$", _base_cmd)
+            or _re.search(r"\s[\w./~\-]+\.\w{1,10}\s*\|", cmd.strip())
         )
-        if not _targets_file or _is_recursive:
+        # Always allow grep targeting library/venv files — code_search only covers project code
+        _targets_external = bool(
+            _re.search(r"(\.venv|site-packages|/lib/python\d|/usr/lib|/usr/local/lib)", _base_cmd)
+        )
+        # Detect command substitution in the file path (e.g. "$(python -c '...')/file.py")
+        _has_cmd_sub = bool(_re.search(r"\$\(", _base_cmd))
+
+        if not _targets_external and (not _targets_file or _is_recursive):
+            if _has_cmd_sub:
+                error_msg = (
+                    "Command substitution in file paths is not supported for grep. "
+                    "Resolve the path first, then use read() or grep with the literal path. "
+                    "Example: shell(cmd='python -c \"import arxiv; print(arxiv.__file__)\"') "
+                    "then read(path='<result>')."
+                )
+            else:
+                error_msg = (
+                    "Use code_search(query='...') instead of shell search commands for project code. "
+                    "code_search uses the semantic index and is more reliable. "
+                    "For library/venv files use read(path='...') directly. "
+                    "Example: code_search(query='FilePathField', mode='semantic')"
+                )
             return {
                 "success": False,
-                "error": (
-                    "Use code_search(query='...') instead of shell search commands. "
-                    "code_search uses the semantic index and is more reliable. "
-                    "Example: code_search(query='FilePathField', mode='semantic')"
-                ),
+                "error": error_msg,
                 "stdout": "",
                 "stderr": "",
                 "return_code": -1,
