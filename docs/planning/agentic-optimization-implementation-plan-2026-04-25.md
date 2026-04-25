@@ -68,7 +68,7 @@ Planned slices:
 | Slice | Status | TDD plan | Notes |
 |---|---|---|---|
 | 3.1 Prompt-section measurement hooks | Done | Added allocator metrics tests first | `PromptSectionBudgetAllocator` now records observed token costs and can budget against measured section sizes when available |
-| 3.2 Dictionary compression for repeated tool/prompt boilerplate | Not started | Add round-trip compression tests | Must be lossless |
+| 3.2 Dictionary compression for repeated tool/prompt boilerplate | Done | Added round-trip compression tests first | Added a lossless prompt dictionary compressor and wired it into `UnifiedPromptPipeline` for repeated per-turn guidance blocks |
 | 3.3 Safe default-on preview pruning for read-only tools | Not started | Add tool-executor pruning tests | Preserve full LLM context until explicitly changed |
 
 ## Phase 4: Memory Evolution
@@ -113,3 +113,5 @@ Planned slices:
 | 2026-04-25 | Phase 2.2 completed via TDD in `victor-rag`: retrieval gaps are now explicitly classified and repair policy routes between retrieval repair, answer revision, and clarification accordingly. |
 | 2026-04-25 | Phase 2.3 completed via TDD in `victor-rag`: retrieval utility scoring moved to a named escape hatch that emits richer metrics and applies bounded authority/diversity-aware reranking. |
 | 2026-04-25 | Phase 3.1 completed via TDD in `codingagent`: prompt section budgeting now records rolling token-cost measurements and uses them to improve future section selection under budget constraints. |
+| 2026-04-25 | Phase 3.2 completed via TDD in `codingagent`: repeated long guidance blocks can now be dictionary-compressed losslessly, and `UnifiedPromptPipeline` uses the compressor for repeated per-turn reminder content when it produces real savings. |
+| 2026-04-25 | Prompt architecture refactor inserted before Phase 3.3. Roadmap resume point remains Phase 3.3; details tracked in `docs/planning/prompt-canonical-architecture-refactor-2026-04-25.md`. |
