@@ -1469,51 +1469,11 @@ class AgenticLoop:
                 logger.warning(f"Fulfillment check failed: {e}")
 
         # Confidence-based fallback
-        if perception.confidence >= 0.8:
-            if "low_confidence_retries" in state:
-                state["low_confidence_retries"] = 0
-            return EvaluationResult(
-                decision=EvaluationDecision.COMPLETE,
-                score=perception.confidence,
-                reason="High confidence in perception",
-            )
-        elif perception.confidence >= 0.5:
-            if "low_confidence_retries" in state:
-                state["low_confidence_retries"] = 0
-            return EvaluationResult(
-                decision=EvaluationDecision.CONTINUE,
-                score=perception.confidence,
-                reason="Medium confidence - continue",
-            )
-        else:
-            retry_limit = max(int(self.config.get("low_confidence_retry_limit", 2)), 0)
-            retry_count = int(state.get("low_confidence_retries", 0))
-            if retry_count >= retry_limit:
-                return EvaluationResult(
-                    decision=EvaluationDecision.FAIL,
-                    score=perception.confidence,
-                    reason=(
-                        "Low confidence retry budget exhausted "
-                        f"after {retry_count} retries"
-                    ),
-                    metadata={
-                        "low_confidence_retry_exhausted": True,
-                        "low_confidence_retries": retry_count,
-                        "low_confidence_retry_limit": retry_limit,
-                    },
-                )
-
-            retry_count += 1
-            state["low_confidence_retries"] = retry_count
-            return EvaluationResult(
-                decision=EvaluationDecision.RETRY,
-                score=perception.confidence,
-                reason="Low confidence - retry",
-                metadata={
-                    "low_confidence_retries": retry_count,
-                    "low_confidence_retry_limit": retry_limit,
-                },
-            )
+        return RuntimeIntelligenceService.evaluate_confidence_progress(
+            perception.confidence,
+            state,
+            retry_limit=max(int(self.config.get("low_confidence_retry_limit", 2)), 0),
+        )
 
     def _apply_low_confidence_retry_budget(
         self,
@@ -1521,43 +1481,11 @@ class AgenticLoop:
         state: Dict[str, Any],
     ) -> EvaluationResult:
         """Bound repeated low-confidence retries in the live loop."""
-        if evaluation.decision in (EvaluationDecision.COMPLETE, EvaluationDecision.CONTINUE):
-            if "low_confidence_retries" in state:
-                state["low_confidence_retries"] = 0
-            return evaluation
-
-        if evaluation.decision != EvaluationDecision.RETRY or evaluation.score >= 0.5:
-            return evaluation
-
-        retry_limit = max(int(self.config.get("low_confidence_retry_limit", 2)), 0)
-        retry_count = int(state.get("low_confidence_retries", 0))
-        if retry_count >= retry_limit:
-            return EvaluationResult(
-                decision=EvaluationDecision.FAIL,
-                score=evaluation.score,
-                reason=f"Low confidence retry budget exhausted after {retry_count} retries",
-                metrics=dict(evaluation.metrics),
-                metadata={
-                    **dict(evaluation.metadata),
-                    "low_confidence_retry_exhausted": True,
-                    "low_confidence_retries": retry_count,
-                    "low_confidence_retry_limit": retry_limit,
-                },
-            )
-
-        retry_count += 1
-        state["low_confidence_retries"] = retry_count
-        return EvaluationResult(
-            decision=EvaluationDecision.RETRY,
-            score=evaluation.score,
-            reason=evaluation.reason,
-            metrics=dict(evaluation.metrics),
-                metadata={
-                    **dict(evaluation.metadata),
-                    "low_confidence_retries": retry_count,
-                    "low_confidence_retry_limit": retry_limit,
-                },
-            )
+        return RuntimeIntelligenceService.apply_low_confidence_retry_budget(
+            evaluation,
+            state,
+            retry_limit=max(int(self.config.get("low_confidence_retry_limit", 2)), 0),
+        )
 
     def _should_use_enhanced_evaluation(self, action_result: Any) -> bool:
         """Only run enhanced evaluation when there is a real execution payload."""

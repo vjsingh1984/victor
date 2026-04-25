@@ -9,6 +9,7 @@ from victor.agent.services.runtime_intelligence import (
     PromptOptimizationBundle,
     RuntimeIntelligenceService,
 )
+from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
 
 
 @pytest.mark.asyncio
@@ -124,3 +125,57 @@ def test_get_clarification_decision_uses_default_prompt_when_missing():
         prompt="Please clarify the target file, component, or bug before I continue.",
         confidence=0.31,
     )
+
+
+def test_apply_low_confidence_retry_budget_increments_retry_count():
+    evaluation = EvaluationResult(
+        decision=EvaluationDecision.RETRY,
+        score=0.2,
+        reason="Low confidence - retry",
+    )
+    state = {}
+
+    result = RuntimeIntelligenceService.apply_low_confidence_retry_budget(
+        evaluation,
+        state,
+        retry_limit=2,
+    )
+
+    assert result.decision == EvaluationDecision.RETRY
+    assert state["low_confidence_retries"] == 1
+    assert result.metadata["low_confidence_retries"] == 1
+    assert result.metadata["low_confidence_retry_limit"] == 2
+
+
+def test_apply_low_confidence_retry_budget_exhausts_after_limit():
+    evaluation = EvaluationResult(
+        decision=EvaluationDecision.RETRY,
+        score=0.2,
+        reason="Low confidence - retry",
+        metadata={"source": "enhanced"},
+    )
+    state = {"low_confidence_retries": 2}
+
+    result = RuntimeIntelligenceService.apply_low_confidence_retry_budget(
+        evaluation,
+        state,
+        retry_limit=2,
+    )
+
+    assert result.decision == EvaluationDecision.FAIL
+    assert result.metadata["low_confidence_retry_exhausted"] is True
+    assert result.metadata["low_confidence_retries"] == 2
+    assert result.metadata["source"] == "enhanced"
+
+
+def test_evaluate_confidence_progress_resets_retry_budget_on_progress():
+    state = {"low_confidence_retries": 1}
+
+    result = RuntimeIntelligenceService.evaluate_confidence_progress(
+        0.6,
+        state,
+        retry_limit=2,
+    )
+
+    assert result.decision == EvaluationDecision.CONTINUE
+    assert state["low_confidence_retries"] == 0

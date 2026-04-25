@@ -77,6 +77,7 @@ Phase 4:
 - Collapse remaining duplicated low-confidence / retry / clarification policies into typed runtime policies behind the same subsystem.
   - 4.1 Clarification policy normalization
   - 4.2 Low-confidence retry-budget policy normalization
+  - 4.3 Enhanced-evaluator policy emission normalization
 
 ## First Implementation Slice
 
@@ -133,7 +134,10 @@ Completed on 2026-04-25:
 - Phase 4.1 clarification-policy normalization:
   - `RuntimeIntelligenceService` now exposes a typed clarification decision
   - `StreamingChatPipeline` and `AgenticLoop` now consume the same canonical clarification prompt policy
+- Phase 4.2 low-confidence retry-budget normalization:
+  - `RuntimeIntelligenceService` now owns the canonical confidence-band and retry-budget policy
+  - `AgenticLoop` now delegates both raw confidence fallback and enhanced low-confidence retry gating through the same runtime policy
 
 Next recommended slice:
-- Phase 4.2: normalize low-confidence retry-budget policy behind
-  `RuntimeIntelligenceService`
+- Phase 4.3: normalize low-confidence policy emission inside
+  `EnhancedCompletionEvaluator` so the evaluator and loop share the same runtime policy vocabulary

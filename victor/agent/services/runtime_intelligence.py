@@ -267,6 +267,113 @@ class RuntimeIntelligenceService:
             confidence=confidence,
         )
 
+    @staticmethod
+    def evaluate_confidence_progress(
+        confidence: float,
+        state: Dict[str, Any],
+        *,
+        retry_limit: int = 2,
+        high_confidence_threshold: float = 0.8,
+        medium_confidence_threshold: float = 0.5,
+    ) -> Any:
+        """Apply the canonical confidence-band policy for live-loop evaluation."""
+        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+
+        if confidence >= high_confidence_threshold:
+            if "low_confidence_retries" in state:
+                state["low_confidence_retries"] = 0
+            return EvaluationResult(
+                decision=EvaluationDecision.COMPLETE,
+                score=confidence,
+                reason="High confidence in perception",
+            )
+
+        if confidence >= medium_confidence_threshold:
+            if "low_confidence_retries" in state:
+                state["low_confidence_retries"] = 0
+            return EvaluationResult(
+                decision=EvaluationDecision.CONTINUE,
+                score=confidence,
+                reason="Medium confidence - continue",
+            )
+
+        retry_limit = max(int(retry_limit), 0)
+        retry_count = int(state.get("low_confidence_retries", 0))
+        if retry_count >= retry_limit:
+            return EvaluationResult(
+                decision=EvaluationDecision.FAIL,
+                score=confidence,
+                reason=f"Low confidence retry budget exhausted after {retry_count} retries",
+                metadata={
+                    "low_confidence_retry_exhausted": True,
+                    "low_confidence_retries": retry_count,
+                    "low_confidence_retry_limit": retry_limit,
+                },
+            )
+
+        retry_count += 1
+        state["low_confidence_retries"] = retry_count
+        return EvaluationResult(
+            decision=EvaluationDecision.RETRY,
+            score=confidence,
+            reason="Low confidence - retry",
+            metadata={
+                "low_confidence_retries": retry_count,
+                "low_confidence_retry_limit": retry_limit,
+            },
+        )
+
+    @staticmethod
+    def apply_low_confidence_retry_budget(
+        evaluation: Any,
+        state: Dict[str, Any],
+        *,
+        retry_limit: int = 2,
+        low_confidence_threshold: float = 0.5,
+    ) -> Any:
+        """Apply the canonical retry-budget policy to low-confidence retry results."""
+        from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+
+        if getattr(evaluation, "should_complete", False) or getattr(
+            evaluation, "should_continue", False
+        ):
+            if "low_confidence_retries" in state:
+                state["low_confidence_retries"] = 0
+            return evaluation
+
+        if not getattr(evaluation, "should_retry", False) or evaluation.score >= low_confidence_threshold:
+            return evaluation
+
+        retry_limit = max(int(retry_limit), 0)
+        retry_count = int(state.get("low_confidence_retries", 0))
+        if retry_count >= retry_limit:
+            return EvaluationResult(
+                decision=EvaluationDecision.FAIL,
+                score=evaluation.score,
+                reason=f"Low confidence retry budget exhausted after {retry_count} retries",
+                metrics=dict(evaluation.metrics),
+                metadata={
+                    **dict(evaluation.metadata),
+                    "low_confidence_retry_exhausted": True,
+                    "low_confidence_retries": retry_count,
+                    "low_confidence_retry_limit": retry_limit,
+                },
+            )
+
+        retry_count += 1
+        state["low_confidence_retries"] = retry_count
+        return EvaluationResult(
+            decision=EvaluationDecision.RETRY,
+            score=evaluation.score,
+            reason=evaluation.reason,
+            metrics=dict(evaluation.metrics),
+            metadata={
+                **dict(evaluation.metadata),
+                "low_confidence_retries": retry_count,
+                "low_confidence_retry_limit": retry_limit,
+            },
+        )
+
     def get_prompt_optimization_bundle(
         self,
         user_message: str,

@@ -426,6 +426,32 @@ class TestEvaluate:
         assert result.decision == EvaluationDecision.CONTINUE
         assert state["low_confidence_retries"] == 0
 
+    async def test_evaluate_applies_retry_budget_to_enhanced_low_confidence_result(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+            config={"low_confidence_retry_limit": 2},
+        )
+        loop.enhanced_completion_evaluator = MagicMock()
+        loop.enhanced_completion_evaluator.evaluate = AsyncMock(
+            return_value=EvaluationResult(
+                decision=EvaluationDecision.RETRY,
+                score=0.2,
+                reason="Low confidence - retry",
+                metadata={"source": "enhanced"},
+            )
+        )
+        loop._should_use_enhanced_evaluation = MagicMock(return_value=True)
+        perception = _make_perception()
+        perception.confidence = 0.2
+        state = {"low_confidence_retries": 2}
+
+        result = await loop._evaluate(perception, MagicMock(), state)
+
+        assert result.decision == EvaluationDecision.FAIL
+        assert result.metadata["low_confidence_retry_exhausted"] is True
+        assert result.metadata["source"] == "enhanced"
+
 
 # ============================================================================
 # _map_to_task_type tests
