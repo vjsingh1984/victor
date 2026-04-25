@@ -182,12 +182,22 @@ Completed on 2026-04-25:
   - Canonical `runtime_evaluation_feedback.json` is now refreshed from that
     aggregate view, and raw heuristic runtime sources remain excluded unless they
     are upgraded into explicit validated evaluation truth
+- Phase 5.7 scoped relevance selection and explicit session-truth schema:
+  - `runtime_feedback.py` now defines a canonical `RuntimeEvaluationFeedbackScope`
+    schema and a typed builder for future validated session-truth emitters instead
+    of relying on loose metadata conventions
+  - Validated evaluation-truth aggregation now applies centralized source trust,
+    freshness, reliability, and scope-adjacency weighting so project/model/task-
+    adjacent evidence is preferred over unrelated artifacts
+  - Active prompt/runtime call sites now pass available provider/model scope into
+    `RuntimeIntelligenceService` so calibration can use scoped evidence whenever
+    the caller already knows that context
 
 Next recommended slice:
-- Phase 5.7: add scoped relevance selection for validated evaluation truth so
-  calibration can prefer project/model/task-adjacent evidence when multiple
-  eligible truth sources exist
-  - Define an explicit schema for future non-benchmark validated session truth
-    emitters rather than relying on loose metadata conventions
-  - Keep source trust tiers and freshness weighting centralized in the same
+- Phase 5.8: connect real post-hoc validators to the validated session-truth
+  emitter path so scoped non-benchmark evidence can enter calibration without
+  synthetic/manual artifact creation
+  - Define which evaluator outcomes are strong enough to emit validated session
+    truth for coding, browser, and research workflows
+  - Keep emission gating and source trust assignments centralized in the same
     runtime-feedback subsystem

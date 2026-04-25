@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, Optional
@@ -23,6 +24,85 @@ VALIDATED_RUNTIME_FEEDBACK_SOURCES = {
 }
 AGGREGATED_RUNTIME_FEEDBACK_SOURCE = "validated_evaluation_truth_aggregate"
 FRESHNESS_HALF_LIFE_DAYS = 14.0
+VALIDATED_RUNTIME_FEEDBACK_SOURCE_TRUST = {
+    "benchmark_truth_feedback": 1.0,
+    "validated_evaluation_truth_feedback": 0.95,
+    "validated_session_truth_feedback": 0.85,
+}
+SCOPE_FIELD_WEIGHTS = {
+    "project": 4.0,
+    "model": 3.5,
+    "task_type": 2.5,
+    "provider": 2.0,
+    "benchmark": 1.5,
+    "vertical": 1.0,
+    "workflow": 0.75,
+}
+
+
+@dataclass(frozen=True)
+class RuntimeEvaluationFeedbackScope:
+    """Explicit scope schema for validated evaluation-truth feedback."""
+
+    project: Optional[str] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    task_type: Optional[str] = None
+    benchmark: Optional[str] = None
+    vertical: Optional[str] = None
+    workflow: Optional[str] = None
+    tags: tuple[str, ...] = field(default_factory=tuple)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the canonical scope schema."""
+        return {
+            "project": self.project,
+            "provider": self.provider,
+            "model": self.model,
+            "task_type": self.task_type,
+            "benchmark": self.benchmark,
+            "vertical": self.vertical,
+            "workflow": self.workflow,
+            "tags": list(self.tags),
+        }
+
+    def is_empty(self) -> bool:
+        """Return whether the scope carries any discriminating fields."""
+        return not any(
+            (
+                self.project,
+                self.provider,
+                self.model,
+                self.task_type,
+                self.benchmark,
+                self.vertical,
+                self.workflow,
+                self.tags,
+            )
+        )
+
+    @classmethod
+    def from_value(cls, value: Any) -> "RuntimeEvaluationFeedbackScope":
+        """Normalize mappings and existing scope objects into the typed schema."""
+        if isinstance(value, cls):
+            return value
+        if not isinstance(value, Mapping):
+            return cls()
+        tags_value = value.get("tags") or ()
+        if isinstance(tags_value, str):
+            tags = (tags_value,)
+        else:
+            tags = tuple(str(tag) for tag in tags_value if str(tag).strip())
+        return cls(
+            project=_coerce_optional_text(value.get("project")),
+            provider=_coerce_optional_text(value.get("provider")),
+            model=_coerce_optional_text(value.get("model")),
+            task_type=_coerce_optional_text(value.get("task_type")),
+            benchmark=_coerce_optional_text(value.get("benchmark")),
+            vertical=_coerce_optional_text(value.get("vertical")),
+            workflow=_coerce_optional_text(value.get("workflow")),
+            tags=tags,
+        )
 
 
 def get_runtime_evaluation_feedback_path(base_dir: Optional[Path] = None) -> Path:
@@ -36,6 +116,18 @@ def get_runtime_evaluation_feedback_path(base_dir: Optional[Path] = None) -> Pat
         return get_victor_dir() / "evaluations" / RUNTIME_EVALUATION_FEEDBACK_FILENAME
     except ImportError:
         return Path.home() / ".victor" / "evaluations" / RUNTIME_EVALUATION_FEEDBACK_FILENAME
+
+
+def _coerce_optional_text(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _normalized_scope_token(value: Any) -> Optional[str]:
+    text = _coerce_optional_text(value)
+    return text.lower() if text is not None else None
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:
@@ -158,12 +250,44 @@ def derive_runtime_evaluation_feedback(result_or_payload: Any) -> RuntimeEvaluat
             "truth_validation_mode": "benchmark",
             "benchmark": config.get("benchmark"),
             "model": config.get("model"),
+            "scope": RuntimeEvaluationFeedbackScope(
+                benchmark=_coerce_optional_text(config.get("benchmark")),
+                model=_coerce_optional_text(config.get("model")),
+            ).to_dict(),
             "dataset_metadata": dict(config.get("dataset_metadata") or {}),
             "truth_alignment_rate": round(truth_alignment_rate, 4),
             "overconfidence_rate": round(overconfidence_rate, 4),
             "underconfidence_rate": round(underconfidence_rate, 4),
             "task_count": len(tasks),
         },
+    )
+
+
+def runtime_evaluation_feedback_scope_from_context(
+    context: Optional[Mapping[str, Any]],
+) -> RuntimeEvaluationFeedbackScope:
+    """Build the canonical scope schema from runtime context/config mappings."""
+    if not isinstance(context, Mapping):
+        return RuntimeEvaluationFeedbackScope()
+    if "scope" in context:
+        explicit_scope = RuntimeEvaluationFeedbackScope.from_value(context.get("scope"))
+        if not explicit_scope.is_empty():
+            return explicit_scope
+    return RuntimeEvaluationFeedbackScope(
+        project=_coerce_optional_text(
+            context.get("project")
+            or context.get("project_name")
+            or context.get("repository")
+            or context.get("repo")
+            or context.get("workspace_name")
+        ),
+        provider=_coerce_optional_text(context.get("provider") or context.get("provider_name")),
+        model=_coerce_optional_text(context.get("model") or context.get("model_name")),
+        task_type=_coerce_optional_text(context.get("task_type")),
+        benchmark=_coerce_optional_text(context.get("benchmark")),
+        vertical=_coerce_optional_text(context.get("vertical")),
+        workflow=_coerce_optional_text(context.get("workflow") or context.get("workflow_name")),
+        tags=tuple(str(tag) for tag in (context.get("tags") or ()) if str(tag).strip()),
     )
 
 
@@ -186,6 +310,14 @@ def build_runtime_evaluation_feedback_payload(
             metadata["truth_validation_mode"] = "benchmark"
         elif validated:
             metadata["truth_validation_mode"] = "posthoc_validated"
+    scope = RuntimeEvaluationFeedbackScope.from_value(metadata.get("scope"))
+    if scope.is_empty():
+        scope = runtime_evaluation_feedback_scope_from_context(metadata)
+    metadata["scope"] = scope.to_dict()
+    if metadata.get("benchmark") is None:
+        metadata["benchmark"] = scope.benchmark
+    if metadata.get("model") is None:
+        metadata["model"] = scope.model
     resolved_saved_at = (
         saved_at or _parse_timestamp(metadata.get("saved_at")) or datetime.now(timezone.utc)
     )
@@ -196,6 +328,39 @@ def build_runtime_evaluation_feedback_payload(
         metadata["source_result_path"] = metadata.get("source_result_path")
     payload["metadata"] = metadata
     return payload
+
+
+def build_validated_session_feedback_payload(
+    feedback: RuntimeEvaluationFeedback,
+    *,
+    scope: RuntimeEvaluationFeedbackScope,
+    validation_label: str = "posthoc_validated",
+    metadata: Optional[Mapping[str, Any]] = None,
+    source: str = "validated_session_truth_feedback",
+    source_result_path: Optional[Path] = None,
+    saved_at: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Build an explicit validated-session truth payload using the canonical schema."""
+    resolved_scope = RuntimeEvaluationFeedbackScope.from_value(scope)
+    payload_metadata = dict(metadata or {})
+    payload_metadata.update(
+        {
+            "source": source,
+            "validated_evaluation_truth": True,
+            "truth_validation_mode": validation_label,
+            "scope": resolved_scope.to_dict(),
+        }
+    )
+    return build_runtime_evaluation_feedback_payload(
+        RuntimeEvaluationFeedback(
+            completion_threshold=feedback.completion_threshold,
+            enhanced_progress_threshold=feedback.enhanced_progress_threshold,
+            minimum_supported_evidence_score=feedback.minimum_supported_evidence_score,
+            metadata=payload_metadata,
+        ),
+        source_result_path=source_result_path,
+        saved_at=saved_at,
+    )
 
 
 def _extract_feedback_payload(value: Any) -> Optional[dict[str, Any]]:
@@ -275,7 +440,63 @@ def _load_feedback_payloads_from_directory(base_dir: Path) -> list[dict[str, Any
     return payloads
 
 
-def _feedback_weight(payload: Mapping[str, Any], reference_time: datetime) -> float:
+def _source_trust_weight(source: Optional[str]) -> float:
+    return VALIDATED_RUNTIME_FEEDBACK_SOURCE_TRUST.get(str(source or ""), 0.75)
+
+
+def _scope_similarity_weight(
+    candidate_scope: Any,
+    target_scope: Any,
+) -> float:
+    selected_scope = RuntimeEvaluationFeedbackScope.from_value(target_scope)
+    if selected_scope.is_empty():
+        return 1.0
+
+    artifact_scope = RuntimeEvaluationFeedbackScope.from_value(candidate_scope)
+    considered_weight = 0.0
+    score = 0.0
+
+    for field_name, field_weight in SCOPE_FIELD_WEIGHTS.items():
+        selected_value = _normalized_scope_token(getattr(selected_scope, field_name))
+        if selected_value is None:
+            continue
+        considered_weight += field_weight
+        artifact_value = _normalized_scope_token(getattr(artifact_scope, field_name))
+        if artifact_value is None:
+            score += field_weight * 0.45
+        elif artifact_value == selected_value:
+            score += field_weight
+        elif field_name in {"project", "model", "task_type"}:
+            score += field_weight * 0.05
+        else:
+            score += field_weight * 0.20
+
+    selected_tags = {
+        _normalized_scope_token(tag)
+        for tag in selected_scope.tags
+        if _normalized_scope_token(tag) is not None
+    }
+    if selected_tags:
+        considered_weight += 1.0
+        artifact_tags = {
+            _normalized_scope_token(tag)
+            for tag in artifact_scope.tags
+            if _normalized_scope_token(tag) is not None
+        }
+        overlap = len(selected_tags & artifact_tags) / max(1, len(selected_tags))
+        score += max(0.1, overlap)
+
+    if considered_weight == 0:
+        return 1.0
+    return _clamp(0.2 + (score / considered_weight) * 1.25, 0.1, 1.5)
+
+
+def _feedback_weight(
+    payload: Mapping[str, Any],
+    reference_time: datetime,
+    *,
+    target_scope: Optional[RuntimeEvaluationFeedbackScope] = None,
+) -> float:
     metadata = dict(payload.get("metadata") or {})
     saved_at = _parse_timestamp(metadata.get("saved_at")) or reference_time
     age_days = max(0.0, (reference_time - saved_at).total_seconds() / 86400.0)
@@ -287,7 +508,9 @@ def _feedback_weight(payload: Mapping[str, Any], reference_time: datetime) -> fl
     )
     task_count = max(1.0, float(metadata.get("task_count", 1.0) or 1.0))
     coverage_weight = min(3.0, 0.75 + (math.sqrt(task_count) / 4.0))
-    return max(0.05, recency_weight * truth_alignment * coverage_weight)
+    trust_weight = _source_trust_weight(metadata.get("source"))
+    scope_weight = _scope_similarity_weight(metadata.get("scope"), target_scope)
+    return max(0.05, recency_weight * truth_alignment * coverage_weight * trust_weight * scope_weight)
 
 
 def _select_metadata(values: list[Any], *, fallback: Any = None) -> Any:
@@ -303,6 +526,8 @@ def _select_metadata(values: list[Any], *, fallback: Any = None) -> Any:
 
 def _aggregate_feedback_payloads(
     payloads: list[dict[str, Any]],
+    *,
+    scope: Optional[Any] = None,
 ) -> Optional[RuntimeEvaluationFeedback]:
     if not payloads:
         return None
@@ -314,13 +539,17 @@ def _aggregate_feedback_payloads(
     if not validated_payloads:
         return None
 
+    selected_scope = RuntimeEvaluationFeedbackScope.from_value(scope)
     saved_at_values = [
         _parse_timestamp(dict(payload.get("metadata") or {}).get("saved_at"))
         for payload in validated_payloads
     ]
     resolved_saved_at_values = [value for value in saved_at_values if value is not None]
     reference_time = max(resolved_saved_at_values, default=datetime.now(timezone.utc))
-    weights = [_feedback_weight(payload, reference_time) for payload in validated_payloads]
+    weights = [
+        _feedback_weight(payload, reference_time, target_scope=selected_scope)
+        for payload in validated_payloads
+    ]
 
     def weighted_average(field_name: str) -> Optional[float]:
         weighted_pairs = [
@@ -335,6 +564,10 @@ def _aggregate_feedback_payloads(
         return round(numerator / max(denominator, 1e-9), 4)
 
     metadata_list = [dict(payload.get("metadata") or {}) for payload in validated_payloads]
+    scope_scores = [
+        _scope_similarity_weight(metadata.get("scope"), selected_scope)
+        for metadata in metadata_list
+    ]
     freshest_payload = max(
         validated_payloads,
         key=lambda payload: _parse_timestamp(dict(payload.get("metadata") or {}).get("saved_at"))
@@ -382,6 +615,13 @@ def _aggregate_feedback_payloads(
                 4,
             ),
             "task_count": sum(task_counts),
+            "scope_selection_strategy": (
+                "scoped_relevance_recency_reliability_weighted"
+                if not selected_scope.is_empty()
+                else "recency_reliability_weighted"
+            ),
+            "scope_target": None if selected_scope.is_empty() else selected_scope.to_dict(),
+            "best_scope_match_score": round(max(scope_scores, default=1.0), 4),
             "freshest_saved_at": _format_timestamp(freshest_saved_at),
             "oldest_saved_at": _format_timestamp(oldest_saved_at),
             "saved_at": _format_timestamp(freshest_saved_at or reference_time),
@@ -435,13 +675,16 @@ def refresh_runtime_evaluation_feedback_aggregate(base_dir: Path) -> Optional[Pa
 
 def load_runtime_evaluation_feedback(
     path: Optional[Path] = None,
+    *,
+    scope: Optional[Any] = None,
 ) -> Optional[RuntimeEvaluationFeedback]:
     """Load persisted runtime calibration feedback when available."""
     target_path = Path(path) if path is not None else get_runtime_evaluation_feedback_path()
     feedback_dir = _resolve_feedback_directory(target_path)
     if feedback_dir is not None:
         aggregate = _aggregate_feedback_payloads(
-            _load_feedback_payloads_from_directory(feedback_dir)
+            _load_feedback_payloads_from_directory(feedback_dir),
+            scope=scope,
         )
         if aggregate is not None:
             return aggregate

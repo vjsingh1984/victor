@@ -10,7 +10,11 @@ from victor.agent.services.runtime_intelligence import (
     PromptOptimizationBundle,
     RuntimeIntelligenceService,
 )
-from victor.evaluation.runtime_feedback import save_runtime_evaluation_feedback
+from victor.evaluation.runtime_feedback import (
+    RuntimeEvaluationFeedbackScope,
+    build_validated_session_feedback_payload,
+    save_runtime_evaluation_feedback,
+)
 from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
 from victor.framework.perception_integration import PerceptionIntegration
 from victor.framework.runtime_evaluation_policy import (
@@ -416,3 +420,69 @@ def test_runtime_intelligence_loads_aggregated_validated_feedback_from_results_d
     assert 0.72 < service.evaluation_policy.completion_threshold < 0.84
     assert service.evaluation_policy.enhanced_progress_threshold is not None
     assert 0.55 <= service.evaluation_policy.enhanced_progress_threshold < 0.66
+
+
+def test_runtime_intelligence_prefers_scope_adjacent_validated_feedback(tmp_path):
+    (tmp_path / "eval_runtime_20260425_010101.json").write_text(
+        json.dumps(
+            build_validated_session_feedback_payload(
+                RuntimeEvaluationFeedback(
+                    completion_threshold=0.61,
+                    enhanced_progress_threshold=0.48,
+                    minimum_supported_evidence_score=0.71,
+                ),
+                scope=RuntimeEvaluationFeedbackScope(
+                    project="other-project",
+                    provider="anthropic",
+                    model="claude-sonnet",
+                    task_type="analyze",
+                ),
+                metadata={
+                    "truth_alignment_rate": 0.95,
+                    "task_count": 18,
+                    "saved_at": "2026-04-25T00:00:00+00:00",
+                },
+            )
+        )
+    )
+    (tmp_path / "eval_runtime_20260420_010101.json").write_text(
+        json.dumps(
+            build_validated_session_feedback_payload(
+                RuntimeEvaluationFeedback(
+                    completion_threshold=0.82,
+                    enhanced_progress_threshold=0.67,
+                    minimum_supported_evidence_score=0.87,
+                ),
+                scope=RuntimeEvaluationFeedbackScope(
+                    project="codingagent",
+                    provider="openai",
+                    model="gpt-5",
+                    task_type="edit",
+                ),
+                metadata={
+                    "truth_alignment_rate": 0.88,
+                    "task_count": 9,
+                    "saved_at": "2026-04-20T00:00:00+00:00",
+                },
+            )
+        )
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+        evaluation_feedback_scope=RuntimeEvaluationFeedbackScope(
+            project="codingagent",
+            provider="openai",
+            model="gpt-5",
+            task_type="edit",
+        ),
+    )
+
+    assert service.evaluation_policy.completion_threshold is not None
+    assert service.evaluation_policy.completion_threshold > 0.73
+    assert service.evaluation_policy.enhanced_progress_threshold is not None
+    assert service.evaluation_policy.enhanced_progress_threshold > 0.58

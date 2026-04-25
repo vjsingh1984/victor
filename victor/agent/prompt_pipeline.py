@@ -270,10 +270,21 @@ class UnifiedPromptPipeline:
         ):
             try:
                 from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+                from victor.evaluation.runtime_feedback import (
+                    runtime_evaluation_feedback_scope_from_context,
+                )
 
                 self._runtime_intelligence = RuntimeIntelligenceService(
                     task_analyzer=self._task_analyzer,
                     optimization_injector=self._optimizer,
+                    evaluation_feedback_scope=runtime_evaluation_feedback_scope_from_context(
+                        {
+                            "provider_name": getattr(provider, "provider_name", None)
+                            or getattr(provider, "name", None),
+                            "model": getattr(builder, "model", None)
+                            or getattr(provider, "model", None),
+                        }
+                    ),
                 )
             except Exception as e:
                 logger.debug("Runtime intelligence bootstrap unavailable: %s", e)

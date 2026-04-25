@@ -21,7 +21,11 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from victor.agent.optimization_injector import OptimizationInjector
 from victor.agent.task_analyzer import TaskAnalyzer, get_task_analyzer
-from victor.evaluation.runtime_feedback import load_runtime_evaluation_feedback
+from victor.evaluation.runtime_feedback import (
+    RuntimeEvaluationFeedbackScope,
+    load_runtime_evaluation_feedback,
+    runtime_evaluation_feedback_scope_from_context,
+)
 from victor.framework.perception_integration import PerceptionIntegration
 from victor.framework.runtime_evaluation_policy import (
     ClarificationDecision,
@@ -70,6 +74,7 @@ class RuntimeIntelligenceService:
         decision_service: Optional["LLMDecisionServiceProtocol"] = None,
         evaluation_policy: Optional[RuntimeEvaluationPolicy] = None,
         evaluation_feedback_path: Optional[Any] = None,
+        evaluation_feedback_scope: Optional[Any] = None,
     ) -> None:
         derived_policy = evaluation_policy
         if derived_policy is None and perception_integration is not None:
@@ -78,7 +83,14 @@ class RuntimeIntelligenceService:
             derived_policy = None
         resolved_policy = derived_policy or RuntimeEvaluationPolicy()
         locked_feedback_fields = self._resolve_locked_feedback_fields(perception_integration)
-        persisted_feedback = self._load_persisted_feedback(evaluation_feedback_path)
+        resolved_feedback_scope = self._resolve_feedback_scope(
+            evaluation_feedback_scope,
+            perception_integration,
+        )
+        persisted_feedback = self._load_persisted_feedback(
+            evaluation_feedback_path,
+            resolved_feedback_scope,
+        )
         if persisted_feedback is not None:
             resolved_policy = self._apply_feedback(
                 resolved_policy,
@@ -116,6 +128,7 @@ class RuntimeIntelligenceService:
         perception_integration: Optional[PerceptionIntegration] = None,
         optimization_injector: Optional[OptimizationInjector] = None,
         evaluation_feedback_path: Optional[Any] = None,
+        evaluation_feedback_scope: Optional[Any] = None,
     ) -> "RuntimeIntelligenceService":
         """Create a service instance by resolving the decision service from an orchestrator."""
         container = getattr(orchestrator, "_container", None)
@@ -125,6 +138,7 @@ class RuntimeIntelligenceService:
                 perception_integration=perception_integration,
                 optimization_injector=optimization_injector,
                 evaluation_feedback_path=evaluation_feedback_path,
+                evaluation_feedback_scope=evaluation_feedback_scope,
             )
 
         return cls.from_container(
@@ -133,6 +147,7 @@ class RuntimeIntelligenceService:
             perception_integration=perception_integration,
             optimization_injector=optimization_injector,
             evaluation_feedback_path=evaluation_feedback_path,
+            evaluation_feedback_scope=evaluation_feedback_scope,
         )
 
     @classmethod
@@ -144,6 +159,7 @@ class RuntimeIntelligenceService:
         perception_integration: Optional[PerceptionIntegration] = None,
         optimization_injector: Optional[OptimizationInjector] = None,
         evaluation_feedback_path: Optional[Any] = None,
+        evaluation_feedback_scope: Optional[Any] = None,
     ) -> "RuntimeIntelligenceService":
         """Create a service instance by resolving the decision service from a container."""
         decision_service = cls._resolve_decision_service(container)
@@ -153,6 +169,7 @@ class RuntimeIntelligenceService:
             optimization_injector=optimization_injector,
             decision_service=decision_service,
             evaluation_feedback_path=evaluation_feedback_path,
+            evaluation_feedback_scope=evaluation_feedback_scope,
         )
 
     @staticmethod
@@ -188,10 +205,25 @@ class RuntimeIntelligenceService:
             return None
 
     @staticmethod
-    def _load_persisted_feedback(path: Optional[Any]) -> Optional[Any]:
+    def _resolve_feedback_scope(
+        explicit_scope: Optional[Any],
+        perception_integration: Any,
+    ) -> RuntimeEvaluationFeedbackScope:
+        """Resolve the requested runtime-feedback scope from explicit input or config."""
+        resolved_scope = RuntimeEvaluationFeedbackScope.from_value(explicit_scope)
+        if not resolved_scope.is_empty():
+            return resolved_scope
+        config = getattr(perception_integration, "config", None)
+        return runtime_evaluation_feedback_scope_from_context(config)
+
+    @staticmethod
+    def _load_persisted_feedback(
+        path: Optional[Any],
+        scope: Optional[Any],
+    ) -> Optional[Any]:
         """Load persisted benchmark-truth feedback when available."""
         try:
-            return load_runtime_evaluation_feedback(path)
+            return load_runtime_evaluation_feedback(path, scope=scope)
         except Exception as exc:
             logger.debug("Runtime intelligence could not load persisted feedback: %s", exc)
             return None

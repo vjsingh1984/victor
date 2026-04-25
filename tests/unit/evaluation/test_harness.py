@@ -694,6 +694,16 @@ class TestBenchmarkToolUsageMetrics:
         assert (
             loaded["runtime_evaluation_feedback"]["metadata"]["validated_evaluation_truth"] is True
         )
+        assert loaded["runtime_evaluation_feedback"]["metadata"]["scope"] == {
+            "project": None,
+            "provider": None,
+            "model": "test",
+            "task_type": None,
+            "benchmark": "dr3_eval",
+            "vertical": None,
+            "workflow": None,
+            "tags": [],
+        }
         assert feedback is not None
         assert feedback.metadata["source"] == "validated_evaluation_truth_aggregate"
         assert feedback.metadata["benchmark"] == "dr3_eval"

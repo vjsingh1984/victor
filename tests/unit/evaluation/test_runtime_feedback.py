@@ -5,6 +5,8 @@ import json
 import pytest
 
 from victor.evaluation.runtime_feedback import (
+    RuntimeEvaluationFeedbackScope,
+    build_validated_session_feedback_payload,
     derive_runtime_evaluation_feedback,
     load_runtime_evaluation_feedback,
     save_runtime_evaluation_feedback,
@@ -96,6 +98,43 @@ def test_save_runtime_feedback_records_source_result_path(tmp_path):
     raw = json.loads(path.read_text())
 
     assert raw["metadata"]["source_result_path"] == str(source_result_path)
+
+
+def test_build_validated_session_feedback_payload_uses_explicit_scope_schema():
+    feedback = RuntimeEvaluationFeedback(
+        completion_threshold=0.76,
+        enhanced_progress_threshold=0.61,
+        minimum_supported_evidence_score=0.83,
+    )
+
+    payload = build_validated_session_feedback_payload(
+        feedback,
+        scope=RuntimeEvaluationFeedbackScope(
+            project="codingagent",
+            provider="openai",
+            model="gpt-5",
+            task_type="edit",
+            vertical="coding",
+            workflow="agentic_loop",
+            tags=("repair", "session"),
+        ),
+        validation_label="human_verified_session",
+        metadata={"truth_alignment_rate": 0.91, "task_count": 7},
+    )
+
+    assert payload["metadata"]["source"] == "validated_session_truth_feedback"
+    assert payload["metadata"]["validated_evaluation_truth"] is True
+    assert payload["metadata"]["truth_validation_mode"] == "human_verified_session"
+    assert payload["metadata"]["scope"] == {
+        "project": "codingagent",
+        "provider": "openai",
+        "model": "gpt-5",
+        "task_type": "edit",
+        "benchmark": None,
+        "vertical": "coding",
+        "workflow": "agentic_loop",
+        "tags": ["repair", "session"],
+    }
 
 
 def test_load_runtime_feedback_aggregates_recent_validated_truth_artifacts(tmp_path):
@@ -212,3 +251,78 @@ def test_load_runtime_feedback_prefers_directory_aggregate_over_stale_canonical_
     assert loaded is not None
     assert loaded.completion_threshold == pytest.approx(0.73)
     assert loaded.metadata["aggregated_artifact_count"] == 1
+
+
+def test_load_runtime_feedback_prefers_project_model_task_adjacent_artifacts(tmp_path):
+    unrelated_path = tmp_path / "eval_runtime_20260425_010101.json"
+    adjacent_path = tmp_path / "eval_runtime_20260420_010101.json"
+
+    unrelated_path.write_text(
+        json.dumps(
+            build_validated_session_feedback_payload(
+                RuntimeEvaluationFeedback(
+                    completion_threshold=0.62,
+                    enhanced_progress_threshold=0.5,
+                    minimum_supported_evidence_score=0.72,
+                ),
+                scope=RuntimeEvaluationFeedbackScope(
+                    project="other-project",
+                    provider="anthropic",
+                    model="claude-sonnet",
+                    task_type="analyze",
+                ),
+                metadata={
+                    "truth_alignment_rate": 0.95,
+                    "task_count": 20,
+                    "saved_at": "2026-04-25T00:00:00+00:00",
+                },
+            )
+        )
+    )
+    adjacent_path.write_text(
+        json.dumps(
+            build_validated_session_feedback_payload(
+                RuntimeEvaluationFeedback(
+                    completion_threshold=0.84,
+                    enhanced_progress_threshold=0.68,
+                    minimum_supported_evidence_score=0.88,
+                ),
+                scope=RuntimeEvaluationFeedbackScope(
+                    project="codingagent",
+                    provider="openai",
+                    model="gpt-5",
+                    task_type="edit",
+                ),
+                metadata={
+                    "truth_alignment_rate": 0.88,
+                    "task_count": 10,
+                    "saved_at": "2026-04-20T00:00:00+00:00",
+                },
+            )
+        )
+    )
+
+    loaded = load_runtime_evaluation_feedback(
+        tmp_path / "runtime_evaluation_feedback.json",
+        scope=RuntimeEvaluationFeedbackScope(
+            project="codingagent",
+            provider="openai",
+            model="gpt-5",
+            task_type="edit",
+        ),
+    )
+
+    assert loaded is not None
+    assert loaded.completion_threshold is not None
+    assert loaded.completion_threshold > 0.74
+    assert loaded.metadata["scope_selection_strategy"] == "scoped_relevance_recency_reliability_weighted"
+    assert loaded.metadata["scope_target"] == {
+        "project": "codingagent",
+        "provider": "openai",
+        "model": "gpt-5",
+        "task_type": "edit",
+        "benchmark": None,
+        "vertical": None,
+        "workflow": None,
+        "tags": [],
+    }
