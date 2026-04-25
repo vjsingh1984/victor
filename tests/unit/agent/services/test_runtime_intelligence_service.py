@@ -127,6 +127,14 @@ def test_get_clarification_decision_uses_default_prompt_when_missing():
     )
 
 
+def test_get_confidence_evaluation_emits_retry_without_budget_metadata():
+    result = RuntimeIntelligenceService.get_confidence_evaluation(0.3)
+
+    assert result.decision == EvaluationDecision.RETRY
+    assert result.reason == "Low confidence - retry"
+    assert result.metadata == {}
+
+
 def test_apply_low_confidence_retry_budget_increments_retry_count():
     evaluation = EvaluationResult(
         decision=EvaluationDecision.RETRY,

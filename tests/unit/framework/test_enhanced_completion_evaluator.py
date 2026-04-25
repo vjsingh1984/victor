@@ -322,6 +322,25 @@ class TestEnhancedCompletionEvaluator:
         )
 
     @pytest.mark.asyncio
+    async def test_evaluate_low_confidence_uses_runtime_policy_without_mutating_budget(
+        self, evaluator
+    ):
+        """Low-confidence fallback should share runtime policy vocabulary without spending budget."""
+        evaluator.enable_completion_scoring = False
+        perception = MockPerception(confidence=0.3)
+        state = {"low_confidence_retries": 1}
+
+        result = await evaluator.evaluate(
+            perception=perception,
+            action_result=None,
+            state=state,
+        )
+
+        assert result.decision == EvaluationDecision.RETRY
+        assert result.reason == "Low confidence - retry"
+        assert state["low_confidence_retries"] == 1
+
+    @pytest.mark.asyncio
     async def test_map_to_task_type_from_perception(self, evaluator):
         """Test mapping perception to TaskType."""
         from victor.framework.completion_scorer import TaskType

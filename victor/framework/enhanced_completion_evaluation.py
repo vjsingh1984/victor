@@ -66,6 +66,7 @@ from victor.framework.completion_scorer import (
     CompletionSignal,
     TaskType,
 )
+from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.framework.context_aware_keyword_detector import (
     ContextAwareKeywordDetector,
 )
@@ -481,24 +482,7 @@ class EnhancedCompletionEvaluator:
 
         # Legacy: Confidence-based fallback
         if perception is not None and hasattr(perception, "confidence"):
-            if perception.confidence >= 0.8:
-                return EvaluationResult(
-                    decision=EvaluationDecision.COMPLETE,
-                    score=perception.confidence,
-                    reason="High confidence in perception",
-                )
-            elif perception.confidence >= 0.5:
-                return EvaluationResult(
-                    decision=EvaluationDecision.CONTINUE,
-                    score=perception.confidence,
-                    reason="Medium confidence - continue",
-                )
-            else:
-                return EvaluationResult(
-                    decision=EvaluationDecision.RETRY,
-                    score=perception.confidence,
-                    reason="Low confidence - retry",
-                )
+            return RuntimeIntelligenceService.get_confidence_evaluation(perception.confidence)
 
         # Default: continue with low confidence
         return EvaluationResult(

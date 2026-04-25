@@ -137,7 +137,10 @@ Completed on 2026-04-25:
 - Phase 4.2 low-confidence retry-budget normalization:
   - `RuntimeIntelligenceService` now owns the canonical confidence-band and retry-budget policy
   - `AgenticLoop` now delegates both raw confidence fallback and enhanced low-confidence retry gating through the same runtime policy
+- Phase 4.3 enhanced-evaluator policy emission normalization:
+  - `RuntimeIntelligenceService` now exposes a budget-free confidence evaluation emitter
+  - `EnhancedCompletionEvaluator` now emits the same canonical confidence vocabulary as the live loop without mutating retry state
 
 Next recommended slice:
-- Phase 4.3: normalize low-confidence policy emission inside
-  `EnhancedCompletionEvaluator` so the evaluator and loop share the same runtime policy vocabulary
+- Phase 5: extract a dedicated runtime evaluation-policy object for shared thresholds,
+  wording, and future calibration hooks across perception, evaluator, and loop paths

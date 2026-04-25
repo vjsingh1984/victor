@@ -277,11 +277,37 @@ class RuntimeIntelligenceService:
         medium_confidence_threshold: float = 0.5,
     ) -> Any:
         """Apply the canonical confidence-band policy for live-loop evaluation."""
+        evaluation = RuntimeIntelligenceService.get_confidence_evaluation(
+            confidence,
+            high_confidence_threshold=high_confidence_threshold,
+            medium_confidence_threshold=medium_confidence_threshold,
+        )
+
+        if getattr(evaluation, "should_complete", False) or getattr(
+            evaluation, "should_continue", False
+        ):
+            if "low_confidence_retries" in state:
+                state["low_confidence_retries"] = 0
+            return evaluation
+
+        return RuntimeIntelligenceService.apply_low_confidence_retry_budget(
+            evaluation,
+            state,
+            retry_limit=retry_limit,
+            low_confidence_threshold=medium_confidence_threshold,
+        )
+
+    @staticmethod
+    def get_confidence_evaluation(
+        confidence: float,
+        *,
+        high_confidence_threshold: float = 0.8,
+        medium_confidence_threshold: float = 0.5,
+    ) -> Any:
+        """Emit the canonical confidence-band evaluation without mutating retry state."""
         from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
 
         if confidence >= high_confidence_threshold:
-            if "low_confidence_retries" in state:
-                state["low_confidence_retries"] = 0
             return EvaluationResult(
                 decision=EvaluationDecision.COMPLETE,
                 score=confidence,
@@ -289,38 +315,16 @@ class RuntimeIntelligenceService:
             )
 
         if confidence >= medium_confidence_threshold:
-            if "low_confidence_retries" in state:
-                state["low_confidence_retries"] = 0
             return EvaluationResult(
                 decision=EvaluationDecision.CONTINUE,
                 score=confidence,
                 reason="Medium confidence - continue",
             )
 
-        retry_limit = max(int(retry_limit), 0)
-        retry_count = int(state.get("low_confidence_retries", 0))
-        if retry_count >= retry_limit:
-            return EvaluationResult(
-                decision=EvaluationDecision.FAIL,
-                score=confidence,
-                reason=f"Low confidence retry budget exhausted after {retry_count} retries",
-                metadata={
-                    "low_confidence_retry_exhausted": True,
-                    "low_confidence_retries": retry_count,
-                    "low_confidence_retry_limit": retry_limit,
-                },
-            )
-
-        retry_count += 1
-        state["low_confidence_retries"] = retry_count
         return EvaluationResult(
             decision=EvaluationDecision.RETRY,
             score=confidence,
             reason="Low confidence - retry",
-            metadata={
-                "low_confidence_retries": retry_count,
-                "low_confidence_retry_limit": retry_limit,
-            },
         )
 
     @staticmethod
