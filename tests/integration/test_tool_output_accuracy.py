@@ -95,7 +95,8 @@ class TestToolOutputAccuracy:
             "contains_markup": True,
         }
 
-        formatter = lambda _tool, _args, output: json.dumps(output, sort_keys=True)
+        def formatter(_tool, _args, output):
+            return json.dumps(output, sort_keys=True)
 
         formatted, llm_output, _, _ = format_and_prune_tool_output(
             tool_name="code_search",

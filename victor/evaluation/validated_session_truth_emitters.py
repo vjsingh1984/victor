@@ -66,6 +66,7 @@ class ValidatedSessionTruthEmitter(Protocol):
     ) -> Optional[ValidatedSessionTruthArtifact]:
         """Build a persisted validated session-truth artifact when evidence is strong enough."""
 
+
 DEFAULT_VALIDATED_SESSION_TRUTH_ARTIFACT_NAMING_POLICY = (
     create_default_validated_session_truth_artifact_naming_policy()
 )
