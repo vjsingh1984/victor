@@ -116,11 +116,13 @@ class TaskAnalyzer:
     def __init__(
         self,
         coordinator: Optional["ModeWorkflowTeamCoordinator"] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize task analyzer.
 
         Args:
             coordinator: Optional ModeWorkflowTeamCoordinator for team/workflow suggestions
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self._complexity_classifier = None
         self._action_authorizer = None
@@ -128,6 +130,7 @@ class TaskAnalyzer:
         self._task_classifier = None
         self._intent_classifier = None
         self._coordinator = coordinator
+        self._runtime_intelligence = runtime_intelligence
 
     def set_coordinator(self, coordinator: "ModeWorkflowTeamCoordinator") -> None:
         """Set the coordinator for team/workflow suggestions.
@@ -136,6 +139,11 @@ class TaskAnalyzer:
             coordinator: ModeWorkflowTeamCoordinator instance
         """
         self._coordinator = coordinator
+
+    def set_runtime_intelligence(self, runtime_intelligence: Any) -> None:
+        """Attach the canonical runtime-intelligence service to this analyzer."""
+        self._runtime_intelligence = runtime_intelligence
+        self._unified_classifier = None
 
     @property
     def complexity_classifier(self) -> ComplexityClassifier:
@@ -159,7 +167,9 @@ class TaskAnalyzer:
     def unified_classifier(self) -> UnifiedTaskClassifier:
         if not self._unified_classifier:
             self._unified_classifier = UnifiedTaskClassifier(
-                task_analyzer=self, enable_semantic=True
+                task_analyzer=self,
+                enable_semantic=True,
+                runtime_intelligence=self._runtime_intelligence,
             )
         return self._unified_classifier
 

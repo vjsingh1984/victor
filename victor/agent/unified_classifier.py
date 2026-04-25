@@ -486,6 +486,7 @@ class UnifiedTaskClassifier:
         semantic_confidence_threshold: float = 0.85,
         context_boost_factor: float = 0.15,
         decision_service: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize the unified classifier.
 
@@ -495,12 +496,14 @@ class UnifiedTaskClassifier:
             semantic_confidence_threshold: Min confidence to trust semantic over keyword
             context_boost_factor: How much to boost confidence from context (0-1)
             decision_service: Optional LLMDecisionService for low-confidence augmentation
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self._task_analyzer = task_analyzer
         self._enable_semantic = enable_semantic
         self._semantic_threshold = semantic_confidence_threshold
         self._context_boost = context_boost_factor
         self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
 
         # Lazy-loaded semantic classifier
         self._semantic_classifier: Optional["TaskTypeClassifier"] = None
@@ -509,6 +512,37 @@ class UnifiedTaskClassifier:
         self._cache: Dict[str, Tuple[ClassificationResult, float]] = {}
         self._cache_hits = 0
         self._cache_misses = 0
+
+    def _has_decision_support(self) -> bool:
+        """Return whether low-confidence LLM task classification is available."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Delegate low-confidence task classification to the canonical runtime service."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
 
     @property
     def semantic_classifier(self) -> Optional["TaskTypeClassifier"]:
@@ -751,17 +785,23 @@ class UnifiedTaskClassifier:
         )
 
         # LLM augmentation: if confidence is low and decision service available
-        if self._decision_service is not None and confidence < 0.7:
+        if self._has_decision_support() and confidence < 0.7:
             try:
                 from victor.agent.decisions.schemas import DecisionType
 
-                decision = self._decision_service.decide_sync(
+                decision = self._decide_sync(
                     DecisionType.TASK_TYPE_CLASSIFICATION,
                     context={"message_excerpt": message[:300]},
                     heuristic_result=best_type,
                     heuristic_confidence=confidence,
                 )
-                if decision.source == "llm" and hasattr(decision.result, "task_type"):
+                if (
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
+                    and hasattr(decision.result, "task_type")
+                ):
+                    llm_task_type = getattr(decision.result.task_type, "value", decision.result.task_type)
                     type_map = {
                         "analysis": ClassifierTaskType.ANALYSIS,
                         "action": ClassifierTaskType.ACTION,
@@ -769,7 +809,7 @@ class UnifiedTaskClassifier:
                         "search": ClassifierTaskType.SEARCH,
                         "edit": ClassifierTaskType.EDIT,
                     }
-                    llm_type = type_map.get(decision.result.task_type)
+                    llm_type = type_map.get(llm_task_type)
                     if llm_type is not None and decision.confidence > confidence:
                         result = ClassificationResult(
                             task_type=llm_type,

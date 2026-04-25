@@ -188,14 +188,47 @@ class ToolErrorClassifier:
         re.compile(r"ECONNREFUSED\b", re.IGNORECASE),
     )
 
-    def __init__(self, decision_service=None) -> None:
+    def __init__(self, decision_service=None, runtime_intelligence: Any = None) -> None:
         """Initialize the classifier with empty failure tracking.
 
         Args:
             decision_service: Optional LLMDecisionService for ambiguous error classification
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self._failed_calls: Set[ToolCallSignature] = set()
         self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
+
+    def _has_decision_support(self) -> bool:
+        """Return whether low-confidence LLM decisions are available."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Any:
+        """Delegate to the canonical runtime-intelligence service when present."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
 
     @lru_cache(maxsize=512)
     def classify(self, error_message: str) -> ErrorType:
@@ -223,7 +256,7 @@ class ToolErrorClassifier:
                 return ErrorType.TRANSIENT
 
         # LLM augmentation: when no pattern matches, consult LLM if available
-        if self._decision_service is not None:
+        if self._has_decision_support():
             try:
                 from victor.agent.decisions.chain import should_use_llm
 
@@ -232,19 +265,25 @@ class ToolErrorClassifier:
 
                 from victor.agent.decisions.schemas import DecisionType
 
-                decision = self._decision_service.decide_sync(
+                decision = self._decide_sync(
                     DecisionType.ERROR_CLASSIFICATION,
                     context={"error_message": error_message[:300]},
                     heuristic_result=ErrorType.RETRYABLE,
                     heuristic_confidence=0.4,
                 )
-                if decision.source == "llm" and hasattr(decision.result, "error_type"):
+                if (
+                    decision is not None
+                    and decision.result is not None
+                    and decision.source == "llm"
+                    and hasattr(decision.result, "error_type")
+                ):
+                    error_type = getattr(decision.result.error_type, "value", decision.result.error_type)
                     type_map = {
                         "permanent": ErrorType.PERMANENT,
                         "transient": ErrorType.TRANSIENT,
                         "retryable": ErrorType.RETRYABLE,
                     }
-                    mapped = type_map.get(decision.result.error_type)
+                    mapped = type_map.get(error_type)
                     if mapped is not None:
                         logger.debug(
                             "LLM classified error as %s (conf=%.2f)",
@@ -340,11 +379,14 @@ class ToolErrorClassifier:
 _global_classifier: ToolErrorClassifier | None = None
 
 
-def get_error_classifier() -> ToolErrorClassifier:
+def get_error_classifier(runtime_intelligence: Any = None) -> ToolErrorClassifier:
     """Get or create the global error classifier instance."""
     global _global_classifier
-    if _global_classifier is None:
-        _global_classifier = ToolErrorClassifier()
+    if _global_classifier is None or (
+        runtime_intelligence is not None
+        and getattr(_global_classifier, "_runtime_intelligence", None) is not runtime_intelligence
+    ):
+        _global_classifier = ToolErrorClassifier(runtime_intelligence=runtime_intelligence)
     return _global_classifier
 
 

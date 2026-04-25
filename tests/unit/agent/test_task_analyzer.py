@@ -238,6 +238,15 @@ class TestTaskAnalyzer:
         result2 = analyzer.check_write_authorization("Show me the contents of README.md")
         assert isinstance(result2, bool)
 
+    def test_unified_classifier_uses_runtime_intelligence_when_configured(self):
+        """TaskAnalyzer should build its unified classifier on the canonical runtime service."""
+        runtime_intelligence = MagicMock()
+        analyzer = TaskAnalyzer(runtime_intelligence=runtime_intelligence)
+
+        classifier = analyzer.unified_classifier
+
+        assert classifier._runtime_intelligence is runtime_intelligence
+
     def test_is_simple_query(self):
         """Test is_simple_query helper."""
         analyzer = TaskAnalyzer()

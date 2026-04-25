@@ -113,11 +113,14 @@ Completed on 2026-04-25:
   - `streaming/intent_classification.py`
   - `agent/factory/coordination_builders.py`
   - direct orchestrator task-completion initialization
-
-Next recommended slice:
-- Phase 3.2: migrate the remaining classifier/compaction decision consumers:
+- Phase 3.2 classifier/runtime consolidation:
   - `error_classifier.py`
   - `unified_classifier.py`
+  - `task_analyzer.py`
+  - runtime-service binding of `TaskAnalyzer` to the canonical runtime boundary
+
+Next recommended slice:
+- Phase 3.3: migrate the remaining compaction/runtime decision consumers:
   - `context_compactor.py`
   - `tool_selection.py`
   - `conversation/state_machine.py`

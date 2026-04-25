@@ -21,8 +21,12 @@ Tests verify:
 - Caching improves performance
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 
+from victor.agent.decisions.schemas import DecisionType, ErrorClassDecision, ErrorType as DecisionErrorType
+from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.agent.error_classifier import ToolErrorClassifier, ErrorType
 
 
@@ -432,3 +436,27 @@ class TestErrorClassifierRealWorldErrors:
         assert classifier.classify("HTTP 500: Internal Server Error") == ErrorType.TRANSIENT
         assert classifier.classify("HTTP 502: Bad Gateway") == ErrorType.TRANSIENT
         assert classifier.classify("HTTP 503: Service Unavailable") == ErrorType.TRANSIENT
+
+
+class TestErrorClassifierRuntimeIntelligence:
+    """Tests for canonical runtime-intelligence integration."""
+
+    def test_runtime_intelligence_classifies_ambiguous_errors(self):
+        """RuntimeIntelligenceService should be the canonical low-confidence error path."""
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.ERROR_CLASSIFICATION,
+            result=ErrorClassDecision(
+                error_type=DecisionErrorType.PERMANENT,
+                confidence=0.9,
+            ),
+            source="llm",
+            confidence=0.9,
+        )
+        classifier = ToolErrorClassifier(runtime_intelligence=runtime_intelligence)
+
+        with patch("victor.agent.decisions.chain.should_use_llm", return_value=True):
+            result = classifier.classify("Unexpected adapter contract violation")
+
+        assert result == ErrorType.PERMANENT
+        runtime_intelligence.decide_sync.assert_called_once()

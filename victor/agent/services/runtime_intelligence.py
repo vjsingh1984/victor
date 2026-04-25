@@ -63,6 +63,11 @@ class RuntimeIntelligenceService:
         self._perception_integration = perception_integration or PerceptionIntegration()
         self._optimization_injector = optimization_injector
         self._decision_service = decision_service
+        if hasattr(self._task_analyzer, "set_runtime_intelligence"):
+            try:
+                self._task_analyzer.set_runtime_intelligence(self)
+            except Exception as exc:
+                logger.debug("Runtime intelligence could not bind task analyzer: %s", exc)
 
     @classmethod
     def from_orchestrator(
