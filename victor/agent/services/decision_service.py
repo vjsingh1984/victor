@@ -29,6 +29,7 @@ from victor.agent.services.protocols.decision_service import (
     DecisionResult,
 )
 from victor.core.async_utils import run_sync
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider
@@ -322,6 +323,20 @@ class LLMDecisionService:
     def get_metrics(self) -> DecisionMetrics:
         """Get aggregate metrics for monitoring."""
         return self._metrics
+
+    def get_runtime_evaluation_feedback(self) -> RuntimeEvaluationFeedback:
+        """Export runtime evaluation thresholds aligned to the service confidence gate."""
+        threshold = self._config.confidence_threshold
+        return RuntimeEvaluationFeedback(
+            completion_threshold=threshold,
+            enhanced_progress_threshold=max(0.35, min(threshold, threshold - 0.15)),
+            minimum_supported_evidence_score=min(0.95, max(0.55, threshold + 0.05)),
+            metadata={
+                "source": "llm_decision_service",
+                "confidence_threshold": threshold,
+                "micro_budget": self._config.micro_budget,
+            },
+        )
 
     async def _call_llm(
         self,

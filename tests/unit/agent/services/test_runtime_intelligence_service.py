@@ -10,7 +10,10 @@ from victor.agent.services.runtime_intelligence import (
     RuntimeIntelligenceService,
 )
 from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
-from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
+from victor.framework.runtime_evaluation_policy import (
+    RuntimeEvaluationFeedback,
+    RuntimeEvaluationPolicy,
+)
 
 
 @pytest.mark.asyncio
@@ -243,3 +246,25 @@ def test_evaluate_confidence_progress_merges_threshold_override_into_policy():
     assert result.decision == EvaluationDecision.RETRY
     assert result.reason == "Retry with stronger evidence"
     assert state["low_confidence_retries"] == 1
+
+
+def test_from_container_applies_decision_service_runtime_feedback():
+    from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+    container = MagicMock()
+    decision_service = MagicMock()
+    decision_service.get_runtime_evaluation_feedback.return_value = RuntimeEvaluationFeedback(
+        completion_threshold=0.77,
+        enhanced_progress_threshold=0.62,
+        minimum_supported_evidence_score=0.84,
+    )
+    container.get_optional.side_effect = (
+        lambda protocol: decision_service if protocol is LLMDecisionServiceProtocol else None
+    )
+
+    service = RuntimeIntelligenceService.from_container(container)
+
+    assert service.evaluation_policy.completion_threshold == pytest.approx(0.77)
+    assert service.evaluation_policy.enhanced_progress_threshold == pytest.approx(0.62)
+    assert service.evaluation_policy.minimum_supported_evidence_score == pytest.approx(0.84)
+    assert service.perception_integration.evaluation_policy.completion_threshold == pytest.approx(0.77)

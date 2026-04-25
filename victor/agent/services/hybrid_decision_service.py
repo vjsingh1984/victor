@@ -46,6 +46,7 @@ from victor.agent.services.protocols.decision_service import (
     DecisionMetrics,
     DecisionResult,
 )
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 if TYPE_CHECKING:
     from victor.providers.base import BaseProvider
@@ -724,6 +725,21 @@ class HybridDecisionService:
     def get_hybrid_metrics(self) -> HybridMetrics:
         """Get hybrid-specific metrics."""
         return self._hybrid_metrics
+
+    def get_runtime_evaluation_feedback(self) -> RuntimeEvaluationFeedback:
+        """Export runtime evaluation feedback from the adaptive calibrator when available."""
+        if self._calibrator is not None:
+            return self._calibrator.get_runtime_evaluation_feedback(DecisionType.TASK_COMPLETION)
+        threshold = self._config.base_threshold
+        return RuntimeEvaluationFeedback(
+            completion_threshold=threshold,
+            enhanced_progress_threshold=max(0.35, min(threshold, threshold - 0.15)),
+            minimum_supported_evidence_score=min(0.95, max(0.55, threshold + 0.05)),
+            metadata={
+                "source": "hybrid_decision_service",
+                "calibration_enabled": False,
+            },
+        )
 
     def get_summary(self) -> Dict[str, Any]:
         """Get a comprehensive summary of service state."""

@@ -55,6 +55,16 @@ class CompletionCalibration:
 
 
 @dataclass(frozen=True)
+class RuntimeEvaluationFeedback:
+    """Calibrated runtime-threshold overlay produced by live or benchmark feedback."""
+
+    completion_threshold: Optional[float] = None
+    enhanced_progress_threshold: Optional[float] = None
+    minimum_supported_evidence_score: Optional[float] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class RuntimeEvaluationPolicy:
     """Shared thresholds and wording for runtime evaluation decisions."""
 
@@ -128,6 +138,19 @@ class RuntimeEvaluationPolicy:
         if not filtered:
             return self
         return replace(self, **filtered)
+
+    def with_feedback(
+        self,
+        feedback: Optional[RuntimeEvaluationFeedback],
+    ) -> "RuntimeEvaluationPolicy":
+        """Return a cloned policy with runtime-calibration feedback applied."""
+        if feedback is None:
+            return self
+        return self.with_overrides(
+            completion_threshold=feedback.completion_threshold,
+            enhanced_progress_threshold=feedback.enhanced_progress_threshold,
+            minimum_supported_evidence_score=feedback.minimum_supported_evidence_score,
+        )
 
     def empty_request_decision(self, confidence: float = 0.0) -> ClarificationDecision:
         """Return the canonical clarification response for empty requests."""

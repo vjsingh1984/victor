@@ -69,11 +69,17 @@ class RuntimeIntelligenceService:
             derived_policy = getattr(perception_integration, "evaluation_policy", None)
         if not isinstance(derived_policy, RuntimeEvaluationPolicy):
             derived_policy = None
-        self._evaluation_policy = derived_policy or RuntimeEvaluationPolicy()
+        resolved_policy = derived_policy or RuntimeEvaluationPolicy()
+        if decision_service is not None:
+            feedback = self._resolve_runtime_feedback(decision_service)
+            if feedback is not None:
+                resolved_policy = resolved_policy.with_feedback(feedback)
+        self._evaluation_policy = resolved_policy
         self._task_analyzer = task_analyzer or get_task_analyzer()
         self._perception_integration = perception_integration or PerceptionIntegration(
             config=self._evaluation_policy.to_config()
         )
+        self._synchronize_perception_policy(self._perception_integration)
         self._optimization_injector = optimization_injector
         self._decision_service = decision_service
         if hasattr(self._task_analyzer, "set_runtime_intelligence"):
@@ -140,6 +146,34 @@ class RuntimeIntelligenceService:
         except Exception as exc:
             logger.debug("Runtime intelligence could not resolve decision service: %s", exc)
         return None
+
+    @staticmethod
+    def _resolve_runtime_feedback(decision_service: Any) -> Optional[Any]:
+        """Resolve runtime evaluation feedback from a decision service when supported."""
+        if decision_service is None or not hasattr(decision_service, "get_runtime_evaluation_feedback"):
+            return None
+        try:
+            return decision_service.get_runtime_evaluation_feedback()
+        except Exception as exc:
+            logger.debug(
+                "Runtime intelligence could not resolve decision-service feedback: %s",
+                exc,
+            )
+            return None
+
+    def _synchronize_perception_policy(self, perception_integration: Any) -> None:
+        """Align the underlying perception integration with the shared runtime policy."""
+        if perception_integration is None:
+            return
+        try:
+            if hasattr(perception_integration, "_evaluation_policy"):
+                perception_integration._evaluation_policy = self._evaluation_policy
+            if hasattr(perception_integration, "config") and isinstance(
+                perception_integration.config, dict
+            ):
+                perception_integration.config.update(self._evaluation_policy.to_config())
+        except Exception as exc:
+            logger.debug("Runtime intelligence could not synchronize perception policy: %s", exc)
 
     @property
     def perception_integration(self) -> PerceptionIntegration:

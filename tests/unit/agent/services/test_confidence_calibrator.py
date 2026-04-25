@@ -19,6 +19,7 @@ from victor.agent.services.confidence_calibrator import (
     TypeStatistics,
     create_confidence_calibrator,
 )
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 
 class TestConfidenceCalibrator:
@@ -462,6 +463,31 @@ class TestSummary:
         type_summary = summary["decision_types"]["task_completion"]
         assert type_summary["total_decisions"] == 10
         assert type_summary["recent_accuracy"] == 0.8
+
+    def test_get_runtime_evaluation_feedback_exports_calibrated_thresholds(self):
+        calibrator = ConfidenceCalibrator(
+            strategy=CalibrationStrategy.ADAPTIVE,
+            base_threshold=0.70,
+            target_accuracy=0.90,
+        )
+        calibrator._thresholds[DecisionType.TASK_COMPLETION] = 0.78
+
+        for i in range(12):
+            calibrator.record_outcome(
+                DecisionType.TASK_COMPLETION,
+                0.80,
+                False,
+                i < 9,
+            )
+
+        feedback = calibrator.get_runtime_evaluation_feedback(DecisionType.TASK_COMPLETION)
+
+        assert isinstance(feedback, RuntimeEvaluationFeedback)
+        assert feedback.completion_threshold == pytest.approx(0.78)
+        assert feedback.enhanced_progress_threshold == pytest.approx(0.63)
+        assert feedback.minimum_supported_evidence_score > feedback.completion_threshold
+        assert feedback.metadata["decision_type"] == DecisionType.TASK_COMPLETION.value
+        assert feedback.metadata["heuristic_accuracy"] == pytest.approx(0.75)
 
 
 class TestFactoryFunction:

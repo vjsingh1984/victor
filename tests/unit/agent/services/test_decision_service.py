@@ -22,6 +22,7 @@ from victor.agent.services.protocols.decision_service import (
     LLMDecisionServiceProtocol,
 )
 from victor.core.async_utils import run_sync as real_run_sync
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 
 @dataclass
@@ -347,6 +348,21 @@ class TestMetrics:
     def test_is_healthy_no_provider(self):
         service = LLMDecisionService(provider=None, model="test")
         assert service.is_healthy() is False
+
+    def test_exports_runtime_evaluation_feedback_from_config_threshold(self):
+        provider = _make_provider({})
+        service = LLMDecisionService(
+            provider=provider,
+            model="test",
+            config=LLMDecisionServiceConfig(confidence_threshold=0.72),
+        )
+
+        feedback = service.get_runtime_evaluation_feedback()
+
+        assert isinstance(feedback, RuntimeEvaluationFeedback)
+        assert feedback.completion_threshold == pytest.approx(0.72)
+        assert feedback.enhanced_progress_threshold == pytest.approx(0.57)
+        assert feedback.minimum_supported_evidence_score == pytest.approx(0.77)
 
 
 class TestSyncDecide:

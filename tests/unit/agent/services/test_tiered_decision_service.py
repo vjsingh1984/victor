@@ -19,6 +19,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from victor.agent.decisions.schemas import DecisionType
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 
 class _MockDecisionResult:
@@ -136,6 +137,25 @@ class TestServiceCaching:
         service.decide_sync(DecisionType.STAGE_DETECTION, {"m": "b"})
         # Both edge-routed, should use same service
         assert mock_svc.decide_sync.call_count == 2
+
+    def test_exports_runtime_feedback_from_task_completion_tier(self):
+        from victor.agent.services.tiered_decision_service import TieredDecisionService
+        from victor.config.decision_settings import DecisionServiceSettings
+
+        config = DecisionServiceSettings()
+        service = TieredDecisionService(config)
+        mock_edge = MagicMock()
+        mock_edge.get_runtime_evaluation_feedback.return_value = RuntimeEvaluationFeedback(
+            completion_threshold=0.76,
+            enhanced_progress_threshold=0.61,
+        )
+        service._services["edge"] = mock_edge
+
+        feedback = service.get_runtime_evaluation_feedback()
+
+        assert feedback is not None
+        assert feedback.completion_threshold == pytest.approx(0.76)
+        mock_edge.get_runtime_evaluation_feedback.assert_called_once_with()
 
 
 class TestDecisionServiceSettings:

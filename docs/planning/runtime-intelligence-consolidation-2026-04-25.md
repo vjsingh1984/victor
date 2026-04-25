@@ -157,8 +157,15 @@ Completed on 2026-04-25:
   - `RuntimeIntelligenceService` static compatibility helpers now merge explicit
     threshold and prompt overrides into the shared policy instead of ignoring
     overrides whenever a policy instance is already present
+- Phase 5.4 runtime calibration feedback integration:
+  - `RuntimeEvaluationPolicy` now accepts calibrated runtime feedback overlays
+  - `ConfidenceCalibrator`, `LLMDecisionService`, and `TieredDecisionService`
+    can export runtime-evaluation feedback for task-completion thresholds
+  - `RuntimeIntelligenceService.from_container(...)` now applies decision-service
+    runtime feedback to the shared policy and synchronizes the perception path to
+    that calibrated policy
 
 Next recommended slice:
-- Phase 5.4: connect adaptive calibration inputs and benchmark-truth feedback to
-  `RuntimeEvaluationPolicy` so live runtime thresholds can evolve from measured
-  evidence without reintroducing scattered policy state
+- Phase 5.5: persist benchmark-truth feedback back into the runtime calibration
+  path so offline evaluation outcomes can update future live policies without
+  requiring ad hoc threshold wiring

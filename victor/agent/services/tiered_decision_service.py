@@ -29,6 +29,7 @@ from typing import Any, Dict, Optional, Set
 from victor.agent.decisions.schemas import DecisionType
 from victor.agent.services.protocols.decision_service import DecisionResult
 from victor.config.decision_settings import DecisionServiceSettings
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 logger = logging.getLogger(__name__)
 
@@ -452,6 +453,14 @@ class TieredDecisionService:
     def get_tier(self, decision_type: DecisionType) -> str:
         """Get current tier for a decision type."""
         return self._tier_routing.get(decision_type.value, "edge")
+
+    def get_runtime_evaluation_feedback(self) -> Optional[RuntimeEvaluationFeedback]:
+        """Export runtime feedback from the decision service used for task completion."""
+        tier = self.get_tier(DecisionType.TASK_COMPLETION)
+        service = self._get_service(tier)
+        if service is not None and hasattr(service, "get_runtime_evaluation_feedback"):
+            return service.get_runtime_evaluation_feedback()
+        return None
 
     def get_metrics(self) -> Dict[str, Any]:
         """Export metrics from all active tier services."""

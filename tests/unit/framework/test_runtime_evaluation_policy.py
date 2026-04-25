@@ -1,7 +1,10 @@
 import pytest
 
 from victor.framework.evaluation_nodes import EvaluationDecision
-from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
+from victor.framework.runtime_evaluation_policy import (
+    RuntimeEvaluationFeedback,
+    RuntimeEvaluationPolicy,
+)
 
 
 def test_from_config_applies_shared_thresholds_and_messages():
@@ -76,3 +79,19 @@ def test_build_completion_evaluation_uses_policy_templates_and_thresholds():
     assert progress_result.reason == "Keep going: 0.70/0.85"
     assert retry_result.decision == EvaluationDecision.RETRY
     assert retry_result.reason == "Retry: 0.60"
+
+
+def test_with_feedback_applies_calibrated_runtime_thresholds():
+    policy = RuntimeEvaluationPolicy()
+    feedback = RuntimeEvaluationFeedback(
+        completion_threshold=0.74,
+        enhanced_progress_threshold=0.59,
+        minimum_supported_evidence_score=0.83,
+        metadata={"source": "decision_service"},
+    )
+
+    calibrated = policy.with_feedback(feedback)
+
+    assert calibrated.completion_threshold == 0.74
+    assert calibrated.enhanced_progress_threshold == 0.59
+    assert calibrated.minimum_supported_evidence_score == 0.83

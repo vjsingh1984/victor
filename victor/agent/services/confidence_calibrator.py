@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
 from victor.agent.decisions.schemas import DecisionType
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationFeedback
 
 logger = logging.getLogger(__name__)
 
@@ -463,6 +464,35 @@ class ConfidenceCalibrator:
             }
 
         return summary
+
+    def get_runtime_evaluation_feedback(
+        self,
+        decision_type: DecisionType = DecisionType.TASK_COMPLETION,
+    ) -> RuntimeEvaluationFeedback:
+        """Export calibrated runtime-evaluation thresholds for live execution."""
+        threshold = self._get_threshold(decision_type)
+        stats = self._statistics.get(decision_type)
+        heuristic_accuracy = stats.get_heuristic_accuracy() if stats is not None else None
+        accuracy_gap = 0.0
+        if heuristic_accuracy is not None:
+            accuracy_gap = max(0.0, self._target_accuracy - heuristic_accuracy)
+
+        progress_delta = max(self._adjustment_step, 0.15)
+        progress_threshold = max(0.35, min(threshold, threshold - progress_delta))
+        evidence_threshold = min(0.95, max(0.55, threshold + 0.05 + accuracy_gap))
+
+        return RuntimeEvaluationFeedback(
+            completion_threshold=threshold,
+            enhanced_progress_threshold=progress_threshold,
+            minimum_supported_evidence_score=evidence_threshold,
+            metadata={
+                "decision_type": decision_type.value,
+                "strategy": self._strategy.value,
+                "target_accuracy": self._target_accuracy,
+                "heuristic_accuracy": heuristic_accuracy,
+                "total_decisions": stats.total_decisions if stats is not None else 0,
+            },
+        )
 
 
 def create_confidence_calibrator(
