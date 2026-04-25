@@ -315,6 +315,7 @@ class ConversationStateMachine:
         max_history_size: int = 100,
         event_bus: Optional[ObservabilityBus] = None,
         state_manager: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
     ) -> None:
         """Initialize the state machine.
 
@@ -325,6 +326,8 @@ class ConversationStateMachine:
             event_bus: Optional ObservabilityBus instance. If None, uses DI container.
             state_manager: Optional ConversationStateManager for canonical state storage.
                           If provided, state will be synced to the manager.
+            runtime_intelligence: Optional canonical runtime-intelligence service for
+                stage-detection augmentation.
         """
         self.state = ConversationState()
         self._last_transition_time: float = 0.0
@@ -337,6 +340,7 @@ class ConversationStateMachine:
         # Stage detection order managed by decisions.chain module
         self._event_bus = event_bus or self._get_default_bus()
         self._state_manager = state_manager  # Optional canonical state manager
+        self._runtime_intelligence = runtime_intelligence
 
         # Edge model decision cache — avoid repeated calls with same input
         # Key: stage_value:message_prefix → (result_stage, confidence, timestamp)
@@ -590,16 +594,6 @@ class ConversationStateMachine:
             Tuple of (detected stage, confidence) or (None, 0.0)
         """
         try:
-            container = get_container()
-
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
-
-            service = container.get(LLMDecisionServiceProtocol)
-            if service is None:
-                return None, 0.0
-
             from victor.agent.decisions.schemas import DecisionType
 
             # Always provide full state to edge model — prevents cold-calling
@@ -639,11 +633,13 @@ class ConversationStateMachine:
             predicted_stage, pred_confidence = self.predict_next_stage()
             heuristic_conf = pred_confidence if pred_confidence >= 0.6 else 0.0
 
-            decision = service.decide_sync(
+            decision = self._decide_stage_sync(
                 DecisionType.STAGE_DETECTION,
                 context=context,
                 heuristic_confidence=heuristic_conf,
             )
+            if decision is None:
+                return None, 0.0
 
             if decision.source in ("heuristic", "budget_exhausted", "timeout_fallback"):
                 return None, 0.0
@@ -682,6 +678,39 @@ class ConversationStateMachine:
         except Exception as e:
             logger.debug(f"Edge stage detection unavailable: {e}")
             return None, 0.0
+
+    def _decide_stage_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Use the canonical runtime-intelligence boundary for stage decisions."""
+        if self._runtime_intelligence is not None:
+            decision = self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_confidence=heuristic_confidence,
+            )
+            if decision is not None:
+                return decision
+
+        container = get_container()
+
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
+
+        service = container.get(LLMDecisionServiceProtocol)
+        if service is None:
+            return None
+
+        return service.decide_sync(
+            decision_type,
+            context=context,
+            heuristic_confidence=heuristic_confidence,
+        )
 
     def _detect_stage_from_tools(self) -> Optional[ConversationStage]:
         """Detect stage from recent tool execution patterns.

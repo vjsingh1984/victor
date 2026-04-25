@@ -156,6 +156,23 @@ class TestOrchestratorServiceProvider:
         assert container.is_registered(TaskTrackerProtocol)
         assert container.is_registered(MessageHistoryProtocol)
 
+    def test_create_state_machine_uses_runtime_intelligence(self, mock_settings):
+        """Scoped state machines should be created with runtime intelligence attached."""
+        from victor.agent.service_provider import OrchestratorServiceProvider
+
+        container = ServiceContainer()
+        provider = OrchestratorServiceProvider(mock_settings)
+        runtime_intelligence = MagicMock()
+
+        with patch(
+            "victor.agent.services.runtime_intelligence.RuntimeIntelligenceService.from_container",
+            return_value=runtime_intelligence,
+        ) as mock_from_container:
+            state_machine = provider._create_conversation_state_machine(container)
+
+        mock_from_container.assert_called_once_with(container)
+        assert state_machine._runtime_intelligence is runtime_intelligence
+
     def test_singleton_same_instance(self, mock_settings):
         """Test that singletons return same instance."""
         from victor.agent.service_provider import OrchestratorServiceProvider

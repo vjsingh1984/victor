@@ -121,8 +121,10 @@ Completed on 2026-04-25:
 - Phase 3.3 compaction/runtime consolidation:
   - `context_compactor.py`
   - `agent/factory/coordination_builders.py` compactor construction path
+- Phase 3.4 state-machine/runtime consolidation:
+  - `conversation/state_machine.py`
+  - `service_provider.py` scoped state-machine construction path
 
 Next recommended slice:
-- Phase 3.4: migrate the remaining container-coupled runtime decision consumers:
+- Phase 3.5: migrate the final container-coupled runtime decision consumer:
   - `tool_selection.py`
-  - `conversation/state_machine.py`

@@ -248,7 +248,7 @@ class OrchestratorServiceProvider:
         # ConversationStateMachine - per-session state
         container.register(
             ConversationStateMachineProtocol,
-            lambda c: self._create_conversation_state_machine(),
+            lambda c: self._create_conversation_state_machine(c),
             ServiceLifetime.SCOPED,
         )
 
@@ -475,11 +475,20 @@ class OrchestratorServiceProvider:
     # Factory methods for scoped services
     # =========================================================================
 
-    def _create_conversation_state_machine(self) -> "ConversationStateMachineProtocol":
+    def _create_conversation_state_machine(
+        self,
+        container: Optional[ServiceContainer] = None,
+    ) -> "ConversationStateMachineProtocol":
         """Create ConversationStateMachine instance."""
         from victor.agent.conversation.state_machine import ConversationStateMachine
+        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 
-        return ConversationStateMachine()
+        runtime_container = container or getattr(self, "container", None)
+        runtime_intelligence = None
+        if runtime_container is not None:
+            runtime_intelligence = RuntimeIntelligenceService.from_container(runtime_container)
+
+        return ConversationStateMachine(runtime_intelligence=runtime_intelligence)
 
     def _create_unified_task_tracker(self) -> "TaskTrackerProtocol":
         """Create UnifiedTaskTracker instance."""

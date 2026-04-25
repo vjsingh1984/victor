@@ -250,6 +250,29 @@ class TestStageDetectionEdge:
         assert stage is None
         assert confidence == 0.0
 
+    def test_edge_stage_detection_prefers_runtime_intelligence(self):
+        """Stage detection should use the canonical runtime-intelligence seam first."""
+        from victor.agent.conversation.state_machine import ConversationStateMachine
+        from victor.core.shared_types import ConversationStage
+
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = MagicMock(
+            source="llm",
+            result=MagicMock(stage="execution"),
+            confidence=0.92,
+        )
+        machine = ConversationStateMachine(runtime_intelligence=runtime_intelligence)
+
+        with patch(
+            "victor.agent.conversation.state_machine.get_container",
+            side_effect=AssertionError("container path should not be used"),
+        ):
+            stage, confidence = machine._detect_stage_with_edge_model("Fix the auth bug")
+
+        assert stage == ConversationStage.EXECUTION
+        assert confidence == 0.92
+        runtime_intelligence.decide_sync.assert_called_once()
+
     def test_keyword_detection_still_works(self):
         from victor.agent.conversation.state_machine import ConversationStateMachine
 
