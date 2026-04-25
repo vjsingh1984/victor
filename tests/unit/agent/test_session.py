@@ -172,6 +172,45 @@ class TestSessionPersistence:
         assert session.metadata.provider == "anthropic"
         assert session.metadata.message_count == 4  # 4 messages (system prompt added lazily)
 
+    def test_load_session_preserves_preview_messages(self, session_manager):
+        """load_session should retain replay-only preview sidecar messages."""
+        conversation = MessageHistory()
+        conversation.add_user_message("Show me config.py")
+        conversation.add_assistant_message("Here is the current file preview.")
+        conversation.add_preview_message(
+            "system",
+            "FILE PREVIEW: config.py",
+            {
+                "preview_kind": "file_preview",
+                "preview_path": "config.py",
+                "preview_language": "python",
+                "preview_body": "SETTING = True\n",
+            },
+        )
+
+        session_id = session_manager.save_session(
+            conversation=conversation,
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+        )
+
+        session = session_manager.load_session(session_id)
+
+        assert session is not None
+        assert session.conversation["preview_messages"] == [
+            {
+                "role": "system",
+                "content": "FILE PREVIEW: config.py",
+                "metadata": {
+                    "preview_kind": "file_preview",
+                    "preview_path": "config.py",
+                    "preview_language": "python",
+                    "preview_body": "SETTING = True\n",
+                },
+                "after_message_index": 2,
+            }
+        ]
+
     def test_load_nonexistent_session(self, session_manager):
         """load_session should return None for missing sessions."""
         session = session_manager.load_session("nonexistent_id")
