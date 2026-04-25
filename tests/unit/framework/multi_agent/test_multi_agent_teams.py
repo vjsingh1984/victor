@@ -645,7 +645,7 @@ class TestTeamSpecSerialization:
         assert data["members"][0]["role_in_team"] == "worker"
         assert data["members"][0]["is_leader"] is True
         assert data["members"][0]["max_concurrent_tasks"] == 3
-        assert data["members"][0]["tool_access"] == ["read_file"]
+        assert data["members"][0]["tool_access"] == ["read"]
         assert data["members"][0]["persona"]["name"] == "Agent"
 
 
