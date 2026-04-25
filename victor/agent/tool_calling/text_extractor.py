@@ -18,9 +18,9 @@ Many open-weight models hosted on OpenAI-compatible providers (Cerebras, Groq,
 Together, etc.) sometimes output tool calls as Python-like function calls in text
 instead of proper structured JSON tool_calls. For example:
 
-    read_file(path='victor/agent/orchestrator.py')
-    shell(command="ls -la")
-    edit(file_path="/path/to/file", old_string="foo", new_string="bar")
+    read(path='victor/agent/orchestrator.py')
+    shell(cmd="ls -la")
+    edit(path="/path/to/file", old_str="foo", new_str="bar")
 
 This module provides extraction logic to parse these text-based calls into
 structured tool call format that Victor can execute.
@@ -35,8 +35,8 @@ Usage:
 
     extractor = PythonCallExtractor()
     result = extractor.extract_from_text(
-        "I'll read the file: read_file(path='foo.py')",
-        valid_tool_names={"read_file", "write_file", "shell"}
+        "I'll read the file: read(path='foo.py')",
+        valid_tool_names={"read", "write", "shell"}
     )
     if result.tool_calls:
         for tc in result.tool_calls:
@@ -48,6 +48,8 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +190,10 @@ class PythonCallExtractor:
             known_tools: Set of known/valid tool names. If None, uses defaults.
             strict_mode: If True, only extract calls for known tools.
         """
-        self._known_tools = known_tools or KNOWN_TOOL_PATTERNS
+        self._known_tools = {
+            canonicalize_core_tool_name(tool_name)
+            for tool_name in (known_tools or KNOWN_TOOL_PATTERNS)
+        }
         self._strict_mode = strict_mode
 
     def extract_from_text(
@@ -210,7 +215,11 @@ class PythonCallExtractor:
             return ExtractionResult(remaining_content=content)
 
         # Explicit valid_tool_names disables generic name heuristics.
-        filter_names = set(valid_tool_names) if valid_tool_names else set(self._known_tools)
+        filter_names = (
+            {canonicalize_core_tool_name(name) for name in valid_tool_names}
+            if valid_tool_names
+            else set(self._known_tools)
+        )
 
         tool_calls: List[ExtractedToolCall] = []
         warnings: List[str] = []
@@ -219,18 +228,19 @@ class PythonCallExtractor:
         # Try simple pattern first
         for match in PYTHON_CALL_PATTERN.finditer(content):
             name = match.group("name")
+            canonical_name = canonicalize_core_tool_name(name)
             args_str = match.group("args")
 
             if self._is_definition_context(content, match.start()):
                 continue
 
             # Filter by known/valid tool names
-            if self._strict_mode and name not in filter_names:
+            if self._strict_mode and canonical_name not in filter_names:
                 continue
 
             # Skip if name doesn't look like a tool
             if not self._is_likely_tool_name(
-                name,
+                canonical_name,
                 filter_names,
                 exact_match_required=valid_tool_names is not None,
             ):
@@ -244,12 +254,14 @@ class PythonCallExtractor:
                 if not parsed_args:
                     continue
 
+            parsed_args = self._canonicalize_arguments(canonical_name, parsed_args)
+
             # Calculate confidence based on various factors
-            confidence = self._calculate_confidence(name, parsed_args, filter_names)
+            confidence = self._calculate_confidence(canonical_name, parsed_args, filter_names)
 
             tool_calls.append(
                 ExtractedToolCall(
-                    name=name,
+                    name=canonical_name,
                     arguments=parsed_args,
                     raw_text=match.group(0),
                     start_pos=match.start(),
@@ -297,15 +309,17 @@ class PythonCallExtractor:
         Returns:
             True if name looks like a tool name
         """
+        canonical_name = canonicalize_core_tool_name(name)
+
         # Direct match
-        if name in valid_names:
+        if canonical_name in valid_names:
             return True
 
         if exact_match_required:
             return False
 
         # Check against known patterns
-        if name in self._known_tools:
+        if canonical_name in self._known_tools:
             return True
 
         # Heuristics for tool-like names
@@ -372,6 +386,41 @@ class PythonCallExtractor:
             return False
 
         return False
+
+    def _canonicalize_arguments(self, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize extracted arguments onto the compact canonical core-tool surface."""
+        if not args:
+            return args
+
+        normalized = dict(args)
+
+        if tool_name == "shell":
+            if "command" in normalized and "cmd" not in normalized:
+                normalized["cmd"] = normalized.pop("command")
+            if "arg_0" in normalized and "cmd" not in normalized and len(normalized) == 1:
+                normalized["cmd"] = normalized.pop("arg_0")
+        elif tool_name in {"read", "write", "ls"}:
+            for alias in ("file_path", "filename", "file", "directory", "dir"):
+                if alias in normalized and "path" not in normalized:
+                    normalized["path"] = normalized.pop(alias)
+            if "arg_0" in normalized and "path" not in normalized and len(normalized) == 1:
+                normalized["path"] = normalized.pop("arg_0")
+        elif tool_name == "edit":
+            if "file_path" in normalized and "path" not in normalized:
+                normalized["path"] = normalized.pop("file_path")
+            if "old_string" in normalized and "old_str" not in normalized:
+                normalized["old_str"] = normalized.pop("old_string")
+            if "new_string" in normalized and "new_str" not in normalized:
+                normalized["new_str"] = normalized.pop("new_string")
+            if "operations" in normalized and "ops" not in normalized:
+                normalized["ops"] = normalized.pop("operations")
+        elif tool_name in {"grep", "search", "code_search"}:
+            if "pattern" in normalized and "query" not in normalized:
+                normalized["query"] = normalized.pop("pattern")
+            if "arg_0" in normalized and "query" not in normalized and len(normalized) == 1:
+                normalized["query"] = normalized.pop("arg_0")
+
+        return normalized
 
     def _parse_arguments(self, args_str: str) -> Tuple[Dict[str, Any], Optional[str]]:
         """Parse Python-style keyword arguments from a string.
@@ -543,7 +592,7 @@ class PythonCallExtractor:
             confidence += 0.1
 
         # Boost for common argument names
-        common_args = {"path", "file_path", "command", "content", "query", "pattern"}
+        common_args = {"path", "cmd", "content", "query", "old_str", "new_str", "ops"}
         if any(arg in common_args for arg in args.keys()):
             confidence += 0.1
 

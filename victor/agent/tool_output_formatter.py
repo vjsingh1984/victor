@@ -64,6 +64,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Protocol, Tuple
+from victor.tools.tool_names import get_canonical_name
 
 if TYPE_CHECKING:
     from victor.agent.presentation import PresentationProtocol
@@ -236,7 +237,7 @@ class ToolOutputFormatter:
         # IMPORTANT: For file reads, check size BEFORE truncation
         # Very large files should use file structure mode, not head+tail truncation
         # This prevents losing critical content in the middle of large files
-        if tool_name in ("read_file", "read"):
+        if get_canonical_name(tool_name) == "read":
             if original_len > self.config.file_structure_threshold:
                 # Skip truncation - use file structure mode instead
                 return self._format_large_file_structure(args, output, output_str, original_len)
@@ -633,31 +634,35 @@ ACTION REQUIRED: This file is too large to display fully.
             Status message string with icon prefix
         """
         running_icon = self._presentation.icon("running")
+        canonical_tool_name = get_canonical_name(tool_name)
+        display_name = tool_name or canonical_tool_name
 
-        if tool_name == "execute_bash" and "command" in tool_args:
-            cmd = tool_args["command"]
+        if canonical_tool_name == "shell":
+            cmd = tool_args.get("cmd") or tool_args.get("command")
+            if not cmd:
+                return f"{running_icon} Running {display_name}..."
             cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-            return f"{running_icon} Running {tool_name}: `{cmd_display}`"
+            return f"{running_icon} Running {display_name}: `{cmd_display}`"
 
-        if tool_name == "list_directory":
+        if canonical_tool_name == "ls":
             path = tool_args.get("path", ".")
             return f"{running_icon} Listing directory: {path}"
 
-        if tool_name == "read":
+        if canonical_tool_name == "read":
             path = tool_args.get("path", "file")
             return f"{running_icon} Reading file: {path}"
 
-        if tool_name == "edit_files":
-            files = tool_args.get("files", [])
+        if canonical_tool_name == "edit":
+            files = tool_args.get("ops") or tool_args.get("files") or tool_args.get("edits") or []
             if files and isinstance(files, list):
-                paths = [f.get("path", "?") for f in files[:3]]
+                paths = [f.get("path", "?") for f in files[:3] if isinstance(f, dict)]
                 path_display = ", ".join(paths)
                 if len(files) > 3:
                     path_display += f" (+{len(files) - 3} more)"
                 return f"{running_icon} Editing: {path_display}"
-            return f"{running_icon} Running {tool_name}..."
+            return f"{running_icon} Running {display_name}..."
 
-        if tool_name == "write":
+        if canonical_tool_name == "write":
             path = tool_args.get("path", "file")
             return f"{running_icon} Writing file: {path}"
 
@@ -666,7 +671,7 @@ ACTION REQUIRED: This file is too large to display fully.
             query_display = query[:50] + "..." if len(query) > 50 else query
             return f"{running_icon} Searching: {query_display}"
 
-        return f"{running_icon} Running {tool_name}..."
+        return f"{running_icon} Running {display_name}..."
 
 
 def create_tool_output_formatter(

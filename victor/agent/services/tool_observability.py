@@ -37,6 +37,7 @@ from typing import (
 )
 
 from victor.observability.request_correlation import get_request_correlation_id
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 logger = logging.getLogger(__name__)
 
@@ -136,11 +137,9 @@ class ToolObservabilityHandler:
         )
 
         # Track read files for task completion detection
-        if (
-            result.success
-            and result.tool_name in ("read", "Read", "read_file")
-            and read_files_session is not None
-        ):
+        canonical_tool_name = canonicalize_core_tool_name((result.tool_name or "").lower())
+
+        if result.success and canonical_tool_name == "read" and read_files_session is not None:
             if result.arguments:
                 file_path = result.arguments.get("path") or result.arguments.get("file_path")
                 if file_path:
@@ -385,11 +384,11 @@ class ToolObservabilityHandler:
 
     def _build_tool_preview(self, result: Any) -> Optional[Dict[str, Any]]:
         """Build a structured preview payload for UI consumption."""
-        tool_name = (result.tool_name or "").lower()
+        tool_name = canonicalize_core_tool_name((result.tool_name or "").lower())
         arguments = result.arguments or {}
         content = result.result
 
-        if tool_name in {"read", "read_file"}:
+        if tool_name == "read":
             text = self._extract_text_content(content)
             if text:
                 return {

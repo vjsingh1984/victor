@@ -50,6 +50,7 @@ import sqlite3
 
 from victor.core.async_utils import run_sync
 from victor.core.json_utils import json_dumps, json_loads
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 import uuid
 
 if TYPE_CHECKING:
@@ -1411,6 +1412,8 @@ class ConversationStore:
         tool_name: Optional[str],
     ) -> MessagePriority:
         """Determine message priority based on role and context."""
+        canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
+
         if role == MessageRole.SYSTEM:
             return MessagePriority.CRITICAL
 
@@ -1422,7 +1425,7 @@ class ConversationStore:
 
         if role == MessageRole.TOOL:
             # File contents and search results are valuable context
-            if tool_name in ("read_file", "code_search", "list_directory"):
+            if canonical_tool_name in ("read", "code_search", "ls"):
                 return MessagePriority.HIGH
             return MessagePriority.MEDIUM
 

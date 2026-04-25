@@ -25,7 +25,7 @@ for escalation.
 
 Example:
     policy = PermissionPolicy(PermissionMode.WORKSPACE_WRITE)
-    result = policy.authorize("bash", {"command": "ls"})
+    result = policy.authorize("shell", {"cmd": "ls"})
     if result.allowed:
         # Execute tool
     elif result.needs_prompt:
@@ -40,6 +40,8 @@ import logging
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Callable, Dict, Optional, Protocol, runtime_checkable
+
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +208,6 @@ class PermissionPrompter(Protocol):
 DEFAULT_TOOL_PERMISSIONS: Dict[str, PermissionMode] = {
     # Read-only tools
     "read": PermissionMode.READ_ONLY,
-    "read_file": PermissionMode.READ_ONLY,
     "glob": PermissionMode.READ_ONLY,
     "glob_search": PermissionMode.READ_ONLY,
     "grep": PermissionMode.READ_ONLY,
@@ -221,9 +222,7 @@ DEFAULT_TOOL_PERMISSIONS: Dict[str, PermissionMode] = {
     "structured_output": PermissionMode.READ_ONLY,
     # Workspace-write tools
     "write": PermissionMode.WORKSPACE_WRITE,
-    "write_file": PermissionMode.WORKSPACE_WRITE,
     "edit": PermissionMode.WORKSPACE_WRITE,
-    "edit_file": PermissionMode.WORKSPACE_WRITE,
     "file_editor": PermissionMode.WORKSPACE_WRITE,
     "patch": PermissionMode.WORKSPACE_WRITE,
     "notebook_edit": PermissionMode.WORKSPACE_WRITE,
@@ -234,7 +233,6 @@ DEFAULT_TOOL_PERMISSIONS: Dict[str, PermissionMode] = {
     "scaffold": PermissionMode.WORKSPACE_WRITE,
     "refactor": PermissionMode.WORKSPACE_WRITE,
     # Danger/full-access tools
-    "bash": PermissionMode.DANGER_FULL_ACCESS,
     "shell": PermissionMode.DANGER_FULL_ACCESS,
     "code_executor": PermissionMode.DANGER_FULL_ACCESS,
     "repl": PermissionMode.DANGER_FULL_ACCESS,
@@ -270,7 +268,12 @@ class PermissionPolicy:
         self._active_mode = active_mode
         self._tool_requirements = dict(DEFAULT_TOOL_PERMISSIONS)
         if tool_requirements:
-            self._tool_requirements.update(tool_requirements)
+            self._tool_requirements.update(
+                {
+                    canonicalize_core_tool_name(name): required
+                    for name, required in tool_requirements.items()
+                }
+            )
         self._allow_all = allow_all
 
     @property
@@ -292,6 +295,7 @@ class PermissionPolicy:
         Returns:
             Required PermissionMode. Defaults to DANGER_FULL_ACCESS for unknown tools.
         """
+        tool_name = canonicalize_core_tool_name(tool_name)
         return self._tool_requirements.get(tool_name, PermissionMode.DANGER_FULL_ACCESS)
 
     def register_tool_permission(self, tool_name: str, required: PermissionMode) -> None:
@@ -301,7 +305,7 @@ class PermissionPolicy:
             tool_name: Name of the tool.
             required: Required permission level.
         """
-        self._tool_requirements[tool_name] = required
+        self._tool_requirements[canonicalize_core_tool_name(tool_name)] = required
 
     def sync_from_tool_metadata(self) -> int:
         """Derive tool permissions from ToolMetadataRegistry's AccessMode.
@@ -346,6 +350,7 @@ class PermissionPolicy:
         if self._allow_all:
             return AuthorizationDecision.allow()
 
+        tool_name = canonicalize_core_tool_name(tool_name)
         required = self.get_required_permission(tool_name)
 
         if self._active_mode >= required:

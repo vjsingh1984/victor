@@ -192,7 +192,7 @@ class QueryService:
         events = []
 
         try:
-            async with aiosqlite.connect(self.paths.conversation_db) as db:
+            async with aiosqlite.connect(self.paths.project_db) as db:
                 db.row_factory = aiosqlite.Row
 
                 # Build query with filters
@@ -429,7 +429,7 @@ class QueryService:
         """
         # Try to get metrics from database
         try:
-            async with aiosqlite.connect(self.paths.conversation_db):
+            async with aiosqlite.connect(self.paths.project_db):
                 # Count messages (proxy for activity)
                 # TODO: Use message count for activity metrics
                 # async with db.execute("SELECT COUNT(*) as count FROM messages") as cursor:
@@ -470,7 +470,7 @@ class QueryService:
 
             cutoff = datetime.now() - timedelta(hours=1)
 
-            async with aiosqlite.connect(self.paths.conversation_db) as db:
+            async with aiosqlite.connect(self.paths.project_db) as db:
                 async with db.execute(
                     """SELECT COUNT(DISTINCT session_id) as count
                        FROM messages

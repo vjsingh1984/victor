@@ -11,6 +11,7 @@ from victor.agent.tool_pipeline import (
     PipelineExecutionResult,
     LRUToolCache,
 )
+from victor.agent.tool_executor import ToolExecutionResult
 
 
 @pytest.fixture
@@ -126,6 +127,26 @@ class TestExecuteToolCalls:
         await pipeline.execute_tool_calls(tool_calls)
         on_start.assert_called()
         on_complete.assert_called()
+
+    async def test_legacy_read_file_uses_exact_dedup_key(self, pipeline):
+        await pipeline.execute_tool_calls([{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}])
+        assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
+
+    async def test_write_file_invalidates_read_dedup_key(self, pipeline, mock_tool_executor):
+        await pipeline.execute_tool_calls([{"name": "read_file", "arguments": {"path": "/tmp/f.py"}}])
+        assert "/tmp/f.py:None:None" in pipeline._read_file_timestamps
+
+        mock_tool_executor.execute.return_value = ToolExecutionResult(
+            tool_name="write",
+            success=True,
+            result="updated",
+            execution_time=0.01,
+        )
+        await pipeline.execute_tool_calls(
+            [{"name": "write_file", "arguments": {"path": "/tmp/f.py", "content": "x"}}]
+        )
+
+        assert "/tmp/f.py:None:None" not in pipeline._read_file_timestamps
 
 
 class TestLRUToolCache:

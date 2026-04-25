@@ -1183,26 +1183,28 @@ class TestSharedInfrastructureIntegration:
         settings = Settings()
 
         # Conversation memory settings
-        assert hasattr(settings, "conversation_memory_enabled")
-        # conversation_memory_db now uses get_project_paths().conversation_db (project-local)
-        # Database consolidation: conversation_db is an alias for project.db
-        assert get_project_paths().conversation_db.name == "project.db"
-        assert hasattr(settings, "max_context_tokens")
-        assert hasattr(settings, "response_token_reserve")
+        assert get_project_paths().project_db.name == "project.db"
+        assert settings.conversation is not None
+        assert settings.context is not None
+        assert settings.response is not None
+        assert settings.conversation.conversation_memory_enabled is not None
+        assert settings.context.max_context_tokens is not None
+        assert settings.response.response_token_reserve is not None
 
         # Resilience settings
-        assert hasattr(settings, "resilience_enabled")
-        assert hasattr(settings, "circuit_breaker_failure_threshold")
-        assert hasattr(settings, "retry_max_attempts")
+        assert settings.resilience is not None
+        assert settings.resilience.circuit_breaker_failure_threshold is not None
+        assert settings.resilience.retry_max_attempts is not None
 
         # Rate limiting settings
-        assert hasattr(settings, "rate_limiting_enabled")
-        assert hasattr(settings, "rate_limit_requests_per_minute")
-        assert hasattr(settings, "rate_limit_max_concurrent")
+        assert settings.resilience.rate_limiting_enabled is not None
+        assert settings.resilience.rate_limit_requests_per_minute is not None
+        assert settings.resilience.rate_limit_max_concurrent is not None
 
         # Streaming metrics settings
-        assert hasattr(settings, "streaming_metrics_enabled")
-        assert hasattr(settings, "streaming_metrics_history_size")
+        assert settings.analytics is not None
+        assert settings.analytics.streaming_metrics_enabled is not None
+        assert settings.analytics.streaming_metrics_history_size is not None
 
 
 if __name__ == "__main__":

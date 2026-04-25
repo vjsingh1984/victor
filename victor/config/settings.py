@@ -150,11 +150,6 @@ class ProjectPaths:
         return self.project_victor_dir / "project.db"
 
     @property
-    def conversation_db(self) -> Path:
-        """Alias for project_db (backward compatibility)."""
-        return self.project_db
-
-    @property
     def embeddings_dir(self) -> Path:
         """Get project-local embeddings directory."""
         return self.project_victor_dir / "embeddings"

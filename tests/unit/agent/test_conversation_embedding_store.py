@@ -458,12 +458,12 @@ class TestConversationStoreIntegration:
     def temp_paths(self):
         """Create temporary paths for both stores.
 
-        Note: Tests use temporary conversation.db for isolation.
+        Note: Tests use temporary project.db for isolation.
         In production, ConversationStore uses project.db (consolidated database).
         """
         with tempfile.TemporaryDirectory() as tmpdir:
             yield {
-                "db_path": Path(tmpdir) / "conversation.db",
+                "db_path": Path(tmpdir) / "project.db",
                 "embed_path": Path(tmpdir) / "embeddings",
             }
 

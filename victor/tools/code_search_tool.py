@@ -637,8 +637,8 @@ def _build_search_response(
     """Build a consistent search tool response envelope."""
     cache_entry = _get_index_cache(exec_ctx).get(str(root_path), {})
     hint = (
-        "Use read_file with offset/limit based on line_number/end_line for precise reads. "
-        "Example: read_file(path, offset=line_number-1, limit=end_line-line_number+5)"
+        "Use read with offset/limit based on line_number/end_line for precise reads. "
+        "Example: read(path, offset=line_number-1, limit=end_line-line_number+5)"
     )
     if follow_up_suggestions:
         hint += f" Graph follow-up: {follow_up_suggestions[0]['command']}"

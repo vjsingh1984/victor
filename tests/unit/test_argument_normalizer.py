@@ -204,12 +204,12 @@ class TestNormalizeArgumentsAST:
         result, strategy = normalizer.normalize_arguments(args, "edit_files")
         assert strategy == NormalizationStrategy.PYTHON_AST
         # The result should be a Python list (new behavior) or valid JSON (old)
-        if isinstance(result["operations"], str):
-            parsed = json.loads(result["operations"])
+        if isinstance(result["ops"], str):
+            parsed = json.loads(result["ops"])
             assert "type" in parsed[0]
         else:
-            assert isinstance(result["operations"], list)
-            assert "type" in result["operations"][0]
+            assert isinstance(result["ops"], list)
+            assert "type" in result["ops"][0]
 
     def test_python_syntax_dict_normalized(self):
         """Test Python syntax dict is normalized to JSON."""
@@ -564,12 +564,12 @@ class TestIntegration:
         assert strategy != NormalizationStrategy.FAILED
 
         # Result should be valid JSON (string) or Python object
-        if isinstance(result["operations"], str):
-            parsed = json.loads(result["operations"])
+        if isinstance(result["ops"], str):
+            parsed = json.loads(result["ops"])
             assert parsed[0]["type"] == "modify"
         else:
             # New behavior: Python object directly
-            assert result["operations"][0]["type"] == "modify"
+            assert result["ops"][0]["type"] == "modify"
 
     def test_gpt_oss_aliases(self):
         """Test gpt-oss style parameter aliases are handled."""

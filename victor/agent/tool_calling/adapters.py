@@ -37,6 +37,7 @@ from victor.agent.tool_calling.base import (
 )
 from victor.agent.tool_calling.capabilities import ModelCapabilityLoader
 from victor.providers.base import ToolDefinition
+from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -878,10 +879,10 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
 
         Handles patterns like:
         - <execute_bash>ls -la</execute_bash>
-        - <tool_code>print(read_file("path"))</tool_code>
+        - <tool_code>print(read("path"))</tool_code>
         - <ctrl42>call: `tool_name` ```json {...}```
         - call: `tool_name` ```json {...}```
-        - print(list_directory(path="..."))
+        - print(ls(path="..."))
         """
         tool_calls = []
         warnings = []
@@ -894,7 +895,13 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             if tool_name and self.is_valid_tool_name(tool_name):
                 try:
                     args = json.loads(json_str) if json_str else {}
-                    tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                    canonical_tool_name = get_canonical_name(tool_name)
+                    tool_calls.append(
+                        ToolCall(
+                            name=canonical_tool_name,
+                            arguments=self.normalize_arguments(args, canonical_tool_name),
+                        )
+                    )
                     remaining = remaining.replace(match.group(0), "")
                     logger.debug(f"Parsed ctrl42 call: {tool_name}({args})")
                 except json.JSONDecodeError:
@@ -907,7 +914,13 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             if tool_name and self.is_valid_tool_name(tool_name):
                 try:
                     args = json.loads(json_str) if json_str else {}
-                    tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                    canonical_tool_name = get_canonical_name(tool_name)
+                    tool_calls.append(
+                        ToolCall(
+                            name=canonical_tool_name,
+                            arguments=self.normalize_arguments(args, canonical_tool_name),
+                        )
+                    )
                     remaining = remaining.replace(match.group(0), "")
                     logger.debug(f"Parsed simple call: {tool_name}({args})")
                 except json.JSONDecodeError:
@@ -924,16 +937,22 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             tool_name = match.group(1).strip()
             arg_value = match.group(2).strip()
             if tool_name and self.is_valid_tool_name(tool_name):
+                canonical_tool_name = get_canonical_name(tool_name)
                 # Map common tool argument names
-                if tool_name in ("list_directory", "read_file"):
+                if canonical_tool_name in ("ls", "read"):
                     args = {"path": arg_value}
-                elif tool_name == "execute_bash":
-                    args = {"command": arg_value}
+                elif canonical_tool_name == "shell":
+                    args = {"cmd": arg_value}
                 elif tool_name in ("code_search", "semantic_code_search"):
                     args = {"query": arg_value}
                 else:
                     args = {"path": arg_value}  # Default
-                tool_calls.append(ToolCall(name=tool_name, arguments=args))
+                tool_calls.append(
+                    ToolCall(
+                        name=canonical_tool_name,
+                        arguments=self.normalize_arguments(args, canonical_tool_name),
+                    )
+                )
                 remaining = remaining.replace(match.group(0), "")
                 logger.debug(f"Parsed Python call: {tool_name}({args})")
 
@@ -943,8 +962,8 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             if command:
                 tool_calls.append(
                     ToolCall(
-                        name="execute_bash",
-                        arguments={"command": command},
+                        name="shell",
+                        arguments={"cmd": command},
                     )
                 )
                 remaining = remaining.replace(match.group(0), "")
@@ -954,12 +973,12 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
             code = match.group(1).strip()
             if code:
                 # Try to extract read_file calls
-                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                read_file_match = re.search(r'read(?:_file)?\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
                 if read_file_match:
                     path = read_file_match.group(1)
                     tool_calls.append(
                         ToolCall(
-                            name="read_file",
+                            name="read",
                             arguments={"path": path},
                         )
                     )
@@ -972,12 +991,12 @@ class GoogleToolCallingAdapter(FallbackParsingMixin, BaseToolCallingAdapter):
         for match in self.CODE_BLOCK_PATTERN.finditer(content):
             code = match.group(1).strip()
             if code:
-                read_file_match = re.search(r'read_file\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
+                read_file_match = re.search(r'read(?:_file)?\s*\(\s*["\']([^"\']+)["\']\s*\)', code)
                 if read_file_match:
                     path = read_file_match.group(1)
                     tool_calls.append(
                         ToolCall(
-                            name="read_file",
+                            name="read",
                             arguments={"path": path},
                         )
                     )

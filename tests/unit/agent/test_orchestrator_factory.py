@@ -566,7 +566,7 @@ class TestCreateMemoryComponents:
         with patch("victor.config.settings.get_project_paths") as mock_paths:
             mock_project = MagicMock()
             mock_project.project_victor_dir = MagicMock()
-            mock_project.conversation_db = "/tmp/test.db"
+            mock_project.project_db = "/tmp/test.db"
             mock_project.project_root = "/tmp/project"
             mock_paths.return_value = mock_project
 

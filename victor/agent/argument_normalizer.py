@@ -14,6 +14,7 @@ from enum import Enum
 from typing import Any, Dict, Optional, Tuple
 
 from pydantic import BaseModel, Field
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 # Import native extensions with unified availability check
 try:
@@ -153,16 +154,8 @@ class ArgumentNormalizer:
         _builtin_aliases: Dict[str, Dict[str, str]] = {
             "shell": {"command": "cmd"},
             "shell_readonly": {"command": "cmd"},
-            "execute_bash": {"command": "cmd"},
             "read": {"file_path": "path", "filename": "path"},
-            "read_file": {"file_path": "path", "filename": "path"},
             "write": {
-                "file_path": "path",
-                "filename": "path",
-                "text": "content",
-                "data": "content",
-            },
-            "write_file": {
                 "file_path": "path",
                 "filename": "path",
                 "text": "content",
@@ -170,9 +163,11 @@ class ArgumentNormalizer:
             },
             "edit": {"operations": "ops"},
             "ls": {"directory": "path", "dir": "path"},
-            "list_directory": {"directory": "path", "dir": "path"},
         }
-        user_aliases = self.config.get("parameter_aliases", {})
+        user_aliases = {
+            canonicalize_core_tool_name(tool_name): aliases
+            for tool_name, aliases in self.config.get("parameter_aliases", {}).items()
+        }
         # Merge: user overrides built-in
         self.parameter_aliases: Dict[str, Dict[str, str]] = {**_builtin_aliases, **user_aliases}
         self.stats: NormalizationStats = NormalizationStats(
@@ -203,6 +198,7 @@ class ArgumentNormalizer:
         Returns:
             (normalized_arguments, was_aliased) - returns original if no aliases apply
         """
+        tool_name = canonicalize_core_tool_name(tool_name)
         tool_aliases = self.parameter_aliases.get(tool_name, {})
         if not tool_aliases:
             return arguments, False
@@ -263,6 +259,7 @@ class ArgumentNormalizer:
         Returns:
             (normalized_arguments, strategy_used)
         """
+        tool_name = canonicalize_core_tool_name(tool_name)
         self.stats.total_calls += 1
 
         # Track per-tool stats
@@ -630,7 +627,7 @@ class ArgumentNormalizer:
             Normalized arguments with tool-specific repairs applied
         """
         # Tool-specific repairs
-        if tool_name in {"edit", "edit_files"}:
+        if canonicalize_core_tool_name(tool_name) == "edit":
             return self._repair_edit_files_args(arguments)
 
         # Add more tool-specific repairs here as needed

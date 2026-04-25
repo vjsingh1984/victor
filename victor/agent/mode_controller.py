@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,6 +86,20 @@ class OperationalModeConfig:
     sandbox_dir: Optional[str] = None
     # Whether edits are allowed in sandbox even if disallowed_tools has edit
     allow_sandbox_edits: bool = False
+
+    def __post_init__(self) -> None:
+        """Normalize tool names to the canonical runtime surface."""
+        self.allowed_tools = {
+            canonicalize_core_tool_name(tool) for tool in self.allowed_tools if tool
+        }
+        self.disallowed_tools = {
+            canonicalize_core_tool_name(tool) for tool in self.disallowed_tools if tool
+        }
+        self.tool_priorities = {
+            canonicalize_core_tool_name(tool): priority
+            for tool, priority in self.tool_priorities.items()
+            if tool
+        }
 
 
 # Default mode configurations
@@ -186,7 +202,7 @@ WORKFLOW:
         tool_priorities={
             "code_search": 1.3,
             "semantic_code_search": 1.3,
-            "read_file": 1.2,
+            "read": 1.2,
             "dependency_graph": 1.2,
             "plan_files": 1.5,
         },
@@ -382,9 +398,10 @@ class AgentModeController:
             True if the tool is allowed
         """
         config = self.config
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
 
         # Check disallowed list first (takes precedence)
-        if tool_name in config.disallowed_tools:
+        if canonical_tool_name in config.disallowed_tools:
             return False
 
         # If allow_all_tools, it's allowed unless disallowed
@@ -392,7 +409,7 @@ class AgentModeController:
             return True
 
         # Otherwise, check allowed list
-        return tool_name in config.allowed_tools
+        return canonical_tool_name in config.allowed_tools
 
     def get_tool_priority(self, tool_name: str) -> float:
         """Get priority adjustment for a tool in current mode.
@@ -403,7 +420,8 @@ class AgentModeController:
         Returns:
             Priority multiplier (1.0 = no adjustment)
         """
-        return self.config.tool_priorities.get(tool_name, 1.0)
+        canonical_tool_name = canonicalize_core_tool_name(tool_name)
+        return self.config.tool_priorities.get(canonical_tool_name, 1.0)
 
     def get_system_prompt_addition(self) -> str:
         """Get additional system prompt text for current mode.

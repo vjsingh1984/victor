@@ -338,7 +338,7 @@ class TestPathResolverResolveFile:
         with pytest.raises(IsADirectoryError) as exc_info:
             resolver.resolve_file("src")
         assert "directory" in str(exc_info.value).lower()
-        assert "list_directory" in str(exc_info.value)
+        assert "ls(" in str(exc_info.value)
 
     def test_raises_for_nonexistent(self, resolver):
         """Test raises FileNotFoundError for nonexistent file."""
@@ -360,7 +360,7 @@ class TestPathResolverResolveDirectory:
         with pytest.raises(NotADirectoryError) as exc_info:
             resolver.resolve_directory("README.md")
         assert "not a directory" in str(exc_info.value).lower()
-        assert "read_file" in str(exc_info.value)
+        assert "read(" in str(exc_info.value)
 
     def test_raises_for_nonexistent(self, resolver):
         """Test raises FileNotFoundError for nonexistent directory."""

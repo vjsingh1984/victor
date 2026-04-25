@@ -66,6 +66,7 @@ from victor.config.tool_selection_defaults import (
     ToolPipelineDefaults,
     IdempotentTools,
 )
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 # Import native compute_signature for 10-20x faster signature generation
 try:
@@ -150,8 +151,6 @@ IDEMPOTENT_TOOLS = IdempotentTools.IDEMPOTENT_TOOLS | frozenset(
         "Grep",
         "Graph",
         "Glob",
-        "read_file",  # Alternative name for 'read'
-        "list_directory",  # Alternative name for 'ls'
         "code_search",  # Semantic code search alias
         "semantic_code_search",
         "refs",  # Reference lookup
@@ -1101,20 +1100,20 @@ class ToolPipeline:
         age = time.monotonic() - self._read_file_timestamps[file_path]
         return age < max_age_seconds
 
-    def record_file_read(self, file_path: str) -> None:
+    def record_file_read(self, read_key: str) -> None:
         """Record that a file was read.
 
         Updates the timestamp for deduplication tracking.
 
         Args:
-            file_path: Path of the file that was read
+            read_key: Deduplication key for the file read, including offset/limit
         """
         # Evict oldest entries if at capacity (prevent unbounded growth)
         if len(self._read_file_timestamps) >= 2000:
             oldest_key = next(iter(self._read_file_timestamps))
             del self._read_file_timestamps[oldest_key]
-        self._read_file_timestamps[file_path] = time.monotonic()
-        logger.debug(f"Recorded file read: {file_path}")
+        self._read_file_timestamps[read_key] = time.monotonic()
+        logger.debug(f"Recorded file read: {read_key}")
 
     def deduplicate_tool_calls(
         self,
@@ -1698,7 +1697,9 @@ class ToolPipeline:
         # NOTE: Only dedup reads of the EXACT same file+args within a short window.
         # Do NOT block re-reads after the file has been edited (agent needs to verify).
         # Allow re-reads with different offset/limit (reading different sections).
-        if tool_name.lower() in ("read", "read_file"):
+        canonical_core_tool = canonicalize_core_tool_name(tool_name.lower())
+
+        if canonical_core_tool == "read":
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             offset = normalized_args.get("offset")
             limit = normalized_args.get("limit")
@@ -1721,7 +1722,7 @@ class ToolPipeline:
                 )
 
         # Invalidate read cache for files that were just edited/written
-        if tool_name.lower() in ("edit", "write", "write_file", "edit_file"):
+        if canonical_core_tool in {"edit", "write"}:
             edited_path = normalized_args.get("path") or normalized_args.get("file_path")
             if edited_path:
                 # Clear all cached reads for this file (any offset/limit)
@@ -2044,10 +2045,12 @@ class ToolPipeline:
 
         # Record file read for deduplication (prompting loop fix)
         # Include capitalized variants for tool name normalization
-        if call_result.success and tool_name.lower() in ("read", "read_file"):
+        if call_result.success and canonical_core_tool == "read":
             file_path = normalized_args.get("path") or normalized_args.get("file_path")
             if file_path:
-                self.record_file_read(file_path)
+                offset = normalized_args.get("offset")
+                limit = normalized_args.get("limit")
+                self.record_file_read(f"{file_path}:{offset}:{limit}")
 
         # Track failed signatures
         if not exec_result.success and self.config.enable_failed_signature_tracking:

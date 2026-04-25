@@ -283,8 +283,7 @@ def isolate_conversation_database(tmp_path):
     without an explicit db_path will write to the real project .victor/
     directory, polluting it with test-model sessions (37K+ observed).
 
-    Patches project_db (the canonical path after DB consolidation).
-    conversation_db is an alias for project_db, so both are covered.
+    Patches project_db, the canonical path after DB consolidation.
     Other ProjectPaths properties (MCP config, context files) still resolve normally.
     """
     from unittest.mock import PropertyMock, patch

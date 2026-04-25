@@ -312,21 +312,21 @@ class TestConvenienceFunctions:
     def test_get_safe_tools(self):
         """Test the get_safe_tools convenience function."""
         all_tools = {
-            "read_file",
-            "write_file",
-            "list_directory",
-            "execute_bash",
+            "read",
+            "write",
+            "ls",
+            "shell",
             "code_search",
         }
 
         # Display only should filter out write
         safe = get_safe_tools("show me a function", all_tools)
-        assert "read_file" in safe
-        assert "write_file" not in safe
+        assert "read" in safe
+        assert "write" not in safe
 
         # Write allowed should include write
         safe = get_safe_tools("save this to file.py", all_tools)
-        assert "write_file" in safe
+        assert "write" in safe
 
 
 class TestSafeActionsMapping:

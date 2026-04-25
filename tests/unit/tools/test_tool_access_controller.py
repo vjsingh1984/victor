@@ -197,6 +197,13 @@ class TestSafetyLayer:
         assert allowed is False
         assert "sandbox" in reason.lower()
 
+    def test_sandbox_mode_blocks_shell_alias(self):
+        """Legacy shell aliases should still be blocked via canonical matching."""
+        layer = SafetyLayer(sandbox_mode=True)
+        allowed, reason = layer.check("execute_bash", None)
+        assert allowed is False
+        assert "sandbox" in reason.lower()
+
     def test_non_sandbox_allows_dangerous(self):
         """Test non-sandbox mode allows dangerous tools."""
         layer = SafetyLayer(sandbox_mode=False)

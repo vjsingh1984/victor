@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Callable, List, Optional, Set, Tuple
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 from victor.tools.tool_names import ToolNames
 
 logger = logging.getLogger(__name__)
@@ -49,6 +50,11 @@ LIST_TOOL_ALIASES = frozenset({ToolNames.LS, "list_directory"})
 WRITE_TOOL_ALIASES = frozenset({ToolNames.WRITE, "write_file", "create_file"})
 EDIT_TOOL_ALIASES = frozenset({ToolNames.EDIT, "edit_files", "edit_file", "patch_file"})
 SHELL_TOOL_ALIASES = frozenset({ToolNames.SHELL, "execute_bash", "bash"})
+
+
+def _canonicalize_tool_set(tools: Set[str]) -> Set[str]:
+    """Canonicalize only the compact file/shell tool aliases."""
+    return {canonicalize_core_tool_name(tool) for tool in tools}
 
 
 class ActionIntent(Enum):
@@ -651,7 +657,12 @@ def get_safe_tools(message: str, all_tools: Set[str]) -> Set[str]:
         tools = action_to_tools.get(action, set())
         safe.update(tools)
 
-    return safe.intersection(all_tools)
+    safe_canonical = _canonicalize_tool_set(safe)
+    return {
+        tool
+        for tool in all_tools
+        if tool in safe or canonicalize_core_tool_name(tool) in safe_canonical
+    }
 
 
 # Semantic alias for clarity

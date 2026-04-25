@@ -106,11 +106,14 @@ class TurnBoundaryContextAssembler:
         for msg in recent_messages[-6:]:
             content = getattr(msg, "content", "") or ""
             content_lower = content.lower()
-            if any(kw in content_lower for kw in ("read_file", "code_search", "grep", "ls ")):
+            if any(kw in content_lower for kw in ("read(", "read_file", "code_search", "grep", "ls(")):
                 tool_types.append("exploration")
-            elif any(kw in content_lower for kw in ("edit", "write_file", "create")):
+            elif any(
+                kw in content_lower
+                for kw in ("edit(", "edit_files", "write(", "write_file", "create")
+            ):
                 tool_types.append("mutation")
-            elif any(kw in content_lower for kw in ("bash", "shell", "test", "git ")):
+            elif any(kw in content_lower for kw in ("shell(", "execute_bash", "bash", "test", "git ")):
                 tool_types.append("execution")
 
         if not tool_types:
@@ -131,9 +134,9 @@ class TurnBoundaryContextAssembler:
             return list(scores)
 
         phase_keywords = {
-            "exploration": ("read_file", "search", "grep"),
-            "mutation": ("edit", "write", "create"),
-            "execution": ("bash", "test", "git "),
+            "exploration": ("read(", "read_file", "search", "grep", "ls("),
+            "mutation": ("edit(", "edit_files", "write(", "write_file", "create"),
+            "execution": ("shell(", "execute_bash", "bash", "test", "git "),
         }
 
         adjusted = []
@@ -141,9 +144,16 @@ class TurnBoundaryContextAssembler:
             content = getattr(msg, "content", "") or ""
             content_lower = content.lower()
 
-            is_exploration = any(kw in content_lower for kw in ("read_file", "search", "grep"))
-            is_mutation = any(kw in content_lower for kw in ("edit", "write", "create"))
-            is_execution = any(kw in content_lower for kw in ("bash", "test", "git "))
+            is_exploration = any(
+                kw in content_lower for kw in ("read(", "read_file", "search", "grep", "ls(")
+            )
+            is_mutation = any(
+                kw in content_lower
+                for kw in ("edit(", "edit_files", "write(", "write_file", "create")
+            )
+            is_execution = any(
+                kw in content_lower for kw in ("shell(", "execute_bash", "bash", "test", "git ")
+            )
 
             if focus_phase == "mutation" and is_exploration:
                 adjusted.append(score * 0.3)

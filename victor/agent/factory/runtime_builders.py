@@ -304,7 +304,7 @@ class RuntimeBuildersMixin:
 
             paths = get_project_paths()
             paths.project_victor_dir.mkdir(parents=True, exist_ok=True)
-            db_path = paths.conversation_db
+            db_path = paths.project_db
             max_context = getattr(self.settings, "max_context_tokens", 100000)
             response_reserve = getattr(self.settings, "response_token_reserve", 4096)
 

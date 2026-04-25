@@ -458,7 +458,7 @@ async def edit(
 
     # Initialize change tracker for undo/redo
     tracker = get_change_tracker()
-    tracker.begin_change_group("edit_files", desc or f"Edit {len(ops)} files")
+    tracker.begin_change_group("edit", desc or f"Edit {len(ops)} files")
 
     # Count operations by type
     by_type = {"create": 0, "modify": 0, "delete": 0, "rename": 0}
@@ -485,7 +485,7 @@ async def edit(
                     change_type=ChangeType.CREATE,
                     original_content=None,
                     new_content=content,
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "create", "path": path},
                 )
 
@@ -509,7 +509,7 @@ async def edit(
                     change_type=ChangeType.MODIFY,
                     original_content=original_content,
                     new_content=content,
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "modify", "path": path},
                 )
 
@@ -526,7 +526,7 @@ async def edit(
                     change_type=ChangeType.DELETE,
                     original_content=original_content,
                     new_content=None,
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "delete", "path": path},
                 )
 
@@ -540,7 +540,7 @@ async def edit(
                     file_path=str(new_file_path),
                     change_type=ChangeType.RENAME,
                     original_path=str(file_path),
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={"type": "rename", "path": path, "new_path": new_path},
                 )
 
@@ -651,7 +651,7 @@ async def edit(
                     change_type=ChangeType.MODIFY,
                     original_content=original_content,
                     new_content=new_content,
-                    tool_name="edit_files",
+                    tool_name="edit",
                     tool_args={
                         "type": "replace",
                         "path": path,

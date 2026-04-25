@@ -48,12 +48,30 @@ from victor.agent.protocols import (
     ToolAccessDecision,
 )
 from victor.protocols.mode_aware import ModeAwareMixin
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.conversation.state_machine import ConversationStage
     from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
+
+
+def _core_tool_name(tool_name: str) -> str:
+    """Canonicalize only the compact file/shell tool aliases."""
+    return canonicalize_core_tool_name(tool_name)
+
+
+def _tool_matches(tool_name: str, names: Set[str]) -> bool:
+    """Return True when a tool matches a set after core alias normalization."""
+    canonical_names = {_core_tool_name(name) for name in names}
+    return _core_tool_name(tool_name) in canonical_names
+
+
+def _filter_matching_tools(all_tools: Set[str], names: Set[str]) -> Set[str]:
+    """Filter original tool names using normalized membership checks."""
+    canonical_names = {_core_tool_name(name) for name in names}
+    return {tool for tool in all_tools if _core_tool_name(tool) in canonical_names}
 
 
 # =============================================================================
@@ -140,8 +158,6 @@ class SafetyLayer(AccessLayer):
     DANGEROUS_TOOLS: Set[str] = frozenset(
         {
             "shell",
-            "bash",
-            "execute_bash",
             "git_push",
             "git_commit",
             "delete_file",
@@ -158,10 +174,10 @@ class SafetyLayer(AccessLayer):
 
     def check(self, tool_name: str, context: Optional[ToolAccessContext]) -> Tuple[bool, str]:
         """Check safety constraints for a tool."""
-        if tool_name in self.BLOCKED_TOOLS:
+        if _tool_matches(tool_name, self.BLOCKED_TOOLS):
             return False, f"Tool '{tool_name}' is blocked for safety reasons"
 
-        if self._sandbox_mode and tool_name in self.DANGEROUS_TOOLS:
+        if self._sandbox_mode and _tool_matches(tool_name, self.DANGEROUS_TOOLS):
             return False, f"Tool '{tool_name}' is blocked in sandbox mode"
 
         return True, "Passed safety checks"
@@ -209,10 +225,11 @@ class ModeLayer(AccessLayer, ModeAwareMixin):
         mode_info = self.get_mode_info()
         if mode_info.allowed_tools:
             # Intersection with mode's allowed tools
-            return all_tools & mode_info.allowed_tools
+            return _filter_matching_tools(all_tools, mode_info.allowed_tools)
 
         # Remove disallowed tools
-        return all_tools - mode_info.disallowed_tools
+        disallowed = _filter_matching_tools(all_tools, mode_info.disallowed_tools)
+        return all_tools - disallowed
 
 
 # =============================================================================
@@ -237,7 +254,7 @@ class SessionLayer(AccessLayer):
         if context is None or context.session_enabled_tools is None:
             return True, "No session restrictions"
 
-        if tool_name in context.session_enabled_tools:
+        if _tool_matches(tool_name, context.session_enabled_tools):
             return True, "Tool enabled for this session"
 
         return False, f"Tool '{tool_name}' not enabled for this session"
@@ -248,7 +265,7 @@ class SessionLayer(AccessLayer):
         """Get tools allowed by session."""
         if context is None or context.session_enabled_tools is None:
             return all_tools.copy()
-        return all_tools & context.session_enabled_tools
+        return _filter_matching_tools(all_tools, context.session_enabled_tools)
 
 
 # =============================================================================
@@ -291,7 +308,7 @@ class VerticalLayer(AccessLayer):
         if not allowed:
             return True, "Vertical has no tool restrictions"
 
-        if tool_name in allowed:
+        if _tool_matches(tool_name, allowed):
             return True, "Tool allowed by vertical config"
 
         vertical_name = context.vertical_name if context else "active"
@@ -342,7 +359,7 @@ class VerticalLayer(AccessLayer):
         if not allowed:
             return all_tools.copy()
 
-        return all_tools & allowed
+        return _filter_matching_tools(all_tools, allowed)
 
 
 # =============================================================================
@@ -368,13 +385,9 @@ class StageLayer(AccessLayer, ModeAwareMixin):
     # Write/execute tools to filter during exploration
     WRITE_TOOLS: Set[str] = frozenset(
         {
-            "write_file",
             "write",
-            "edit_files",
             "edit",
             "shell",
-            "bash",
-            "execute_bash",
             "git_commit",
             "git_push",
             "delete_file",
@@ -385,9 +398,7 @@ class StageLayer(AccessLayer, ModeAwareMixin):
     CORE_TOOLS: Set[str] = frozenset(
         {
             "read",
-            "read_file",
             "ls",
-            "list_directory",
             "search",
             "code_search",
             "shell",
@@ -430,11 +441,11 @@ class StageLayer(AccessLayer, ModeAwareMixin):
             return True, f"Stage {stage_name} allows all tools"
 
         # Always allow core and preserved tools
-        if tool_name in self.CORE_TOOLS or tool_name in self._preserved_tools:
+        if _tool_matches(tool_name, self.CORE_TOOLS | self._preserved_tools):
             return True, f"Tool '{tool_name}' is core/preserved"
 
         # Filter write tools during exploration
-        if tool_name in self.WRITE_TOOLS:
+        if _tool_matches(tool_name, self.WRITE_TOOLS):
             return False, f"Write tool '{tool_name}' filtered during {stage_name} stage"
 
         return True, f"Tool allowed during {stage_name} stage"
@@ -465,13 +476,9 @@ class IntentLayer(AccessLayer):
     # Write tools blocked for read-only intents
     WRITE_TOOLS: Set[str] = frozenset(
         {
-            "write_file",
             "write",
-            "edit_files",
             "edit",
             "shell",
-            "bash",
-            "execute_bash",
             "git_commit",
             "git_push",
             "delete_file",
@@ -489,7 +496,7 @@ class IntentLayer(AccessLayer):
 
         # Check if read-only intent
         if intent_name in self.READ_ONLY_INTENTS:
-            if tool_name in self.WRITE_TOOLS:
+            if _tool_matches(tool_name, self.WRITE_TOOLS):
                 return (
                     False,
                     f"Write tool '{tool_name}' blocked for {intent_name} intent",

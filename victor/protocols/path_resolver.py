@@ -579,7 +579,7 @@ class PathResolver(IPathResolver):
         if result.is_directory:
             raise IsADirectoryError(
                 f"Cannot read directory as file: {path}\n"
-                f"Suggestion: Use list_directory(path='{path}') to explore its contents."
+                f"Suggestion: Use ls(path='{path}') to explore its contents."
             )
 
         return result
@@ -602,7 +602,7 @@ class PathResolver(IPathResolver):
         if result.is_file:
             raise NotADirectoryError(
                 f"Path is not a directory: {path}\n"
-                f"Suggestion: Use read_file(path='{path}') to read file contents."
+                f"Suggestion: Use read(path='{path}') to read file contents."
             )
 
         return result

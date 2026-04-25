@@ -293,18 +293,14 @@ _PROGRESSIVE_TOOLS_CONFIG = {
     "grep": ["query", "directory"],
     "search": ["query", "directory"],
     "ls": ["path", "recursive"],
-    "shell": ["command"],
+    "shell": ["cmd"],
     "git": ["operation", "files", "branch"],
     "http": ["url", "method"],
     "web": ["query"],
     "summarize": ["query"],
     "fetch": ["url"],
-    # Legacy names (backward compatibility - LLMs may still use these)
-    "read_file": ["path", "offset", "limit"],
     "code_search": ["query", "directory"],
     "semantic_code_search": ["query", "directory"],
-    "list_directory": ["path", "recursive"],
-    "execute_bash": ["command"],
     "http_request": ["url", "method"],
     "web_search": ["query"],
     "web_summarize": ["query"],
@@ -2052,8 +2048,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
     def get_session_tools(self) -> Optional[list]:
         """Get session-locked tools for cache-friendly API calls.
 
-        Returns the FULL tool set (frozen at session start) so the tools
-        prefix remains byte-identical across all API calls in a session.
+        Returns the currently enabled tool set (frozen at session start) so the
+        tool prefix remains byte-identical across API calls in the same session.
         When cache optimization is disabled, returns None (use per-turn).
         """
         if not self._cache_optimization_enabled:
@@ -2061,14 +2057,19 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         session_tools = getattr(self, "_session_tools", None)
         if session_tools is None:
             try:
-                all_tools = self._get_all_available_tools()
-                if all_tools:
-                    self._session_tools = all_tools
+                enabled_tools = self.get_enabled_tools()
+                locked_tools = [
+                    tool
+                    for tool in self.tools.list_tools(only_enabled=True)
+                    if getattr(tool, "name", None) in enabled_tools
+                ]
+                if locked_tools:
+                    self._session_tools = locked_tools
                     logger.info(
                         "[cache] Session tools locked: %d tools (prefix-stable)",
-                        len(all_tools),
+                        len(locked_tools),
                     )
-                    return all_tools
+                    return locked_tools
             except Exception:
                 return None
         return session_tools
@@ -3026,6 +3027,41 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
                         role="system", content=self._system_prompt
                     )
 
+    def refresh_system_prompt(
+        self,
+        query_classification=None,
+        *,
+        preserve_existing_classification: bool = True,
+    ) -> None:
+        """Force a system prompt rebuild after an explicit runtime change."""
+        if getattr(self, "_prompt_pipeline", None):
+            self._prompt_pipeline.unfreeze()
+        self._system_prompt_frozen = False
+        self._session_tools = None
+
+        if query_classification is None and preserve_existing_classification:
+            query_classification = getattr(self.prompt_builder, "query_classification", None)
+
+        self.update_system_prompt_for_query(query_classification=query_classification)
+
+    def _sync_prompt_builder_runtime_state(self) -> None:
+        """Align prompt-builder state with current mode and enabled tools."""
+        builder = getattr(self, "prompt_builder", None)
+        if builder is None:
+            return
+
+        try:
+            builder.available_tools = sorted(self.get_enabled_tools())
+        except Exception as exc:
+            logger.debug("Failed to sync enabled tools into prompt builder: %s", exc)
+            builder.available_tools = []
+
+        try:
+            builder.mode_prompt_addition = self.get_mode_system_prompt()
+        except Exception as exc:
+            logger.debug("Failed to sync mode prompt into prompt builder: %s", exc)
+            builder.mode_prompt_addition = ""
+
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the unified pipeline.
 
@@ -3033,6 +3069,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         available. Falls back to SystemPromptCoordinator, then inline logic
         during __init__ before the pipeline is created.
         """
+        self._sync_prompt_builder_runtime_state()
+
         pipeline = getattr(self, "_prompt_pipeline", None)
         if pipeline is not None:
             return pipeline.build_system_prompt()

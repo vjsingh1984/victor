@@ -37,7 +37,7 @@ class TestPythonCallExtractor:
 
         assert result.success
         assert len(result.tool_calls) == 1
-        assert result.tool_calls[0].name == "read_file"
+        assert result.tool_calls[0].name == "read"
         assert result.tool_calls[0].arguments == {"path": "foo.py"}
 
     def test_simple_double_quoted_arg(self):
@@ -48,7 +48,7 @@ class TestPythonCallExtractor:
         assert result.success
         assert len(result.tool_calls) == 1
         assert result.tool_calls[0].name == "shell"
-        assert result.tool_calls[0].arguments == {"command": "ls -la"}
+        assert result.tool_calls[0].arguments == {"cmd": "ls -la"}
 
     def test_multiple_arguments(self):
         """Test extraction with multiple arguments."""
@@ -59,9 +59,9 @@ class TestPythonCallExtractor:
         assert len(result.tool_calls) == 1
         tc = result.tool_calls[0]
         assert tc.name == "edit"
-        assert tc.arguments["file_path"] == "/path/to/file"
-        assert tc.arguments["old_string"] == "foo"
-        assert tc.arguments["new_string"] == "bar"
+        assert tc.arguments["path"] == "/path/to/file"
+        assert tc.arguments["old_str"] == "foo"
+        assert tc.arguments["new_str"] == "bar"
 
     def test_numeric_argument(self):
         """Test extraction with numeric argument."""
@@ -180,7 +180,7 @@ class TestPythonCallExtractorEdgeCases:
         result = self.extractor.extract_from_text(content)
 
         assert result.success
-        assert result.tool_calls[0].arguments["command"] == "echo 'hello world'"
+        assert result.tool_calls[0].arguments["cmd"] == "echo 'hello world'"
 
     def test_path_with_spaces(self):
         """Test path with spaces."""
@@ -215,7 +215,7 @@ line3')"""
         result = self.extractor.extract_from_text(content)
 
         assert result.success
-        assert result.tool_calls[0].name == "read_file"
+        assert result.tool_calls[0].name == "read"
 
     def test_no_arguments(self):
         """Test function call with no arguments."""

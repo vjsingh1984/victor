@@ -27,6 +27,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -154,7 +156,6 @@ class ToolOutputPruner:
         "read",
         "grep",
         "ls",
-        "list_directory",
         "overview",
         "code_search",
         "semantic_code_search",
@@ -168,7 +169,6 @@ class ToolOutputPruner:
         "patch",
         "apply_patch",
         "shell",
-        "execute_bash",
         "pytest",
     }
 
@@ -178,7 +178,6 @@ class ToolOutputPruner:
         "code_search": {"max_body_lines": 140},
         "semantic_code_search": {"max_body_lines": 140},
         "ls": {"max_body_lines": 160},
-        "list_directory": {"max_body_lines": 160},
         "overview": {"max_body_lines": 180},
         "default": {"max_body_lines": 140},
     }
@@ -234,6 +233,8 @@ class ToolOutputPruner:
                 pruning_reason="Pruning disabled",
                 task_type=task_type,
             )
+
+        tool_name = canonicalize_core_tool_name(tool_name)
 
         if context and context.get("formatted_output"):
             return self._prune_formatted_output(
@@ -492,7 +493,7 @@ class ToolOutputPruner:
             if isinstance(path, str):
                 return f"Use read(path={path!r}, offset=..., limit=200) to continue."
 
-        if tool_name in {"ls", "list_directory"}:
+        if tool_name == "ls":
             path = tool_args.get("path", ".")
             return (
                 f"Rerun ls(path={path!r}, pattern='...', limit=...) "

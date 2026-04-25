@@ -1407,7 +1407,7 @@ async def read(
         # Databases - suggest querying
         "database": {
             "extensions": {".db", ".sqlite", ".sqlite3"},
-            "suggestion": "This is a database file. Use execute_bash with 'sqlite3' to query it, "
+            "suggestion": "This is a database file. Use shell with 'sqlite3' to query it, "
             "e.g., `sqlite3 file.db '.tables'` or `sqlite3 file.db 'SELECT * FROM table LIMIT 5'`.",
         },
         # Python bytecode/cache
@@ -1424,7 +1424,7 @@ async def read(
         # Archives
         "archive": {
             "extensions": {".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar", ".tgz"},
-            "suggestion": "This is an archive. Use execute_bash to list contents: "
+            "suggestion": "This is an archive. Use shell to list contents: "
             "`unzip -l file.zip`, `tar -tf file.tar.gz`, etc.",
         },
         # Compiled/binary
@@ -1537,7 +1537,7 @@ async def read(
         raise ValueError(
             f"Cannot read binary file: {path}\n"
             f"Type: coverage database\n"
-            f"Suggestion: This is a pytest-cov SQLite database. Use execute_bash with sqlite3 to query, "
+            f"Suggestion: This is a pytest-cov SQLite database. Use shell with sqlite3 to query, "
             f"or use 'coverage report' to see formatted coverage data."
         )
 
@@ -2053,13 +2053,13 @@ async def write(
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Record the change
-    tracker.begin_change_group("write_file", f"Write to {path}")
+    tracker.begin_change_group("write", f"Write to {path}")
     tracker.record_change(
         file_path=str(file_path),
         change_type=change_type,
         original_content=original_content,
         new_content=content,
-        tool_name="write_file",
+        tool_name="write",
         tool_args={"path": path},
     )
 
@@ -2975,7 +2975,7 @@ async def overview(
             "total_files_scanned": len(all_files),
             "hints": [
                 "Summary-First: Use directory summaries to identify relevant subsystems before deep diving.",
-                "Use read_file to examine important documentation first",
+                "Use read to examine important documentation first",
                 "Large files often indicate core modules",
                 "Check README.md and CLAUDE.md for project-specific guidance",
             ],

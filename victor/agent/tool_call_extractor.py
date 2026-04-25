@@ -40,6 +40,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -133,7 +135,7 @@ class ToolCallExtractor:
 
         # Try extraction for each mentioned tool, return first successful
         for tool_name in mentioned_tools:
-            result = self._extract_for_tool(text, tool_name, context)
+            result = self._extract_for_tool(text, canonicalize_core_tool_name(tool_name), context)
             if result and result.confidence >= 0.5:
                 logger.info(
                     f"[ToolCallExtractor] Extracted {tool_name} call with "
@@ -163,21 +165,20 @@ class ToolCallExtractor:
         Returns:
             ExtractedToolCall or None
         """
-        # Normalize tool name
-        tool_lower = tool_name.lower()
+        tool_lower = canonicalize_core_tool_name(tool_name).lower()
 
         # Route to appropriate extractor
-        if tool_lower in ("write", "write_file"):
+        if tool_lower == "write":
             return self._extract_write_call(text, context)
-        elif tool_lower in ("edit", "edit_file", "edit_files"):
+        elif tool_lower == "edit":
             return self._extract_edit_call(text, context)
-        elif tool_lower in ("read", "read_file"):
+        elif tool_lower == "read":
             return self._extract_read_call(text, context)
-        elif tool_lower in ("shell", "bash", "execute", "run"):
+        elif tool_lower == "shell":
             return self._extract_shell_call(text, context)
         elif tool_lower in ("grep", "search", "find"):
             return self._extract_search_call(text, context)
-        elif tool_lower in ("ls", "list", "list_directory"):
+        elif tool_lower in ("ls", "list"):
             return self._extract_ls_call(text, context)
         elif tool_lower in ("graph", "graph_search", "query_graph"):
             return self._extract_graph_call(text, context)
@@ -243,8 +244,8 @@ class ToolCallExtractor:
                 tool_name="edit",
                 arguments={
                     "path": file_path,
-                    "old_string": old_content,
-                    "new_string": new_content,
+                    "old_str": old_content,
+                    "new_str": new_content,
                 },
                 confidence=0.8,
                 source_text=text[:200],
@@ -320,7 +321,7 @@ class ToolCallExtractor:
 
         return ExtractedToolCall(
             tool_name="shell",
-            arguments={"command": command},
+            arguments={"cmd": command},
             confidence=0.75,
             source_text=text[:150],
         )

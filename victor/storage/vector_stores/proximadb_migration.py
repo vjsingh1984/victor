@@ -87,7 +87,7 @@ class SqliteLanceDBMigration:
         self.symbol_store_db_path = (
             Path(symbol_store_db_path).expanduser()
             if symbol_store_db_path
-            else project_paths.conversation_db
+            else project_paths.project_db
         )
 
     async def migrate(self, clear_target: bool = False) -> Dict[str, int]:

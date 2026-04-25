@@ -213,6 +213,20 @@ def helper_function():
         # Check for pagination hint (new format uses "HOW TO READ THIS FILE")
         assert "HOW TO READ THIS FILE" in result or "To see specific sections" in result
 
+    def test_format_read_canonical_very_large(self):
+        """Canonical read should use the same large-file path as legacy aliases."""
+        config = ToolOutputFormatterConfig(file_structure_threshold=100)
+        formatter = ToolOutputFormatter(config=config)
+
+        large_content = "def helper():\n    pass\n" * 80
+        result = formatter.format_tool_output(
+            tool_name="read",
+            args={"path": "/path/to/file.py"},
+            output=large_content,
+        )
+
+        assert "FILE STRUCTURE" in result
+
     def test_format_list_directory(self):
         """Test formatting list_directory tool output with xml strategy."""
         formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
@@ -525,6 +539,13 @@ class TestGetStatusMessage:
         result = formatter.get_status_message("execute_bash", {"command": "ls -la /home"})
         assert "Running execute_bash" in result
         assert "ls -la /home" in result
+
+    def test_status_shell_canonical(self):
+        """Test status message for canonical shell tool."""
+        formatter = ToolOutputFormatter()
+        result = formatter.get_status_message("shell", {"cmd": "ls -la /home"})
+        assert "Running shell" in result
+        assert "ls -la /home" in result
         # Accept both emoji (🔧) and text (*) versions
         assert "🔧" in result or "*" in result
 
@@ -586,6 +607,15 @@ class TestGetStatusMessage:
         formatter = ToolOutputFormatter()
         result = formatter.get_status_message("edit_files", {"files": []})
         assert "Running edit_files" in result
+
+    def test_status_edit_canonical_ops(self):
+        """Test status message for canonical edit tool using ops."""
+        formatter = ToolOutputFormatter()
+        result = formatter.get_status_message(
+            "edit",
+            {"ops": [{"type": "replace", "path": "file1.py", "old_str": "a", "new_str": "b"}]},
+        )
+        assert "Editing: file1.py" in result
 
     def test_status_edit_files_not_list(self):
         """Test status message for edit_files with invalid files type."""

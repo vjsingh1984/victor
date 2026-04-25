@@ -471,11 +471,11 @@ class ResponseSanitizer:
         r"Do NOT surround the function call.*",
         r"All parameters are required unless.*",
         r"The agent is not allowed to directly access.*",
-        r"Begin by calling list_directory.*",
-        r"execute_bash\(command=.*\)",
+        r"Begin by calling ls.*",
+        r"shell\(cmd=.*\)",
         r"No files read yet\. Avoid file-specific claims.*",
-        r'list_directory\(path="[^"]*"\)',
-        r'read_file\(path="[^"]*"\)',
+        r'ls\(path="[^"]*"\)',
+        r'read\(path="[^"]*"\)',
     ]
 
     # Patterns indicating garbage/malformed output

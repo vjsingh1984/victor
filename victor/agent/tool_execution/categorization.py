@@ -24,6 +24,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Dict, List, Optional, Set
+from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +82,12 @@ class ToolCallSpec:
 # Optimized tool categorization using frozenset for O(1) lookups
 READ_TOOLS = frozenset(
     {
-        "read_file",
-        "list_directory",
+        "read",
+        "ls",
         "code_search",
         "semantic_code_search",
         "grep_search",
-        "plan_files",
+        "plan",
         "git",
         "directory_tree",
         "file_info",
@@ -95,9 +96,9 @@ READ_TOOLS = frozenset(
 
 WRITE_TOOLS = frozenset(
     {
-        "write_file",
-        "edit_files",
-        "execute_bash",
+        "write",
+        "edit",
+        "shell",
         "docker",
         "patch",
         "create_file",
@@ -109,7 +110,7 @@ NETWORK_TOOLS = frozenset(
     {
         "web_search",
         "web_fetch",
-        "http_request",
+        "http",
         "fetch",
     }
 )
@@ -117,19 +118,20 @@ NETWORK_TOOLS = frozenset(
 # Tool metadata for categorization
 TOOL_METADATA: Dict[str, Dict[str, Any]] = {
     # File operation tools
-    "read_file": {"category": ToolCategory.READ_ONLY, "side_effects": False},
-    "list_directory": {"category": ToolCategory.READ_ONLY, "side_effects": False},
-    "write_file": {"category": ToolCategory.WRITE, "side_effects": True},
-    "edit_files": {"category": ToolCategory.WRITE, "side_effects": True},
-    "execute_bash": {"category": ToolCategory.WRITE, "side_effects": True},
+    "read": {"category": ToolCategory.READ_ONLY, "side_effects": False},
+    "ls": {"category": ToolCategory.READ_ONLY, "side_effects": False},
+    "write": {"category": ToolCategory.WRITE, "side_effects": True},
+    "edit": {"category": ToolCategory.WRITE, "side_effects": True},
+    "shell": {"category": ToolCategory.WRITE, "side_effects": True},
     # Search tools
     "code_search": {"category": ToolCategory.READ_ONLY, "side_effects": False},
     "semantic_code_search": {"category": ToolCategory.READ_ONLY, "side_effects": False},
     "grep_search": {"category": ToolCategory.READ_ONLY, "side_effects": False},
+    "plan": {"category": ToolCategory.READ_ONLY, "side_effects": False},
     # Network tools
     "web_search": {"category": ToolCategory.NETWORK, "side_effects": False},
     "web_fetch": {"category": ToolCategory.NETWORK, "side_effects": False},
-    "http_request": {"category": ToolCategory.NETWORK, "side_effects": False},
+    "http": {"category": ToolCategory.NETWORK, "side_effects": False},
     "fetch": {"category": ToolCategory.NETWORK, "side_effects": False},
     # Development tools
     "docker": {"category": ToolCategory.WRITE, "side_effects": True},
@@ -149,16 +151,18 @@ def categorize_tool_call(tool_name: str, arguments: Dict[str, Any]) -> ToolCateg
     Returns:
         ToolCategory for the tool call
     """
+    canonical_tool_name = get_canonical_name(tool_name)
+
     # Check metadata first
-    if tool_name in TOOL_METADATA:
-        return TOOL_METADATA[tool_name]["category"]
+    if canonical_tool_name in TOOL_METADATA:
+        return TOOL_METADATA[canonical_tool_name]["category"]
 
     # Fallback to frozenset checks
-    if tool_name in READ_TOOLS:
+    if canonical_tool_name in READ_TOOLS:
         return ToolCategory.READ_ONLY
-    elif tool_name in WRITE_TOOLS:
+    elif canonical_tool_name in WRITE_TOOLS:
         return ToolCategory.WRITE
-    elif tool_name in NETWORK_TOOLS:
+    elif canonical_tool_name in NETWORK_TOOLS:
         return ToolCategory.NETWORK
 
     # Default to COMPUTE for unknown tools
@@ -182,5 +186,15 @@ def extract_files_from_args(arguments: Dict[str, Any]) -> List[str]:
                 files.append(value)
             elif isinstance(value, list):
                 files.extend(value)
+        elif key == "ops" and isinstance(value, list):
+            for op in value:
+                if not isinstance(op, dict):
+                    continue
+                path = op.get("path")
+                new_path = op.get("new_path")
+                if isinstance(path, str):
+                    files.append(path)
+                if isinstance(new_path, str):
+                    files.append(new_path)
 
     return files

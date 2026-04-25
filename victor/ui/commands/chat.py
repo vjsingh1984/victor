@@ -2170,7 +2170,7 @@ def _create_cli_prompt_session(settings=None):
             try:
                 import sqlite3
 
-                db_path = get_project_paths().conversation_db
+                db_path = get_project_paths().project_db
                 if db_path.exists():
                     with sqlite3.connect(db_path) as conn:
                         cursor = conn.execute("""

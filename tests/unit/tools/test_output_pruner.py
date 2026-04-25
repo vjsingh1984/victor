@@ -391,3 +391,19 @@ class TestFormattedOutputPruning:
         assert pruned == formatted
         assert info.was_pruned is False
         assert info.pruning_reason == "safety_critical_tool"
+
+    def test_formatted_output_canonicalizes_legacy_tool_names(self):
+        pruner = ToolOutputPruner(enabled=True)
+        body = "\n".join(f"file_{i}.py" for i in range(200))
+        formatted = f"<TOOL_OUTPUT tool=\"list_directory\">\n{body}\n</TOOL_OUTPUT>"
+
+        pruned, info = pruner.prune(
+            tool_output=formatted,
+            task_type="analysis",
+            tool_name="list_directory",
+            context={"formatted_output": True, "safe_only": True, "tool_args": {"path": "."}},
+        )
+
+        assert info.was_pruned is True
+        assert "list_directory" not in info.recovery_hint
+        assert "ls(path='.'" in info.recovery_hint

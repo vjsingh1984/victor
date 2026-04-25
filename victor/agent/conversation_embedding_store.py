@@ -163,7 +163,7 @@ class ConversationEmbeddingStore:
             if self._lancedb_path is None:
                 self._lancedb_path = paths.embeddings_dir / "conversations"
             if self._sqlite_db_path is None:
-                self._sqlite_db_path = paths.conversation_db
+                self._sqlite_db_path = paths.project_db
 
         # Ensure directory exists
         self._lancedb_path.mkdir(parents=True, exist_ok=True)

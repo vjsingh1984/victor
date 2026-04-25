@@ -179,7 +179,7 @@ class TestPermissionPolicy:
     def test_get_denied_tools(self):
         policy = PermissionPolicy(PermissionMode.READ_ONLY)
         denied = policy.get_denied_tools()
-        assert "bash" in denied
+        assert "shell" in denied
         assert "docker" in denied
         assert "read" not in denied
 
@@ -207,7 +207,7 @@ class TestPermissionPolicy:
     def test_default_tool_permissions_not_empty(self):
         assert len(DEFAULT_TOOL_PERMISSIONS) > 0
         assert "read" in DEFAULT_TOOL_PERMISSIONS
-        assert "bash" in DEFAULT_TOOL_PERMISSIONS
+        assert "shell" in DEFAULT_TOOL_PERMISSIONS
 
     def test_sync_from_tool_metadata_uses_singleton_registry(self):
         registry = ToolMetadataRegistry.get_instance()

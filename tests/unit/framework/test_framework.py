@@ -236,6 +236,21 @@ class TestTaskResult:
         assert "/tmp/a.txt" in read
         assert "/tmp" in read
 
+    def test_files_read_and_modified_extract_legacy_aliases(self):
+        """Legacy core tool aliases should resolve to canonical read/write semantics."""
+        result = TaskResult(
+            content="Done",
+            tool_calls=[
+                {"tool": "write_file", "arguments": {"path": "/tmp/a.txt"}, "success": True},
+                {"tool": "read_file", "arguments": {"path": "/tmp/b.txt"}, "success": True},
+                {"tool": "list_directory", "arguments": {"path": "/tmp"}, "success": True},
+            ],
+        )
+
+        assert "/tmp/a.txt" in result.files_modified
+        assert "/tmp/b.txt" in result.files_read
+        assert "/tmp" in result.files_read
+
     def test_tool_count(self):
         """tool_count should return number of tool calls."""
         result = TaskResult(
