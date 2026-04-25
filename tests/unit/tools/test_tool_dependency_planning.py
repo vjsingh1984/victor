@@ -157,6 +157,7 @@ def test_registry_keyword_lookup():
     mock_tool.task_types = []
     mock_tool.progress_params = []
     mock_tool.execution_category = ExecutionCategory.READ_ONLY
+    mock_tool.get_metadata.return_value = None
 
     registry = ToolMetadataRegistry()
     registry.register(mock_tool)
@@ -193,6 +194,9 @@ def test_registry_keyword_lookup_case_insensitive():
     mock_tool.task_types = []
     mock_tool.progress_params = []
     mock_tool.execution_category = ExecutionCategory.READ_ONLY
+    # ToolMetadataEntry.from_tool() calls get_metadata(); return None so direct
+    # attributes (priority, access_mode, etc.) are used instead of a mock object.
+    mock_tool.get_metadata.return_value = None
 
     registry = ToolMetadataRegistry()
     registry.register(mock_tool)

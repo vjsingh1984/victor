@@ -125,6 +125,7 @@ class ToolOutputFormatterConfig:
     max_functions_shown: int = 20  # Reduced from 30
     sample_lines_start: int = 20  # Reduced from 30
     sample_lines_end: int = 15  # Reduced from 20
+    default_format_style: str = "plain"  # "plain" (token-efficient) or "xml" (anti-hallucination)
 
 
 class TruncatorProtocol(Protocol):
@@ -389,51 +390,8 @@ class ToolOutputFormatter:
             except Exception as e:
                 logger.debug(f"Failed to get provider format spec: {e}")
 
-        # Default: plain JSON format
-        return ToolOutputFormat(style="plain")
-
-    def _format_read_file(
-        self,
-        args: Dict[str, Any],
-        output: Any,
-        output_str: str,
-        original_len: int,
-        truncated: bool,
-    ) -> str:
-        """Format read_file tool output with special handling for large files."""
-        file_path = args.get("path", "unknown")
-
-        # For very large files, show structure instead of raw content
-        if original_len > self.config.file_structure_threshold:
-            file_content = str(output) if output is not None else ""
-            structure_summary = self.extract_file_structure(file_content, file_path)
-            return f"""<TOOL_OUTPUT tool="read_file" path="{file_path}">
-═══ FILE IS VERY LARGE ({original_len:,} chars / {len(file_content.splitlines())} lines) ═══
-{structure_summary}
-═══ END OF FILE STRUCTURE ═══
-</TOOL_OUTPUT>
-
-NOTE: This file is very large. Showing structure summary instead of full content.
-To see specific sections, use read_file with offset/limit parameters or code_search to find specific code."""
-
-        header = f"═══ ACTUAL FILE CONTENT: {file_path} ═══"
-        footer = f"═══ END OF FILE: {file_path} ═══"
-        if truncated:
-            # Calculate approximate line count for offset guidance
-            lines_shown = output_str.count("\n")
-            footer = (
-                f"═══ TRUNCATED: {self.config.max_output_chars:,}/{original_len:,} chars (~{lines_shown} lines) ═══\n"
-                f"To continue: read(path='{file_path}', offset={lines_shown}, limit=500)"
-            )
-
-        return f"""<TOOL_OUTPUT tool="read_file" path="{file_path}">
-{header}
-{output_str}
-{footer}
-</TOOL_OUTPUT>
-
-IMPORTANT: The content above between the ═══ markers is the EXACT content of the file.
-You MUST use this actual content in your analysis. Do NOT fabricate or imagine different content."""
+        # Default: use configured style (plain = token-efficient, xml = anti-hallucination)
+        return ToolOutputFormat(style=self.config.default_format_style)
 
     def _format_large_file_structure(
         self,
@@ -486,71 +444,6 @@ ACTION REQUIRED: This file is too large to display fully.
 - Use 'search' parameter to find specific functions/classes
 - Use 'offset' and 'limit' parameters to read specific line ranges
 - DO NOT re-read the full file without parameters - you will get this same structure view"""
-
-    def _format_list_directory(self, args: Dict[str, Any], output_str: str) -> str:
-        """Format list_directory tool output."""
-        dir_path = args.get("path", ".")
-        return f"""<TOOL_OUTPUT tool="list_directory" path="{dir_path}">
-═══ ACTUAL DIRECTORY LISTING: {dir_path} ═══
-{output_str}
-═══ END OF DIRECTORY LISTING ═══
-</TOOL_OUTPUT>
-
-Use only the files/directories listed above. Do not invent files that are not shown."""
-
-    def _format_code_search(
-        self, tool_name: str, args: Dict[str, Any], output_str: str, output: Any
-    ) -> str:
-        """Format code_search / semantic_code_search tool output."""
-        query = args.get("query", args.get("pattern", ""))
-        follow_up_block = self._format_code_search_follow_ups(output)
-        return f"""<TOOL_OUTPUT tool="{tool_name}" query="{query}">
-═══ SEARCH RESULTS ═══
-{output_str}
-{follow_up_block}
-═══ END OF SEARCH RESULTS ═══
-</TOOL_OUTPUT>
-
-These are the actual search results. Reference only the files and matches shown above."""
-
-    def _format_code_search_follow_ups(self, output: Any) -> str:
-        """Extract and format suggested next tools from code_search output."""
-        if not isinstance(output, dict):
-            return ""
-
-        metadata = output.get("metadata")
-        if not isinstance(metadata, dict):
-            return ""
-
-        suggestions = metadata.get("follow_up_suggestions")
-        if not isinstance(suggestions, list) or not suggestions:
-            return ""
-
-        lines = ["", "═══ SUGGESTED NEXT TOOLS ═══"]
-        for suggestion in suggestions[:3]:
-            if not isinstance(suggestion, dict):
-                continue
-            command = suggestion.get("command")
-            reason = suggestion.get("reason")
-            if not isinstance(command, str) or not command.strip():
-                continue
-            if isinstance(reason, str) and reason.strip():
-                lines.append(f"- {command}  ({reason.strip()})")
-            else:
-                lines.append(f"- {command}")
-
-        if len(lines) == 2:
-            return ""
-        return "\n".join(lines)
-
-    def _format_bash(self, args: Dict[str, Any], output_str: str) -> str:
-        """Format execute_bash tool output."""
-        command = args.get("command", "")
-        return f"""<TOOL_OUTPUT tool="execute_bash" command="{command}">
-═══ COMMAND OUTPUT ═══
-{output_str}
-═══ END OF COMMAND OUTPUT ═══
-</TOOL_OUTPUT>"""
 
     def _format_generic(
         self,

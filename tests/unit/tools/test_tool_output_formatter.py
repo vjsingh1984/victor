@@ -150,20 +150,20 @@ class TestToolOutputFormatter:
         assert formatter._truncator is truncator
 
     def test_format_generic_tool(self):
-        """Test formatting generic tool output."""
-        formatter = ToolOutputFormatter()
+        """Test formatting generic tool output with xml style."""
+        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
         result = formatter.format_tool_output(
             tool_name="test_tool",
             args={"param": "value"},
             output="Test output content",
         )
-        assert '<TOOL_OUTPUT tool="test_tool">' in result
+        assert '<TOOL_OUTPUT tool="test_tool"' in result
         assert "Test output content" in result
         assert "</TOOL_OUTPUT>" in result
 
     def test_format_read_file(self):
-        """Test formatting read_file tool output."""
-        formatter = ToolOutputFormatter()
+        """Test formatting read_file tool output with xml strategy."""
+        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
         result = formatter.format_tool_output(
             tool_name="read_file",
             args={"path": "/path/to/file.py"},
@@ -172,12 +172,11 @@ class TestToolOutputFormatter:
         assert '<TOOL_OUTPUT tool="read_file"' in result
         assert 'path="/path/to/file.py"' in result
         assert "def hello():" in result
-        assert "ACTUAL FILE CONTENT" in result
-        assert "IMPORTANT" in result  # Anti-hallucination note
+        assert "</TOOL_OUTPUT>" in result
 
     def test_format_read_file_truncated(self):
-        """Test formatting truncated read_file output."""
-        config = ToolOutputFormatterConfig(max_output_chars=100)
+        """Test formatting truncated read_file output with xml strategy."""
+        config = ToolOutputFormatterConfig(max_output_chars=100, default_format_style="xml")
         formatter = ToolOutputFormatter(config=config)
 
         long_content = "x" * 500
@@ -187,7 +186,7 @@ class TestToolOutputFormatter:
             output=long_content,
         )
         assert "TRUNCATED" in result
-        assert "To continue: read" in result
+        assert "</TOOL_OUTPUT>" in result
 
     def test_format_read_file_very_large(self):
         """Test formatting very large file with structure summary."""
@@ -215,8 +214,8 @@ def helper_function():
         assert "HOW TO READ THIS FILE" in result or "To see specific sections" in result
 
     def test_format_list_directory(self):
-        """Test formatting list_directory tool output."""
-        formatter = ToolOutputFormatter()
+        """Test formatting list_directory tool output with xml strategy."""
+        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
         result = formatter.format_tool_output(
             tool_name="list_directory",
             args={"path": "/home/user"},
@@ -224,13 +223,12 @@ def helper_function():
         )
         assert '<TOOL_OUTPUT tool="list_directory"' in result
         assert 'path="/home/user"' in result
-        assert "ACTUAL DIRECTORY LISTING" in result
         assert "file1.py" in result
-        assert "Do not invent files" in result
+        assert "</TOOL_OUTPUT>" in result
 
     def test_format_code_search(self):
-        """Test formatting code_search tool output."""
-        formatter = ToolOutputFormatter()
+        """Test formatting code_search tool output with xml strategy."""
+        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
         result = formatter.format_tool_output(
             tool_name="code_search",
             args={"query": "def main"},
@@ -238,11 +236,11 @@ def helper_function():
         )
         assert '<TOOL_OUTPUT tool="code_search"' in result
         assert 'query="def main"' in result
-        assert "SEARCH RESULTS" in result
+        assert "def main" in result
 
     def test_format_code_search_includes_follow_up_suggestions(self):
-        """code_search output should surface suggested graph follow-ups."""
-        formatter = ToolOutputFormatter()
+        """code_search structured output is serialized inside the xml tag."""
+        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
         result = formatter.format_tool_output(
             tool_name="code_search",
             args={"query": "entry point for request processing"},
@@ -260,13 +258,14 @@ def helper_function():
             },
         )
 
-        assert "SUGGESTED NEXT TOOLS" in result
-        assert 'graph(mode="trace", node="main", depth=3)' in result
-        assert "Trace execution starting from main." in result
+        # Structured output is serialized as JSON inside the XML wrapper
+        assert '<TOOL_OUTPUT tool="code_search"' in result
+        assert "src/main.py" in result
+        assert "follow_up_suggestions" in result
 
     def test_format_semantic_code_search(self):
-        """Test formatting semantic_code_search tool output."""
-        formatter = ToolOutputFormatter()
+        """Test formatting semantic_code_search tool output with xml style."""
+        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
         result = formatter.format_tool_output(
             tool_name="semantic_code_search",
             args={"query": "find authentication handler"},
@@ -276,8 +275,8 @@ def helper_function():
         assert "find authentication handler" in result
 
     def test_format_execute_bash(self):
-        """Test formatting execute_bash tool output."""
-        formatter = ToolOutputFormatter()
+        """Test formatting execute_bash tool output with xml strategy."""
+        formatter = ToolOutputFormatter(config=ToolOutputFormatterConfig(default_format_style="xml"))
         result = formatter.format_tool_output(
             tool_name="execute_bash",
             args={"command": "ls -la"},
@@ -285,7 +284,7 @@ def helper_function():
         )
         assert '<TOOL_OUTPUT tool="execute_bash"' in result
         assert 'command="ls -la"' in result
-        assert "COMMAND OUTPUT" in result
+        assert "total 48" in result
 
     def test_format_with_truncation_note(self):
         """Test truncation note in generic formatting."""
@@ -644,13 +643,13 @@ class TestFactoryFunctions:
         assert formatter._truncator is truncator
 
     def test_format_tool_output_convenience(self):
-        """Test convenience function."""
+        """Test convenience function — plain style returns raw content."""
         result = format_tool_output(
             tool_name="test",
             args={"a": 1},
             output="output content",
         )
-        assert "test" in result
+        # Plain style (default) returns raw content without XML wrapping
         assert "output content" in result
 
     def test_format_tool_output_with_context(self):
