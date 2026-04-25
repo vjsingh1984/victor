@@ -81,8 +81,8 @@ class ManagerRole:
     )
     allowed_tools: Set[str] = field(
         default_factory=lambda: {
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "grep",
             "semantic_search",
             "task_complete",
@@ -146,8 +146,8 @@ class ResearcherRole:
     )
     allowed_tools: Set[str] = field(
         default_factory=lambda: {
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "grep",
             "glob",
             "semantic_search",
@@ -214,15 +214,14 @@ class ExecutorRole:
     )
     allowed_tools: Set[str] = field(
         default_factory=lambda: {
-            "read_file",
-            "write_file",
-            "edit_file",
-            "create_file",
+            "read",
+            "write",
+            "edit",
             "delete_file",
-            "list_directory",
+            "ls",
             "grep",
             "glob",
-            "bash",
+            "shell",
             "git",
             "semantic_search",
             "code_search",
@@ -284,8 +283,8 @@ class ReviewerRole:
     )
     allowed_tools: Set[str] = field(
         default_factory=lambda: {
-            "read_file",
-            "list_directory",
+            "read",
+            "ls",
             "grep",
             "glob",
             "git",

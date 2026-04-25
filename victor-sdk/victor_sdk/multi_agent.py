@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from victor_sdk.constants import get_canonical_name
+
 
 class CommunicationStyle(Enum):
     """Communication styles for agent personas."""
@@ -52,6 +54,7 @@ class PersonaTraits:
             )
         if not 0.0 <= self.creativity <= 1.0:
             raise ValueError(f"creativity must be between 0.0 and 1.0, got {self.creativity}")
+        self.preferred_tools = [get_canonical_name(tool) for tool in self.preferred_tools]
 
     def to_system_prompt_fragment(self) -> str:
         """Generate a system prompt fragment for this persona."""
@@ -125,6 +128,10 @@ class TeamMember:
     is_leader: bool = False
     max_concurrent_tasks: int = 1
     tool_access: List[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """Normalize tool access to canonical names."""
+        self.tool_access = [get_canonical_name(tool) for tool in self.tool_access]
 
     @property
     def name(self) -> str:

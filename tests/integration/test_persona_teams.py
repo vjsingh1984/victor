@@ -79,7 +79,7 @@ def sample_persona_traits():
         expertise_level=ExpertiseLevel.EXPERT,
         verbosity=0.7,
         strengths=["testing", "debugging", "documentation"],
-        preferred_tools=["pytest", "git", "read_file"],
+        preferred_tools=["pytest", "git", "read"],
         risk_tolerance=0.3,
         creativity=0.6,
     )
@@ -261,7 +261,7 @@ class TestTeamSpecIntegration:
             persona=sample_persona_traits,
             role_in_team="researcher",
             is_leader=False,
-            tool_access=["code_search", "read_file"],
+            tool_access=["code_search", "read"],
         )
 
         reviewer1 = TeamMember(
@@ -402,7 +402,7 @@ class TestTeamSpecIntegration:
             persona=sample_persona_traits,
             role_in_team="developer",
             is_leader=True,
-            tool_access=["git", "read_file"],
+            tool_access=["git", "read"],
         )
 
         spec = TeamSpec(template=template, members=[member])
@@ -589,7 +589,7 @@ class TestMultiAgentTeamComposition:
                     strengths=archaeologist.strengths,
                 ),
                 role_in_team="researcher",
-                tool_access=["code_search", "read_file", "grep"],
+                tool_access=["code_search", "read", "grep"],
             ),
             TeamMember(
                 persona=PersonaTraits(
@@ -599,7 +599,7 @@ class TestMultiAgentTeamComposition:
                     strengths=auditor.strengths,
                 ),
                 role_in_team="researcher",
-                tool_access=["security_scan", "read_file"],
+                tool_access=["security_scan", "read"],
             ),
             TeamMember(
                 persona=PersonaTraits(
@@ -775,7 +775,7 @@ class TestCrossComponentIntegration:
         member = TeamMember(
             persona=sample_persona_traits,
             role_in_team="developer",
-            tool_access=["edit_file", "git"],
+            tool_access=["edit", "git"],
         )
 
         # Access persona properties through member
