@@ -404,14 +404,14 @@ class TaskTypeRegistry:
                 hint="[EDIT] Modify existing code. Read target files first, then make focused changes.",
                 tool_budget=25,
                 max_iterations=10,
-                priority_tools=["read_file", "edit_files", "code_search"],
+                priority_tools=["read", "edit", "code_search"],
                 aliases={"modify", "change", "update", "fix"},
                 force_action_after_read=True,
                 stage_tools={
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["edit_files", "read_file"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["edit", "read"],
+                    "verifying": ["read", "run_tests"],
                 },
                 force_action_hints={
                     "after_target_read": "Use edit to make the change.",
@@ -428,13 +428,13 @@ class TaskTypeRegistry:
                 hint="[CREATE] Create new files. Explore context first, then write files.",
                 tool_budget=25,
                 max_iterations=10,
-                priority_tools=["write_file", "read_file", "list_directory"],
+                priority_tools=["write", "read", "ls"],
                 aliases={"new", "add", "write"},
                 stage_tools={
-                    "initial": ["list_directory", "read_file"],
-                    "reading": ["read_file"],
-                    "executing": ["write_file", "edit_files"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "read"],
+                    "reading": ["read"],
+                    "executing": ["write", "edit"],
+                    "verifying": ["read", "run_tests"],
                 },
                 force_action_hints={
                     "max_iterations": "Please create the file.",
@@ -450,12 +450,12 @@ class TaskTypeRegistry:
                 hint="[GENERATE] Write code directly. Minimal exploration. Display or save as requested.",
                 tool_budget=5,
                 max_iterations=3,
-                priority_tools=["write_file"],
+                priority_tools=["write"],
                 aliases={"generate", "generation", "simple_create"},
                 stage_tools={
-                    "initial": ["write_file"],
-                    "executing": ["write_file"],
-                    "verifying": ["read_file"],
+                    "initial": ["write"],
+                    "executing": ["write"],
+                    "verifying": ["read"],
                 },
                 force_action_hints={
                     "immediate": "Create the code directly using write.",
@@ -474,15 +474,15 @@ class TaskTypeRegistry:
                 priority_tools=[
                     "code_search",
                     "semantic_code_search",
-                    "read_file",
-                    "list_directory",
+                    "read",
+                    "ls",
                 ],
                 aliases={"find", "locate", "grep", "look"},
                 stage_tools={
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["read_file"],
-                    "verifying": ["read_file"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["read"],
+                    "verifying": ["read"],
                 },
                 force_action_hints={
                     "max_iterations": "Please summarize your findings.",
@@ -498,13 +498,13 @@ class TaskTypeRegistry:
                 hint="[ANALYZE] Analyze code metrics. Read files and run analysis commands.",
                 tool_budget=40,
                 max_iterations=20,
-                priority_tools=["read_file", "code_search", "execute_bash"],
+                priority_tools=["read", "code_search", "shell"],
                 aliases={"analysis", "review", "audit", "examine"},
                 stage_tools={
-                    "initial": ["list_directory", "code_search"],
-                    "reading": ["read_file", "code_search", "execute_bash"],
-                    "executing": ["execute_bash"],
-                    "verifying": ["read_file"],
+                    "initial": ["ls", "code_search"],
+                    "reading": ["read", "code_search", "shell"],
+                    "executing": ["shell"],
+                    "verifying": ["read"],
                 },
                 force_action_hints={
                     "max_iterations": "Please summarize your analysis.",
@@ -521,10 +521,10 @@ class TaskTypeRegistry:
                 tool_budget=60,
                 max_iterations=50,
                 priority_tools=[
-                    "read_file",
+                    "read",
                     "code_search",
                     "semantic_code_search",
-                    "list_directory",
+                    "ls",
                 ],
                 aliases={"comprehensive", "thorough", "full_analysis"},
                 exploration_multiplier=1.5,
@@ -539,13 +539,13 @@ class TaskTypeRegistry:
                 hint="[DESIGN] Architecture/design questions. Explore codebase to understand patterns and structure.",
                 tool_budget=40,
                 max_iterations=20,
-                priority_tools=["read_file", "list_directory", "code_search"],
+                priority_tools=["read", "ls", "code_search"],
                 aliases={"plan", "architect", "conceptual"},
                 needs_tools=True,  # Design tasks benefit from codebase exploration
                 stage_tools={
-                    "initial": ["list_directory", "code_search", "read_file"],
-                    "reading": ["read_file", "code_search", "list_directory"],
-                    "verifying": ["read_file"],
+                    "initial": ["ls", "code_search", "read"],
+                    "reading": ["read", "code_search", "ls"],
+                    "verifying": ["read"],
                 },
                 force_action_hints={
                     "max_iterations": "Please summarize the architecture and provide your recommendations.",
@@ -561,7 +561,7 @@ class TaskTypeRegistry:
                 hint="[ACTION] Execute task. Multiple tool calls allowed. Continue until complete.",
                 tool_budget=50,
                 max_iterations=12,
-                priority_tools=["execute_bash", "git_commit", "run_tests"],
+                priority_tools=["shell", "git_commit", "run_tests"],
                 aliases={"execute", "run", "do"},
             )
         )
@@ -596,13 +596,13 @@ class TaskTypeRegistry:
                 hint="[GENERAL] General task. Explore as needed and complete the task.",
                 tool_budget=35,
                 max_iterations=15,
-                priority_tools=["read_file", "list_directory", "code_search"],
+                priority_tools=["read", "ls", "code_search"],
                 aliases={"default", "chat", "help", "ambiguous"},
                 stage_tools={
-                    "initial": ["list_directory", "code_search", "read_file"],
-                    "reading": ["read_file", "code_search"],
-                    "executing": ["edit_files", "write_file", "execute_bash"],
-                    "verifying": ["read_file", "run_tests"],
+                    "initial": ["ls", "code_search", "read"],
+                    "reading": ["read", "code_search"],
+                    "executing": ["edit", "write", "shell"],
+                    "verifying": ["read", "run_tests"],
                 },
                 force_action_hints={
                     "max_iterations": "Please complete the task or explain blockers.",
@@ -621,7 +621,7 @@ class TaskTypeRegistry:
                 hint="[SIMPLE] Simple query. 1-2 tool calls max. Answer immediately after.",
                 tool_budget=2,
                 max_iterations=3,
-                priority_tools=["list_directory", "read_file"],
+                priority_tools=["ls", "read"],
                 aliases={"quick", "brief"},
             )
         )
@@ -638,7 +638,7 @@ class TaskTypeRegistry:
                 hint="[REFACTOR] Restructure existing code. Read carefully, then make incremental changes.",
                 tool_budget=30,
                 max_iterations=15,
-                priority_tools=["read_file", "edit_files", "code_search"],
+                priority_tools=["read", "edit", "code_search"],
                 aliases={"restructure", "reorganize"},
             )
         )
@@ -650,7 +650,7 @@ class TaskTypeRegistry:
                 hint="[DEBUG] Find and fix bugs. Read code, trace issues, then fix.",
                 tool_budget=25,
                 max_iterations=12,
-                priority_tools=["read_file", "code_search", "execute_bash"],
+                priority_tools=["read", "code_search", "shell"],
                 aliases={"troubleshoot", "diagnose"},
             )
         )
@@ -662,7 +662,7 @@ class TaskTypeRegistry:
                 hint="[TEST] Write or run tests. Create test files or execute test commands.",
                 tool_budget=25,
                 max_iterations=10,
-                priority_tools=["write_file", "execute_bash", "read_file"],
+                priority_tools=["write", "shell", "read"],
                 aliases={"unit_test", "testing"},
             )
         )
@@ -722,7 +722,7 @@ class TaskTypeRegistry:
                 hint="[TECHNICAL RESEARCH] Deep dive into technical topics.",
                 tool_budget=35,
                 max_iterations=20,
-                priority_tools=["web_search", "web_fetch", "read_file"],
+                priority_tools=["web_search", "web_fetch", "read"],
             )
         )
 
@@ -833,10 +833,10 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             tool_budget=30,
             max_iterations=15,
             priority_tools=[
-                "read_file",
-                "write_file",
-                "execute_bash",
-                "list_directory",
+                "read",
+                "write",
+                "shell",
+                "ls",
             ],
         ),
     )
@@ -850,7 +850,7 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[CI/CD] Configure CI/CD pipelines. Understand workflow structure first.",
             tool_budget=25,
             max_iterations=12,
-            priority_tools=["read_file", "write_file", "code_search"],
+            priority_tools=["read", "write", "code_search"],
             aliases={"pipeline", "workflow", "github_actions"},
         ),
     )
@@ -864,7 +864,7 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[K8S] Create or modify Kubernetes manifests. Check existing resources.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["read_file", "write_file", "execute_bash"],
+            priority_tools=["read", "write", "shell"],
             aliases={"k8s", "helm"},
         ),
     )
@@ -878,7 +878,7 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[TERRAFORM] Create or modify Terraform configs. Plan before applying.",
             tool_budget=35,
             max_iterations=18,
-            priority_tools=["read_file", "write_file", "execute_bash", "code_search"],
+            priority_tools=["read", "write", "shell", "code_search"],
             aliases={"tf", "iac"},
         ),
     )
@@ -892,7 +892,7 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[DOCKER] Create or modify Dockerfiles. Follow best practices.",
             tool_budget=20,
             max_iterations=10,
-            priority_tools=["read_file", "write_file"],
+            priority_tools=["read", "write"],
             aliases={"docker"},
         ),
     )
@@ -906,7 +906,7 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[COMPOSE] Create or modify docker-compose files. Check service dependencies.",
             tool_budget=25,
             max_iterations=12,
-            priority_tools=["read_file", "write_file", "code_search"],
+            priority_tools=["read", "write", "code_search"],
             aliases={"compose"},
         ),
     )
@@ -920,7 +920,7 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[MONITORING] Configure monitoring and alerting. Review current setup first.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["read_file", "write_file", "code_search"],
+            priority_tools=["read", "write", "code_search"],
             aliases={"observability", "alerts"},
         ),
     )
@@ -934,7 +934,7 @@ def register_devops_task_types(registry: TaskTypeRegistry) -> None:
             hint="[DEVOPS EDIT] Edit infrastructure files carefully. Verify syntax and dependencies.",
             tool_budget=30,
             max_iterations=12,
-            priority_tools=["read_file", "edit_files", "execute_bash"],
+            priority_tools=["read", "edit", "shell"],
             force_action_after_read=True,
         ),
     )
@@ -957,7 +957,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[PROFILE] Profile dataset. Examine structure, types, distributions.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["read_file", "execute_bash", "notebook_edit"],
+            priority_tools=["read", "shell", "notebook_edit"],
         ),
     )
 
@@ -970,7 +970,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[STATS] Perform statistical analysis. Calculate metrics and significance.",
             tool_budget=40,
             max_iterations=20,
-            priority_tools=["read_file", "execute_bash", "notebook_edit"],
+            priority_tools=["read", "shell", "notebook_edit"],
             aliases={"statistics"},
         ),
     )
@@ -984,7 +984,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[CORRELATION] Analyze relationships between variables.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["read_file", "execute_bash", "notebook_edit"],
+            priority_tools=["read", "shell", "notebook_edit"],
         ),
     )
 
@@ -997,7 +997,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[REGRESSION] Build regression models. Fit and evaluate.",
             tool_budget=40,
             max_iterations=20,
-            priority_tools=["read_file", "execute_bash", "notebook_edit", "write_file"],
+            priority_tools=["read", "shell", "notebook_edit", "write"],
         ),
     )
 
@@ -1010,7 +1010,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[CLUSTERING] Cluster data points. Find patterns and groupings.",
             tool_budget=40,
             max_iterations=20,
-            priority_tools=["read_file", "execute_bash", "notebook_edit"],
+            priority_tools=["read", "shell", "notebook_edit"],
         ),
     )
 
@@ -1023,7 +1023,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[TIME SERIES] Analyze temporal patterns. Decompose and forecast.",
             tool_budget=45,
             max_iterations=25,
-            priority_tools=["read_file", "execute_bash", "notebook_edit"],
+            priority_tools=["read", "shell", "notebook_edit"],
         ),
     )
 
@@ -1036,7 +1036,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[VIZ] Create data visualizations. Choose appropriate chart types.",
             tool_budget=25,
             max_iterations=12,
-            priority_tools=["read_file", "execute_bash", "notebook_edit", "write_file"],
+            priority_tools=["read", "shell", "notebook_edit", "write"],
             aliases={"chart", "plot", "graph"},
         ),
     )
@@ -1050,7 +1050,7 @@ def register_data_analysis_task_types(registry: TaskTypeRegistry) -> None:
             hint="[DATA ANALYZE] Analyze data comprehensively. Profile, explore, and summarize.",
             tool_budget=50,
             max_iterations=25,
-            priority_tools=["read_file", "execute_bash", "notebook_edit"],
+            priority_tools=["read", "shell", "notebook_edit"],
         ),
     )
 
@@ -1072,7 +1072,7 @@ def register_coding_task_types(registry: TaskTypeRegistry) -> None:
             hint="[CODEGEN] Generate code from specification. Follow project patterns.",
             tool_budget=20,
             max_iterations=10,
-            priority_tools=["read_file", "write_file", "code_search"],
+            priority_tools=["read", "write", "code_search"],
         ),
     )
 
@@ -1085,7 +1085,7 @@ def register_coding_task_types(registry: TaskTypeRegistry) -> None:
             hint="[REFACTOR] Refactor code systematically. Preserve behavior, improve structure.",
             tool_budget=35,
             max_iterations=20,
-            priority_tools=["read_file", "edit_files", "code_search", "run_tests"],
+            priority_tools=["read", "edit", "code_search", "run_tests"],
         ),
     )
 
@@ -1098,7 +1098,7 @@ def register_coding_task_types(registry: TaskTypeRegistry) -> None:
             hint="[DEBUG] Debug code issues. Read stack traces, add logging, trace execution.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["read_file", "code_search", "execute_bash", "edit_files"],
+            priority_tools=["read", "code_search", "shell", "edit"],
         ),
     )
 
@@ -1111,7 +1111,7 @@ def register_coding_task_types(registry: TaskTypeRegistry) -> None:
             hint="[TEST] Write and run tests. Ensure coverage and edge cases.",
             tool_budget=30,
             max_iterations=15,
-            priority_tools=["write_file", "execute_bash", "read_file", "code_search"],
+            priority_tools=["write", "shell", "read", "code_search"],
         ),
     )
 
