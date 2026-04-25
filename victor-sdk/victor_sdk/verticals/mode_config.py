@@ -236,8 +236,7 @@ class StaticModeConfigProvider:
         """Return mode configurations for this vertical."""
 
         return {
-            name: definition.to_mode_config()
-            for name, definition in self._config.modes.items()
+            name: definition.to_mode_config() for name, definition in self._config.modes.items()
         }
 
     def get_default_mode(self) -> str:

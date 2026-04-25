@@ -236,9 +236,7 @@ class VerticalBase(
 
         def _create() -> Any:
             module = importlib.import_module(import_path)
-            target_name = attribute_name or cls._auto_extension_class_name(
-                extension_key
-            )
+            target_name = attribute_name or cls._auto_extension_class_name(extension_key)
             extension_cls = getattr(module, target_name)
             return extension_cls()
 
@@ -262,9 +260,7 @@ class VerticalBase(
                 return
 
             prefix = f"{cls._cache_namespace()}:"
-            stale_config_keys = [
-                key for key in cls._config_cache if key.startswith(prefix)
-            ]
+            stale_config_keys = [key for key in cls._config_cache if key.startswith(prefix)]
             for key in stale_config_keys:
                 cls._config_cache.pop(key, None)
             stale_keys = [key for key in cls._extension_cache if key.startswith(prefix)]
@@ -388,12 +384,8 @@ class VerticalBase(
             prompt_contributor = cls.get_prompt_contributor()
             return VerticalExtensions(
                 middleware=lambda: list(cls.get_middleware() or []),
-                safety_extensions=lambda: (
-                    [safety_extension] if safety_extension else []
-                ),
-                prompt_contributors=lambda: (
-                    [prompt_contributor] if prompt_contributor else []
-                ),
+                safety_extensions=lambda: ([safety_extension] if safety_extension else []),
+                prompt_contributors=lambda: ([prompt_contributor] if prompt_contributor else []),
                 mode_config_provider=cls.get_mode_config_provider,
                 tool_dependency_provider=cls.get_tool_dependency_provider,
                 workflow_provider=cls.get_workflow_provider,

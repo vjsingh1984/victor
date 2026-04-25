@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List
@@ -82,9 +83,6 @@ class BaseRLConfig:
             f"learners={len(self.active_learners)}, "
             f"task_types={len(self.task_type_mappings)})"
         )
-
-
-import time
 
 
 # ── Promoted from victor.framework.rl.base ─────────────────────────────

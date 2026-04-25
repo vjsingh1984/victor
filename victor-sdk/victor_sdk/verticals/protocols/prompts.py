@@ -8,7 +8,6 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable, List, Dict, Any
 
 
-
 @runtime_checkable
 class PromptProvider(Protocol):
     """Protocol for providing prompt configurations.

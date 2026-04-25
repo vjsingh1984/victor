@@ -85,11 +85,11 @@ class ToolFactoryAdapter:
             context: PluginContext with register_tool method
         """
         # Register all instances
-        for tool_name, tool_instance in self._instances.items():
+        for _tool_name, tool_instance in self._instances.items():
             context.register_tool(tool_instance)
 
         # Register all factories (create instances)
-        for tool_name, factory in self._factories.items():
+        for _tool_name, factory in self._factories.items():
             tool_instance = factory()
             context.register_tool(tool_instance)
 

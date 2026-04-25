@@ -32,9 +32,16 @@ class TestGraphNodeData:
 
     def test_with_all_fields(self):
         n = GraphNodeData(
-            node_id="n2", type="class", name="Bar", file="b.py",
-            line=10, end_line=50, lang="python", signature="class Bar:",
-            docstring="A class", parent_id="mod1",
+            node_id="n2",
+            type="class",
+            name="Bar",
+            file="b.py",
+            line=10,
+            end_line=50,
+            lang="python",
+            signature="class Bar:",
+            docstring="A class",
+            parent_id="mod1",
         )
         assert n.line == 10
         assert n.parent_id == "mod1"
@@ -55,9 +62,7 @@ class TestGraphEdgeData:
 
 class TestEmbeddingSearchResultData:
     def test_fields(self):
-        r = EmbeddingSearchResultData(
-            file_path="a.py", content="def foo():", score=0.95
-        )
+        r = EmbeddingSearchResultData(file_path="a.py", content="def foo():", score=0.95)
         assert r.file_path == "a.py"
         assert r.score == 0.95
         assert r.symbol_name is None

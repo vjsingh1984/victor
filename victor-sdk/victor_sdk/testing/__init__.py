@@ -33,10 +33,8 @@ Usage in your vertical's test suite::
 from __future__ import annotations
 
 import ast
-import inspect
-import os
 from pathlib import Path
-from typing import Any, List, Optional, Set, Tuple, Type
+from typing import Any, List, Optional, Tuple, Type
 
 # Default forbidden import prefixes for external verticals
 _DEFAULT_FORBIDDEN_PREFIXES = (
@@ -83,9 +81,7 @@ def assert_valid_vertical(vertical_cls: Type[Any]) -> None:
         assert (
             method is not None
         ), f"Vertical {vertical_cls.__name__} missing required method: {method_name}"
-        assert callable(
-            method
-        ), f"Vertical {vertical_cls.__name__}.{method_name} is not callable"
+        assert callable(method), f"Vertical {vertical_cls.__name__}.{method_name} is not callable"
 
     # Validate get_tools returns list of strings
     tools = vertical_cls.get_tools()
@@ -93,9 +89,7 @@ def assert_valid_vertical(vertical_cls: Type[Any]) -> None:
         f"Vertical {vertical_cls.__name__}.get_tools() must return list, "
         f"got {type(tools).__name__}"
     )
-    assert (
-        len(tools) > 0
-    ), f"Vertical {vertical_cls.__name__}.get_tools() returned empty list"
+    assert len(tools) > 0, f"Vertical {vertical_cls.__name__}.get_tools() returned empty list"
     for tool in tools:
         assert isinstance(tool, str), (
             f"Vertical {vertical_cls.__name__}.get_tools() items must be str, "
@@ -163,16 +157,10 @@ def assert_import_boundaries(
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     if any(alias.name.startswith(p) for p in forbidden_prefixes):
-                        violations.append(
-                            f"{py_file}:{node.lineno}: import {alias.name}"
-                        )
+                        violations.append(f"{py_file}:{node.lineno}: import {alias.name}")
             elif isinstance(node, ast.ImportFrom):
-                if node.module and any(
-                    node.module.startswith(p) for p in forbidden_prefixes
-                ):
-                    violations.append(
-                        f"{py_file}:{node.lineno}: from {node.module} import ..."
-                    )
+                if node.module and any(node.module.startswith(p) for p in forbidden_prefixes):
+                    violations.append(f"{py_file}:{node.lineno}: from {node.module} import ...")
 
     return violations
 

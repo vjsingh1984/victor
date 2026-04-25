@@ -29,9 +29,7 @@ class TestProjectPathsData:
         assert p.logs_dir == "/home/user/project/.victor/logs"
 
     def test_custom_victor_dir(self):
-        p = ProjectPathsData(
-            project_root="/proj", victor_dir_name=".myvictor"
-        )
+        p = ProjectPathsData(project_root="/proj", victor_dir_name=".myvictor")
         assert p.victor_dir == "/proj/.myvictor"
 
     def test_existing_properties(self):

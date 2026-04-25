@@ -56,11 +56,9 @@ class ComputeNodeProtocol(Protocol):
 class WorkflowContextProtocol(Protocol):
     """Structural protocol for workflow context consumed by extracted handlers."""
 
-    def get(self, key: str, default: Any = None) -> Any:
-        ...
+    def get(self, key: str, default: Any = None) -> Any: ...
 
-    def set(self, key: str, value: Any) -> None:
-        ...
+    def set(self, key: str, value: Any) -> None: ...
 
 
 @runtime_checkable
@@ -72,8 +70,7 @@ class ComputeHandlerProtocol(Protocol):
         node: ComputeNodeProtocol,
         context: WorkflowContextProtocol,
         tool_registry: Any,
-    ) -> NodeResult:
-        ...
+    ) -> NodeResult: ...
 
 
 ComputeHandlerRegistrar = Callable[[str, ComputeHandlerProtocol], None]

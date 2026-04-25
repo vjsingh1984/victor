@@ -30,6 +30,7 @@ class CapabilityContract:
             return True
         try:
             from packaging.specifiers import SpecifierSet
+
             spec = SpecifierSet(self.min_sdk_version)
             return sdk_version in spec
         except ImportError:
@@ -68,13 +69,19 @@ class CapabilityContractRegistry:
         results = []
         for name, contract in self._contracts.items():
             compatible = contract.is_sdk_compatible(sdk_version)
-            msg = "" if compatible else (
-                f"{name} v{contract.version} requires SDK {contract.min_sdk_version}, "
-                f"got {sdk_version}"
+            msg = (
+                ""
+                if compatible
+                else (
+                    f"{name} v{contract.version} requires SDK {contract.min_sdk_version}, "
+                    f"got {sdk_version}"
+                )
             )
-            results.append(CapabilityCheckResult(
-                contract_name=name,
-                compatible=compatible,
-                message=msg,
-            ))
+            results.append(
+                CapabilityCheckResult(
+                    contract_name=name,
+                    compatible=compatible,
+                    message=msg,
+                )
+            )
         return results

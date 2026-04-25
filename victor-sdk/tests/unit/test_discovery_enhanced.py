@@ -312,7 +312,7 @@ class TestProtocolRegistration:
 
         reset_global_registry()
         registry = get_global_registry()
-        stats = registry.load_from_entry_points()
+        registry.load_from_entry_points()
 
         # Should have discovered the tool provider
         assert len(registry.get_tool_providers()) >= 1
@@ -351,9 +351,7 @@ class TestProtocolRegistration:
 
         import importlib.metadata
 
-        monkeypatch.setattr(
-            importlib.metadata, "entry_points", lambda *a, **kw: mock_eps
-        )
+        monkeypatch.setattr(importlib.metadata, "entry_points", lambda *a, **kw: mock_eps)
 
         reset_global_registry()
         registry = get_global_registry()
@@ -431,9 +429,7 @@ class TestProtocolRegistration:
 
         import importlib.metadata
 
-        monkeypatch.setattr(
-            importlib.metadata, "entry_points", lambda *a, **kw: mock_eps
-        )
+        monkeypatch.setattr(importlib.metadata, "entry_points", lambda *a, **kw: mock_eps)
 
         registry = ProtocolRegistry()
         stats = registry.load_from_entry_points(reload=True)

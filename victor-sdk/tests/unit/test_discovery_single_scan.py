@@ -59,9 +59,7 @@ class TestSinglePassScan:
         ep_vertical = _make_entry_point(
             "fake", ProtocolRegistry.VERTICALS_GROUP, load_return=mock_plugin
         )
-        ep_capability = _make_entry_point(
-            "fake_cap", ProtocolRegistry.CAPABILITIES_GROUP
-        )
+        ep_capability = _make_entry_point("fake_cap", ProtocolRegistry.CAPABILITIES_GROUP)
         ep_validator = _make_entry_point(
             "fake_val",
             ProtocolRegistry.VALIDATORS_GROUP,
@@ -83,9 +81,7 @@ class TestSinglePassScan:
         ep_validator.load.assert_called_once()
 
     @patch("victor_sdk.discovery.importlib.metadata.entry_points")
-    def test_load_from_entry_points_ignores_non_victor_groups(
-        self, mock_entry_points
-    ):
+    def test_load_from_entry_points_ignores_non_victor_groups(self, mock_entry_points):
         """Entry points from non-victor groups (e.g., console_scripts) are ignored."""
         ep_console = _make_entry_point("victor-cli", "console_scripts")
         ep_gui = _make_entry_point("victor-gui", "gui_scripts")

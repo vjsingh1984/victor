@@ -40,11 +40,22 @@ class TestVerticalBaseBackwardCompat:
 
     # Core methods (always on VerticalBase)
     CORE_METHODS = [
-        "get_name", "get_description", "get_tools", "get_system_prompt",
-        "get_config", "get_definition", "get_stages", "get_version",
-        "get_tier", "get_metadata", "get_extensions", "get_manifest",
-        "get_skills", "get_capability_configs",
-        "clear_config_cache", "clear_extension_cache",
+        "get_name",
+        "get_description",
+        "get_tools",
+        "get_system_prompt",
+        "get_config",
+        "get_definition",
+        "get_stages",
+        "get_version",
+        "get_tier",
+        "get_metadata",
+        "get_extensions",
+        "get_manifest",
+        "get_skills",
+        "get_capability_configs",
+        "clear_config_cache",
+        "clear_extension_cache",
     ]
 
     # RL methods (extracted to RLMixin)
@@ -52,37 +63,56 @@ class TestVerticalBaseBackwardCompat:
 
     # Team methods (extracted to TeamMixin)
     TEAM_METHODS = [
-        "get_team_spec_provider", "get_team_specs",
-        "get_team_declarations", "get_default_team", "get_team_metadata",
+        "get_team_spec_provider",
+        "get_team_specs",
+        "get_team_declarations",
+        "get_default_team",
+        "get_team_metadata",
     ]
 
     # Workflow metadata methods (extracted to WorkflowMetadataMixin)
     WORKFLOW_METADATA_METHODS = [
-        "get_initial_stage", "get_workflow_spec",
-        "get_provider_hints", "get_evaluation_criteria",
+        "get_initial_stage",
+        "get_workflow_spec",
+        "get_provider_hints",
+        "get_evaluation_criteria",
         "get_workflow_metadata",
     ]
 
     # Prompt metadata methods (extracted to PromptMetadataMixin)
     PROMPT_METADATA_METHODS = [
-        "get_prompt_templates", "get_task_type_hints", "get_prompt_metadata",
+        "get_prompt_templates",
+        "get_task_type_hints",
+        "get_prompt_metadata",
     ]
 
     # Extension provider methods (extracted to ExtensionProviderMixin)
     EXTENSION_PROVIDER_METHODS = [
-        "get_middleware", "get_safety_extension", "get_prompt_contributor",
-        "get_mode_config_provider", "get_tool_dependency_provider",
-        "get_workflow_provider", "get_service_provider",
-        "get_enrichment_strategy", "get_tool_selection_strategy",
-        "get_tiered_tool_config", "get_capability_provider",
-        "get_handlers", "get_tool_graph", "get_mode_config",
-        "get_tool_requirements", "get_capability_requirements",
+        "get_middleware",
+        "get_safety_extension",
+        "get_prompt_contributor",
+        "get_mode_config_provider",
+        "get_tool_dependency_provider",
+        "get_workflow_provider",
+        "get_service_provider",
+        "get_enrichment_strategy",
+        "get_tool_selection_strategy",
+        "get_tiered_tool_config",
+        "get_capability_provider",
+        "get_handlers",
+        "get_tool_graph",
+        "get_mode_config",
+        "get_tool_requirements",
+        "get_capability_requirements",
     ]
 
     ALL_METHODS = (
-        CORE_METHODS + RL_METHODS + TEAM_METHODS +
-        WORKFLOW_METADATA_METHODS + PROMPT_METADATA_METHODS +
-        EXTENSION_PROVIDER_METHODS
+        CORE_METHODS
+        + RL_METHODS
+        + TEAM_METHODS
+        + WORKFLOW_METADATA_METHODS
+        + PROMPT_METADATA_METHODS
+        + EXTENSION_PROVIDER_METHODS
     )
 
     @pytest.mark.parametrize("method_name", ALL_METHODS)
@@ -107,12 +137,14 @@ class TestMixinStandaloneUsage:
     def test_rl_mixin_importable(self):
         """RLMixin should be importable from the mixins package."""
         from victor_sdk.verticals.mixins import RLMixin
+
         assert hasattr(RLMixin, "get_rl_config_provider")
         assert hasattr(RLMixin, "get_rl_hooks")
 
     def test_team_mixin_importable(self):
         """TeamMixin should be importable from the mixins package."""
         from victor_sdk.verticals.mixins import TeamMixin
+
         assert hasattr(TeamMixin, "get_team_spec_provider")
         assert hasattr(TeamMixin, "get_team_specs")
         assert hasattr(TeamMixin, "get_team_declarations")
@@ -122,6 +154,7 @@ class TestMixinStandaloneUsage:
     def test_workflow_metadata_mixin_importable(self):
         """WorkflowMetadataMixin should be importable from the mixins package."""
         from victor_sdk.verticals.mixins import WorkflowMetadataMixin
+
         assert hasattr(WorkflowMetadataMixin, "get_initial_stage")
         assert hasattr(WorkflowMetadataMixin, "get_workflow_spec")
         assert hasattr(WorkflowMetadataMixin, "get_workflow_metadata")
@@ -129,6 +162,7 @@ class TestMixinStandaloneUsage:
     def test_prompt_metadata_mixin_importable(self):
         """PromptMetadataMixin should be importable from the mixins package."""
         from victor_sdk.verticals.mixins import PromptMetadataMixin
+
         assert hasattr(PromptMetadataMixin, "get_prompt_templates")
         assert hasattr(PromptMetadataMixin, "get_task_type_hints")
         assert hasattr(PromptMetadataMixin, "get_prompt_metadata")
@@ -136,6 +170,7 @@ class TestMixinStandaloneUsage:
     def test_extension_provider_mixin_importable(self):
         """ExtensionProviderMixin should be importable from the mixins package."""
         from victor_sdk.verticals.mixins import ExtensionProviderMixin
+
         assert hasattr(ExtensionProviderMixin, "get_middleware")
         assert hasattr(ExtensionProviderMixin, "get_safety_extension")
         assert hasattr(ExtensionProviderMixin, "get_tiered_tool_config")

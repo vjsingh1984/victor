@@ -12,7 +12,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Protocol, runtime_checkable
 
-
 # =============================================================================
 # Graph Storage Data Types
 # =============================================================================
@@ -104,9 +103,7 @@ class GraphStoreProtocol(Protocol):
 
     async def upsert_edges(self, edges: Iterable[Any]) -> None: ...
 
-    async def get_neighbors(
-        self, node_id: str, edge_type: Optional[str] = None
-    ) -> List[Any]: ...
+    async def get_neighbors(self, node_id: str, edge_type: Optional[str] = None) -> List[Any]: ...
 
     async def find_nodes(self, **kwargs: Any) -> List[Any]: ...
 
@@ -127,9 +124,7 @@ class VectorStoreProtocol(Protocol):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None: ...
 
-    async def search_similar(
-        self, query_embedding: List[float], limit: int = 10
-    ) -> List[Any]: ...
+    async def search_similar(self, query_embedding: List[float], limit: int = 10) -> List[Any]: ...
 
     async def delete_document(self, doc_id: str) -> None: ...
 

@@ -457,8 +457,7 @@ class ToolDependencyLoader:
         if not isinstance(raw_value, dict):
             raise ToolDependencyLoadError(path, "Expected a mapping of tool sets")
         return {
-            str(name): self._convert_tool_set(tools, path=path)
-            for name, tools in raw_value.items()
+            str(name): self._convert_tool_set(tools, path=path) for name, tools in raw_value.items()
         }
 
     def _convert_named_tool_lists(

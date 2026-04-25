@@ -66,7 +66,8 @@ class TestValidateManifestStructural:
     def test_api_version_above_current_reports_warning(self):
         class FutureVertical(VerticalBase):
             _victor_manifest = ExtensionManifest(
-                name="future", version="1.0.0",
+                name="future",
+                version="1.0.0",
                 api_version=CURRENT_API_VERSION + 1,
             )
 
@@ -89,7 +90,8 @@ class TestValidateManifestStructural:
     def test_api_version_below_minimum_reports_error(self):
         class OldVertical(VerticalBase):
             _victor_manifest = ExtensionManifest(
-                name="old", version="1.0.0",
+                name="old",
+                version="1.0.0",
                 api_version=MIN_SUPPORTED_API_VERSION - 1,
             )
 

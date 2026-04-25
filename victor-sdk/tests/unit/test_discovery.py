@@ -1,6 +1,5 @@
 """Unit tests for protocol discovery."""
 
-
 from victor_sdk.discovery import (
     ProtocolRegistry,
     get_global_registry,
