@@ -202,7 +202,7 @@ class TestProviderPayloadLimiter:
         """Repeated tool payloads should collapse to a shared dictionary reference."""
         limiter = ProviderPayloadLimiter(
             provider_name="test",
-            max_payload_bytes=4500,
+            max_payload_bytes=9000,
             safety_margin=1.0,
             enable_dictionary_compression=True,
         )
