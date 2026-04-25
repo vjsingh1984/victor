@@ -29,6 +29,7 @@ from victor.framework.search.codebase_embedding_bridge import (
     write_codebase_index_manifest,
 )
 from victor.tools.code_search_tool import (
+    IntegrityProbeOutcome,
     _ensure_file_watcher_subscription,
     _build_codebase_embedding_config,
     _build_index_failure_key,
@@ -175,7 +176,7 @@ class TestCorruptionDetection:
         # The integrity check should return False (no rebuild needed)
         result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result is False  # Should NOT trigger rebuild
+        assert result == IntegrityProbeOutcome()  # Should NOT trigger rebuild
 
     @pytest.mark.asyncio
     async def test_corruption_check_proceeds_when_not_indexing(self):
@@ -195,7 +196,7 @@ class TestCorruptionDetection:
         # The integrity check should return False (healthy)
         result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result is False  # Should be healthy
+        assert result == IntegrityProbeOutcome()  # Should be healthy
         mock_table.count_rows.assert_called_once()
 
     @pytest.mark.asyncio
@@ -220,7 +221,7 @@ class TestCorruptionDetection:
         # The integrity check should return False (no rebuild for transient errors)
         result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result is False  # Should NOT rebuild for transient errors
+        assert result == IntegrityProbeOutcome()  # Should NOT rebuild for transient errors
 
     @pytest.mark.asyncio
     async def test_actual_corruption_triggers_rebuild(self):
@@ -235,13 +236,38 @@ class TestCorruptionDetection:
             raise ValueError("Invalid data format")
 
         mock_index.semantic_search = mock_semantic_search_corrupt
+        mock_index.index_codebase = AsyncMock()
 
-        # The integrity check should return True (rebuild triggered)
-        with patch("victor.tools.code_search_tool.asyncio.create_task"):
-            result = await _probe_index_integrity(mock_index, timeout=5.0)
+        # The integrity check should return rebuilt=True when inline rebuild succeeds.
+        result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result is True  # Should trigger rebuild
+        assert result == IntegrityProbeOutcome(rebuilt=True)  # Should trigger rebuild
         assert mock_index._is_indexed is False  # Flag should be cleared
+
+    @pytest.mark.asyncio
+    async def test_failed_rebuild_marks_index_stale(self, monkeypatch):
+        """A corrupt persisted index should stay stale if its inline rebuild fails."""
+        mock_index = MagicMock()
+        mock_index._is_indexing = False
+        mock_index._is_indexed = True
+
+        async def mock_semantic_search_corrupt(*args, **kwargs):
+            raise ValueError("Invalid data format")
+
+        mock_index.semantic_search = mock_semantic_search_corrupt
+
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            code_search_tool_module,
+            "_background_index_rebuild",
+            AsyncMock(return_value=False),
+        )
+
+        result = await _probe_index_integrity(mock_index, timeout=5.0)
+
+        assert result == IntegrityProbeOutcome(stale=True)
+        assert mock_index._is_indexed is False
 
     @pytest.mark.asyncio
     async def test_probe_cancellation_cleans_up_semantic_search_task(self):
@@ -295,12 +321,12 @@ class TestErrorClassification:
             raise EmptyError()
 
         mock_index.semantic_search = mock_empty_error
+        mock_index.index_codebase = AsyncMock()
 
         # Should use type name as error message
-        with patch("victor.tools.code_search_tool.asyncio.create_task"):
-            result = await _probe_index_integrity(mock_index, timeout=5.0)
+        result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result is True  # Should trigger rebuild (not a transient error)
+        assert result == IntegrityProbeOutcome(rebuilt=True)  # Should trigger rebuild
 
     @pytest.mark.asyncio
     async def test_timeout_error_classified_as_transient(self):
@@ -323,7 +349,7 @@ class TestErrorClassification:
         # Should NOT trigger rebuild for timeout errors
         result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result is False  # Should skip rebuild
+        assert result == IntegrityProbeOutcome()  # Should skip rebuild
 
     @pytest.mark.asyncio
     async def test_not_ready_error_classified_as_transient(self):
@@ -346,7 +372,7 @@ class TestErrorClassification:
         # Should NOT trigger rebuild
         result = await _probe_index_integrity(mock_index, timeout=5.0)
 
-        assert result is False  # Should skip rebuild
+        assert result == IntegrityProbeOutcome()  # Should skip rebuild
 
 
 class TestBackgroundRebuildLogging:
@@ -367,8 +393,9 @@ class TestBackgroundRebuildLogging:
             embedding_provider=provider,
         )
 
-        await _background_index_rebuild(mock_index, rebuild_timeout=10.0)
+        result = await _background_index_rebuild(mock_index, rebuild_timeout=10.0)
 
+        assert result is True
         mock_index.index_codebase.assert_awaited_once()
         provider.get_stats.assert_awaited_once()
 
@@ -441,9 +468,10 @@ class TestBackgroundRebuildLogging:
         import logging
 
         with caplog.at_level(logging.WARNING):
-            await _background_index_rebuild(mock_index, rebuild_timeout=10.0)
+            result = await _background_index_rebuild(mock_index, rebuild_timeout=10.0)
 
         # Check that log includes error details
+        assert result is False
         log_messages = [record.message for record in caplog.records]
         assert any("Test rebuild error" in msg for msg in log_messages)
         assert any("/test/project" in msg for msg in log_messages)
@@ -1216,6 +1244,75 @@ class TestStructuralIndexPersistence:
         assert index is mock_index
         assert rebuilt is False
         assert mock_index._is_indexed is True
+        mock_index.index_codebase.assert_not_awaited()
+        probe_mock.assert_awaited_once_with(mock_index)
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_marks_persisted_cache_stale_when_integrity_rebuild_fails(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        persist_dir = tmp_path / "embeddings"
+        persist_dir.mkdir()
+        (persist_dir / "existing.lance").mkdir()
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(persist_dir),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        embedding_config = _build_codebase_embedding_config(settings, root)
+        write_codebase_index_manifest(persist_dir, build_codebase_index_manifest(embedding_config))
+
+        mock_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
+        fake_factory = SimpleNamespace(create=lambda **kwargs: mock_index)
+        fake_cache: dict[str, dict[str, object]] = {}
+
+        async def _stale_probe(index):
+            index._is_indexed = False
+            return IntegrityProbeOutcome(stale=True)
+
+        probe_mock = AsyncMock(side_effect=_stale_probe)
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+
+        clear_index_cache()
+        index, rebuilt = await _get_or_build_index(root=root, settings=settings)
+
+        assert index is mock_index
+        assert rebuilt is False
+        assert fake_cache[str(root)]["stale"] is True
+        assert mock_index._is_indexed is False
         mock_index.index_codebase.assert_not_awaited()
         probe_mock.assert_awaited_once_with(mock_index)
 

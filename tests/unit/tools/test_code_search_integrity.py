@@ -7,9 +7,11 @@
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
+from victor.tools.code_search_tool import IntegrityProbeOutcome
 
 
 class TestIndexIntegrityProbe:
@@ -32,7 +34,7 @@ class TestIndexIntegrityProbe:
         from victor.tools.code_search_tool import _probe_index_integrity
 
         rebuilt = await _probe_index_integrity(mock_index)
-        assert rebuilt is True
+        assert rebuilt == IntegrityProbeOutcome(rebuilt=True)
         mock_index.index_codebase.assert_called_once()
 
     @pytest.mark.asyncio
@@ -50,7 +52,7 @@ class TestIndexIntegrityProbe:
         from victor.tools.code_search_tool import _probe_index_integrity
 
         rebuilt = await _probe_index_integrity(mock_index)
-        assert rebuilt is False
+        assert rebuilt == IntegrityProbeOutcome()
         mock_index.index_codebase.assert_not_called()
 
     @pytest.mark.asyncio
@@ -68,5 +70,5 @@ class TestIndexIntegrityProbe:
         from victor.tools.code_search_tool import _probe_index_integrity
 
         rebuilt = await _probe_index_integrity(mock_index, timeout=0.1)
-        assert rebuilt is True
+        assert rebuilt == IntegrityProbeOutcome(rebuilt=True)
         mock_index.index_codebase.assert_called_once()

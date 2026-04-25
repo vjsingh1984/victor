@@ -35,6 +35,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class IntegrityProbeOutcome:
+    """Outcome of validating a persisted semantic index before reuse."""
+
+    rebuilt: bool = False
+    stale: bool = False
+
+
+def _coerce_integrity_probe_outcome(value: Any) -> IntegrityProbeOutcome:
+    """Normalize legacy boolean probe results into the explicit outcome contract."""
+
+    if isinstance(value, IntegrityProbeOutcome):
+        return value
+    if isinstance(value, bool):
+        return IntegrityProbeOutcome(rebuilt=value, stale=False)
+    return IntegrityProbeOutcome()
+
+
 @dataclass
 class SearchFilters:
     """Filters for code search operations.
@@ -186,11 +204,11 @@ def _get_index_build_failure_cache(exec_ctx: Optional[Any] = None) -> Any:
     return failure_cache
 
 
-async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
+async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> IntegrityProbeOutcome:
     """Validate persistent index integrity with a lightweight check.
 
-    Returns True if corruption was detected (rebuild triggered),
-    False if index is healthy or currently being initialized.
+    Returns an explicit outcome so callers can distinguish a healthy persisted
+    index from a successfully rebuilt one and from a still-stale failed rebuild.
 
     ENHANCEMENT: Distinguishes between init-time races and actual corruption.
     """
@@ -199,7 +217,7 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
         # NEW: Check if index is currently being built
         if _get_instance_attr(index, "_is_indexing", False) is True:
             logger.debug("Index currently being built, skipping integrity check")
-            return False  # Don't trigger rebuild during init
+            return IntegrityProbeOutcome()  # Don't trigger rebuild during init
 
         # Quick check: does the vector store have data?
         store = _get_instance_attr(index, "_vector_store", None)
@@ -211,7 +229,7 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
                 row_count = table.count_rows() if hasattr(table, "count_rows") else -1
                 if isinstance(row_count, (int, float)) and row_count > 0:
                     logger.info("Persistent index healthy: %d rows in vector store", row_count)
-                    return False  # Healthy
+                    return IntegrityProbeOutcome()  # Healthy
 
         # Fallback: try a semantic search with timeout
         probe_task = asyncio.get_running_loop().create_task(
@@ -226,10 +244,10 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
             )
             if hasattr(index, "_is_indexed"):
                 index._is_indexed = False
-            await _background_index_rebuild(index)
-            return True
+            rebuilt = await _background_index_rebuild(index)
+            return IntegrityProbeOutcome(rebuilt=rebuilt, stale=not rebuilt)
         await probe_task
-        return False  # Healthy — no rebuild needed
+        return IntegrityProbeOutcome()  # Healthy — no rebuild needed
     except asyncio.CancelledError:
         if probe_task is not None and not probe_task.done():
             probe_task.cancel()
@@ -255,7 +273,7 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
 
         if any(kw in error_msg.lower() for kw in transient_keywords):
             logger.debug("Transient init issue detected (%s), skipping rebuild", error_msg)
-            return False  # Don't rebuild for transient issues
+            return IntegrityProbeOutcome()  # Don't rebuild for transient issues
 
         # Log with full error details for debugging
         logger.warning("Persistent index corrupt (%s); rebuilding inline", error_msg)
@@ -264,8 +282,8 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
             index._is_indexed = False
 
         # Rebuild inline while the startup path already holds the index lock.
-        await _background_index_rebuild(index)
-        return True  # Corruption detected, rebuild in flight
+        rebuilt = await _background_index_rebuild(index)
+        return IntegrityProbeOutcome(rebuilt=rebuilt, stale=not rebuilt)
 
 
 def _build_codebase_embedding_extra_config(settings: Any, root: Optional[Path] = None) -> Dict[str, Any]:
@@ -396,7 +414,7 @@ async def _finalize_index_storage(index: Any) -> None:
         logger.debug("Failed to finalize structural code_search provider writes: %s", exc)
 
 
-async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> None:
+async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> bool:
     """Rebuild a corrupt index in the background without blocking callers."""
     import time
 
@@ -414,12 +432,14 @@ async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) 
             elapsed,
             index_path,
         )
+        return True
     except asyncio.TimeoutError:
         logger.warning(
             "Background index rebuild timed out after %ds; index remains stale (index=%s)",
             rebuild_timeout,
             getattr(index, "root", "unknown"),
         )
+        return False
     except Exception as err:
         error_msg = str(err) if str(err) else f"{type(err).__name__}"
         logger.warning(
@@ -428,6 +448,7 @@ async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) 
             error_msg,
             getattr(index, "root", "unknown"),
         )
+        return False
 
 
 def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -1303,6 +1324,7 @@ async def _get_or_build_index(
             await index.index_codebase()
             await _finalize_index_storage(index)
             rebuilt = True
+            cache_stale = False
         else:
             # Persistent embeddings exist on disk (LanceDB tables).
             # Mark as indexed so semantic_search() works directly against
@@ -1311,9 +1333,9 @@ async def _get_or_build_index(
                 index._is_indexed = True
             logger.info("Using persistent embeddings from %s (skip full rebuild)", persist_path)
             # Validate integrity — corrupt LanceDB data will fail silently
-            rebuilt = await _probe_index_integrity(index)
-            if rebuilt:
-                await _finalize_index_storage(index)
+            probe_outcome = _coerce_integrity_probe_outcome(await _probe_index_integrity(index))
+            rebuilt = probe_outcome.rebuilt
+            cache_stale = probe_outcome.stale
 
         try:
             write_codebase_index_manifest(persist_path, index_manifest)
@@ -1326,6 +1348,7 @@ async def _get_or_build_index(
             "indexed_at": time.time(),
             "index_manifest": index_manifest,
             "watcher_subscribed": False,  # Will be subscribed on next access
+            "stale": cache_stale,
         }
 
         # Mark lock as used
