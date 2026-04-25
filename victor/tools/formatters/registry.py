@@ -145,7 +145,8 @@ class _FormatCache:
             key_parts.append(sorted_kwargs)
 
         key_string = ":".join(key_parts)
-        return hashlib.sha256(key_string.encode()).hexdigest()[:32]
+        content_hash = hashlib.sha256(key_string.encode()).hexdigest()[:32]
+        return f"{tool_name}:{content_hash}"
 
 
 # Global cache instance

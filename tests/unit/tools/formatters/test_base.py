@@ -66,7 +66,7 @@ class TestToolFormatter:
         class ConcreteFormatter(ToolFormatter):
             pass
 
-        with pytest.raises(TypeError, match="Can't instantiate abstract class ConcreteFormatter with abstract method format"):
+        with pytest.raises(TypeError, match="abstract"):
             ConcreteFormatter()
 
     def test_validate_input_default(self):

@@ -401,6 +401,8 @@ class TestKVToolSelectionStrategy:
 
         orch = MagicMock(spec=AgentOrchestrator)
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=False)
+        # Disable v2 so the legacy pass-through path is exercised
+        orch._is_tool_strategy_v2_enabled.return_value = False
 
         tool_a = MagicMock()
         tool_a.name = "a_tool"

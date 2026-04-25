@@ -88,8 +88,10 @@ class TestNetworkFormatter:
         """Test formatting ping when host is down."""
         formatter = NetworkFormatter()
         data = {
+            "operation": "ping",
             "host": "unreachable.com",
-            "packet_loss": 100.0
+            "packet_loss": 100.0,
+            "latency_ms": 0.0,
         }
 
         result = formatter.format(data)
