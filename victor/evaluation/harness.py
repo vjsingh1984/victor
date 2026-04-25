@@ -48,9 +48,9 @@ from victor.evaluation.runtime_feedback import (
 from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmitterRegistry,
 )
-from victor.evaluation.validated_session_truth_service import (
+from victor.evaluation.services import (
     ValidatedSessionTruthService,
-    create_default_validated_session_truth_service,
+    create_validated_session_truth_service,
 )
 
 logger = logging.getLogger(__name__)
@@ -491,7 +491,7 @@ class EvaluationHarness:
         self._runners = runners or {}
         self._validated_session_truth_service = (
             validated_session_truth_service
-            or create_default_validated_session_truth_service(validated_session_truth_emitters)
+            or create_validated_session_truth_service(validated_session_truth_emitters)
         )
         try:
             from victor.config.secure_paths import get_victor_dir

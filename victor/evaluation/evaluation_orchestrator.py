@@ -63,9 +63,9 @@ from victor.evaluation.env_setup import EnvironmentConfig, EnvironmentSetup, Set
 from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmitterRegistry,
 )
-from victor.evaluation.validated_session_truth_service import (
+from victor.evaluation.services import (
     ValidatedSessionTruthService,
-    create_default_validated_session_truth_service,
+    create_validated_session_truth_service,
 )
 from victor.evaluation.result_correlation import (
     CorrelationReport,
@@ -337,7 +337,7 @@ class EvaluationOrchestrator:
         self.progress_callback = progress_callback
         self._validated_session_truth_service = (
             validated_session_truth_service
-            or create_default_validated_session_truth_service(validated_session_truth_emitters)
+            or create_validated_session_truth_service(validated_session_truth_emitters)
         )
 
         # Initialize components

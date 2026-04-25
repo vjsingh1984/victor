@@ -295,8 +295,19 @@ Next recommended slice:
     keyword as a compatibility shim
 
 Next recommended slice:
-- Phase 5.17: promote the validated session-truth service through higher-level
-  factories/exports so the broader evaluation stack depends on one canonical
-  DI entrypoint instead of importing the concrete service opportunistically
-  - Keep compatibility shims minimal and avoid reintroducing registry-first
-    construction on new call sites
+- Phase 5.17 completed: promote the validated session-truth service through
+  higher-level factories/exports so the broader evaluation stack depends on
+  one canonical DI entrypoint instead of importing the concrete service
+  opportunistically
+  - `services.py` now exposes the canonical evaluation-level validated
+    session-truth factory/export path
+  - `EvaluationHarness` and `EvaluationOrchestrator` now resolve their default
+    service through that higher-level entrypoint instead of importing the
+    concrete service factory directly
+
+Next recommended slice:
+- Phase 5.18: narrow validated session-truth constructor and factory typing to
+  a protocol so evaluation runtimes depend on the service contract rather than
+  the concrete implementation class
+  - Keep the canonical evaluation-level factory path in `services.py`
+  - Preserve existing runtime behavior while reducing implementation coupling

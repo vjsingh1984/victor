@@ -852,6 +852,24 @@ class TestBenchmarkToolUsageMetrics:
 
         assert saved_paths == [tmp_path / "eval_session_stub.json"]
 
+    def test_harness_uses_canonical_evaluation_service_factory(self, tmp_path):
+        """Harness should resolve the default service through the evaluation-level entrypoint."""
+
+        registry = ValidatedSessionTruthEmitterRegistry()
+        stub_service = object()
+
+        with patch(
+            "victor.evaluation.harness.create_validated_session_truth_service",
+            return_value=stub_service,
+        ) as create_service:
+            harness = EvaluationHarness(
+                checkpoint_dir=tmp_path,
+                validated_session_truth_emitters=registry,
+            )
+
+        assert harness._validated_session_truth_service is stub_service
+        create_service.assert_called_once_with(registry)
+
 
 class TestSaveAndLoadResults:
     """Tests for saving and loading evaluation results."""

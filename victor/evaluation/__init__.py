@@ -105,6 +105,10 @@ from victor.evaluation.analyzers import (
     get_code_quality_analyzer,
     get_pass_at_k_evaluator,
 )
+from victor.evaluation.services import (
+    ValidatedSessionTruthService,
+    create_validated_session_truth_service,
+)
 
 # Code generation harness (HumanEval, MBPP - provider-only, no tools)
 from victor.evaluation.code_generation_harness import (
@@ -258,6 +262,8 @@ __all__ = [
     "AnalyzerRegistry",
     "get_code_quality_analyzer",
     "get_pass_at_k_evaluator",
+    "ValidatedSessionTruthService",
+    "create_validated_session_truth_service",
     # Code generation harness (HumanEval, MBPP - provider-only)
     "CodeGenMetrics",
     "CodeGenResult",

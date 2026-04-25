@@ -599,6 +599,25 @@ class TestEvaluationOrchestrator:
 
             assert saved_path == output_dir / "evaluations" / "eval_session_stub.json"
 
+    def test_orchestrator_uses_canonical_evaluation_service_factory(self):
+        """Orchestrator should resolve the default service through the evaluation-level entrypoint."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = OrchestratorConfig(output_dir=Path(tmpdir))
+            registry = ValidatedSessionTruthEmitterRegistry()
+            stub_service = object()
+
+            with patch(
+                "victor.evaluation.evaluation_orchestrator.create_validated_session_truth_service",
+                return_value=stub_service,
+            ) as create_service:
+                orchestrator = EvaluationOrchestrator(
+                    config,
+                    validated_session_truth_emitters=registry,
+                )
+
+            assert orchestrator._validated_session_truth_service is stub_service
+            create_service.assert_called_once_with(registry)
+
 
 class TestProgressCallback:
     """Tests for progress callback functionality."""
