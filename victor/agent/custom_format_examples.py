@@ -70,7 +70,7 @@ class MarkdownFormatStrategy:
 
     Example output:
         ```markdown
-        # Tool: read_file
+        # Tool: read
 
         **Path:** `example.py`
 
@@ -209,7 +209,7 @@ class YAMLFormatStrategy:
 
     Example output:
         ```yaml
-        tool: read_file
+        tool: read
         args:
           path: example.py
         output: |

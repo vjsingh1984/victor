@@ -468,9 +468,9 @@ class FallbackParsingMixin:
         """Parse Python-style function calls from content (fallback).
 
         Handles text-based tool calls like:
-        - read_file(path='foo.py')
+        - read(path='foo.py')
         - shell(command="ls -la")
-        - edit(file_path='/path', old_string="x", new_string="y")
+        - edit(path='/path', old_string="x", new_string="y")
 
         Common with open-weight models on OpenAI-compatible providers
         (Cerebras, Groq, Together, etc.) that output tool calls as text.

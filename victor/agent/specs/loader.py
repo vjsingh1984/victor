@@ -22,13 +22,13 @@ agents:
   - name: researcher
     description: Gathers information
     capabilities:
-      tools: [web_search, read_file, code_search]
+      tools: [web_search, read, code_search]
       can_browse_web: true
     model_preference: reasoning
 
   - name: coder
     description: Writes code
-    capabilities: [edit_file, write_file, execute_bash]
+    capabilities: [edit, write, shell]
     model_preference: coding
 
 ensemble:

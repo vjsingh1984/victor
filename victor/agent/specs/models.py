@@ -235,7 +235,7 @@ class AgentSpec:
             name="researcher",
             description="Finds and analyzes information",
             capabilities=AgentCapabilities(
-                tools={"web_search", "read_file"},
+                tools={"web_search", "read"},
                 can_browse_web=True,
             ),
             model_preference=ModelPreference.REASONING,
@@ -245,7 +245,7 @@ class AgentSpec:
         agent = AgentSpec.from_dict({
             "name": "researcher",
             "description": "Finds and analyzes information",
-            "capabilities": ["web_search", "read_file"],
+            "capabilities": ["web_search", "read"],
             "model_preference": "reasoning",
         })
     """
