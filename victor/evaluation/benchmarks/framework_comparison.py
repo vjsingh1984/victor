@@ -36,6 +36,7 @@ from victor.evaluation.protocol import (
     EvaluationConfig,
     EvaluationResult,
     LeaderboardEntry,
+    get_benchmark_metadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -249,8 +250,8 @@ class ComparisonReport:
             "",
             "## Leaderboard",
             "",
-            "| Rank | Framework | Pass Rate | Avg Latency | Tokens/Task | Cost/Task |",
-            "|------|-----------|-----------|-------------|-------------|-----------|",
+            "| Rank | Framework | Model | Pass Rate | Avg Latency | Tokens/Task | Cost/Task | Source |",
+            "|------|-----------|-------|-----------|-------------|-------------|-----------|--------|",
         ]
 
         for i, result in enumerate(
@@ -258,10 +259,12 @@ class ComparisonReport:
         ):
             lines.append(
                 f"| {i+1} | {result.framework.value} | "
+                f"{result.model} | "
                 f"{result.metrics.pass_rate:.1%} | "
                 f"{result.metrics.avg_latency_ms:.0f}ms | "
                 f"{result.metrics.tokens_per_task:.0f} | "
-                f"${result.metrics.cost_per_task:.4f} |"
+                f"${result.metrics.cost_per_task:.4f} | "
+                f"{result.config.get('source', '')} |"
             )
 
         lines.extend(
@@ -299,13 +302,19 @@ class ComparisonReport:
                 {
                     "framework": r.framework.value,
                     "model": r.model,
+                    "timestamp": r.timestamp.isoformat(),
                     "metrics": {
                         "pass_rate": r.metrics.pass_rate,
                         "avg_latency_ms": r.metrics.avg_latency_ms,
                         "tokens_per_task": r.metrics.tokens_per_task,
                         "code_quality_score": r.metrics.code_quality_score,
                         "cost_per_task": r.metrics.cost_per_task,
+                        "test_pass_rate": r.metrics.test_pass_rate,
+                        "partial_completion": r.metrics.partial_completion,
+                        "error_rate": r.metrics.error_rate,
+                        "timeout_rate": r.metrics.timeout_rate,
                     },
+                    "config": r.config,
                 }
                 for r in self.results
             ],
@@ -362,6 +371,210 @@ def compute_metrics_from_result(result: EvaluationResult) -> ComparisonMetrics:
     metrics.timeout_rate = result.timeout_tasks / result.total_tasks
 
     return metrics
+
+
+def _safe_int(value: Any) -> int:
+    """Best-effort integer conversion for saved result ingestion."""
+    try:
+        if value is None:
+            return 0
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_float(value: Any) -> float:
+    """Best-effort float conversion for saved result ingestion."""
+    try:
+        if value is None:
+            return 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _get_saved_task_results(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract task result records from supported saved result schemas."""
+    tasks = data.get("task_results")
+    if isinstance(tasks, list):
+        return [task for task in tasks if isinstance(task, dict)]
+    tasks = data.get("tasks")
+    if isinstance(tasks, list):
+        return [task for task in tasks if isinstance(task, dict)]
+    return []
+
+
+def _get_saved_dataset_metadata(data: dict[str, Any]) -> dict[str, Any]:
+    """Extract dataset metadata from saved result payloads."""
+    dataset_metadata = data.get("dataset_metadata")
+    if isinstance(dataset_metadata, dict):
+        return dict(dataset_metadata)
+    config = data.get("config")
+    if isinstance(config, dict) and isinstance(config.get("dataset_metadata"), dict):
+        return dict(config["dataset_metadata"])
+    return {}
+
+
+def _resolve_saved_benchmark_type(data: dict[str, Any]) -> BenchmarkType:
+    """Resolve a benchmark enum from a saved result payload."""
+    benchmark_name = data.get("benchmark")
+    if benchmark_name is None:
+        config = data.get("config")
+        if isinstance(config, dict):
+            benchmark_name = config.get("benchmark")
+    if benchmark_name is None:
+        raise ValueError("Saved benchmark result is missing benchmark metadata")
+    metadata = get_benchmark_metadata(str(benchmark_name))
+    if metadata is None:
+        raise ValueError(f"Unknown benchmark in saved result: {benchmark_name}")
+    return metadata.type
+
+
+def compute_metrics_from_saved_result(data: dict[str, Any]) -> ComparisonMetrics:
+    """Compute comparison metrics from a saved benchmark JSON artifact."""
+    metrics = ComparisonMetrics()
+    summary: dict[str, Any] = {}
+    for key in ("summary", "metrics"):
+        candidate = data.get(key)
+        if isinstance(candidate, dict):
+            summary.update(candidate)
+
+    task_results = _get_saved_task_results(data)
+    total_tasks = _safe_int(summary.get("total_tasks")) or len(task_results)
+    if total_tasks <= 0:
+        return metrics
+
+    passed_tasks = sum(
+        1 for task in task_results if str(task.get("status", "")).lower() == "passed"
+    )
+    error_tasks = sum(
+        1 for task in task_results if str(task.get("status", "")).lower() == "error"
+    )
+    timeout_tasks = sum(
+        1 for task in task_results if str(task.get("status", "")).lower() == "timeout"
+    )
+
+    if summary.get("pass_rate") is not None:
+        metrics.pass_rate = _safe_float(summary.get("pass_rate"))
+    else:
+        metrics.pass_rate = passed_tasks / total_tasks
+
+    duration_seconds = _safe_float(summary.get("duration_seconds"))
+    if duration_seconds > 0:
+        metrics.avg_latency_ms = (duration_seconds * 1000) / total_tasks
+    elif summary.get("avg_duration_per_task") is not None:
+        metrics.avg_latency_ms = _safe_float(summary.get("avg_duration_per_task")) * 1000
+    else:
+        task_duration = sum(
+            _safe_float(task.get("duration_seconds") or task.get("duration"))
+            for task in task_results
+        )
+        metrics.avg_latency_ms = (task_duration * 1000) / total_tasks if task_duration else 0.0
+
+    total_tokens = _safe_float(summary.get("total_tokens"))
+    if total_tokens > 0:
+        metrics.tokens_per_task = total_tokens / total_tasks
+    elif summary.get("avg_tokens_per_task") is not None:
+        metrics.tokens_per_task = _safe_float(summary.get("avg_tokens_per_task"))
+    else:
+        metrics.tokens_per_task = sum(_safe_float(task.get("tokens_used")) for task in task_results) / total_tasks
+
+    total_tests = sum(_safe_int(task.get("tests_total")) for task in task_results)
+    passed_tests = sum(_safe_int(task.get("tests_passed")) for task in task_results)
+    if total_tests > 0:
+        metrics.test_pass_rate = passed_tests / total_tests
+
+    completion_scores = [
+        _safe_float(task.get("completion_score"))
+        for task in task_results
+        if task.get("completion_score") is not None
+    ]
+    if completion_scores:
+        metrics.partial_completion = sum(completion_scores) / len(completion_scores)
+
+    quality_scores = []
+    for task in task_results:
+        code_quality = task.get("code_quality")
+        if isinstance(code_quality, dict) and code_quality.get("overall_score") is not None:
+            quality_scores.append(_safe_float(code_quality.get("overall_score")))
+    if quality_scores:
+        metrics.code_quality_score = sum(quality_scores) / len(quality_scores)
+
+    total_turns = _safe_float(summary.get("total_turns"))
+    if total_turns > 0:
+        metrics.turns_per_task = total_turns / total_tasks
+    else:
+        metrics.turns_per_task = sum(_safe_float(task.get("turns")) for task in task_results) / total_tasks
+
+    total_tool_calls = _safe_float(summary.get("total_tool_calls"))
+    if total_tool_calls > 0:
+        metrics.tool_calls_per_task = total_tool_calls / total_tasks
+    else:
+        metrics.tool_calls_per_task = sum(
+            _safe_float(task.get("tool_calls")) for task in task_results
+        ) / total_tasks
+
+    total_cost_micros = _safe_float(summary.get("cost_usd_micros"))
+    if total_cost_micros > 0:
+        metrics.cost_per_task = (total_cost_micros / 1_000_000) / total_tasks
+    elif metrics.tokens_per_task > 0:
+        metrics.cost_per_task = (metrics.tokens_per_task / 1000) * 0.01
+
+    summary_errors = summary.get("errors")
+    summary_timeouts = summary.get("timeouts")
+    metrics.error_rate = (
+        _safe_float(summary_errors) / total_tasks if summary_errors is not None else error_tasks / total_tasks
+    )
+    metrics.timeout_rate = (
+        _safe_float(summary_timeouts) / total_tasks
+        if summary_timeouts is not None
+        else timeout_tasks / total_tasks
+    )
+
+    return metrics
+
+
+def load_framework_result_from_file(
+    path: Path,
+    framework: Framework = Framework.VICTOR,
+    model_override: Optional[str] = None,
+) -> FrameworkResult:
+    """Load a saved benchmark artifact into a FrameworkResult."""
+    with open(path) as f:
+        data = json.load(f)
+
+    benchmark = _resolve_saved_benchmark_type(data)
+    config = data.get("config") if isinstance(data.get("config"), dict) else {}
+    dataset_metadata = _get_saved_dataset_metadata(data)
+    resolved_model = model_override or data.get("model") or config.get("model") or "unknown"
+    source_name = (
+        dataset_metadata.get("source_name")
+        or config.get("source")
+        or f"Local result ({path.name})"
+    )
+    timestamp_value = data.get("timestamp") or data.get("end_time") or data.get("start_time")
+    try:
+        timestamp = datetime.fromisoformat(str(timestamp_value)) if timestamp_value else datetime.now()
+    except ValueError:
+        timestamp = datetime.now()
+
+    framework_config: dict[str, Any] = {
+        "artifact_path": str(path),
+        "source": source_name,
+        "dataset_metadata": dataset_metadata,
+    }
+    if config.get("max_tasks") is not None:
+        framework_config["max_tasks"] = config.get("max_tasks")
+
+    return FrameworkResult(
+        framework=framework,
+        benchmark=benchmark,
+        model=str(resolved_model),
+        metrics=compute_metrics_from_saved_result(data),
+        timestamp=timestamp,
+        config=framework_config,
+        task_results=_get_saved_task_results(data),
+    )
 
 
 # External benchmark results for comparison (from published data)
@@ -427,6 +640,31 @@ def create_comparison_report(
             result = FrameworkResult(
                 framework=framework,
                 benchmark=benchmark,
+                model=data.get("model", "unknown"),
+                metrics=metrics,
+                config={"source": data.get("source", "published")},
+            )
+            report.results.append(result)
+
+    return report
+
+
+def create_comparison_report_from_saved_result(
+    path: Path,
+    framework: Framework = Framework.VICTOR,
+    include_published: bool = True,
+) -> ComparisonReport:
+    """Create a comparison report from a saved benchmark JSON artifact."""
+    framework_result = load_framework_result_from_file(path, framework=framework)
+    report = ComparisonReport(benchmark=framework_result.benchmark)
+    report.results.append(framework_result)
+
+    if include_published and framework_result.benchmark in PUBLISHED_RESULTS:
+        for published_framework, data in PUBLISHED_RESULTS[framework_result.benchmark].items():
+            metrics = ComparisonMetrics(pass_rate=data.get("pass_rate", 0.0))
+            result = FrameworkResult(
+                framework=published_framework,
+                benchmark=framework_result.benchmark,
                 model=data.get("model", "unknown"),
                 metrics=metrics,
                 config={"source": data.get("source", "published")},

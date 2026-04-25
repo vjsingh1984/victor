@@ -152,6 +152,21 @@ def _summarize_failure_examples(
     return grouped
 
 
+def _comparison_result_source(result: Any) -> str:
+    """Format a human-readable source label for comparison rows."""
+    config = getattr(result, "config", {}) or {}
+    source = str(config.get("source") or "").strip()
+    artifact_path = str(config.get("artifact_path") or "").strip()
+    artifact_name = Path(artifact_path).name if artifact_path else ""
+    if source and artifact_name:
+        return f"{source} [{artifact_name}]"
+    if source:
+        return source
+    if artifact_name:
+        return f"Local result [{artifact_name}]"
+    return ""
+
+
 async def _prewarm_code_intelligence_index(
     work_dir: Optional[Path],
     warmed_repos: Dict[str, CodeIntelligencePrewarmResult],
@@ -1101,12 +1116,19 @@ def compare_frameworks(
     format: str = typer.Option(
         "table", "--format", "-f", help="Output format: table, markdown, json"
     ),
+    victor_results: Optional[Path] = typer.Option(
+        None,
+        "--victor-results",
+        help="Saved Victor benchmark JSON artifact to include in the comparison",
+    ),
 ) -> None:
     """Compare Victor against other AI coding frameworks."""
     from victor.evaluation.benchmarks import (
-        Framework,
-        FRAMEWORK_CAPABILITIES,
+        ComparisonMetrics,
+        ComparisonReport,
+        FrameworkResult,
         PUBLISHED_RESULTS,
+        create_comparison_report_from_saved_result,
     )
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
@@ -1120,65 +1142,74 @@ def compare_frameworks(
 
     console.print(f"\n[bold cyan]Framework Comparison: {benchmark}[/]\n")
 
-    # Get published results
-    if bench_type not in PUBLISHED_RESULTS:
-        console.print("[yellow]No published results available for this benchmark[/]")
-        console.print("Run 'victor benchmark run' to generate Victor results")
-        raise typer.Exit(0)
+    if victor_results is not None:
+        try:
+            report = create_comparison_report_from_saved_result(victor_results, include_published=True)
+        except Exception as exc:
+            console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
+            raise typer.Exit(1)
+        if report.benchmark != bench_type:
+            console.print(
+                "[bold red]Error:[/] Victor result artifact benchmark "
+                f"'{report.benchmark.value}' does not match requested benchmark '{metadata.name}'"
+            )
+            raise typer.Exit(1)
+    else:
+        if bench_type not in PUBLISHED_RESULTS:
+            console.print("[yellow]No published results available for this benchmark[/]")
+            console.print("Run 'victor benchmark run' to generate Victor results")
+            raise typer.Exit(0)
 
-    table = Table(title=f"Published Results: {benchmark}")
+        report = ComparisonReport(benchmark=bench_type)
+        for framework, data in PUBLISHED_RESULTS[bench_type].items():
+            report.results.append(
+                FrameworkResult(
+                    framework=framework,
+                    benchmark=bench_type,
+                    model=data.get("model", "unknown"),
+                    metrics=ComparisonMetrics(pass_rate=data.get("pass_rate", 0.0)),
+                    config={"source": data.get("source", "published")},
+                )
+            )
+
+    table = Table(title=f"Results: {benchmark}")
     table.add_column("Framework", style="cyan")
     table.add_column("Model", style="white")
     table.add_column("Pass Rate", style="green")
     table.add_column("Source", style="dim")
 
-    results = PUBLISHED_RESULTS[bench_type]
-    for framework, data in sorted(
-        results.items(), key=lambda x: x[1].get("pass_rate", 0), reverse=True
-    ):
+    for result in sorted(report.results, key=lambda item: item.metrics.pass_rate, reverse=True):
         table.add_row(
-            framework.value,
-            data.get("model", "unknown"),
-            f"{data.get('pass_rate', 0):.1%}",
-            data.get("source", ""),
+            result.framework.value,
+            result.model,
+            f"{result.metrics.pass_rate:.1%}",
+            _comparison_result_source(result),
         )
 
     console.print(table)
 
-    if format == "markdown" and output:
-        md_lines = [
-            f"# Framework Comparison: {benchmark}",
-            "",
-            "| Framework | Model | Pass Rate | Source |",
-            "|-----------|-------|-----------|--------|",
-        ]
-        for framework, data in results.items():
-            md_lines.append(
-                f"| {framework.value} | {data.get('model', 'unknown')} | "
-                f"{data.get('pass_rate', 0):.1%} | {data.get('source', '')} |"
-            )
-        output.write_text("\n".join(md_lines))
-        console.print(f"\n[dim]Report saved to {output}[/]")
+    if victor_results is not None:
+        console.print(f"\n[dim]Included local Victor results: {victor_results}[/]")
 
+    if format == "markdown" and output:
+        output.write_text(report.to_markdown())
+        console.print(f"\n[dim]Report saved to {output}[/]")
     elif format == "json" and output:
-        output.write_text(
-            json.dumps(
-                {
-                    "benchmark": benchmark,
-                    "results": {f.value: d for f, d in results.items()},
-                },
-                indent=2,
-            )
-        )
+        output.write_text(report.to_json())
         console.print(f"\n[dim]Report saved to {output}[/]")
 
 
 @benchmark_app.command("leaderboard")
 def show_leaderboard(
     benchmark: str = typer.Option("swe-bench", "--benchmark", "-b", help="Benchmark to show"),
+    victor_results: Optional[Path] = typer.Option(
+        None,
+        "--victor-results",
+        help="Saved Victor benchmark JSON artifact to include in the leaderboard",
+    ),
 ) -> None:
     """Show the leaderboard for a benchmark."""
-    from victor.evaluation.benchmarks import PUBLISHED_RESULTS
+    from victor.evaluation.benchmarks import PUBLISHED_RESULTS, create_comparison_report_from_saved_result
     from victor.evaluation.protocol import get_benchmark_metadata, normalize_benchmark_name
 
     benchmark_lower = normalize_benchmark_name(benchmark)
@@ -1191,19 +1222,51 @@ def show_leaderboard(
 
     console.print(f"\n[bold cyan]Leaderboard: {benchmark}[/]\n")
 
-    if bench_type not in PUBLISHED_RESULTS:
+    entries: list[tuple[str, float, str]] = []
+    if bench_type in PUBLISHED_RESULTS:
+        for framework, data in PUBLISHED_RESULTS[bench_type].items():
+            entries.append(
+                (
+                    framework.value,
+                    float(data.get("pass_rate", 0.0)),
+                    str(data.get("source", "")),
+                )
+            )
+
+    if victor_results is not None:
+        try:
+            report = create_comparison_report_from_saved_result(victor_results, include_published=False)
+        except Exception as exc:
+            console.print(f"[bold red]Error:[/] Failed to load Victor results: {exc}")
+            raise typer.Exit(1)
+        if report.benchmark != bench_type:
+            console.print(
+                "[bold red]Error:[/] Victor result artifact benchmark "
+                f"'{report.benchmark.value}' does not match requested benchmark '{metadata.name}'"
+            )
+            raise typer.Exit(1)
+        local_result = report.results[0]
+        entries.append(
+            (
+                local_result.framework.value,
+                float(local_result.metrics.pass_rate),
+                _comparison_result_source(local_result),
+            )
+        )
+
+    if not entries:
         console.print("[yellow]No results available[/]")
         raise typer.Exit(0)
 
-    results = PUBLISHED_RESULTS[bench_type]
-    sorted_results = sorted(results.items(), key=lambda x: x[1].get("pass_rate", 0), reverse=True)
+    sorted_results = sorted(entries, key=lambda item: item[1], reverse=True)
 
     table = Table()
     table.add_column("Rank", style="bold")
     table.add_column("Framework", style="cyan")
     table.add_column("Pass Rate", style="green")
+    table.add_column("Source", style="dim")
 
-    for i, (framework, data) in enumerate(sorted_results, 1):
+    for i, (framework_name, pass_rate, source) in enumerate(sorted_results, 1):
         medal = ""
         if i == 1:
             medal = "🥇 "
@@ -1214,12 +1277,16 @@ def show_leaderboard(
 
         table.add_row(
             f"{medal}{i}",
-            framework.value,
-            f"{data.get('pass_rate', 0):.1%}",
+            framework_name,
+            f"{pass_rate:.1%}",
+            source,
         )
 
     console.print(table)
-    console.print("\n[dim]Based on published benchmark results[/]")
+    if victor_results is not None:
+        console.print(f"\n[dim]Includes local Victor result: {victor_results}[/]")
+    else:
+        console.print("\n[dim]Based on published benchmark results[/]")
 
 
 @benchmark_app.command("capabilities")

@@ -202,6 +202,79 @@ class TestBenchmarkCompare:
         assert result.exit_code == 0
         assert "No published results available" in result.stdout
 
+    def test_compare_external_benchmark_with_local_victor_results(self, tmp_path):
+        """Local Victor artifacts should drive comparison output for external benchmarks."""
+        saved_result = tmp_path / "guide_result.json"
+        output = tmp_path / "compare.json"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "test-model",
+                    "dataset_metadata": {"source_name": "GUIDE Consortium"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 1.0,
+                    },
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-results",
+                str(saved_result),
+                "--format",
+                "json",
+                "--output",
+                str(output),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Framework Comparison" in result.stdout
+        saved = json.loads(output.read_text())
+        assert saved["benchmark"] == "guide"
+        assert saved["results"][0]["framework"] == "victor"
+        assert saved["results"][0]["config"]["source"] == "GUIDE Consortium"
+
+    def test_compare_rejects_mismatched_local_victor_results(self, tmp_path):
+        """Comparison should fail when a local artifact is for another benchmark."""
+        saved_result = tmp_path / "wrong_result.json"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "swe-bench",
+                    "model": "test-model",
+                    "metrics": {"total_tasks": 1, "pass_rate": 1.0},
+                    "task_results": [{"task_id": "swe-1", "status": "passed"}],
+                }
+            )
+        )
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "compare",
+                "--benchmark",
+                "guide",
+                "--victor-results",
+                str(saved_result),
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "does not match requested" in result.stdout
+
 
 class TestBenchmarkLeaderboard:
     """Tests for benchmark leaderboard command."""
@@ -218,6 +291,44 @@ class TestBenchmarkLeaderboard:
         result = runner.invoke(benchmark_app, ["leaderboard", "--benchmark", "unknown"])
         assert result.exit_code == 1
         assert "Unknown benchmark" in result.stdout
+
+    def test_leaderboard_external_benchmark_with_local_victor_results(self, tmp_path):
+        """Leaderboards should accept local Victor artifacts for external benchmarks."""
+        saved_result = tmp_path / "guide_result.json"
+        saved_result.write_text(
+            json.dumps(
+                {
+                    "benchmark": "guide",
+                    "model": "test-model",
+                    "dataset_metadata": {"source_name": "GUIDE Consortium"},
+                    "metrics": {
+                        "total_tasks": 1,
+                        "passed": 1,
+                        "failed": 0,
+                        "errors": 0,
+                        "timeouts": 0,
+                        "pass_rate": 1.0,
+                    },
+                    "task_results": [{"task_id": "guide-1", "status": "passed"}],
+                }
+            )
+        )
+
+        result = runner.invoke(
+            benchmark_app,
+            [
+                "leaderboard",
+                "--benchmark",
+                "guide",
+                "--victor-results",
+                str(saved_result),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "Leaderboard" in result.stdout
+        assert "victor" in result.stdout
+        assert "GUIDE Consortium" in result.stdout
 
 
 class TestBenchmarkCapabilities:
