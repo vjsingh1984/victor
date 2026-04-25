@@ -1937,10 +1937,11 @@ async def code_search(
 
         # Check if embeddings are disabled for this agent (workflow-level service mode)
         disable_embeddings = _exec_ctx.get("disable_embeddings", False) if _exec_ctx else False
+        fallback_search_path = str(root_path)
         if disable_embeddings:
             logger.info("Embeddings disabled for this agent, falling back to literal search")
             exts = filters.extensions if filters else None
-            result = await _literal_search(query, path, k, exts)
+            result = await _literal_search(query, fallback_search_path, k, exts)
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_disabled",
@@ -2005,7 +2006,7 @@ async def code_search(
                 logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
 
             exts = filters.extensions if filters else None
-            result = await _literal_search(query, path, k, exts)
+            result = await _literal_search(query, fallback_search_path, k, exts)
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_index"),
@@ -2022,7 +2023,7 @@ async def code_search(
                 root_path,
             )
             exts = filters.extensions if filters else None
-            result = await _literal_search(query, path, k, exts)
+            result = await _literal_search(query, fallback_search_path, k, exts)
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_index_stale",
@@ -2252,7 +2253,7 @@ async def code_search(
             )
         except (asyncio.TimeoutError, Exception) as exc:
             logger.warning("Semantic search failed (%s), falling back to literal search", exc)
-            result = await _literal_search(query, path, k, exts)
+            result = await _literal_search(query, fallback_search_path, k, exts)
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_search"),

@@ -1029,6 +1029,33 @@ async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(t
 
 
 @pytest.mark.asyncio
+async def test_code_search_semantic_fallback_uses_normalized_parent_path(tmp_path) -> None:
+    """Semantic failure fallback should search the resolved parent directory, not a bad child path."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    missing_child = source_dir / "missing.py"
+    mock_index = SimpleNamespace(semantic_search=AsyncMock(side_effect=RuntimeError("boom")))
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="main entrypoint",
+            path=str(missing_child),
+            k=3,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with("main entrypoint", str(source_dir), 3, None)
+    assert result["fallback"] == "semantic_search_error"
+
+
+@pytest.mark.asyncio
 async def test_code_search_literal_fallback_preserves_mode_context_after_semantic_failure(
     tmp_path,
 ) -> None:
@@ -1094,6 +1121,32 @@ async def test_code_search_literal_fallback_preserves_requested_mode_on_index_bu
     assert result["fallback"] == "semantic_index_error"
     assert result["metadata"]["requested_mode"] == "localize"
     assert result["metadata"]["fallback_mode"] == "literal"
+
+
+@pytest.mark.asyncio
+async def test_code_search_index_build_fallback_uses_normalized_parent_path(tmp_path) -> None:
+    """Index-build fallback should search the resolved parent directory, not a bad child path."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    missing_child = source_dir / "missing.py"
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(side_effect=RuntimeError("index build failed")),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="main entrypoint",
+            path=str(missing_child),
+            k=3,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with("main entrypoint", str(source_dir), 3, None)
+    assert result["fallback"] == "semantic_index_error"
 
 
 @pytest.mark.asyncio
