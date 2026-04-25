@@ -23,13 +23,16 @@ class TestSessionLockedTools:
     """Verify tools are frozen at session start when cache optimization enabled."""
 
     def test_session_tools_returns_full_set(self):
-        """get_session_tools() returns the full tool set, not a subset."""
+        """get_session_tools() locks the currently enabled tool definitions."""
         orch = MagicMock()
         orch._cache_optimization_enabled = True
         orch._session_tools = None
 
         all_tools = [MagicMock(name=f"tool_{i}") for i in range(10)]
-        orch._get_all_available_tools = MagicMock(return_value=all_tools)
+        for i, tool in enumerate(all_tools):
+            tool.name = f"tool_{i}"
+        orch.get_enabled_tools = MagicMock(return_value={tool.name for tool in all_tools})
+        orch.tools.list_tools = MagicMock(return_value=all_tools)
 
         # Import and call the method pattern
         from victor.agent.orchestrator import AgentOrchestrator
@@ -37,6 +40,7 @@ class TestSessionLockedTools:
         result = AgentOrchestrator.get_session_tools(orch)
         assert result == all_tools
         assert len(result) == 10
+        orch.tools.list_tools.assert_called_once_with(only_enabled=True)
 
     def test_session_tools_cached_after_first_call(self):
         """Second call returns same object (not re-computed)."""
@@ -49,7 +53,7 @@ class TestSessionLockedTools:
 
         result = AgentOrchestrator.get_session_tools(orch)
         assert result is all_tools
-        orch._get_all_available_tools.assert_not_called()
+        orch.tools.list_tools.assert_not_called()
 
     def test_returns_none_when_disabled(self):
         """When cache optimization disabled, returns None (use per-turn)."""
