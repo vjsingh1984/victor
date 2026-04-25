@@ -564,6 +564,56 @@ async def test_code_search_semantic_glob_file_pattern_filters_results_after_sear
 
 
 @pytest.mark.asyncio
+async def test_code_search_semantic_extension_filter_applies_after_search(tmp_path) -> None:
+    """Semantic searches should honor extension filters even though backends only support exact metadata filters."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.js",
+                    "content": "export function parseJson(data) { return JSON.parse(data); }",
+                    "score": 0.91,
+                },
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return json.loads(data)",
+                    "score": 0.74,
+                },
+            ]
+        )
+    )
+    filters = SearchFilters(extensions=["py"])
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(),
+    ) as literal_search:
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=2,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_not_awaited()
+    mock_index.semantic_search.assert_awaited_once_with(
+        query="json parsing",
+        max_results=8,
+        filter_metadata=None,
+        similarity_threshold=0.25,
+        expand_query=True,
+    )
+    assert result["mode"] == "semantic"
+    assert result["count"] == 1
+    assert result["results"][0]["file_path"] == "src/parser.py"
+    assert "ext=py" in result["metadata"]["filters_applied"]
+
+
+@pytest.mark.asyncio
 async def test_code_search_filename_mode_uses_parent_directory_for_file_path(tmp_path) -> None:
     """Filename mode should normalize file paths to their parent directory before searching."""
     source_dir = tmp_path / "src"

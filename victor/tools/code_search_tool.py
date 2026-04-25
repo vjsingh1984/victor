@@ -759,6 +759,24 @@ def _filter_search_results_by_file_pattern(
     return filtered_results
 
 
+def _filter_search_results_by_extensions(
+    results: List[Any],
+    exts: List[str],
+) -> List[Any]:
+    """Filter result objects by normalized file extension."""
+
+    normalized_exts = _normalize_extensions(exts)
+    filtered_results: List[Any] = []
+    for result in results:
+        result_dict = _normalize_result_dict(result)
+        file_path = result_dict.get("file_path") or result_dict.get("path")
+        if not isinstance(file_path, str):
+            continue
+        if Path(file_path).suffix in normalized_exts:
+            filtered_results.append(result)
+    return filtered_results
+
+
 def _build_literal_search_kwargs(
     *,
     allow_filename_autodetect: bool,
@@ -2207,11 +2225,18 @@ async def code_search(
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []
         manual_file_pattern_filter: Optional[str] = None
+        manual_extension_filter: Optional[List[str]] = None
         if mode_fallback_to_semantic:
             filters_applied.append("mode_fallback=semantic")
 
         if filters and any(
-            [filters.file_pattern, filters.symbol, filters.language, filters.test_only is not None]
+            [
+                filters.file_pattern,
+                filters.symbol,
+                filters.language,
+                filters.test_only is not None,
+                filters.extensions,
+            ]
         ):
             filter_metadata = {}
             if filters.file_pattern:
@@ -2229,6 +2254,9 @@ async def code_search(
             if filters.test_only is not None:
                 filter_metadata["is_test_file"] = filters.test_only
                 filters_applied.append(f"test={filters.test_only}")
+            if filters.extensions:
+                manual_extension_filter = filters.extensions
+                filters_applied.append(f"ext={','.join(filters.extensions)}")
 
         try:
             index, rebuilt = await asyncio.wait_for(
@@ -2524,7 +2552,7 @@ async def code_search(
         # Perform semantic search with timeout and literal fallback
         try:
             semantic_max_results = k * 2 if enable_hybrid else k
-            if manual_file_pattern_filter:
+            if manual_file_pattern_filter or manual_extension_filter:
                 semantic_max_results = max(semantic_max_results, k * 4)
             results = await asyncio.wait_for(
                 index.semantic_search(
@@ -2565,6 +2593,8 @@ async def code_search(
                 manual_file_pattern_filter,
                 search_root=root_path,
             )
+        if manual_extension_filter:
+            results = _filter_search_results_by_extensions(results, manual_extension_filter)
 
         # Record outcome for RL threshold learning if enabled
         if getattr(settings, "enable_semantic_threshold_rl_learning", False):
