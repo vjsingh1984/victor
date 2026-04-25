@@ -550,6 +550,28 @@ def _classify_semantic_fallback(exc: BaseException, *, scope: str) -> str:
     return f"{scope}_error"
 
 
+def _decorate_literal_fallback_result(
+    result: Dict[str, Any],
+    *,
+    fallback: str,
+    filters_applied: Optional[List[str]] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Attach consistent fallback context to literal-search results."""
+
+    result["fallback"] = fallback
+    merged_metadata = result.get("metadata")
+    if not isinstance(merged_metadata, dict):
+        merged_metadata = {}
+    if filters_applied:
+        merged_metadata["filters_applied"] = filters_applied
+    if metadata:
+        merged_metadata.update(metadata)
+    if merged_metadata:
+        result["metadata"] = merged_metadata
+    return result
+
+
 # Directories that indicate non-core code (lower importance)
 NON_CORE_DIRS = {
     "test",
@@ -1903,8 +1925,11 @@ async def code_search(
 
             exts = filters.extensions if filters else None
             result = await _literal_search(query, path, k, exts)
-            result["fallback"] = _classify_semantic_fallback(exc, scope="semantic_index")
-            return result
+            return _decorate_literal_fallback_result(
+                result,
+                fallback=_classify_semantic_fallback(exc, scope="semantic_index"),
+                filters_applied=filters_applied,
+            )
 
         if _is_cached_index_stale(root_path, _exec_ctx):
             logger.warning(
@@ -1913,8 +1938,11 @@ async def code_search(
             )
             exts = filters.extensions if filters else None
             result = await _literal_search(query, path, k, exts)
-            result["fallback"] = "semantic_index_stale"
-            return result
+            return _decorate_literal_fallback_result(
+                result,
+                fallback="semantic_index_stale",
+                filters_applied=filters_applied,
+            )
 
         backend_metadata = _collect_code_search_backend_metadata(index, settings)
 
@@ -2136,8 +2164,12 @@ async def code_search(
         except (asyncio.TimeoutError, Exception) as exc:
             logger.warning("Semantic search failed (%s), falling back to literal search", exc)
             result = await _literal_search(query, path, k, exts)
-            result["fallback"] = _classify_semantic_fallback(exc, scope="semantic_search")
-            return result
+            return _decorate_literal_fallback_result(
+                result,
+                fallback=_classify_semantic_fallback(exc, scope="semantic_search"),
+                filters_applied=filters_applied,
+                metadata={**backend_metadata, **fallback_metadata},
+            )
 
         # Record outcome for RL threshold learning if enabled
         if getattr(settings, "enable_semantic_threshold_rl_learning", False):

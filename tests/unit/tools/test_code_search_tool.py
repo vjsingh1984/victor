@@ -805,6 +805,43 @@ async def test_code_search_reports_non_timeout_semantic_search_fallback_reason(t
 
 
 @pytest.mark.asyncio
+async def test_code_search_literal_fallback_preserves_mode_context_after_semantic_failure(
+    tmp_path,
+) -> None:
+    """Literal fallback should keep requested-mode context after mode->semantic downgrade."""
+    mock_index = SimpleNamespace(
+        localize_issue=AsyncMock(side_effect=NotImplementedError("localize_issue unsupported")),
+        semantic_search=AsyncMock(side_effect=RuntimeError("semantic search failed")),
+    )
+    exec_ctx = {"settings": _settings()}
+    filters = SearchFilters(language="python")
+    literal_result = {"success": True, "results": [], "count": 0, "mode": "literal"}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="which files should I edit to add a logger parameter to BaseRepository",
+            path=str(tmp_path),
+            k=3,
+            mode="localize",
+            filters=filters,
+            _exec_ctx=exec_ctx,
+        )
+
+    literal_search.assert_awaited_once()
+    assert result["fallback"] == "semantic_search_error"
+    assert result["metadata"]["requested_mode"] == "localize"
+    assert result["metadata"]["fallback_mode"] == "semantic"
+    assert result["metadata"]["vector_store"] == "lancedb"
+    assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
+
+
+@pytest.mark.asyncio
 async def test_code_search_skips_semantic_search_when_cached_index_is_stale(tmp_path) -> None:
     """Known-stale semantic indexes should fall back immediately to literal search."""
     mock_index = SimpleNamespace(semantic_search=AsyncMock())
