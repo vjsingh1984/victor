@@ -166,9 +166,13 @@ class DefaultProviderConfig(ProviderConfigStrategy):
 
         result = dict(base_settings)
 
-        # Try to get API key from settings attribute first (for backwards compat)
+        # Try to get API key from nested provider group first (Phase 5 layout),
+        # then flat attribute (backward compat), then env/secrets resolver.
         settings_attr = f"{self._provider_name}_api_key"
-        raw_key = getattr(settings, settings_attr, None)
+        provider_group = getattr(settings, "provider", None)
+        raw_key = getattr(provider_group, settings_attr, None) if provider_group else None
+        if raw_key is None:
+            raw_key = getattr(settings, settings_attr, None)
         if raw_key and hasattr(raw_key, "get_secret_value"):
             api_key = raw_key.get_secret_value()
         else:
@@ -256,7 +260,13 @@ class LMStudioConfig(ProviderConfigStrategy):
     ) -> Dict[str, Any]:
         result = dict(base_settings)
 
-        urls = getattr(settings, "lmstudio_base_urls", []) or []
+        # lmstudio_base_urls lives under settings.provider after Phase 5 LEGACY mapping
+        provider_group = getattr(settings, "provider", None)
+        urls = (
+            getattr(provider_group, "lmstudio_base_urls", None)
+            if provider_group
+            else getattr(settings, "lmstudio_base_urls", None)
+        ) or []
         # If provider config supplied a list, merge/override
         if "base_url" in result:
             cfg_url = result["base_url"]

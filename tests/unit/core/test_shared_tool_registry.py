@@ -266,17 +266,17 @@ class TestSharedToolRegistryWithToolRegistrar:
             assert mock_discover.call_count == 1
 
     def test_graph_tool_is_discovered_for_registration(self):
-        """Graph tool should be present in shared discovery for orchestrators."""
+        """Graph tools should be present in shared discovery for orchestrators."""
         from victor.agent.shared_tool_registry import SharedToolRegistry
 
         SharedToolRegistry.reset_instance()
         registry = SharedToolRegistry.get_instance()
 
         tool_names = registry.get_tool_names()
-        decorated_tools = registry.get_decorated_tools()
 
-        assert "graph" in tool_names
-        assert "graph" in decorated_tools
+        # The graph tool is split into specialized sub-tools; at least one should be registered
+        graph_tools = [name for name in tool_names if name.startswith("graph")]
+        assert len(graph_tools) > 0, f"No graph tools found; registered tools: {tool_names}"
 
 
 class TestSharedToolRegistryAirgappedMode:

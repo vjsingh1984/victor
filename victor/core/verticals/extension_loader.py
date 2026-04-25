@@ -1270,6 +1270,7 @@ class VerticalExtensionLoader(ABC):
                 cls._increment_loader_metric("in_flight")
                 in_flight_now = cls._pressure_monitor.get_metric("in_flight")
                 cls._update_loader_peak_metric("max_in_flight", in_flight_now)
+                cls._check_pressure(reason="extension_task_started")
 
                 future = loop.run_in_executor(
                     executor,
