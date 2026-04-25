@@ -1517,11 +1517,11 @@ async def _literal_search(
             f"resolved={search_path!r}, exts={exts}"
         )
 
-        # Filename detection: if query looks like a filename (has extension),
-        # use find/rg --files instead of content search.
-        is_filename_query = _looks_like_filename_query(search_query)
+        # Filename detection: explicit filename mode should always use filename matching,
+        # while other literal searches only do so for filename-like queries.
+        should_use_filename_search = filename_only or _looks_like_filename_query(search_query)
 
-        if is_filename_query:
+        if should_use_filename_search:
             import platform
 
             system = platform.system()

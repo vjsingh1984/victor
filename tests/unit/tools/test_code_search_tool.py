@@ -545,6 +545,31 @@ async def test_literal_search_filename_only_does_not_fall_back_to_content_on_mis
 
 
 @pytest.mark.asyncio
+async def test_literal_search_filename_only_uses_filename_matching_without_extension(
+    tmp_path,
+) -> None:
+    """Explicit filename searches should not require an extension-shaped query."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    target = source_dir / "parser.py"
+    target.write_text("pass\n", encoding="utf-8")
+
+    result = await _literal_search(
+        "parser",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=True,
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+    assert result["results"][0]["path"].endswith("parser.py")
+    assert result["results"][0]["snippet"].startswith("[File found:")
+
+
+@pytest.mark.asyncio
 async def test_code_search_literal_mode_escalation_preserves_requested_mode_context(
     tmp_path,
 ) -> None:
