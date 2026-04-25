@@ -1,4 +1,5 @@
 import asyncio
+import fnmatch
 import importlib.util
 import logging
 import os
@@ -673,6 +674,58 @@ def _glob_patterns_for_extensions(exts: Optional[List[str]]) -> List[str]:
             seen.add(pattern)
             patterns.append(pattern)
     return patterns
+
+
+def _normalize_code_search_path(path_text: str) -> str:
+    """Normalize path text for file-pattern matching."""
+
+    normalized = path_text.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _matches_literal_file_pattern(file_path: str, file_pattern: str, *, search_root: str) -> bool:
+    """Return whether a literal-search hit matches the caller's file pattern."""
+
+    normalized_pattern = _normalize_code_search_path(file_pattern.strip())
+    if not normalized_pattern:
+        return True
+
+    try:
+        relative_path = Path(file_path).resolve().relative_to(Path(search_root).resolve())
+        candidate_path = _normalize_code_search_path(str(relative_path))
+    except Exception:
+        candidate_path = _normalize_code_search_path(file_path)
+
+    basename = os.path.basename(candidate_path)
+    has_glob = any(token in normalized_pattern for token in "*?[]")
+
+    if has_glob:
+        if "/" in normalized_pattern:
+            return fnmatch.fnmatch(candidate_path, normalized_pattern)
+        return fnmatch.fnmatch(basename, normalized_pattern)
+
+    if "/" in normalized_pattern:
+        return candidate_path == normalized_pattern or candidate_path.endswith(f"/{normalized_pattern}")
+
+    return basename == normalized_pattern or normalized_pattern in candidate_path
+
+
+def _build_literal_search_kwargs(
+    *,
+    allow_filename_autodetect: bool,
+    filename_only: Optional[bool] = None,
+    file_pattern: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build stable kwargs for literal-search call sites without emitting empty filters."""
+
+    kwargs: Dict[str, Any] = {"allow_filename_autodetect": allow_filename_autodetect}
+    if filename_only is not None:
+        kwargs["filename_only"] = filename_only
+    if file_pattern is not None:
+        kwargs["file_pattern"] = file_pattern
+    return kwargs
 
 
 _FILENAME_QUERY_EXTENSIONS = (
@@ -1550,6 +1603,7 @@ async def _literal_search(
     *,
     filename_only: bool = False,
     allow_filename_autodetect: bool = True,
+    file_pattern: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Literal/keyword search using ripgrep (rg) or grep subprocess.
 
@@ -1564,6 +1618,7 @@ async def _literal_search(
         exts: File extensions ([".py", ".js"])
         filename_only: Restrict filename-like queries to filename matching only.
         allow_filename_autodetect: Whether filename-like queries may use filename search.
+        file_pattern: Optional path pattern filter for narrowing content hits.
     """
     import shutil
     import subprocess
@@ -1607,7 +1662,7 @@ async def _literal_search(
 
         logger.info(
             f"Literal search: query={query!r}, path={path!r}, "
-            f"resolved={search_path!r}, exts={exts}"
+            f"resolved={search_path!r}, exts={exts}, file_pattern={file_pattern!r}"
         )
 
         # Filename detection: explicit filename mode should always use filename matching,
@@ -1785,6 +1840,13 @@ async def _literal_search(
                     dotted_class,
                 )
 
+        if file_pattern and file_matches:
+            file_matches = {
+                fpath: matches
+                for fpath, matches in file_matches.items()
+                if _matches_literal_file_pattern(fpath, file_pattern, search_root=search_path)
+            }
+
         # Sort by number of matches (most matches = most relevant)
         ranked = sorted(file_matches.items(), key=lambda x: len(x[1]), reverse=True)
         top = ranked[:k]
@@ -1944,6 +2006,7 @@ async def code_search(
     literal_escalation_metadata: Dict[str, Any] = {}
     mode_fallback_to_semantic = False
     allow_filename_autodetect = requested_mode not in {"literal", "text"}
+    literal_file_pattern = filters.file_pattern if filters and filters.file_pattern else None
 
     # Auto-detect filename search mode
     if mode == "semantic":
@@ -1974,8 +2037,11 @@ async def code_search(
             resolved_search_root,
             k,
             exts,
-            filename_only=(mode == "filename"),
-            allow_filename_autodetect=allow_filename_autodetect,
+            **_build_literal_search_kwargs(
+                filename_only=(mode == "filename"),
+                allow_filename_autodetect=allow_filename_autodetect,
+                file_pattern=literal_file_pattern,
+            ),
         )
         result = dict(result)
         result["mode"] = mode
@@ -2068,7 +2134,10 @@ async def code_search(
                 fallback_search_path,
                 k,
                 exts,
-                allow_filename_autodetect=allow_filename_autodetect,
+                **_build_literal_search_kwargs(
+                    allow_filename_autodetect=allow_filename_autodetect,
+                    file_pattern=literal_file_pattern,
+                ),
             )
             return _decorate_literal_fallback_result(
                 result,
@@ -2143,7 +2212,10 @@ async def code_search(
                 fallback_search_path,
                 k,
                 exts,
-                allow_filename_autodetect=allow_filename_autodetect,
+                **_build_literal_search_kwargs(
+                    allow_filename_autodetect=allow_filename_autodetect,
+                    file_pattern=literal_file_pattern,
+                ),
             )
             return _decorate_literal_fallback_result(
                 result,
@@ -2170,7 +2242,10 @@ async def code_search(
                 fallback_search_path,
                 k,
                 exts,
-                allow_filename_autodetect=allow_filename_autodetect,
+                **_build_literal_search_kwargs(
+                    allow_filename_autodetect=allow_filename_autodetect,
+                    file_pattern=literal_file_pattern,
+                ),
             )
             return _decorate_literal_fallback_result(
                 result,
@@ -2410,7 +2485,10 @@ async def code_search(
                 fallback_search_path,
                 k,
                 exts,
-                allow_filename_autodetect=allow_filename_autodetect,
+                **_build_literal_search_kwargs(
+                    allow_filename_autodetect=allow_filename_autodetect,
+                    file_pattern=literal_file_pattern,
+                ),
             )
             return _decorate_literal_fallback_result(
                 result,
@@ -2495,7 +2573,10 @@ async def code_search(
                     str(root_path),
                     k * 2,
                     exts=exts,
-                    allow_filename_autodetect=allow_filename_autodetect,
+                    **_build_literal_search_kwargs(
+                        allow_filename_autodetect=allow_filename_autodetect,
+                        file_pattern=literal_file_pattern,
+                    ),
                 )
 
                 if keyword_results.get("success"):

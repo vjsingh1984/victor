@@ -480,6 +480,7 @@ async def test_code_search_auto_detected_filename_mode_uses_file_pattern_query(t
         None,
         filename_only=True,
         allow_filename_autodetect=True,
+        file_pattern="parser.py",
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -605,6 +606,47 @@ async def test_code_search_text_mode_preserves_explicit_text_search_for_filename
         None,
         filename_only=False,
         allow_filename_autodetect=False,
+    )
+    get_index.assert_not_awaited()
+    assert result["mode"] == "text"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_code_search_text_mode_passes_file_pattern_to_literal_search(tmp_path) -> None:
+    """Explicit text mode should honor file_pattern filters on the literal path."""
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:needle"}],
+        "count": 1,
+        "mode": "literal",
+    }
+    filters = SearchFilters(file_pattern="*.py")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="needle",
+            path=str(tmp_path),
+            k=3,
+            mode="text",
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with(
+        "needle",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=False,
+        allow_filename_autodetect=False,
+        file_pattern="*.py",
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "text"
@@ -776,6 +818,7 @@ async def test_code_search_allows_blank_query_when_file_pattern_is_provided(tmp_
         None,
         filename_only=True,
         allow_filename_autodetect=True,
+        file_pattern="parser.py",
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -817,6 +860,7 @@ async def test_code_search_strips_whitespace_from_file_pattern_before_filename_s
         None,
         filename_only=True,
         allow_filename_autodetect=True,
+        file_pattern="parser.py",
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -920,6 +964,27 @@ async def test_literal_search_grep_fallback_honors_extension_filters_without_dot
     assert result["success"] is True
     assert result["mode"] == "literal"
     assert result["count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_literal_search_respects_file_pattern_filter(tmp_path) -> None:
+    """Literal search should filter content hits by file_pattern when requested."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    (source_dir / "keep.py").write_text("needle = True\n", encoding="utf-8")
+    (source_dir / "skip.js").write_text("const needle = true;\n", encoding="utf-8")
+
+    result = await _literal_search(
+        "needle",
+        str(tmp_path),
+        5,
+        file_pattern="*.py",
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "literal"
+    assert result["count"] == 1
+    assert result["results"][0]["path"].endswith("keep.py")
 
 
 @pytest.mark.asyncio
