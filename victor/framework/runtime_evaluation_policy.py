@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields, replace
 from typing import Any, Dict, List, Mapping, Optional
 
 
@@ -116,6 +116,18 @@ class RuntimeEvaluationPolicy:
     def to_config(self) -> Dict[str, Any]:
         """Return config-compatible representation of the policy."""
         return asdict(self)
+
+    def with_overrides(self, **overrides: Any) -> "RuntimeEvaluationPolicy":
+        """Return a cloned policy with non-None overrides applied."""
+        allowed = {field.name for field in fields(self)}
+        filtered = {
+            key: value
+            for key, value in overrides.items()
+            if key in allowed and value is not None
+        }
+        if not filtered:
+            return self
+        return replace(self, **filtered)
 
     def empty_request_decision(self, confidence: float = 0.0) -> ClarificationDecision:
         """Return the canonical clarification response for empty requests."""

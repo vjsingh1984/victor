@@ -152,8 +152,13 @@ Completed on 2026-04-25:
     enhanced COMPLETE/CONTINUE/RETRY result construction through that shared policy
   - `AgenticLoop` now relies on the shared policy for completion-threshold
     configuration instead of threading a separate evaluator-only threshold knob
+- Phase 5.3 immutable policy overlays for compatibility helpers:
+  - `RuntimeEvaluationPolicy` now supports immutable override overlays
+  - `RuntimeIntelligenceService` static compatibility helpers now merge explicit
+    threshold and prompt overrides into the shared policy instead of ignoring
+    overrides whenever a policy instance is already present
 
 Next recommended slice:
-- Phase 5.3: connect adaptive calibration inputs and any remaining compatibility
-  wrappers to `RuntimeEvaluationPolicy` so benchmark-truth signals can tune live
-  runtime thresholds without reintroducing scattered policy state
+- Phase 5.4: connect adaptive calibration inputs and benchmark-truth feedback to
+  `RuntimeEvaluationPolicy` so live runtime thresholds can evolve from measured
+  evidence without reintroducing scattered policy state

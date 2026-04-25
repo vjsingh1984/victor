@@ -254,13 +254,13 @@ class RuntimeIntelligenceService:
     def get_clarification_decision(
         perception: Optional[Any],
         *,
-        default_prompt: str = (
+        default_prompt: Optional[str] = (
             "Please clarify the target file, component, or bug before I continue."
         ),
         policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> ClarificationDecision:
         """Normalize clarification policy into one typed runtime decision."""
-        selected_policy = policy or RuntimeEvaluationPolicy(
+        selected_policy = (policy or RuntimeEvaluationPolicy()).with_overrides(
             default_clarification_prompt=default_prompt
         )
         return selected_policy.get_clarification_decision(perception)
@@ -270,13 +270,13 @@ class RuntimeIntelligenceService:
         confidence: float,
         state: Dict[str, Any],
         *,
-        retry_limit: int = 2,
-        high_confidence_threshold: float = 0.8,
-        medium_confidence_threshold: float = 0.5,
+        retry_limit: Optional[int] = 2,
+        high_confidence_threshold: Optional[float] = 0.8,
+        medium_confidence_threshold: Optional[float] = 0.5,
         policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> Any:
         """Apply the canonical confidence-band policy for live-loop evaluation."""
-        selected_policy = policy or RuntimeEvaluationPolicy(
+        selected_policy = (policy or RuntimeEvaluationPolicy()).with_overrides(
             high_confidence_threshold=high_confidence_threshold,
             medium_confidence_threshold=medium_confidence_threshold,
             low_confidence_retry_limit=retry_limit,
@@ -291,12 +291,12 @@ class RuntimeIntelligenceService:
     def get_confidence_evaluation(
         confidence: float,
         *,
-        high_confidence_threshold: float = 0.8,
-        medium_confidence_threshold: float = 0.5,
+        high_confidence_threshold: Optional[float] = 0.8,
+        medium_confidence_threshold: Optional[float] = 0.5,
         policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> Any:
         """Emit the canonical confidence-band evaluation without mutating retry state."""
-        selected_policy = policy or RuntimeEvaluationPolicy(
+        selected_policy = (policy or RuntimeEvaluationPolicy()).with_overrides(
             high_confidence_threshold=high_confidence_threshold,
             medium_confidence_threshold=medium_confidence_threshold,
         )
@@ -307,12 +307,12 @@ class RuntimeIntelligenceService:
         evaluation: Any,
         state: Dict[str, Any],
         *,
-        retry_limit: int = 2,
-        low_confidence_threshold: float = 0.5,
+        retry_limit: Optional[int] = 2,
+        low_confidence_threshold: Optional[float] = 0.5,
         policy: Optional[RuntimeEvaluationPolicy] = None,
     ) -> Any:
         """Apply the canonical retry-budget policy to low-confidence retry results."""
-        selected_policy = policy or RuntimeEvaluationPolicy(
+        selected_policy = (policy or RuntimeEvaluationPolicy()).with_overrides(
             low_confidence_retry_limit=retry_limit,
             medium_confidence_threshold=low_confidence_threshold,
         )

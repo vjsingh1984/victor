@@ -10,6 +10,7 @@ from victor.agent.services.runtime_intelligence import (
     RuntimeIntelligenceService,
 )
 from victor.framework.evaluation_nodes import EvaluationDecision, EvaluationResult
+from victor.framework.runtime_evaluation_policy import RuntimeEvaluationPolicy
 
 
 @pytest.mark.asyncio
@@ -127,12 +128,48 @@ def test_get_clarification_decision_uses_default_prompt_when_missing():
     )
 
 
+def test_get_clarification_decision_merges_override_prompt_into_policy():
+    perception = SimpleNamespace(
+        needs_clarification=True,
+        clarification_reason="target artifact or scope is underspecified",
+        clarification_prompt=None,
+        confidence=0.31,
+    )
+    policy = RuntimeEvaluationPolicy(
+        default_clarification_prompt="Use the policy prompt unless explicitly overridden."
+    )
+
+    decision = RuntimeIntelligenceService.get_clarification_decision(
+        perception,
+        default_prompt="Use the override prompt.",
+        policy=policy,
+    )
+
+    assert decision.prompt == "Use the override prompt."
+
+
 def test_get_confidence_evaluation_emits_retry_without_budget_metadata():
     result = RuntimeIntelligenceService.get_confidence_evaluation(0.3)
 
     assert result.decision == EvaluationDecision.RETRY
     assert result.reason == "Low confidence - retry"
     assert result.metadata == {}
+
+
+def test_get_confidence_evaluation_merges_threshold_override_into_policy():
+    policy = RuntimeEvaluationPolicy(
+        medium_confidence_threshold=0.5,
+        low_confidence_reason="Retry with stronger evidence",
+    )
+
+    result = RuntimeIntelligenceService.get_confidence_evaluation(
+        0.65,
+        medium_confidence_threshold=0.7,
+        policy=policy,
+    )
+
+    assert result.decision == EvaluationDecision.RETRY
+    assert result.reason == "Retry with stronger evidence"
 
 
 def test_apply_low_confidence_retry_budget_increments_retry_count():
@@ -187,3 +224,22 @@ def test_evaluate_confidence_progress_resets_retry_budget_on_progress():
 
     assert result.decision == EvaluationDecision.CONTINUE
     assert state["low_confidence_retries"] == 0
+
+
+def test_evaluate_confidence_progress_merges_threshold_override_into_policy():
+    state = {}
+    policy = RuntimeEvaluationPolicy(
+        medium_confidence_threshold=0.5,
+        low_confidence_reason="Retry with stronger evidence",
+    )
+
+    result = RuntimeIntelligenceService.evaluate_confidence_progress(
+        0.6,
+        state,
+        medium_confidence_threshold=0.7,
+        policy=policy,
+    )
+
+    assert result.decision == EvaluationDecision.RETRY
+    assert result.reason == "Retry with stronger evidence"
+    assert state["low_confidence_retries"] == 1
