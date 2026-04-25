@@ -207,5 +207,8 @@ class TestGEPAStrategyAdapter:
         assert categorize_tool("read") == "exploration"
         assert categorize_tool("edit") == "mutation"
         assert categorize_tool("bash") == "execution"
+        assert categorize_tool("list_directory") == "exploration"
+        assert categorize_tool("create_file") == "mutation"
+        assert categorize_tool("execute_bash") == "execution"
         assert categorize_tool("graph") == "analysis"
         assert categorize_tool("unknown_tool") == "general"

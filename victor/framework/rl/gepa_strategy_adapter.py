@@ -14,33 +14,33 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from victor.framework.tool_naming import ToolNames, get_canonical_name
 from victor.framework.rl.gepa_tier_manager import GEPATierManager
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 logger = logging.getLogger(__name__)
 
 # Tool name → category mapping for per-tool-type GEPA evolution
 TOOL_CATEGORY_MAP: Dict[str, str] = {
-    "read": "exploration",
-    "ls": "exploration",
-    "list_directory": "exploration",
+    ToolNames.READ: "exploration",
+    ToolNames.LS: "exploration",
     "code_search": "exploration",
     "semantic_code_search": "exploration",
     "overview": "exploration",
     "graph": "analysis",
     "architecture_summary": "analysis",
-    "edit": "mutation",
-    "write": "mutation",
-    "create_file": "mutation",
-    "bash": "execution",
-    "shell": "execution",
-    "git": "execution",
+    ToolNames.EDIT: "mutation",
+    ToolNames.WRITE: "mutation",
+    ToolNames.SHELL: "execution",
+    ToolNames.GIT: "execution",
     "run_tests": "execution",
 }
 
 
 def categorize_tool(tool_name: str) -> str:
     """Map a tool name to its GEPA category."""
-    return TOOL_CATEGORY_MAP.get(tool_name, "general")
+    canonical_tool_name = get_canonical_name(canonicalize_core_tool_name(tool_name))
+    return TOOL_CATEGORY_MAP.get(canonical_tool_name, "general")
 
 
 class GEPAServiceStrategy:
@@ -97,7 +97,8 @@ class GEPAServiceStrategy:
             for d in getattr(t, "tool_call_details", []):
                 name = getattr(d, "tool_name", "")
                 if name:
-                    all_tools[name] += 1
+                    canonical_tool_name = get_canonical_name(canonicalize_core_tool_name(name))
+                    all_tools[canonical_tool_name] += 1
         top_tools = all_tools.most_common(5)
         lines = [
             "=== DATA DISTRIBUTION PROFILE ===",
