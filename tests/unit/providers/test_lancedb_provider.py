@@ -310,6 +310,9 @@ class TestLanceDBProvider:
             "content": "content1",
             "file_path": "test1.py",
             "symbol_name": "func1",
+            "line_number": 12,
+            "vector": [0.1, 0.2, 0.3],
+            "symbol_type": "function",
             "_distance": 0.1,
         }
         result2 = {
@@ -344,6 +347,10 @@ class TestLanceDBProvider:
             assert results[0].file_path == "test1.py"
             assert results[0].content == "content1"
             assert results[0].score > 0
+            assert "vector" not in results[0].metadata
+            assert "content" not in results[0].metadata
+            assert "file_path" not in results[0].metadata
+            assert results[0].metadata["symbol_type"] == "function"
 
     @pytest.mark.asyncio
     async def test_search_similar_no_table(self, lancedb_config, mock_lancedb):

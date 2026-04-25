@@ -28,6 +28,7 @@ For embedding models:
 - OpenAI: pip install openai (requires API key)
 """
 
+import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -48,6 +49,16 @@ from victor.storage.vector_stores.models import (
     EmbeddingModelConfig,
     create_embedding_model,
 )
+
+logger = logging.getLogger(__name__)
+
+_SEARCH_METADATA_EXCLUDE_KEYS = {
+    "vector",
+    "content",
+    "file_path",
+    "symbol_name",
+    "line_number",
+}
 
 
 class LanceDBProvider(BaseEmbeddingProvider):
@@ -136,15 +147,9 @@ class LanceDBProvider(BaseEmbeddingProvider):
         if table_name not in existing_tables:
             # Create empty table with schema
             # We'll add data later when indexing
-            import logging
-
-            logger = logging.getLogger(__name__)
             logger.info(f"Creating new LanceDB table: {table_name}")
         else:
             self.table = self.db.open_table(table_name)
-            import logging
-
-            logger = logging.getLogger(__name__)
             logger.debug(f"Opened existing LanceDB table: {table_name}")
 
         self._initialized = True
@@ -293,7 +298,11 @@ class LanceDBProvider(BaseEmbeddingProvider):
                     content=result.get("content", ""),
                     score=score,
                     line_number=result.get("line_number"),
-                    metadata={k: v for k, v in result.items() if not k.startswith("_")},
+                    metadata={
+                        k: v
+                        for k, v in result.items()
+                        if not k.startswith("_") and k not in _SEARCH_METADATA_EXCLUDE_KEYS
+                    },
                 )
             )
 

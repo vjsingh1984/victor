@@ -18,6 +18,8 @@ Verifies that LLM receives full tool output while user sees preview.
 This is a critical fix - LLM must have complete context to make accurate decisions.
 """
 
+import json
+
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -81,6 +83,32 @@ class TestToolOutputAccuracy:
 
         # 4. Most important: LLM output contains ALL original content
         # (This is the fix - LLM gets full output regardless of preview)
+
+    def test_llm_output_strips_preview_only_fields(self):
+        """Verify preview-only fields stay in display output but not in LLM output."""
+        from victor.agent.services.tool_service import format_and_prune_tool_output
+
+        structured_output = {
+            "success": True,
+            "results": [{"path": "src/main.py", "line": 42, "snippet": "def main():"}],
+            "formatted_results": "[bold cyan]1 match[/]",
+            "contains_markup": True,
+        }
+
+        formatter = lambda _tool, _args, output: json.dumps(output, sort_keys=True)
+
+        formatted, llm_output, _, _ = format_and_prune_tool_output(
+            tool_name="code_search",
+            arguments={"query": "main"},
+            output=structured_output,
+            formatter=formatter,
+        )
+
+        assert '"formatted_results"' in formatted
+        assert '"contains_markup"' in formatted
+        assert '"formatted_results"' not in llm_output
+        assert '"contains_markup"' not in llm_output
+        assert '"results"' in llm_output
 
     def test_was_pruned_flag_clarity(self):
         """Verify was_pruned flag meaning changed from 'pruned for LLM' to 'pruned for preview'."""

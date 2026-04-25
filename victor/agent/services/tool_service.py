@@ -93,6 +93,36 @@ def normalize_tool_result_arguments(arguments: Any) -> Dict[str, Any]:
     return {}
 
 
+_PREVIEW_ONLY_TOOL_RESULT_FIELDS = frozenset(
+    {
+        "formatted_output",
+        "formatted_summary",
+        "formatted_results",
+        "contains_markup",
+    }
+)
+
+
+def _strip_preview_only_tool_fields(output: Any) -> Any:
+    """Remove preview-only fields from tool results before LLM injection.
+
+    Rich preview payloads improve CLI/TUI UX, but they duplicate structured data
+    and add token cost when sent back to the model. Keep them for display paths
+    while excluding them from the LLM-facing serialization.
+    """
+    if isinstance(output, dict):
+        stripped = {
+            key: _strip_preview_only_tool_fields(value)
+            for key, value in output.items()
+            if key not in _PREVIEW_ONLY_TOOL_RESULT_FIELDS
+        }
+        # Preserve original content if preview fields were the only payload.
+        return stripped or output
+    if isinstance(output, list):
+        return [_strip_preview_only_tool_fields(value) for value in output]
+    return output
+
+
 def format_and_prune_tool_output(
     tool_name: str,
     arguments: Any,
@@ -106,9 +136,16 @@ def format_and_prune_tool_output(
     CRITICAL: LLM receives FULL output for accuracy. Pruning only affects user preview.
     """
     normalized_args = normalize_tool_result_arguments(arguments)
+    llm_safe_output = _strip_preview_only_tool_fields(output)
+    llm_output_changed = llm_safe_output != output
 
     if formatter is not None:
         formatted_output = formatter(tool_name, normalized_args, output)
+        llm_output = (
+            formatter(tool_name, normalized_args, llm_safe_output)
+            if llm_output_changed
+            else formatted_output
+        )
     else:
         from victor.agent.tool_output_formatter import format_tool_output as default_formatter
         from victor.agent.tool_output_formatter import ToolOutputFormatterConfig
@@ -132,12 +169,21 @@ def format_and_prune_tool_output(
             output,
             config=llm_formatter_config,
         )
+        llm_output = (
+            default_formatter(
+                tool_name,
+                normalized_args,
+                llm_safe_output,
+                config=llm_formatter_config,
+            )
+            if llm_output_changed
+            else formatted_output
+        )
 
     if not isinstance(formatted_output, str):
         formatted_output = str(formatted_output)
-
-    # LLM receives FULL output - no pruning for accuracy
-    llm_output = formatted_output
+    if not isinstance(llm_output, str):
+        llm_output = str(llm_output)
 
     # Generate preview for user display only (does not affect LLM)
     preview_output = formatted_output

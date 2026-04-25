@@ -19,7 +19,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from victor.tools.code_search_tool import code_search
+from victor.tools.code_search_tool import SearchFilters, code_search
 
 
 def _settings(**overrides):
@@ -48,6 +48,7 @@ async def test_code_search_bug_mode_uses_provider_capability(tmp_path) -> None:
         )
     )
     exec_ctx = {"settings": _settings()}
+    filters = SearchFilters(language="python")
 
     with patch(
         "victor.tools.code_search_tool._get_or_build_index",
@@ -58,7 +59,7 @@ async def test_code_search_bug_mode_uses_provider_capability(tmp_path) -> None:
             path=str(tmp_path),
             k=4,
             mode="bugs",
-            lang="python",
+            filters=filters,
             _exec_ctx=exec_ctx,
         )
 
@@ -100,6 +101,7 @@ async def test_code_search_localize_mode_uses_provider_capability(tmp_path) -> N
         )
     )
     exec_ctx = {"settings": _settings()}
+    filters = SearchFilters(language="python")
 
     with patch(
         "victor.tools.code_search_tool._get_or_build_index",
@@ -110,7 +112,7 @@ async def test_code_search_localize_mode_uses_provider_capability(tmp_path) -> N
             path=str(tmp_path),
             k=5,
             mode="localize",
-            lang="python",
+            filters=filters,
             _exec_ctx=exec_ctx,
         )
 
@@ -147,6 +149,7 @@ async def test_code_search_localize_mode_falls_back_to_semantic_when_unsupported
         ),
     )
     exec_ctx = {"settings": _settings()}
+    filters = SearchFilters(language="python")
 
     with patch(
         "victor.tools.code_search_tool._get_or_build_index",
@@ -157,7 +160,7 @@ async def test_code_search_localize_mode_falls_back_to_semantic_when_unsupported
             path=str(tmp_path),
             k=3,
             mode="localize",
-            lang="python",
+            filters=filters,
             _exec_ctx=exec_ctx,
         )
 
@@ -172,6 +175,7 @@ async def test_code_search_localize_mode_falls_back_to_semantic_when_unsupported
     assert result["mode"] == "semantic"
     assert result["metadata"]["requested_mode"] == "localize"
     assert result["metadata"]["fallback_mode"] == "semantic"
+    assert "lang=python" in result["metadata"]["filters_applied"]
     assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
 
 
@@ -198,6 +202,7 @@ async def test_code_search_impact_mode_uses_provider_capability(tmp_path) -> Non
         )
     )
     exec_ctx = {"settings": _settings()}
+    filters = SearchFilters(language="python")
 
     with patch(
         "victor.tools.code_search_tool._get_or_build_index",
@@ -208,7 +213,7 @@ async def test_code_search_impact_mode_uses_provider_capability(tmp_path) -> Non
             path=str(tmp_path),
             k=4,
             mode="impact",
-            lang="python",
+            filters=filters,
             _exec_ctx=exec_ctx,
         )
 
@@ -246,6 +251,7 @@ async def test_code_search_impact_mode_falls_back_to_semantic_when_unsupported(
         ),
     )
     exec_ctx = {"settings": _settings()}
+    filters = SearchFilters(language="python")
 
     with patch(
         "victor.tools.code_search_tool._get_or_build_index",
@@ -256,7 +262,7 @@ async def test_code_search_impact_mode_falls_back_to_semantic_when_unsupported(
             path=str(tmp_path),
             k=3,
             mode="impact",
-            lang="python",
+            filters=filters,
             _exec_ctx=exec_ctx,
         )
 
@@ -271,6 +277,7 @@ async def test_code_search_impact_mode_falls_back_to_semantic_when_unsupported(
     assert result["mode"] == "semantic"
     assert result["metadata"]["requested_mode"] == "impact"
     assert result["metadata"]["fallback_mode"] == "semantic"
+    assert "lang=python" in result["metadata"]["filters_applied"]
     assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
 
 
@@ -294,6 +301,7 @@ async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(
         ),
     )
     exec_ctx = {"settings": _settings()}
+    filters = SearchFilters(language="python")
 
     with patch(
         "victor.tools.code_search_tool._get_or_build_index",
@@ -304,7 +312,7 @@ async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(
             path=str(tmp_path),
             k=2,
             mode="bugs",
-            lang="python",
+            filters=filters,
             _exec_ctx=exec_ctx,
         )
 
@@ -319,6 +327,7 @@ async def test_code_search_bug_mode_falls_back_to_semantic_when_unsupported(
     assert result["mode"] == "semantic"
     assert result["metadata"]["requested_mode"] == "bugs"
     assert result["metadata"]["fallback_mode"] == "semantic"
+    assert "lang=python" in result["metadata"]["filters_applied"]
     assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
 
 
@@ -359,5 +368,53 @@ async def test_code_search_semantic_mode_adds_graph_follow_up_for_entrypoint(
     assert result["hint"].endswith('graph(mode="trace", node="main", depth=3)')
     assert follow_ups[0]["tool"] == "graph"
     assert follow_ups[0]["arguments"] == {"mode": "trace", "node": "main", "depth": 3}
-    assert any(item["arguments"]["mode"] == "callers" for item in follow_ups)
-    assert any(item["arguments"]["mode"] == "callees" for item in follow_ups)
+    assert any(item["arguments"]["mode"] == "callers|callees" for item in follow_ups)
+
+
+@pytest.mark.asyncio
+async def test_code_search_strips_vectors_and_console_only_fields(tmp_path) -> None:
+    """Semantic search responses should omit vectors while keeping rich preview fields."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/main.py",
+                    "content": "def main():\n    return run_app()\n",
+                    "score": 0.82,
+                    "line_number": 3,
+                    "metadata": {
+                        "id": "symbol:src/main.py:main",
+                        "vector": [0.1, 0.2, 0.3],
+                        "file_path": "src/main.py",
+                        "content": "def main():\n    return run_app()\n",
+                        "symbol_type": "function",
+                        "end_line": 12,
+                        "language": "python",
+                    },
+                }
+            ]
+        )
+    )
+    exec_ctx = {"settings": _settings()}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ):
+        result = await code_search(
+            query="main entry point",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    hit = result["results"][0]
+    assert result["success"] is True
+    assert result["contains_markup"] is True
+    assert "src/main.py" in result["formatted_results"]
+    assert "vector" not in hit["metadata"]
+    assert "content" not in hit["metadata"]
+    assert "file_path" not in hit["metadata"]
+    assert hit["metadata"]["symbol_type"] == "function"
+    assert hit["metadata"]["end_line"] == 12
+    assert hit["metadata"]["language"] == "python"

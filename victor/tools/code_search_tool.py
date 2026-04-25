@@ -501,6 +501,40 @@ def _normalize_result_dict(result: Any) -> Dict[str, Any]:
     return dict(result)
 
 
+_SEARCH_RESULT_METADATA_DROP_KEYS = {
+    "vector",
+    "embedding",
+    "embeddings",
+    "content",
+    "file_path",
+    "path",
+    "score",
+    "similarity",
+    "combined_score",
+    "semantic_score",
+    "keyword_score",
+}
+
+
+def _sanitize_search_metadata(value: Any) -> Any:
+    """Remove bulky or duplicate search metadata before tool return.
+
+    Search hits only need compact grounding metadata for follow-up reads.
+    Raw embeddings and duplicate payload fields add large token cost without
+    helping the LLM act on the result.
+    """
+    if isinstance(value, dict):
+        sanitized: Dict[str, Any] = {}
+        for key, item in value.items():
+            if key in _SEARCH_RESULT_METADATA_DROP_KEYS:
+                continue
+            sanitized[key] = _sanitize_search_metadata(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_search_metadata(item) for item in value]
+    return value
+
+
 def _prepare_ranked_results(
     results: List[Any],
     search_mode: str,
@@ -511,6 +545,9 @@ def _prepare_ranked_results(
     for result in results:
         result_dict = _normalize_result_dict(result)
         result_dict.setdefault("search_mode", search_mode)
+        metadata = result_dict.get("metadata")
+        if isinstance(metadata, dict):
+            result_dict["metadata"] = _sanitize_search_metadata(metadata)
 
         content = result_dict.get("content", "")
         if isinstance(content, str) and len(content) > max_content_chars:
@@ -664,10 +701,28 @@ def _build_search_response(
     if follow_up_suggestions:
         metadata["follow_up_suggestions"] = follow_up_suggestions
 
-    # Use unified formatter system
+    preview_results: List[Dict[str, Any]] = []
+    for result in results:
+        content = result.get("content", "")
+        snippet = result.get("snippet")
+        if not isinstance(snippet, str) or not snippet.strip():
+            if isinstance(content, str):
+                snippet = " ".join(line.strip() for line in content.splitlines()[:2] if line.strip())
+            else:
+                snippet = ""
+
+        preview_results.append(
+            {
+                "path": result.get("file_path", result.get("path", "unknown")),
+                "line": result.get("line_number", result.get("line", "?")),
+                "score": result.get("score", result.get("combined_score", 0)),
+                "snippet": snippet,
+            }
+        )
+
     formatted_result = format_search_results(
         {
-            "results": results,
+            "results": preview_results,
             "mode": mode,
         }
     )
@@ -680,7 +735,7 @@ def _build_search_response(
         "hint": hint,
         "ranking_note": ranking_note,
         "metadata": metadata,
-        "formatted_results": formatted_result.content,  # Rich-formatted for console
+        "formatted_results": formatted_result.content,
         "contains_markup": formatted_result.contains_markup,
     }
 
