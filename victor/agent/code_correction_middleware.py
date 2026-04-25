@@ -15,7 +15,7 @@ Integration Points:
 - ToolPipeline: Called during argument processing
 - code_executor: Validates Python code before execution
 - file_editor: Validates code in file content
-- write_file: Validates code in file content
+- write: Validates code in file content
 
 Usage:
     from victor.agent.code_correction_middleware import CodeCorrectionMiddleware
@@ -49,6 +49,7 @@ from victor.evaluation.correction import (
     create_self_corrector,
     CorrectionMetricsCollector,
 )
+from victor.tools.tool_names import ToolNames, get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -69,10 +70,9 @@ class CodeCorrectionConfig:
                 "code_executor",
                 "execute_code",
                 "run_code",
-                "write_file",
+                ToolNames.WRITE,
                 "file_editor",
-                "edit_file",
-                "create_file",
+                ToolNames.EDIT,
             }
         )
     )
@@ -164,7 +164,7 @@ class CodeCorrectionMiddleware:
         """
         if not self.config.enabled:
             return False
-        return tool_name in self.config.code_tools
+        return get_canonical_name(tool_name) in self.config.code_tools
 
     def find_code_argument(self, arguments: Dict[str, Any]) -> Optional[Tuple[str, str]]:
         """Find the code argument in tool arguments."""
