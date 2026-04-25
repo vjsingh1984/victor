@@ -31,9 +31,9 @@ class TestFocusPhaseDetection:
         from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         messages = [
-            MockMessage("assistant", "edit result: successfully replaced old_str"),
+            MockMessage("assistant", "edit_files result: successfully replaced old_str"),
             MockMessage("assistant", "write_file created new_module.py"),
-            MockMessage("assistant", "edit result: added import statement"),
+            MockMessage("assistant", "edit_files result: added import statement"),
         ]
         assert TurnBoundaryContextAssembler._detect_focus_phase(messages) == "mutation"
 
@@ -71,7 +71,7 @@ class TestFocusScoring:
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [
             MockMessage("assistant", "read_file result: old content..."),
-            MockMessage("assistant", "edit result: updated auth module"),
+            MockMessage("assistant", "edit_files result: updated auth module"),
         ]
         adjusted = TurnBoundaryContextAssembler._apply_focus_scoring(
             assembler, messages, [1.0, 1.0], "mutation"
@@ -94,7 +94,7 @@ class TestFocusScoring:
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
         messages = [
-            MockMessage("assistant", "edit result: old modification"),
+            MockMessage("assistant", "edit_files result: old modification"),
             MockMessage("assistant", "read_file result: current content"),
         ]
         adjusted = TurnBoundaryContextAssembler._apply_focus_scoring(
@@ -107,7 +107,7 @@ class TestFocusScoring:
         from victor.agent.conversation.assembler import TurnBoundaryContextAssembler
 
         assembler = TurnBoundaryContextAssembler.__new__(TurnBoundaryContextAssembler)
-        messages = [MockMessage("assistant", "edit result: replaced function body")]
+        messages = [MockMessage("assistant", "edit_files result: replaced function body")]
         adjusted = TurnBoundaryContextAssembler._apply_focus_scoring(
             assembler, messages, [1.0], "mutation"
         )
