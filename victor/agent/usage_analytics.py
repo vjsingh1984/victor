@@ -30,7 +30,7 @@ Usage:
 
     # Record tool execution
     analytics.record_tool_execution(
-        tool_name="read_file",
+        tool_name="read",
         success=True,
         execution_time_ms=150,
         error_type=None,
@@ -38,7 +38,7 @@ Usage:
     )
 
     # Get optimization insights
-    insights = analytics.get_tool_insights("read_file")
+    insights = analytics.get_tool_insights("read")
     # Returns: {"success_rate": 0.95, "avg_execution_ms": 120, ...}
 
     # Export metrics for dashboard

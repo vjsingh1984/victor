@@ -131,7 +131,7 @@ class FormatPerformanceMonitor:
         monitor.record_format_metric(
             provider_name="openai",
             format_style="plain",
-            tool_name="read_file",
+            tool_name="read",
             input_chars=1000,
             output_chars=850,
             estimated_tokens=212,

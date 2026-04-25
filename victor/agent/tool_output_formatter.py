@@ -46,7 +46,7 @@ Usage:
 
     # Format tool output
     formatted = formatter.format_tool_output(
-        tool_name="read_file",
+        tool_name="read",
         args={"path": "/path/to/file.py"},
         output=file_content,
         context=FormattingContext(

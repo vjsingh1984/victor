@@ -34,7 +34,7 @@ Usage:
 
     # Record tool executions
     result = detector.record_tool_call(
-        tool_name="read_file",
+        tool_name="read",
         arguments={"path": "foo.py"},
         result_hash="abc123",
     )
