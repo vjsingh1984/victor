@@ -4001,17 +4001,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         return sorted_tools
 
     def _apply_kv_tool_strategy(self, tools):
-        """Apply the configured KV tool selection strategy.
+        """Apply the configured KV tool selection strategy with context-window awareness.
+
+        Extended for economy-first, context-aware tool selection:
+        - Session-lock when cache discount available (economy-optimal)
+        - Context-budgeted selection for small models
+        - Respect 25% context window constraint for tool tokens
 
         Strategies (controlled by settings.context.kv_tool_strategy):
-          'per_turn'       — Return tools as-is (fresh selection each turn)
+          'per_turn'       — Fresh selection each turn (original behavior)
           'session_stable' — Lock tools after first selection for KV prefix stability
+          'context_aware'  — NEW: Context-window-aware, economy-first selection
 
         Only active when _kv_optimization_enabled is True and provider does NOT
         use API-level caching (which already session-locks the full tool set).
         """
         if tools is None:
             return None
+        if not tools:
+            return tools
+
+        # Check if new context-aware strategy is enabled
+        if self._is_tool_strategy_v2_enabled():
+            return self._apply_context_aware_strategy(tools)
+
+        # Original implementation for backward compatibility
         if not self._kv_optimization_enabled:
             return tools
 
@@ -4034,6 +4048,485 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         # per_turn: return as-is, don't cache
         return tools
+
+    def _is_tool_strategy_v2_enabled(self) -> bool:
+        """Check if the new context-aware tool strategy is enabled.
+
+        Returns:
+            True if tool_strategy_v2 feature flag is enabled
+        """
+        try:
+            # Check feature flag
+            from victor.core.feature_flags import is_enabled
+
+            return is_enabled("tool_strategy_v2")
+        except Exception:
+            # If feature flag system unavailable, check settings
+            try:
+                settings = getattr(self, "settings", None)
+                if settings is not None:
+                    return getattr(settings, "tool_strategy_v2_enabled", False)
+            except Exception:
+                return False
+
+    def _apply_context_aware_strategy(self, tools):
+        """Apply context-window-aware, economy-first tool selection strategy with provider-specific tiers.
+
+        Economy-first principles:
+        1. Session-lock when cache discount available (minimize invalidations)
+        2. Respect 25% context window constraint (hard limit)
+        3. Context-budgeted semantic selection for small models
+        4. Provider-specific tier assignments for optimal token usage
+
+        Args:
+            tools: List of tools to filter/adjust
+
+        Returns:
+            Filtered list of tools appropriate for provider and context window
+        """
+        from victor.config.tool_tiers import get_provider_category
+        from victor.tools.enums import Priority, SchemaLevel
+
+        # Get provider and model info
+        provider = self.provider
+        model = self.model
+
+        # Get context window
+        context_window = self._get_context_window(provider, model)
+
+        # Determine provider category based on context window
+        provider_category = get_provider_category(context_window)
+
+        # Estimate tool tokens using provider-specific tiers
+        tool_tokens = sum(self._estimate_tool_tokens(tool, provider_category) for tool in tools)
+
+        # HARD CONSTRAINT: Tools must not exceed 25% of context window
+        # This ensures room for system prompt, user message, and output
+        max_tool_tokens = int(context_window * 0.25)
+
+        if tool_tokens > max_tool_tokens:
+            logger.warning(
+                f"Tool tokens ({tool_tokens}) exceed 25% of context window ({context_window}). "
+                f"Demoting low-priority tools to STUB or dropping them."
+            )
+            tools = self._demote_tools_to_fit(tools, max_tool_tokens, context_window, provider_category)
+            tool_tokens = sum(self._estimate_tool_tokens(tool, provider_category) for tool in tools)
+
+        # ECONOMY STRATEGY: Session-lock when beneficial
+        # Cache discount providers: Session-lock all tools for 90% discount
+        # Large local models (≥32K): Session-lock for KV efficiency
+        if self._should_session_lock_all_tools(provider, context_window, tool_tokens):
+            logger.debug(
+                f"Provider supports caching or has large context window ({context_window}) "
+                f"→ session-lock all {len(tools)} tools for economy"
+            )
+            self._emit_tool_strategy_event(
+                strategy="session_lock",
+                tool_count=len(tools),
+                tool_tokens=tool_tokens,
+                context_window=context_window,
+                provider=provider.name,
+                reason="cache_discount_or_large_context",
+                tools=tools,
+                provider_category=provider_category
+            )
+            return tools
+
+        # Gemini special case: Need 32K total to qualify for caching
+        if self._is_gemini_provider(provider):
+            total_prompt = 2000 + tool_tokens  # Approximate system prompt
+            if 25000 < total_prompt < 32000:  # Close to threshold
+                logger.debug(
+                    f"Gemini: Total prompt ({total_prompt}) close to 32K cache threshold. "
+                    f"Consider adding fuller descriptions or optional tools."
+                )
+                # Could pad with fuller descriptions, but for now just log
+
+        # SMALL LOCAL MODELS: Context-budgeted semantic selection
+        logger.debug(
+            f"Small local model (context: {context_window}, category: {provider_category}) → "
+            f"semantic selection with {max_tool_tokens} token budget"
+        )
+        result = self._semantic_select_tools(tools, max_tool_tokens, provider_category)
+
+        self._emit_tool_strategy_event(
+            strategy="semantic_selection",
+            tool_count=len(result),
+            tool_tokens=sum(self._estimate_tool_tokens(t, provider_category) for t in result),
+            context_window=context_window,
+            provider=provider.name,
+            reason="small_context_window",
+            tools=result,
+            provider_category=provider_category
+        )
+
+        return result
+
+    def _get_context_window(self, provider, model: str) -> int:
+        """Get context window size for provider/model.
+
+        Args:
+            provider: Provider instance
+            model: Model identifier
+
+        Returns:
+            Context window in tokens
+        """
+        if hasattr(provider, "context_window"):
+            return provider.context_window(model)
+
+        # Fallback: safe default
+        logger.warning(f"Provider {provider.name} does not support context_window(), using default 8192")
+        return 8192
+
+    def _estimate_tool_tokens(self, tool, provider_category: str = None) -> int:
+        """Estimate token cost for a tool at its current schema level.
+
+        Args:
+            tool: Tool instance
+            provider_category: Optional provider category for tier selection
+
+        Returns:
+            Estimated token count
+        """
+        from victor.config.tool_tiers import get_provider_tool_tier, get_tool_tier
+
+        try:
+            # Use provider-specific tier if category provided
+            if provider_category:
+                tier = get_provider_tool_tier(tool.name, provider_category)
+            else:
+                tier = get_tool_tier(tool.name)  # Fallback to global
+
+            # Generate schema at appropriate level
+            schema = tool.to_schema(tier)
+
+            # Rough token estimate: ~4 characters per token
+            return len(str(schema)) // 4
+        except Exception:
+            # Fallback: estimate based on tool name length
+            return len(tool.name) + 50  # Rough estimate
+
+    def _should_session_lock_all_tools(self, provider, context_window: int, tool_tokens: int) -> bool:
+        """Determine if all tools should be session-locked.
+
+        Session-locking is economy-optimal when:
+        1. Provider supports API-level caching (90% discount)
+        2. Context window is large (≥32K) for KV efficiency
+        3. Tool token count is reasonable
+
+        Args:
+            provider: Provider instance
+            context_window: Context window in tokens
+            tool_tokens: Current tool token count
+
+        Returns:
+            True if session-locking is recommended
+        """
+        # Cloud providers with caching: Always session-lock
+        if hasattr(provider, "supports_prompt_caching") and provider.supports_prompt_caching():
+            return True
+
+        # Large local models (≥32K): Session-lock for KV efficiency
+        if context_window >= 32000:
+            return True
+
+        # Otherwise: Don't session-lock (use semantic selection)
+        return False
+
+    def _is_gemini_provider(self, provider) -> bool:
+        """Check if provider is Gemini.
+
+        Args:
+            provider: Provider instance
+
+        Returns:
+            True if this is a Gemini provider
+        """
+        provider_name = getattr(provider, "name", "").lower()
+        return "gemini" in provider_name or "google" in provider_name
+
+    def _demote_tools_to_fit(self, tools, max_tokens: int, context_window: int, provider_category: str = None) -> list:
+        """Demote or drop low-priority tools until within budget.
+
+        Args:
+            tools: List of tools to filter
+            max_tokens: Maximum tool tokens allowed (25% of context window)
+            context_window: Context window size
+            provider_category: Provider category for tier selection
+
+        Returns:
+            Filtered list of tools that fit within budget
+        """
+        from victor.tools.enums import Priority, SchemaLevel
+
+        # Sort by priority (CRITICAL first)
+        sorted_tools = sorted(tools, key=lambda t: (t.priority.value if hasattr(t, "priority") else 99, t.name))
+
+        result = []
+        current_tokens = 0
+
+        for tool in sorted_tools:
+            # Estimate current token cost using provider-specific tiers
+            tool_cost = self._estimate_tool_tokens(tool, provider_category)
+
+            if current_tokens + tool_cost <= max_tokens:
+                # Tool fits within budget
+                result.append(tool)
+                current_tokens += tool_cost
+            elif hasattr(tool, "priority") and tool.priority == Priority.CRITICAL:
+                # Critical tools MUST fit - demote to STUB
+                try:
+                    # Temporarily override schema level to STUB
+                    original_schema = getattr(tool, "_schema_level", None)
+                    tool._schema_level = SchemaLevel.STUB
+                    stub_cost = self._estimate_tool_tokens(tool)
+                    tool._schema_level = original_schema  # Restore
+
+                    if current_tokens + stub_cost <= max_tokens:
+                        result.append(tool)
+                        current_tokens += stub_cost
+                        logger.debug(f"Demoted critical tool {tool.name} to STUB to fit budget")
+                    else:
+                        logger.warning(
+                            f"Critical tool {tool.name} ({stub_cost} tokens) exceeds budget "
+                            f"even as STUB. Dropping tool."
+                        )
+                except Exception as e:
+                    logger.warning(f"Error demoting tool {tool.name}: {e}")
+            else:
+                # Skip non-critical tool
+                logger.debug(
+                    f"Skipping {tool.name} (priority: {tool.priority if hasattr(tool, 'priority') else 'unknown'}) "
+                    f"to fit within {max_tokens} token budget"
+                )
+
+        logger.info(
+            f"Demoted tools to fit context window: {len(tools)} → {len(result)} tools, "
+            f"{current_tokens} tokens (budget: {max_tokens}, context: {context_window})"
+        )
+
+        return result
+
+    def _semantic_select_tools(self, tools, max_tokens: int, provider_category: str = None) -> list:
+        """Select tools semantically within context budget using provider-specific tiers.
+
+        For small local models where every token matters. Uses semantic
+        relevance to current task to select most important tools.
+
+        Args:
+            tools: List of available tools
+            max_tokens: Maximum tool tokens allowed
+            provider_category: Provider category for tier selection
+
+        Returns:
+            Semantically filtered list of tools within budget
+        """
+        from victor.tools.enums import Priority
+
+        # Always include critical tools
+        core_tools = [t for t in tools if hasattr(t, "priority") and t.priority == Priority.CRITICAL]
+        core_tokens = sum(self._estimate_tool_tokens(t, provider_category) for t in core_tools)
+
+        logger.debug(f"Core tools: {len(core_tools)} tools, {core_tokens} tokens")
+
+        # If core tools already exceed budget, we have a problem
+        if core_tokens > max_tokens:
+            logger.warning(
+                f"Core tools ({core_tokens} tokens) exceed budget ({max_tokens}). "
+                f"Using only critical tools that fit."
+            )
+            # Return only core tools that fit
+            result = []
+            current_tokens = 0
+            for tool in core_tools:
+                tool_cost = self._estimate_tool_tokens(tool)
+                if current_tokens + tool_cost <= max_tokens:
+                    result.append(tool)
+                    current_tokens += tool_cost
+            return result
+
+        remaining_budget = max_tokens - core_tokens
+        selected = core_tools.copy()
+
+        # Add tools based on semantic relevance if semantic selector available
+        if hasattr(self, "tool_selector") and hasattr(self.tool_selector, "semantic_selector"):
+            try:
+                # Get semantic scores for remaining tools
+                remaining_tools = [t for t in tools if t not in core_tools]
+
+                # Simple semantic selection: prioritize by recent usage or task relevance
+                # (This is where existing semantic_selector infrastructure comes in)
+                for tool in remaining_tools:
+                    tool_cost = self._estimate_tool_tokens(tool)
+
+                    if core_tokens + tool_cost <= max_tokens:
+                        # Could add semantic relevance check here
+                        # For now, just add if budget allows
+                        selected.append(tool)
+                        core_tokens += tool_cost
+
+                        if core_tokens >= max_tokens * 0.9:  # Stop at 90% of budget
+                            break
+
+            except Exception as e:
+                logger.debug(f"Semantic selection error: {e}, using budget-based fallback")
+
+        logger.info(
+            f"Semantic selection: {len(tools)} → {len(selected)} tools, "
+            f"{core_tokens} tokens (budget: {max_tokens})"
+        )
+
+        return selected
+
+    def _emit_tool_strategy_event(
+        self,
+        strategy: str,
+        tool_count: int,
+        tool_tokens: int,
+        context_window: int,
+        provider: str,
+        reason: str,
+        tools=None,
+    ):
+        """Emit tool strategy selection event for observability.
+
+        Args:
+            strategy: Strategy name (session_lock, semantic_selection, etc.)
+            tool_count: Number of tools selected
+            tool_tokens: Total tool tokens
+            context_window: Context window size
+            provider: Provider name
+            reason: Reason for strategy selection
+            tools: Optional list of tools for detailed metrics
+        """
+        from victor.config.tool_tiers import get_tool_tier
+
+        try:
+            # Calculate context utilization
+            context_utilization = (tool_tokens / max_tool_tokens) if (max_tool_tokens := int(context_window * 0.25)) > 0 else 0
+
+            # Determine provider category
+            provider_category = self._get_provider_category(provider)
+
+            # Calculate tier distribution if tools provided
+            tier_distribution = {}
+            if tools:
+                for tool in tools:
+                    tier = get_tool_tier(tool.name)
+                    tier_distribution[tier] = tier_distribution.get(tier, 0) + 1
+
+            # Build comprehensive event data
+            event_data = {
+                "event_type": "tool.strategy_chosen",
+                "strategy": strategy,
+                "tool_count": tool_count,
+                "tool_tokens": tool_tokens,
+                "context_window": context_window,
+                "max_tool_tokens": max_tool_tokens,
+                "context_utilization": round(context_utilization, 3),
+                "provider": provider,
+                "provider_category": provider_category,
+                "model": self.model,
+                "reason": reason,
+                "tier_distribution": tier_distribution,
+                "v2_enabled": self._is_tool_strategy_v2_enabled(),
+            }
+
+            # Log structured event (parseable for metrics)
+            logger.info(
+                f"Tool strategy v2={event_data['v2_enabled']}: "
+                f"{strategy} ({tool_count} tools, {tool_tokens} tokens, "
+                f"{context_utilization:.1%} context utilization, "
+                f"provider={provider}, category={provider_category}, "
+                f"reason={reason})"
+            )
+
+            # Log detailed tier distribution
+            if tier_distribution:
+                tier_summary = ", ".join(f"{k}:{v}" for k, v in sorted(tier_distribution.items()))
+                logger.debug(f"Tool tier distribution: {tier_summary}")
+
+            # Emit to metrics system for dashboard integration
+            self._emit_tool_strategy_metrics(event_data)
+
+        except Exception as e:
+            logger.debug(f"Failed to emit tool strategy event: {e}")
+
+    def _get_provider_category(self, provider) -> str:
+        """Get provider category for metrics.
+
+        Args:
+            provider: Provider instance or name
+
+        Returns:
+            Provider category: 'caching' or 'local'
+        """
+        provider_name = provider if isinstance(provider, str) else provider.name
+
+        # Caching providers (90% API discount)
+        caching_providers = {
+            "anthropic", "openai", "deepseek", "google", "azure_openai",
+            "bedrock", "cerebras", "fireworks", "groq"
+        }
+
+        return "caching" if provider_name.lower() in caching_providers else "local"
+
+    def _emit_tool_strategy_metrics(self, event_data: dict):
+        """Emit metrics in Prometheus-compatible format.
+
+        Args:
+            event_data: Event data dictionary from _emit_tool_strategy_event
+        """
+        try:
+            # These log lines can be parsed by metrics collectors
+            # Format: METRIC_NAME{label1="value1",label2="value2"} value
+
+            labels = (
+                f'provider="{event_data["provider"]}",'
+                f'category="{event_data["provider_category"]}",'
+                f'strategy="{event_data["strategy"]}",'
+                f'model="{event_data["model"]}"'
+            )
+
+            # Counter: tool strategy decisions
+            logger.debug(
+                f'METRIC: victor_tool_strategy decisions{{{labels}}} 1'
+            )
+
+            # Gauge: tool count
+            logger.debug(
+                f'METRIC: victor_tool_count{{{labels}}} {event_data["tool_count"]}'
+            )
+
+            # Gauge: tool tokens
+            logger.debug(
+                f'METRIC: victor_tool_tokens{{{labels}}} {event_data["tool_tokens"]}'
+            )
+
+            # Gauge: context utilization
+            logger.debug(
+                f'METRIC: victor_context_utilization{{{labels}}} {event_data["context_utilization"]:.3f}'
+            )
+
+            # Gauge: v2 enabled status
+            v2_labels = f'provider="{event_data["provider"]}"'
+            logger.debug(
+                f'METRIC: victor_tool_strategy_v2_enabled{{{v2_labels}}} {int(event_data["v2_enabled"])}'
+            )
+
+            # Emit tier distribution if available
+            for tier, count in event_data.get("tier_distribution", {}).items():
+                tier_labels = (
+                    f'provider="{event_data["provider"]}",'
+                    f'tier="{tier}"'
+                )
+                logger.debug(
+                    f'METRIC: victor_tool_tier_count{{{tier_labels}}} {count}'
+                )
+
+        except Exception as e:
+            logger.debug(f"Failed to emit tool strategy metrics: {e}")
 
     # =====================================================================
     # Recovery Coordination Helper

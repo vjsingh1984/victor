@@ -1096,6 +1096,123 @@ class ToolSelector(ModeAwareMixin):
 
         return levels
 
+    def get_tools_with_levels_provider_optimized(
+        self,
+        user_message: str,
+        provider: Any,
+        vertical: Optional[str] = None,
+    ) -> Dict[str, SchemaLevel]:
+        """Return tools with schema levels optimized for provider capabilities.
+
+        This method implements provider-specific tool broadcasting optimization:
+        - Caching providers (cloud): FULL/COMPACT for 17 core tools, STUB for rest
+        - Local providers: STUB for 8 core tools + dynamic selection for others
+
+        Args:
+            user_message: The user's message for semantic matching
+            provider: Provider instance or name (str)
+            vertical: Optional vertical name (coding, devops, research, etc.)
+
+        Returns:
+            Dict mapping tool_name -> SchemaLevel
+        """
+        from victor.providers.detection import get_provider_category, ProviderCategory
+        from victor.tools.schema_level_mapper import SchemaLevelMapper
+
+        # Detect provider category
+        provider_category = get_provider_category(provider)
+        is_caching = provider_category == ProviderCategory.CACHING
+
+        # Initialize schema level mapper
+        mapper = SchemaLevelMapper()
+
+        # Get available tools from registry
+        all_tools = set(t.name for t in self.tools.list_tools(only_enabled=True))
+
+        levels: Dict[str, SchemaLevel] = {}
+
+        if is_caching:
+            # Caching provider strategy: Freeze 17 core tools in system prompt
+            # FULL schema (7 tools) + COMPACT schema (10 tools) + STUB for rest
+            full_tools = mapper.get_cloud_core_full_tools()
+            compact_tools = mapper.get_cloud_core_compact_tools()
+
+            # Assign FULL schema to core tools
+            for tool_name in full_tools:
+                if tool_name in all_tools:
+                    levels[tool_name] = SchemaLevel.FULL
+
+            # Assign COMPACT schema to secondary core tools
+            for tool_name in compact_tools:
+                if tool_name in all_tools and tool_name not in levels:
+                    levels[tool_name] = SchemaLevel.COMPACT
+
+            # Assign STUB schema to remaining tools
+            remaining_tools = all_tools - set(levels.keys())
+            for tool_name in remaining_tools:
+                levels[tool_name] = SchemaLevel.STUB
+
+            logger.debug(
+                f"Provider-optimized schema levels (caching provider): "
+                f"FULL={len([t for t, lvl in levels.items() if lvl == SchemaLevel.FULL])}, "
+                f"COMPACT={len([t for t, lvl in levels.items() if lvl == SchemaLevel.COMPACT])}, "
+                f"STUB={len([t for t, lvl in levels.items() if lvl == SchemaLevel.STUB])}"
+            )
+        else:
+            # Local provider strategy: 8 core tools + dynamic selection
+            # All tools use STUB schema to minimize prompt length
+            core_tools = mapper.get_local_core_stub_tools()
+
+            # Assign STUB schema to core tools
+            for tool_name in core_tools:
+                if tool_name in all_tools:
+                    levels[tool_name] = SchemaLevel.STUB
+
+            # Dynamic selection for additional tools (8-12 tools)
+            # Use semantic selection based on user message
+            remaining_tools = all_tools - set(levels.keys())
+
+            # Simple keyword matching for dynamic selection
+            message_lower = user_message.lower()
+            matched_tools = []
+
+            for tool_name in remaining_tools:
+                tool = None
+                for t in self.tools.list_tools():
+                    if t.name == tool_name:
+                        tool = t
+                        break
+
+                if tool:
+                    # Check keywords from metadata
+                    should_include = False
+                    if hasattr(tool, "metadata") and tool.metadata:
+                        keywords = getattr(tool.metadata, "keywords", []) or []
+                        if any(kw.lower() in message_lower for kw in keywords):
+                            should_include = True
+
+                    # Check tool description keywords
+                    if not should_include:
+                        desc_words = tool.description.lower().split()[:10]
+                        if any(word in message_lower for word in desc_words if len(word) > 4):
+                            should_include = True
+
+                    if should_include:
+                        matched_tools.append(tool_name)
+
+            # Limit to 8-12 dynamic tools
+            max_dynamic = 12
+            for tool_name in matched_tools[:max_dynamic]:
+                levels[tool_name] = SchemaLevel.STUB
+
+            logger.debug(
+                f"Provider-optimized schema levels (local provider): "
+                f"Core STUB={len([t for t, lvl in levels.items() if lvl == SchemaLevel.STUB])}, "
+                f"Total tools={len(levels)}"
+            )
+
+        return levels
+
     def get_tools_for_broadcast(
         self,
         user_message: str,
