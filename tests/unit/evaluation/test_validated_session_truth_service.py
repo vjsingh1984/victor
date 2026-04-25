@@ -26,10 +26,13 @@ from victor.evaluation.validated_session_truth_emitters import (
 )
 from victor.evaluation.validated_session_truth_service import (
     ValidatedSessionTruthService,
+    create_default_validated_session_truth_service,
 )
 
 
-def test_service_persists_evaluation_result_via_registry_and_persistence_helper(tmp_path, monkeypatch):
+def test_service_persists_evaluation_result_via_registry_and_persistence_helper(
+    tmp_path, monkeypatch
+):
     captured = {}
 
     class StubEmitter:
@@ -81,7 +84,9 @@ def test_service_persists_evaluation_result_via_registry_and_persistence_helper(
     assert captured["refresh_when_empty"] is True
 
 
-def test_service_persists_validation_result_via_registry_and_persistence_helper(tmp_path, monkeypatch):
+def test_service_persists_validation_result_via_registry_and_persistence_helper(
+    tmp_path, monkeypatch
+):
     captured = {}
 
     class StubEmitter:
@@ -155,6 +160,15 @@ def test_service_returns_none_when_validation_emitter_is_missing(tmp_path):
     assert saved_path is None
 
 
+def test_create_default_validated_session_truth_service_uses_supplied_registry():
+    registry = ValidatedSessionTruthEmitterRegistry()
+
+    service = create_default_validated_session_truth_service(registry)
+
+    assert isinstance(service, ValidatedSessionTruthService)
+    assert service._emitters is registry
+
+
 def test_service_creates_results_dir_before_persisting(tmp_path, monkeypatch):
     captured = {}
 
@@ -180,7 +194,9 @@ def test_service_creates_results_dir_before_persisting(tmp_path, monkeypatch):
     results_dir = tmp_path / "missing" / "evaluations"
     result = EvaluationResult(
         config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"),
-        task_results=[TaskResult(task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0)],
+        task_results=[
+            TaskResult(task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0)
+        ],
     )
 
     service.persist_evaluation_result(

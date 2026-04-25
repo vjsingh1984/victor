@@ -36,6 +36,10 @@ from victor.evaluation.evaluation_orchestrator import (
 )
 from victor.evaluation.result_correlation import SWEBenchScore
 from victor.evaluation.test_runners import TestRunResults
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthArtifact,
+    ValidatedSessionTruthEmitterRegistry,
+)
 
 
 class TestEvaluationStage:
@@ -564,6 +568,36 @@ class TestEvaluationOrchestrator:
             assert captured_kwargs["validation_result"] is validation_result
             assert captured_kwargs["results_dir"] == output_dir / "evaluations"
             refresh_aggregate.assert_not_called()
+
+    def test_orchestrator_accepts_legacy_emitter_registry_keyword(self):
+        """Legacy emitter-registry wiring should still resolve through the service factory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir)
+            config = OrchestratorConfig(output_dir=output_dir)
+
+            class StubEmitter:
+                def supports(self, benchmark):
+                    return benchmark.value == "swe_bench"
+
+                def build_artifact(self, context):
+                    return ValidatedSessionTruthArtifact(
+                        path=context.results_dir / "eval_session_stub.json",
+                        record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
+                    )
+
+            orchestrator = EvaluationOrchestrator(
+                config,
+                validated_session_truth_emitters=ValidatedSessionTruthEmitterRegistry(
+                    [StubEmitter()]
+                ),
+            )
+
+            saved_path = orchestrator._save_validated_session_feedback(
+                "django__123",
+                validation_result=object(),
+            )
+
+            assert saved_path == output_dir / "evaluations" / "eval_session_stub.json"
 
 
 class TestProgressCallback:

@@ -142,3 +142,10 @@ class ValidatedSessionTruthService:
             )
             return None
         return saved_paths[0] if saved_paths else None
+
+
+def create_default_validated_session_truth_service(
+    emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
+) -> ValidatedSessionTruthService:
+    """Return the canonical validated session-truth service instance."""
+    return ValidatedSessionTruthService(emitters)

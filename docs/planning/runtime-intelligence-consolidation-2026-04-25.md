@@ -285,9 +285,18 @@ Next recommended slice:
     through that policy instead of open-coding filenames inside emitter logic
 
 Next recommended slice:
-- Phase 5.16: make validated session-truth service construction canonical so
-  runtime constructors no longer need to expose both service and registry
-  wiring paths as permanent peers
-  - Preserve backward compatibility at the edge, but move default construction
-    behind one small factory/helper
-  - Keep the runtime-facing API centered on the service, not the registry
+- Phase 5.16 completed: make validated session-truth service construction
+  canonical so runtime constructors no longer need to expose both service and
+  registry wiring paths as permanent peers
+  - `create_default_validated_session_truth_service(...)` now owns default
+    service construction from an optional registry override
+  - `EvaluationHarness` and `EvaluationOrchestrator` now center their public
+    constructor wiring on the service while still accepting the legacy registry
+    keyword as a compatibility shim
+
+Next recommended slice:
+- Phase 5.17: promote the validated session-truth service through higher-level
+  factories/exports so the broader evaluation stack depends on one canonical
+  DI entrypoint instead of importing the concrete service opportunistically
+  - Keep compatibility shims minimal and avoid reintroducing registry-first
+    construction on new call sites

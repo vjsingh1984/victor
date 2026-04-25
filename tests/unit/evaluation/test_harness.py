@@ -39,6 +39,10 @@ from victor.evaluation.protocol import (
     TaskResult,
     TaskStatus,
 )
+from victor.evaluation.validated_session_truth_emitters import (
+    ValidatedSessionTruthArtifact,
+    ValidatedSessionTruthEmitterRegistry,
+)
 
 # =============================================================================
 # BaseBenchmarkRunner._filter_tasks Tests
@@ -814,6 +818,39 @@ class TestBenchmarkToolUsageMetrics:
         assert captured["result"] is result
         assert captured["kwargs"]["results_dir"] == tmp_path
         assert captured["kwargs"]["refresh_when_empty"] is True
+
+    def test_harness_accepts_legacy_emitter_registry_keyword(self, tmp_path):
+        """Legacy emitter-registry wiring should still resolve through the service factory."""
+
+        class StubEmitter:
+            def supports(self, benchmark):
+                return benchmark == BenchmarkType.GUIDE
+
+            def build_artifact(self, context):
+                return ValidatedSessionTruthArtifact(
+                    path=tmp_path / "eval_session_stub.json",
+                    record={"runtime_evaluation_feedback": {"metadata": {"source": "stub"}}},
+                )
+
+        harness = EvaluationHarness(
+            checkpoint_dir=tmp_path,
+            validated_session_truth_emitters=ValidatedSessionTruthEmitterRegistry([StubEmitter()]),
+        )
+        harness._results_dir = tmp_path
+        result = EvaluationResult(
+            config=EvaluationConfig(benchmark=BenchmarkType.GUIDE, model="test"),
+            task_results=[
+                TaskResult(task_id="guide-1", status=TaskStatus.PASSED, completion_score=1.0)
+            ],
+        )
+
+        saved_paths = harness._save_validated_session_feedbacks(
+            result,
+            source_result_path=tmp_path / "eval_guide_20260425_010101.json",
+            summary={"total_tasks": 0, "passed": 0, "failed": 0},
+        )
+
+        assert saved_paths == [tmp_path / "eval_session_stub.json"]
 
 
 class TestSaveAndLoadResults:

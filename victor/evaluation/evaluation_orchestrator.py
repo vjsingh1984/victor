@@ -65,6 +65,7 @@ from victor.evaluation.validated_session_truth_emitters import (
 )
 from victor.evaluation.validated_session_truth_service import (
     ValidatedSessionTruthService,
+    create_default_validated_session_truth_service,
 )
 from victor.evaluation.result_correlation import (
     CorrelationReport,
@@ -316,7 +317,7 @@ class EvaluationOrchestrator:
         config: OrchestratorConfig,
         progress_callback: Optional[ProgressCallback] = None,
         validated_session_truth_service: Optional[ValidatedSessionTruthService] = None,
-        validated_session_truth_emitters: Optional[ValidatedSessionTruthEmitterRegistry] = None,
+        **legacy_kwargs: Any,
     ):
         """Initialize the orchestrator.
 
@@ -324,13 +325,19 @@ class EvaluationOrchestrator:
             config: Orchestrator configuration
             progress_callback: Optional callback for progress updates
             validated_session_truth_service: Service for validated session-truth orchestration
-            validated_session_truth_emitters: Registry for validated session-truth emitters
         """
+        validated_session_truth_emitters = legacy_kwargs.pop(
+            "validated_session_truth_emitters",
+            None,
+        )
+        if legacy_kwargs:
+            unexpected = ", ".join(sorted(legacy_kwargs))
+            raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
         self.config = config
         self.progress_callback = progress_callback
         self._validated_session_truth_service = (
             validated_session_truth_service
-            or ValidatedSessionTruthService(validated_session_truth_emitters)
+            or create_default_validated_session_truth_service(validated_session_truth_emitters)
         )
 
         # Initialize components
