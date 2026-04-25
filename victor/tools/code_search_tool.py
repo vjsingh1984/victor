@@ -1678,6 +1678,9 @@ async def _literal_search(
             normalized_filename_query = search_query.replace("\\", "/").lstrip("./")
             query_has_path_components = "/" in normalized_filename_query
             query_suffix = normalized_filename_query.lower()
+            filename_filter_pattern = file_pattern
+            if filename_filter_pattern is None and _looks_like_filename_query(search_query):
+                filename_filter_pattern = normalized_filename_query
             logger.info(
                 f"Filename query detected: using {'dir' if system == 'Windows' else 'find'} "
                 f"for {search_query!r} on {system}"
@@ -1715,6 +1718,16 @@ async def _literal_search(
                         fpath
                         for fpath in found_files
                         if query_suffix in fpath.replace("\\", "/").lower()
+                    ]
+                if filename_filter_pattern:
+                    found_files = [
+                        fpath
+                        for fpath in found_files
+                        if _matches_literal_file_pattern(
+                            fpath,
+                            filename_filter_pattern,
+                            search_root=search_path,
+                        )
                     ]
                 if found_files:
                     results = []

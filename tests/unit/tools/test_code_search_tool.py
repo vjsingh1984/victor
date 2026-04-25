@@ -940,6 +940,28 @@ async def test_literal_search_filename_only_matches_path_qualified_query(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_literal_search_filename_query_requires_exact_filename_without_glob(tmp_path) -> None:
+    """Filename queries with extensions should not match longer suffix variants."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    (source_dir / "parser.py").write_text("pass\n", encoding="utf-8")
+    (source_dir / "parser.py.bak").write_text("pass\n", encoding="utf-8")
+
+    result = await _literal_search(
+        "parser.py",
+        str(tmp_path),
+        5,
+        None,
+        filename_only=True,
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+    assert result["results"][0]["path"].endswith("parser.py")
+
+
+@pytest.mark.asyncio
 async def test_literal_search_grep_fallback_honors_extension_filters_without_dots(tmp_path) -> None:
     """The grep fallback should honor normalized extension filters when rg is unavailable."""
 
