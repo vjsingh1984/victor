@@ -52,6 +52,7 @@ from victor.tools.budget_controller import BudgetController
 from victor.tools.tool_call_parser import ToolCallParser
 from victor.tools.tool_call_validator import ToolCallValidator
 from victor.tools.tool_names import ToolNames
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.tool_pipeline import ToolPipeline, PipelineExecutionResult
@@ -1095,10 +1096,11 @@ class ToolCoordinator:
         try:
             from victor.tools.decorators import resolve_tool_name
 
-            canonical = resolve_tool_name(tool_name)
+            canonical = canonicalize_core_tool_name(resolve_tool_name(tool_name))
         except Exception:
-            canonical = tool_name
+            canonical = canonicalize_core_tool_name(tool_name)
 
+        enabled_tools = self.get_enabled_tools()
         available_tools = self.get_available_tools()
         enabled = _is_enabled(canonical)
         # Reject malformed names unless the resolved tool is explicitly enabled.
@@ -1125,6 +1127,52 @@ class ToolCoordinator:
 
         # Check if enabled
         if not enabled:
+            available_preview = ", ".join(sorted(enabled_tools)[:8]) or "(none)"
+            mode_controller = getattr(self, "_mode_controller", None)
+            if (
+                mode_controller
+                and canonical in {"edit", "write"}
+                and not getattr(mode_controller.config, "allow_all_tools", False)
+                and getattr(mode_controller.config, "allow_sandbox_edits", False)
+                and getattr(mode_controller.config, "sandbox_dir", None)
+            ):
+                mode_name = mode_controller.current_mode.value.upper()
+                sandbox_dir = mode_controller.config.sandbox_dir
+                error_message = (
+                    f"Tool '{tool_name}' is not available because it resolves to '{canonical}', "
+                    f"which is limited to {sandbox_dir} in {mode_name} mode. "
+                    f"Available tools: {available_preview}"
+                )
+            elif mode_controller and not mode_controller.is_tool_allowed(canonical):
+                mode_name = mode_controller.current_mode.value.upper()
+                sandbox_dir = getattr(mode_controller.config, "sandbox_dir", None)
+                if (
+                    canonical in {"edit", "write"}
+                    and getattr(mode_controller.config, "allow_sandbox_edits", False)
+                    and sandbox_dir
+                ):
+                    error_message = (
+                        f"Tool '{tool_name}' is not available because it resolves to "
+                        f"'{canonical}', which is limited to {sandbox_dir} in {mode_name} mode. "
+                        f"Available tools: {available_preview}"
+                    )
+                else:
+                    error_message = (
+                        f"Tool '{tool_name}' is not available because it resolves to "
+                        f"'{canonical}', which is not allowed in {mode_name} mode. "
+                        f"Available tools: {available_preview}"
+                    )
+            elif canonical not in available_tools:
+                error_message = (
+                    f"Tool '{tool_name}' is not available because it resolves to '{canonical}', "
+                    f"which is not registered. Available tools: {available_preview}"
+                )
+            else:
+                error_message = (
+                    f"Tool '{tool_name}' is not available because it resolves to '{canonical}', "
+                    f"which is not enabled for this session. Available tools: {available_preview}"
+                )
+
             return ToolCallValidation(
                 valid=False,
                 original_name=tool_name,
@@ -1136,11 +1184,7 @@ class ToolCoordinator:
                     "tool_name": tool_name,
                     "success": False,
                     "result": None,
-                    "error": (
-                        f"Tool '{tool_name}' is not available. It may be disabled, not registered, "
-                        "or not included in the current tool selection. "
-                        "Use only the tools listed in your available tools."
-                    ),
+                    "error": error_message,
                 },
             )
 

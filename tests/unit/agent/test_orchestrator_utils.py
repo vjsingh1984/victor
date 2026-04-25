@@ -435,6 +435,11 @@ class TestGetToolStatusMessage:
         result = get_tool_status_message("execute_bash", {}, presentation=self.presentation)
         assert result == f"{self.ICON_PREFIX} Running execute_bash..."
 
+    def test_shell_with_cmd(self):
+        """Test canonical shell tool with cmd argument."""
+        result = get_tool_status_message("shell", {"cmd": "ls -la"}, presentation=self.presentation)
+        assert result == f"{self.ICON_PREFIX} Running shell: `ls -la`"
+
     def test_list_directory_with_path(self):
         """Test status message for list_directory with path."""
         result = get_tool_status_message(
@@ -446,6 +451,11 @@ class TestGetToolStatusMessage:
         """Test list_directory defaults to '.' when no path."""
         result = get_tool_status_message("list_directory", {}, presentation=self.presentation)
         assert result == f"{self.ICON_PREFIX} Listing directory: ."
+
+    def test_ls_with_path(self):
+        """Test canonical ls tool with path."""
+        result = get_tool_status_message("ls", {"path": "/home/user"}, presentation=self.presentation)
+        assert result == f"{self.ICON_PREFIX} Listing directory: /home/user"
 
     def test_read_with_path(self):
         """Test status message for read tool with path."""
@@ -501,6 +511,15 @@ class TestGetToolStatusMessage:
         """Test edit_files without files key."""
         result = get_tool_status_message("edit_files", {}, presentation=self.presentation)
         assert result == f"{self.ICON_PREFIX} Running edit_files..."
+
+    def test_edit_with_ops(self):
+        """Test canonical edit tool with ops list."""
+        result = get_tool_status_message(
+            "edit",
+            {"ops": [{"type": "replace", "path": "main.py", "old_str": "a", "new_str": "b"}]},
+            presentation=self.presentation,
+        )
+        assert result == f"{self.ICON_PREFIX} Editing: main.py"
 
     def test_edit_files_non_list_files(self):
         """Test edit_files with non-list files value."""

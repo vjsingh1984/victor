@@ -1421,6 +1421,20 @@ class TestToolExecutorCacheInvalidation:
 
         mock_cache.invalidate_paths.assert_called_once_with(["/tmp/test.py"])
 
+    def test_invalidate_cache_write_canonical(self):
+        """Canonical write tool should invalidate the written path."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("write", {"path": "/tmp/test.py"})
+
+        mock_cache.invalidate_paths.assert_called_once_with(["/tmp/test.py"])
+
     def test_invalidate_cache_edit_files_with_edits(self):
         """Test cache invalidation for edit_files with edits list."""
         registry = ToolRegistry()
@@ -1457,6 +1471,30 @@ class TestToolExecutorCacheInvalidation:
 
         mock_cache.invalidate_paths.assert_called_once_with(["/tmp/single.py"])
 
+    def test_invalidate_cache_edit_canonical_with_ops(self):
+        """Canonical edit tool should extract paths from ops."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool(
+            "edit",
+            {
+                "ops": [
+                    {"type": "replace", "path": "/tmp/file1.py", "old_str": "a", "new_str": "b"},
+                    {"type": "rename", "path": "/tmp/file2.py", "new_path": "/tmp/file3.py"},
+                ]
+            },
+        )
+
+        mock_cache.invalidate_paths.assert_called_once_with(
+            ["/tmp/file1.py", "/tmp/file2.py", "/tmp/file3.py"]
+        )
+
     def test_invalidate_cache_execute_bash(self):
         """Test cache invalidation for execute_bash (wide invalidation)."""
         registry = ToolRegistry()
@@ -1471,8 +1509,24 @@ class TestToolExecutorCacheInvalidation:
 
         # Bash commands invalidate file-related caches
         assert mock_cache.invalidate_by_tool.call_count == 2
-        mock_cache.invalidate_by_tool.assert_any_call("read_file")
-        mock_cache.invalidate_by_tool.assert_any_call("list_directory")
+        mock_cache.invalidate_by_tool.assert_any_call("read")
+        mock_cache.invalidate_by_tool.assert_any_call("ls")
+
+    def test_invalidate_cache_shell_canonical(self):
+        """Canonical shell tool should invalidate canonical read caches."""
+        registry = ToolRegistry()
+        mock_cache = MagicMock()
+
+        executor = ToolExecutor(
+            tool_registry=registry,
+            tool_cache=mock_cache,
+        )
+
+        executor._invalidate_cache_for_write_tool("shell", {"cmd": "rm -rf /tmp/*"})
+
+        assert mock_cache.invalidate_by_tool.call_count == 2
+        mock_cache.invalidate_by_tool.assert_any_call("read")
+        mock_cache.invalidate_by_tool.assert_any_call("ls")
 
     def test_invalidate_cache_git_tool(self):
         """Test cache invalidation for git tool (wide invalidation)."""
@@ -1488,8 +1542,8 @@ class TestToolExecutorCacheInvalidation:
 
         # Git commands invalidate many caches
         assert mock_cache.invalidate_by_tool.call_count == 3
-        mock_cache.invalidate_by_tool.assert_any_call("read_file")
-        mock_cache.invalidate_by_tool.assert_any_call("list_directory")
+        mock_cache.invalidate_by_tool.assert_any_call("read")
+        mock_cache.invalidate_by_tool.assert_any_call("ls")
         mock_cache.invalidate_by_tool.assert_any_call("code_search")
 
     def test_invalidate_cache_docker_tool(self):
@@ -1885,6 +1939,7 @@ class TestIntentBasedToolFilter:
     def test_read_only_intent_filters_write_tools(self):
         """READ_ONLY intent should remove write/generation tools from the tool list."""
         from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+        from victor.tools.tool_names import get_canonical_name
 
         tools = [
             {"name": "read"},
@@ -1894,7 +1949,7 @@ class TestIntentBasedToolFilter:
             {"name": "execute_bash"},
         ]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.READ_ONLY]
-        filtered = [t for t in tools if t.get("name") not in blocked]
+        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
 
         names = {t["name"] for t in filtered}
         assert "write_file" not in names
@@ -1906,20 +1961,22 @@ class TestIntentBasedToolFilter:
     def test_write_allowed_intent_no_filtering(self):
         """WRITE_ALLOWED intent should not filter any tools."""
         from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+        from victor.tools.tool_names import get_canonical_name
 
         tools = [{"name": "write_file"}, {"name": "edit_files"}, {"name": "read"}]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.WRITE_ALLOWED]
-        filtered = [t for t in tools if t.get("name") not in blocked]
+        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
 
         assert len(filtered) == len(tools)
 
     def test_display_only_intent_filters_write_tools(self):
         """DISPLAY_ONLY intent should remove write tools."""
         from victor.agent.action_authorizer import INTENT_BLOCKED_TOOLS, ActionIntent
+        from victor.tools.tool_names import get_canonical_name
 
         tools = [{"name": "write_file"}, {"name": "read"}, {"name": "ls"}]
         blocked = INTENT_BLOCKED_TOOLS[ActionIntent.DISPLAY_ONLY]
-        filtered = [t for t in tools if t.get("name") not in blocked]
+        filtered = [t for t in tools if get_canonical_name(t.get("name", "")) not in blocked]
 
         assert {"name": "write_file"} not in filtered
         assert {"name": "read"} in filtered

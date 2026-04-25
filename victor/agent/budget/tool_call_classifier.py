@@ -26,6 +26,7 @@ from enum import Enum
 from typing import Optional, Set
 
 from victor.agent.protocols import IToolCallClassifier
+from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -41,13 +42,9 @@ class OperationType(str, Enum):
 # Default set of write tools (can be extended via OCP)
 DEFAULT_WRITE_TOOLS: Set[str] = frozenset(
     {
-        "write_file",
         "write",
-        "edit_files",
         "edit",
         "shell",
-        "bash",
-        "execute_bash",
         "git_commit",
         "git_push",
         "delete_file",
@@ -94,7 +91,7 @@ class ToolCallClassifier(IToolCallClassifier):
         Returns:
             True if this is a write/modify operation
         """
-        return tool_name.lower() in self._write_tools
+        return get_canonical_name(tool_name.lower()) in self._write_tools
 
     def classify_operation(self, tool_name: str) -> OperationType:
         """Classify tool operation type.
@@ -105,11 +102,11 @@ class ToolCallClassifier(IToolCallClassifier):
         Returns:
             Operation type enum value
         """
-        tool_lower = tool_name.lower()
+        tool_lower = get_canonical_name(tool_name.lower())
 
         if tool_lower in self._write_tools:
             return OperationType.WRITE
-        elif tool_lower in {"read", "read_file", "grep", "search"}:
+        elif tool_lower in {"read", "grep", "search"}:
             return OperationType.READ
         else:
             return OperationType.UNKNOWN
@@ -123,7 +120,7 @@ class ToolCallClassifier(IToolCallClassifier):
             tool_name: Name of the tool to add
         """
         self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
-        self._write_tools.add(tool_name.lower())
+        self._write_tools.add(get_canonical_name(tool_name.lower()))
         logger.debug(f"ToolCallClassifier: added write tool '{tool_name}'")
 
     def remove_write_tool(self, tool_name: str) -> None:
@@ -132,9 +129,10 @@ class ToolCallClassifier(IToolCallClassifier):
         Args:
             tool_name: Name of the tool to remove
         """
-        if tool_name.lower() in self._write_tools:
+        canonical_tool_name = get_canonical_name(tool_name.lower())
+        if canonical_tool_name in self._write_tools:
             self._write_tools = set(self._write_tools)  # Convert from frozenset if needed
-            self._write_tools.discard(tool_name.lower())
+            self._write_tools.discard(canonical_tool_name)
             logger.debug(f"ToolCallClassifier: removed write tool '{tool_name}'")
 
     def get_write_tools(self) -> Set[str]:

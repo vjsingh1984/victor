@@ -36,6 +36,7 @@ from victor.core.completion_markers import (
     TASK_DONE_MARKER,
 )
 from victor.core.constants import DEFAULT_VERTICAL
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.query_classifier import QueryClassification
@@ -266,6 +267,7 @@ class SystemPromptBuilder:
         vertical: Optional[str] = None,
         concise_mode: bool = False,
         query_classification: Optional["QueryClassification"] = None,
+        mode_prompt_addition: str = "",
         provider_caches: bool = False,
         provider_has_kv_cache: bool = False,
         system_prompt_strategy: str = "static",
@@ -316,6 +318,7 @@ class SystemPromptBuilder:
         self.vertical = vertical or DEFAULT_VERTICAL
         self.concise_mode = concise_mode
         self.query_classification = query_classification
+        self.mode_prompt_addition = mode_prompt_addition.strip()
         self.provider_caches = provider_caches
         self.provider_has_kv_cache = provider_has_kv_cache
         self.system_prompt_strategy = system_prompt_strategy
@@ -580,11 +583,18 @@ class SystemPromptBuilder:
         }
         return guidance_map.get(self.query_classification.query_type, "")
 
+    def _get_mode_guidance_section(self) -> str:
+        """Get current mode-specific guidance from the live runtime."""
+        return self.mode_prompt_addition.strip()
+
     def _get_tool_constraint_section(self) -> str:
         """Get tool constraint section listing available tools."""
-        if not self.available_tools:
+        normalized_tools = sorted(
+            {canonicalize_core_tool_name(tool) for tool in self.available_tools if tool}
+        )
+        if not normalized_tools:
             return ""
-        tool_list = ", ".join(sorted(self.available_tools))
+        tool_list = ", ".join(normalized_tools)
         return (
             f"IMPORTANT: Only use tools from this list: {tool_list}. "
             "Do not attempt to call unlisted tools."
@@ -646,6 +656,10 @@ class SystemPromptBuilder:
 
         return prompt
 
+    def invalidate_cache(self) -> None:
+        """Clear any cached prompt so runtime state changes are reflected."""
+        self._cached_prompt = None
+
     def _get_effective_strategy(self) -> str:
         """Get the effective strategy based on configuration and provider type.
 
@@ -683,6 +697,11 @@ class SystemPromptBuilder:
         if "concise_mode" in sections_to_include and self.concise_mode:
             base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
             logger.debug("Concise mode enabled - added brevity guidance to prompt")
+
+        if "mode_guidance" in sections_to_include:
+            mode_guidance = self._get_mode_guidance_section()
+            if mode_guidance:
+                base_prompt = f"{base_prompt}\n\n{mode_guidance}"
 
         if "task_guidance" in sections_to_include:
             task_guidance = self._get_task_guidance_section()
@@ -733,6 +752,7 @@ class SystemPromptBuilder:
         """
         all_sections = {
             "concise_mode",
+            "mode_guidance",
             "task_guidance",
             "tool_constraint",
             "completion",
@@ -778,7 +798,7 @@ class SystemPromptBuilder:
         # For non-caching providers without edge model, use a reduced set.
         # Full sections are expensive (reparsed every turn) with no cache benefit.
         if not self.provider_caches:
-            reduced = {"completion", "task_guidance", "tool_constraint"}
+            reduced = {"completion", "mode_guidance", "task_guidance", "tool_constraint"}
             if self.concise_mode:
                 reduced.add("concise_mode")
             logger.debug(

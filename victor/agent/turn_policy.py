@@ -31,6 +31,7 @@ import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set
+from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ MAX_ALL_BLOCKED = 3
 NUDGE_THRESHOLD = 2
 """Inject nudge message after this many no-tool turns."""
 
-READ_ONLY_TOOLS = frozenset({"read", "ls", "list_directory", "grep"})
+READ_ONLY_TOOLS = frozenset({"read", "ls", "grep"})
 """Tools considered read-only for code_search escalation nudge."""
 
 READ_ONLY_ESCALATION_THRESHOLD = 5
@@ -136,9 +137,10 @@ class SpinDetector:
 
             # Track read-only turns for code_search escalation
             if tool_names:
-                if "code_search" in tool_names:
+                canonical_tool_names = {get_canonical_name(tool) for tool in tool_names}
+                if "code_search" in canonical_tool_names:
                     self.has_used_code_search = True
-                if tool_names.issubset(READ_ONLY_TOOLS):
+                if canonical_tool_names.issubset(READ_ONLY_TOOLS):
                     self.consecutive_read_only_turns += 1
                 else:
                     self.consecutive_read_only_turns = 0
@@ -376,6 +378,7 @@ class FulfillmentCriteriaBuilder:
         tool_name = result.get("tool_name", "")
         args = result.get("args", {})
         success = result.get("success", False)
+        canonical_tool_name = get_canonical_name(tool_name)
 
         if not success:
             error = result.get("error", "")
@@ -386,18 +389,18 @@ class FulfillmentCriteriaBuilder:
         # Track file operations
         file_path = args.get("file_path", "") or args.get("path", "")
 
-        if tool_name in ("write", "write_file", "create_file"):
+        if canonical_tool_name in ("write", "create_file"):
             if file_path:
                 self._written_files.append(file_path)
                 if file_path.endswith(".md") or file_path.endswith(".rst"):
                     self._doc_files.append(file_path)
 
-        elif tool_name in ("edit", "edit_file", "replace_in_file"):
+        elif canonical_tool_name in ("edit", "replace_in_file"):
             if file_path:
                 self._edited_files.append(file_path)
 
-        elif tool_name in ("shell", "bash", "run_command"):
-            command = args.get("command", "")
+        elif canonical_tool_name in ("shell", "run_command"):
+            command = args.get("cmd") or args.get("command", "")
             if "pytest" in command or "test" in command:
                 # Extract test file if present
                 parts = command.split()

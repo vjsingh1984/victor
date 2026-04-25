@@ -58,9 +58,21 @@ class TestTaskGuidance:
     def test_tool_constraint_lists_available_tools(self):
         builder = _make_builder(available_tools=["read_file", "write_file", "shell"])
         prompt = builder.build()
-        assert "read_file" in prompt
-        assert "write_file" in prompt
+        assert "read" in prompt
+        assert "write" in prompt
         assert "shell" in prompt
+        assert "read_file" not in prompt
+        assert "write_file" not in prompt
+
+    def test_mode_guidance_is_injected(self):
+        builder = SystemPromptBuilder(
+            provider_name="anthropic",
+            model="claude-sonnet-4-20250514",
+            mode_prompt_addition="PLAN mode: Only edit files in .victor/sandbox/.",
+        )
+        prompt = builder.build()
+        assert "PLAN mode" in prompt
+        assert ".victor/sandbox/" in prompt
 
     def test_prompt_content_varies_by_type(self):
         quick = _make_builder(QueryType.QUICK_QUESTION).build()

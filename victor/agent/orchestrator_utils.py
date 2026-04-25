@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING
+from victor.tools.tool_names import get_canonical_name
 
 if TYPE_CHECKING:
     from victor.config.settings import Settings
@@ -162,31 +163,35 @@ def get_tool_status_message(
         presentation = create_presentation_adapter()
 
     running_icon = presentation.icon("running")
+    canonical_tool_name = get_canonical_name(tool_name)
+    display_name = tool_name or canonical_tool_name
 
-    if tool_name == "execute_bash" and "command" in tool_args:
-        cmd = tool_args["command"]
+    if canonical_tool_name == "shell":
+        cmd = tool_args.get("cmd") or tool_args.get("command")
+        if not cmd:
+            return f"{running_icon} Running {display_name}..."
         cmd_display = cmd[:80] + "..." if len(cmd) > 80 else cmd
-        return f"{running_icon} Running {tool_name}: `{cmd_display}`"
+        return f"{running_icon} Running {display_name}: `{cmd_display}`"
 
-    if tool_name == "list_directory":
+    if canonical_tool_name == "ls":
         path = tool_args.get("path", ".")
         return f"{running_icon} Listing directory: {path}"
 
-    if tool_name == "read":
+    if canonical_tool_name == "read":
         path = tool_args.get("path", "file")
         return f"{running_icon} Reading file: {path}"
 
-    if tool_name == "edit_files":
-        files = tool_args.get("files", [])
+    if canonical_tool_name == "edit":
+        files = tool_args.get("ops") or tool_args.get("files") or tool_args.get("edits") or []
         if files and isinstance(files, list):
-            paths = [f.get("path", "?") for f in files[:3]]
+            paths = [f.get("path", "?") for f in files[:3] if isinstance(f, dict)]
             path_display = ", ".join(paths)
             if len(files) > 3:
                 path_display += f" (+{len(files) - 3} more)"
             return f"{running_icon} Editing: {path_display}"
-        return f"{running_icon} Running {tool_name}..."
+        return f"{running_icon} Running {display_name}..."
 
-    if tool_name == "write":
+    if canonical_tool_name == "write":
         path = tool_args.get("path", "file")
         return f"{running_icon} Writing file: {path}"
 
@@ -195,7 +200,7 @@ def get_tool_status_message(
         query_display = query[:50] + "..." if len(query) > 50 else query
         return f"{running_icon} Searching: {query_display}"
 
-    return f"{running_icon} Running {tool_name}..."
+    return f"{running_icon} Running {display_name}..."
 
 
 # Aliases for backward compatibility during migration

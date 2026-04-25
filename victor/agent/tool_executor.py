@@ -53,6 +53,7 @@ from victor.core.retry import (
 from victor.tools.base import BaseTool, ToolResult, ToolValidationResult
 from victor.tools.enums import AccessMode
 from victor.tools.registry import Hook, HookError, ToolRegistry
+from victor.tools.tool_names import get_canonical_name
 
 # RL hook integration (lazy import to avoid circular dependencies)
 _rl_hooks = None
@@ -1324,31 +1325,41 @@ class ToolExecutor:
         if not self.cache:
             return
 
+        canonical_tool_name = get_canonical_name(tool_name)
+
         # Extract paths from arguments based on tool type
         paths_to_invalidate: List[str] = []
 
-        if tool_name == "write_file":
-            if "path" in arguments:
-                paths_to_invalidate.append(arguments["path"])
-        elif tool_name == "edit_files":
-            # edit_files can have multiple file edits
-            if "edits" in arguments:
-                for edit in arguments.get("edits", []):
-                    if "path" in edit:
-                        paths_to_invalidate.append(edit["path"])
+        if canonical_tool_name == "write":
+            file_path = arguments.get("path") or arguments.get("file_path")
+            if file_path:
+                paths_to_invalidate.append(file_path)
+        elif canonical_tool_name == "edit":
+            ops = arguments.get("ops") or arguments.get("edits") or arguments.get("files")
+            if isinstance(ops, list):
+                for op in ops:
+                    if not isinstance(op, dict):
+                        continue
+                    path = op.get("path")
+                    new_path = op.get("new_path")
+                    if path:
+                        paths_to_invalidate.append(path)
+                    if new_path:
+                        paths_to_invalidate.append(new_path)
             elif "path" in arguments:
                 paths_to_invalidate.append(arguments["path"])
-        elif tool_name == "execute_bash":
+        elif canonical_tool_name == "shell":
             # Bash commands can modify anything - invalidate all file-related caches
-            self.cache.invalidate_by_tool("read_file")
-            self.cache.invalidate_by_tool("list_directory")
+            self.cache.invalidate_by_tool("read")
+            self.cache.invalidate_by_tool("ls")
             return
-        elif tool_name in ("git", "docker"):
+        elif canonical_tool_name in ("git", "docker"):
             # Git and docker operations can have wide-reaching effects
-            self.cache.invalidate_by_tool("read_file")
-            self.cache.invalidate_by_tool("list_directory")
+            self.cache.invalidate_by_tool("read")
+            self.cache.invalidate_by_tool("ls")
             self.cache.invalidate_by_tool("code_search")
             return
 
         if paths_to_invalidate:
-            self.cache.invalidate_paths(paths_to_invalidate)
+            unique_paths = list(dict.fromkeys(paths_to_invalidate))
+            self.cache.invalidate_paths(unique_paths)

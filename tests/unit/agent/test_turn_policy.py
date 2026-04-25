@@ -90,6 +90,15 @@ class TestSpinDetector:
         assert detector.consecutive_read_only_turns == READ_ONLY_ESCALATION_THRESHOLD
         assert detector.has_used_code_search is False
 
+    def test_read_only_tracking_accepts_alias_names(self):
+        detector = SpinDetector()
+        detector.record_turn(
+            has_tool_calls=True,
+            tool_names={"read_file", "list_directory"},
+            tool_count=2,
+        )
+        assert detector.consecutive_read_only_turns == 1
+
     def test_code_search_breaks_read_only(self):
         detector = SpinDetector()
         detector.record_turn(has_tool_calls=True, tool_names={"read"}, tool_count=1)
@@ -226,6 +235,18 @@ class TestFulfillmentCriteriaBuilder:
         )
         criteria = builder.build()
         assert "tests/test_main.py" in criteria.test_files
+
+    def test_records_test_files_from_shell_cmd(self):
+        builder = FulfillmentCriteriaBuilder()
+        builder.record_tool_result(
+            {
+                "tool_name": "shell",
+                "args": {"cmd": "pytest tests/test_other.py -q"},
+                "success": True,
+            }
+        )
+        criteria = builder.build()
+        assert "tests/test_other.py" in criteria.test_files
 
     def test_records_doc_files(self):
         builder = FulfillmentCriteriaBuilder()

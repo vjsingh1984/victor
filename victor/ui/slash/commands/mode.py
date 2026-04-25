@@ -45,7 +45,7 @@ class ModeCommand(BaseSlashCommand):
         if not self._require_agent(ctx):
             return
 
-        from victor.agent.adaptive_mode_controller import AgentMode
+        from victor.agent.mode_controller import AgentMode
 
         # Use ModeAwareMixin's public mode_controller property (lazy-loads)
         mode_controller = ctx.agent.mode_controller
@@ -93,6 +93,9 @@ class ModeCommand(BaseSlashCommand):
                 else:
                     ctx.console.print("[yellow]Mode controller not available[/]")
                     return
+
+            if hasattr(ctx.agent, "refresh_system_prompt"):
+                ctx.agent.refresh_system_prompt()
 
             ctx.console.print(f"[green]Switched to mode:[/] [cyan]{mode_name}[/]")
 
@@ -192,7 +195,7 @@ class PlanCommand(BaseSlashCommand):
                 self._show_plan(ctx)
                 return
 
-        from victor.agent.adaptive_mode_controller import AgentMode
+        from victor.agent.mode_controller import AgentMode
 
         # Switch to plan mode using public interface
         # Uses ModeAwareMixin's mode_controller property (lazy-loads)
@@ -202,6 +205,9 @@ class PlanCommand(BaseSlashCommand):
         else:
             ctx.console.print("[yellow]Mode controller not available[/]")
             return
+
+        if hasattr(ctx.agent, "refresh_system_prompt"):
+            ctx.agent.refresh_system_prompt()
 
         ctx.console.print("[green]Switched to planning mode[/]")
         ctx.console.print("[dim]Sandbox edits enabled in .victor/sandbox/ directory[/]")

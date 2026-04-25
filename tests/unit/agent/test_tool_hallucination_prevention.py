@@ -20,9 +20,11 @@ class TestToolConstraintPrompt:
             available_tools=["read_file", "write_file", "shell"],
         )
         section = builder._get_tool_constraint_section()
-        assert "read_file" in section
-        assert "write_file" in section
+        assert "read" in section
+        assert "write" in section
         assert "shell" in section
+        assert "read_file" not in section
+        assert "write_file" not in section
         assert "IMPORTANT" in section or "Only use" in section
 
     def test_prompt_no_tools_when_empty(self):
@@ -66,7 +68,7 @@ class TestToolConstraintPrompt:
         )
         prompt = builder.build()
         # Both task guidance and tool constraints should be present
-        assert "read_file" in prompt
+        assert "read" in prompt
         assert "systematically" in prompt.lower() or "explore" in prompt.lower()
 
 

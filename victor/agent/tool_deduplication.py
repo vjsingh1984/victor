@@ -27,6 +27,7 @@ import logging
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, List, Optional, Set
+from victor.tools.tool_names import get_canonical_name
 
 logger = logging.getLogger(__name__)
 
@@ -95,9 +96,10 @@ class ToolDeduplicationTracker:
             tool_name: Name of the tool
             args: Tool arguments
         """
-        call = TrackedToolCall(tool_name=tool_name, args=args)
+        canonical_tool_name = get_canonical_name(tool_name)
+        call = TrackedToolCall(tool_name=canonical_tool_name, args=args)
         self.recent_calls.append(call)
-        logger.debug(f"Tracking tool call: {tool_name}({self._format_args(args)})")
+        logger.debug(f"Tracking tool call: {canonical_tool_name}({self._format_args(args)})")
 
     def is_redundant(self, tool_name: str, args: Dict[str, Any], explain: bool = False) -> bool:
         """Check if a tool call is redundant given recent history.
@@ -110,26 +112,28 @@ class ToolDeduplicationTracker:
         Returns:
             True if the call is likely redundant, False otherwise
         """
+        canonical_tool_name = get_canonical_name(tool_name)
+
         if not self.recent_calls:
             return False
 
         # Check for exact duplicates
         for recent in self.recent_calls:
-            if recent.tool_name == tool_name and recent.args == args:
+            if recent.tool_name == canonical_tool_name and recent.args == args:
                 if explain:
                     import time
 
                     logger.info(
-                        f"Redundant tool call detected: {tool_name}({self._format_args(args)}) "
+                        f"Redundant tool call detected: {canonical_tool_name}({self._format_args(args)}) "
                         f"was called {(time.time() - recent.timestamp):.1f}s ago"
                     )
                 return True
 
         # Check for semantic overlap
-        if self._has_semantic_overlap(tool_name, args):
+        if self._has_semantic_overlap(canonical_tool_name, args):
             if explain:
                 logger.info(
-                    f"Semantically redundant tool call: {tool_name}({self._format_args(args)}) "
+                    f"Semantically redundant tool call: {canonical_tool_name}({self._format_args(args)}) "
                     "overlaps with recent call"
                 )
             return True
@@ -146,16 +150,17 @@ class ToolDeduplicationTracker:
         Returns:
             True if there's semantic overlap with recent calls
         """
+        tool_name = get_canonical_name(tool_name)
         # Check for grep/search redundancy
         if tool_name in ("grep", "code_search", "semantic_code_search"):
             return self._check_search_redundancy(tool_name, args)
 
         # Check for file operation redundancy
-        if tool_name in ("read_file", "edit_file", "write_file"):
+        if tool_name in ("read", "edit", "write"):
             return self._check_file_redundancy(tool_name, args)
 
         # Check for list/ls redundancy
-        if tool_name in ("list_directory", "ls", "tree"):
+        if tool_name in ("ls", "tree"):
             return self._check_list_redundancy(tool_name, args)
 
         return False
@@ -206,7 +211,7 @@ class ToolDeduplicationTracker:
 
         # Check recent file operations
         for recent in self.recent_calls:
-            if recent.tool_name not in ("read_file", "edit_file", "write_file"):
+            if recent.tool_name not in ("read", "edit", "write"):
                 continue
 
             recent_path = (
@@ -218,7 +223,7 @@ class ToolDeduplicationTracker:
             # Same file accessed
             if path == recent_path:
                 # Read after read is redundant (unless large file with different offsets)
-                if tool_name == "read_file" and recent.tool_name == "read_file":
+                if tool_name == "read" and recent.tool_name == "read":
                     # Allow if different offsets specified
                     if args.get("offset") != recent.args.get("offset"):
                         return False
@@ -236,7 +241,7 @@ class ToolDeduplicationTracker:
 
         # Check recent list operations
         for recent in self.recent_calls:
-            if recent.tool_name not in ("list_directory", "ls", "tree"):
+            if recent.tool_name not in ("ls", "tree"):
                 continue
 
             recent_path = recent.args.get("path", ".")

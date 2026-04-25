@@ -35,6 +35,7 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set
 
 from victor.agent.tool_executor import ToolExecutionResult, ToolExecutor
+from victor.tools.tool_names import get_canonical_name
 
 
 def _get_embedding_config():
@@ -69,17 +70,17 @@ class ToolCategory(Enum):
 # Optimized tool categorization using frozenset for O(1) lookups
 READ_TOOLS = frozenset(
     {
-        "read_file",
-        "list_directory",
+        "read",
+        "ls",
         "code_search",
         "semantic_code_search",
         "grep_search",
-        "plan_files",
+        "plan",
         "git",
     }
 )
-WRITE_TOOLS = frozenset({"write_file", "edit_files", "execute_bash", "docker"})
-NETWORK_TOOLS = frozenset({"web_search", "web_fetch", "http_request"})
+WRITE_TOOLS = frozenset({"write", "edit", "shell", "docker"})
+NETWORK_TOOLS = frozenset({"web_search", "web_fetch", "http"})
 
 # TOOL_CATEGORIES dictionary for backward compatibility with tests
 TOOL_CATEGORIES: Dict[str, ToolCategory] = {
@@ -87,6 +88,34 @@ TOOL_CATEGORIES: Dict[str, ToolCategory] = {
     **dict.fromkeys(WRITE_TOOLS, ToolCategory.WRITE),
     **dict.fromkeys(NETWORK_TOOLS, ToolCategory.NETWORK),
 }
+
+
+def _canonical_tool_name(tool_name: str) -> str:
+    """Normalize aliases to the canonical runtime tool name."""
+    return get_canonical_name(tool_name)
+
+
+def _extract_paths_from_arguments(tool_name: str, arguments: Dict[str, Any]) -> List[str]:
+    """Extract file paths from canonical tool arguments for dependency tracking."""
+    paths: List[str] = []
+    direct_path = arguments.get("path") or arguments.get("file_path")
+    if isinstance(direct_path, str) and direct_path:
+        paths.append(direct_path)
+
+    if tool_name == "edit":
+        ops = arguments.get("ops") or arguments.get("edits") or arguments.get("files") or []
+        if isinstance(ops, list):
+            for op in ops:
+                if not isinstance(op, dict):
+                    continue
+                path = op.get("path")
+                new_path = op.get("new_path")
+                if isinstance(path, str) and path:
+                    paths.append(path)
+                if isinstance(new_path, str) and new_path:
+                    paths.append(new_path)
+
+    return list(dict.fromkeys(paths))
 
 
 @dataclass
@@ -131,16 +160,17 @@ class ParallelToolExecutor:
         self.progress_callback = progress_callback
 
     def _get_category(self, tool_name: str) -> ToolCategory:
-        if tool_name in READ_TOOLS:
+        canonical_tool_name = _canonical_tool_name(tool_name)
+        if canonical_tool_name in READ_TOOLS:
             return ToolCategory.READ_ONLY
-        elif tool_name in WRITE_TOOLS:
+        elif canonical_tool_name in WRITE_TOOLS:
             return ToolCategory.WRITE
-        elif tool_name in NETWORK_TOOLS:
+        elif canonical_tool_name in NETWORK_TOOLS:
             return ToolCategory.NETWORK
         return ToolCategory.COMPUTE
 
     def _has_write_tools(self, tool_calls: List[Dict[str, Any]]) -> bool:
-        return any(tc.get("name", "") in WRITE_TOOLS for tc in tool_calls)
+        return any(_canonical_tool_name(tc.get("name", "")) in WRITE_TOOLS for tc in tool_calls)
 
     def _can_parallelize(self, tool_calls: List[Dict[str, Any]]) -> bool:
         """Check if the given tool calls can be parallelized.
@@ -185,14 +215,18 @@ class ParallelToolExecutor:
                     args = _json.loads(args)
                 except Exception:
                     args = {}
-            path = args.get("path") or args.get("file_path")
+            canonical_name = _canonical_tool_name(name)
+            paths = _extract_paths_from_arguments(canonical_name, args)
 
-            if name in WRITE_TOOLS:
-                if path:
+            if canonical_name in WRITE_TOOLS:
+                if paths:
                     # Write→write on same file: serialize
-                    if path in path_writers:
-                        dependencies[i].update(path_writers[path])
-                    path_writers.setdefault(path, []).append(i)
+                    for path in paths:
+                        if path in path_writers:
+                            dependencies[i].update(path_writers[path])
+                    dependencies[i].update(unresolved_writers)
+                    for path in paths:
+                        path_writers.setdefault(path, []).append(i)
                 else:
                     # Unknown write target: depends on ALL prior writes
                     for prev_writers in path_writers.values():
@@ -201,10 +235,11 @@ class ParallelToolExecutor:
                     unresolved_writers.append(i)
                 # All unresolved writes also depend on this one
                 # (handled by future iterations looking at unresolved_writers)
-            elif name in READ_TOOLS:
+            elif canonical_name in READ_TOOLS:
                 # Read depends on prior writes to same path
-                if path and path in path_writers:
-                    dependencies[i].update(path_writers[path])
+                for path in paths:
+                    if path in path_writers:
+                        dependencies[i].update(path_writers[path])
                 # Read also depends on unresolved writes (conservative)
                 dependencies[i].update(unresolved_writers)
 

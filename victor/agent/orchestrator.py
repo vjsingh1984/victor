@@ -3003,6 +3003,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
 
         if query_classification is not None:
             self.prompt_builder.query_classification = query_classification
+            self.prompt_builder.invalidate_cache()
         base_system_prompt = self._build_system_prompt_with_adapter()
         if self.project_context and self.project_context.content:
             self._system_prompt = (
@@ -3038,6 +3039,8 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             self._prompt_pipeline.unfreeze()
         self._system_prompt_frozen = False
         self._session_tools = None
+        if getattr(self, "prompt_builder", None):
+            self.prompt_builder.invalidate_cache()
 
         if query_classification is None and preserve_existing_classification:
             query_classification = getattr(self.prompt_builder, "query_classification", None)
@@ -3050,17 +3053,31 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         if builder is None:
             return
 
+        cache_invalidated = False
         try:
-            builder.available_tools = sorted(self.get_enabled_tools())
+            enabled_tools = sorted(self.get_enabled_tools())
+            if builder.available_tools != enabled_tools:
+                builder.available_tools = enabled_tools
+                cache_invalidated = True
         except Exception as exc:
             logger.debug("Failed to sync enabled tools into prompt builder: %s", exc)
-            builder.available_tools = []
+            if builder.available_tools:
+                builder.available_tools = []
+                cache_invalidated = True
 
         try:
-            builder.mode_prompt_addition = self.get_mode_system_prompt()
+            mode_prompt = self.get_mode_system_prompt()
+            if builder.mode_prompt_addition != mode_prompt:
+                builder.mode_prompt_addition = mode_prompt
+                cache_invalidated = True
         except Exception as exc:
             logger.debug("Failed to sync mode prompt into prompt builder: %s", exc)
-            builder.mode_prompt_addition = ""
+            if builder.mode_prompt_addition:
+                builder.mode_prompt_addition = ""
+                cache_invalidated = True
+
+        if cache_invalidated:
+            builder.invalidate_cache()
 
     def _build_system_prompt_with_adapter(self) -> str:
         """Build system prompt using the unified pipeline.

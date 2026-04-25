@@ -469,6 +469,29 @@ class TestToolServiceValidationConsolidation:
         _, invalid4 = service.validate_tool_calls({"name": "code_search", "arguments": []})
         assert "must be a dictionary" in invalid4[0]["_validation_error"]
 
+    def test_validate_tool_calls_reports_canonical_alias_and_mode_reason(self):
+        """Alias-based tool errors should explain the canonical tool and mode limit."""
+        from victor.agent.mode_controller import AgentMode, AgentModeController
+        from victor.agent.services.tool_service import ToolService, ToolServiceConfig
+
+        service = ToolService(
+            config=ToolServiceConfig(),
+            tool_selector=Mock(),
+            tool_executor=Mock(),
+            tool_registrar=Mock(),
+        )
+        service.get_available_tools = Mock(return_value={"read", "edit", "shell"})
+        service._enabled_tools = {"read"}
+
+        controller = AgentModeController()
+        controller.switch_mode(AgentMode.PLAN)
+        service.set_mode_controller(controller)
+
+        _, invalid = service.validate_tool_calls({"name": "edit_file", "arguments": {}})
+
+        assert "resolves to 'edit'" in invalid[0]["_validation_error"]
+        assert "PLAN mode" in invalid[0]["_validation_error"]
+
 
 class TestToolServiceValidationIntegration:
     """Integration tests for validation with other service methods."""

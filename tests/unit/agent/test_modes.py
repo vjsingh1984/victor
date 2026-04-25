@@ -74,18 +74,20 @@ class TestModeConfig:
         assert config.allow_all_tools is False
         assert config.require_write_confirmation is True
         assert config.verbose_planning is True
-        # Should disallow bash/git modifications (but sandbox edits allowed)
-        assert "bash" in config.disallowed_tools
+        # Should disallow shell/git modifications (but sandbox edits allowed)
+        assert "shell" in config.disallowed_tools
         assert "git_commit" in config.disallowed_tools
         # Should allow read operations and sandbox editing
-        assert "read_file" in config.allowed_tools
+        assert "read" in config.allowed_tools
         assert "code_search" in config.allowed_tools
-        assert "write_file" in config.allowed_tools  # Sandbox edits allowed
+        assert "write" in config.allowed_tools  # Sandbox edits allowed
+        assert "edit" in config.allowed_tools
         # Should have sandbox configuration
         assert config.sandbox_dir == ".victor/sandbox"
         assert config.allow_sandbox_edits is True
         # Should have high exploration multiplier for plan mode (like Claude Code)
         assert config.exploration_multiplier == 10.0
+        assert config.tool_priorities["read"] == 1.2
 
     def test_explore_mode_config(self):
         """Test EXPLORE mode configuration."""
@@ -94,12 +96,12 @@ class TestModeConfig:
         assert config.name == "Explore"
         assert config.allow_all_tools is False
         assert config.require_write_confirmation is True
-        # Should disallow bash and edit_files (but sandbox notes allowed)
-        assert "bash" in config.disallowed_tools
-        assert "edit_files" in config.disallowed_tools
+        # Should disallow shell and edit (but sandbox notes allowed)
+        assert "shell" in config.disallowed_tools
+        assert "edit" in config.disallowed_tools
         # Should allow read operations and sandbox notes
-        assert "read_file" in config.allowed_tools
-        assert "write_file" in config.allowed_tools  # Sandbox notes allowed
+        assert "read" in config.allowed_tools
+        assert "write" in config.allowed_tools  # Sandbox notes allowed
         # Should have sandbox configuration
         assert config.sandbox_dir == ".victor/sandbox"
         assert config.allow_sandbox_edits is True
@@ -176,26 +178,26 @@ class TestToolAllowance:
 
     def test_build_mode_allows_all_tools(self, manager):
         """Test that BUILD mode allows all tools."""
-        assert manager.is_tool_allowed("write_file")
-        assert manager.is_tool_allowed("edit_files")
-        assert manager.is_tool_allowed("bash")
-        assert manager.is_tool_allowed("read_file")
+        assert manager.is_tool_allowed("write")
+        assert manager.is_tool_allowed("edit")
+        assert manager.is_tool_allowed("shell")
+        assert manager.is_tool_allowed("read")
 
     def test_plan_mode_restricts_tools(self, manager):
         """Test that PLAN mode restricts modification tools but allows sandbox edits."""
         manager.switch_mode(AgentMode.PLAN)
 
         # Should allow read tools
-        assert manager.is_tool_allowed("read_file")
+        assert manager.is_tool_allowed("read")
         assert manager.is_tool_allowed("code_search")
         assert manager.is_tool_allowed("git_status")
 
-        # Should allow sandbox edits (write_file and edit_files are in allowed_tools)
-        assert manager.is_tool_allowed("write_file")  # Sandbox edits allowed
-        assert manager.is_tool_allowed("edit_files")  # Sandbox edits allowed
+        # Should allow sandbox edits
+        assert manager.is_tool_allowed("write")
+        assert manager.is_tool_allowed("edit")
 
-        # Should disallow bash and git modifications
-        assert not manager.is_tool_allowed("bash")
+        # Should disallow shell and git modifications
+        assert not manager.is_tool_allowed("shell")
         assert not manager.is_tool_allowed("git_commit")
 
     def test_explore_mode_restricts_tools(self, manager):
@@ -203,16 +205,16 @@ class TestToolAllowance:
         manager.switch_mode(AgentMode.EXPLORE)
 
         # Should allow read tools
-        assert manager.is_tool_allowed("read_file")
-        assert manager.is_tool_allowed("list_directory")
+        assert manager.is_tool_allowed("read")
+        assert manager.is_tool_allowed("ls")
         assert manager.is_tool_allowed("web_search")
 
-        # Should allow sandbox notes (write_file is in allowed_tools)
-        assert manager.is_tool_allowed("write_file")  # Sandbox notes allowed
+        # Should allow sandbox notes
+        assert manager.is_tool_allowed("write")
 
-        # Should disallow bash and edit_files
-        assert not manager.is_tool_allowed("bash")
-        assert not manager.is_tool_allowed("edit_files")  # Only notes, no edits
+        # Should disallow shell and edit
+        assert not manager.is_tool_allowed("shell")
+        assert not manager.is_tool_allowed("edit")
 
 
 class TestToolPriority:
@@ -220,8 +222,8 @@ class TestToolPriority:
 
     def test_build_mode_priorities(self, manager):
         """Test tool priorities in BUILD mode."""
-        # edit_files should have higher priority
-        assert manager.get_tool_priority("edit_files") > 1.0
+        # edit should have higher priority
+        assert manager.get_tool_priority("edit") > 1.0
         # Unknown tool should have default priority
         assert manager.get_tool_priority("unknown_tool") == 1.0
 

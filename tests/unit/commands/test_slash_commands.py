@@ -909,6 +909,30 @@ class TestModeCommands:
         assert meta.name == "explore"
         assert meta.category in ["mode", "system", "general"]
 
+    def test_mode_command_switches_canonical_controller_and_refreshes_prompt(self):
+        """Mode command should use the canonical AgentMode enum and refresh prompt."""
+        from victor.agent.mode_controller import AgentMode, AgentModeController
+        from victor.ui.slash.commands.mode import ModeCommand
+
+        console = Console(file=io.StringIO())
+        controller = AgentModeController()
+        agent = SimpleNamespace(
+            mode_controller=controller,
+            refresh_system_prompt=MagicMock(),
+        )
+        ctx = CommandContext(
+            console=console,
+            settings=MagicMock(),
+            agent=agent,
+            args=["plan"],
+        )
+
+        ModeCommand().execute(ctx)
+
+        assert controller.current_mode == AgentMode.PLAN
+        assert controller.config.name == "Plan"
+        agent.refresh_system_prompt.assert_called_once()
+
 
 # =============================================================================
 # MODEL COMMANDS TESTS

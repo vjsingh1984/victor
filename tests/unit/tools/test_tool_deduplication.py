@@ -57,7 +57,7 @@ class TestToolDeduplicationTracker:
         tracker.add_call("read_file", {"path": "foo.py"})
 
         assert len(tracker.recent_calls) == 1
-        assert tracker.recent_calls[0].tool_name == "read_file"
+        assert tracker.recent_calls[0].tool_name == "read"
         assert tracker.recent_calls[0].args == {"path": "foo.py"}
 
     def test_window_size_enforcement(self):
@@ -182,6 +182,15 @@ class TestFileRedundancy:
 
         assert is_dup is False
 
+    def test_canonical_and_alias_read_names_match(self):
+        """Canonical and legacy read names should dedupe together."""
+        tracker = ToolDeduplicationTracker()
+
+        tracker.add_call("read", {"path": "foo.py"})
+        is_dup = tracker.is_redundant("read_file", {"path": "foo.py"})
+
+        assert is_dup is True
+
     def test_file_path_parameter_variations(self):
         """Test different parameter names for file path."""
         tracker = ToolDeduplicationTracker()
@@ -225,6 +234,15 @@ class TestListRedundancy:
 
         tracker.add_call("list_directory", {})
         is_dup = tracker.is_redundant("list_directory", {})
+
+        assert is_dup is True
+
+    def test_canonical_and_alias_list_names_match(self):
+        """Canonical and legacy list names should dedupe together."""
+        tracker = ToolDeduplicationTracker()
+
+        tracker.add_call("ls", {"path": "."})
+        is_dup = tracker.is_redundant("list_directory", {"path": "."})
 
         assert is_dup is True
 

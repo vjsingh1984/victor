@@ -43,6 +43,7 @@ from victor.agent.streaming.iteration import (
     create_force_completion_result,
 )
 from victor.providers.base import StreamChunk
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
     from victor.agent.orchestrator import AgentOrchestrator
@@ -1167,7 +1168,9 @@ class StreamingChatHandler:
 
         # Generate preview chunks for successful write/edit operations
         if success:
-            if tool_name == "write_file" and tool_args.get("content"):
+            canonical_tool_name = canonicalize_core_tool_name(tool_name)
+
+            if canonical_tool_name == "write" and tool_args.get("content"):
                 preview_chunk = self.generate_file_preview_chunk(
                     tool_args["content"],
                     tool_args.get("path", ""),
@@ -1175,17 +1178,45 @@ class StreamingChatHandler:
                 if preview_chunk:
                     chunks.append(preview_chunk)
 
-            elif tool_name == "edit_files" and tool_args.get("files"):
-                files = tool_args.get("files", [])
-                for file_edit in files[:max_files]:
-                    path = file_edit.get("path", "")
-                    edits = file_edit.get("edits", [])
-                    for edit in edits[:max_edits_per_file]:
-                        old_str = edit.get("old_string", "")
-                        new_str = edit.get("new_string", "")
-                        edit_chunk = self.generate_edit_preview_chunk(old_str, new_str, path)
-                        if edit_chunk:
-                            chunks.append(edit_chunk)
+            elif canonical_tool_name == "edit":
+                ops = tool_args.get("ops", [])
+                if isinstance(ops, list) and ops:
+                    preview_count = 0
+                    for op in ops:
+                        if not isinstance(op, dict):
+                            continue
+                        op_type = op.get("type")
+                        path = op.get("path", "")
+                        if op_type == "replace":
+                            edit_chunk = self.generate_edit_preview_chunk(
+                                op.get("old_str", ""),
+                                op.get("new_str", ""),
+                                path,
+                            )
+                            if edit_chunk:
+                                chunks.append(edit_chunk)
+                                preview_count += 1
+                        elif op_type in {"create", "modify"} and op.get("content"):
+                            preview_chunk = self.generate_file_preview_chunk(
+                                op.get("content", ""),
+                                path,
+                            )
+                            if preview_chunk:
+                                chunks.append(preview_chunk)
+                                preview_count += 1
+                        if preview_count >= max_files * max_edits_per_file:
+                            break
+                elif tool_args.get("files"):
+                    files = tool_args.get("files", [])
+                    for file_edit in files[:max_files]:
+                        path = file_edit.get("path", "")
+                        edits = file_edit.get("edits", [])
+                        for edit in edits[:max_edits_per_file]:
+                            old_str = edit.get("old_string", "")
+                            new_str = edit.get("new_string", "")
+                            edit_chunk = self.generate_edit_preview_chunk(old_str, new_str, path)
+                            if edit_chunk:
+                                chunks.append(edit_chunk)
 
         return chunks
 

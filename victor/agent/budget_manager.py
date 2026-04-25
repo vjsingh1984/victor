@@ -73,6 +73,7 @@ from victor.agent.protocols import (
     IBudgetManager,
 )
 from victor.protocols.mode_aware import ModeAwareMixin
+from victor.tools.tool_names import get_canonical_name
 
 # Type alias for backward compatibility
 ModeCompletionCriteria = ModeCompletionChecker
@@ -468,8 +469,8 @@ class ExtendedBudgetManager(BudgetManager):
             True if budget was available
         """
         # Track file operations
-        tool_lower = tool_name.lower()
-        if tool_lower in {"read", "read_file"}:
+        tool_lower = get_canonical_name(tool_name.lower())
+        if tool_lower == "read":
             self.record_file_read()
         elif self._tool_classifier.is_write_operation(tool_name):
             self.record_file_write()

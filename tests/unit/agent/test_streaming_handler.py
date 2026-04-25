@@ -1273,7 +1273,7 @@ class TestGenerateToolResultChunks:
     def test_simple_success(self, handler):
         """Simple successful result generates one chunk."""
         result = {
-            "name": "read_file",
+            "name": "read",
             "elapsed": 0.5,
             "args": {"path": "/test.py"},
             "success": True,
@@ -1284,10 +1284,10 @@ class TestGenerateToolResultChunks:
         assert len(chunks) == 1
         assert chunks[0].metadata["tool_result"]["success"] is True
 
-    def test_write_file_with_preview(self, handler):
-        """write_file generates result and preview chunks."""
+    def test_write_with_preview(self, handler):
+        """Canonical write generates result and preview chunks."""
         result = {
-            "name": "write_file",
+            "name": "write",
             "elapsed": 0.3,
             "args": {"path": "/test.py", "content": "line1\nline2\nline3"},
             "success": True,
@@ -1296,23 +1296,28 @@ class TestGenerateToolResultChunks:
         chunks = handler.generate_tool_result_chunks(result)
 
         assert len(chunks) == 2
-        assert chunks[0].metadata["tool_result"]["name"] == "write_file"
+        assert chunks[0].metadata["tool_result"]["name"] == "write"
         assert "file_preview" in chunks[1].metadata
 
-    def test_edit_files_with_preview(self, handler):
-        """edit_files generates result and edit preview chunks."""
+    def test_edit_with_preview(self, handler):
+        """Canonical edit generates result and edit preview chunks."""
         result = {
-            "name": "edit_files",
+            "name": "edit",
             "elapsed": 0.4,
             "args": {
-                "files": [
+                "ops": [
                     {
+                        "type": "replace",
                         "path": "/test.py",
-                        "edits": [
-                            {"old_string": "old1", "new_string": "new1"},
-                            {"old_string": "old2", "new_string": "new2"},
-                        ],
-                    }
+                        "old_str": "old1",
+                        "new_str": "new1",
+                    },
+                    {
+                        "type": "replace",
+                        "path": "/test.py",
+                        "old_str": "old2",
+                        "new_str": "new2",
+                    },
                 ]
             },
             "success": True,
@@ -1321,7 +1326,7 @@ class TestGenerateToolResultChunks:
         chunks = handler.generate_tool_result_chunks(result)
 
         assert len(chunks) == 3  # 1 result + 2 edit previews
-        assert chunks[0].metadata["tool_result"]["name"] == "edit_files"
+        assert chunks[0].metadata["tool_result"]["name"] == "edit"
         assert "edit_preview" in chunks[1].metadata
         assert "edit_preview" in chunks[2].metadata
 

@@ -44,6 +44,8 @@ from typing import (
     Union,
 )
 
+from victor.tools.core_tool_aliases import canonicalize_core_tool_name
+
 if TYPE_CHECKING:
     from victor.agent.services.protocols.tool_service import ToolSelectionContext
 
@@ -1263,6 +1265,9 @@ class ToolService:
         Returns:
             Tuple of (is_valid, error_message)
         """
+        def _normalize_tools(tool_names: set[str]) -> set[str]:
+            return {canonicalize_core_tool_name(name) for name in tool_names}
+
         # Check required fields
         if not isinstance(tool_call, dict):
             return False, "Tool call must be a dictionary"
@@ -1271,12 +1276,64 @@ class ToolService:
         if not tool_name:
             return False, "Tool call missing 'name' field"
 
+        canonical_name = canonicalize_core_tool_name(self.resolve_tool_alias(str(tool_name)))
+
         # Check if tool is available
         if available_tools is None:
-            available_tools = self.get_available_tools()
+            available_tools = self.get_enabled_tools()
 
-        if tool_name not in available_tools:
-            return False, f"Tool '{tool_name}' is not available"
+        normalized_available = _normalize_tools(available_tools)
+
+        if canonical_name not in normalized_available:
+            registered_tools = _normalize_tools(self.get_available_tools())
+            available_preview = ", ".join(sorted(normalized_available)[:8]) or "(none)"
+
+            if canonical_name not in registered_tools:
+                return (
+                    False,
+                    f"Tool '{tool_name}' is not available because it is not registered. "
+                    f"Available tools: {available_preview}",
+                )
+
+            if self._mode_controller is not None:
+                mode_name = self._mode_controller.current_mode.value.upper()
+                sandbox_dir = getattr(self._mode_controller.config, "sandbox_dir", None)
+                if (
+                    canonical_name in {"edit", "write"}
+                    and not getattr(self._mode_controller.config, "allow_all_tools", False)
+                    and getattr(self._mode_controller.config, "allow_sandbox_edits", False)
+                    and sandbox_dir
+                ):
+                    return (
+                        False,
+                        f"Tool '{tool_name}' is not available because it resolves to "
+                        f"'{canonical_name}', which is limited to {sandbox_dir} in {mode_name} "
+                        f"mode. Available tools: {available_preview}",
+                    )
+                if not self._mode_controller.is_tool_allowed(canonical_name):
+                    return (
+                        False,
+                        f"Tool '{tool_name}' is not available because it resolves to "
+                        f"'{canonical_name}', which is not allowed in {mode_name} mode. "
+                        f"Available tools: {available_preview}",
+                    )
+
+            if self._enabled_tools is not None and canonical_name not in _normalize_tools(
+                self._enabled_tools
+            ):
+                return (
+                    False,
+                    f"Tool '{tool_name}' is not available because it resolves to "
+                    f"'{canonical_name}', which is not enabled for this session. "
+                    f"Available tools: {available_preview}",
+                )
+
+            return (
+                False,
+                f"Tool '{tool_name}' is not available because it resolves to "
+                f"'{canonical_name}', which is not enabled in the current runtime state. "
+                f"Available tools: {available_preview}",
+            )
 
         # Check arguments field
         arguments = tool_call.get("arguments", {})

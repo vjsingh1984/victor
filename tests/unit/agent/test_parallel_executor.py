@@ -33,15 +33,15 @@ class TestToolCategories:
 
     def test_read_tools_categorized(self):
         """Test that read-only tools are properly categorized."""
-        assert TOOL_CATEGORIES.get("read_file") == ToolCategory.READ_ONLY
-        assert TOOL_CATEGORIES.get("list_directory") == ToolCategory.READ_ONLY
+        assert TOOL_CATEGORIES.get("read") == ToolCategory.READ_ONLY
+        assert TOOL_CATEGORIES.get("ls") == ToolCategory.READ_ONLY
         assert TOOL_CATEGORIES.get("code_search") == ToolCategory.READ_ONLY
 
     def test_write_tools_categorized(self):
         """Test that write tools are properly categorized."""
-        assert TOOL_CATEGORIES.get("write_file") == ToolCategory.WRITE
-        assert TOOL_CATEGORIES.get("edit_files") == ToolCategory.WRITE
-        assert TOOL_CATEGORIES.get("execute_bash") == ToolCategory.WRITE
+        assert TOOL_CATEGORIES.get("write") == ToolCategory.WRITE
+        assert TOOL_CATEGORIES.get("edit") == ToolCategory.WRITE
+        assert TOOL_CATEGORIES.get("shell") == ToolCategory.WRITE
 
     def test_network_tools_categorized(self):
         """Test that network tools are properly categorized."""
@@ -90,8 +90,14 @@ class TestParallelToolExecutor:
     def test_get_category_known_tool(self):
         """Test category lookup for known tools."""
         executor = ParallelToolExecutor(self.mock_tool_executor)
+        assert executor._get_category("read") == ToolCategory.READ_ONLY
+        assert executor._get_category("write") == ToolCategory.WRITE
+
+    def test_get_category_alias_tool(self):
+        """Legacy aliases should still resolve to canonical categories."""
+        executor = ParallelToolExecutor(self.mock_tool_executor)
         assert executor._get_category("read_file") == ToolCategory.READ_ONLY
-        assert executor._get_category("write_file") == ToolCategory.WRITE
+        assert executor._get_category("execute_bash") == ToolCategory.WRITE
 
     def test_get_category_unknown_tool(self):
         """Test category defaults to COMPUTE for unknown tools."""
