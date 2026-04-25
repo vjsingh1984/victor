@@ -521,6 +521,70 @@ async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> N
 
 
 @pytest.mark.asyncio
+async def test_code_search_strips_whitespace_before_filename_auto_detection(tmp_path) -> None:
+    """Whitespace-padded filename queries should still route to filename search."""
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/parser.py", "score": 10, "snippet": "[File found: src/parser.py]"}],
+        "count": 1,
+        "mode": "filename",
+    }
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="  parser.py  ",
+            path=str(tmp_path),
+            k=3,
+            mode="semantic",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with(
+        "parser.py",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=True,
+    )
+    get_index.assert_not_awaited()
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_code_search_rejects_blank_query_before_searching(tmp_path) -> None:
+    """Blank queries should fail fast instead of matching arbitrary files or content."""
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(),
+    ) as literal_search:
+        result = await code_search(
+            query="   ",
+            path=str(tmp_path),
+            k=3,
+            mode="filename",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    get_index.assert_not_awaited()
+    literal_search.assert_not_awaited()
+    assert result == {
+        "success": False,
+        "error": "Search query cannot be empty.",
+    }
+
+
+@pytest.mark.asyncio
 async def test_literal_search_filename_only_does_not_fall_back_to_content_on_miss(tmp_path) -> None:
     """Filename-only searches should not degrade into content matches on a miss."""
 

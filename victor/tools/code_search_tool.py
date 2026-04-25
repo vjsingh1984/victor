@@ -1820,6 +1820,13 @@ async def code_search(
     - "localize": File-level issue localization using semantic seeds plus graph expansion.
     - "impact": Change-impact / blast-radius analysis using graph expansion when available.
     """
+    query = query.strip()
+    if not query:
+        return {
+            "success": False,
+            "error": "Search query cannot be empty.",
+        }
+
     requested_mode = mode
     literal_escalation_metadata: Dict[str, Any] = {}
     mode_fallback_to_semantic = False
