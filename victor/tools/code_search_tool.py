@@ -1665,6 +1665,7 @@ async def _literal_search(
             system = platform.system()
             normalized_filename_query = search_query.replace("\\", "/").lstrip("./")
             query_has_path_components = "/" in normalized_filename_query
+            query_has_glob = any(token in normalized_filename_query for token in "*?[]")
             query_suffix = normalized_filename_query.lower()
             filename_filter_pattern = file_pattern
             if filename_filter_pattern is None and _looks_like_filename_query(search_query):
@@ -1701,7 +1702,7 @@ async def _literal_search(
                     "obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")}
                 )
                 found_files = [f.strip() for f in find_result.stdout.splitlines() if f.strip()]
-                if query_has_path_components:
+                if query_has_path_components and not query_has_glob:
                     found_files = [
                         fpath
                         for fpath in found_files
