@@ -557,7 +557,9 @@ class OrchestratorFactory(
         from victor.agent.optimization_injector import OptimizationInjector
         from victor.agent.prompt_pipeline import UnifiedPromptPipeline
         from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
-        from victor.evaluation.runtime_feedback import runtime_evaluation_feedback_scope_from_context
+        from victor.evaluation.runtime_feedback import (
+            runtime_evaluation_feedback_scope_from_context,
+        )
 
         optimizer = OptimizationInjector()
         registry = create_default_registry()

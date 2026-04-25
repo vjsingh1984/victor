@@ -396,9 +396,11 @@ def build_swe_bench_validated_session_feedback_payload(
     pass_to_pass_score = (
         float(getattr(score, "pass_to_pass_score", 1.0) or 1.0)
         if score is not None
-        else 1.0 - (len(broken_tests) / max(1, total_pass_to_pass))
-        if total_pass_to_pass > 0
-        else 1.0
+        else (
+            1.0 - (len(broken_tests) / max(1, total_pass_to_pass))
+            if total_pass_to_pass > 0
+            else 1.0
+        )
     )
     overall_score = (
         float(getattr(score, "overall_score", getattr(validation_result, "score", 0.0)) or 0.0)
@@ -411,10 +413,7 @@ def build_swe_bench_validated_session_feedback_payload(
     regression_rate = len(broken_tests) / max(1, total_pass_to_pass)
 
     completion_threshold = _clamp(
-        0.72
-        + (unresolved_gap * 0.16)
-        + (regression_rate * 0.12)
-        - (0.05 if resolved else 0.0),
+        0.72 + (unresolved_gap * 0.16) + (regression_rate * 0.12) - (0.05 if resolved else 0.0),
         0.58,
         0.92,
     )
@@ -558,8 +557,10 @@ def _build_coverage_validated_session_feedback_payload(
     primary_coverage = _coerce_float(failure_details.get(primary_coverage_key))
     secondary_coverage = _coerce_float(failure_details.get(secondary_coverage_key))
 
-    if primary_coverage is None and secondary_coverage is None and (
-        completion_score is None or completion_score <= 0.0
+    if (
+        primary_coverage is None
+        and secondary_coverage is None
+        and (completion_score is None or completion_score <= 0.0)
     ):
         return None
 
@@ -632,7 +633,9 @@ def _build_coverage_validated_session_feedback_payload(
     dataset_metadata = _extract_value(evaluation_result, "dataset_metadata")
     if not isinstance(dataset_metadata, Mapping):
         dataset_metadata = {}
-    benchmark = _coerce_optional_text(_extract_value(evaluation_result, "benchmark")) or benchmark_default
+    benchmark = (
+        _coerce_optional_text(_extract_value(evaluation_result, "benchmark")) or benchmark_default
+    )
     provider = _coerce_optional_text(_extract_value(evaluation_result, "provider"))
     model = _coerce_optional_text(_extract_value(evaluation_result, "model"))
     project = _coerce_optional_text(_extract_value(evaluation_result, "project"))
@@ -920,7 +923,9 @@ def _feedback_weight(
     coverage_weight = min(3.0, 0.75 + (math.sqrt(task_count) / 4.0))
     trust_weight = _source_trust_weight(metadata.get("source"))
     scope_weight = _scope_similarity_weight(metadata.get("scope"), target_scope)
-    return max(0.05, recency_weight * truth_alignment * coverage_weight * trust_weight * scope_weight)
+    return max(
+        0.05, recency_weight * truth_alignment * coverage_weight * trust_weight * scope_weight
+    )
 
 
 def _select_metadata(values: list[Any], *, fallback: Any = None) -> Any:
