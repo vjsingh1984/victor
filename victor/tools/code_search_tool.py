@@ -441,6 +441,50 @@ def _cache_entry_matches_manifest(
     return isinstance(cached_manifest, dict) and cached_manifest == index_manifest
 
 
+def _build_index_failure_key(root: Path, index_manifest: Dict[str, Any]) -> str:
+    """Build a manifest-scoped failure cache key for code_search indexes."""
+
+    import hashlib
+    import json
+
+    root_hash = hashlib.md5(str(root).encode()).hexdigest()
+    manifest_hash = hashlib.md5(
+        json.dumps(index_manifest, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    return f"{root_hash}:{manifest_hash}_build_failure"
+
+
+def _failure_cache_get(failure_cache: Any, key: str) -> Any:
+    """Get a failure entry from either a namespace cache or a plain dict."""
+
+    getter = getattr(failure_cache, "get", None)
+    if callable(getter):
+        return getter(key)
+    return None
+
+
+def _failure_cache_set(failure_cache: Any, key: str, value: Any) -> None:
+    """Set a failure entry on either a namespace cache or a plain dict."""
+
+    setter = getattr(failure_cache, "set", None)
+    if callable(setter):
+        setter(key, value)
+        return
+    if isinstance(failure_cache, dict):
+        failure_cache[key] = value
+
+
+def _failure_cache_delete(failure_cache: Any, key: str) -> None:
+    """Delete a failure entry from either a namespace cache or a plain dict."""
+
+    deleter = getattr(failure_cache, "delete", None)
+    if callable(deleter):
+        deleter(key)
+        return
+    if isinstance(failure_cache, dict):
+        failure_cache.pop(key, None)
+
+
 # Directories that indicate non-core code (lower importance)
 NON_CORE_DIRS = {
     "test",
@@ -1001,6 +1045,9 @@ async def _get_or_build_index(
             # Re-raise with enhanced message
             raise
 
+    embedding_config = _build_codebase_embedding_config(settings, root)
+    index_manifest = build_codebase_index_manifest(embedding_config)
+
     # Get cache using DI-aware accessor
     index_cache = _get_index_cache(exec_ctx)
 
@@ -1023,12 +1070,8 @@ async def _get_or_build_index(
 
     # Check for recent build failures before attempting build
     if failure_cache and not force_reindex:
-        import hashlib
-
-        root_hash = hashlib.md5(str(root).encode()).hexdigest()
-        failure_key = f"{root_hash}_build_failure"
-
-        failure_entry = failure_cache.get(failure_key)
+        failure_key = _build_index_failure_key(root, index_manifest)
+        failure_entry = _failure_cache_get(failure_cache, failure_key)
         if failure_entry:
             # Check if failure entry is still valid (hasn't expired)
             if hasattr(failure_entry, "is_expired") and not failure_entry.is_expired():
@@ -1048,9 +1091,6 @@ async def _get_or_build_index(
                     f"Semantic index build recently failed: {failure_entry.get('error', 'Unknown error')}\n"
                     f"Use reindex=True to retry, or mode='literal' for keyword search."
                 )
-
-    embedding_config = _build_codebase_embedding_config(settings, root)
-    index_manifest = build_codebase_index_manifest(embedding_config)
 
     cache_entry = index_cache.get(str(root))
     cached_index = cache_entry["index"] if cache_entry else None
@@ -1179,10 +1219,7 @@ async def _get_or_build_index(
 
     # Clear failure cache on successful build
     try:
-        import hashlib
-
-        root_hash = hashlib.md5(str(root).encode()).hexdigest()
-        failure_key = f"{root_hash}_build_failure"
+        failure_key = _build_index_failure_key(root, index_manifest)
 
         # Get failure cache (same logic as above)
         failure_cache = None
@@ -1199,8 +1236,8 @@ async def _get_or_build_index(
                 _get_or_build_index._failure_cache = {}
             failure_cache = _get_or_build_index._failure_cache
 
-        if failure_cache and failure_cache.get(failure_key):
-            failure_cache.delete(failure_key)
+        if failure_cache and _failure_cache_get(failure_cache, failure_key):
+            _failure_cache_delete(failure_cache, failure_key)
             logger.info("[code_search] Cleared index build failure cache after successful build")
     except Exception as cache_err:
         logger.debug(f"[code_search] Failed to clear index build failure cache: {cache_err}")
@@ -1710,10 +1747,10 @@ async def code_search(
 
             # Cache the failure for 1 hour to prevent repeated attempts
             try:
-                import hashlib
-
-                root_hash = hashlib.md5(str(root_path).encode()).hexdigest()
-                failure_key = f"{root_hash}_build_failure"
+                failure_key = _build_index_failure_key(
+                    root_path,
+                    build_codebase_index_manifest(_build_codebase_embedding_config(settings, root_path)),
+                )
 
                 # Get failure cache (same logic as in _get_or_build_index)
                 failure_cache = None
@@ -1737,7 +1774,7 @@ async def code_search(
                         value={"error": error_msg, "timestamp": time.time()},
                         ttl=3600,  # 1 hour
                     )
-                    failure_cache.set(failure_key, failure_entry)
+                    _failure_cache_set(failure_cache, failure_key, failure_entry)
                     logger.info("[code_search] Cached index build failure for 1 hour")
             except Exception as cache_err:
                 logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
