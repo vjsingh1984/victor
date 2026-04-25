@@ -55,8 +55,8 @@ Planned slices:
 | Slice | Status | TDD plan | Notes |
 |---|---|---|---|
 | 2.1 Search-first coding fallback hints | Done | Added prompt-pipeline tests first | Prompt completeness guard now injects search-first guidance for symbol-scoped requests without file paths |
-| 2.2 Richer retrieval diagnosis classes | Not started | Add workflow decision tests | Build on `victor-rag` repair flow |
-| 2.3 Utility-aware retrieval ranking | Not started | Add retrieval-ranking tests | Use existing retrieval utility stage as insertion point |
+| 2.2 Richer retrieval diagnosis classes | Done | Added workflow decision tests first | `victor-rag` now classifies repair gaps explicitly and routes repair vs revise vs clarify through a stable vocabulary |
+| 2.3 Utility-aware retrieval ranking | Done | Added retrieval-ranking tests first | Replaced the inline utility script with a named `victor-rag` transform that scores authority, diversity, and redundancy and reranks results boundedly |
 
 ## Phase 3: Context Budget and Prompt Compression
 
@@ -67,7 +67,7 @@ Planned slices:
 
 | Slice | Status | TDD plan | Notes |
 |---|---|---|---|
-| 3.1 Prompt-section measurement hooks | Not started | Add allocator metrics tests | Build on `PromptSectionBudgetAllocator` |
+| 3.1 Prompt-section measurement hooks | Done | Added allocator metrics tests first | `PromptSectionBudgetAllocator` now records observed token costs and can budget against measured section sizes when available |
 | 3.2 Dictionary compression for repeated tool/prompt boilerplate | Not started | Add round-trip compression tests | Must be lossless |
 | 3.3 Safe default-on preview pruning for read-only tools | Not started | Add tool-executor pruning tests | Preserve full LLM context until explicitly changed |
 
@@ -110,3 +110,6 @@ Planned slices:
 | 2026-04-25 | Plan created. Phase 1 selected as first implementation target. |
 | 2026-04-25 | Phase 1 completed via TDD: benchmark state persistence, benchmark result recording, promotion, rollback, and recommendation gating preference implemented in `PromptOptimizerLearner`. |
 | 2026-04-25 | Phase 2.1 completed via TDD: prompt completeness guard now emits search-first guidance for symbol-scoped requests without explicit file paths. |
+| 2026-04-25 | Phase 2.2 completed via TDD in `victor-rag`: retrieval gaps are now explicitly classified and repair policy routes between retrieval repair, answer revision, and clarification accordingly. |
+| 2026-04-25 | Phase 2.3 completed via TDD in `victor-rag`: retrieval utility scoring moved to a named escape hatch that emits richer metrics and applies bounded authority/diversity-aware reranking. |
+| 2026-04-25 | Phase 3.1 completed via TDD in `codingagent`: prompt section budgeting now records rolling token-cost measurements and uses them to improve future section selection under budget constraints. |
