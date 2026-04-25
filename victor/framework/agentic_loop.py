@@ -78,6 +78,7 @@ from victor.framework.fulfillment import FulfillmentDetector, TaskType
 from victor.framework.perception_integration import Perception, PerceptionIntegration
 from victor.framework.capabilities.task_hints import TaskTypeHintCapabilityProvider
 from victor.agent.paradigm_router import ParadigmRouter, get_paradigm_router
+from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.framework.enhanced_completion_evaluation import EnhancedCompletionEvaluator
 
 logger = logging.getLogger(__name__)
@@ -1280,20 +1281,15 @@ class AgenticLoop:
         completion detection with multi-signal fusion for more accurate
         and earlier stopping when task requirements are satisfied.
         """
-        if getattr(perception, "needs_clarification", False):
-            clarification_reason = getattr(
-                perception,
-                "clarification_reason",
-                None,
-            ) or "task details are incomplete"
-            clarification_prompt = getattr(perception, "clarification_prompt", None)
+        clarification = RuntimeIntelligenceService.get_clarification_decision(perception)
+        if clarification.requires_clarification:
             return EvaluationResult(
                 decision=EvaluationDecision.FAIL,
-                score=float(getattr(perception, "confidence", 0.0)),
-                reason=f"Clarification required: {clarification_reason}",
+                score=clarification.confidence,
+                reason=f"Clarification required: {clarification.reason}",
                 metadata={
                     "requires_clarification": True,
-                    "clarification_prompt": clarification_prompt,
+                    "clarification_prompt": clarification.prompt,
                 },
             )
 

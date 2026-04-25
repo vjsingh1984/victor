@@ -163,6 +163,41 @@ async def test_pipeline_returns_targeted_clarification_before_provider_call():
 
 
 @pytest.mark.asyncio
+async def test_pipeline_uses_runtime_clarification_policy_default_prompt():
+    coordinator = DummyCoordinator(limit_result=(False, None))
+    coordinator._stream_provider_response = AsyncMock(
+        return_value=("assistant notes", None, None, False)
+    )
+    runtime_intelligence = SimpleNamespace(
+        reset_decision_budget=MagicMock(),
+        analyze_turn=AsyncMock(
+            return_value=SimpleNamespace(
+                perception=SimpleNamespace(
+                    needs_clarification=True,
+                    clarification_prompt=None,
+                    clarification_reason="target artifact or scope is underspecified",
+                    confidence=0.3,
+                    intent="write_allowed",
+                    complexity="medium",
+                )
+            )
+        ),
+    )
+
+    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+
+    chunks = []
+    async for chunk in pipeline.run("Fix it and add tests."):
+        chunks.append(chunk)
+
+    assert [chunk.content for chunk in chunks] == [
+        "Please clarify the target file, component, or bug before I continue."
+    ]
+    assert chunks[0].is_final is True
+    coordinator._stream_provider_response.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_pipeline_uses_runtime_intelligence_for_budget_reset_and_analysis():
     cancel_chunk = StreamChunk(content="", is_final=True)
     coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])

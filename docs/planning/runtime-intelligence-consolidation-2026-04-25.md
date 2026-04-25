@@ -75,6 +75,8 @@ Phase 3:
 
 Phase 4:
 - Collapse remaining duplicated low-confidence / retry / clarification policies into typed runtime policies behind the same subsystem.
+  - 4.1 Clarification policy normalization
+  - 4.2 Low-confidence retry-budget policy normalization
 
 ## First Implementation Slice
 
@@ -128,7 +130,10 @@ Completed on 2026-04-25:
   - `tool_selection.py`
   - `agent/factory/tool_builders.py`
   - `service_provider.py` tool-selector construction path
+- Phase 4.1 clarification-policy normalization:
+  - `RuntimeIntelligenceService` now exposes a typed clarification decision
+  - `StreamingChatPipeline` and `AgenticLoop` now consume the same canonical clarification prompt policy
 
 Next recommended slice:
-- Phase 4: collapse remaining duplicated low-confidence / retry / clarification policies
-  into typed runtime policies behind `RuntimeIntelligenceService`
+- Phase 4.2: normalize low-confidence retry-budget policy behind
+  `RuntimeIntelligenceService`

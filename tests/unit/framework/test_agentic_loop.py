@@ -375,6 +375,26 @@ class TestEvaluate:
             == "Which file, component, or bug should I target first?"
         )
 
+    async def test_evaluate_requires_clarification_uses_default_prompt_when_missing(self):
+        loop = AgenticLoop(
+            orchestrator=MagicMock(),
+            enable_fulfillment_check=False,
+        )
+        perception = _make_perception()
+        perception.confidence = 0.28
+        perception.needs_clarification = True
+        perception.clarification_reason = "target artifact or scope is underspecified"
+        perception.clarification_prompt = None
+
+        result = await loop._evaluate(perception, {}, {})
+
+        assert result.decision == EvaluationDecision.FAIL
+        assert result.metadata["requires_clarification"] is True
+        assert (
+            result.metadata["clarification_prompt"]
+            == "Please clarify the target file, component, or bug before I continue."
+        )
+
     async def test_evaluate_fails_after_low_confidence_retry_budget_exhausted(self):
         loop = AgenticLoop(
             orchestrator=MagicMock(),

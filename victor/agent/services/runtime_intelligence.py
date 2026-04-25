@@ -49,6 +49,16 @@ class RuntimeIntelligenceSnapshot:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ClarificationDecision:
+    """Typed clarification policy outcome for a perception result."""
+
+    requires_clarification: bool = False
+    reason: Optional[str] = None
+    prompt: Optional[str] = None
+    confidence: float = 0.0
+
+
 class RuntimeIntelligenceService:
     """Service-first boundary for runtime task intelligence."""
 
@@ -231,6 +241,31 @@ class RuntimeIntelligenceService:
                     exc,
                 )
         return {"task_type": "default", "confidence": 0.0}
+
+    @staticmethod
+    def get_clarification_decision(
+        perception: Optional[Any],
+        *,
+        default_prompt: str = (
+            "Please clarify the target file, component, or bug before I continue."
+        ),
+    ) -> ClarificationDecision:
+        """Normalize clarification policy into one typed runtime decision."""
+        if not getattr(perception, "needs_clarification", False):
+            return ClarificationDecision(
+                requires_clarification=False,
+                confidence=float(getattr(perception, "confidence", 0.0) or 0.0),
+            )
+
+        reason = getattr(perception, "clarification_reason", None) or "task details are incomplete"
+        prompt = getattr(perception, "clarification_prompt", None) or default_prompt
+        confidence = float(getattr(perception, "confidence", 0.0) or 0.0)
+        return ClarificationDecision(
+            requires_clarification=True,
+            reason=reason,
+            prompt=prompt,
+            confidence=confidence,
+        )
 
     def get_prompt_optimization_bundle(
         self,

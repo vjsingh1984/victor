@@ -7,6 +7,7 @@ import logging
 import re
 from typing import Any, AsyncIterator, List, Optional
 
+from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 from victor.agent.services.protocols.streaming_runtime import StreamingPipelineRuntimeProtocol
 from victor.core.completion_markers import FILE_DONE_MARKER
 from victor.providers.base import StreamChunk
@@ -240,14 +241,13 @@ class StreamingChatPipeline:
                         getattr(_perception, "complexity", "unknown"),
                         getattr(_perception, "confidence", 0.0),
                     )
-                    if getattr(_perception, "needs_clarification", False):
-                        clarification_prompt = getattr(
-                            _perception,
-                            "clarification_prompt",
-                            None,
-                        ) or "Please clarify the target file, component, or bug before I continue."
+                    clarification = RuntimeIntelligenceService.get_clarification_decision(
+                        _perception
+                    )
+                    if clarification.requires_clarification:
                         yield orch._chunk_generator.generate_content_chunk(
-                            clarification_prompt,
+                            clarification.prompt
+                            or "Please clarify the target file, component, or bug before I continue.",
                             is_final=True,
                         )
                         return
@@ -271,14 +271,13 @@ class StreamingChatPipeline:
                         getattr(_perception, "complexity", "unknown"),
                         getattr(_perception, "confidence", 0.0),
                     )
-                    if getattr(_perception, "needs_clarification", False):
-                        clarification_prompt = getattr(
-                            _perception,
-                            "clarification_prompt",
-                            None,
-                        ) or "Please clarify the target file, component, or bug before I continue."
+                    clarification = RuntimeIntelligenceService.get_clarification_decision(
+                        _perception
+                    )
+                    if clarification.requires_clarification:
                         yield orch._chunk_generator.generate_content_chunk(
-                            clarification_prompt,
+                            clarification.prompt
+                            or "Please clarify the target file, component, or bug before I continue.",
                             is_final=True,
                         )
                         return

@@ -5,6 +5,7 @@ import pytest
 
 from victor.agent.decisions.schemas import DecisionType
 from victor.agent.services.runtime_intelligence import (
+    ClarificationDecision,
     PromptOptimizationBundle,
     RuntimeIntelligenceService,
 )
@@ -104,4 +105,22 @@ def test_decide_sync_delegates_to_decision_service():
         DecisionType.TASK_COMPLETION,
         {"response_tail": "done"},
         heuristic_confidence=0.4,
+    )
+
+
+def test_get_clarification_decision_uses_default_prompt_when_missing():
+    perception = SimpleNamespace(
+        needs_clarification=True,
+        clarification_reason="target artifact or scope is underspecified",
+        clarification_prompt=None,
+        confidence=0.31,
+    )
+
+    decision = RuntimeIntelligenceService.get_clarification_decision(perception)
+
+    assert decision == ClarificationDecision(
+        requires_clarification=True,
+        reason="target artifact or scope is underspecified",
+        prompt="Please clarify the target file, component, or bug before I continue.",
+        confidence=0.31,
     )
