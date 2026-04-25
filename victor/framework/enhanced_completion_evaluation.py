@@ -534,8 +534,8 @@ class EnhancedCompletionEvaluator:
             from victor.agent.action_authorizer import ActionIntent
 
             intent_to_type = {
-                ActionIntent.TOOL_USE: TaskType.CODE_GENERATION,
-                ActionIntent.MODIFICATION: TaskType.CODE_GENERATION,
+                ActionIntent.WRITE_ALLOWED: TaskType.CODE_GENERATION,
+                ActionIntent.AMBIGUOUS: TaskType.CODE_GENERATION,
                 ActionIntent.DISPLAY_ONLY: TaskType.SEARCH,
                 ActionIntent.READ_ONLY: TaskType.ANALYSIS,
             }

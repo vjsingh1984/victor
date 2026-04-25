@@ -364,6 +364,7 @@ class AgenticLoop:
         orchestrator: Optional[Any] = None,  # PlanningContextProtocol
         turn_executor: Optional["TurnExecutor"] = None,
         memory_coordinator: Optional["UnifiedMemoryCoordinator"] = None,
+        runtime_intelligence: Optional[Any] = None,
         max_iterations: int = 10,
         enable_fulfillment_check: bool = True,
         enable_adaptive_iterations: bool = True,
@@ -380,6 +381,7 @@ class AgenticLoop:
                 (one LLM call per iteration). If None, falls back to
                 orchestrator.chat() (which runs its own multi-turn loop).
             memory_coordinator: Optional unified memory for context retrieval
+            runtime_intelligence: Optional canonical runtime-intelligence service
             max_iterations: Maximum loop iterations (can be adapted at runtime)
             enable_fulfillment_check: Whether to check task fulfillment
             enable_adaptive_iterations: Allow early exit on plateau / extension
@@ -406,10 +408,17 @@ class AgenticLoop:
         self.nudge_policy = NudgePolicy()
         self.criteria_builder = FulfillmentCriteriaBuilder()
 
-        # Initialize components
-        self.perception = PerceptionIntegration(
-            memory_coordinator=memory_coordinator,
-        )
+        # Initialize canonical runtime intelligence boundary
+        if runtime_intelligence is None:
+            from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+
+            runtime_intelligence = RuntimeIntelligenceService(
+                perception_integration=PerceptionIntegration(
+                    memory_coordinator=memory_coordinator,
+                )
+            )
+        self.runtime_intelligence = runtime_intelligence
+        self.perception = self.runtime_intelligence.perception_integration
 
         self.fulfillment = FulfillmentDetector() if enable_fulfillment_check else None
 
@@ -456,6 +465,22 @@ class AgenticLoop:
             f"adaptive={enable_adaptive_iterations}, "
             f"fulfillment={enable_fulfillment_check})"
         )
+
+    async def _analyze_turn(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+    ) -> Perception:
+        """Analyze a turn through the canonical runtime-intelligence service."""
+        snapshot = await self.runtime_intelligence.analyze_turn(
+            query,
+            context=context,
+            conversation_history=conversation_history,
+        )
+        if snapshot.perception is not None:
+            return snapshot.perception
+        raise RuntimeError("Runtime intelligence did not produce a perception snapshot")
 
     async def run(
         self,
@@ -590,7 +615,7 @@ class AgenticLoop:
 
                 # PERCEIVE
                 logger.info(f"[Iteration {i}/{effective_max}] PERCEIVE")
-                perception = await self.perception.perceive(query, context, conversation_history)
+                perception = await self._analyze_turn(query, context, conversation_history)
                 iteration.perception = perception
                 self._last_perception = perception  # Cache for next iteration check
 
@@ -844,7 +869,7 @@ class AgenticLoop:
             iteration = LoopIteration(iteration=i, stage=LoopStage.PERCEIVE)
 
             # PERCEIVE
-            perception = await self.perception.perceive(query, context)
+            perception = await self._analyze_turn(query, context)
             iteration.perception = perception
             state["perception"] = perception.to_dict()
             yield iteration
@@ -903,7 +928,7 @@ class AgenticLoop:
         self.criteria_builder.reset()
 
         # PERCEIVE (before streaming — understands task before LLM call)
-        perception = await self.perception.perceive(query, context)
+        perception = await self._analyze_turn(query, context)
         logger.info(
             f"[stream] Perceived: intent={perception.intent.value}, "
             f"complexity={perception.complexity.value}, "
@@ -1273,7 +1298,9 @@ class AgenticLoop:
             )
 
         # ENHANCED: Use EnhancedCompletionEvaluator if enabled
-        if self.enhanced_completion_evaluator is not None:
+        if self.enhanced_completion_evaluator is not None and self._should_use_enhanced_evaluation(
+            action_result
+        ):
             try:
                 enhanced_result = await self.enhanced_completion_evaluator.evaluate(
                     perception=perception,
@@ -1529,12 +1556,28 @@ class AgenticLoop:
             score=evaluation.score,
             reason=evaluation.reason,
             metrics=dict(evaluation.metrics),
-            metadata={
-                **dict(evaluation.metadata),
-                "low_confidence_retries": retry_count,
-                "low_confidence_retry_limit": retry_limit,
-            },
-        )
+                metadata={
+                    **dict(evaluation.metadata),
+                    "low_confidence_retries": retry_count,
+                    "low_confidence_retry_limit": retry_limit,
+                },
+            )
+
+    def _should_use_enhanced_evaluation(self, action_result: Any) -> bool:
+        """Only run enhanced evaluation when there is a real execution payload."""
+        try:
+            from victor.agent.services.turn_execution_runtime import TurnResult
+
+            if isinstance(action_result, TurnResult):
+                return True
+        except Exception:
+            pass
+
+        if action_result is None:
+            return False
+        if isinstance(action_result, str):
+            return bool(action_result.strip())
+        return hasattr(action_result, "response") or hasattr(action_result, "content")
 
     async def _check_fulfillment(
         self,

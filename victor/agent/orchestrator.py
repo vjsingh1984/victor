@@ -1025,13 +1025,20 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             from victor.agent.content_registry import create_default_registry
             from victor.agent.optimization_injector import OptimizationInjector
             from victor.agent.prompt_pipeline import UnifiedPromptPipeline
+            from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 
             self._optimization_injector = OptimizationInjector()
+            self._runtime_intelligence = RuntimeIntelligenceService.from_orchestrator(
+                self,
+                task_analyzer=get_task_analyzer(),
+                optimization_injector=self._optimization_injector,
+            )
             self._prompt_pipeline = UnifiedPromptPipeline(
                 provider=self.provider,
                 builder=self.prompt_builder,
                 registry=create_default_registry(),
                 optimizer=self._optimization_injector,
+                runtime_intelligence=self._runtime_intelligence,
                 get_context_window=self._get_model_context_window,
             )
             # Backward compat alias — old code referencing _prompt_composer
@@ -1039,6 +1046,7 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
         except Exception as e:
             logger.debug("UnifiedPromptPipeline unavailable: %s", e)
             self._optimization_injector = None
+            self._runtime_intelligence = None
             self._prompt_pipeline = None
             self._prompt_composer = None
 

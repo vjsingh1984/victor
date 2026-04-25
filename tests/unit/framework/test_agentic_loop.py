@@ -186,6 +186,25 @@ class TestAgenticLoop:
         )
         assert result.final_state.get("project") == "myapp"
 
+    async def test_run_uses_runtime_intelligence_snapshot(self):
+        """Loop should consume the canonical runtime intelligence service when provided."""
+        perception = _make_perception()
+        perception.confidence = 0.9
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.analyze_turn = AsyncMock(
+            return_value=MagicMock(perception=perception, task_analysis=perception.task_analysis)
+        )
+        loop = self._make_loop(
+            orchestrator=MagicMock(spec=[]),
+            max_iterations=1,
+            runtime_intelligence=runtime_intelligence,
+        )
+
+        result = await loop.run("Fix the bug")
+
+        assert result.success is True
+        runtime_intelligence.analyze_turn.assert_awaited_once()
+
     async def test_determine_success_complete(self):
         """Success determined by last evaluation."""
         loop = self._make_loop()

@@ -41,7 +41,12 @@ def test_service_streaming_runtime_caches_pipeline(monkeypatch):
     second = runtime.get_pipeline()
 
     assert first is second
-    assert created == [(runtime, {"perception": None, "fulfillment": None})]
+    assert len(created) == 1
+    owner, kwargs = created[0]
+    assert owner is runtime
+    assert kwargs["perception"] is None
+    assert kwargs["fulfillment"] is None
+    assert kwargs["runtime_intelligence"] is orch._runtime_intelligence
 
 
 @pytest.mark.asyncio

@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -160,6 +160,36 @@ async def test_pipeline_returns_targeted_clarification_before_provider_call():
     assert chunks[0].is_final is True
     assert coordinator._stream_ctx.perception.needs_clarification is True
     coordinator._stream_provider_response.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_uses_runtime_intelligence_for_budget_reset_and_analysis():
+    cancel_chunk = StreamChunk(content="", is_final=True)
+    coordinator = DummyCoordinator(pre_chunks=[cancel_chunk])
+    runtime_intelligence = SimpleNamespace(
+        reset_decision_budget=MagicMock(),
+        analyze_turn=AsyncMock(
+            return_value=SimpleNamespace(
+                perception=SimpleNamespace(
+                    needs_clarification=False,
+                    confidence=0.7,
+                    intent="write_allowed",
+                    complexity="medium",
+                )
+            )
+        ),
+    )
+
+    pipeline = StreamingChatPipeline(coordinator, runtime_intelligence=runtime_intelligence)
+
+    chunks = []
+    async for chunk in pipeline.run("hello"):
+        chunks.append(chunk)
+
+    assert chunks == [cancel_chunk]
+    runtime_intelligence.reset_decision_budget.assert_called_once_with()
+    runtime_intelligence.analyze_turn.assert_awaited_once()
+    assert coordinator._stream_ctx.perception.confidence == 0.7
 
 
 @pytest.mark.asyncio

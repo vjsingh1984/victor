@@ -62,6 +62,7 @@ def _make_pipeline(**kwargs):
         "registry": _make_registry(),
         "optimizer": None,
         "task_analyzer": None,
+        "runtime_intelligence": None,
         "get_context_window": lambda: 128000,
         "session_id": "test-session",
     }
@@ -207,6 +208,27 @@ class TestComposeTurnPrefix:
 
         prefix = pipeline.compose_turn_prefix("Try again", ctx)
         assert "Check file path" in prefix
+
+    def test_runtime_intelligence_supplies_prompt_optimizations(self):
+        """Canonical runtime intelligence service can supply prompt optimizations."""
+        from victor.agent.services.runtime_intelligence import PromptOptimizationBundle
+
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.get_prompt_optimization_bundle.return_value = (
+            PromptOptimizationBundle(
+                evolved_sections=["Prefer read over cat."],
+                few_shots="Example trajectory",
+                failure_hint="Check the file path before editing.",
+            )
+        )
+        pipeline = _make_pipeline(runtime_intelligence=runtime_intelligence)
+        ctx = self._make_turn_context(last_turn_failed=True)
+
+        prefix = pipeline.compose_turn_prefix("Fix the bug", ctx)
+
+        assert "Prefer read over cat." in prefix
+        assert "Example trajectory" in prefix
+        assert "Check the file path before editing." in prefix
 
     def test_credit_in_prefix_tier_a(self):
         """Tier A: credit guidance goes in user prefix (not system prompt)."""

@@ -56,11 +56,13 @@ class StreamingChatPipeline:
     def __init__(
         self,
         runtime_owner: StreamingPipelineRuntimeProtocol,
+        runtime_intelligence: Optional[Any] = None,
         perception: Optional[Any] = None,
         fulfillment: Optional[Any] = None,
         confidence_monitor: Optional[Any] = None,
     ) -> None:
         self._runtime_owner = runtime_owner
+        self._runtime_intelligence = runtime_intelligence
         # AgenticLoop component integration (streaming parity)
         self._perception = perception  # PerceptionIntegration instance
         self._fulfillment = fulfillment  # FulfillmentDetector instance
@@ -202,9 +204,12 @@ class StreamingChatPipeline:
         orch.debug_logger.reset()
 
         # Reset LLM decision service budget for this turn (if available)
-        decision_service = _get_decision_service(orch)
-        if decision_service is not None and hasattr(decision_service, "reset_budget"):
-            decision_service.reset_budget()
+        if self._runtime_intelligence is not None:
+            self._runtime_intelligence.reset_decision_budget()
+        else:
+            decision_service = _get_decision_service(orch)
+            if decision_service is not None and hasattr(decision_service, "reset_budget"):
+                decision_service.reset_budget()
 
         # Spin detection via shared turn_policy (consistent with batch/AgenticLoop path)
         from victor.agent.turn_policy import SpinDetector, NudgePolicy, SpinState
@@ -216,7 +221,39 @@ class StreamingChatPipeline:
         # Structured task understanding before iteration begins. Reuses
         # PerceptionIntegration from the AgenticLoop's PERCEIVE phase.
         _perception = None
-        if self._perception is not None:
+        if self._runtime_intelligence is not None:
+            try:
+                snapshot = await self._runtime_intelligence.analyze_turn(
+                    user_message,
+                    context={
+                        "conversation_stage": getattr(stream_ctx, "conversation_stage", "initial"),
+                        "is_analysis_task": stream_ctx.is_analysis_task,
+                        "is_action_task": stream_ctx.is_action_task,
+                    },
+                )
+                _perception = snapshot.perception
+                if _perception:
+                    stream_ctx.perception = _perception
+                    logger.info(
+                        "Streaming perception: intent=%s, complexity=%s, confidence=%.2f",
+                        getattr(_perception, "intent", "unknown"),
+                        getattr(_perception, "complexity", "unknown"),
+                        getattr(_perception, "confidence", 0.0),
+                    )
+                    if getattr(_perception, "needs_clarification", False):
+                        clarification_prompt = getattr(
+                            _perception,
+                            "clarification_prompt",
+                            None,
+                        ) or "Please clarify the target file, component, or bug before I continue."
+                        yield orch._chunk_generator.generate_content_chunk(
+                            clarification_prompt,
+                            is_final=True,
+                        )
+                        return
+            except Exception as e:
+                logger.debug("Runtime intelligence perception skipped: %s", e)
+        elif self._perception is not None:
             try:
                 _perception = await self._perception.perceive(
                     user_message,
@@ -910,12 +947,14 @@ class StreamingChatPipeline:
 
 def create_streaming_chat_pipeline(
     runtime_owner: StreamingPipelineRuntimeProtocol,
+    runtime_intelligence: Optional[Any] = None,
     perception: Optional[Any] = None,
     fulfillment: Optional[Any] = None,
 ) -> StreamingChatPipeline:
     """Factory helper for creating a streaming pipeline bound to a runtime owner."""
     return StreamingChatPipeline(
         runtime_owner,
+        runtime_intelligence=runtime_intelligence,
         perception=perception,
         fulfillment=fulfillment,
     )

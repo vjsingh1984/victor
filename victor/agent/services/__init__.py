@@ -39,6 +39,11 @@ from victor.agent.services.decision_service import (
 from victor.agent.services.exploration_runtime import ExplorationCoordinator, ExplorationResult
 from victor.agent.services.metrics_service import MetricsCoordinator, create_metrics_coordinator
 from victor.agent.services.provider_service import ProviderService
+from victor.agent.services.runtime_intelligence import (
+    PromptOptimizationBundle,
+    RuntimeIntelligenceService,
+    RuntimeIntelligenceSnapshot,
+)
 from victor.agent.services.rl_runtime import (
     AsyncWriterQueue,
     RLCoordinator,
@@ -123,9 +128,12 @@ __all__ = [
     "OrchestratorProtocolAdapter",
     "AsyncWriterQueue",
     "ProviderService",
+    "PromptOptimizationBundle",
     "RLCoordinator",
     "RecoveryService",
     "RecoveryContextImpl",
+    "RuntimeIntelligenceService",
+    "RuntimeIntelligenceSnapshot",
     "StreamingRecoveryContext",
     "StreamingRecoveryCoordinator",
     "SessionCoordinator",

@@ -253,6 +253,7 @@ class UnifiedPromptPipeline:
         registry: Optional["ContentRegistry"] = None,
         optimizer: Optional["OptimizationInjector"] = None,
         task_analyzer: Optional["TaskAnalyzer"] = None,
+        runtime_intelligence: Optional[Any] = None,
         get_context_window: Optional[Callable[[], int]] = None,
         session_id: str = "",
         edge_sections: Optional[Set[str]] = None,
@@ -263,6 +264,19 @@ class UnifiedPromptPipeline:
         self._registry = registry
         self._optimizer = optimizer
         self._task_analyzer = task_analyzer
+        self._runtime_intelligence = runtime_intelligence
+        if self._runtime_intelligence is None and (
+            self._optimizer is not None or self._task_analyzer is not None
+        ):
+            try:
+                from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
+
+                self._runtime_intelligence = RuntimeIntelligenceService(
+                    task_analyzer=self._task_analyzer,
+                    optimization_injector=self._optimizer,
+                )
+            except Exception as e:
+                logger.debug("Runtime intelligence bootstrap unavailable: %s", e)
         self._get_context_window = get_context_window or (lambda: 128000)
         self._session_id = session_id
         if enable_prompt_completeness_guard is None:
@@ -366,7 +380,9 @@ class UnifiedPromptPipeline:
     def unfreeze(self) -> None:
         """Unfreeze system prompt (called on workspace switch)."""
         self._frozen_prompt = None
-        if self._optimizer:
+        if self._runtime_intelligence:
+            self._runtime_intelligence.clear_session_cache()
+        elif self._optimizer:
             self._optimizer.clear_session_cache()
 
     # ----------------------------------------------------------------
@@ -419,32 +435,50 @@ class UnifiedPromptPipeline:
             guidance = self._build_prompt_completeness_guidance(user_message, turn_context)
             add_block("prompt_completeness", guidance)
 
-        # 1. GEPA/MIPROv2/CoT evolved sections
-        if self._optimizer:
+        # 1. GEPA/MiPRO/CoT/failure optimizations via canonical runtime intelligence
+        optimization_bundle = None
+        if self._runtime_intelligence:
+            optimization_bundle = self._runtime_intelligence.get_prompt_optimization_bundle(
+                user_message,
+                turn_context,
+            )
+        elif self._optimizer:
             evolved = self._optimizer.get_evolved_sections(
                 provider=turn_context.provider_name,
                 model=turn_context.model,
                 task_type=turn_context.task_type,
             )
-            for index, section in enumerate(evolved):
-                add_block(
-                    f"evolved_section_{index}",
-                    self._canonicalize_system_guidance_text(section),
-                )
-
-            # 2. MIPROv2 few-shots (KNN per-query)
             few_shots = self._optimizer.get_few_shots(user_message)
-            if few_shots:
-                add_block("few_shots", self._canonicalize_system_guidance_text(few_shots))
-
-            # 3. Failure hints (after rollback/error)
+            hint = None
             if turn_context.last_turn_failed:
                 hint = self._optimizer.get_failure_hint(
                     turn_context.last_failure_category,
                     turn_context.last_failure_error,
                 )
-                if hint:
-                    add_block("failure_hint", self._canonicalize_system_guidance_text(hint))
+            from victor.agent.services.runtime_intelligence import PromptOptimizationBundle
+
+            optimization_bundle = PromptOptimizationBundle(
+                evolved_sections=list(evolved or []),
+                few_shots=few_shots,
+                failure_hint=hint,
+            )
+
+        if optimization_bundle:
+            for index, section in enumerate(optimization_bundle.evolved_sections):
+                add_block(
+                    f"evolved_section_{index}",
+                    self._canonicalize_system_guidance_text(section),
+                )
+            if optimization_bundle.few_shots:
+                add_block(
+                    "few_shots",
+                    self._canonicalize_system_guidance_text(optimization_bundle.few_shots),
+                )
+            if optimization_bundle.failure_hint:
+                add_block(
+                    "failure_hint",
+                    self._canonicalize_system_guidance_text(optimization_bundle.failure_hint),
+                )
 
         # 4. Active skill prompt
         add_block("active_skill_prompt", turn_context.active_skill_prompt)
@@ -489,6 +523,11 @@ class UnifiedPromptPipeline:
 
     def classify_task_keywords(self, user_message: str) -> Dict[str, Any]:
         """Classify task type based on keywords."""
+        if self._runtime_intelligence:
+            try:
+                return self._runtime_intelligence.classify_task_keywords(user_message)
+            except Exception as e:
+                logger.debug("Runtime intelligence keyword classification failed: %s", e)
         if self._task_analyzer:
             try:
                 return self._task_analyzer.classify_keywords(user_message)
@@ -500,6 +539,17 @@ class UnifiedPromptPipeline:
         self, user_message: str, history: Optional[List[Any]] = None
     ) -> Dict[str, Any]:
         """Classify task type with conversation history context."""
+        if self._runtime_intelligence:
+            try:
+                return self._runtime_intelligence.classify_task_with_context(
+                    user_message,
+                    history or [],
+                )
+            except Exception as e:
+                logger.debug(
+                    "Runtime intelligence task classification with context failed: %s",
+                    e,
+                )
         if self._task_analyzer:
             try:
                 return self._task_analyzer.classify_with_context(user_message, history or [])

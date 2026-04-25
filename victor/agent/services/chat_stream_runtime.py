@@ -40,6 +40,7 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
         """Get or create the canonical streaming pipeline for the service path."""
         if self._streaming_pipeline is None:
             from victor.agent.streaming import create_streaming_chat_pipeline
+            from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 
             orch = self._orchestrator
             perception = (
@@ -52,8 +53,19 @@ class ServiceStreamingRuntime(ChatStreamHelperMixin):
                 if orch.has_capability("fulfillment_detector")
                 else None
             )
+            runtime_intelligence = getattr(getattr(orch, "__dict__", {}), "get", lambda *_: None)(
+                "_runtime_intelligence"
+            )
+            if runtime_intelligence is None:
+                runtime_intelligence = RuntimeIntelligenceService.from_orchestrator(
+                    orch,
+                    perception_integration=perception,
+                    optimization_injector=getattr(orch, "_optimization_injector", None),
+                )
+                orch._runtime_intelligence = runtime_intelligence
             self._streaming_pipeline = create_streaming_chat_pipeline(
                 self,
+                runtime_intelligence=runtime_intelligence,
                 perception=perception,
                 fulfillment=fulfillment,
             )

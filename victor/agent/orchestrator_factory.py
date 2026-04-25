@@ -556,15 +556,20 @@ class OrchestratorFactory(
         from victor.agent.content_registry import create_default_registry
         from victor.agent.optimization_injector import OptimizationInjector
         from victor.agent.prompt_pipeline import UnifiedPromptPipeline
+        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
 
         optimizer = OptimizationInjector()
         registry = create_default_registry()
+        runtime_intelligence = RuntimeIntelligenceService(
+            optimization_injector=optimizer,
+        )
 
         return UnifiedPromptPipeline(
             provider=self.provider,
             builder=builder,
             registry=registry,
             optimizer=optimizer,
+            runtime_intelligence=runtime_intelligence,
             get_context_window=get_context_window,
         )
 
