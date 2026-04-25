@@ -73,6 +73,21 @@ class TestSafetyRule:
         assert rule.matches("git", ["push", "--force", "origin", "main"])
         assert not rule.matches("git", ["push", "origin", "main"])
 
+    def test_matches_canonicalizes_legacy_tool_names(self):
+        """Test tool-name aliases normalize before matching."""
+        rule = SafetyRule(
+            rule_id="system_write",
+            category=SafetyCategory.FILE,
+            pattern=r"/etc/",
+            description="Write to system directory",
+            action=SafetyAction.BLOCK,
+            tool_names=["write_file", "edit_files"],
+        )
+
+        assert rule.tool_names == ["write", "edit"]
+        assert rule.matches("write", ["/etc/hosts", "content"])
+        assert rule.matches("edit_file", ["/etc/hosts", "content"])
+
     def test_to_dict(self):
         """Test converting rule to dictionary."""
         rule = SafetyRule(
@@ -455,6 +470,25 @@ class TestSafetyCoordinator:
         # Should require confirmation (not block)
         assert result.is_safe is False
         assert result.action == SafetyAction.REQUIRE_CONFIRMATION
+
+    def test_default_file_overwrite_rule_blocks_canonical_write(self):
+        """Test default system-path rule matches canonical write tool names."""
+        coordinator = SafetyCoordinator(enable_default_rules=True)
+
+        result = coordinator.check_safety("write", ["/etc/hosts", "127.0.0.1 localhost"])
+
+        assert result.is_safe is False
+        assert result.action == SafetyAction.BLOCK
+        assert result.block_reason == "Write to system directory"
+
+    def test_default_file_overwrite_rule_blocks_canonical_edit(self):
+        """Test default system-path rule matches canonical edit tool names."""
+        coordinator = SafetyCoordinator(enable_default_rules=True)
+
+        result = coordinator.check_safety("edit", ["/usr/bin/python", "replace shebang"])
+
+        assert result.is_safe is False
+        assert result.action == SafetyAction.BLOCK
 
 
 class TestSafetyCheckResult:

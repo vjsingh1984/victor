@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from victor_sdk.constants import ToolNames, get_canonical_name
+
 logger = logging.getLogger(__name__)
 
 
@@ -58,13 +60,18 @@ class SafetyRule:
     tool_names: List[str] = field(default_factory=list)
     confirmation_prompt: str = ""
 
+    def __post_init__(self) -> None:
+        """Normalize configured tool names to canonical runtime forms."""
+        self.tool_names = list(dict.fromkeys(get_canonical_name(name) for name in self.tool_names))
+
     def matches(self, tool_name: str, args: List[str]) -> bool:
         """Check whether the rule matches a tool invocation."""
-        if self.tool_names and tool_name not in self.tool_names:
+        canonical_tool_name = get_canonical_name(tool_name)
+        if self.tool_names and canonical_tool_name not in self.tool_names:
             return False
 
         if self.pattern:
-            if re.search(self.pattern, tool_name, re.IGNORECASE):
+            if re.search(self.pattern, canonical_tool_name, re.IGNORECASE):
                 return True
 
             args_str = " ".join(args)
@@ -171,17 +178,17 @@ class SafetyCoordinator:
             description="Recursive file deletion",
             action=SafetyAction.REQUIRE_CONFIRMATION,
             severity=8,
-            tool_names=["shell", "execute_bash"],
+            tool_names=[ToolNames.SHELL],
             confirmation_prompt="This will recursively delete files. Continue?",
         ),
         SafetyRule(
             rule_id="file_overwrite_system",
             category=SafetyCategory.FILE,
-            pattern=r"write.*/(etc|usr|bin|sbin)/",
+            pattern=r"/(etc|usr|bin|sbin)/",
             description="Write to system directory",
             action=SafetyAction.BLOCK,
             severity=10,
-            tool_names=["write_file", "edit_files"],
+            tool_names=[ToolNames.WRITE, ToolNames.EDIT],
         ),
         SafetyRule(
             rule_id="shell_format_disk",
@@ -190,7 +197,7 @@ class SafetyCoordinator:
             description="Disk formatting operation",
             action=SafetyAction.BLOCK,
             severity=10,
-            tool_names=["shell", "execute_bash"],
+            tool_names=[ToolNames.SHELL],
         ),
         SafetyRule(
             rule_id="shell_remove_user",
@@ -199,7 +206,7 @@ class SafetyCoordinator:
             description="Remove user account",
             action=SafetyAction.BLOCK,
             severity=9,
-            tool_names=["shell", "execute_bash"],
+            tool_names=[ToolNames.SHELL],
         ),
         SafetyRule(
             rule_id="docker_rm_container",
