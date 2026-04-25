@@ -27,6 +27,7 @@ from victor.tools.code_search_tool import (
     _get_index_build_failure_cache,
     _get_or_build_index,
     _literal_search,
+    _normalize_search_filters,
     code_search,
 )
 from victor.tools.context import ToolExecutionContext
@@ -40,6 +41,27 @@ def _settings(**overrides):
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
+
+
+def test_normalize_search_filters_trims_text_fields_and_extensions() -> None:
+    """SearchFilters normalization should trim all string-like filter fields."""
+    filters = SearchFilters(
+        file_pattern="  src/*.py  ",
+        symbol="  function  ",
+        language="  python  ",
+        test_only=True,
+        extensions=[" py ", " .js ", "   "],
+    )
+
+    normalized = _normalize_search_filters(filters)
+
+    assert normalized == SearchFilters(
+        file_pattern="src/*.py",
+        symbol="function",
+        language="python",
+        test_only=True,
+        extensions=["py", ".js"],
+    )
 
 
 def test_build_codebase_embedding_config_forwards_existing_search_settings(tmp_path) -> None:

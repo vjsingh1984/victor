@@ -614,21 +614,42 @@ def _normalize_search_filters(filters: Optional[SearchFilters]) -> Optional[Sear
     if filters is None:
         return None
 
-    normalized_file_pattern = (
-        filters.file_pattern.strip() if isinstance(filters.file_pattern, str) else filters.file_pattern
-    )
-    if normalized_file_pattern == "":
-        normalized_file_pattern = None
+    def _normalize_optional_text(value: Optional[str]) -> Optional[str]:
+        if not isinstance(value, str):
+            return value
+        normalized_value = value.strip()
+        return normalized_value or None
 
-    if normalized_file_pattern == filters.file_pattern:
+    normalized_file_pattern = _normalize_optional_text(filters.file_pattern)
+    normalized_symbol = _normalize_optional_text(filters.symbol)
+    normalized_language = _normalize_optional_text(filters.language)
+    normalized_extensions = None
+    if filters.extensions is not None:
+        normalized_extensions = []
+        for ext in filters.extensions:
+            if isinstance(ext, str):
+                normalized_ext = ext.strip()
+                if normalized_ext:
+                    normalized_extensions.append(normalized_ext)
+            elif ext:
+                normalized_extensions.append(ext)
+        if not normalized_extensions:
+            normalized_extensions = None
+
+    if (
+        normalized_file_pattern == filters.file_pattern
+        and normalized_symbol == filters.symbol
+        and normalized_language == filters.language
+        and normalized_extensions == filters.extensions
+    ):
         return filters
 
     return SearchFilters(
         file_pattern=normalized_file_pattern,
-        symbol=filters.symbol,
-        language=filters.language,
+        symbol=normalized_symbol,
+        language=normalized_language,
         test_only=filters.test_only,
-        extensions=filters.extensions,
+        extensions=normalized_extensions,
     )
 
 
