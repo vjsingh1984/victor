@@ -1534,6 +1534,7 @@ async def _literal_search(
     exts: Optional[List[str]] = None,
     *,
     filename_only: bool = False,
+    allow_filename_autodetect: bool = True,
 ) -> Dict[str, Any]:
     """Literal/keyword search using ripgrep (rg) or grep subprocess.
 
@@ -1547,6 +1548,7 @@ async def _literal_search(
         k: Max results
         exts: File extensions ([".py", ".js"])
         filename_only: Restrict filename-like queries to filename matching only.
+        allow_filename_autodetect: Whether filename-like queries may use filename search.
     """
     import shutil
     import subprocess
@@ -1568,7 +1570,9 @@ async def _literal_search(
         # "class SQLCompiler:" and "def get_order_by(self):" on separate lines.
         search_query = query
         dotted_class = None
-        should_preserve_filename_query = filename_only or _looks_like_filename_query(query)
+        should_preserve_filename_query = filename_only or (
+            allow_filename_autodetect and _looks_like_filename_query(query)
+        )
         if (
             not should_preserve_filename_query
             and "." in query
@@ -1593,7 +1597,9 @@ async def _literal_search(
 
         # Filename detection: explicit filename mode should always use filename matching,
         # while other literal searches only do so for filename-like queries.
-        should_use_filename_search = filename_only or _looks_like_filename_query(search_query)
+        should_use_filename_search = filename_only or (
+            allow_filename_autodetect and _looks_like_filename_query(search_query)
+        )
 
         if should_use_filename_search:
             import platform
@@ -1922,6 +1928,7 @@ async def code_search(
     requested_mode = mode
     literal_escalation_metadata: Dict[str, Any] = {}
     mode_fallback_to_semantic = False
+    allow_filename_autodetect = requested_mode not in {"literal", "text"}
 
     # Auto-detect filename search mode
     if mode == "semantic":
@@ -1953,7 +1960,10 @@ async def code_search(
             k,
             exts,
             filename_only=(mode == "filename"),
+            allow_filename_autodetect=allow_filename_autodetect,
         )
+        result = dict(result)
+        result["mode"] = mode
         if result.get("count", 0) > 0:
             return result
         if mode == "filename":
@@ -2038,7 +2048,13 @@ async def code_search(
         if disable_embeddings:
             logger.info("Embeddings disabled for this agent, falling back to literal search")
             exts = filters.extensions if filters else None
-            result = await _literal_search(query, fallback_search_path, k, exts)
+            result = await _literal_search(
+                query,
+                fallback_search_path,
+                k,
+                exts,
+                allow_filename_autodetect=allow_filename_autodetect,
+            )
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_disabled",
@@ -2103,7 +2119,13 @@ async def code_search(
                 logger.debug(f"[code_search] Failed to cache index build failure: {cache_err}")
 
             exts = filters.extensions if filters else None
-            result = await _literal_search(query, fallback_search_path, k, exts)
+            result = await _literal_search(
+                query,
+                fallback_search_path,
+                k,
+                exts,
+                allow_filename_autodetect=allow_filename_autodetect,
+            )
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_index"),
@@ -2120,7 +2142,13 @@ async def code_search(
                 root_path,
             )
             exts = filters.extensions if filters else None
-            result = await _literal_search(query, fallback_search_path, k, exts)
+            result = await _literal_search(
+                query,
+                fallback_search_path,
+                k,
+                exts,
+                allow_filename_autodetect=allow_filename_autodetect,
+            )
             return _decorate_literal_fallback_result(
                 result,
                 fallback="semantic_index_stale",
@@ -2350,7 +2378,13 @@ async def code_search(
             )
         except (asyncio.TimeoutError, Exception) as exc:
             logger.warning("Semantic search failed (%s), falling back to literal search", exc)
-            result = await _literal_search(query, fallback_search_path, k, exts)
+            result = await _literal_search(
+                query,
+                fallback_search_path,
+                k,
+                exts,
+                allow_filename_autodetect=allow_filename_autodetect,
+            )
             return _decorate_literal_fallback_result(
                 result,
                 fallback=_classify_semantic_fallback(exc, scope="semantic_search"),
@@ -2425,7 +2459,13 @@ async def code_search(
                 from victor.framework.search import create_hybrid_search_engine
 
                 # Get keyword search results
-                keyword_results = await _literal_search(query, str(root_path), k * 2, exts=exts)
+                keyword_results = await _literal_search(
+                    query,
+                    str(root_path),
+                    k * 2,
+                    exts=exts,
+                    allow_filename_autodetect=allow_filename_autodetect,
+                )
 
                 if keyword_results.get("success"):
                     # Convert semantic results to dict format for hybrid engine

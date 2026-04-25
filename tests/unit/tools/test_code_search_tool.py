@@ -440,6 +440,7 @@ async def test_code_search_filename_mode_uses_literal_filename_search(tmp_path) 
         3,
         None,
         filename_only=True,
+        allow_filename_autodetect=True,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -478,6 +479,7 @@ async def test_code_search_auto_detected_filename_mode_uses_file_pattern_query(t
         3,
         None,
         filename_only=True,
+        allow_filename_autodetect=True,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -519,6 +521,7 @@ async def test_code_search_filename_mode_uses_parent_directory_for_file_path(tmp
         3,
         None,
         filename_only=True,
+        allow_filename_autodetect=True,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -561,9 +564,50 @@ async def test_code_search_literal_mode_uses_parent_directory_for_missing_child_
         3,
         None,
         filename_only=False,
+        allow_filename_autodetect=False,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "literal"
+    assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_code_search_text_mode_preserves_explicit_text_search_for_filename_like_query(
+    tmp_path,
+) -> None:
+    """Explicit text mode should not auto-switch to filename search for parser.py-like queries."""
+    literal_result = {
+        "success": True,
+        "results": [{"path": "src/main.py", "score": 1, "snippet": "src/main.py:1:parser.py"}],
+        "count": 1,
+        "mode": "literal",
+    }
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(return_value=dict(literal_result)),
+    ) as literal_search:
+        result = await code_search(
+            query="parser.py",
+            path=str(tmp_path),
+            k=3,
+            mode="text",
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_awaited_once_with(
+        "parser.py",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=False,
+        allow_filename_autodetect=False,
+    )
+    get_index.assert_not_awaited()
+    assert result["mode"] == "text"
     assert result["count"] == 1
 
 
@@ -598,6 +642,7 @@ async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> N
         3,
         None,
         filename_only=True,
+        allow_filename_autodetect=True,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -635,6 +680,7 @@ async def test_code_search_strips_whitespace_before_filename_auto_detection(tmp_
         3,
         None,
         filename_only=True,
+        allow_filename_autodetect=True,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -729,6 +775,7 @@ async def test_code_search_allows_blank_query_when_file_pattern_is_provided(tmp_
         3,
         None,
         filename_only=True,
+        allow_filename_autodetect=True,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -769,6 +816,7 @@ async def test_code_search_strips_whitespace_from_file_pattern_before_filename_s
         3,
         None,
         filename_only=True,
+        allow_filename_autodetect=True,
     )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
@@ -964,6 +1012,7 @@ async def test_code_search_literal_mode_escalation_preserves_requested_mode_cont
         3,
         None,
         filename_only=False,
+        allow_filename_autodetect=False,
     )
     assert result["success"] is True
     assert result["mode"] == "semantic"
@@ -1153,6 +1202,7 @@ async def test_code_search_hybrid_mode_preserves_extension_filter_for_keyword_si
         str(tmp_path),
         6,
         exts=["py"],
+        allow_filename_autodetect=True,
     )
     assert result["success"] is True
     assert result["mode"] == "hybrid"
@@ -1219,6 +1269,7 @@ async def test_code_search_hybrid_mode_uses_keyword_results_when_semantic_is_emp
         str(tmp_path),
         6,
         exts=None,
+        allow_filename_autodetect=True,
     )
     assert result["success"] is True
     assert result["mode"] == "hybrid"
@@ -1404,7 +1455,13 @@ async def test_code_search_semantic_fallback_uses_normalized_parent_path(tmp_pat
             _exec_ctx={"settings": _settings()},
         )
 
-    literal_search.assert_awaited_once_with("main entrypoint", str(source_dir), 3, None)
+    literal_search.assert_awaited_once_with(
+        "main entrypoint",
+        str(source_dir),
+        3,
+        None,
+        allow_filename_autodetect=True,
+    )
     assert result["fallback"] == "semantic_search_error"
 
 
@@ -1498,7 +1555,13 @@ async def test_code_search_index_build_fallback_uses_normalized_parent_path(tmp_
             _exec_ctx={"settings": _settings()},
         )
 
-    literal_search.assert_awaited_once_with("main entrypoint", str(source_dir), 3, None)
+    literal_search.assert_awaited_once_with(
+        "main entrypoint",
+        str(source_dir),
+        3,
+        None,
+        allow_filename_autodetect=True,
+    )
     assert result["fallback"] == "semantic_index_error"
 
 
