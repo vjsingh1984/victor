@@ -93,11 +93,14 @@ class PromptOptimizeCommand(BaseSlashCommand):
                 COMPLETION_GUIDANCE,
                 GROUNDING_RULES,
             )
+            from victor.framework.init_synthesizer import SYNTHESIS_RULES
 
             section_text = {
                 "ASI_TOOL_EFFECTIVENESS_GUIDANCE": ASI_TOOL_EFFECTIVENESS_GUIDANCE,
                 "GROUNDING_RULES": GROUNDING_RULES,
                 "COMPLETION_GUIDANCE": COMPLETION_GUIDANCE,
+                "FEW_SHOT_EXAMPLES": "",  # No static text; MIPROv2 mines from traces
+                "INIT_SYNTHESIS_RULES": SYNTHESIS_RULES,
             }
 
             # Run evolution
@@ -108,9 +111,10 @@ class PromptOptimizeCommand(BaseSlashCommand):
             results.add_column("Change", style="dim")
 
             for section in sections:
-                current = section_text.get(section, "")
-                if not current:
-                    results.add_row(section, "-", "[yellow]No text[/]", "-")
+                current = section_text.get(section)
+                if current is None:
+                    # Section not registered in section_text at all
+                    results.add_row(section, "-", "[yellow]Not available[/]", "-")
                     continue
 
                 candidate = learner.evolve(section, current)

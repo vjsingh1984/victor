@@ -209,6 +209,7 @@ class NudgePolicy:
         detector: SpinDetector,
         iteration: int = 0,
         max_iterations: int = 10,
+        intent: Optional[Any] = None,
     ) -> NudgeDecision:
         """Evaluate whether a nudge is needed.
 
@@ -216,6 +217,7 @@ class NudgePolicy:
             detector: Current spin detector state
             iteration: Current iteration number
             max_iterations: Maximum iterations
+            intent: Current ActionIntent (used to tailor nudge for write tasks)
 
         Returns:
             NudgeDecision with nudge type and message
@@ -249,20 +251,36 @@ class NudgePolicy:
             )
             return nudge
 
-        # Too many read-only turns without code_search
-        if (
-            detector.consecutive_read_only_turns >= READ_ONLY_ESCALATION_THRESHOLD
-            and not detector.has_used_code_search
-        ):
-            return NudgeDecision(
-                nudge_type=NudgeType.CODE_SEARCH,
-                message=(
-                    "You have been browsing files for several turns. "
-                    "Consider using code_search(query='...') to find "
-                    "relevant code more efficiently."
-                ),
-                role="user",
+        # Too many read-only turns: tailor based on intent
+        if detector.consecutive_read_only_turns >= READ_ONLY_ESCALATION_THRESHOLD:
+            _is_write_task = (
+                intent is not None
+                and hasattr(intent, "value")
+                and intent.value == "write_allowed"
             )
+            if _is_write_task:
+                # Model has gathered enough context — push it to edit, not search
+                return NudgeDecision(
+                    nudge_type=NudgeType.CODE_SEARCH,
+                    message=(
+                        "You've been reading files for several turns without making changes. "
+                        "You have enough context. Stop reading and apply the fix now using:\n"
+                        "edit(ops=[{\"type\": \"replace\", \"path\": \"file.py\", "
+                        "\"old_str\": \"exact text from file\", \"new_str\": \"replacement\"}])\n"
+                        "Use the exact text you already read as old_str."
+                    ),
+                    role="user",
+                )
+            if not detector.has_used_code_search:
+                return NudgeDecision(
+                    nudge_type=NudgeType.CODE_SEARCH,
+                    message=(
+                        "You have been browsing files for several turns. "
+                        "Consider using code_search(query='...') to find "
+                        "relevant code more efficiently."
+                    ),
+                    role="user",
+                )
 
         return NudgeDecision()
 

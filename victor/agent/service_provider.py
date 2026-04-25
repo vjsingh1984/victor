@@ -849,6 +849,7 @@ class OrchestratorServiceProvider:
         embedding_service = EmbeddingService(model_name=embedding_model)
 
         # Create embedding store with SQLite backend
+        # Note: Uses separate embeddings database, not project.db or victor.db
         sqlite_path = cache_dir / "embeddings" / "conversation.db"
 
         return ConversationEmbeddingStore(

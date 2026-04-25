@@ -38,7 +38,8 @@ if TYPE_CHECKING:
 def _get_input_history_from_db(limit: int = 100) -> List[str]:
     """Load user message history from conversation database.
 
-    Returns recent unique user messages from the project's conversation.db.
+    Returns recent unique user messages from the project's consolidated database.
+    Uses project.db (consolidated database) which includes conversation history.
     Filters out tool outputs and system-like messages.
     """
     try:

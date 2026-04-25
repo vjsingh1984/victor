@@ -519,7 +519,8 @@ class StreamingChatPipeline:
             if _pipeline_obj and getattr(_pipeline_obj, "last_batch_all_skipped", False):
                 _spin.record_turn(has_tool_calls=True, all_blocked=True)
                 logger.info(f"[spin-check] all_blocked=True state={_spin.state.value}")
-                nudge = _nudge_policy.evaluate(_spin)
+                _intent = getattr(orch, "_current_intent", None)
+                nudge = _nudge_policy.evaluate(_spin, intent=_intent)
                 if nudge.should_inject:
                     orch.add_message(nudge.role, nudge.message)
                 if _spin.state == SpinState.TERMINATED:
@@ -638,7 +639,8 @@ class StreamingChatPipeline:
 
             if _no_progress:
                 # Inject nudge via shared NudgePolicy
-                nudge = _nudge_policy.evaluate(_spin)
+                _intent = getattr(orch, "_current_intent", None)
+                nudge = _nudge_policy.evaluate(_spin, intent=_intent)
                 if nudge.should_inject:
                     orch.add_message(nudge.role, nudge.message)
                     logger.info(f"[nudge] {nudge.nudge_type.value}")
@@ -874,11 +876,25 @@ class StreamingChatPipeline:
                             "Streaming progress plateau detected (scores=%s), injecting nudge",
                             [f"{s:.2f}" for s in recent],
                         )
-                        orch.add_message(
-                            "system",
-                            "Progress seems stalled. Try a different approach or "
-                            "summarize what you've found so far.",
+                        _plateau_intent = getattr(orch, "_current_intent", None)
+                        _is_write = (
+                            _plateau_intent is not None
+                            and hasattr(_plateau_intent, "value")
+                            and _plateau_intent.value == "write_allowed"
                         )
+                        if _is_write:
+                            _plateau_msg = (
+                                "Progress stalled. You have enough context — stop reading "
+                                "and apply the change now with edit(ops=[{\"type\": \"replace\", "
+                                "\"path\": \"file\", \"old_str\": \"exact text\", "
+                                "\"new_str\": \"replacement\"}])."
+                            )
+                        else:
+                            _plateau_msg = (
+                                "Progress seems stalled. Try a different approach or "
+                                "summarize what you've found so far."
+                            )
+                        orch.add_message("system", _plateau_msg)
 
 
 def create_streaming_chat_pipeline(
