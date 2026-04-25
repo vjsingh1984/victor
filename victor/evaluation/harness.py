@@ -42,8 +42,9 @@ from victor.evaluation.protocol import (
     TaskStatus,
 )
 from victor.evaluation.runtime_feedback import (
+    build_runtime_evaluation_feedback_payload,
     derive_runtime_evaluation_feedback,
-    save_runtime_evaluation_feedback,
+    refresh_runtime_evaluation_feedback_aggregate,
 )
 
 logger = logging.getLogger(__name__)
@@ -1221,6 +1222,10 @@ class EvaluationHarness:
         filename = f"eval_{result.config.benchmark.value}_{timestamp}.json"
         output_path = self._results_dir / filename
         runtime_feedback = derive_runtime_evaluation_feedback(result)
+        runtime_feedback_payload = build_runtime_evaluation_feedback_payload(
+            runtime_feedback,
+            source_result_path=output_path,
+        )
 
         # Serialize result
         data = {
@@ -1232,7 +1237,7 @@ class EvaluationHarness:
                 "dataset_metadata": result.config.dataset_metadata,
             },
             "summary": result.get_metrics(),
-            "runtime_evaluation_feedback": runtime_feedback.to_dict(),
+            "runtime_evaluation_feedback": runtime_feedback_payload,
             "start_time": result.start_time.isoformat() if result.start_time else None,
             "end_time": result.end_time.isoformat() if result.end_time else None,
             "tasks": [
@@ -1281,11 +1286,7 @@ class EvaluationHarness:
         with open(output_path, "w") as f:
             json.dump(data, f, indent=2)
 
-        save_runtime_evaluation_feedback(
-            runtime_feedback,
-            path=self._results_dir / "runtime_evaluation_feedback.json",
-            source_result_path=output_path,
-        )
+        refresh_runtime_evaluation_feedback_aggregate(self._results_dir)
 
         logger.info(f"Results saved to: {output_path}")
         return output_path

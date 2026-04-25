@@ -173,8 +173,21 @@ Completed on 2026-04-25:
   - Explicit live runtime config remains authoritative, so persisted or live
     calibration can tune future runs without silently overriding intentionally set
     thresholds on the active execution path
+- Phase 5.6 validated evaluation-truth freshness and aggregation:
+  - `EvaluationHarness` now persists normalized per-run validated-evaluation-truth
+    payloads inside each evaluation result artifact
+  - `runtime_feedback.py` now aggregates eligible evaluation-truth artifacts from
+    the results directory using recency- and reliability-weighted scoring instead
+    of trusting a single stale canonical file
+  - Canonical `runtime_evaluation_feedback.json` is now refreshed from that
+    aggregate view, and raw heuristic runtime sources remain excluded unless they
+    are upgraded into explicit validated evaluation truth
 
 Next recommended slice:
-- Phase 5.6: add freshness and aggregation policy for benchmark-truth feedback so
-  runtime calibration can prefer the most relevant recent benchmark evidence
-  without overfitting to a single stale or narrow evaluation artifact
+- Phase 5.7: add scoped relevance selection for validated evaluation truth so
+  calibration can prefer project/model/task-adjacent evidence when multiple
+  eligible truth sources exist
+  - Define an explicit schema for future non-benchmark validated session truth
+    emitters rather than relying on loose metadata conventions
+  - Keep source trust tiers and freshness weighting centralized in the same
+    runtime-feedback subsystem

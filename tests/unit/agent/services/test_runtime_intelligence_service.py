@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -363,3 +364,55 @@ def test_runtime_intelligence_keeps_explicit_config_thresholds_over_persisted_fe
     assert service.perception_integration.evaluation_policy.completion_threshold == pytest.approx(
         0.93
     )
+
+
+def test_runtime_intelligence_loads_aggregated_validated_feedback_from_results_dir(tmp_path):
+    (tmp_path / "eval_guide_20260401_010101.json").write_text(
+        json.dumps(
+            {
+                "runtime_evaluation_feedback": {
+                    "completion_threshold": 0.88,
+                    "enhanced_progress_threshold": 0.71,
+                    "minimum_supported_evidence_score": 0.9,
+                    "metadata": {
+                        "source": "benchmark_truth_feedback",
+                        "validated_evaluation_truth": True,
+                        "truth_alignment_rate": 0.94,
+                        "task_count": 20,
+                        "saved_at": "2026-04-01T00:00:00+00:00",
+                    },
+                }
+            }
+        )
+    )
+    (tmp_path / "eval_session_20260425_010101.json").write_text(
+        json.dumps(
+            {
+                "runtime_evaluation_feedback": {
+                    "completion_threshold": 0.72,
+                    "enhanced_progress_threshold": 0.55,
+                    "minimum_supported_evidence_score": 0.81,
+                    "metadata": {
+                        "source": "validated_session_truth_feedback",
+                        "validated_evaluation_truth": True,
+                        "truth_alignment_rate": 0.9,
+                        "task_count": 14,
+                        "saved_at": "2026-04-25T00:00:00+00:00",
+                    },
+                }
+            }
+        )
+    )
+
+    service = RuntimeIntelligenceService(
+        task_analyzer=MagicMock(),
+        perception_integration=None,
+        optimization_injector=None,
+        decision_service=None,
+        evaluation_feedback_path=tmp_path / "runtime_evaluation_feedback.json",
+    )
+
+    assert service.evaluation_policy.completion_threshold is not None
+    assert 0.72 < service.evaluation_policy.completion_threshold < 0.84
+    assert service.evaluation_policy.enhanced_progress_threshold is not None
+    assert 0.55 <= service.evaluation_policy.enhanced_progress_threshold < 0.66

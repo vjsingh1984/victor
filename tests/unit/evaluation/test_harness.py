@@ -691,7 +691,11 @@ class TestBenchmarkToolUsageMetrics:
             loaded["runtime_evaluation_feedback"]["metadata"]["source"]
             == "benchmark_truth_feedback"
         )
+        assert (
+            loaded["runtime_evaluation_feedback"]["metadata"]["validated_evaluation_truth"] is True
+        )
         assert feedback is not None
+        assert feedback.metadata["source"] == "validated_evaluation_truth_aggregate"
         assert feedback.metadata["benchmark"] == "dr3_eval"
         assert feedback.metadata["model"] == "test"
         assert feedback.metadata["dataset_metadata"] == {
@@ -699,6 +703,7 @@ class TestBenchmarkToolUsageMetrics:
             "version": "2026.04",
         }
         assert feedback.metadata["source_result_path"] == str(saved_path)
+        assert feedback.metadata["aggregated_artifact_count"] == 1
         assert feedback.completion_threshold == pytest.approx(
             loaded["runtime_evaluation_feedback"]["completion_threshold"]
         )
