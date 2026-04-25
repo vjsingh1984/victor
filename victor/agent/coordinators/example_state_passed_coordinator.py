@@ -183,14 +183,14 @@ class ExampleStatePassedCoordinator:
         reasoning = "Need to list files to answer query about file/directory structure"
 
         batch = TransitionBatch()
-        batch.execute_tool(tool_name="list_directory", arguments={"path": "."})
+        batch.execute_tool(tool_name="ls", arguments={"path": "."})
 
         return CoordinatorResult(
             transitions=batch,
             reasoning=reasoning,
             confidence=0.95,
             metadata={
-                "tool_requested": "list_directory",
+                "tool_requested": "ls",
                 "tool_reason": "file_structure_inquiry",
             },
         )
@@ -413,7 +413,7 @@ class ExampleStatePassedCoordinatorTest:
         ]
 
         assert len(tool_transitions) > 0
-        assert tool_transitions[0].data["tool_name"] == "list_directory"
+        assert tool_transitions[0].data["tool_name"] == "ls"
 
         print("✓ Test passed: tool_execution_request")
 
