@@ -332,30 +332,7 @@ workflows:
       - id: score_retrieval_utility
         type: transform
         name: "Score Retrieval Utility"
-        transform: |
-          candidate_count = len(ranked_results) if ranked_results else 0
-          authority_hits = 0
-          unique_sources = set()
-          for chunk in ranked_results or []:
-            source_url = chunk.get("source_url", "") if isinstance(chunk, dict) else getattr(chunk, "source_url", "")
-            source_title = chunk.get("source_title", "") if isinstance(chunk, dict) else getattr(chunk, "source_title", "")
-            if source_url or source_title:
-              authority_hits += 1
-            if source_url:
-              unique_sources.add(source_url)
-            elif source_title:
-              unique_sources.add(source_title)
-
-          source_diversity = len(unique_sources)
-          retrieval_utility = {
-            "candidate_count": candidate_count,
-            "authority_hits": authority_hits,
-            "source_diversity": source_diversity,
-            "utility_score": min(
-              1.0,
-              0.35 + min(candidate_count, 5) * 0.08 + min(authority_hits, 3) * 0.08 + min(source_diversity, 3) * 0.05
-            ),
-          }
+        transform: score_retrieval_utility
         next: [check_coverage]
 
       # =====================================================================
@@ -410,6 +387,11 @@ workflows:
           1. repair retrieval with broader / more authoritative search
           2. revise the answer using existing evidence
           3. ask the user for clarification when the gap is not repairable automatically
+
+          Produce a structured diagnosis with:
+          - gap_type: one of [missing_support, weak_authority, contradictory_evidence, query_ambiguity, low_utility, answer_revision]
+          - missing_information: short list of what evidence is missing
+          - repair_strategy: concise description of the preferred next action
 
           Prefer retrieval repair when the issue is missing support, weak sources,
           low coverage, or incomplete evidence.

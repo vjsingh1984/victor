@@ -249,6 +249,17 @@ class TestQueryWorkflow:
         next_nodes = workflow.get_next_nodes("rerank")
         assert [node.id for node in next_nodes] == ["score_retrieval_utility"]
 
+    def test_query_uses_named_retrieval_utility_transform(self):
+        """Utility scoring should resolve to the registered escape hatch."""
+        from victor_rag.workflows import RAGWorkflowProvider
+
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("rag_query")
+        assert workflow is not None
+
+        utility_node = workflow.nodes["score_retrieval_utility"]
+        assert utility_node.transform.__name__ == "score_retrieval_utility"
+
     def test_query_has_retrieval_repair_branch(self):
         """Low-support retrieval should go through diagnosis and repair."""
         from victor_rag.workflows import RAGWorkflowProvider
@@ -269,9 +280,114 @@ class TestQueryWorkflow:
         next_nodes = workflow.get_next_nodes("increment_retrieval_repair_attempt")
         assert [node.id for node in next_nodes] == ["repair_retrieval"]
 
+    def test_query_diagnosis_node_requests_explicit_gap_types(self):
+        """Diagnosis prompt should request explicit retrieval gap classes."""
+        from victor_rag.workflows import RAGWorkflowProvider
+
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("rag_query")
+        assert workflow is not None
+
+        diagnosis = workflow.nodes["diagnose_retrieval_gap"]
+        assert "gap_type" in diagnosis.goal
+        assert "missing_support" in diagnosis.goal
+        assert "weak_authority" in diagnosis.goal
+        assert "contradictory_evidence" in diagnosis.goal
+        assert "query_ambiguity" in diagnosis.goal
+
 
 class TestRAGEscapeHatches:
     """Tests for RAG workflow escape hatches."""
+
+    def test_score_retrieval_utility_reorders_for_authority_and_diversity(self):
+        """Authority and source diversity should improve result ordering."""
+        from victor_rag.escape_hatches import score_retrieval_utility
+
+        ctx = {
+            "ranked_results": [
+                {
+                    "id": "weak-snippet",
+                    "score": 0.96,
+                    "text": "A short unattributed answer fragment.",
+                },
+                {
+                    "id": "official-doc",
+                    "score": 0.92,
+                    "source_title": "Product Documentation",
+                    "source_url": "https://docs.example.com/guide",
+                    "text": "Official product guidance with concrete steps.",
+                },
+                {
+                    "id": "duplicate-doc",
+                    "score": 0.91,
+                    "source_title": "Product Documentation",
+                    "source_url": "https://docs.example.com/reference",
+                    "text": "Reference page from the same documentation site.",
+                },
+                {
+                    "id": "independent-analysis",
+                    "score": 0.90,
+                    "source_title": "Independent Analysis",
+                    "source_url": "https://analysis.example.org/report",
+                    "text": "Independent write-up that corroborates the docs.",
+                },
+            ]
+        }
+
+        result = score_retrieval_utility(ctx)
+        ranked_ids = [chunk["id"] for chunk in result["ranked_results"]]
+
+        assert ranked_ids[0] == "official-doc"
+        assert ranked_ids.index("independent-analysis") < ranked_ids.index("duplicate-doc")
+        assert result["retrieval_utility"]["authority_hits"] == 3
+        assert result["retrieval_utility"]["source_diversity"] == 2
+
+    def test_score_retrieval_utility_reports_sparse_low_utility_context(self):
+        """Sparse unattributed context should stay below the repair threshold."""
+        from victor_rag.escape_hatches import score_retrieval_utility
+
+        result = score_retrieval_utility(
+            {
+                "ranked_results": [
+                    {
+                        "id": "weak-snippet",
+                        "score": 0.42,
+                        "text": "Unattributed summary with limited support.",
+                    }
+                ]
+            }
+        )
+
+        utility = result["retrieval_utility"]
+        assert utility["candidate_count"] == 1
+        assert utility["authority_hits"] == 0
+        assert utility["utility_score"] < 0.55
+
+    def test_classify_retrieval_gap_prefers_explicit_gap_type(self):
+        """Structured diagnosis should override heuristic fallback."""
+        from victor_rag.escape_hatches import classify_retrieval_gap
+
+        ctx = {
+            "retrieval_gap_diagnosis": {
+                "gap_type": "weak_authority",
+                "missing_information": ["authoritative sources"],
+            },
+            "coverage_assessment": {"has_answer": False, "confidence": "low"},
+        }
+
+        assert classify_retrieval_gap(ctx) == "weak_authority"
+
+    def test_classify_retrieval_gap_detects_contradictory_evidence(self):
+        """Verification issues about conflicts should classify as contradiction."""
+        from victor_rag.escape_hatches import classify_retrieval_gap
+
+        ctx = {
+            "coverage_assessment": {"has_answer": True, "confidence": "medium"},
+            "verification": {"passed": False, "issues": ["Sources conflict on the timeline"]},
+            "retrieval_utility": {"utility_score": 0.8, "authority_hits": 3},
+        }
+
+        assert classify_retrieval_gap(ctx) == "contradictory_evidence"
 
     def test_retrieval_repair_decision_prefers_repair_for_missing_support(self):
         """Coverage gaps with remaining repair budget should retry retrieval."""
@@ -285,6 +401,34 @@ class TestRAGEscapeHatches:
         }
 
         assert retrieval_repair_decision(ctx) == "repair"
+
+    def test_retrieval_repair_decision_clarifies_for_query_ambiguity(self):
+        """Ambiguous or underspecified asks should prompt clarification."""
+        from victor_rag.escape_hatches import retrieval_repair_decision
+
+        ctx = {
+            "retrieval_gap_diagnosis": {"gap_type": "query_ambiguity"},
+            "coverage_assessment": {"has_answer": False, "confidence": "low"},
+            "verification": {"passed": False, "issues": ["Question is ambiguous"]},
+            "repair_attempt_count": 0,
+            "max_repair_attempts": 2,
+        }
+
+        assert retrieval_repair_decision(ctx) == "clarify"
+
+    def test_retrieval_repair_decision_revises_when_evidence_exists(self):
+        """If evidence is adequate but the draft is weak, revise instead of repairing retrieval."""
+        from victor_rag.escape_hatches import retrieval_repair_decision
+
+        ctx = {
+            "coverage_assessment": {"has_answer": True, "confidence": "high"},
+            "verification": {"passed": False, "issues": ["Answer overstates one claim"]},
+            "retrieval_utility": {"utility_score": 0.82, "authority_hits": 3},
+            "repair_attempt_count": 0,
+            "max_repair_attempts": 2,
+        }
+
+        assert retrieval_repair_decision(ctx) == "revise"
 
     def test_retrieval_repair_decision_escalates_after_budget_exhausted(self):
         """Repair budget exhaustion should stop automatic retries."""

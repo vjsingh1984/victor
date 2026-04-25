@@ -30,8 +30,18 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+RETRIEVAL_GAP_TYPES = {
+    "missing_support",
+    "weak_authority",
+    "contradictory_evidence",
+    "query_ambiguity",
+    "low_utility",
+    "answer_revision",
+}
 
 
 # =============================================================================
@@ -254,43 +264,144 @@ def retrieval_repair_decision(ctx: Dict[str, Any]) -> str:
         "repair", "revise", or "clarify"
     """
     coverage = ctx.get("coverage_assessment", {}) or {}
-    verification = ctx.get("verification", {}) or {}
-    utility = ctx.get("retrieval_utility", {}) or {}
     repair_attempt_count = ctx.get("repair_attempt_count", 0)
     max_repair_attempts = ctx.get("max_repair_attempts", 2)
 
     has_answer = bool(coverage.get("has_answer", False))
+    gap_type = classify_retrieval_gap(ctx)
+
+    if repair_attempt_count >= max_repair_attempts:
+        if gap_type == "answer_revision" and has_answer:
+            return "revise"
+        return "clarify"
+
+    if gap_type == "query_ambiguity":
+        return "clarify"
+
+    if gap_type in {
+        "missing_support",
+        "weak_authority",
+        "contradictory_evidence",
+        "low_utility",
+    }:
+        return "repair"
+
+    if gap_type == "answer_revision":
+        return "revise"
+
+    return "clarify"
+
+
+def classify_retrieval_gap(ctx: Dict[str, Any]) -> str:
+    """Classify the dominant retrieval gap for repair-policy routing.
+
+    Returns one of:
+    - "missing_support"
+    - "weak_authority"
+    - "contradictory_evidence"
+    - "query_ambiguity"
+    - "low_utility"
+    - "answer_revision"
+    """
+    diagnosis = ctx.get("retrieval_gap_diagnosis", {}) or {}
+    coverage = ctx.get("coverage_assessment", {}) or {}
+    verification = ctx.get("verification", {}) or {}
+    utility = ctx.get("retrieval_utility", {}) or {}
+
+    explicit_gap_type = _extract_explicit_gap_type(diagnosis)
+    if explicit_gap_type:
+        return explicit_gap_type
+
+    has_answer = bool(coverage.get("has_answer", False))
     confidence = str(coverage.get("confidence", "")).lower()
     utility_score = float(utility.get("utility_score", 0.0) or 0.0)
+    authority_hits = int(utility.get("authority_hits", 0) or 0)
     verification_passed = verification.get("passed", True)
     issues = verification.get("issues", []) or []
     issue_text = " ".join(str(issue).lower() for issue in issues)
 
-    missing_support = any(
+    if any(
+        phrase in issue_text
+        for phrase in ("ambiguous", "unclear", "clarify", "underspecified", "specify")
+    ):
+        return "query_ambiguity"
+
+    if any(
+        phrase in issue_text
+        for phrase in ("conflict", "contradict", "inconsistent", "disagree")
+    ):
+        return "contradictory_evidence"
+
+    if any(
+        phrase in issue_text
+        for phrase in (
+            "weak source",
+            "unreliable source",
+            "authority",
+            "authoritative",
+            "credibility",
+        )
+    ):
+        return "weak_authority"
+
+    if any(
         phrase in issue_text
         for phrase in (
             "missing support",
             "missing evidence",
             "unsupported",
             "citation",
-            "source",
             "grounding",
         )
-    )
+    ):
+        return "missing_support"
 
-    if repair_attempt_count >= max_repair_attempts:
-        return "clarify"
+    if not has_answer or confidence in {"low", "none", "uncertain"}:
+        return "missing_support"
 
-    if missing_support or not has_answer or confidence in {"low", "none", "uncertain"}:
-        return "repair"
+    if utility_score < 0.55 or authority_hits == 0:
+        return "low_utility"
 
-    if utility_score < 0.55:
-        return "repair"
+    if verification_passed is False and has_answer:
+        return "answer_revision"
 
-    if verification_passed is False:
-        return "revise"
+    return "low_utility"
 
-    return "clarify"
+
+def _extract_explicit_gap_type(diagnosis: Any) -> str:
+    """Normalize gap-type data coming from the diagnosis node."""
+    if isinstance(diagnosis, dict):
+        for key in ("gap_type", "type", "diagnosis"):
+            value = diagnosis.get(key)
+            normalized = _normalize_gap_type(value)
+            if normalized:
+                return normalized
+        return ""
+
+    return _normalize_gap_type(diagnosis)
+
+
+def _normalize_gap_type(value: Any) -> str:
+    """Normalize gap-type aliases to a stable vocabulary."""
+    if not value:
+        return ""
+
+    normalized = str(value).strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "missing_evidence": "missing_support",
+        "low_support": "missing_support",
+        "weak_sources": "weak_authority",
+        "source_quality": "weak_authority",
+        "conflicting_evidence": "contradictory_evidence",
+        "contradiction": "contradictory_evidence",
+        "ambiguous_query": "query_ambiguity",
+        "ambiguity": "query_ambiguity",
+        "clarification": "query_ambiguity",
+        "revise": "answer_revision",
+        "revision": "answer_revision",
+    }
+    normalized = aliases.get(normalized, normalized)
+    return normalized if normalized in RETRIEVAL_GAP_TYPES else ""
 
 
 def embedding_batch_size(ctx: Dict[str, Any]) -> str:
@@ -417,6 +528,92 @@ def format_context_window(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def score_retrieval_utility(ctx: Dict[str, Any]) -> Dict[str, Any]:
+    """Score retrieval utility and apply bounded reranking adjustments."""
+    ranked_results = list(ctx.get("ranked_results", []) or [])
+    rescored_results = []
+    unique_sources = set()
+    seen_content = set()
+    authority_hits = 0
+    repeated_source_hits = 0
+    duplicate_content_hits = 0
+    total_relevance = 0.0
+
+    for position, chunk in enumerate(ranked_results):
+        relevance = _chunk_relevance(chunk)
+        total_relevance += relevance
+
+        source_key = _chunk_source_key(chunk)
+        content_key = _chunk_content_key(chunk)
+        has_source = bool(source_key)
+        source_novelty_bonus = 0.0
+        content_redundancy_penalty = 0.0
+
+        if has_source:
+            authority_hits += 1
+            if source_key in unique_sources:
+                repeated_source_hits += 1
+                source_novelty_bonus = -0.03
+            else:
+                unique_sources.add(source_key)
+                source_novelty_bonus = 0.04
+
+        if content_key:
+            if content_key in seen_content:
+                duplicate_content_hits += 1
+                content_redundancy_penalty = 0.05
+            else:
+                seen_content.add(content_key)
+
+        authority_bonus = 0.08 if has_source else 0.0
+        authority_bonus += 0.04 if _looks_authoritative_source(chunk) else 0.0
+        utility_rank_score = round(
+            relevance + authority_bonus + source_novelty_bonus - content_redundancy_penalty,
+            6,
+        )
+        rescored_results.append(
+            (
+                utility_rank_score,
+                relevance,
+                -position,
+                _annotated_chunk(
+                    chunk,
+                    utility_rank_score=utility_rank_score,
+                    source_key=source_key,
+                    has_source=has_source,
+                ),
+            )
+        )
+
+    rescored_results.sort(reverse=True)
+    reranked_results = [chunk for _, _, _, chunk in rescored_results]
+    candidate_count = len(ranked_results)
+    source_diversity = len(unique_sources)
+    average_relevance = total_relevance / candidate_count if candidate_count else 0.0
+    average_rank_score = (
+        sum(score for score, _, _, _ in rescored_results) / candidate_count if candidate_count else 0.0
+    )
+
+    retrieval_utility = {
+        "candidate_count": candidate_count,
+        "authority_hits": authority_hits,
+        "source_diversity": source_diversity,
+        "repeated_source_hits": repeated_source_hits,
+        "duplicate_content_hits": duplicate_content_hits,
+        "average_relevance": round(average_relevance, 4),
+        "average_rank_score": round(average_rank_score, 4),
+        "utility_score": _utility_score(
+            candidate_count=candidate_count,
+            authority_hits=authority_hits,
+            source_diversity=source_diversity,
+            average_relevance=average_relevance,
+            repeated_source_hits=repeated_source_hits,
+            duplicate_content_hits=duplicate_content_hits,
+        ),
+    }
+    return {"ranked_results": reranked_results, "retrieval_utility": retrieval_utility}
+
+
 def aggregate_ingestion_stats(ctx: Dict[str, Any]) -> Dict[str, Any]:
     """Aggregate statistics from parallel ingestion operations.
 
@@ -455,6 +652,92 @@ def aggregate_ingestion_stats(ctx: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _chunk_relevance(chunk: Any) -> float:
+    """Extract a stable relevance score from a retrieval chunk."""
+    value = _chunk_value(chunk, "relevance_score")
+    if value in (None, ""):
+        value = _chunk_value(chunk, "score")
+
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _chunk_source_key(chunk: Any) -> str:
+    """Normalize a chunk source to a site-level key."""
+    source_url = str(_chunk_value(chunk, "source_url") or "").strip()
+    if source_url:
+        parsed = urlparse(source_url)
+        if parsed.netloc:
+            return parsed.netloc.lower()
+
+    source_title = str(_chunk_value(chunk, "source_title") or "").strip().lower()
+    return source_title
+
+
+def _chunk_content_key(chunk: Any) -> str:
+    """Normalize content for lightweight redundancy detection."""
+    text = str(_chunk_value(chunk, "text") or _chunk_value(chunk, "content") or "").strip().lower()
+    if not text:
+        return ""
+    return " ".join(text.split())[:160]
+
+
+def _chunk_value(chunk: Any, key: str) -> Any:
+    """Read a value from dict-like or object-like chunks."""
+    if isinstance(chunk, dict):
+        return chunk.get(key)
+    return getattr(chunk, key, None)
+
+
+def _annotated_chunk(chunk: Any, **annotations: Any) -> Any:
+    """Attach utility metadata while preserving the original chunk shape."""
+    if isinstance(chunk, dict):
+        enriched_chunk = dict(chunk)
+        enriched_chunk.update(annotations)
+        return enriched_chunk
+    return chunk
+
+
+def _looks_authoritative_source(chunk: Any) -> bool:
+    """Apply a small boost for sources that look official or canonical."""
+    source_url = str(_chunk_value(chunk, "source_url") or "").strip().lower()
+    source_title = str(_chunk_value(chunk, "source_title") or "").strip().lower()
+    authority_markers = (
+        ".gov",
+        ".edu",
+        "arxiv.org",
+        "doi.org",
+        "docs.",
+        "developer.",
+        "documentation",
+        "official",
+        "reference",
+    )
+    return any(marker in source_url or marker in source_title for marker in authority_markers)
+
+
+def _utility_score(
+    *,
+    candidate_count: int,
+    authority_hits: int,
+    source_diversity: int,
+    average_relevance: float,
+    repeated_source_hits: int,
+    duplicate_content_hits: int,
+) -> float:
+    """Aggregate retrieval utility with bounded bonuses and penalties."""
+    score = 0.2
+    score += min(candidate_count, 5) * 0.08
+    score += min(authority_hits, 3) * 0.09
+    score += min(source_diversity, 3) * 0.05
+    score += max(0.0, average_relevance - 0.5) * 0.35
+    score -= min(repeated_source_hits, 3) * 0.04
+    score -= min(duplicate_content_hits, 3) * 0.04
+    return round(max(0.0, min(1.0, score)), 4)
+
+
 # =============================================================================
 # Registry Exports
 # =============================================================================
@@ -467,6 +750,7 @@ CONDITIONS = {
     "should_reindex": should_reindex,
     "query_complexity": query_complexity,
     "answer_confidence": answer_confidence,
+    "classify_retrieval_gap": classify_retrieval_gap,
     "retrieval_repair_decision": retrieval_repair_decision,
     "embedding_batch_size": embedding_batch_size,
 }
@@ -475,6 +759,7 @@ CONDITIONS = {
 TRANSFORMS = {
     "merge_retrieved_chunks": merge_retrieved_chunks,
     "format_context_window": format_context_window,
+    "score_retrieval_utility": score_retrieval_utility,
     "aggregate_ingestion_stats": aggregate_ingestion_stats,
 }
 
@@ -486,11 +771,13 @@ __all__ = [
     "should_reindex",
     "query_complexity",
     "answer_confidence",
+    "classify_retrieval_gap",
     "retrieval_repair_decision",
     "embedding_batch_size",
     # Transforms
     "merge_retrieved_chunks",
     "format_context_window",
+    "score_retrieval_utility",
     "aggregate_ingestion_stats",
     # Registries
     "CONDITIONS",
