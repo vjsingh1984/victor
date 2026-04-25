@@ -25,6 +25,7 @@ from victor.tools.code_search_tool import (
     _build_codebase_embedding_config,
     _get_index_build_failure_cache,
     _get_or_build_index,
+    _literal_search,
     code_search,
 )
 from victor.tools.context import ToolExecutionContext
@@ -432,7 +433,13 @@ async def test_code_search_filename_mode_uses_literal_filename_search(tmp_path) 
             _exec_ctx={"settings": _settings()},
         )
 
-    literal_search.assert_awaited_once_with("parser.py", str(tmp_path), 3, None)
+    literal_search.assert_awaited_once_with(
+        "parser.py",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=True,
+    )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
     assert result["count"] == 1
@@ -464,7 +471,13 @@ async def test_code_search_auto_detected_filename_mode_uses_file_pattern_query(t
             _exec_ctx={"settings": _settings()},
         )
 
-    literal_search.assert_awaited_once_with("parser.py", str(tmp_path), 3, None)
+    literal_search.assert_awaited_once_with(
+        "parser.py",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=True,
+    )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
     assert result["count"] == 1
@@ -495,10 +508,40 @@ async def test_code_search_auto_detects_filename_query_from_query(tmp_path) -> N
             _exec_ctx={"settings": _settings()},
         )
 
-    literal_search.assert_awaited_once_with("parser.py", str(tmp_path), 3, None)
+    literal_search.assert_awaited_once_with(
+        "parser.py",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=True,
+    )
     get_index.assert_not_awaited()
     assert result["mode"] == "filename"
     assert result["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_literal_search_filename_only_does_not_fall_back_to_content_on_miss(tmp_path) -> None:
+    """Filename-only searches should not degrade into content matches on a miss."""
+
+    proc = SimpleNamespace(communicate=AsyncMock(return_value=(b"", b"")))
+
+    with patch("asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)) as create_proc:
+        result = await _literal_search(
+            "missing.py",
+            str(tmp_path),
+            3,
+            None,
+            filename_only=True,
+        )
+
+    assert create_proc.await_count == 1
+    assert result == {
+        "success": True,
+        "results": [],
+        "count": 0,
+        "mode": "filename",
+    }
 
 
 @pytest.mark.asyncio
@@ -537,7 +580,13 @@ async def test_code_search_literal_mode_escalation_preserves_requested_mode_cont
             _exec_ctx=exec_ctx,
         )
 
-    literal_search.assert_awaited_once_with("main entrypoint", str(tmp_path), 3, None)
+    literal_search.assert_awaited_once_with(
+        "main entrypoint",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=False,
+    )
     assert result["success"] is True
     assert result["mode"] == "semantic"
     assert result["metadata"]["requested_mode"] == "literal"
@@ -721,7 +770,12 @@ async def test_code_search_hybrid_mode_preserves_extension_filter_for_keyword_si
             _exec_ctx=exec_ctx,
         )
 
-    literal_search.assert_awaited_once_with("main entrypoint", str(tmp_path), 6, exts=["py"])
+    literal_search.assert_awaited_once_with(
+        "main entrypoint",
+        str(tmp_path),
+        6,
+        exts=["py"],
+    )
     assert result["success"] is True
     assert result["mode"] == "hybrid"
 
@@ -782,7 +836,12 @@ async def test_code_search_hybrid_mode_uses_keyword_results_when_semantic_is_emp
             _exec_ctx=exec_ctx,
         )
 
-    literal_search.assert_awaited_once_with("main entrypoint", str(tmp_path), 6, exts=None)
+    literal_search.assert_awaited_once_with(
+        "main entrypoint",
+        str(tmp_path),
+        6,
+        exts=None,
+    )
     assert result["success"] is True
     assert result["mode"] == "hybrid"
     assert result["count"] == 1

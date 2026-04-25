@@ -1452,6 +1452,8 @@ async def _literal_search(
     path: str = ".",
     k: int = 5,
     exts: Optional[List[str]] = None,
+    *,
+    filename_only: bool = False,
 ) -> Dict[str, Any]:
     """Literal/keyword search using ripgrep (rg) or grep subprocess.
 
@@ -1464,6 +1466,7 @@ async def _literal_search(
         path: Directory to search
         k: Max results
         exts: File extensions ([".py", ".js"])
+        filename_only: Restrict filename-like queries to filename matching only.
     """
     import shutil
     import subprocess
@@ -1559,6 +1562,21 @@ async def _literal_search(
                     }
             except (subprocess.TimeoutExpired, Exception) as e:
                 logger.debug(f"Filename search failed, falling back to content: {e}")
+                if filename_only:
+                    return {
+                        "success": False,
+                        "error": str(e),
+                        "results": [],
+                        "count": 0,
+                        "mode": "filename",
+                    }
+            if filename_only:
+                return {
+                    "success": True,
+                    "results": [],
+                    "count": 0,
+                    "mode": "filename",
+                }
             # Fall through to content search if find returns nothing
 
         # Build command: prefer ripgrep, fall back to grep
@@ -1794,7 +1812,13 @@ async def code_search(
     # Route to literal / filename search for non-semantic modes
     if mode in ("literal", "text", "filename"):
         exts = filters.extensions if filters else None
-        result = await _literal_search(filename_query, path, k, exts)
+        result = await _literal_search(
+            filename_query,
+            path,
+            k,
+            exts,
+            filename_only=(mode == "filename"),
+        )
         if result.get("count", 0) > 0:
             return result
         if mode == "filename":
