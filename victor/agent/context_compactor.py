@@ -309,6 +309,7 @@ class ContextCompactor:
         provider_type: str = "cloud",
         event_bus: Optional[Any] = None,
         decision_service: Optional[Any] = None,
+        runtime_intelligence: Optional[Any] = None,
         adaptive_threshold: Optional["AdaptiveCompactionThreshold"] = None,
     ):
         """Initialize the context compactor.
@@ -320,6 +321,7 @@ class ContextCompactor:
             provider_type: Provider type for RL state (cloud, local)
             event_bus: Optional event bus for compaction events (ObservabilityBus)
             decision_service: Optional TieredDecisionService for tier-based compaction routing
+            runtime_intelligence: Optional canonical runtime-intelligence service
             adaptive_threshold: Optional adaptive threshold system for pattern-based thresholds
         """
         self.controller = controller
@@ -328,6 +330,7 @@ class ContextCompactor:
         self.provider_type = provider_type
         self._event_bus = event_bus
         self._decision_service = decision_service
+        self._runtime_intelligence = runtime_intelligence
         self._last_compaction_turn: int = 0
         self._total_chars_freed: int = 0
         self._total_tokens_freed: int = 0
@@ -346,8 +349,39 @@ class ContextCompactor:
             f"ContextCompactor initialized (threshold: {self.config.proactive_threshold:.0%}, "
             f"rl_enabled: {self._rl_enabled}, "
             f"adaptive_enabled: {self._adaptive_enabled}, "
-            f"decision_service: {decision_service is not None})"
+            f"decision_service: {decision_service is not None or runtime_intelligence is not None})"
         )
+
+    def _has_decision_support(self) -> bool:
+        """Return whether compaction decisions can use the canonical runtime boundary."""
+        if self._runtime_intelligence is not None:
+            return True
+        return self._decision_service is not None
+
+    def _decide_sync(
+        self,
+        decision_type: Any,
+        context: Dict[str, Any],
+        *,
+        heuristic_result: Any = None,
+        heuristic_confidence: float = 0.0,
+    ) -> Optional[Any]:
+        """Delegate bounded compaction decisions via runtime intelligence when available."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        if self._decision_service is not None:
+            return self._decision_service.decide_sync(
+                decision_type,
+                context,
+                heuristic_result=heuristic_result,
+                heuristic_confidence=heuristic_confidence,
+            )
+        return None
 
     # ========================================================================
     # Tier-Based Provider Selection
@@ -428,7 +462,7 @@ class ContextCompactor:
         Returns:
             Dict with optimization decision, or None if decision service unavailable
         """
-        if not self._decision_service:
+        if not self._has_decision_support():
             return None
 
         try:
@@ -611,9 +645,9 @@ class ContextCompactor:
         estimated_tokens = sum(self.estimate_message_tokens(m) for m in turns_to_summarize)
 
         # Try decision service for tier-based routing
-        if self._decision_service:
+        if self._has_decision_support():
             try:
-                decision_result = self._decision_service.decide_sync(
+                decision_result = self._decide_sync(
                     DecisionType.COMPACTION,
                     context={
                         "message_count": len(turns_to_summarize),
@@ -1527,6 +1561,7 @@ def create_context_compactor(
     enable_tool_truncation: bool = True,
     pruning_learner: Optional["ContextPruningLearner"] = None,
     provider_type: str = "cloud",
+    runtime_intelligence: Optional[Any] = None,
 ) -> ContextCompactor:
     """Factory function to create a configured ContextCompactor.
 
@@ -1542,6 +1577,7 @@ def create_context_compactor(
         enable_tool_truncation: Enable tool result truncation (default: True)
         pruning_learner: Optional RL learner for adaptive pruning decisions
         provider_type: Provider type for RL state (cloud, local)
+        runtime_intelligence: Optional canonical runtime-intelligence service
 
     Returns:
         Configured ContextCompactor instance
@@ -1561,4 +1597,5 @@ def create_context_compactor(
         config=config,
         pruning_learner=pruning_learner,
         provider_type=provider_type,
+        runtime_intelligence=runtime_intelligence,
     )

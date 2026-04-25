@@ -15,7 +15,8 @@
 """Tests for ContextCompactor."""
 
 import pytest
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from victor.agent.context_compactor import (
     CompactionAction,
@@ -1505,6 +1506,54 @@ class TestFactoryFunctionAdvanced:
 
         assert compactor.pruning_learner is mock_learner
         assert compactor.provider_type == "cloud"
+
+    def test_create_context_compactor_with_runtime_intelligence(self, mock_controller):
+        """Test factory function preserves runtime-intelligence wiring."""
+        runtime_intelligence = MagicMock()
+
+        compactor = create_context_compactor(
+            controller=mock_controller,
+            runtime_intelligence=runtime_intelligence,
+        )
+
+        assert compactor._runtime_intelligence is runtime_intelligence
+
+
+class TestRuntimeIntelligenceCompaction:
+    """Tests for runtime-intelligence-backed compaction decisions."""
+
+    def test_maybe_summarize_turns_uses_runtime_intelligence(self):
+        """Compaction tier routing should go through runtime intelligence when present."""
+        from victor.agent.decisions.schemas import DecisionType
+        from victor.agent.services.protocols.decision_service import DecisionResult
+
+        controller = MagicMock()
+        controller.messages = [Message(role="system", content="System prompt")]
+        for i in range(18):
+            controller.messages.append(Message(role="user", content=f"User turn {i}"))
+            controller.messages.append(Message(role="assistant", content=f"Assistant turn {i}"))
+
+        runtime_intelligence = MagicMock()
+        runtime_intelligence.decide_sync.return_value = DecisionResult(
+            decision_type=DecisionType.COMPACTION,
+            result=SimpleNamespace(recommended_tier="edge"),
+            source="llm",
+            confidence=0.9,
+        )
+
+        compactor = ContextCompactor(
+            controller=controller,
+            runtime_intelligence=runtime_intelligence,
+        )
+        compactor._get_provider_for_tier = MagicMock(return_value=MagicMock())
+
+        with patch("victor.agent.llm_compaction_summarizer.LLMCompactionSummarizer") as mock_cls:
+            mock_cls.return_value.summarize.return_value = "summarized context"
+
+            action = compactor._maybe_summarize_turns()
+
+        assert action is not None
+        runtime_intelligence.decide_sync.assert_called_once()
 
 
 class TestEnsureAsyncState:

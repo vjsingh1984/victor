@@ -269,6 +269,7 @@ class CoordinationBuildersMixin:
             enable_tool_truncation=getattr(self.settings, "tool_result_truncation", True),
             pruning_learner=pruning_learner,
             provider_type=provider_type,
+            runtime_intelligence=self._get_runtime_intelligence_service(),
         )
 
         rl_status = "with RL learner" if pruning_learner else "without RL learner"

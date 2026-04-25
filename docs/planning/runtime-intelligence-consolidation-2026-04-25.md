@@ -118,9 +118,11 @@ Completed on 2026-04-25:
   - `unified_classifier.py`
   - `task_analyzer.py`
   - runtime-service binding of `TaskAnalyzer` to the canonical runtime boundary
+- Phase 3.3 compaction/runtime consolidation:
+  - `context_compactor.py`
+  - `agent/factory/coordination_builders.py` compactor construction path
 
 Next recommended slice:
-- Phase 3.3: migrate the remaining compaction/runtime decision consumers:
-  - `context_compactor.py`
+- Phase 3.4: migrate the remaining container-coupled runtime decision consumers:
   - `tool_selection.py`
   - `conversation/state_machine.py`

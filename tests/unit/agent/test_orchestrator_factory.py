@@ -742,6 +742,31 @@ class TestWorkflowOptimizationComponents:
         assert detector._runtime_intelligence is not None
         assert detector._runtime_intelligence._decision_service is decision_service
 
+    def test_create_context_compactor_uses_runtime_intelligence(
+        self, factory, mock_container, mock_settings
+    ):
+        """Context compactor should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        mock_settings.context_proactive_threshold = 0.9
+        mock_settings.context_min_messages_after_compact = 8
+        mock_settings.max_tool_output_chars = 8192
+        mock_settings.max_tool_output_lines = 200
+        mock_settings.context_proactive_compaction = True
+        mock_settings.tool_result_truncation = True
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = (
+            lambda protocol: decision_service
+            if protocol is LLMDecisionServiceProtocol
+            else None
+        )
+
+        controller = MagicMock()
+        compactor = factory.create_context_compactor(controller)
+
+        assert compactor._runtime_intelligence is not None
+        assert compactor._runtime_intelligence._decision_service is decision_service
+
     def test_create_resource_manager(self, factory):
         """create_resource_manager returns singleton ResourceManager."""
         from victor.agent.resource_manager import ResourceManager
