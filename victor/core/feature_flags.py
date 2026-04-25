@@ -126,10 +126,21 @@ class FeatureFlag(Enum):
     # Priority 4 - Learning from Execution (meta-learning, user feedback, explainability)
     USE_LEARNING_FROM_EXECUTION = "use_learning_from_execution"
 
+    # Tool Broadcasting Optimization (context-aware, economy-first)
+    TOOL_STRATEGY_V2 = "tool_strategy_v2"
+
     # Phase 9 - Prompt Optimization (controlled via settings.prompt_optimization)
     # USE_PROMPT_OPTIMIZER → settings.prompt_optimization.enabled
     # USE_GEPA_V2          → settings.prompt_optimization.gepa.enabled
     # USE_GEPA_TRACE_ENRICHMENT → settings.prompt_optimization.gepa.capture_reasoning
+
+    # Phase 12 - Rich Formatting (unified formatter system with preview integration)
+    # USE_RICH_FORMATTING → settings.rich_formatting_enabled (master switch)
+    # This flag controls the entire Rich formatter system including:
+    # - Tool output formatting with Rich markup
+    # - Preview strategy integration
+    # - Performance guards and error handling
+    USE_RICH_FORMATTING = "use_rich_formatting"
 
     def get_env_var_name(self) -> str:
         """Get the environment variable name for this flag.
