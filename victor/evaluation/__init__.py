@@ -106,6 +106,7 @@ from victor.evaluation.analyzers import (
     get_pass_at_k_evaluator,
 )
 from victor.evaluation.services import (
+    parse_validated_session_truth_legacy_kwargs,
     ValidatedSessionTruthServiceProtocol,
     ValidatedSessionTruthService,
     create_validated_session_truth_service,
@@ -264,6 +265,7 @@ __all__ = [
     "AnalyzerRegistry",
     "get_code_quality_analyzer",
     "get_pass_at_k_evaluator",
+    "parse_validated_session_truth_legacy_kwargs",
     "ValidatedSessionTruthServiceProtocol",
     "ValidatedSessionTruthService",
     "create_validated_session_truth_service",

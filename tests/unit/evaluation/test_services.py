@@ -9,6 +9,7 @@ from victor.evaluation.services import (
     ValidatedSessionTruthServiceProtocol,
     ValidatedSessionTruthService as exported_service,
     create_validated_session_truth_service,
+    parse_validated_session_truth_legacy_kwargs,
     resolve_validated_session_truth_service,
 )
 from victor.evaluation.validated_session_truth_emitters import (
@@ -74,3 +75,22 @@ def test_resolve_validated_session_truth_service_delegates_to_factory(monkeypatc
 
     assert resolved is stub_service
     assert captured["emitters"] is registry
+
+
+def test_parse_validated_session_truth_legacy_kwargs_returns_registry():
+    registry = ValidatedSessionTruthEmitterRegistry()
+
+    parsed = parse_validated_session_truth_legacy_kwargs(
+        {"validated_session_truth_emitters": registry}
+    )
+
+    assert parsed is registry
+
+
+def test_parse_validated_session_truth_legacy_kwargs_rejects_unexpected_keys():
+    try:
+        parse_validated_session_truth_legacy_kwargs({"unexpected": object()})
+    except TypeError as exc:
+        assert str(exc) == "Unexpected keyword argument(s): unexpected"
+    else:
+        raise AssertionError("Expected TypeError for unexpected keyword")

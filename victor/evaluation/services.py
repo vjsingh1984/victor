@@ -67,9 +67,22 @@ def resolve_validated_session_truth_service(
     return service or create_validated_session_truth_service(emitters)
 
 
+def parse_validated_session_truth_legacy_kwargs(
+    legacy_kwargs: Mapping[str, Any],
+) -> Optional[ValidatedSessionTruthEmitterRegistry]:
+    """Parse validated-session-truth compatibility kwargs and reject unknown keys."""
+    remaining_kwargs = dict(legacy_kwargs)
+    emitters = remaining_kwargs.pop("validated_session_truth_emitters", None)
+    if remaining_kwargs:
+        unexpected = ", ".join(sorted(remaining_kwargs))
+        raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
+    return emitters
+
+
 __all__ = [
     "ValidatedSessionTruthServiceProtocol",
     "ValidatedSessionTruthService",
     "create_validated_session_truth_service",
+    "parse_validated_session_truth_legacy_kwargs",
     "resolve_validated_session_truth_service",
 ]

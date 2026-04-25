@@ -325,8 +325,18 @@ Next recommended slice:
     instead of duplicating the same service-or-registry resolution logic
 
 Next recommended slice:
-- Phase 5.20: centralize legacy validated session-truth compatibility kwarg
-  parsing so runtime constructors stop duplicating `validated_session_truth_emitters`
-  extraction and unexpected-key handling
-  - Keep public compatibility behavior stable
-  - Avoid widening the higher-level constructor surface while the shim remains
+- Phase 5.20 completed: centralize legacy validated session-truth compatibility
+  kwarg parsing so runtime constructors stop duplicating
+  `validated_session_truth_emitters` extraction and unexpected-key handling
+  - `services.py` now owns compatibility parsing in
+    `parse_validated_session_truth_legacy_kwargs(...)`
+  - `EvaluationHarness` and `EvaluationOrchestrator` now share that parser
+    instead of hand-rolling the same legacy kwarg handling
+
+Next recommended slice:
+- Phase 5.21: collapse the remaining parse-plus-resolve constructor flow into a
+  single evaluation-level helper so runtimes no longer carry any
+  validated-session-truth-specific constructor logic beyond accepting an
+  injected service
+  - Keep compatibility behavior stable
+  - Prefer one final materialization helper over stacking more constructor code

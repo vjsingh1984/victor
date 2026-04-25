@@ -49,6 +49,7 @@ from victor.evaluation.validated_session_truth_emitters import (
     ValidatedSessionTruthEmitterRegistry,
 )
 from victor.evaluation.services import (
+    parse_validated_session_truth_legacy_kwargs,
     ValidatedSessionTruthServiceProtocol,
     resolve_validated_session_truth_service,
 )
@@ -481,13 +482,9 @@ class EvaluationHarness:
             checkpoint_dir: Directory for checkpoint files (defaults to ~/.victor/checkpoints)
             validated_session_truth_service: Service for validated session-truth orchestration
         """
-        validated_session_truth_emitters = legacy_kwargs.pop(
-            "validated_session_truth_emitters",
-            None,
+        validated_session_truth_emitters = parse_validated_session_truth_legacy_kwargs(
+            legacy_kwargs
         )
-        if legacy_kwargs:
-            unexpected = ", ".join(sorted(legacy_kwargs))
-            raise TypeError(f"Unexpected keyword argument(s): {unexpected}")
         self._runners = runners or {}
         self._validated_session_truth_service = resolve_validated_session_truth_service(
             service=validated_session_truth_service,

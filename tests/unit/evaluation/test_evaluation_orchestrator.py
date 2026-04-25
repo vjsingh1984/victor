@@ -637,6 +637,29 @@ class TestEvaluationOrchestrator:
             assert orchestrator._validated_session_truth_service is stub_service
             resolve_service.assert_called_once_with(service=None, emitters=registry)
 
+    def test_orchestrator_parses_legacy_service_kwargs_through_shared_helper(self):
+        """Orchestrator should centralize validated-session-truth compatibility parsing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config = OrchestratorConfig(output_dir=Path(tmpdir))
+            registry = ValidatedSessionTruthEmitterRegistry()
+
+            with patch(
+                "victor.evaluation.evaluation_orchestrator.parse_validated_session_truth_legacy_kwargs",
+                return_value=registry,
+            ) as parse_legacy:
+                with patch(
+                    "victor.evaluation.evaluation_orchestrator.resolve_validated_session_truth_service",
+                    return_value=object(),
+                ):
+                    EvaluationOrchestrator(
+                        config,
+                        validated_session_truth_emitters=registry,
+                    )
+
+            parse_legacy.assert_called_once_with(
+                {"validated_session_truth_emitters": registry}
+            )
+
 
 class TestProgressCallback:
     """Tests for progress callback functionality."""

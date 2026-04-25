@@ -888,6 +888,28 @@ class TestBenchmarkToolUsageMetrics:
         assert harness._validated_session_truth_service is stub_service
         resolve_service.assert_called_once_with(service=None, emitters=registry)
 
+    def test_harness_parses_legacy_service_kwargs_through_shared_helper(self, tmp_path):
+        """Harness should centralize validated-session-truth compatibility parsing."""
+
+        registry = ValidatedSessionTruthEmitterRegistry()
+
+        with patch(
+            "victor.evaluation.harness.parse_validated_session_truth_legacy_kwargs",
+            return_value=registry,
+        ) as parse_legacy:
+            with patch(
+                "victor.evaluation.harness.resolve_validated_session_truth_service",
+                return_value=object(),
+            ):
+                EvaluationHarness(
+                    checkpoint_dir=tmp_path,
+                    validated_session_truth_emitters=registry,
+                )
+
+        parse_legacy.assert_called_once_with(
+            {"validated_session_truth_emitters": registry}
+        )
+
 
 class TestSaveAndLoadResults:
     """Tests for saving and loading evaluation results."""
