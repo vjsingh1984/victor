@@ -165,7 +165,7 @@ class TestDefaultSafetyExtension:
 
     def test_get_tool_restrictions(self, ext):
         restrictions = ext.get_tool_restrictions()
-        assert "write_file" in restrictions
+        assert "write" in restrictions
         assert "shell" in restrictions
 
     def test_category_is_default(self, ext):
