@@ -221,7 +221,7 @@ The function above handles authentication.
         detector = ContextAwareKeywordDetector()
 
         # Strong completion signals
-        response = "Here is the implementation. ```code``` ## Summary"
+        response = "Here is the implementation.\n```code```\n## Summary"
 
         signal = detector.detect_completion(
             response=response, task_type=TaskType.CODE_GENERATION, requirements=None

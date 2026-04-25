@@ -276,7 +276,8 @@ class ContextAwareKeywordDetector:
         pattern_match_count = len(matched_patterns)
 
         if has_task_pattern:
-            evidence.append(f"Found task-specific completion pattern for {task_type}")
+            patterns_str = ", ".join(f"'{p}'" for p in matched_patterns[:3])
+            evidence.append(f"Found task-specific completion pattern for {task_type}: {patterns_str}")
             indicator_types.append(CompletionIndicatorType.EXPLICIT)
 
         # 3. Check for deliverable references
