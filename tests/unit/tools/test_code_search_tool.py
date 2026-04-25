@@ -1023,6 +1023,42 @@ async def test_code_search_literal_mode_escalation_preserves_requested_mode_cont
 
 
 @pytest.mark.asyncio
+async def test_code_search_text_mode_escalation_preserves_requested_mode_on_semantic_failure(
+    tmp_path,
+) -> None:
+    """Explicit text mode should keep mode='text' if semantic fallback returns to literal search."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(side_effect=RuntimeError("semantic search failed"))
+    )
+    exec_ctx = {"settings": _settings()}
+    literal_search = AsyncMock(return_value={"success": True, "results": [], "count": 0, "mode": "literal"})
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=literal_search,
+    ):
+        result = await code_search(
+            query="main entrypoint",
+            path=str(tmp_path),
+            k=3,
+            mode="text",
+            _exec_ctx=exec_ctx,
+        )
+
+    assert literal_search.await_count == 2
+    assert result["success"] is True
+    assert result["mode"] == "text"
+    assert result["fallback"] == "semantic_search_error"
+    assert result["metadata"]["requested_mode"] == "text"
+    assert result["metadata"]["fallback_mode"] == "semantic"
+    assert result["metadata"]["fallback_reason"] == "literal_no_results"
+    assert "mode_fallback=semantic" in result["metadata"]["filters_applied"]
+
+
+@pytest.mark.asyncio
 async def test_code_search_strips_vectors_and_console_only_fields(tmp_path) -> None:
     """Semantic search responses should omit vectors while keeping rich preview fields."""
     mock_index = SimpleNamespace(

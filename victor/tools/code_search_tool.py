@@ -556,9 +556,12 @@ def _decorate_literal_fallback_result(
     fallback: str,
     filters_applied: Optional[List[str]] = None,
     metadata: Optional[Dict[str, Any]] = None,
+    mode_override: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Attach consistent fallback context to literal-search results."""
 
+    if mode_override:
+        result["mode"] = mode_override
     result["fallback"] = fallback
     merged_metadata = result.get("metadata")
     if not isinstance(merged_metadata, dict):
@@ -590,6 +593,18 @@ def _early_semantic_fallback_metadata(
     if literal_escalation_metadata:
         return dict(literal_escalation_metadata)
     return _requested_mode_literal_fallback_metadata(mode)
+
+
+def _literal_fallback_mode_override(
+    requested_mode: str,
+    *,
+    literal_escalation_metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[str]:
+    """Preserve explicit direct-route modes when semantic fallback returns to literal search."""
+
+    if literal_escalation_metadata and requested_mode in {"literal", "text"}:
+        return requested_mode
+    return None
 
 
 def _normalize_search_filters(filters: Optional[SearchFilters]) -> Optional[SearchFilters]:
@@ -2062,6 +2077,10 @@ async def code_search(
                     mode,
                     literal_escalation_metadata=literal_escalation_metadata,
                 ),
+                mode_override=_literal_fallback_mode_override(
+                    requested_mode,
+                    literal_escalation_metadata=literal_escalation_metadata,
+                ),
             )
 
         # Build metadata filter from optional parameters
@@ -2134,6 +2153,10 @@ async def code_search(
                     mode,
                     literal_escalation_metadata=literal_escalation_metadata,
                 ),
+                mode_override=_literal_fallback_mode_override(
+                    requested_mode,
+                    literal_escalation_metadata=literal_escalation_metadata,
+                ),
             )
 
         if _is_cached_index_stale(root_path, _exec_ctx):
@@ -2155,6 +2178,10 @@ async def code_search(
                 filters_applied=filters_applied,
                 metadata=_early_semantic_fallback_metadata(
                     mode,
+                    literal_escalation_metadata=literal_escalation_metadata,
+                ),
+                mode_override=_literal_fallback_mode_override(
+                    requested_mode,
                     literal_escalation_metadata=literal_escalation_metadata,
                 ),
             )
@@ -2390,6 +2417,10 @@ async def code_search(
                 fallback=_classify_semantic_fallback(exc, scope="semantic_search"),
                 filters_applied=filters_applied,
                 metadata={**backend_metadata, **fallback_metadata},
+                mode_override=_literal_fallback_mode_override(
+                    requested_mode,
+                    literal_escalation_metadata=literal_escalation_metadata,
+                ),
             )
 
         # Record outcome for RL threshold learning if enabled
