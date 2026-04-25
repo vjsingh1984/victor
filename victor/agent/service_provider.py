@@ -48,6 +48,7 @@ import logging
 import warnings
 from typing import TYPE_CHECKING, Any, Optional
 
+from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
 from victor.core.container import ServiceContainer, ServiceLifetime
 from victor.core.service_registration import (
     ServiceRegistrationSpec,
@@ -807,7 +808,7 @@ class OrchestratorServiceProvider:
 
         # Get embedding model from settings
         embedding_model = getattr(self._settings, "embedding_model", "all-MiniLM-L12-v2")
-        use_semantic_selection = getattr(self._settings, "use_semantic_tool_selection", True)
+        use_semantic_selection = is_semantic_tool_selection_enabled(self._settings, default=True)
 
         if not use_semantic_selection:
             # Return a no-op selector that just returns all tools

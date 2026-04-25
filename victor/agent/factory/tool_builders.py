@@ -26,6 +26,8 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
+from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
+
 if TYPE_CHECKING:
     from victor.config.settings import Settings
     from victor.providers.base import BaseProvider
@@ -502,7 +504,7 @@ class ToolBuildersMixin:
         Returns:
             SemanticToolSelector instance or None
         """
-        use_semantic_selection = getattr(self.settings, "use_semantic_tool_selection", False)
+        use_semantic_selection = is_semantic_tool_selection_enabled(self.settings, default=False)
 
         if not use_semantic_selection:
             return None

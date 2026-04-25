@@ -59,7 +59,7 @@ from typing import (
 if TYPE_CHECKING:
     from victor.agent.tool_calling import BaseToolCallingAdapter, ToolCallParseResult
     from victor.agent.tool_output_formatter import ToolOutputFormatter
-    from victor.tools import ToolRegistry
+    from victor.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

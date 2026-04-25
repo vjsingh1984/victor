@@ -63,11 +63,7 @@ from importlib.metadata import entry_points
 import yaml
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
-
-from victor.core.tool_dependency_base import (
-    BaseToolDependencyProvider,
-    ToolDependencyConfig,
-)
+from victor_sdk.verticals.tool_dependencies import BaseToolDependencyProvider, ToolDependencyConfig
 from victor.core.tool_dependency_schema import ToolDependencySpec
 from victor.core.tool_types import ToolDependency
 from victor.core.verticals.config_registry import (

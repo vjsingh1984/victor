@@ -39,7 +39,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from victor.core.tool_dependency_base import ToolDependencyConfig
+    from victor_sdk.verticals.tool_dependencies import ToolDependencyConfig
 
 
 @dataclass

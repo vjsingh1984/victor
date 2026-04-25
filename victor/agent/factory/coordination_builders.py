@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Dict, Optional, Tuple, TYPE_CHECKING
 
+from victor.config.tool_selection_access import is_semantic_tool_selection_enabled
 from victor.agent.coordinators.factory_support import (
     create_exploration_coordinator as build_exploration_coordinator,
     create_exploration_state_passed_coordinator as build_exploration_state_passed_coordinator,
@@ -522,7 +523,7 @@ class CoordinationBuildersMixin:
         Returns:
             Tuple of (use_semantic_selection, embedding_preload_task_placeholder)
         """
-        use_semantic = getattr(self.settings, "use_semantic_tool_selection", False)
+        use_semantic = is_semantic_tool_selection_enabled(self.settings, default=False)
         logger.debug(f"Semantic selection setup: enabled={use_semantic}")
         return (use_semantic, None)
 
