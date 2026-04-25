@@ -1634,6 +1634,16 @@ async def _literal_search(
                         "count": len(results),
                         "mode": "filename",
                     }
+            except asyncio.TimeoutError:
+                logger.debug("Filename search timed out after 15s")
+                if filename_only:
+                    return {
+                        "success": False,
+                        "error": "Filename search timed out after 15s",
+                        "results": [],
+                        "count": 0,
+                        "mode": "filename",
+                    }
             except (subprocess.TimeoutExpired, Exception) as e:
                 logger.debug(f"Filename search failed, falling back to content: {e}")
                 if filename_only:
@@ -1752,6 +1762,8 @@ async def _literal_search(
             "count": len(results),
             "mode": "literal",
         }
+    except asyncio.TimeoutError:
+        return {"success": False, "error": "Search timed out after 30s"}
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Search timed out after 30s"}
     except Exception as exc:

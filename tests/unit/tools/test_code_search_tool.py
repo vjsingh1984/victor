@@ -14,6 +14,7 @@
 
 """Unit tests for code_search_tool."""
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -788,6 +789,54 @@ async def test_literal_search_grep_fallback_honors_extension_filters_without_dot
     assert result["success"] is True
     assert result["mode"] == "literal"
     assert result["count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_literal_search_timeout_returns_friendly_error(tmp_path) -> None:
+    """Async literal-search timeouts should return a stable timeout message."""
+
+    proc = SimpleNamespace(communicate=MagicMock(return_value=object()))
+
+    with patch(
+        "asyncio.create_subprocess_exec",
+        new=AsyncMock(return_value=proc),
+    ), patch(
+        "asyncio.wait_for",
+        side_effect=asyncio.TimeoutError,
+    ):
+        result = await _literal_search("needle", str(tmp_path), 3)
+
+    assert result == {"success": False, "error": "Search timed out after 30s"}
+
+
+@pytest.mark.asyncio
+async def test_literal_search_filename_only_timeout_returns_friendly_error(tmp_path) -> None:
+    """Filename-only async timeouts should return a filename-specific timeout message."""
+
+    proc = SimpleNamespace(communicate=MagicMock(return_value=object()))
+
+    with patch(
+        "asyncio.create_subprocess_exec",
+        new=AsyncMock(return_value=proc),
+    ), patch(
+        "asyncio.wait_for",
+        side_effect=asyncio.TimeoutError,
+    ):
+        result = await _literal_search(
+            "parser.py",
+            str(tmp_path),
+            3,
+            None,
+            filename_only=True,
+        )
+
+    assert result == {
+        "success": False,
+        "error": "Filename search timed out after 15s",
+        "results": [],
+        "count": 0,
+        "mode": "filename",
+    }
 
 
 @pytest.mark.asyncio
