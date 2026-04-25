@@ -570,6 +570,29 @@ async def test_literal_search_filename_only_uses_filename_matching_without_exten
 
 
 @pytest.mark.asyncio
+async def test_literal_search_filename_only_matches_path_qualified_query(tmp_path) -> None:
+    """Explicit filename searches should support path-qualified queries like src/parser.py."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    target = source_dir / "parser.py"
+    target.write_text("pass\n", encoding="utf-8")
+
+    result = await _literal_search(
+        "src/parser.py",
+        str(tmp_path),
+        3,
+        None,
+        filename_only=True,
+    )
+
+    assert result["success"] is True
+    assert result["mode"] == "filename"
+    assert result["count"] == 1
+    assert result["results"][0]["path"].endswith("src/parser.py")
+    assert result["results"][0]["score"] == 10
+
+
+@pytest.mark.asyncio
 async def test_code_search_literal_mode_escalation_preserves_requested_mode_context(
     tmp_path,
 ) -> None:

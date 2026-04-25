@@ -1525,6 +1525,9 @@ async def _literal_search(
             import platform
 
             system = platform.system()
+            normalized_filename_query = search_query.replace("\\", "/").lstrip("./")
+            query_has_path_components = "/" in normalized_filename_query
+            query_suffix = normalized_filename_query.lower()
             logger.info(
                 f"Filename query detected: using {'dir' if system == 'Windows' else 'find'} "
                 f"for {search_query!r} on {system}"
@@ -1532,11 +1535,16 @@ async def _literal_search(
 
             if system == "Windows":
                 # Windows: use dir /s /b for recursive file search
-                find_cmd = ["cmd", "/c", "dir", "/s", "/b", f"*{search_query}*"]
+                if query_has_path_components:
+                    find_cmd = ["cmd", "/c", "dir", "/s", "/b"]
+                else:
+                    find_cmd = ["cmd", "/c", "dir", "/s", "/b", f"*{search_query}*"]
                 find_cwd = search_path
             else:
                 # Linux / macOS: use find
-                find_cmd = ["find", search_path, "-type", "f", "-name", f"*{search_query}*"]
+                find_cmd = ["find", search_path, "-type", "f"]
+                if not query_has_path_components:
+                    find_cmd.extend(["-name", f"*{search_query}*"])
                 find_cwd = None
 
             try:
@@ -1552,13 +1560,20 @@ async def _literal_search(
                     "obj", (object,), {"stdout": stdout.decode("utf-8", errors="ignore")}
                 )
                 found_files = [f.strip() for f in find_result.stdout.splitlines() if f.strip()]
+                if query_has_path_components:
+                    found_files = [
+                        fpath
+                        for fpath in found_files
+                        if query_suffix in fpath.replace("\\", "/").lower()
+                    ]
                 if found_files:
                     results = []
                     for fpath in found_files[:k]:
+                        normalized_path = fpath.replace("\\", "/").lower()
                         results.append(
                             {
                                 "path": fpath,
-                                "score": 10 if fpath.endswith(search_query) else 5,
+                                "score": 10 if normalized_path.endswith(query_suffix) else 5,
                                 "snippet": f"[File found: {fpath}]",
                             }
                         )
