@@ -352,8 +352,12 @@ class ContextAwareKeywordDetector:
         # Convert task_type to string key
         if isinstance(task_type, str):
             task_key = task_type.lower()
+        elif hasattr(task_type, "value"):
+            task_key = str(task_type.value).lower()
         else:
-            task_key = str(task_type).lower().replace("TaskType.", "")
+            # Handle enum repr like "TaskType.TESTING" → "testing"
+            raw = str(task_type).lower()
+            task_key = raw.split(".")[-1]
 
         # Look up task-specific patterns
         if task_key in self.task_completion_patterns:
