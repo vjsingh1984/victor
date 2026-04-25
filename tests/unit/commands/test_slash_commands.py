@@ -1324,7 +1324,9 @@ class TestSessionCommands:
             },
             "conversation": {
                 "messages": [{"role": "user", "content": "hello"}],
-                "preview_messages": [{"role": "assistant", "content": "diff", "metadata": {}}],
+                "preview_messages": [
+                    {"role": "assistant", "content": "diff", "metadata": {"preview_path": "app.py"}}
+                ],
             },
         }
         linker_instance = MagicMock()
@@ -1346,6 +1348,7 @@ class TestSessionCommands:
         output = stdout.getvalue()
         assert "Session Resumed" in output
         assert "Previews:" in output
+        assert "Preview Files:" in output
         assert "Resume:" in output
         assert "app.py" in output
         assert "1" in output

@@ -433,7 +433,12 @@ class ResumeCommand(BaseSlashCommand):
             # Restore conversation
             metadata = session_data.get("metadata", {})
             conversation_dict = session_data.get("conversation", {})
-            preview_count = _preview_count(conversation_dict.get("preview_messages", []))
+            preview_messages = conversation_dict.get("preview_messages", [])
+            preview_count = _preview_count(preview_messages)
+            preview_paths = _preview_path_summary(preview_messages)
+            preview_paths_line = (
+                f"[bold]Preview Files:[/] {preview_paths}\n" if preview_paths else ""
+            )
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
@@ -514,6 +519,7 @@ class ResumeCommand(BaseSlashCommand):
                     f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
                     f"[bold]Messages:[/] {metadata.get('message_count', 0)}\n"
                     f"[bold]Previews:[/] {preview_count}\n"
+                    f"{preview_paths_line}"
                     f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}\n"
                     f"[bold]Resume:[/] {resume_ctx.resume_summary}",
                     title="Session Resumed",
