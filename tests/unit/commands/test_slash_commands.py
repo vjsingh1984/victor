@@ -1217,6 +1217,45 @@ class TestSessionCommands:
         assert "claude-sonnet-4-20250514" in output
         assert "1" in output
 
+    def test_load_command_surfaces_preview_counts(self):
+        """Test LoadCommand shows preview counts from persisted preview messages."""
+        from victor.ui.slash.commands.session import LoadCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False, width=160)
+        settings = MagicMock()
+        agent = MagicMock()
+        session = MagicMock()
+        session.conversation = {
+            "messages": [{"role": "user", "content": "hello"}],
+            "preview_messages": [{"role": "assistant", "content": "diff", "metadata": {}}],
+        }
+        session.conversation_state = None
+        session.metadata = SimpleNamespace(
+            title="Preview Session",
+            model="claude-sonnet-4-20250514",
+            provider="anthropic",
+            message_count=2,
+            created_at="2026-03-19T10:00:00",
+        )
+
+        ctx = CommandContext(
+            console=console,
+            settings=settings,
+            agent=agent,
+            args=["test-session-123"],
+        )
+
+        with patch("victor.agent.session.get_session_manager") as get_session_manager:
+            get_session_manager.return_value.load_session.return_value = session
+            LoadCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Session Loaded" in output
+        assert "Previews:" in output
+        assert "Preview Session" in output
+        assert "1" in output
+
     def test_resume_command_surfaces_resume_summary(self):
         """Test ResumeCommand shows SessionContextLinker resume summary."""
         from victor.agent.session_context_linker import SessionResumeContext
@@ -1238,7 +1277,10 @@ class TestSessionCommands:
                 "message_count": 2,
                 "created_at": "2026-03-19T10:00:00",
             },
-            "conversation": {"messages": [{"role": "user", "content": "hello"}]},
+            "conversation": {
+                "messages": [{"role": "user", "content": "hello"}],
+                "preview_messages": [{"role": "assistant", "content": "diff", "metadata": {}}],
+            },
         }
         linker_instance = MagicMock()
         linker_instance.build_resume_context.return_value = SessionResumeContext(
@@ -1258,8 +1300,10 @@ class TestSessionCommands:
 
         output = stdout.getvalue()
         assert "Session Resumed" in output
+        assert "Previews:" in output
         assert "Resume:" in output
         assert "app.py" in output
+        assert "1" in output
 
     def test_resume_command_selection_displays_preview_counts(self):
         """Test interactive ResumeCommand listing shows preview counts."""

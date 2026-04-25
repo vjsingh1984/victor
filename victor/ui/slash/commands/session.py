@@ -167,7 +167,11 @@ class LoadCommand(BaseSlashCommand):
                 return
 
             # Restore conversation
-            ctx.agent.conversation = MessageHistory.from_dict(session.conversation)
+            conversation_dict = session.conversation
+            preview_messages = conversation_dict.get("preview_messages", [])
+            preview_count = len(preview_messages) if isinstance(preview_messages, list) else 0
+
+            ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
             # Set active session ID for parallel session support
             ctx.agent.active_session_id = session_id
@@ -188,6 +192,7 @@ class LoadCommand(BaseSlashCommand):
                     f"[bold]Model:[/] {session.metadata.model}\n"
                     f"[bold]Provider:[/] {session.metadata.provider}\n"
                     f"[bold]Messages:[/] {session.metadata.message_count}\n"
+                    f"[bold]Previews:[/] {preview_count}\n"
                     f"[bold]Created:[/] {session.metadata.created_at}",
                     title="Session Loaded",
                     border_style="green",
@@ -377,6 +382,8 @@ class ResumeCommand(BaseSlashCommand):
             # Restore conversation
             metadata = session_data.get("metadata", {})
             conversation_dict = session_data.get("conversation", {})
+            preview_messages = conversation_dict.get("preview_messages", [])
+            preview_count = len(preview_messages) if isinstance(preview_messages, list) else 0
 
             ctx.agent.conversation = MessageHistory.from_dict(conversation_dict)
 
@@ -456,6 +463,7 @@ class ResumeCommand(BaseSlashCommand):
                     f"[bold]Model:[/] {metadata.get('model', 'N/A')}\n"
                     f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
                     f"[bold]Messages:[/] {metadata.get('message_count', 0)}\n"
+                    f"[bold]Previews:[/] {preview_count}\n"
                     f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}\n"
                     f"[bold]Resume:[/] {resume_ctx.resume_summary}",
                     title="Session Resumed",
