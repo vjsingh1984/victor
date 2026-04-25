@@ -514,6 +514,56 @@ async def test_code_search_semantic_query_respects_file_pattern_filter(tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_code_search_semantic_glob_file_pattern_filters_results_after_search(tmp_path) -> None:
+    """Glob file patterns should filter semantic hits after retrieval instead of exact-matching metadata."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.js",
+                    "content": "export function parseJson(data) { return JSON.parse(data); }",
+                    "score": 0.91,
+                },
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return json.loads(data)",
+                    "score": 0.74,
+                },
+            ]
+        )
+    )
+    filters = SearchFilters(file_pattern="*.py")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ) as get_index, patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(),
+    ) as literal_search:
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=2,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_not_awaited()
+    get_index.assert_awaited_once()
+    mock_index.semantic_search.assert_awaited_once_with(
+        query="json parsing",
+        max_results=8,
+        filter_metadata=None,
+        similarity_threshold=0.25,
+        expand_query=True,
+    )
+    assert result["mode"] == "semantic"
+    assert result["count"] == 1
+    assert result["results"][0]["file_path"] == "src/parser.py"
+
+
+@pytest.mark.asyncio
 async def test_code_search_filename_mode_uses_parent_directory_for_file_path(tmp_path) -> None:
     """Filename mode should normalize file paths to their parent directory before searching."""
     source_dir = tmp_path / "src"

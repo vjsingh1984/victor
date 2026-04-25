@@ -733,6 +733,32 @@ def _matches_literal_file_pattern(file_path: str, file_pattern: str, *, search_r
     return basename == normalized_pattern
 
 
+def _file_pattern_has_glob(file_pattern: str) -> bool:
+    """Return whether a file pattern uses glob syntax rather than exact matching."""
+
+    normalized_pattern = _normalize_code_search_path(file_pattern.strip())
+    return any(token in normalized_pattern for token in "*?[]")
+
+
+def _filter_search_results_by_file_pattern(
+    results: List[Any],
+    file_pattern: str,
+    *,
+    search_root: Path,
+) -> List[Any]:
+    """Filter result objects by file pattern using the shared path matcher."""
+
+    filtered_results: List[Any] = []
+    for result in results:
+        result_dict = _normalize_result_dict(result)
+        file_path = result_dict.get("file_path") or result_dict.get("path")
+        if not isinstance(file_path, str):
+            continue
+        if _matches_literal_file_pattern(file_path, file_pattern, search_root=str(search_root)):
+            filtered_results.append(result)
+    return filtered_results
+
+
 def _build_literal_search_kwargs(
     *,
     allow_filename_autodetect: bool,
@@ -2180,6 +2206,7 @@ async def code_search(
         # Build metadata filter from optional parameters
         filter_metadata: Optional[Dict[str, Any]] = None
         filters_applied = []
+        manual_file_pattern_filter: Optional[str] = None
         if mode_fallback_to_semantic:
             filters_applied.append("mode_fallback=semantic")
 
@@ -2188,8 +2215,11 @@ async def code_search(
         ):
             filter_metadata = {}
             if filters.file_pattern:
-                filter_metadata["file_path"] = filters.file_pattern
                 filters_applied.append(f"file={filters.file_pattern}")
+                if _file_pattern_has_glob(filters.file_pattern):
+                    manual_file_pattern_filter = filters.file_pattern
+                else:
+                    filter_metadata["file_path"] = filters.file_pattern
             if filters.symbol:
                 filter_metadata["symbol_type"] = filters.symbol
                 filters_applied.append(f"symbol={filters.symbol}")
@@ -2493,10 +2523,13 @@ async def code_search(
 
         # Perform semantic search with timeout and literal fallback
         try:
+            semantic_max_results = k * 2 if enable_hybrid else k
+            if manual_file_pattern_filter:
+                semantic_max_results = max(semantic_max_results, k * 4)
             results = await asyncio.wait_for(
                 index.semantic_search(
                     query=query,
-                    max_results=k * 2 if enable_hybrid else k,
+                    max_results=semantic_max_results,
                     filter_metadata=safe_filter,
                     similarity_threshold=similarity_threshold,
                     expand_query=expand_query,
@@ -2524,6 +2557,13 @@ async def code_search(
                     requested_mode,
                     literal_escalation_metadata=literal_escalation_metadata,
                 ),
+            )
+
+        if manual_file_pattern_filter:
+            results = _filter_search_results_by_file_pattern(
+                results,
+                manual_file_pattern_filter,
+                search_root=root_path,
             )
 
         # Record outcome for RL threshold learning if enabled
