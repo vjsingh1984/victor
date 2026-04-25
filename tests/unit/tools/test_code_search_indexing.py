@@ -242,6 +242,38 @@ class TestCorruptionDetection:
         assert result is True  # Should trigger rebuild
         assert mock_index._is_indexed is False  # Flag should be cleared
 
+    @pytest.mark.asyncio
+    async def test_probe_cancellation_cleans_up_semantic_search_task(self):
+        """Cancelling the integrity probe should also cancel the spawned search task."""
+        mock_index = MagicMock()
+        mock_index._is_indexing = False
+        mock_index._is_indexed = True
+
+        mock_store = MagicMock()
+        mock_store._table = None
+        mock_index._vector_store = mock_store
+
+        cancelled = asyncio.Event()
+
+        async def mock_semantic_search(*args, **kwargs):
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                cancelled.set()
+                raise
+
+        mock_index.semantic_search = mock_semantic_search
+
+        probe = asyncio.create_task(_probe_index_integrity(mock_index, timeout=5.0))
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        probe.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await probe
+
+        assert cancelled.is_set()
+
 
 class TestErrorClassification:
     """Tests for error classification in corruption detection."""

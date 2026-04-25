@@ -172,6 +172,7 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
 
     ENHANCEMENT: Distinguishes between init-time races and actual corruption.
     """
+    probe_task: Optional[asyncio.Task[Any]] = None
     try:
         # NEW: Check if index is currently being built
         if _get_instance_attr(index, "_is_indexing", False) is True:
@@ -207,6 +208,11 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
             return True
         await probe_task
         return False  # Healthy — no rebuild needed
+    except asyncio.CancelledError:
+        if probe_task is not None and not probe_task.done():
+            probe_task.cancel()
+            await asyncio.gather(probe_task, return_exceptions=True)
+        raise
     except Exception as e:
         # ENHANCEMENT: Better error classification
         error_msg = str(e) if str(e) else f"{type(e).__name__}"
