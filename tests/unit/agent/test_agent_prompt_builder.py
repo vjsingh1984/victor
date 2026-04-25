@@ -85,6 +85,14 @@ class TestSystemPromptBuilder:
         assert isinstance(result, str)
         assert len(result) > 0
 
+    def test_build_document_renders_same_prompt(self):
+        """Canonical document render should match legacy build output."""
+        builder = SystemPromptBuilder(provider_name="anthropic", model="claude-3")
+
+        document = builder.build_document()
+
+        assert document.render() == builder.build()
+
     def test_build_cloud_prompt_mentions_tools(self):
         """Test that cloud prompt mentions tool usage."""
         builder = SystemPromptBuilder(provider_name="anthropic", model="claude-3")

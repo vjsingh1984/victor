@@ -36,6 +36,7 @@ from victor.core.completion_markers import (
     TASK_DONE_MARKER,
 )
 from victor.core.constants import DEFAULT_VERTICAL
+from victor.framework.prompt_document import PromptBlock, PromptDocument
 from victor.tools.core_tool_aliases import canonicalize_core_tool_name
 
 if TYPE_CHECKING:
@@ -636,7 +637,7 @@ class SystemPromptBuilder:
                 return self._cached_prompt
 
         # Build the prompt
-        prompt = self._build_prompt_internal()
+        prompt = self.build_document().render()
 
         # Cache for static mode
         if strategy == "static":
@@ -655,6 +656,126 @@ class SystemPromptBuilder:
         # hybrid: cache for API providers, no cache for local
 
         return prompt
+
+    def build_document(self) -> PromptDocument:
+        """Build the canonical system prompt document."""
+        document = PromptDocument()
+
+        if self.tool_adapter:
+            base_prompt = self._build_with_adapter()
+        else:
+            base_prompt = self._build_for_provider()
+
+        sections_to_include = self._get_active_sections()
+        document.upsert(
+            PromptBlock(
+                name="base_prompt",
+                content=base_prompt,
+                priority=10,
+                header="",
+                kind="system_base",
+            )
+        )
+
+        if "concise_mode" in sections_to_include and self.concise_mode:
+            document.upsert(
+                PromptBlock(
+                    name="concise_mode",
+                    content=CONCISE_MODE_GUIDANCE,
+                    priority=20,
+                    header="",
+                    kind="guidance",
+                )
+            )
+            logger.debug("Concise mode enabled - added brevity guidance to prompt")
+
+        if "mode_guidance" in sections_to_include:
+            mode_guidance = self._get_mode_guidance_section()
+            if mode_guidance:
+                document.upsert(
+                    PromptBlock(
+                        name="mode_guidance",
+                        content=mode_guidance,
+                        priority=30,
+                        header="",
+                        kind="guidance",
+                    )
+                )
+
+        if "task_guidance" in sections_to_include:
+            task_guidance = self._get_task_guidance_section()
+            if task_guidance:
+                document.upsert(
+                    PromptBlock(
+                        name="task_guidance",
+                        content=task_guidance,
+                        priority=40,
+                        header="",
+                        kind="guidance",
+                    )
+                )
+
+        tool_constraint = ""
+        if "tool_constraint" in sections_to_include:
+            tool_constraint = self._get_tool_constraint_section()
+            if tool_constraint:
+                document.upsert(
+                    PromptBlock(
+                        name="tool_constraint",
+                        content=tool_constraint,
+                        priority=50,
+                        header="",
+                        kind="tooling",
+                    )
+                )
+
+        if "completion" in sections_to_include:
+            document.upsert(
+                PromptBlock(
+                    name="completion_guidance",
+                    content=COMPLETION_GUIDANCE,
+                    priority=60,
+                    header="",
+                    kind="completion",
+                )
+            )
+
+        provider_tool_guidance = ""
+        if "tool_guidance" in sections_to_include:
+            provider_tool_guidance = self.get_provider_tool_guidance()
+            if provider_tool_guidance:
+                document.upsert(
+                    PromptBlock(
+                        name="provider_tool_guidance",
+                        content=provider_tool_guidance,
+                        priority=70,
+                        header="",
+                        kind="tooling",
+                    )
+                )
+
+            document.upsert(
+                PromptBlock(
+                    name="tool_effectiveness_guidance",
+                    content=ASI_TOOL_EFFECTIVENESS_GUIDANCE,
+                    priority=80,
+                    header="",
+                    kind="tooling",
+                )
+            )
+
+        rendered = document.render()
+        logger.debug(
+            "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
+            "tool_guidance_len=%d prompt_total_len=%d strategy=%s",
+            self.provider_name,
+            sorted(sections_to_include),
+            tool_constraint[:300] if tool_constraint else "(none)",
+            len(provider_tool_guidance),
+            len(rendered),
+            self.system_prompt_strategy,
+        )
+        return document
 
     def invalidate_cache(self) -> None:
         """Clear any cached prompt so runtime state changes are reflected."""
@@ -683,65 +804,7 @@ class SystemPromptBuilder:
         Returns:
             System prompt string tailored to the provider/model
         """
-        # Try adapter-based prompt first
-        if self.tool_adapter:
-            base_prompt = self._build_with_adapter()
-        else:
-            # Fall back to provider-specific prompt
-            base_prompt = self._build_for_provider()
-
-        # Determine which prompt sections to include.
-        # Edge model can select only task-relevant sections to save tokens.
-        sections_to_include = self._get_active_sections()
-
-        if "concise_mode" in sections_to_include and self.concise_mode:
-            base_prompt = f"{CONCISE_MODE_GUIDANCE}\n\n{base_prompt}"
-            logger.debug("Concise mode enabled - added brevity guidance to prompt")
-
-        if "mode_guidance" in sections_to_include:
-            mode_guidance = self._get_mode_guidance_section()
-            if mode_guidance:
-                base_prompt = f"{base_prompt}\n\n{mode_guidance}"
-
-        if "task_guidance" in sections_to_include:
-            task_guidance = self._get_task_guidance_section()
-            if task_guidance:
-                base_prompt = f"{base_prompt}\n\n{task_guidance}"
-
-        if "tool_constraint" in sections_to_include:
-            tool_constraint = self._get_tool_constraint_section()
-            if tool_constraint:
-                base_prompt = f"{base_prompt}\n\n{tool_constraint}"
-
-        if "completion" in sections_to_include:
-            # Static baseline in system prompt. GEPA-evolved versions go to
-            # user messages via PromptComposer/OptimizationInjector.
-            base_prompt = f"{base_prompt}\n\n{COMPLETION_GUIDANCE}"
-
-        if "tool_guidance" in sections_to_include:
-            tool_guidance = self.get_provider_tool_guidance()
-            if tool_guidance:
-                base_prompt = f"{base_prompt}\n\n{tool_guidance}"
-
-        # Static tool effectiveness guidance in system prompt (baseline).
-        # GEPA-evolved versions are injected via PromptComposer.compose_user_prefix()
-        # into user messages, keeping the system prompt stable for cache efficiency.
-        if "tool_guidance" in sections_to_include:
-            base_prompt = f"{base_prompt}\n\n{ASI_TOOL_EFFECTIVENESS_GUIDANCE}"
-
-        # Log system prompt composition sent to LLM
-        logger.debug(
-            "[SystemPrompt→LLM] provider=%s sections=%s tool_constraint=%s "
-            "tool_guidance_len=%d prompt_total_len=%d strategy=%s",
-            self.provider_name,
-            sorted(sections_to_include),
-            self._get_tool_constraint_section()[:300] if self.available_tools else "(none)",
-            len(self.get_provider_tool_guidance()),
-            len(base_prompt),
-            self.system_prompt_strategy,
-        )
-
-        return base_prompt
+        return self.build_document().render()
 
     def _get_active_sections(self) -> set:
         """Determine which prompt sections to include.

@@ -247,6 +247,22 @@ class TestComposeTurnPrefix:
         assert "<system-reminder>" in prefix
         assert "</system-reminder>" in prefix
 
+    def test_repeated_boilerplate_is_dictionary_compressed(self):
+        """Repeated long guidance blocks should be aliased once in the reminder body."""
+        repeated = (
+            "Search first with available tools before editing and do not guess file paths or "
+            "symbol locations in the repository."
+        )
+        optimizer = _make_optimizer(evolved_sections=[repeated, repeated])
+        pipeline = _make_pipeline(optimizer=optimizer)
+        ctx = self._make_turn_context()
+
+        prefix = pipeline.compose_turn_prefix("Help", ctx)
+
+        assert "## Reusable Guidance" in prefix
+        assert prefix.count(repeated) == 1
+        assert prefix.count("[[R1]]") >= 2
+
 
 class TestRuntimeGuidanceLookups:
     """Verify prompt-time guidance resolves live runtime services from DI."""

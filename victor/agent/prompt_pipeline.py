@@ -390,13 +390,34 @@ class UnifiedPromptPipeline:
         Returns:
             Prefix string to prepend to user message, or empty string.
         """
-        parts: List[str] = []
+        from victor.framework.prompt_dictionary_compressor import compress_prompt_blocks
+        from victor.framework.prompt_document import PromptBlock, PromptDocument
+
+        document = PromptDocument()
         self._last_prompt_completeness_assessment = None
+        next_priority = 10
+
+        def add_block(name: str, content: Optional[str]) -> None:
+            nonlocal next_priority
+            if not content:
+                return
+            normalized = content.strip()
+            if not normalized:
+                return
+            document.upsert(
+                PromptBlock(
+                    name=f"{name}_{next_priority}",
+                    content=normalized,
+                    priority=next_priority,
+                    header="",
+                    kind="turn_prefix",
+                )
+            )
+            next_priority += 10
 
         if self.enable_prompt_completeness_guard:
             guidance = self._build_prompt_completeness_guidance(user_message, turn_context)
-            if guidance:
-                parts.append(guidance)
+            add_block("prompt_completeness", guidance)
 
         # 1. GEPA/MIPROv2/CoT evolved sections
         if self._optimizer:
@@ -405,12 +426,16 @@ class UnifiedPromptPipeline:
                 model=turn_context.model,
                 task_type=turn_context.task_type,
             )
-            parts.extend(self._canonicalize_system_guidance_text(section) for section in evolved)
+            for index, section in enumerate(evolved):
+                add_block(
+                    f"evolved_section_{index}",
+                    self._canonicalize_system_guidance_text(section),
+                )
 
             # 2. MIPROv2 few-shots (KNN per-query)
             few_shots = self._optimizer.get_few_shots(user_message)
             if few_shots:
-                parts.append(self._canonicalize_system_guidance_text(few_shots))
+                add_block("few_shots", self._canonicalize_system_guidance_text(few_shots))
 
             # 3. Failure hints (after rollback/error)
             if turn_context.last_turn_failed:
@@ -419,32 +444,34 @@ class UnifiedPromptPipeline:
                     turn_context.last_failure_error,
                 )
                 if hint:
-                    parts.append(self._canonicalize_system_guidance_text(hint))
+                    add_block("failure_hint", self._canonicalize_system_guidance_text(hint))
 
         # 4. Active skill prompt
-        if turn_context.active_skill_prompt:
-            parts.append(turn_context.active_skill_prompt)
+        add_block("active_skill_prompt", turn_context.active_skill_prompt)
 
         # 5. Context reminders
-        if turn_context.reminder_text:
-            parts.append(turn_context.reminder_text)
+        add_block("context_reminder", turn_context.reminder_text)
 
         # 6. Credit guidance: Tier A/B only (system prompt is frozen)
         # Tier C credit is already in build_system_prompt()
         if self._tier != ProviderTier.NO_CACHE:
             credit = self._get_credit_guidance()
             if credit:
-                parts.append(self._canonicalize_system_guidance_text(credit))
+                add_block("credit_guidance", self._canonicalize_system_guidance_text(credit))
 
         # 7. Online tool reputation (mid-turn feedback from current session)
         reputation = self._get_tool_reputation_guidance()
         if reputation:
-            parts.append(self._canonicalize_system_guidance_text(reputation))
+            add_block("tool_reputation", self._canonicalize_system_guidance_text(reputation))
 
-        if not parts:
+        if not document.iter_renderable_blocks():
             return ""
 
-        return "<system-reminder>\n" + "\n\n".join(parts) + "\n</system-reminder>\n\n"
+        compression = compress_prompt_blocks(
+            block.content for block in document.iter_renderable_blocks()
+        )
+        reminder_body = compression.compressed_prompt
+        return "<system-reminder>\n" + reminder_body + "\n</system-reminder>\n\n"
 
     # ----------------------------------------------------------------
     # Migrated from SystemPromptCoordinator
