@@ -320,6 +320,10 @@ class PromptCandidate:
     alpha: float = 1.0
     beta_val: float = 1.0
     sample_count: int = 0
+    benchmark_score: float = 0.0
+    benchmark_runs: int = 0
+    benchmark_passed: bool = False
+    is_active: bool = False
 
     def sample(self) -> float:
         """Thompson Sampling: draw from Beta distribution with staleness decay.
@@ -696,6 +700,9 @@ class PromptOptimizerLearner(BaseLearner):
                 ("coverage_count INTEGER", "0"),
                 ("is_on_frontier INTEGER", "1"),
                 ("char_length INTEGER", "0"),
+                ("benchmark_score REAL", "0.0"),
+                ("benchmark_runs INTEGER", "0"),
+                ("benchmark_passed INTEGER", "0"),
             ]:
                 try:
                     self.db.execute(
@@ -721,7 +728,8 @@ class PromptOptimizerLearner(BaseLearner):
             cursor = self.db.execute(
                 f"SELECT section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
-                f"alpha, beta, sample_count "
+                f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
+                f"benchmark_passed, is_active "
                 f"FROM {Tables.AGENT_PROMPT_CANDIDATE}"
             )
             for row in cursor.fetchall():
@@ -740,6 +748,10 @@ class PromptOptimizerLearner(BaseLearner):
                     alpha=row[9],
                     beta_val=row[10],
                     sample_count=row[11],
+                    benchmark_score=row[12] or 0.0,
+                    benchmark_runs=row[13] or 0,
+                    benchmark_passed=bool(row[14]),
+                    is_active=bool(row[15]),
                 )
                 key = self._candidate_key(row[0], row[1] or "default")
                 self._candidates.setdefault(key, []).append(candidate)
@@ -767,7 +779,9 @@ class PromptOptimizerLearner(BaseLearner):
             self._candidate_key(section, "default"),
         ]:
             candidates = self._candidates.get(key, [])
-            active = [c for c in candidates if c.sample_count > 0]
+            active = [c for c in candidates if c.is_active] or [
+                c for c in candidates if c.sample_count > 0
+            ]
             if active:
                 candidate = active[-1]
                 success = outcome.success and outcome.quality_score >= 0.5
@@ -804,6 +818,14 @@ class PromptOptimizerLearner(BaseLearner):
         if not candidates:
             return None
 
+        active_candidates = [c for c in candidates if c.is_active]
+        approved_candidates = [c for c in candidates if c.benchmark_passed]
+
+        if active_candidates:
+            candidates = [c for c in active_candidates if c.benchmark_passed] or active_candidates
+        elif approved_candidates:
+            candidates = approved_candidates
+
         # Hybrid: if Pareto enabled, restrict Thompson to frontier candidates
         if self._use_pareto:
             key = self._candidate_key(section_name, provider or "default")
@@ -823,13 +845,24 @@ class PromptOptimizerLearner(BaseLearner):
 
         # Thompson Sampling: sample from (frontier) candidates' Beta distributions
         best = max(candidates, key=lambda c: c.sample())
-        confidence = min(best.sample_count / (MIN_SAMPLES_FOR_CONFIDENCE * 2), 1.0)
+        evidence_count = max(best.sample_count, best.benchmark_runs)
+        confidence = min(evidence_count / (MIN_SAMPLES_FOR_CONFIDENCE * 2), 1.0)
+
+        reason_parts = [f"GEPA gen-{best.generation} (α={best.alpha:.1f}, β={best.beta_val:.1f})"]
+        if best.is_active:
+            reason_parts.append("active")
+        if best.benchmark_passed:
+            reason_parts.append(
+                f"bench={best.benchmark_score:.2f}/{best.benchmark_runs}"
+                if best.benchmark_runs
+                else "bench-approved"
+            )
 
         return RLRecommendation(
             value=best.text,
             confidence=confidence,
-            reason=f"GEPA gen-{best.generation} (α={best.alpha:.1f}, β={best.beta_val:.1f})",
-            sample_size=best.sample_count,
+            reason=", ".join(reason_parts),
+            sample_size=evidence_count,
             is_baseline=best.sample_count < MIN_SAMPLES_FOR_CONFIDENCE,
         )
 
@@ -1004,7 +1037,9 @@ class PromptOptimizerLearner(BaseLearner):
                 f"INSERT OR REPLACE INTO {Tables.AGENT_PROMPT_CANDIDATE} "
                 f"(section_name, provider, text_hash, text, generation, parent_hash, "
                 f"completion_score, token_efficiency, tool_effectiveness, "
-                f"alpha, beta, sample_count) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                f"alpha, beta, sample_count, benchmark_score, benchmark_runs, "
+                f"benchmark_passed, is_active) "
+                f"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     candidate.section_name,
                     candidate.provider,
@@ -1018,11 +1053,120 @@ class PromptOptimizerLearner(BaseLearner):
                     candidate.alpha,
                     candidate.beta_val,
                     candidate.sample_count,
+                    candidate.benchmark_score,
+                    candidate.benchmark_runs,
+                    int(candidate.benchmark_passed),
+                    int(candidate.is_active),
                 ),
             )
             self.db.commit()
         except Exception as e:
             logger.warning("Failed to save prompt candidate: %s", e)
+
+    def _find_candidate(
+        self,
+        section_name: str,
+        provider: str,
+        text_hash: str,
+    ) -> Optional[PromptCandidate]:
+        """Find a specific candidate by section/provider/hash."""
+        candidates = self._candidates.get(self._candidate_key(section_name, provider), [])
+        for candidate in candidates:
+            if candidate.text_hash == text_hash:
+                return candidate
+        return None
+
+    def record_benchmark_result(
+        self,
+        section_name: str,
+        provider: str,
+        text_hash: str,
+        score: float,
+        passed: bool,
+    ) -> Optional[PromptCandidate]:
+        """Record a benchmark result for a candidate.
+
+        Uses a running average for benchmark score and remembers whether
+        the candidate has ever passed its gating benchmark.
+        """
+        candidate = self._find_candidate(section_name, provider, text_hash)
+        if candidate is None:
+            return None
+
+        previous_runs = candidate.benchmark_runs
+        cumulative_score = candidate.benchmark_score * previous_runs
+        candidate.benchmark_runs += 1
+        candidate.benchmark_score = (cumulative_score + score) / candidate.benchmark_runs
+        candidate.benchmark_passed = candidate.benchmark_passed or bool(passed)
+        self._save_candidate(candidate)
+        return candidate
+
+    def promote_candidate(
+        self,
+        section_name: str,
+        provider: str,
+        text_hash: str,
+    ) -> Optional[PromptCandidate]:
+        """Promote a candidate to active status for its section/provider."""
+        key = self._candidate_key(section_name, provider)
+        candidates = self._candidates.get(key, [])
+        if not candidates:
+            return None
+
+        target: Optional[PromptCandidate] = None
+        for candidate in candidates:
+            if candidate.text_hash == text_hash:
+                target = candidate
+                break
+
+        if target is None:
+            return None
+        if target.benchmark_runs > 0 and not target.benchmark_passed:
+            raise ValueError("cannot promote candidate that has failed benchmark gating")
+
+        for candidate in candidates:
+            candidate.is_active = candidate.text_hash == text_hash
+            self._save_candidate(candidate)
+        return target
+
+    def rollback_active_candidate(
+        self,
+        section_name: str,
+        provider: str,
+        failed_text_hash: Optional[str] = None,
+    ) -> Optional[PromptCandidate]:
+        """Rollback the active candidate to the best prior approved candidate."""
+        key = self._candidate_key(section_name, provider)
+        candidates = self._candidates.get(key, [])
+        if not candidates:
+            return None
+
+        failed_hash = failed_text_hash
+        if failed_hash is None:
+            active = next((c for c in candidates if c.is_active), None)
+            failed_hash = active.text_hash if active else None
+
+        for candidate in candidates:
+            if failed_hash and candidate.text_hash == failed_hash:
+                candidate.is_active = False
+                self._save_candidate(candidate)
+
+        fallback_candidates = [
+            c
+            for c in candidates
+            if c.text_hash != failed_hash and c.benchmark_passed
+        ]
+        if not fallback_candidates:
+            return None
+
+        fallback = max(
+            fallback_candidates,
+            key=lambda c: (c.benchmark_score, c.benchmark_runs, c.sample_count, c.generation),
+        )
+        for candidate in candidates:
+            candidate.is_active = candidate.text_hash == fallback.text_hash
+            self._save_candidate(candidate)
+        return fallback
 
     def seed_from_evaluations(self, eval_dir: Optional[Path] = None) -> int:
         """Load evaluation results and update Pareto instance scores.

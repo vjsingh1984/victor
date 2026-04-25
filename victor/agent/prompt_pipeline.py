@@ -191,6 +191,7 @@ class PromptCompletenessAssessment:
     missing_elements: List[str] = field(default_factory=list)
     ambiguous_reference: bool = False
     needs_clarification: bool = False
+    search_first: bool = False
 
     def to_metadata(self) -> Dict[str, Any]:
         """Serialize assessment details for testing and observability."""
@@ -202,6 +203,7 @@ class PromptCompletenessAssessment:
             "missing_elements": list(self.missing_elements),
             "ambiguous_reference": self.ambiguous_reference,
             "needs_clarification": self.needs_clarification,
+            "search_first": self.search_first,
         }
 
     def render_guidance(self) -> str:
@@ -215,6 +217,10 @@ class PromptCompletenessAssessment:
             lines.append(f"- Constraints: {', '.join(self.constraints[:3])}")
         if self.missing_elements:
             lines.append(f"- Missing: {', '.join(self.missing_elements[:3])}")
+        if self.search_first:
+            lines.append(
+                "- Search first: locate relevant files with code_search, overview, or read before editing. Do not guess paths."
+            )
         if self.needs_clarification:
             lines.append(
                 "- Ask one targeted clarification before editing files or taking irreversible actions."
@@ -543,6 +549,7 @@ class UnifiedPromptPipeline:
             or assessment.required_outputs
             or assessment.constraints
             or assessment.missing_elements
+            or assessment.search_first
         ):
             return None
         return assessment.render_guidance()
@@ -561,6 +568,7 @@ class UnifiedPromptPipeline:
         required_files = self._extract_required_files(message)
         required_outputs = self._extract_required_outputs(message)
         constraints = self._extract_constraints(message)
+        scope_hints = self._extract_scope_hints(message)
 
         action_markers = (
             "fix",
@@ -600,11 +608,12 @@ class UnifiedPromptPipeline:
         report_task = turn_context.task_type in {"review", "analysis", "benchmark"} or any(
             marker in message_lower for marker in report_markers
         )
-        target_present = bool(required_files or self._extract_scope_hints(message))
+        target_present = bool(required_files or scope_hints)
         deliverable_present = bool(required_outputs) or (action_task and not report_task)
         ambiguous_reference = bool(
             re.search(r"\b(it|this|that|same thing|same one|above|below)\b", message_lower)
         ) and not target_present
+        search_first = bool(action_task and scope_hints and not required_files and not ambiguous_reference)
 
         missing: List[str] = []
         if action_task and not target_present:
@@ -644,6 +653,7 @@ class UnifiedPromptPipeline:
             missing_elements=missing,
             ambiguous_reference=ambiguous_reference,
             needs_clarification=needs_clarification,
+            search_first=search_first,
         )
 
     def _extract_required_files(self, user_message: str) -> List[str]:

@@ -260,6 +260,172 @@ class TestPromptOptimizerLearner:
         key = learner._candidate_key("COMPLETION_GUIDANCE", "ollama")
         assert key == "COMPLETION_GUIDANCE::ollama"
 
+    def test_save_and_load_candidate_persists_benchmark_state(self, db):
+        learner1 = PromptOptimizerLearner(name="test1", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="TEST_SECTION",
+            provider="ollama",
+            text="Evolved prompt text",
+            text_hash="bench123",
+            generation=2,
+            parent_hash="parent",
+            benchmark_score=0.92,
+            benchmark_runs=3,
+            benchmark_passed=True,
+            is_active=True,
+        )
+        key = learner1._candidate_key("TEST_SECTION", "ollama")
+        learner1._candidates[key] = [candidate]
+        learner1._save_candidate(candidate)
+
+        learner2 = PromptOptimizerLearner(name="test2", db_connection=db)
+        loaded = learner2._candidates[key][0]
+        assert loaded.benchmark_score == pytest.approx(0.92)
+        assert loaded.benchmark_runs == 3
+        assert loaded.benchmark_passed is True
+        assert loaded.is_active is True
+
+    def test_record_benchmark_result_updates_running_average(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        candidate = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Prompt",
+            text_hash="benchhash",
+            generation=1,
+            parent_hash="parent",
+        )
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [candidate]
+        learner._save_candidate(candidate)
+
+        learner.record_benchmark_result(
+            section_name="TEST",
+            provider="ollama",
+            text_hash="benchhash",
+            score=0.8,
+            passed=False,
+        )
+        learner.record_benchmark_result(
+            section_name="TEST",
+            provider="ollama",
+            text_hash="benchhash",
+            score=1.0,
+            passed=True,
+        )
+
+        updated = learner._candidates[key][0]
+        assert updated.benchmark_runs == 2
+        assert updated.benchmark_score == pytest.approx(0.9)
+        assert updated.benchmark_passed is True
+
+    def test_promote_candidate_marks_only_target_active(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        first = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Prompt A",
+            text_hash="a1",
+            generation=1,
+            parent_hash="parent",
+            benchmark_score=0.85,
+            benchmark_runs=2,
+            benchmark_passed=True,
+            is_active=True,
+        )
+        second = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Prompt B",
+            text_hash="b2",
+            generation=2,
+            parent_hash="a1",
+            benchmark_score=0.91,
+            benchmark_runs=3,
+            benchmark_passed=True,
+        )
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [first, second]
+        learner._save_candidate(first)
+        learner._save_candidate(second)
+
+        learner.promote_candidate(section_name="TEST", provider="ollama", text_hash="b2")
+
+        assert first.is_active is False
+        assert second.is_active is True
+
+    def test_rollback_active_candidate_reactivates_best_approved_candidate(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        stable = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Stable prompt",
+            text_hash="stable",
+            generation=1,
+            parent_hash="parent",
+            benchmark_score=0.88,
+            benchmark_runs=4,
+            benchmark_passed=True,
+        )
+        risky = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Risky prompt",
+            text_hash="risky",
+            generation=2,
+            parent_hash="stable",
+            benchmark_score=0.93,
+            benchmark_runs=5,
+            benchmark_passed=True,
+            is_active=True,
+        )
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [stable, risky]
+        learner._save_candidate(stable)
+        learner._save_candidate(risky)
+
+        learner.rollback_active_candidate(
+            section_name="TEST",
+            provider="ollama",
+            failed_text_hash="risky",
+        )
+
+        assert risky.is_active is False
+        assert stable.is_active is True
+
+    def test_get_recommendation_prefers_active_benchmark_passed_candidate(self, db):
+        learner = PromptOptimizerLearner(name="test", db_connection=db)
+        legacy = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Legacy best by samples",
+            text_hash="legacy",
+            generation=1,
+            parent_hash="parent",
+            alpha=10.0,
+            beta_val=1.0,
+            sample_count=20,
+        )
+        approved = PromptCandidate(
+            section_name="TEST",
+            provider="ollama",
+            text="Approved active prompt",
+            text_hash="approved",
+            generation=2,
+            parent_hash="legacy",
+            benchmark_score=0.94,
+            benchmark_runs=3,
+            benchmark_passed=True,
+            is_active=True,
+        )
+        key = learner._candidate_key("TEST", "ollama")
+        learner._candidates[key] = [legacy, approved]
+
+        rec = learner.get_recommendation("ollama", "qwen", "action", section_name="TEST")
+
+        assert rec is not None
+        assert rec.value == "Approved active prompt"
+
     def test_enrich_traces_with_credit_uses_registered_service(self, learner):
         """Recent credit summary should enrich traces when service is in DI."""
         service = CreditTrackingService()

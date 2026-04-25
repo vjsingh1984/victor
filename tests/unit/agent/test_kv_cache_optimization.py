@@ -342,6 +342,8 @@ class TestKVToolSelectionStrategy:
 
         orch = MagicMock(spec=AgentOrchestrator)
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
+        # Disable v2 so this test exercises the legacy session_stable path
+        orch._is_tool_strategy_v2_enabled.return_value = False
 
         # Configure session_stable strategy
         ctx = MagicMock()
@@ -376,6 +378,8 @@ class TestKVToolSelectionStrategy:
         orch = MagicMock(spec=AgentOrchestrator)
         type(orch)._kv_optimization_enabled = PropertyMock(return_value=True)
         orch._session_semantic_tools = None
+        # Disable v2 so this test exercises the legacy per_turn path
+        orch._is_tool_strategy_v2_enabled.return_value = False
 
         # Configure per_turn strategy
         ctx = MagicMock()

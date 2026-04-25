@@ -431,6 +431,42 @@ class TestPromptCompletenessGuard:
         assert assessment.needs_clarification is True
         assert "target artifact or scope" in assessment.missing_elements
 
+    def test_guard_adds_search_first_guidance_for_symbol_scoped_request(self):
+        """Symbol-scoped work without file paths should prefer search-first execution."""
+        pipeline = _make_pipeline(enable_prompt_completeness_guard=True)
+        ctx = self._make_turn_context(task_type="implementation")
+
+        prefix = pipeline.compose_turn_prefix(
+            "Fix `authenticate_user` and add tests without changing the public API.",
+            ctx,
+        )
+
+        assert "Prompt execution contract" in prefix
+        assert "Search first" in prefix
+        assert "Do not guess paths" in prefix
+
+        assessment = pipeline.last_prompt_completeness_assessment
+        assert assessment is not None
+        assert assessment.search_first is True
+        assert assessment.needs_clarification is False
+
+    def test_guard_skips_search_first_when_explicit_file_is_provided(self):
+        """Explicit file targets should not trigger search-first guidance."""
+        pipeline = _make_pipeline(enable_prompt_completeness_guard=True)
+        ctx = self._make_turn_context(task_type="implementation")
+
+        prefix = pipeline.compose_turn_prefix(
+            "Fix src/auth/login.py and add tests without changing the public API.",
+            ctx,
+        )
+
+        assert "Prompt execution contract" in prefix
+        assert "Search first" not in prefix
+
+        assessment = pipeline.last_prompt_completeness_assessment
+        assert assessment is not None
+        assert assessment.search_first is False
+
 
 # ============================================================================
 # 7. Backward Compatibility (3 tests)

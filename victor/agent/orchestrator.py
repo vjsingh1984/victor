@@ -4086,15 +4086,14 @@ class AgentOrchestrator(ModeAwareMixin, CapabilityRegistryMixin):
             return None
         if not tools:
             return tools
+        if not self._kv_optimization_enabled:
+            return tools
 
         # Check if new context-aware strategy is enabled
         if self._is_tool_strategy_v2_enabled():
             return self._apply_context_aware_strategy(tools)
 
         # Original implementation for backward compatibility
-        if not self._kv_optimization_enabled:
-            return tools
-
         strategy = "per_turn"
         try:
             ctx = getattr(self, "settings", None)
