@@ -636,14 +636,17 @@ async def _on_file_change(
     if not cache_entry:
         return  # No index exists, nothing to update
 
-    if event.change_type == FileChangeType.DELETED:
-        # File deleted - mark cache as stale (next search will rebuild)
-        logger.info(f"[code_search] File deleted, marking cache stale: {event.path}")
-        cache_entry["stale"] = True
-
-    elif event.change_type in (FileChangeType.MODIFIED, FileChangeType.CREATED):
-        # File modified or created - trigger incremental update
-        logger.info(f"[code_search] File changed, triggering incremental update: {event.path}")
+    if event.change_type in (
+        FileChangeType.DELETED,
+        FileChangeType.MODIFIED,
+        FileChangeType.CREATED,
+        FileChangeType.RENAMED,
+    ):
+        logger.info(
+            "[code_search] File change detected (%s), triggering incremental update: %s",
+            event.change_type.value,
+            event.path,
+        )
 
         try:
             index = cache_entry["index"]
@@ -666,8 +669,8 @@ async def _on_file_change(
                 )
                 cache_entry["stale"] = True
         except Exception as e:
-            logger.error(f"[code_search] Incremental update failed: {e}")
             cache_entry["stale"] = True
+            logger.error(f"[code_search] Incremental update failed: {e}")
 
 
 def _normalize_extensions(exts: Optional[List[str]]) -> Set[str]:

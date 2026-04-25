@@ -876,13 +876,36 @@ class TestFileWatcherIncrementalUpdates:
     """Tests for watcher-driven incremental code_search refreshes."""
 
     @pytest.mark.asyncio
-    async def test_on_file_change_finalizes_structural_provider_after_incremental_reindex(
-        self, tmp_path, monkeypatch
+    @pytest.mark.parametrize(
+        ("change_type", "mutate_paths"),
+        [
+            (FileChangeType.MODIFIED, "modify"),
+            (FileChangeType.CREATED, "create"),
+            (FileChangeType.DELETED, "delete"),
+            (FileChangeType.RENAMED, "rename"),
+        ],
+    )
+    async def test_on_file_change_incrementally_updates_supported_change_types(
+        self, tmp_path, monkeypatch, change_type, mutate_paths
     ):
         root = tmp_path / "repo"
         root.mkdir()
-        changed_file = root / "main.py"
-        changed_file.write_text("print('hello')\n", encoding="utf-8")
+        original_file = root / "main.py"
+        original_file.write_text("print('hello')\n", encoding="utf-8")
+        changed_file = original_file
+        old_path = None
+
+        if mutate_paths == "modify":
+            original_file.write_text("print('updated')\n", encoding="utf-8")
+        elif mutate_paths == "create":
+            changed_file = root / "created.py"
+            changed_file.write_text("print('created')\n", encoding="utf-8")
+        elif mutate_paths == "delete":
+            original_file.unlink()
+        elif mutate_paths == "rename":
+            changed_file = root / "renamed.py"
+            original_file.rename(changed_file)
+            old_path = original_file
 
         provider = SimpleNamespace(
             config=SimpleNamespace(vector_store="victor_structural_bridge"),
@@ -906,6 +929,44 @@ class TestFileWatcherIncrementalUpdates:
         await _on_file_change(
             FileChangeEvent(
                 path=changed_file,
+                change_type=change_type,
+                timestamp=datetime.now(),
+                old_path=old_path,
+            ),
+            root,
+        )
+
+        index.incremental_reindex.assert_awaited_once()
+        provider.get_stats.assert_awaited_once()
+        assert cache_entry["latest_mtime"] == _latest_mtime(root)
+        assert cache_entry["stale"] is False
+
+    @pytest.mark.asyncio
+    async def test_on_file_change_marks_cache_stale_when_incremental_update_fails(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        changed_file = root / "main.py"
+        changed_file.write_text("print('hello')\n", encoding="utf-8")
+
+        index = SimpleNamespace(
+            incremental_reindex=AsyncMock(side_effect=RuntimeError("boom")),
+        )
+        cache_entry = {
+            "index": index,
+            "latest_mtime": _latest_mtime(root),
+            "stale": False,
+        }
+        fake_cache = {str(root): cache_entry}
+
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+
+        await _on_file_change(
+            FileChangeEvent(
+                path=changed_file,
                 change_type=FileChangeType.MODIFIED,
                 timestamp=datetime.now(),
             ),
@@ -913,6 +974,4 @@ class TestFileWatcherIncrementalUpdates:
         )
 
         index.incremental_reindex.assert_awaited_once()
-        provider.get_stats.assert_awaited_once()
-        assert cache_entry["latest_mtime"] >= _latest_mtime(root)
-        assert cache_entry["stale"] is False
+        assert cache_entry["stale"] is True
