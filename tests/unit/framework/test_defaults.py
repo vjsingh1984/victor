@@ -549,15 +549,15 @@ class TestStageToolMappings:
         assert set(EXECUTION_STAGE_TOOLS.keys()) == _REQUIRED_STAGES
 
     def test_modification_executing_has_edit(self):
-        assert "edit_files" in MODIFICATION_STAGE_TOOLS["executing"]
+        assert "edit" in MODIFICATION_STAGE_TOOLS["executing"]
 
     def test_analysis_executing_is_read_only(self):
         tools = ANALYSIS_STAGE_TOOLS["executing"]
-        assert "edit_files" not in tools
-        assert "read_file" in tools
+        assert "edit" not in tools
+        assert "read" in tools
 
     def test_execution_executing_has_bash(self):
-        assert "execute_bash" in EXECUTION_STAGE_TOOLS["executing"]
+        assert "shell" in EXECUTION_STAGE_TOOLS["executing"]
 
 
 class TestGetStageToolsForCategory:

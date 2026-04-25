@@ -61,6 +61,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Callable, Dict, List, Optional, Set
 
+from victor.framework.tool_naming import canonicalize_tool_list
+
 logger = logging.getLogger(__name__)
 
 
@@ -124,11 +126,15 @@ class TaskTypeDefinition:
     exploration_multiplier: float = 1.0
 
     def __post_init__(self):
-        """Normalize name to lowercase."""
+        """Normalize task-type metadata to canonical runtime forms."""
         self.name = self.name.lower()
         # Ensure aliases are a set
         if isinstance(self.aliases, list):
             self.aliases = set(self.aliases)
+        self.priority_tools = canonicalize_tool_list(self.priority_tools)
+        self.stage_tools = {
+            stage: canonicalize_tool_list(tools) for stage, tools in self.stage_tools.items()
+        }
 
 
 class TaskTypeRegistry:
@@ -408,7 +414,7 @@ class TaskTypeRegistry:
                     "verifying": ["read_file", "run_tests"],
                 },
                 force_action_hints={
-                    "after_target_read": "Use edit_files to make the change.",
+                    "after_target_read": "Use edit to make the change.",
                     "max_iterations": "Please make the change or explain blockers.",
                 },
             )
@@ -452,7 +458,7 @@ class TaskTypeRegistry:
                     "verifying": ["read_file"],
                 },
                 force_action_hints={
-                    "immediate": "Create the code directly using write_file.",
+                    "immediate": "Create the code directly using write.",
                 },
             )
         )
