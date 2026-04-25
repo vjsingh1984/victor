@@ -196,6 +196,49 @@ class FailureDiagnosis:
         )
 
 
+class ConfidenceBucket(Enum):
+    """Bucketized confidence for truth-aligned reporting."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+@dataclass(frozen=True)
+class ConfidenceAssessment:
+    """Derived task confidence and uncertainty summary."""
+
+    confidence_score: float
+    uncertainty: float
+    evidence_score: float
+    bucket: ConfidenceBucket
+    truth_aligned: bool
+    signals: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to report-friendly output."""
+        return {
+            "confidence_score": self.confidence_score,
+            "uncertainty": self.uncertainty,
+            "evidence_score": self.evidence_score,
+            "bucket": self.bucket.value,
+            "truth_aligned": self.truth_aligned,
+            "signals": dict(self.signals),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: dict[str, Any]) -> "ConfidenceAssessment":
+        """Reconstruct a confidence assessment from serialized data."""
+        return cls(
+            confidence_score=float(payload.get("confidence_score", 0.0)),
+            uncertainty=float(payload.get("uncertainty", 1.0)),
+            evidence_score=float(payload.get("evidence_score", 0.0)),
+            bucket=ConfidenceBucket(payload.get("bucket", ConfidenceBucket.LOW.value)),
+            truth_aligned=bool(payload.get("truth_aligned", False)),
+            signals=dict(payload.get("signals") or {}),
+        )
+
+
 class EvaluationMetric(Enum):
     """Standard evaluation metrics."""
 
@@ -346,6 +389,7 @@ class TaskResult:
     failure_category: Optional[BenchmarkFailureCategory] = None
     failure_details: dict[str, Any] = field(default_factory=dict)
     failure_diagnosis: Optional[FailureDiagnosis] = None
+    confidence_assessment: Optional[ConfidenceAssessment] = None
 
     # Detailed output
     stdout: str = ""
@@ -413,6 +457,12 @@ class TaskResult:
         if diagnosis is None:
             return None
         return diagnosis.path
+
+    def get_confidence_assessment(self) -> ConfidenceAssessment:
+        """Return truth-aligned confidence and uncertainty for this task."""
+        if self.confidence_assessment is not None:
+            return self.confidence_assessment
+        return derive_confidence_assessment(self)
 
     def calculate_completion_score(self) -> float:
         """Calculate partial completion score based on tests and quality."""
@@ -575,6 +625,12 @@ class EvaluationResult:
         failure_categories = Counter()
         failure_stages = Counter()
         failure_taxonomy = Counter()
+        confidence_buckets = Counter()
+        confidence_scores: list[float] = []
+        uncertainty_scores: list[float] = []
+        truth_aligned_tasks = 0
+        overconfident_failures = 0
+        underconfident_passes = 0
         for task_result in self.task_results:
             if task_result.failure_category is not None:
                 failure_categories[task_result.failure_category.value] += 1
@@ -582,6 +638,16 @@ class EvaluationResult:
             if diagnosis is not None:
                 failure_stages[diagnosis.stage.value] += 1
                 failure_taxonomy[diagnosis.path] += 1
+            confidence = task_result.get_confidence_assessment()
+            confidence_buckets[confidence.bucket.value] += 1
+            confidence_scores.append(confidence.confidence_score)
+            uncertainty_scores.append(confidence.uncertainty)
+            if confidence.truth_aligned:
+                truth_aligned_tasks += 1
+            if task_result.status != TaskStatus.PASSED and confidence.bucket == ConfidenceBucket.HIGH:
+                overconfident_failures += 1
+            if task_result.status == TaskStatus.PASSED and confidence.bucket == ConfidenceBucket.LOW:
+                underconfident_passes += 1
         return {
             "total_tasks": self.total_tasks,
             "passed": self.passed_tasks,
@@ -608,6 +674,12 @@ class EvaluationResult:
             "failure_categories": dict(failure_categories),
             "failure_stages": dict(failure_stages),
             "failure_taxonomy": dict(failure_taxonomy),
+            "avg_confidence_score": sum(confidence_scores) / max(1, len(confidence_scores)),
+            "avg_uncertainty": sum(uncertainty_scores) / max(1, len(uncertainty_scores)),
+            "confidence_buckets": dict(confidence_buckets),
+            "truth_alignment_rate": truth_aligned_tasks / max(1, self.total_tasks),
+            "overconfidence_rate": overconfident_failures / max(1, self.total_tasks),
+            "underconfidence_rate": underconfident_passes / max(1, self.total_tasks),
         }
 
 
@@ -755,6 +827,75 @@ def derive_failure_diagnosis(result: TaskResult) -> FailureDiagnosis:
         subtype="unknown",
         retryable=False,
         metadata=dict(details),
+    )
+
+
+def derive_confidence_assessment(result: TaskResult) -> ConfidenceAssessment:
+    """Infer truth-aligned confidence from task evidence and failure state."""
+    evidence_signals: list[float] = []
+
+    if result.tests_total > 0:
+        evidence_signals.append(result.tests_passed / max(1, result.tests_total))
+
+    for key in (
+        "claim_coverage",
+        "citation_coverage",
+        "action_coverage",
+        "answer_coverage",
+    ):
+        value = result.failure_details.get(key)
+        if isinstance(value, (int, float)):
+            evidence_signals.append(float(value))
+
+    if result.completion_score > 0:
+        evidence_signals.append(float(result.completion_score))
+
+    evidence_score = sum(evidence_signals) / max(1, len(evidence_signals))
+
+    if result.status == TaskStatus.PASSED:
+        confidence_score = min(0.99, 0.6 + (0.4 * evidence_score))
+    else:
+        failure_factor = {
+            BenchmarkFailureCategory.UNSUPPORTED_CLAIM: 0.2,
+            BenchmarkFailureCategory.TOOL_USAGE: 0.25,
+            BenchmarkFailureCategory.TASK_COMPLETION: 0.35,
+            BenchmarkFailureCategory.TEST_FAILURE: 0.45,
+            BenchmarkFailureCategory.PATCH_APPLICATION: 0.3,
+            BenchmarkFailureCategory.TIMEOUT: 0.25,
+            BenchmarkFailureCategory.EXECUTION_ERROR: 0.15,
+            BenchmarkFailureCategory.ENVIRONMENT_ERROR: 0.1,
+            BenchmarkFailureCategory.UNKNOWN: 0.2,
+        }.get(result.failure_category, 0.2)
+        confidence_score = min(0.49, evidence_score * failure_factor)
+
+    uncertainty = max(0.0, 1.0 - confidence_score)
+    if confidence_score >= 0.67:
+        bucket = ConfidenceBucket.HIGH
+    elif confidence_score >= 0.34:
+        bucket = ConfidenceBucket.MEDIUM
+    else:
+        bucket = ConfidenceBucket.LOW
+
+    truth_aligned = (
+        (result.status == TaskStatus.PASSED and bucket != ConfidenceBucket.LOW)
+        or (result.status != TaskStatus.PASSED and bucket != ConfidenceBucket.HIGH)
+    )
+
+    return ConfidenceAssessment(
+        confidence_score=round(confidence_score, 4),
+        uncertainty=round(uncertainty, 4),
+        evidence_score=round(evidence_score, 4),
+        bucket=bucket,
+        truth_aligned=truth_aligned,
+        signals={
+            "status": result.status.value,
+            "failure_category": (
+                result.failure_category.value if result.failure_category is not None else None
+            ),
+            "completion_score": result.completion_score,
+            "tests_passed": result.tests_passed,
+            "tests_total": result.tests_total,
+        },
     )
 
 

@@ -97,6 +97,17 @@ Planned slices:
 | 5.2 Browser / web-task benchmark adapter | Done | Added benchmark catalog + browser-runner tests first | Added a dedicated browser-task runner for `clawbench` / `guide` / `vlaa-gui`, updated the shared catalog and CLI routing, and evaluate action traces plus final-answer coverage through local manifests |
 | 5.3 Hierarchical failure taxonomy | Done | Added evaluator diagnosis + persistence tests first | Added a structured failure diagnosis layer on `TaskResult`, aggregate stage/path metrics in `EvaluationResult`, and persisted taxonomy output in the benchmark harness while preserving the existing flat failure-category contract |
 
+## Phase 6: Calibration and Confidence
+
+Objective:
+- Add truth-aligned confidence signals on the canonical benchmark evaluation path.
+
+Planned slices:
+
+| Slice | Status | TDD plan | Notes |
+|---|---|---|---|
+| 6.1 Truth-aligned confidence assessment | Done | Added task/evaluation/harness confidence tests first | `TaskResult` now derives confidence + uncertainty from objective evidence and failure taxonomy, and benchmark summaries persist confidence buckets plus truth-alignment rates |
+
 ## Immediate Execution Order
 
 1. Finish Phase 1 end-to-end.
@@ -117,3 +128,4 @@ Planned slices:
 | 2026-04-25 | Prompt architecture refactor inserted before Phase 3.3. Roadmap resume point remains Phase 3.3; details tracked in `docs/planning/prompt-canonical-architecture-refactor-2026-04-25.md`. |
 | 2026-04-25 | Phase 3.3 completed via TDD in `codingagent`: read-only tool results now default to pruned user previews while keeping full model-visible output intact and preserving full output for expansion/debug in streaming renderers. |
 | 2026-04-25 | Phase 5.3 completed via TDD in `codingagent`: benchmark results now derive and persist a hierarchical failure diagnosis with stage + subtype paths, and aggregate metrics report both flat categories and taxonomy breakdowns across DR3/browser/external benchmark adapters. |
+| 2026-04-25 | Phase 6.1 completed via TDD in `codingagent`: benchmark results now derive truth-aligned confidence/uncertainty from evidence plus failure taxonomy, and persisted reports include confidence buckets and alignment rates for calibration-aware triage. |

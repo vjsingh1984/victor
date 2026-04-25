@@ -35,6 +35,7 @@ from victor.evaluation.pass_at_k import (
 )
 from victor.evaluation.analyzers import AnalyzerRegistry
 from victor.evaluation.protocol import FailureStage
+from victor.evaluation.protocol import ConfidenceBucket
 
 
 class TestPassAtK:
@@ -302,6 +303,43 @@ class TestTaskResult:
         assert diagnosis.subtype == "missing_required_actions"
         assert diagnosis.path == "action.task_completion.missing_required_actions"
 
+    def test_get_confidence_assessment_high_for_supported_pass(self):
+        """Successful results with strong evidence should report high confidence."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.PASSED,
+            tests_passed=4,
+            tests_total=4,
+            completion_score=1.0,
+        )
+
+        assessment = result.get_confidence_assessment()
+
+        assert assessment.confidence_score > 0.95
+        assert assessment.bucket == ConfidenceBucket.HIGH
+        assert assessment.truth_aligned is True
+
+    def test_get_confidence_assessment_penalizes_unsupported_claim_failures(self):
+        """Unsupported-claim failures should remain low confidence even with high coverage."""
+        result = TaskResult(
+            task_id="test1",
+            status=TaskStatus.FAILED,
+            completion_score=1.0,
+            failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+            failure_details={
+                "claim_coverage": 1.0,
+                "citation_coverage": 1.0,
+                "forbidden_claim_hits": ["invented claim"],
+            },
+        )
+
+        assessment = result.get_confidence_assessment()
+
+        assert assessment.evidence_score == pytest.approx(1.0)
+        assert assessment.confidence_score < 0.3
+        assert assessment.bucket == ConfidenceBucket.LOW
+        assert assessment.truth_aligned is True
+
 
 class TestEvaluationResult:
     """Tests for EvaluationResult aggregate metrics."""
@@ -379,6 +417,47 @@ class TestEvaluationResult:
             "action.task_completion.missing_required_actions": 1,
             "grounding.unsupported_claim.forbidden_claim": 1,
         }
+
+    def test_get_metrics_includes_confidence_calibration_summary(self):
+        """Aggregate metrics should summarize confidence buckets and alignment."""
+        passed = TaskResult(
+            task_id="task-1",
+            status=TaskStatus.PASSED,
+            tests_passed=2,
+            tests_total=2,
+            completion_score=1.0,
+        )
+        failed = TaskResult(
+            task_id="task-2",
+            status=TaskStatus.FAILED,
+            completion_score=1.0,
+            failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+            failure_details={
+                "claim_coverage": 1.0,
+                "citation_coverage": 1.0,
+                "forbidden_claim_hits": ["invented claim"],
+            },
+        )
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.DR3_EVAL,
+                model="test-model",
+            ),
+            task_results=[passed, failed],
+        )
+
+        metrics = result.get_metrics()
+
+        expected_average = (
+            passed.get_confidence_assessment().confidence_score
+            + failed.get_confidence_assessment().confidence_score
+        ) / 2
+        assert metrics["avg_confidence_score"] == pytest.approx(expected_average)
+        assert metrics["confidence_buckets"] == {
+            "high": 1,
+            "low": 1,
+        }
+        assert metrics["truth_alignment_rate"] == pytest.approx(1.0)
 
 
 class TestPassAtKResult:

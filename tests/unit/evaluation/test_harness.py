@@ -600,6 +600,37 @@ class TestBenchmarkToolUsageMetrics:
             "metadata": {"missing_actions": ["click"]},
         }
 
+    def test_save_results_persists_confidence_assessment(self, tmp_path):
+        """Saved results should include derived confidence/uncertainty output."""
+        harness = EvaluationHarness(checkpoint_dir=tmp_path)
+        result = EvaluationResult(
+            config=EvaluationConfig(
+                benchmark=BenchmarkType.DR3_EVAL,
+                model="test",
+            ),
+            task_results=[
+                TaskResult(
+                    task_id="task-4",
+                    status=TaskStatus.FAILED,
+                    completion_score=1.0,
+                    failure_category=BenchmarkFailureCategory.UNSUPPORTED_CLAIM,
+                    failure_details={
+                        "claim_coverage": 1.0,
+                        "citation_coverage": 1.0,
+                        "forbidden_claim_hits": ["invented claim"],
+                    },
+                )
+            ],
+        )
+
+        saved_path = harness._save_results(result)
+        loaded = harness.load_results(saved_path)
+
+        assert loaded["summary"]["confidence_buckets"] == {"low": 1}
+        assert loaded["summary"]["truth_alignment_rate"] == 1.0
+        assert loaded["tasks"][0]["confidence_assessment"]["bucket"] == "low"
+        assert loaded["tasks"][0]["confidence_assessment"]["truth_aligned"] is True
+
     def test_save_results_persists_dataset_metadata(self, tmp_path):
         """Saved results should carry manifest metadata into persisted artifacts."""
         harness = EvaluationHarness(checkpoint_dir=tmp_path)

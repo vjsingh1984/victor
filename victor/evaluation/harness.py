@@ -32,6 +32,7 @@ from typing import Any, Optional, Protocol, runtime_checkable
 
 from victor.evaluation.protocol import (
     BenchmarkFailureCategory,
+    ConfidenceAssessment,
     FailureDiagnosis,
     BenchmarkTask,
     BenchmarkType,
@@ -561,6 +562,7 @@ class EvaluationHarness:
                         if r.get_failure_diagnosis() is not None
                         else None
                     ),
+                    "confidence_assessment": r.get_confidence_assessment().to_dict(),
                     "generated_code": r.generated_code,
                 }
                 for r in completed_results
@@ -621,6 +623,11 @@ class EvaluationHarness:
                     failure_diagnosis=(
                         FailureDiagnosis.from_dict(r["failure_diagnosis"])
                         if r.get("failure_diagnosis")
+                        else None
+                    ),
+                    confidence_assessment=(
+                        ConfidenceAssessment.from_dict(r["confidence_assessment"])
+                        if r.get("confidence_assessment")
                         else None
                     ),
                     generated_code=r.get("generated_code"),
@@ -1031,6 +1038,7 @@ class EvaluationHarness:
                 task_result.failure_category = eval_result.failure_category
                 task_result.failure_details = dict(eval_result.failure_details)
                 task_result.failure_diagnosis = eval_result.get_failure_diagnosis()
+                task_result.confidence_assessment = eval_result.get_confidence_assessment()
 
                 # Calculate completion score
                 task_result.completion_score = task_result.calculate_completion_score()
@@ -1245,6 +1253,7 @@ class EvaluationHarness:
                         if r.get_failure_diagnosis() is not None
                         else None
                     ),
+                    "confidence_assessment": r.get_confidence_assessment().to_dict(),
                     "code_quality": (
                         {
                             "syntax_valid": r.code_quality.syntax_valid,
