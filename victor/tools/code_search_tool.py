@@ -429,6 +429,18 @@ def _get_index_cache(exec_ctx: Optional[Dict[str, Any]] = None) -> Dict[str, Any
     return _INDEX_CACHE
 
 
+def _cache_entry_matches_manifest(
+    cache_entry: Optional[Dict[str, Any]],
+    index_manifest: Dict[str, Any],
+) -> bool:
+    """Return True when an in-memory cache entry matches the requested index manifest."""
+
+    if not isinstance(cache_entry, dict):
+        return False
+    cached_manifest = cache_entry.get("index_manifest")
+    return isinstance(cached_manifest, dict) and cached_manifest == index_manifest
+
+
 # Directories that indicate non-core code (lower importance)
 NON_CORE_DIRS = {
     "test",
@@ -1037,6 +1049,9 @@ async def _get_or_build_index(
                     f"Use reindex=True to retry, or mode='literal' for keyword search."
                 )
 
+    embedding_config = _build_codebase_embedding_config(settings, root)
+    index_manifest = build_codebase_index_manifest(embedding_config)
+
     cache_entry = index_cache.get(str(root))
     cached_index = cache_entry["index"] if cache_entry else None
     last_mtime = cache_entry["latest_mtime"] if cache_entry else 0.0
@@ -1048,6 +1063,9 @@ async def _get_or_build_index(
         # Check if cache is marked as stale from file watcher
         if cache_entry.get("stale", False):
             logger.info(f"[code_search] Cache marked stale for {root}, will rebuild")
+            # Fall through to rebuild below
+        elif not _cache_entry_matches_manifest(cache_entry, index_manifest):
+            logger.info("[code_search] Cache manifest mismatch for %s, rebuilding", root)
             # Fall through to rebuild below
         elif latest <= last_mtime:
             # No files changed, use cache directly
@@ -1083,7 +1101,9 @@ async def _get_or_build_index(
 
         # Check if we have a valid cached index (double-check)
         if cached_index and not force_reindex:
-            if latest <= last_mtime:
+            if not _cache_entry_matches_manifest(cache_entry, index_manifest):
+                logger.info("[code_search] Cache manifest mismatch for %s (inside lock), rebuilding", root)
+            elif latest <= last_mtime:
                 # Another task built it while we waited for lock
                 logger.info(f"[code_search] Cache hit for {root} (inside lock)")
 
@@ -1096,9 +1116,6 @@ async def _get_or_build_index(
 
         # Build index with exclusive access to this path
         logger.info(f"[code_search] Building index for {root} (exclusive lock acquired)")
-
-        embedding_config = _build_codebase_embedding_config(settings, root)
-        index_manifest = build_codebase_index_manifest(embedding_config)
 
         graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
         graph_path = getattr(settings, "codebase_graph_path", None)
@@ -1151,6 +1168,7 @@ async def _get_or_build_index(
             "index": index,
             "latest_mtime": latest,
             "indexed_at": time.time(),
+            "index_manifest": index_manifest,
             "watcher_subscribed": False,  # Will be subscribed on next access
         }
 

@@ -30,6 +30,7 @@ from victor.tools.code_search_tool import (
     _build_codebase_embedding_config,
     _finalize_index_storage,
     _get_or_build_index,
+    _latest_mtime,
     _probe_index_integrity,
     clear_index_cache,
 )
@@ -359,6 +360,146 @@ class TestBackgroundRebuildLogging:
 
 class TestStructuralIndexPersistence:
     """Tests for manifest-aware persistent index reuse."""
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_reuses_cached_index_when_in_memory_manifest_matches(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(tmp_path / "embeddings"),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        cached_index = SimpleNamespace(incremental_reindex=AsyncMock())
+        index_manifest = build_codebase_index_manifest(
+            _build_codebase_embedding_config(settings, root)
+        )
+        fake_cache: dict[str, dict[str, object]] = {
+            str(root): {
+                "index": cached_index,
+                "latest_mtime": _latest_mtime(root),
+                "indexed_at": time.time(),
+                "index_manifest": index_manifest,
+                "watcher_subscribed": True,
+            }
+        }
+
+        factory = MagicMock()
+        fake_factory = SimpleNamespace(create=factory)
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+
+        clear_index_cache()
+        index, rebuilt = await _get_or_build_index(root=root, settings=settings)
+
+        assert index is cached_index
+        assert rebuilt is False
+        factory.assert_not_called()
+        cached_index.incremental_reindex.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_get_or_build_index_invalidates_cached_index_when_manifest_changes(
+        self, tmp_path, monkeypatch
+    ):
+        root = tmp_path / "repo"
+        root.mkdir()
+        (root / "main.py").write_text("print('hello')\n", encoding="utf-8")
+
+        persist_dir = tmp_path / "embeddings"
+        persist_dir.mkdir()
+        (persist_dir / "existing.lance").mkdir()
+
+        settings = SimpleNamespace(
+            codebase_vector_store="lancedb",
+            codebase_embedding_provider="sentence-transformers",
+            codebase_embedding_model="BAAI/bge-small-en-v1.5",
+            codebase_persist_directory=str(persist_dir),
+            codebase_dimension=384,
+            codebase_batch_size=32,
+            codebase_structural_indexing_enabled=False,
+            codebase_chunking_strategy="tree_sitter_structural",
+            codebase_chunk_size=500,
+            codebase_chunk_overlap=50,
+            codebase_embedding_extra_config={},
+            codebase_graph_store="sqlite",
+            codebase_graph_path=None,
+            unified_embedding_model="BAAI/bge-small-en-v1.5",
+        )
+
+        new_manifest = build_codebase_index_manifest(_build_codebase_embedding_config(settings, root))
+        write_codebase_index_manifest(persist_dir, new_manifest)
+
+        cached_index = SimpleNamespace(incremental_reindex=AsyncMock())
+        replacement_index = SimpleNamespace(index_codebase=AsyncMock(), _is_indexed=False)
+        fake_cache: dict[str, dict[str, object]] = {
+            str(root): {
+                "index": cached_index,
+                "latest_mtime": _latest_mtime(root),
+                "indexed_at": time.time(),
+                "index_manifest": {"schema_version": -1},
+                "watcher_subscribed": True,
+            }
+        }
+        fake_factory = SimpleNamespace(create=lambda **kwargs: replacement_index)
+        probe_mock = AsyncMock(return_value=False)
+
+        import victor.core.capability_registry as capability_registry_module
+        import victor.core.indexing.index_lock as index_lock_module
+        import victor.tools.code_search_tool as code_search_tool_module
+
+        monkeypatch.setattr(
+            capability_registry_module.CapabilityRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeCapabilityRegistry(fake_factory)),
+        )
+        monkeypatch.setattr(
+            index_lock_module.IndexLockRegistry,
+            "get_instance",
+            staticmethod(lambda: _FakeIndexLockRegistry()),
+        )
+        monkeypatch.setattr(code_search_tool_module, "_get_index_cache", lambda exec_ctx=None: fake_cache)
+        monkeypatch.setattr(code_search_tool_module, "_probe_index_integrity", probe_mock)
+
+        clear_index_cache()
+        index, rebuilt = await _get_or_build_index(root=root, settings=settings)
+
+        assert index is replacement_index
+        assert rebuilt is False
+        cached_index.incremental_reindex.assert_not_awaited()
+        replacement_index.index_codebase.assert_not_awaited()
+        probe_mock.assert_awaited_once_with(replacement_index)
+        assert fake_cache[str(root)]["index"] is replacement_index
+        assert fake_cache[str(root)]["index_manifest"] == new_manifest
 
     @pytest.mark.asyncio
     async def test_get_or_build_index_rebuilds_when_manifest_mismatch(self, tmp_path, monkeypatch):
