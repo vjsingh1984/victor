@@ -591,7 +591,7 @@ def _latest_mtime(root: Path) -> float:
 async def _subscribe_to_file_watcher(
     root: Path,
     exec_ctx: Optional[Dict[str, Any]] = None,
-) -> None:
+) -> bool:
     """Subscribe to file watcher for automatic index invalidation.
 
     Args:
@@ -609,8 +609,40 @@ async def _subscribe_to_file_watcher(
         file_watcher.subscribe(lambda e: asyncio.create_task(_on_file_change(e, root, exec_ctx)))
 
         logger.info(f"[code_search] Subscribed to file watcher for {root}")
+        return True
     except Exception as e:
         logger.error(f"[code_search] Failed to subscribe to file watcher: {e}")
+        return False
+
+
+async def _ensure_file_watcher_subscription(
+    cache_entry: Dict[str, Any],
+    root: Path,
+    exec_ctx: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """Subscribe a cached index to file watching exactly once per root.
+
+    Concurrent cache-hit callers can reach the watcher subscription path before
+    the per-root index lock is acquired. Keep the subscription single-flight so
+    duplicate callbacks do not stack up on the same watcher.
+    """
+
+    if cache_entry.get("watcher_subscribed", False):
+        return True
+
+    pending_task = cache_entry.get("watcher_subscription_task")
+    if not isinstance(pending_task, asyncio.Task) or pending_task.done():
+        pending_task = asyncio.create_task(_subscribe_to_file_watcher(root, exec_ctx))
+        cache_entry["watcher_subscription_task"] = pending_task
+
+    try:
+        subscribed = bool(await pending_task)
+    finally:
+        if cache_entry.get("watcher_subscription_task") is pending_task:
+            cache_entry.pop("watcher_subscription_task", None)
+
+    cache_entry["watcher_subscribed"] = subscribed
+    return subscribed
 
 
 async def _on_file_change(
@@ -1119,9 +1151,7 @@ async def _get_or_build_index(
         elif latest <= last_mtime:
             # No files changed, use cache directly
             # Subscribe to file watcher for auto-invalidation (only once per index)
-            if not cache_entry.get("watcher_subscribed", False):
-                await _subscribe_to_file_watcher(root, exec_ctx)
-                cache_entry["watcher_subscribed"] = True
+            await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
 
             return cached_index, False
         else:
@@ -1131,9 +1161,7 @@ async def _get_or_build_index(
             index_cache[str(root)]["latest_mtime"] = latest
 
             # Subscribe to file watcher for auto-invalidation (only once per index)
-            if not cache_entry.get("watcher_subscribed", False):
-                await _subscribe_to_file_watcher(root, exec_ctx)
-                cache_entry["watcher_subscribed"] = True
+            await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
 
             return cached_index, False  # Not a full rebuild
 
@@ -1160,9 +1188,7 @@ async def _get_or_build_index(
                 logger.info(f"[code_search] Cache hit for {root} (inside lock)")
 
                 # Subscribe to file watcher if not already subscribed
-                if not cache_entry.get("watcher_subscribed", False):
-                    await _subscribe_to_file_watcher(root, exec_ctx)
-                    cache_entry["watcher_subscribed"] = True
+                await _ensure_file_watcher_subscription(cache_entry, root, exec_ctx)
 
                 return cached_index, False
 
