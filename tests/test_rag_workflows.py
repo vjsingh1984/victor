@@ -14,8 +14,6 @@
 
 """Tests for RAG workflow provider."""
 
-import pytest
-
 from victor.core.verticals.protocols import WorkflowProviderProtocol
 from victor.workflows.definition import WorkflowDefinition
 
@@ -238,6 +236,68 @@ class TestQueryWorkflow:
             for node_id in nodes
         )
         assert has_synthesis, "Query workflow should have a synthesis step"
+
+    def test_query_has_retrieval_utility_scoring_step(self):
+        """Query workflow should score retrieval utility before coverage checks."""
+        from victor_rag.workflows import RAGWorkflowProvider
+
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("rag_query")
+        assert workflow is not None
+
+        assert "score_retrieval_utility" in workflow.nodes
+        next_nodes = workflow.get_next_nodes("rerank")
+        assert [node.id for node in next_nodes] == ["score_retrieval_utility"]
+
+    def test_query_has_retrieval_repair_branch(self):
+        """Low-support retrieval should go through diagnosis and repair."""
+        from victor_rag.workflows import RAGWorkflowProvider
+
+        provider = RAGWorkflowProvider()
+        workflow = provider.get_workflow("rag_query")
+        assert workflow is not None
+
+        coverage_decision = workflow.nodes["coverage_decision"]
+        assert coverage_decision.branches["false"] == "diagnose_retrieval_gap"
+
+        repair_decision = workflow.nodes["check_retrieval_repair"]
+        assert repair_decision.branches["repair"] == "increment_retrieval_repair_attempt"
+        assert repair_decision.branches["revise"] == "revise_answer"
+        assert repair_decision.branches["clarify"] == "request_clarification"
+
+        assert "repair_retrieval" in workflow.nodes
+        next_nodes = workflow.get_next_nodes("increment_retrieval_repair_attempt")
+        assert [node.id for node in next_nodes] == ["repair_retrieval"]
+
+
+class TestRAGEscapeHatches:
+    """Tests for RAG workflow escape hatches."""
+
+    def test_retrieval_repair_decision_prefers_repair_for_missing_support(self):
+        """Coverage gaps with remaining repair budget should retry retrieval."""
+        from victor_rag.escape_hatches import retrieval_repair_decision
+
+        ctx = {
+            "coverage_assessment": {"has_answer": False, "confidence": "low"},
+            "verification": {"passed": False, "issues": ["Missing supporting evidence"]},
+            "repair_attempt_count": 0,
+            "max_repair_attempts": 2,
+        }
+
+        assert retrieval_repair_decision(ctx) == "repair"
+
+    def test_retrieval_repair_decision_escalates_after_budget_exhausted(self):
+        """Repair budget exhaustion should stop automatic retries."""
+        from victor_rag.escape_hatches import retrieval_repair_decision
+
+        ctx = {
+            "coverage_assessment": {"has_answer": False, "confidence": "low"},
+            "verification": {"passed": False, "issues": ["Need external clarification"]},
+            "repair_attempt_count": 2,
+            "max_repair_attempts": 2,
+        }
+
+        assert retrieval_repair_decision(ctx) == "clarify"
 
 
 class TestMaintenanceWorkflow:

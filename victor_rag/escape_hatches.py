@@ -29,7 +29,7 @@ Example YAML usage:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +239,60 @@ def answer_confidence(ctx: Dict[str, Any]) -> str:
     return "uncertain"
 
 
+def retrieval_repair_decision(ctx: Dict[str, Any]) -> str:
+    """Choose whether to repair retrieval, revise, or ask for clarification.
+
+    Args:
+        ctx: Workflow context with keys:
+            - coverage_assessment (dict): Coverage result from context check
+            - verification (dict): Verification result for generated answer
+            - retrieval_utility (dict): Utility-aware retrieval scores
+            - repair_attempt_count (int): Number of automatic repair attempts
+            - max_repair_attempts (int): Maximum automatic repair attempts
+
+    Returns:
+        "repair", "revise", or "clarify"
+    """
+    coverage = ctx.get("coverage_assessment", {}) or {}
+    verification = ctx.get("verification", {}) or {}
+    utility = ctx.get("retrieval_utility", {}) or {}
+    repair_attempt_count = ctx.get("repair_attempt_count", 0)
+    max_repair_attempts = ctx.get("max_repair_attempts", 2)
+
+    has_answer = bool(coverage.get("has_answer", False))
+    confidence = str(coverage.get("confidence", "")).lower()
+    utility_score = float(utility.get("utility_score", 0.0) or 0.0)
+    verification_passed = verification.get("passed", True)
+    issues = verification.get("issues", []) or []
+    issue_text = " ".join(str(issue).lower() for issue in issues)
+
+    missing_support = any(
+        phrase in issue_text
+        for phrase in (
+            "missing support",
+            "missing evidence",
+            "unsupported",
+            "citation",
+            "source",
+            "grounding",
+        )
+    )
+
+    if repair_attempt_count >= max_repair_attempts:
+        return "clarify"
+
+    if missing_support or not has_answer or confidence in {"low", "none", "uncertain"}:
+        return "repair"
+
+    if utility_score < 0.55:
+        return "repair"
+
+    if verification_passed is False:
+        return "revise"
+
+    return "clarify"
+
+
 def embedding_batch_size(ctx: Dict[str, Any]) -> str:
     """Determine optimal embedding batch size.
 
@@ -413,6 +467,7 @@ CONDITIONS = {
     "should_reindex": should_reindex,
     "query_complexity": query_complexity,
     "answer_confidence": answer_confidence,
+    "retrieval_repair_decision": retrieval_repair_decision,
     "embedding_batch_size": embedding_batch_size,
 }
 
@@ -431,6 +486,7 @@ __all__ = [
     "should_reindex",
     "query_complexity",
     "answer_confidence",
+    "retrieval_repair_decision",
     "embedding_batch_size",
     # Transforms
     "merge_retrieved_chunks",
