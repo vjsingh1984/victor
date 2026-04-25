@@ -198,7 +198,7 @@ def analyze_capability_gaps(traces) -> List[CapabilityGap]:
 
 FAILURE_HINTS: Dict[str, str] = {
     "file_not_found": (
-        "Verify file paths with ls() or list_directory before reading. "
+        "Verify file paths with ls() before reading. "
         "Use code_search to find files by name or content."
     ),
     "read_directory": (
@@ -223,7 +223,7 @@ FAILURE_HINTS: Dict[str, str] = {
     ),
     "tool_not_found": (
         "Use only tools listed in the available tools. Check tool name spelling. "
-        "Use list_directory or code_search as universal fallbacks."
+        "Use ls or code_search as universal fallbacks."
     ),
     "timeout": (
         "Keep tool calls focused. Avoid reading entire large directories. "
