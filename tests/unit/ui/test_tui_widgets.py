@@ -288,6 +288,66 @@ def test_tool_call_widget_emits_follow_up_selection_message() -> None:
     event.stop.assert_called_once_with()
 
 
+def test_tool_call_widget_recomposes_when_follow_ups_added_on_update() -> None:
+    """Follow-up buttons added after completion should trigger a recompose."""
+    widget = ToolCallWidget("code_search", status="pending")
+    widget.refresh = MagicMock()
+
+    widget.update_status(
+        "success",
+        elapsed=0.5,
+        follow_up_suggestions=[
+            {
+                "command": 'graph(mode="trace", node="main", depth=3)',
+                "description": "Trace execution starting from main.",
+            }
+        ],
+    )
+
+    widget.refresh.assert_called_once_with(recompose=True)
+    assert widget.follow_up_suggestions == [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+
+
+def test_tool_call_widget_skips_recompose_when_follow_ups_unchanged() -> None:
+    """Repeated status updates should avoid recompose when follow-ups did not change."""
+    follow_ups = [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+    widget = ToolCallWidget("code_search", status="success", follow_up_suggestions=follow_ups)
+    widget.refresh = MagicMock()
+
+    widget.update_status(
+        "success",
+        elapsed=0.7,
+        follow_up_suggestions=follow_ups,
+    )
+
+    widget.refresh.assert_not_called()
+
+
+def test_tool_call_widget_updates_output_preview_without_recompose() -> None:
+    """Output preview updates should not require a widget recompose."""
+    widget = ToolCallWidget("read", status="pending")
+    widget.refresh = MagicMock()
+
+    widget.update_status(
+        "success",
+        elapsed=0.2,
+        output_preview="line1\nline2\nline3\nline4",
+    )
+
+    assert widget._output_preview == "line1\nline2\nline3\n..."
+    widget.refresh.assert_not_called()
+
+
 def test_update_scroll_processes_after_resize_guard_window() -> None:
     """Once resize guard expires, follow state updates should resume normally."""
     log = EnhancedConversationLog()

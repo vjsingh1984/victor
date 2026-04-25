@@ -117,6 +117,13 @@ class Session:
             lines.append(f"### {role_display}")
             lines.append("")
             lines.append(msg.content)
+            preview_body = msg.metadata.get("preview_body")
+            if isinstance(preview_body, str) and preview_body:
+                language = msg.metadata.get("preview_language") or "text"
+                lines.append("")
+                lines.append(f"```{language}")
+                lines.append(preview_body)
+                lines.append("```")
             lines.append("")
 
         return "\n".join(lines)

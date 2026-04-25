@@ -45,7 +45,7 @@ def _get_input_history_from_db(limit: int = 100) -> List[str]:
     try:
         from victor.config.settings import get_project_paths
 
-        db_path = get_project_paths().conversation_db
+        db_path = get_project_paths().project_db
         if not db_path.exists():
             return []
 
@@ -624,6 +624,13 @@ class ToolCallWidget(Static):
         height: auto;
     }
 
+    ToolCallWidget .tool-output-preview {
+        margin-top: 1;
+        color: $text-muted;
+        max-height: 4;
+        overflow: hidden;
+    }
+
     ToolCallWidget .follow-up-button {
         width: auto;
         min-width: 18;
@@ -645,6 +652,7 @@ class ToolCallWidget(Static):
         status: str = "pending",
         elapsed: float | None = None,
         follow_up_suggestions: list[dict] | None = None,
+        output_preview: str | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -653,6 +661,7 @@ class ToolCallWidget(Static):
         self.status = status
         self.elapsed = elapsed
         self.follow_up_suggestions = self._normalize_follow_up_suggestions(follow_up_suggestions)
+        self._output_preview = self._normalize_output_preview(output_preview)
         self.add_class(status)
 
     @staticmethod
@@ -681,6 +690,18 @@ class ToolCallWidget(Static):
         if len(label) > 32:
             return label[:29] + "..."
         return label
+
+    @staticmethod
+    def _normalize_output_preview(output_preview: str | None) -> str:
+        """Build a compact multi-line preview for tool output."""
+        if not isinstance(output_preview, str) or not output_preview.strip():
+            return ""
+        lines = output_preview.splitlines() or [output_preview]
+        preview_lines = lines[:3]
+        normalized = "\n".join(line[:120] for line in preview_lines)
+        if len(lines) > 3 or len(output_preview) > len(normalized):
+            normalized += "\n..."
+        return normalized
 
     def compose(self) -> ComposeResult:
         """Compose the tool call widget.
@@ -723,6 +744,7 @@ class ToolCallWidget(Static):
             classes="tool-header",
             id="tool-header-label",
         )
+        yield Static(self._output_preview, classes="tool-output-preview", id="tool-output-preview")
         if self.follow_up_suggestions:
             with Horizontal(classes="tool-follow-ups"):
                 for idx, suggestion in enumerate(self.follow_up_suggestions[:2]):
@@ -738,15 +760,22 @@ class ToolCallWidget(Static):
         status: str,
         elapsed: float | None = None,
         follow_up_suggestions: list[dict] | None = None,
+        output_preview: str | None = None,
     ) -> None:
         """Update tool call status."""
         self.remove_class(self.status)
         self.status = status
         self.elapsed = elapsed
+        follow_ups_changed = False
         if follow_up_suggestions is not None:
-            self.follow_up_suggestions = self._normalize_follow_up_suggestions(
-                follow_up_suggestions
-            )
+            normalized_follow_ups = self._normalize_follow_up_suggestions(follow_up_suggestions)
+            follow_ups_changed = normalized_follow_ups != self.follow_up_suggestions
+            self.follow_up_suggestions = normalized_follow_ups
+        preview_changed = False
+        if output_preview is not None:
+            normalized_preview = self._normalize_output_preview(output_preview)
+            preview_changed = normalized_preview != self._output_preview
+            self._output_preview = normalized_preview
         self.add_class(status)
         # Targeted header update instead of expensive refresh(recompose=True)
         try:
@@ -776,6 +805,17 @@ class ToolCallWidget(Static):
             )
         except Exception as e:
             logger.debug(f"Failed to update tool header label: {e}")
+        if preview_changed:
+            try:
+                preview = self.query_one("#tool-output-preview", Static)
+                preview.update(self._output_preview)
+            except Exception as e:
+                logger.debug(f"Failed to update tool output preview: {e}")
+        if follow_ups_changed:
+            try:
+                self.refresh(recompose=True)
+            except Exception as e:
+                logger.debug(f"Failed to recompose tool follow-ups: {e}")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         """Handle follow-up suggestion buttons."""
@@ -1435,6 +1475,20 @@ class EnhancedConversationLog(VerticalScroll):
             return
         self._message_count += 1
         self.mount(msg)
+
+    def add_history_code_block(
+        self,
+        code: str,
+        language: str = "python",
+    ) -> None:
+        """Add a replayed code block without scroll or unread side effects."""
+        block = CodeBlock(
+            code=code,
+            language=language,
+            id=f"code-{self._message_count}",
+        )
+        self._message_count += 1
+        self.mount(block)
 
     # -- streaming -----------------------------------------------------------
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from rich.console import Console
@@ -846,10 +847,64 @@ class VictorTUI(App):
             self._update_thinking(thinking_buffer)
 
         def show_preview(kind: str, path: str, body: str) -> None:
-            """Surface preview metadata as a compact system message."""
+            """Surface preview metadata with a replayable code block."""
             header = f"{kind}: {path}" if path else kind
-            message = f"{header}\n{body}" if body else header
-            self._add_system_message(message)
+            preview_kind = "edit" if kind.lower().startswith("edit") else "file"
+            self._add_system_message(
+                header,
+                preview_body=body,
+                preview_kind=preview_kind,
+                preview_language=self._infer_preview_language(path, preview_kind),
+                preview_path=path,
+            )
+
+        def build_tool_output_preview(
+            tool_name: str,
+            arguments: dict[str, Any],
+            raw_result: Any,
+        ) -> str | None:
+            """Build a compact tool-output preview for TUI widgets."""
+            if raw_result is None:
+                return None
+
+            raw_text = str(raw_result)
+            if not raw_text.strip():
+                return None
+
+            try:
+                from victor.config.tool_settings import get_tool_settings
+                from victor.ui.rendering.tool_preview import renderer as tool_preview_renderer
+
+                tool_settings = get_tool_settings()
+                if not tool_settings.tool_output_preview_enabled:
+                    return None
+
+                max_lines = tool_settings.tool_output_preview_lines
+                preview = tool_preview_renderer.render(tool_name, arguments, raw_text, max_lines=max_lines)
+                if preview.contains_rich_markup:
+                    return raw_text
+
+                preview_parts: list[str] = []
+                if preview.header:
+                    preview_parts.append(preview.header)
+                preview_parts.extend(preview.lines)
+                if preview.total_line_count > len(preview.lines):
+                    preview_parts.append("...")
+                if preview_parts:
+                    return "\n".join(preview_parts)
+            except Exception:
+                logger.debug("Failed to build TUI tool preview for %s", tool_name, exc_info=True)
+
+            return raw_text
+
+        def should_show_tool_pruning_notice() -> bool:
+            """Return True when tool-output transparency notices should be shown."""
+            try:
+                from victor.config.tool_settings import get_tool_settings
+
+                return bool(get_tool_settings().tool_output_show_transparency)
+            except Exception:
+                return True
 
         def process_content(raw_content: str) -> None:
             """Normalize and route content through the shared inline-thinking filter."""
@@ -1002,7 +1057,7 @@ class VictorTUI(App):
                             error_message = tool_data.get("error")
                             if isinstance(error_message, str) and error_message.strip():
                                 self._add_error_message(f"{tool_name}: {error_message.strip()}")
-                            if tool_data.get("was_pruned"):
+                            if tool_data.get("was_pruned") and should_show_tool_pruning_notice():
                                 self._add_system_message(
                                     f"Tool output for {tool_name} was pruned before sending to the model."
                                 )
@@ -1010,6 +1065,13 @@ class VictorTUI(App):
                                 success=tool_data.get("success", True),
                                 elapsed=tool_data.get("elapsed"),
                                 follow_up_suggestions=tool_data.get("follow_up_suggestions"),
+                                tool_name=tool_name,
+                                arguments=tool_data.get("arguments", {}),
+                                output_preview=build_tool_output_preview(
+                                    tool_name,
+                                    tool_data.get("arguments", {}),
+                                    tool_data.get("result"),
+                                ),
                             )
                         except Exception as e:
                             logger.warning(f"Failed to finish tool call: {e}")
@@ -1107,8 +1169,13 @@ class VictorTUI(App):
         success: bool = True,
         elapsed: float | None = None,
         follow_up_suggestions: list[dict] | None = None,
+        tool_name: str | None = None,
+        arguments: dict | None = None,
+        output_preview: str | None = None,
     ) -> None:
         """Finish current tool call."""
+        if self._current_tool_widget is None and (tool_name or arguments):
+            self._show_tool_call(tool_name or "tool", arguments or {})
         if self._current_tool_widget:
             status = "success" if success else "error"
             finished_widget = self._current_tool_widget
@@ -1116,6 +1183,7 @@ class VictorTUI(App):
                 status,
                 elapsed,
                 follow_up_suggestions=follow_up_suggestions,
+                output_preview=output_preview,
             )
             self._current_tool_widget = None
             self._schedule_tool_widget_cleanup(
@@ -1371,7 +1439,7 @@ class VictorTUI(App):
         self._set_status(f"Loading session ({message_count} messages)...", "busy")
 
         self._session_messages = list(session.messages)
-        self._replay_transcript([(msg.role, msg.content) for msg in session.messages])
+        self._replay_transcript(session.messages)
 
         self._restore_agent_conversation(session.messages)
         self._add_system_message(
@@ -1440,13 +1508,55 @@ class VictorTUI(App):
         title = metadata.get("title") or session_id[:8]
         self._add_system_message(f"Project session loaded: {title} ({message_count} messages)")
 
-    def _render_message(self, role: str, content: str, replay: bool = False) -> None:
+    @staticmethod
+    def _infer_preview_language(path: str, preview_kind: str) -> str:
+        """Infer a CodeBlock lexer from preview metadata."""
+        if preview_kind == "edit":
+            return "diff"
+
+        suffix = Path(path).suffix.lstrip(".").lower()
+        return suffix or "text"
+
+    @staticmethod
+    def _coerce_replay_message(message: Message | tuple[str, str]) -> Message:
+        """Normalize replay payloads so metadata survives session restore."""
+        if isinstance(message, Message):
+            return message
+
+        role, content = message
+        return Message(role=role, content=content, metadata={})
+
+    def _render_preview_block(self, metadata: dict[str, Any], replay: bool = False) -> None:
+        """Render an attached preview code block when metadata provides one."""
+        if not self._conversation_log:
+            return
+
+        preview_body = metadata.get("preview_body")
+        if not isinstance(preview_body, str) or not preview_body:
+            return
+
+        preview_language = metadata.get("preview_language")
+        language = preview_language.strip() if isinstance(preview_language, str) else ""
+        if not language:
+            language = "text"
+
+        if replay:
+            self._conversation_log.add_history_code_block(preview_body, language)
+        else:
+            self._conversation_log.add_code_block(preview_body, language)
+
+    def _render_message(
+        self,
+        role: str,
+        content: str,
+        replay: bool = False,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> None:
         if not self._conversation_log:
             return
         if replay:
             self._conversation_log.add_history_message(role, content)
-            return
-        if role == "user":
+        elif role == "user":
             self._conversation_log.add_user_message(content)
         elif role == "assistant":
             self._conversation_log.add_assistant_message(content)
@@ -1454,6 +1564,9 @@ class VictorTUI(App):
             self._conversation_log.add_system_message(content)
         elif role == "error":
             self._conversation_log.add_error_message(content)
+
+        if metadata:
+            self._render_preview_block(metadata, replay=replay)
 
     def _restore_agent_conversation(self, messages: list[Message]) -> None:
         if not self.agent or not hasattr(self.agent, "conversation"):
@@ -1480,21 +1593,27 @@ class VictorTUI(App):
         except Exception as exc:
             self._add_error_message(f"Failed to restore agent context: {exc}")
 
-    def _replay_transcript(self, messages: list[tuple[str, str]]) -> None:
-        """Replay a list of (role, content) tuples into the conversation log.
+    def _replay_transcript(self, messages: list[Message | tuple[str, str]]) -> None:
+        """Replay saved messages into the conversation log.
 
         Uses ``add_history_message`` to avoid scroll/unread side effects,
         then jumps to bottom once.
         """
         with self.batch_update():
             self._conversation_log.clear()
-            for role, content in messages:
-                self._conversation_log.add_history_message(role, content)
+            for replay_message in messages:
+                message = self._coerce_replay_message(replay_message)
+                self._render_message(
+                    message.role,
+                    message.content,
+                    replay=True,
+                    metadata=message.metadata,
+                )
         self._conversation_log.set_follow_paused(False, jump_to_bottom=True)
 
     async def _replay_transcript_async(
         self,
-        messages: list[tuple[str, str]],
+        messages: list[Message | tuple[str, str]],
         status_label: str = "Loading session",
     ) -> None:
         """Replay a transcript with async chunking for large histories."""
@@ -1508,8 +1627,14 @@ class VictorTUI(App):
         while idx < total:
             chunk_end = min(idx + self._ASYNC_REPLAY_CHUNK_SIZE, total)
             with self.batch_update():
-                for role, content in messages[idx:chunk_end]:
-                    self._conversation_log.add_history_message(role, content)
+                for replay_message in messages[idx:chunk_end]:
+                    message = self._coerce_replay_message(replay_message)
+                    self._render_message(
+                        message.role,
+                        message.content,
+                        replay=True,
+                        metadata=message.metadata,
+                    )
             idx = chunk_end
             self._set_status(f"{status_label} ({idx}/{total})")
             await asyncio.sleep(0)
@@ -1544,8 +1669,7 @@ class VictorTUI(App):
             self._add_error_message(f"Session not found: {session_id}")
             return
 
-        messages = [(msg.role, msg.content) for msg in session.messages]
-        await self._replay_transcript_async(messages, status_label="Loading session")
+        await self._replay_transcript_async(session.messages, status_label="Loading session")
         self._restore_agent_conversation(session.messages)
         self._add_system_message(
             f"Session loaded: {session.name or session.id[:8]} ({len(session.messages)} messages)"
@@ -1873,10 +1997,9 @@ Slash Commands:
             self._conversation_log.add_assistant_message(content)
         self._record_message("assistant", content)
 
-    def _add_system_message(self, content: str) -> None:
-        if self._conversation_log:
-            self._conversation_log.add_system_message(content)
-        self._record_message("system", content)
+    def _add_system_message(self, content: str, **metadata: Any) -> None:
+        self._render_message("system", content, metadata=metadata or None)
+        self._record_message("system", content, **metadata)
 
     def _add_error_message(self, content: str) -> None:
         if self._conversation_log:

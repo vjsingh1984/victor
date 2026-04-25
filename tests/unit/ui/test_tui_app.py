@@ -2,6 +2,7 @@
 
 import asyncio
 from contextlib import nullcontext
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 
 from textual.messages import UpdateScroll
@@ -137,6 +138,26 @@ def test_render_message_replay_uses_history_path() -> None:
     app._conversation_log.add_error_message.assert_not_called()
 
 
+def test_render_message_replay_renders_preview_code_block() -> None:
+    """Replay should restore preview metadata as a separate code block."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+
+    app._render_message(
+        "system",
+        "File preview: /tmp/test.py",
+        replay=True,
+        metadata={"preview_body": "print('hello')", "preview_language": "py"},
+    )
+
+    app._conversation_log.add_history_message.assert_called_once_with(
+        "system",
+        "File preview: /tmp/test.py",
+    )
+    app._conversation_log.add_history_code_block.assert_called_once_with("print('hello')", "py")
+    app._conversation_log.add_code_block.assert_not_called()
+
+
 def test_replay_transcript_batches_and_reanchors_once() -> None:
     """Transcript replay should clear, batch-mount history, and jump to latest once."""
     app = VictorTUI()
@@ -246,7 +267,7 @@ def test_load_session_async_uses_async_replay_path() -> None:
 
     to_thread.assert_awaited_once_with(manager.load, "session-12345678")
     app._replay_transcript_async.assert_awaited_once_with(
-        [(msg.role, msg.content) for msg in session.messages],
+        session.messages,
         status_label="Loading session",
     )
     app._restore_agent_conversation.assert_called_once_with(session.messages)
@@ -320,9 +341,7 @@ def test_load_session_uses_status_and_single_completion_message() -> None:
     )
     assert app._set_status.call_count == 2
     app._restore_agent_conversation.assert_called_once_with(session.messages)
-    app._replay_transcript.assert_called_once_with(
-        [(msg.role, msg.content) for msg in session.messages]
-    )
+    app._replay_transcript.assert_called_once_with(session.messages)
     app._add_system_message.assert_called_once_with("Session loaded: Replay Test (60 messages)")
 
 
@@ -364,6 +383,7 @@ def test_finish_tool_call_keeps_follow_up_widgets_visible_longer() -> None:
         "success",
         0.5,
         follow_up_suggestions=follow_ups,
+        output_preview=None,
     )
     app._schedule_tool_widget_cleanup.assert_called_once_with(
         widget,
@@ -427,7 +447,48 @@ def test_stream_response_handles_metadata_tool_results_with_follow_ups() -> None
         success=True,
         elapsed=0.5,
         follow_up_suggestions=follow_ups,
+        tool_name="code_search",
+        arguments={"query": "main entry point"},
+        output_preview=None,
     )
+
+
+def test_finish_tool_call_creates_widget_when_result_arrives_without_start() -> None:
+    """Result-only tool events should still create a visible tool widget in TUI."""
+    app = VictorTUI()
+    widget = MagicMock()
+    app._schedule_tool_widget_cleanup = MagicMock()
+    app._prune_tool_widgets = MagicMock()
+
+    def _show_tool_call(tool_name, arguments):
+        app._current_tool_widget = widget
+
+    app._show_tool_call = MagicMock(side_effect=_show_tool_call)
+
+    follow_ups = [
+        {
+            "command": 'graph(mode="trace", node="main", depth=3)',
+            "description": "Trace execution starting from main.",
+        }
+    ]
+
+    app._finish_tool_call(
+        success=True,
+        elapsed=0.5,
+        follow_up_suggestions=follow_ups,
+        tool_name="code_search",
+        arguments={"query": "main entry point"},
+        output_preview="line1\nline2\nline3",
+    )
+
+    app._show_tool_call.assert_called_once_with("code_search", {"query": "main entry point"})
+    widget.update_status.assert_called_once_with(
+        "success",
+        0.5,
+        follow_up_suggestions=follow_ups,
+        output_preview="line1\nline2\nline3",
+    )
+    app._schedule_tool_widget_cleanup.assert_called_once_with(widget, timeout=20.0)
 
 
 def test_stream_response_surfaces_tool_result_error_details() -> None:
@@ -464,6 +525,9 @@ def test_stream_response_surfaces_tool_result_error_details() -> None:
         success=False,
         elapsed=0.2,
         follow_up_suggestions=None,
+        tool_name="read",
+        arguments={"path": "/tmp/test.py"},
+        output_preview=None,
     )
 
 
@@ -497,17 +561,147 @@ def test_stream_response_surfaces_pruned_tool_notice() -> None:
     asyncio.run(app._stream_response("trace main"))
 
     app._add_system_message.assert_called_once_with(
-        "Tool output for code_search was truncated (full output sent to model)."
+        "Tool output for code_search was pruned before sending to the model."
     )
     app._finish_tool_call.assert_called_once_with(
         success=True,
         elapsed=0.5,
         follow_up_suggestions=None,
+        tool_name="code_search",
+        arguments={"query": "main"},
+        output_preview=None,
+    )
+
+
+def test_stream_response_respects_disabled_tool_pruning_notice() -> None:
+    """TUI should hide pruning notices when transparency display is disabled."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._add_system_message = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "code_search",
+                    "success": True,
+                    "elapsed": 0.5,
+                    "arguments": {"query": "main"},
+                    "was_pruned": True,
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    with patch(
+        "victor.config.tool_settings.get_tool_settings",
+        return_value=SimpleNamespace(tool_output_show_transparency=False),
+    ):
+        asyncio.run(app._stream_response("trace main"))
+
+    app._add_system_message.assert_not_called()
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.5,
+        follow_up_suggestions=None,
+        tool_name="code_search",
+        arguments={"query": "main"},
+        output_preview=None,
+    )
+
+
+def test_stream_response_forwards_tool_result_preview() -> None:
+    """TUI should forward tool-result payloads so widgets can show previews."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "read",
+                    "success": True,
+                    "elapsed": 0.2,
+                    "arguments": {"path": "/tmp/test.py"},
+                    "result": "line1\nline2\nline3\nline4",
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    asyncio.run(app._stream_response("preview"))
+
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.2,
+        follow_up_suggestions=None,
+        tool_name="read",
+        arguments={"path": "/tmp/test.py"},
+        output_preview="line1\nline2\nline3\n...",
+    )
+
+
+def test_stream_response_respects_disabled_tool_preview_setting() -> None:
+    """TUI should suppress tool previews when preview display is disabled."""
+    app = VictorTUI()
+    app.agent = MagicMock()
+    app._conversation_log = MagicMock()
+    app._start_streaming_ui = AsyncMock()
+    app._set_status = MagicMock()
+    app._finish_tool_call = MagicMock()
+    app._record_message = MagicMock()
+
+    async def _stream():
+        yield StreamChunk(
+            content="",
+            metadata={
+                "tool_result": {
+                    "name": "read",
+                    "success": True,
+                    "elapsed": 0.2,
+                    "arguments": {"path": "/tmp/test.py"},
+                    "result": "line1\nline2\nline3\nline4",
+                }
+            },
+        )
+
+    app.agent.stream_chat = MagicMock(return_value=_stream())
+
+    with patch(
+        "victor.config.tool_settings.get_tool_settings",
+        return_value=SimpleNamespace(
+            tool_output_preview_enabled=False,
+            tool_output_preview_lines=3,
+        ),
+    ):
+        asyncio.run(app._stream_response("preview"))
+
+    app._finish_tool_call.assert_called_once_with(
+        success=True,
+        elapsed=0.2,
+        follow_up_suggestions=None,
+        tool_name="read",
+        arguments={"path": "/tmp/test.py"},
+        output_preview=None,
     )
 
 
 def test_stream_response_surfaces_file_preview_metadata() -> None:
-    """TUI should surface file preview metadata as a system message."""
+    """TUI should surface file preview metadata via the shared preview path."""
     app = VictorTUI()
     app.agent = MagicMock()
     app._conversation_log = MagicMock()
@@ -526,12 +720,17 @@ def test_stream_response_surfaces_file_preview_metadata() -> None:
 
     asyncio.run(app._stream_response("preview"))
 
-    app._add_system_message.assert_called_once_with("File preview: /tmp/test.py\nprint('hello')")
-    app._record_message.assert_not_called()
+    app._add_system_message.assert_called_once_with(
+        "File preview: /tmp/test.py",
+        preview_body="print('hello')",
+        preview_kind="file",
+        preview_language="py",
+        preview_path="/tmp/test.py",
+    )
 
 
 def test_stream_response_surfaces_edit_preview_metadata() -> None:
-    """TUI should surface edit preview metadata as a system message."""
+    """TUI should surface edit preview metadata via the shared preview path."""
     app = VictorTUI()
     app.agent = MagicMock()
     app._conversation_log = MagicMock()
@@ -550,8 +749,37 @@ def test_stream_response_surfaces_edit_preview_metadata() -> None:
 
     asyncio.run(app._stream_response("preview"))
 
-    app._add_system_message.assert_called_once_with("Edit preview: /tmp/test.py\n-old\n+new")
-    app._record_message.assert_not_called()
+    app._add_system_message.assert_called_once_with(
+        "Edit preview: /tmp/test.py",
+        preview_body="-old\n+new",
+        preview_kind="edit",
+        preview_language="diff",
+        preview_path="/tmp/test.py",
+    )
+
+
+def test_add_system_message_renders_live_preview_code_block_and_records_metadata() -> None:
+    """Live system previews should render as header plus code block and stay replayable."""
+    app = VictorTUI()
+    app._conversation_log = MagicMock()
+    app._record_message = MagicMock()
+
+    app._add_system_message(
+        "File preview: /tmp/test.py",
+        preview_body="print('hello')",
+        preview_language="py",
+        preview_path="/tmp/test.py",
+    )
+
+    app._conversation_log.add_system_message.assert_called_once_with("File preview: /tmp/test.py")
+    app._conversation_log.add_code_block.assert_called_once_with("print('hello')", "py")
+    app._record_message.assert_called_once_with(
+        "system",
+        "File preview: /tmp/test.py",
+        preview_body="print('hello')",
+        preview_language="py",
+        preview_path="/tmp/test.py",
+    )
 
 
 def test_stream_response_normalizes_cumulative_content_snapshots() -> None:
