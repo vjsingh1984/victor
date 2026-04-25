@@ -305,7 +305,7 @@ class ProjectPaths:
 ```
 {project_root}/.victor/
 ├── init.md              # Project context
-├── conversation.db      # Conversation history
+├── project.db           # Consolidated project database (conversations, graph, entities)
 ├── embeddings/          # Vector embeddings
 ├── graph/               # Graph data
 ├── backups/             # File edit backups
@@ -314,6 +314,7 @@ class ProjectPaths:
 └── mcp.yaml             # MCP configuration
 
 ~/.victor/
+├── victor.db            # Global user database (RL, prompt opt, sessions, tool usage)
 ├── profiles.yaml        # Global profiles
 ├── plugins/             # Plugins directory
 ├── cache/               # Global cache
@@ -322,13 +323,18 @@ class ProjectPaths:
 └── embeddings/          # Global embeddings
 ```
 
+**Database Consolidation**: All conversation data migrated from `conversation.db` to:
+- **project.db**: Project-specific data (conversations, graph, entities) - local to each project
+- **victor.db**: Global user data (RL learning, prompt optimization, cross-project sessions)
+
 ### Project-Local Paths
 
 | Property | Type | Path |
 |----------|------|------|
 | `project_victor_dir` | `Path` | `{project_root}/.victor/` |
 | `project_context_file` | `Path` | `.victor/init.md` |
-| `conversation_db` | `Path` | `.victor/conversation.db` |
+| `project_db` | `Path` | `.victor/project.db` (consolidated database) |
+| `conversation_db` | `Path` | Alias for `project_db` (backward compatibility) |
 | `embeddings_dir` | `Path` | `.victor/embeddings/` |
 | `graph_dir` | `Path` | `.victor/graph/` |
 | `backups_dir` | `Path` | `.victor/backups/` |

@@ -395,8 +395,10 @@ class TestStreamingShimBehavior:
         mock_orchestrator._get_service_streaming_runtime.assert_called_once_with()
 
     @pytest.mark.asyncio
-    async def test_stream_chat_prefers_service_runtime_over_legacy_hook(self, mock_orchestrator):
-        """Shim uses service runtime before the legacy _stream_chat_runtime hook."""
+    async def test_stream_chat_prefers_service_runtime_over_legacy_compatibility_hook(
+        self, mock_orchestrator
+    ):
+        """Shim uses service runtime before the legacy compatibility hook."""
         from victor.providers.base import StreamChunk
 
         chunk = StreamChunk(content="runtime", role="assistant")
@@ -408,7 +410,7 @@ class TestStreamingShimBehavior:
             yield chunk
 
         async def _legacy_stream_chat(user_message: str, **kwargs):
-            raise AssertionError("legacy _stream_chat_runtime should not run")
+            raise AssertionError("legacy compatibility hook should not run")
 
         runtime.stream_chat = _runtime_stream_chat
         mock_orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)
@@ -425,8 +427,10 @@ class TestStreamingShimBehavior:
         mock_orchestrator._get_service_streaming_runtime.assert_called_once_with()
 
     @pytest.mark.asyncio
-    async def test_stream_chat_prefers_bound_chat_service_over_other_paths(self, mock_orchestrator):
-        """Shim uses bound ChatService before service runtime and legacy hook."""
+    async def test_stream_chat_prefers_bound_chat_service_over_other_paths(
+        self, mock_orchestrator
+    ):
+        """Shim uses bound ChatService before service runtime and the legacy compatibility hook."""
         from victor.providers.base import StreamChunk
 
         chunk = StreamChunk(content="service", role="assistant")
@@ -442,7 +446,7 @@ class TestStreamingShimBehavior:
             raise AssertionError("service runtime should not run when ChatService is bound")
 
         async def _legacy_stream_chat(user_message: str, **kwargs):
-            raise AssertionError("legacy _stream_chat_runtime should not run")
+            raise AssertionError("legacy compatibility hook should not run")
 
         chat_service.stream_chat = _service_stream_chat
         runtime.stream_chat = _runtime_stream_chat
@@ -461,8 +465,10 @@ class TestStreamingShimBehavior:
         mock_orchestrator._get_service_streaming_runtime.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_stream_chat_falls_back_to_legacy_runtime_helper(self, mock_orchestrator):
-        """Shim preserves legacy _stream_chat_runtime fallback for compatibility."""
+    async def test_stream_chat_falls_back_to_legacy_compatibility_hook(
+        self, mock_orchestrator
+    ):
+        """Shim preserves the legacy compatibility hook as the final fallback."""
         from victor.providers.base import StreamChunk
 
         chunk = StreamChunk(content="legacy", role="assistant")

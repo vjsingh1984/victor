@@ -70,7 +70,8 @@ Frontend will start on `http://localhost:5173`
                       ↓
 ┌─────────────────────────────────────────────────────────────┐
 │              Data Layer (SQLite + JSONL)                    │
-│  conversation.db | project.db | usage.jsonl               │
+│  project.db | victor.db | usage.jsonl                      │
+│  (project-specific) (global user data)                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 

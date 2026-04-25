@@ -18,6 +18,7 @@ from textwrap import dedent
 
 from victor.agent.task_tool_config_loader import TaskToolConfigLoader
 from victor.agent.unified_task_tracker import (
+    Milestone,
     TrackerTaskType,
     UnifiedTaskConfigLoader,
     UnifiedTaskTracker,
@@ -60,7 +61,7 @@ def test_unified_task_tracker_accepts_legacy_aliases_for_progress_tracking():
     assert "src/app.py" in tracker._progress.files_modified
 
     tracker.record_tool_call("execute_bash", {"cmd": "pytest -q"})
-    assert tracker._progress.action_iterations >= 2
+    assert Milestone.CHANGE_VERIFIED in tracker._progress.milestones
 
 
 def test_unified_task_config_loader_returns_canonical_required_tools():

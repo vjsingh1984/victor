@@ -15,6 +15,80 @@ Each tool has:
 - **Cost Tier**: Resource cost classification (FREE, LOW, MEDIUM, HIGH)
 - **Access Mode**: Permission level (READONLY, WRITE, EXECUTE, NETWORK, MIXED)
 
+### Rich Formatted Output
+
+Victor includes a **Rich formatter system** that provides beautiful, color-coded output for many tools. This makes it easier to quickly scan and understand tool results.
+
+**Tools with Rich Formatting**:
+- ✅ **Testing** (`test`, `pytest`, `run_tests`) — Color-coded test results (✓ passed, ✗ failed, ○ skipped)
+- ✅ **Code Search** (`code_search`, `semantic_code_search`) — Grouped file results with relevance scores
+- ✅ **Git** (`git`) — Color-coded status (green=added, yellow=modified, red=deleted)
+- ✅ **HTTP** (`http`, `https`) — Status code colors (2xx green, 3xx yellow, 4xx/5xx red)
+- ✅ **Database** (`database`, `db`, `sql`) — Rich table formatting with row counts
+- ✅ **Docker** (`docker`) — Container states (● running, ○ stopped, ◐ paused)
+- ✅ **Refactoring** (`refactor`, `refactoring`) — Operation icons (↝ rename, ♢ extract, ♦ inline)
+- ✅ **Security** (`security`, `security_scan`) — Severity levels (‼ critical, ⚠ high, ⚡ medium, ⚐ low)
+
+**Benefits**:
+- **Faster comprehension**: Color-coding highlights important information
+- **Better UX**: Professional, readable output instead of plain text
+- **Consistent format**: All tools follow the same formatting pattern
+- **Zero overhead**: Formatters are <1ms overhead with production guards
+
+**Example: Rich Test Output**
+```
+✓ 8 passed • 10 total
+
+Failed Tests:
+
+  ✗ test_authentication
+    tests/auth.py
+    AssertionError: Invalid token
+
+  ✗ test_database_connection
+    tests/db.py
+    ConnectionError: Timeout
+```
+
+**Configuration**:
+Rich formatting can be controlled via multiple methods:
+
+**Method 1: Feature Flag (Master Switch)**
+```bash
+# Environment variable
+export VICTOR_USE_RICH_FORMATTING=false
+
+# YAML config (~/.victor/features.yaml)
+features:
+  use_rich_formatting: false
+```
+
+**Method 2: Settings (Per-Tool Control)**
+```python
+# In settings or profile
+rich_formatting_enabled = true  # Master switch
+rich_formatting_tools = ["test", "git", "code_search"]  # Tool whitelist
+rich_formatting_max_output_size = 1_000_000  # 1MB limit
+rich_formatting_max_time_ms = 200  # 200ms timeout
+```
+
+**Method 3: Runtime Override**
+```python
+from victor.core.feature_flags import get_feature_flag_manager, FeatureFlag
+
+manager = get_feature_flag_manager()
+manager.disable(FeatureFlag.USE_RICH_FORMATTING)
+```
+
+**Performance Guards**:
+- Input size validation (1MB limit)
+- Formatting timeout protection (200ms)
+- Output size truncation
+- Tool whitelist enforcement
+- Graceful fallback to plain text
+
+See `victor/config/tool_settings.py` for all available options.
+
 ### How Tools Work
 
 1. **Selection**: Victor analyzes your request and selects relevant tools

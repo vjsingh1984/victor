@@ -247,7 +247,7 @@ async def test_chat_coordinator_streaming_prefers_service_runtime_getter():
 
 
 @pytest.mark.asyncio
-async def test_chat_coordinator_streaming_service_runtime_beats_legacy_hook():
+async def test_chat_coordinator_streaming_service_runtime_beats_legacy_compatibility_hook():
     chunk = StreamChunk(content="service-runtime", is_final=True)
     orchestrator = MagicMock()
     runtime = MagicMock()
@@ -258,7 +258,7 @@ async def test_chat_coordinator_streaming_service_runtime_beats_legacy_hook():
         yield chunk
 
     async def _legacy_stream_chat(user_message: str, **kwargs):
-        raise AssertionError("legacy _stream_chat_runtime should not run")
+        raise AssertionError("legacy compatibility hook should not run")
 
     runtime.stream_chat = _runtime_stream_chat
     orchestrator._get_service_streaming_runtime = MagicMock(return_value=runtime)

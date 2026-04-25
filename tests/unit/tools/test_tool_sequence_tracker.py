@@ -141,11 +141,11 @@ class TestRecordExecution:
 
         tracker.record_execution("read_file")
         tracker.record_execution("edit_files", success=True)
-        assert tracker._transitions["read_file"]["edit_files"].success_rate == 1.0
+        assert tracker._transitions["read"]["edit"].success_rate == 1.0
 
         tracker.record_execution("edit_files", success=False)
         # With learning_rate=1.0, it should be 0.0
-        assert tracker._transitions["edit_files"]["edit_files"].success_rate == 0.0
+        assert tracker._transitions["edit"]["edit"].success_rate == 0.0
 
 
 class TestGetNextSuggestions:

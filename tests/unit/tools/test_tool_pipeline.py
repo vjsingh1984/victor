@@ -1814,9 +1814,9 @@ class TestPerToolTimeout:
         assert result.results[0].success is True
 
     def test_config_default_timeout(self):
-        """Test that default per_tool_timeout_seconds is 30."""
+        """Test that default per_tool_timeout_seconds is 60."""
         config = ToolPipelineConfig()
-        assert config.per_tool_timeout_seconds == 30.0
+        assert config.per_tool_timeout_seconds == 60.0
 
     def test_config_custom_timeout(self):
         """Test custom per_tool_timeout_seconds."""
