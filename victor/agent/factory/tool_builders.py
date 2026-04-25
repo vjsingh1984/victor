@@ -299,9 +299,13 @@ class ToolBuildersMixin:
         Returns:
             ToolSelector instance configured with all dependencies
         """
+        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
         from victor.agent.tool_selection import ToolSelector
 
         fallback_max_tools = getattr(self.settings, "fallback_max_tools", 8)
+        runtime_intelligence = None
+        if getattr(self, "container", None) is not None:
+            runtime_intelligence = RuntimeIntelligenceService.from_container(self.container)
 
         # Merge ToolSettings into tool_selection_config so ToolSelector
         # has access to max_tool_schema_tokens, schema_promotion_threshold,
@@ -332,6 +336,7 @@ class ToolBuildersMixin:
             tool_selection_config=merged_config,
             fallback_max_tools=fallback_max_tools,
             on_selection_recorded=on_selection_recorded,
+            runtime_intelligence=runtime_intelligence,
         )
 
         logger.debug(f"ToolSelector created with fallback_max_tools={fallback_max_tools}")

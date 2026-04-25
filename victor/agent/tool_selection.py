@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 from victor.core.yaml_utils import safe_load as yaml_safe_load
+from victor.core import get_container
 
 from victor.agent.conversation.state_machine import ConversationStage
 from victor.tools.enums import SchemaLevel
@@ -831,6 +832,7 @@ class ToolSelector(ModeAwareMixin):
         fallback_max_tools: int = 8,
         on_selection_recorded: Optional[Callable[[str, int], None]] = None,
         vertical_context: Optional["VerticalContext"] = None,
+        runtime_intelligence: Optional[Any] = None,
     ):
         """Initialize the tool selector.
 
@@ -845,6 +847,7 @@ class ToolSelector(ModeAwareMixin):
             fallback_max_tools: Max tools for fallback selection
             on_selection_recorded: Optional callback for recording selection stats
             vertical_context: Optional vertical context for vertical-specific tool selection
+            runtime_intelligence: Optional canonical runtime-intelligence service
         """
         self.tools = tools
         self.semantic_selector = semantic_selector
@@ -858,6 +861,7 @@ class ToolSelector(ModeAwareMixin):
 
         # Vertical context for vertical-specific tool selection (DIP)
         self._vertical_context: Optional["VerticalContext"] = vertical_context
+        self._runtime_intelligence = runtime_intelligence
 
         # Task tool config loader for YAML-based configuration
         self._task_config_loader: Optional["TaskToolConfigLoader"] = None
@@ -2273,16 +2277,8 @@ class ToolSelector(ModeAwareMixin):
         per cloud LLM request.
         """
         try:
-            from victor.core import get_container
-
-            container = get_container()
-
-            from victor.agent.services.protocols.decision_service import (
-                LLMDecisionServiceProtocol,
-            )
-
-            service = container.get(LLMDecisionServiceProtocol)
-            if service is None:
+            decider = self._get_tool_selection_decider()
+            if decider is None:
                 return tools
 
             from victor.agent.edge_model import select_tools_with_edge_model
@@ -2291,7 +2287,7 @@ class ToolSelector(ModeAwareMixin):
             stage_name = stage.value if stage else "initial"
 
             selected_names = select_tools_with_edge_model(
-                service=service,
+                service=decider,
                 user_message=user_message,
                 available_tools=tool_names,
                 stage=stage_name,
@@ -2312,6 +2308,21 @@ class ToolSelector(ModeAwareMixin):
             logger.debug(f"Edge tool filter unavailable: {e}")
 
         return tools
+
+    def _get_tool_selection_decider(self) -> Optional[Any]:
+        """Resolve the canonical decider for edge-model tool filtering."""
+        if self._runtime_intelligence is not None:
+            return self._runtime_intelligence
+
+        from victor.agent.services.protocols.decision_service import (
+            LLMDecisionServiceProtocol,
+        )
+
+        container = get_container()
+        service = container.get(LLMDecisionServiceProtocol)
+        if service is None:
+            return None
+        return service
 
     def prioritize_by_stage(
         self,

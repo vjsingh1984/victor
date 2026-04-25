@@ -173,6 +173,24 @@ class TestOrchestratorServiceProvider:
         mock_from_container.assert_called_once_with(container)
         assert state_machine._runtime_intelligence is runtime_intelligence
 
+    def test_create_tool_selector_uses_runtime_intelligence(self, mock_settings):
+        """Singleton tool selector should be created with runtime intelligence attached."""
+        from victor.agent.service_provider import OrchestratorServiceProvider
+
+        container = ServiceContainer()
+        provider = OrchestratorServiceProvider(mock_settings)
+        provider.container = container
+        runtime_intelligence = MagicMock()
+
+        with patch(
+            "victor.agent.services.runtime_intelligence.RuntimeIntelligenceService.from_container",
+            return_value=runtime_intelligence,
+        ) as mock_from_container:
+            selector = provider._create_tool_selector()
+
+        mock_from_container.assert_called_once_with(container)
+        assert selector._runtime_intelligence is runtime_intelligence
+
     def test_singleton_same_instance(self, mock_settings):
         """Test that singletons return same instance."""
         from victor.agent.service_provider import OrchestratorServiceProvider

@@ -999,6 +999,7 @@ class OrchestratorServiceProvider:
 
     def _create_tool_selector(self) -> "ToolSelectorProtocol":
         """Create ToolSelector instance."""
+        from victor.agent.services.runtime_intelligence import RuntimeIntelligenceService
         from victor.agent.tool_selection import ToolSelector
         from victor.tools.registry import ToolRegistry
 
@@ -1007,12 +1008,17 @@ class OrchestratorServiceProvider:
         model = getattr(self._settings, "model", "claude-opus-4")
         provider_name = getattr(self._settings, "provider", "anthropic")
         fallback_max_tools = getattr(self._settings, "fallback_max_tools", 8)
+        runtime_container = getattr(self, "container", None)
+        runtime_intelligence = None
+        if runtime_container is not None:
+            runtime_intelligence = RuntimeIntelligenceService.from_container(runtime_container)
 
         return ToolSelector(
             tools=tools,
             model=model,
             provider_name=provider_name,
             fallback_max_tools=fallback_max_tools,
+            runtime_intelligence=runtime_intelligence,
         )
 
     def _create_tool_executor(self) -> "ToolExecutorProtocol":

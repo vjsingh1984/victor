@@ -124,7 +124,11 @@ Completed on 2026-04-25:
 - Phase 3.4 state-machine/runtime consolidation:
   - `conversation/state_machine.py`
   - `service_provider.py` scoped state-machine construction path
+- Phase 3.5 tool-selection/runtime consolidation:
+  - `tool_selection.py`
+  - `agent/factory/tool_builders.py`
+  - `service_provider.py` tool-selector construction path
 
 Next recommended slice:
-- Phase 3.5: migrate the final container-coupled runtime decision consumer:
-  - `tool_selection.py`
+- Phase 4: collapse remaining duplicated low-confidence / retry / clarification policies
+  into typed runtime policies behind `RuntimeIntelligenceService`

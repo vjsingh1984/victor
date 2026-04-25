@@ -767,6 +767,43 @@ class TestWorkflowOptimizationComponents:
         assert compactor._runtime_intelligence is not None
         assert compactor._runtime_intelligence._decision_service is decision_service
 
+    def test_create_tool_selector_uses_runtime_intelligence(
+        self, factory, mock_container, mock_settings
+    ):
+        """Tool selector should be wired through RuntimeIntelligenceService."""
+        from victor.agent.services.protocols.decision_service import LLMDecisionServiceProtocol
+
+        mock_settings.fallback_max_tools = 8
+        mock_settings.tools = MagicMock(
+            max_tool_schema_tokens=0,
+            schema_promotion_threshold=0.8,
+            max_mcp_tools_per_turn=12,
+        )
+        decision_service = MagicMock()
+        mock_container.get_optional.side_effect = (
+            lambda protocol: decision_service
+            if protocol is LLMDecisionServiceProtocol
+            else None
+        )
+        tools = MagicMock()
+        tools.list_tools.return_value = []
+        conversation_state = MagicMock()
+        unified_tracker = MagicMock()
+
+        selector = factory.create_tool_selector(
+            tools=tools,
+            semantic_selector=None,
+            conversation_state=conversation_state,
+            unified_tracker=unified_tracker,
+            model="claude-opus-4",
+            provider_name="anthropic",
+            tool_selection={},
+            on_selection_recorded=None,
+        )
+
+        assert selector._runtime_intelligence is not None
+        assert selector._runtime_intelligence._decision_service is decision_service
+
     def test_create_resource_manager(self, factory):
         """create_resource_manager returns singleton ResourceManager."""
         from victor.agent.resource_manager import ResourceManager
