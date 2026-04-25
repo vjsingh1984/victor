@@ -2451,6 +2451,7 @@ async def code_search(
         filters_applied = []
         manual_file_pattern_filter: Optional[str] = None
         manual_extension_filter: Optional[List[str]] = None
+        manual_symbol_filter: Optional[str] = None
         manual_language_filter: Optional[str] = None
         manual_test_only_filter: Optional[bool] = None
         if mode_fallback_to_semantic:
@@ -2474,6 +2475,7 @@ async def code_search(
                     manual_file_pattern_filter = filters.file_pattern
             if filters.symbol:
                 filter_metadata["symbol_name"] = filters.symbol
+                manual_symbol_filter = filters.symbol
                 filters_applied.append(f"symbol={filters.symbol}")
             if filters.language:
                 manual_language_filter = filters.language
@@ -2830,6 +2832,8 @@ async def code_search(
             )
         if manual_extension_filter:
             results = _filter_search_results_by_extensions(results, manual_extension_filter)
+        if manual_symbol_filter:
+            results = _filter_search_results_by_symbol(results, manual_symbol_filter)
         if manual_language_filter:
             results = _filter_search_results_by_language(results, manual_language_filter)
         if manual_test_only_filter is not None:

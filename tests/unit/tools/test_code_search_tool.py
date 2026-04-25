@@ -611,6 +611,57 @@ async def test_code_search_semantic_symbol_filter_uses_symbol_name(tmp_path) -> 
 
 
 @pytest.mark.asyncio
+async def test_code_search_semantic_symbol_filter_post_filters_backend_results(tmp_path) -> None:
+    """Semantic search should still enforce symbol filters if a backend returns extra symbol hits."""
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json(data): return data",
+                    "score": 0.74,
+                    "symbol_name": "parse_json",
+                },
+                {
+                    "file_path": "src/parser.py",
+                    "content": "def parse_json_or_none(data): return data or None",
+                    "score": 0.73,
+                    "symbol_name": "parse_json_or_none",
+                },
+            ]
+        )
+    )
+    filters = SearchFilters(symbol="parse_json")
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ), patch(
+        "victor.tools.code_search_tool._literal_search",
+        new=AsyncMock(),
+    ) as literal_search:
+        result = await code_search(
+            query="json parsing",
+            path=str(tmp_path),
+            k=3,
+            filters=filters,
+            _exec_ctx={"settings": _settings()},
+        )
+
+    literal_search.assert_not_awaited()
+    mock_index.semantic_search.assert_awaited_once_with(
+        query="json parsing",
+        max_results=3,
+        filter_metadata={"symbol_name": "parse_json"},
+        similarity_threshold=0.25,
+        expand_query=True,
+    )
+    assert result["mode"] == "semantic"
+    assert result["count"] == 1
+    assert result["results"][0]["symbol_name"] == "parse_json"
+
+
+@pytest.mark.asyncio
 async def test_code_search_semantic_glob_file_pattern_filters_results_after_search(tmp_path) -> None:
     """Glob file patterns should filter semantic hits after retrieval instead of exact-matching metadata."""
     mock_index = SimpleNamespace(
