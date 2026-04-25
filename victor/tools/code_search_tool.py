@@ -1146,7 +1146,9 @@ async def _get_or_build_index(
 
         # Check if we have a valid cached index (double-check)
         if cached_index and not force_reindex:
-            if not _cache_entry_matches_manifest(cache_entry, index_manifest):
+            if cache_entry.get("stale", False):
+                logger.info("[code_search] Cache marked stale for %s (inside lock), rebuilding", root)
+            elif not _cache_entry_matches_manifest(cache_entry, index_manifest):
                 logger.info("[code_search] Cache manifest mismatch for %s (inside lock), rebuilding", root)
             elif latest <= last_mtime:
                 # Another task built it while we waited for lock
