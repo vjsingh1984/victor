@@ -1041,19 +1041,44 @@ class ConversationController:
         relevant_context: List[str] = []
 
         try:
-            # Get semantically similar historical messages
-            relevant_msgs = self._conversation_store.get_semantically_relevant_messages(
-                self._session_id,
-                query,
-                limit=limit,
-                min_similarity=self.config.semantic_relevance_threshold,
-            )
+            if hasattr(self._conversation_store, "get_dual_trace_relevant_messages"):
+                execution_limit = max(1, limit // 3)
+                semantic_limit = max(1, limit - execution_limit)
+                relevant_traces = self._conversation_store.get_dual_trace_relevant_messages(
+                    self._session_id,
+                    query,
+                    semantic_limit=semantic_limit,
+                    execution_limit=execution_limit,
+                    min_similarity=self.config.semantic_relevance_threshold,
+                )
 
-            for msg, score in relevant_msgs:
-                # Format as context reminder
-                role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
-                context = f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
-                relevant_context.append(context)
+                for msg, score in relevant_traces.get("semantic", []):
+                    role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                    context = f"[Semantic memory {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
+                    relevant_context.append(context)
+
+                for msg, score in relevant_traces.get("execution", []):
+                    trace_text = (
+                        self._conversation_store.get_message_trace_text(msg, "execution")
+                        if hasattr(self._conversation_store, "get_message_trace_text")
+                        else msg.content
+                    )
+                    context = f"[Execution trace (relevance: {score:.2f})]: {trace_text[:500]}"
+                    relevant_context.append(context)
+            else:
+                # Get semantically similar historical messages
+                relevant_msgs = self._conversation_store.get_semantically_relevant_messages(
+                    self._session_id,
+                    query,
+                    limit=limit,
+                    min_similarity=self.config.semantic_relevance_threshold,
+                )
+
+                for msg, score in relevant_msgs:
+                    # Format as context reminder
+                    role_label = msg.role.value if hasattr(msg.role, "value") else str(msg.role)
+                    context = f"[Historical {role_label} (relevance: {score:.2f})]: {msg.content[:500]}"
+                    relevant_context.append(context)
 
             # Get relevant summaries
             relevant_summaries = self._conversation_store.get_relevant_summaries(

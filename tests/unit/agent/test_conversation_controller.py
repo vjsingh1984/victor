@@ -14,6 +14,8 @@
 
 """Tests for ConversationController."""
 
+from unittest.mock import MagicMock
+
 from victor.agent.conversation.controller import (
     ConversationController,
     ConversationConfig,
@@ -21,6 +23,7 @@ from victor.agent.conversation.controller import (
     CompactionStrategy,
     MessageImportance,
 )
+from victor.agent.conversation.types import ConversationMessage, MessagePriority
 from victor.agent.conversation.state_machine import ConversationStage
 from victor.providers.base import Message
 
@@ -456,3 +459,53 @@ class TestSmartCompaction:
         assert config.tool_result_retention_weight == COMPACTION_CONFIG.tool_result_retention_weight
         assert config.recent_message_weight == COMPACTION_CONFIG.recent_message_weight
         assert config.semantic_relevance_threshold == 0.3
+
+    def test_retrieve_relevant_history_prefers_dual_trace_store_when_available(self):
+        """Historical retrieval should surface both semantic and execution traces."""
+        controller = ConversationController()
+        store = MagicMock()
+
+        semantic_message = ConversationMessage(
+            id="msg_semantic",
+            role="user",
+            content="Authentication middleware fails.",
+            priority=MessagePriority.MEDIUM,
+            token_count=12,
+            metadata={"memory_trace_kind": "semantic"},
+        )
+
+        execution_message = ConversationMessage(
+            id="msg_execution",
+            role="tool",
+            content='<TOOL_OUTPUT tool="read" path="src/auth.py">config loader</TOOL_OUTPUT>',
+            priority=MessagePriority.HIGH,
+            token_count=20,
+            tool_name="read",
+            tool_call_id="call_1",
+            metadata={
+                "memory_trace_kind": "execution",
+                "memory_execution_text": "tool read path src/auth.py config loader",
+            },
+        )
+
+        store.get_dual_trace_relevant_messages.return_value = {
+            "semantic": [(semantic_message, 0.91)],
+            "execution": [(execution_message, 0.83)],
+        }
+        store.get_relevant_summaries.return_value = []
+        store.get_message_trace_text.return_value = "tool read path src/auth.py config loader"
+
+        controller.set_conversation_store(store, "session_123")
+
+        result = controller.retrieve_relevant_history("authentication config", limit=3)
+
+        assert len(result) == 2
+        assert "Semantic memory" in result[0]
+        assert "Execution trace" in result[1]
+        store.get_dual_trace_relevant_messages.assert_called_once_with(
+            "session_123",
+            "authentication config",
+            semantic_limit=2,
+            execution_limit=1,
+            min_similarity=controller.config.semantic_relevance_threshold,
+        )

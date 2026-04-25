@@ -80,7 +80,7 @@ Planned slices:
 
 | Slice | Status | TDD plan | Notes |
 |---|---|---|---|
-| 4.1 Dual-trace memory encoding | Not started | Add memory retrieval tests | Separate semantic and execution traces |
+| 4.1 Dual-trace memory encoding | Done | Added store, controller, and adapter tests first | Conversation memory now persists semantic vs execution traces separately and can retrieve both buckets through the store/controller/adapter path |
 | 4.2 Memory transfer hooks across verticals | Not started | Add policy / filter tests | Avoid naive cross-project leakage |
 | 4.3 Proactive memory hints | Not started | Add next-turn hint generation tests | PRiME-inspired, bounded first version |
 

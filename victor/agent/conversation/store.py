@@ -46,6 +46,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 import asyncio
 import logging
+import re
 import sqlite3
 
 from victor.core.async_utils import run_sync
@@ -1023,6 +1024,16 @@ class ConversationStore:
 
         # Estimate token count
         token_count = self._estimate_tokens(content)
+        trace_metadata = self._build_trace_metadata(
+            role=role,
+            content=content,
+            tool_name=tool_name,
+            tool_call_id=tool_call_id,
+            metadata=metadata,
+            tool_calls=tool_calls,
+        )
+        merged_metadata = dict(metadata or {})
+        merged_metadata.update(trace_metadata)
 
         message = ConversationMessage(
             id=self._generate_message_id(),
@@ -1033,7 +1044,7 @@ class ConversationStore:
             priority=priority,
             tool_name=tool_name,
             tool_call_id=tool_call_id,
-            metadata=metadata or {},
+            metadata=merged_metadata,
             tool_calls=tool_calls,
         )
 
@@ -1443,6 +1454,262 @@ class ConversationStore:
         from victor.processing.native.tokenizer import count_tokens_fast
 
         return count_tokens_fast(content)
+
+    def _build_trace_metadata(
+        self,
+        role: MessageRole,
+        content: str,
+        tool_name: Optional[str],
+        tool_call_id: Optional[str],
+        metadata: Optional[Dict[str, Any]],
+        tool_calls: Optional[List],
+    ) -> Dict[str, Any]:
+        """Build persisted metadata for semantic and execution retrieval traces."""
+        existing = dict(metadata or {})
+        semantic_text = str(existing.get("memory_semantic_text") or content)
+        trace_kind = "execution" if self._is_execution_trace_message(
+            role,
+            tool_name,
+            tool_call_id,
+            tool_calls,
+        ) else "semantic"
+        trace_metadata: Dict[str, Any] = {
+            "memory_trace_kind": trace_kind,
+            "memory_semantic_text": semantic_text,
+        }
+        if trace_kind == "execution":
+            trace_metadata["memory_execution_text"] = str(
+                existing.get("memory_execution_text")
+                or self._build_execution_trace_text(
+                    role=role,
+                    content=content,
+                    tool_name=tool_name,
+                    tool_call_id=tool_call_id,
+                    tool_calls=tool_calls,
+                )
+            )
+        return trace_metadata
+
+    def _is_execution_trace_message(
+        self,
+        role: MessageRole,
+        tool_name: Optional[str],
+        tool_call_id: Optional[str],
+        tool_calls: Optional[List],
+    ) -> bool:
+        """Return whether a message should participate in execution-trace retrieval."""
+        return (
+            role in (MessageRole.TOOL, MessageRole.TOOL_CALL)
+            or bool(tool_name)
+            or bool(tool_call_id)
+            or bool(tool_calls)
+        )
+
+    def _build_execution_trace_text(
+        self,
+        role: MessageRole,
+        content: str,
+        tool_name: Optional[str],
+        tool_call_id: Optional[str],
+        tool_calls: Optional[List],
+    ) -> str:
+        """Create a compact lexical representation for execution-oriented recall."""
+        parts: List[str] = []
+        canonical_tool_name = canonicalize_core_tool_name(tool_name) if tool_name else None
+        extracted_tool_name = self._extract_trace_attribute(content, "tool")
+        effective_tool_name = canonical_tool_name or extracted_tool_name
+
+        if effective_tool_name:
+            parts.append(f"tool {effective_tool_name}")
+        else:
+            role_value = role.value if hasattr(role, "value") else str(role)
+            parts.append(role_value.replace("_", " "))
+
+        if tool_call_id:
+            parts.append(tool_call_id)
+
+        for attr_name in ("path", "query", "pattern", "symbol", "file", "name"):
+            attr_value = self._extract_trace_attribute(content, attr_name)
+            if attr_value:
+                parts.append(f"{attr_name} {attr_value}")
+
+        if tool_calls:
+            parts.append(str(tool_calls))
+
+        body_text = re.sub(r"<[^>]+>", " ", content)
+        body_text = re.sub(r"\s+", " ", body_text).strip()
+        if body_text:
+            parts.append(body_text[:500])
+
+        trace_text = " ".join(part for part in parts if part).strip()
+        return trace_text or content[:500]
+
+    @staticmethod
+    def _extract_trace_attribute(content: str, attribute_name: str) -> Optional[str]:
+        """Extract an XML-style attribute value from stored tool-output markup."""
+        match = re.search(rf'{attribute_name}="([^"]+)"', content)
+        if not match:
+            return None
+        return match.group(1).strip() or None
+
+    @staticmethod
+    def _trace_tokens(text: str) -> List[str]:
+        """Tokenize trace text for lightweight overlap scoring."""
+        return re.findall(r"[a-z0-9_]+", text.lower())
+
+    def get_message_trace_kind(self, message: ConversationMessage) -> str:
+        """Return the retrieval trace kind for a message."""
+        metadata = getattr(message, "metadata", {}) or {}
+        trace_kind = metadata.get("memory_trace_kind")
+        if trace_kind in {"semantic", "execution"}:
+            return trace_kind
+        role = message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
+        if self._is_execution_trace_message(
+            role,
+            getattr(message, "tool_name", None),
+            getattr(message, "tool_call_id", None),
+            getattr(message, "tool_calls", None),
+        ):
+            return "execution"
+        return "semantic"
+
+    def get_message_trace_text(
+        self,
+        message: ConversationMessage,
+        trace_kind: Optional[str] = None,
+    ) -> str:
+        """Return the retrieval text for the requested trace kind."""
+        metadata = getattr(message, "metadata", {}) or {}
+        resolved_kind = trace_kind or self.get_message_trace_kind(message)
+        if resolved_kind == "execution":
+            existing = metadata.get("memory_execution_text")
+            if existing:
+                return str(existing)
+            role = message.role if isinstance(message.role, MessageRole) else MessageRole(message.role)
+            return self._build_execution_trace_text(
+                role=role,
+                content=message.content,
+                tool_name=getattr(message, "tool_name", None),
+                tool_call_id=getattr(message, "tool_call_id", None),
+                tool_calls=getattr(message, "tool_calls", None),
+            )
+        return str(metadata.get("memory_semantic_text") or message.content)
+
+    def _score_execution_trace(
+        self,
+        query: str,
+        trace_text: str,
+    ) -> float:
+        """Score execution traces by lexical overlap with the current request."""
+        query_tokens = set(self._trace_tokens(query))
+        trace_tokens = set(self._trace_tokens(trace_text))
+        if not query_tokens or not trace_tokens:
+            return 0.0
+
+        overlap = query_tokens & trace_tokens
+        if not overlap:
+            return 0.0
+
+        score = len(overlap) / len(query_tokens)
+        if query.lower() in trace_text.lower():
+            score += 0.15
+        return min(score, 1.0)
+
+    def get_dual_trace_relevant_messages(
+        self,
+        session_id: str,
+        query: str,
+        semantic_limit: int = 5,
+        execution_limit: int = 3,
+        min_similarity: float = 0.3,
+    ) -> Dict[str, List[Tuple[ConversationMessage, float]]]:
+        """Retrieve semantic and execution traces in separate relevance buckets."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            raise RuntimeError(
+                "Cannot call get_dual_trace_relevant_messages from async context. "
+                "Use await aget_dual_trace_relevant_messages(...) instead."
+            )
+
+        return run_sync(
+            self.aget_dual_trace_relevant_messages(
+                session_id=session_id,
+                query=query,
+                semantic_limit=semantic_limit,
+                execution_limit=execution_limit,
+                min_similarity=min_similarity,
+            )
+        )
+
+    async def aget_dual_trace_relevant_messages(
+        self,
+        session_id: str,
+        query: str,
+        semantic_limit: int = 5,
+        execution_limit: int = 3,
+        min_similarity: float = 0.3,
+    ) -> Dict[str, List[Tuple[ConversationMessage, float]]]:
+        """Async dual-trace retrieval with semantic and execution lanes."""
+        semantic_results = await self.aget_semantically_relevant_messages(
+            session_id=session_id,
+            query=query,
+            limit=max(semantic_limit, 1),
+            min_similarity=min_similarity,
+            exclude_recent=0,
+        )
+        semantic_bucket = [
+            (message, score)
+            for message, score in semantic_results
+            if self.get_message_trace_kind(message) == "semantic"
+        ][:semantic_limit]
+
+        execution_bucket = await asyncio.to_thread(
+            self._get_execution_trace_matches,
+            session_id,
+            query,
+            execution_limit,
+        )
+
+        return {
+            "semantic": semantic_bucket,
+            "execution": execution_bucket,
+        }
+
+    def _get_execution_trace_matches(
+        self,
+        session_id: str,
+        query: str,
+        limit: int,
+    ) -> List[Tuple[ConversationMessage, float]]:
+        """Retrieve execution traces using a lightweight lexical scorer."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT * FROM messages
+                WHERE session_id = ?
+                ORDER BY timestamp DESC
+                """,
+                (session_id,),
+            ).fetchall()
+
+        scored_messages: List[Tuple[ConversationMessage, float]] = []
+        for row in rows:
+            message = self._message_from_row(row)
+            if self.get_message_trace_kind(message) != "execution":
+                continue
+
+            trace_text = self.get_message_trace_text(message, "execution")
+            score = self._score_execution_trace(query, trace_text)
+            if score <= 0:
+                continue
+            scored_messages.append((message, score))
+
+        scored_messages.sort(key=lambda item: item[1], reverse=True)
+        return scored_messages[:limit]
 
     def _score_messages(
         self,

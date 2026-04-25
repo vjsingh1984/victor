@@ -290,6 +290,47 @@ class ConversationMemoryAdapter:
 
         try:
             results = []
+            dual_trace_requested = bool((query.filters or {}).get("dual_trace"))
+
+            if dual_trace_requested and hasattr(self._store, "aget_dual_trace_relevant_messages"):
+                dual_trace_results = await self._store.aget_dual_trace_relevant_messages(
+                    session_id=session_id,
+                    query=query.query,
+                    semantic_limit=query.limit,
+                    execution_limit=query.limit,
+                    min_similarity=query.min_relevance or 0.3,
+                )
+
+                for trace_kind in ("semantic", "execution"):
+                    for message, similarity in dual_trace_results.get(trace_kind, []):
+                        trace_text = (
+                            self._store.get_message_trace_text(message, trace_kind)
+                            if hasattr(self._store, "get_message_trace_text")
+                            else message.content
+                        )
+                        results.append(
+                            MemoryResult(
+                                source=MemoryType.CONVERSATION,
+                                content={
+                                    "role": message.role.value,
+                                    "content": message.content,
+                                    "tool_name": message.tool_name,
+                                    "tool_call_id": message.tool_call_id,
+                                    "trace_text": trace_text,
+                                },
+                                relevance=similarity,
+                                id=message.id,
+                                metadata={
+                                    "role": message.role.value,
+                                    "priority": message.priority.value,
+                                    "token_count": message.token_count,
+                                    "trace_kind": trace_kind,
+                                },
+                                timestamp=message.timestamp.timestamp(),
+                            )
+                        )
+
+                return results[: query.limit]
 
             # Try semantic search first
             if hasattr(self._store, "aget_semantically_relevant_messages"):

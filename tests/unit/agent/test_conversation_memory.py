@@ -291,6 +291,56 @@ class TestSemanticRetrievalBoundaries:
         ):
             store.get_semantically_relevant_messages(session.session_id, "auth failure")
 
+    def test_add_message_encodes_execution_trace_metadata(self, store):
+        """Tool-oriented messages should be tagged as execution traces."""
+        session = store.create_session(session_id="session-3")
+
+        message = store.add_message(
+            session.session_id,
+            MessageRole.TOOL,
+            '<TOOL_OUTPUT tool="read" path="src/auth.py">...</TOOL_OUTPUT>',
+            tool_name="read",
+            tool_call_id="call_read_1",
+        )
+
+        assert message.metadata["memory_trace_kind"] == "execution"
+        assert "tool read" in message.metadata["memory_execution_text"].lower()
+        assert "call_read_1" in message.metadata["memory_execution_text"]
+
+    @pytest.mark.asyncio
+    async def test_dual_trace_retrieval_separates_semantic_and_execution_messages(self, store):
+        """Dual-trace retrieval should bucket semantic and execution matches separately."""
+        session = store.create_session(session_id="session-4")
+        semantic_message = store.add_message(
+            session.session_id,
+            MessageRole.USER,
+            "Authentication middleware fails when loading tenant config.",
+        )
+        execution_message = store.add_message(
+            session.session_id,
+            MessageRole.TOOL,
+            '<TOOL_OUTPUT tool="read" path="src/auth.py">tenant config loader</TOOL_OUTPUT>',
+            tool_name="read",
+            tool_call_id="call_read_2",
+        )
+
+        hit = type("SearchHit", (), {"message_id": semantic_message.id, "similarity": 0.94})()
+        embedding_store = AsyncMock()
+        embedding_store.search_similar = AsyncMock(return_value=[hit])
+        store.set_embedding_store(embedding_store)
+
+        traces = await store.aget_dual_trace_relevant_messages(
+            session.session_id,
+            "authentication read tenant config",
+            semantic_limit=2,
+            execution_limit=2,
+        )
+
+        assert [msg.id for msg, _score in traces["semantic"]] == [semantic_message.id]
+        assert [msg.id for msg, _score in traces["execution"]] == [execution_message.id]
+        assert store.get_message_trace_kind(semantic_message) == "semantic"
+        assert store.get_message_trace_kind(execution_message) == "execution"
+
     def test_parse_qwen_3(self):
         """Parse qwen3 model."""
         metadata = parse_model_metadata("qwen3:32b")
