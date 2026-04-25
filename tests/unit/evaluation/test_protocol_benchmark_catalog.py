@@ -31,14 +31,17 @@ class TestBenchmarkCatalog:
         catalog = {metadata.name: metadata for metadata in get_benchmark_catalog()}
 
         assert catalog["clawbench"].type == BenchmarkType.CLAW_BENCH
+        assert catalog["dr3-eval"].type == BenchmarkType.DR3_EVAL
         assert catalog["guide"].type == BenchmarkType.GUIDE
         assert catalog["vlaa-gui"].type == BenchmarkType.VLAA_GUI
+        assert catalog["dr3-eval"].runner_status == "implemented"
         assert catalog["guide"].runner_status == "benchmark-only"
 
     def test_benchmark_alias_resolution(self):
         """CLI aliases should resolve to the same benchmark metadata."""
         assert get_benchmark_metadata("human_eval").type == BenchmarkType.HUMAN_EVAL
         assert get_benchmark_metadata("claw-bench").type == BenchmarkType.CLAW_BENCH
+        assert get_benchmark_metadata("dr3_eval").type == BenchmarkType.DR3_EVAL
         assert get_benchmark_metadata(BenchmarkType.GUIDE).name == "guide"
 
     def test_external_agentic_detection(self):

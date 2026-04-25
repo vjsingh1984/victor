@@ -112,6 +112,7 @@ class BenchmarkType(Enum):
     LIVE_CODE_BENCH = "live_code_bench"  # Live coding evaluation
     BIG_CODE_BENCH = "big_code_bench"  # Large-scale code tasks
     AIDER_POLYGLOT = "aider_polyglot"  # Multi-language tasks
+    DR3_EVAL = "dr3_eval"  # Deep-research report evaluation
     CLAW_BENCH = "claw_bench"  # GUI/web computer-use evaluation
     GUIDE = "guide"  # Grounded multimodal UI agent evaluation
     VLAA_GUI = "vlaa_gui"  # Vision-language action benchmark for GUI tasks
@@ -647,6 +648,18 @@ BENCHMARK_CATALOG: tuple[BenchmarkMetadata, ...] = (
         source_name="Google Research",
         aliases=("mbpp_test",),
         evaluation_mode="code-generation",
+    ),
+    BenchmarkMetadata(
+        name="dr3-eval",
+        type=BenchmarkType.DR3_EVAL,
+        version="1.0",
+        total_tasks=0,
+        languages=["report"],
+        categories=["agentic", "deep-research", "reporting"],
+        description="Deep-research report benchmark with claim and citation checks.",
+        source_name="DR3-Eval",
+        aliases=("dr3_eval", "dr3"),
+        evaluation_mode="deep-research",
     ),
     BenchmarkMetadata(
         name="clawbench",

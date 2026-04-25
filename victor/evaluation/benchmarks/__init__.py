@@ -36,6 +36,9 @@ from victor.evaluation.benchmarks.swe_bench import (
 from victor.evaluation.benchmarks.external_agentic import (
     ExternalAgenticBenchmarkRunner,
 )
+from victor.evaluation.benchmarks.deep_research import (
+    DeepResearchBenchmarkRunner,
+)
 from victor.evaluation.benchmarks.framework_comparison import (
     ComparisonMetrics,
     ComparisonReport,
@@ -58,6 +61,7 @@ __all__ = [
     "MBPPRunner",
     "SWEBenchRunner",
     "ExternalAgenticBenchmarkRunner",
+    "DeepResearchBenchmarkRunner",
     # Framework comparison
     "ComparisonMetrics",
     "ComparisonReport",
