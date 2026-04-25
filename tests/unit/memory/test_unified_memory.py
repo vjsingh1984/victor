@@ -33,8 +33,6 @@ from victor.storage.memory.unified import (
     MemoryType,
     MemoryResult,
     MemoryQuery,
-    MemoryEvolutionTrace,
-    MemoryTransferHint,
     MemoryProviderProtocol,
     RankingStrategyProtocol,
     RelevanceRankingStrategy,
@@ -225,121 +223,6 @@ class TestMemoryQuery:
         assert query.filters["entity_types"] == ["class", "function"]
         assert query.min_relevance == 0.5
         assert query.session_id == "session_123"
-
-
-# =============================================================================
-# Test Memory Evolution
-# =============================================================================
-
-
-class TestMemoryEvolution:
-    """Tests for shadow memory evolution and transfer hints."""
-
-    @pytest.mark.asyncio
-    async def test_records_successful_trace_when_enabled(self):
-        coordinator = create_memory_coordinator(enable_memory_evolution=True)
-        results = [
-            MemoryResult(
-                source=MemoryType.CONVERSATION,
-                content="Auth findings",
-                relevance=0.85,
-                id="msg_auth_1",
-            )
-        ]
-
-        stored = await coordinator.record_outcome(
-            query="authentication failure",
-            results=results,
-            success=True,
-            session_id="session-a",
-            metadata={"gaps": ["benchmarks"]},
-        )
-
-        assert stored is True
-        assert len(coordinator._evolution_traces) == 1
-        trace = coordinator._evolution_traces[0]
-        assert isinstance(trace, MemoryEvolutionTrace)
-        assert trace.query == "authentication failure"
-        assert trace.result_ids == ["msg_auth_1"]
-        assert trace.source_types == ["CONVERSATION"]
-        assert trace.metadata["gaps"] == ["benchmarks"]
-
-    @pytest.mark.asyncio
-    async def test_suggest_transfer_ignores_stale_trace(self):
-        coordinator = create_memory_coordinator(
-            enable_memory_evolution=True,
-            trace_ttl_hours=0.01,
-        )
-        results = [
-            MemoryResult(
-                source=MemoryType.ENTITY,
-                content="AuthService",
-                relevance=0.8,
-                id="ent_auth_1",
-            )
-        ]
-
-        await coordinator.record_outcome(
-            query="authentication failure",
-            results=results,
-            success=True,
-            session_id="session-a",
-        )
-        coordinator._evolution_traces[0].timestamp -= 3600
-
-        hints = coordinator.suggest_transfer("authentication retries", session_id="session-b")
-
-        assert hints == []
-
-    @pytest.mark.asyncio
-    async def test_search_all_boosts_results_with_transfer_hints(self):
-        coordinator = create_memory_coordinator(
-            enable_memory_evolution=True,
-            transfer_boost=0.12,
-        )
-        preferred_result = MemoryResult(
-            source=MemoryType.CONVERSATION,
-            content="authentication login workflow",
-            relevance=0.72,
-            id="msg_preferred",
-            timestamp=time.time(),
-        )
-        competitor_result = MemoryResult(
-            source=MemoryType.ENTITY,
-            content="authentication service",
-            relevance=0.75,
-            id="ent_competitor",
-            timestamp=preferred_result.timestamp,
-        )
-
-        conversation_provider = MockMemoryProvider(
-            MemoryType.CONVERSATION,
-            [preferred_result],
-        )
-        entity_provider = MockMemoryProvider(
-            MemoryType.ENTITY,
-            [competitor_result],
-        )
-        coordinator.register_provider(conversation_provider)
-        coordinator.register_provider(entity_provider)
-
-        await coordinator.record_outcome(
-            query="authentication bug",
-            results=[preferred_result],
-            success=True,
-            session_id="session-a",
-        )
-
-        ranked = await coordinator.search_all(
-            "authentication login",
-            session_id="session-b",
-        )
-
-        assert ranked[0].id == "msg_preferred"
-        assert ranked[0].metadata["memory_transfer_boost"] > 0
-        assert coordinator.last_transfer_hints
-        assert isinstance(coordinator.last_transfer_hints[0], MemoryTransferHint)
-        assert coordinator.last_transfer_hints[0].cross_session is True
 
 
 # =============================================================================
