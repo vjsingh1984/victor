@@ -7,6 +7,20 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
+from victor.framework.search import (
+    CODEBASE_INDEX_MANIFEST_NAME,
+    DEFAULT_CODEBASE_CHUNKING_STRATEGY,
+    DEFAULT_CODEBASE_CHUNK_OVERLAP,
+    DEFAULT_CODEBASE_CHUNK_SIZE,
+    STRUCTURAL_CODEBASE_VECTOR_STORE,
+    build_codebase_index_manifest,
+    enable_structural_codebase_embeddings,
+    enrich_code_search_results,
+    has_compatible_codebase_index_manifest,
+    has_persisted_codebase_index_data,
+    rerank_code_search_results,
+    write_codebase_index_manifest,
+)
 from victor.tools.base import AccessMode, DangerLevel, Priority
 from victor.tools.common import EXCLUDE_DIRS, DEFAULT_CODE_EXTENSIONS, latest_mtime
 from victor.tools.decorators import tool
@@ -137,35 +151,61 @@ def clear_index_cache() -> None:
     _INDEX_CACHE.clear()
 
 
+def _get_instance_attr(obj: Any, name: str, default: Any = None) -> Any:
+    """Read explicitly assigned instance attributes without triggering mock fallbacks."""
+
+    try:
+        instance_dict = vars(obj)
+    except TypeError:
+        instance_dict = getattr(obj, "__dict__", None)
+
+    if isinstance(instance_dict, dict) and name in instance_dict:
+        return instance_dict[name]
+    return default
+
+
 async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
     """Validate persistent index integrity with a lightweight check.
 
-    Returns True if corruption was detected (rebuild triggered in background),
+    Returns True if corruption was detected (rebuild triggered),
     False if index is healthy or currently being initialized.
 
     ENHANCEMENT: Distinguishes between init-time races and actual corruption.
     """
     try:
         # NEW: Check if index is currently being built
-        if hasattr(index, "_is_indexing") and index._is_indexing:
+        if _get_instance_attr(index, "_is_indexing", False) is True:
             logger.debug("Index currently being built, skipping integrity check")
             return False  # Don't trigger rebuild during init
 
         # Quick check: does the vector store have data?
-        store = getattr(index, "_vector_store", None) or getattr(index, "vector_store", None)
+        store = _get_instance_attr(index, "_vector_store", None)
+        if store is None:
+            store = _get_instance_attr(index, "vector_store", None)
         if store:
             table = getattr(store, "_table", None)
             if table is not None:
                 row_count = table.count_rows() if hasattr(table, "count_rows") else -1
-                if row_count > 0:
+                if isinstance(row_count, (int, float)) and row_count > 0:
                     logger.info("Persistent index healthy: %d rows in vector store", row_count)
                     return False  # Healthy
 
         # Fallback: try a semantic search with timeout
-        await asyncio.wait_for(
-            index.semantic_search(query="test", max_results=1),
-            timeout=timeout,
+        probe_task = asyncio.get_running_loop().create_task(
+            index.semantic_search(query="test", max_results=1)
         )
+        done, pending = await asyncio.wait({probe_task}, timeout=timeout)
+        if pending:
+            probe_task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+            logger.warning(
+                "Persistent index probe timed out after %.2fs; rebuilding inline", timeout
+            )
+            if hasattr(index, "_is_indexed"):
+                index._is_indexed = False
+            await _background_index_rebuild(index)
+            return True
+        await probe_task
         return False  # Healthy — no rebuild needed
     except Exception as e:
         # ENHANCEMENT: Better error classification
@@ -190,14 +230,142 @@ async def _probe_index_integrity(index: Any, timeout: float = 5.0) -> bool:
             return False  # Don't rebuild for transient issues
 
         # Log with full error details for debugging
-        logger.warning("Persistent index corrupt (%s); scheduling background rebuild", error_msg)
+        logger.warning("Persistent index corrupt (%s); rebuilding inline", error_msg)
 
         if hasattr(index, "_is_indexed"):
             index._is_indexed = False
 
-        # Fire rebuild as background task
-        asyncio.create_task(_background_index_rebuild(index))
+        # Rebuild inline while the startup path already holds the index lock.
+        await _background_index_rebuild(index)
         return True  # Corruption detected, rebuild in flight
+
+
+def _build_codebase_embedding_extra_config(settings: Any, root: Optional[Path] = None) -> Dict[str, Any]:
+    """Build provider-specific embedding config from settings.
+
+    Existing search settings define dimension and batch size but the code_search
+    path historically failed to forward them to the backend provider. This
+    helper keeps the translation in one place and allows future provider-
+    specific extensions without widening the factory call sites.
+    """
+
+    extra_config: Dict[str, Any] = {
+        "dimension": getattr(settings, "codebase_dimension", 384),
+        "batch_size": getattr(settings, "codebase_batch_size", 32),
+        "structural_indexing_enabled": getattr(
+            settings, "codebase_structural_indexing_enabled", True
+        ),
+        "code_chunking_strategy": getattr(
+            settings, "codebase_chunking_strategy", DEFAULT_CODEBASE_CHUNKING_STRATEGY
+        ),
+        "chunk_size": getattr(settings, "codebase_chunk_size", DEFAULT_CODEBASE_CHUNK_SIZE),
+        "chunk_overlap": getattr(
+            settings, "codebase_chunk_overlap", DEFAULT_CODEBASE_CHUNK_OVERLAP
+        ),
+    }
+
+    custom_extra = getattr(settings, "codebase_embedding_extra_config", None)
+    if isinstance(custom_extra, dict):
+        extra_config.update(custom_extra)
+
+    if root is not None:
+        extra_config.setdefault("workspace_root", str(root))
+
+    return extra_config
+
+
+def _build_codebase_embedding_config(settings: Any, root: Path) -> Dict[str, Any]:
+    """Build the embedding configuration passed to the codebase index factory."""
+
+    from victor.config.settings import get_project_paths
+
+    default_persist_dir = str(get_project_paths(root).embeddings_dir)
+    config = {
+        "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
+        "embedding_model_type": getattr(
+            settings, "codebase_embedding_provider", "sentence-transformers"
+        ),
+        "embedding_model_name": getattr(
+            settings,
+            "codebase_embedding_model",
+            getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
+        ),
+        "persist_directory": getattr(settings, "codebase_persist_directory", None)
+        or default_persist_dir,
+        "extra_config": _build_codebase_embedding_extra_config(settings, root),
+    }
+    return enable_structural_codebase_embeddings(config)
+
+
+def _collect_code_search_backend_metadata(index: Any, settings: Any) -> Dict[str, Any]:
+    """Collect compact backend metadata for code_search responses."""
+
+    metadata: Dict[str, Any] = {}
+    provider = getattr(index, "embedding_provider", None)
+    config = getattr(provider, "config", None)
+
+    def _assign_if_present(key: str, value: Any) -> None:
+        if value not in (None, "", {}):
+            metadata[key] = value
+
+    if config is not None:
+        extra_config = getattr(config, "extra_config", None)
+        raw_vector_store = getattr(config, "vector_store", None)
+        if raw_vector_store == STRUCTURAL_CODEBASE_VECTOR_STORE and isinstance(extra_config, dict):
+            _assign_if_present("vector_store", extra_config.get("upstream_vector_store"))
+            metadata["indexing_backend"] = "structural_bridge"
+            metadata["structural_indexing_enabled"] = True
+        else:
+            _assign_if_present("vector_store", raw_vector_store)
+        _assign_if_present("embedding_provider", getattr(config, "embedding_model_type", None))
+        _assign_if_present("embedding_model", getattr(config, "embedding_model_name", None))
+        if isinstance(extra_config, dict):
+            _assign_if_present("embedding_dimension", extra_config.get("dimension"))
+            _assign_if_present("embedding_batch_size", extra_config.get("batch_size"))
+            _assign_if_present(
+                "chunking_strategy",
+                extra_config.get("code_chunking_strategy") or extra_config.get("chunking_strategy"),
+            )
+
+    # Fall back to settings when the backend does not expose explicit config.
+    metadata.setdefault("vector_store", getattr(settings, "codebase_vector_store", "lancedb"))
+    metadata.setdefault(
+        "embedding_provider",
+        getattr(settings, "codebase_embedding_provider", "sentence-transformers"),
+    )
+    metadata.setdefault(
+        "embedding_model",
+        getattr(
+            settings,
+            "codebase_embedding_model",
+            getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
+        ),
+    )
+    metadata.setdefault("embedding_dimension", getattr(settings, "codebase_dimension", 384))
+    metadata.setdefault("embedding_batch_size", getattr(settings, "codebase_batch_size", 32))
+    metadata.setdefault(
+        "chunking_strategy",
+        getattr(settings, "codebase_chunking_strategy", DEFAULT_CODEBASE_CHUNKING_STRATEGY),
+    )
+    return metadata
+
+
+async def _finalize_index_storage(index: Any) -> None:
+    """Flush provider-level buffered writes before marking an index reusable."""
+
+    provider = getattr(index, "embedding_provider", None)
+    config = getattr(provider, "config", None)
+    if getattr(config, "vector_store", None) != STRUCTURAL_CODEBASE_VECTOR_STORE:
+        return
+
+    get_stats = getattr(provider, "get_stats", None)
+    if not callable(get_stats):
+        return
+
+    try:
+        await get_stats()
+    except Exception as exc:
+        logger.debug("Failed to finalize structural code_search provider writes: %s", exc)
 
 
 async def _background_index_rebuild(index: Any, rebuild_timeout: float = 120.0) -> None:
@@ -685,7 +853,7 @@ def _build_search_response(
         "root": str(root_path),
         "indexed_at": cache_entry.get("indexed_at"),
         "filters_applied": filters_applied if filters_applied else None,
-        "chunking_strategy": "BODY_AWARE",
+        "chunking_strategy": "provider_default",
         "importance_weighted": True,
         "available_filters": [
             "file_path",
@@ -929,25 +1097,8 @@ async def _get_or_build_index(
         # Build index with exclusive access to this path
         logger.info(f"[code_search] Building index for {root} (exclusive lock acquired)")
 
-        # Default persist directory is {root}/.victor/embeddings/ for project-local storage
-        from victor.config.settings import get_project_paths
-
-        default_persist_dir = str(get_project_paths(root).embeddings_dir)
-
-        embedding_config = {
-            "vector_store": getattr(settings, "codebase_vector_store", "lancedb"),
-            "embedding_model_type": getattr(
-                settings, "codebase_embedding_provider", "sentence-transformers"
-            ),
-            "embedding_model_name": getattr(
-                settings,
-                "codebase_embedding_model",
-                getattr(settings, "unified_embedding_model", "all-MiniLM-L12-v2"),
-            ),
-            "persist_directory": getattr(settings, "codebase_persist_directory", None)
-            or default_persist_dir,
-            "extra_config": {},
-        }
+        embedding_config = _build_codebase_embedding_config(settings, root)
+        index_manifest = build_codebase_index_manifest(embedding_config)
 
         graph_store_name = getattr(settings, "codebase_graph_store", "sqlite")
         graph_path = getattr(settings, "codebase_graph_path", None)
@@ -964,11 +1115,20 @@ async def _get_or_build_index(
         logger.info(f"[code_search] Index creation complete for {root}")
 
         # Only do full index if forced or no persistent data exists
-        persist_path = Path(default_persist_dir)
-        has_persistent_data = persist_path.exists() and any(persist_path.iterdir())
-        if force_reindex or not has_persistent_data:
+        persist_path = Path(embedding_config["persist_directory"])
+        has_persistent_data = has_persisted_codebase_index_data(persist_path)
+        has_compatible_manifest = has_compatible_codebase_index_manifest(persist_path, index_manifest)
+        if has_persistent_data and not has_compatible_manifest:
+            logger.info(
+                "Persistent code_search index manifest mismatch for %s; rebuilding (%s)",
+                persist_path,
+                CODEBASE_INDEX_MANIFEST_NAME,
+            )
+
+        if force_reindex or not has_persistent_data or not has_compatible_manifest:
             # First time or forced - full index
             await index.index_codebase()
+            await _finalize_index_storage(index)
             rebuilt = True
         else:
             # Persistent embeddings exist on disk (LanceDB tables).
@@ -979,6 +1139,13 @@ async def _get_or_build_index(
             logger.info("Using persistent embeddings from %s (skip full rebuild)", persist_path)
             # Validate integrity — corrupt LanceDB data will fail silently
             rebuilt = await _probe_index_integrity(index)
+            if rebuilt:
+                await _finalize_index_storage(index)
+
+        try:
+            write_codebase_index_manifest(persist_path, index_manifest)
+        except OSError as exc:
+            logger.warning("Failed to write code_search index manifest to %s: %s", persist_path, exc)
 
         index_cache[str(root)] = {
             "index": index,
@@ -1562,6 +1729,8 @@ async def code_search(
             result["fallback"] = "semantic_index_timeout"
             return result
 
+        backend_metadata = _collect_code_search_backend_metadata(index, settings)
+
         if mode == "bugs":
             ignored_filters = []
             if filters:
@@ -1586,9 +1755,12 @@ async def code_search(
                     bug_results,
                     search_mode="bug_similarity",
                 )
-                extra_metadata = {
-                    "provider_capability": "find_similar_bugs",
-                }
+                ranked_results, enrichment_metadata = enrich_code_search_results(
+                    ranked_results,
+                    root_path=root_path,
+                )
+                extra_metadata = {**backend_metadata, "provider_capability": "find_similar_bugs"}
+                extra_metadata.update(enrichment_metadata)
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
                 follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
@@ -1644,9 +1816,12 @@ async def code_search(
                     localization_results,
                     search_mode="issue_localization",
                 )
-                extra_metadata = {
-                    "provider_capability": "localize_issue",
-                }
+                ranked_results, enrichment_metadata = enrich_code_search_results(
+                    ranked_results,
+                    root_path=root_path,
+                )
+                extra_metadata = {**backend_metadata, "provider_capability": "localize_issue"}
+                extra_metadata.update(enrichment_metadata)
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
                 follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
@@ -1700,9 +1875,12 @@ async def code_search(
                     impact_results,
                     search_mode="change_impact",
                 )
-                extra_metadata = {
-                    "provider_capability": "analyze_change_impact",
-                }
+                ranked_results, enrichment_metadata = enrich_code_search_results(
+                    ranked_results,
+                    root_path=root_path,
+                )
+                extra_metadata = {**backend_metadata, "provider_capability": "analyze_change_impact"}
+                extra_metadata.update(enrichment_metadata)
                 if ignored_filters:
                     extra_metadata["ignored_filters"] = ignored_filters
                 follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
@@ -1729,7 +1907,7 @@ async def code_search(
                     "fallback_reason": str(exc),
                 }
         else:
-            fallback_metadata = {}
+            fallback_metadata = dict(backend_metadata)
 
         # Get semantic search configuration from settings
         # Default threshold lowered from 0.5 to 0.25 for better recall on technical queries
@@ -1890,6 +2068,17 @@ async def code_search(
                 # Fall back to semantic-only results (already have them)
 
         ranked_results = _prepare_ranked_results(results, search_mode="semantic")
+        ranked_results, enrichment_metadata = enrich_code_search_results(
+            ranked_results,
+            root_path=root_path,
+        )
+        ranked_results, utility_metadata = rerank_code_search_results(
+            ranked_results,
+            query=query,
+        )
+        fallback_metadata.update(enrichment_metadata)
+        fallback_metadata.update(backend_metadata)
+        fallback_metadata["retrieval_utility"] = utility_metadata
         follow_up_suggestions = _build_graph_follow_up_suggestions(ranked_results)
 
         return _build_search_response(
@@ -1899,7 +2088,7 @@ async def code_search(
             root_path=root_path,
             exec_ctx=_exec_ctx,
             filters_applied=filters_applied,
-            ranking_note="Results ranked by combined_score (semantic_similarity × importance). Core src/ code ranked higher than test/demo files.",
+            ranking_note="Results ranked by utility-adjusted score (semantic/hybrid relevance × importance, then bounded file-diversity and duplicate-snippet adjustments).",
             extra_metadata=fallback_metadata,
             follow_up_suggestions=follow_up_suggestions,
         )

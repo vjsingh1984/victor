@@ -27,6 +27,11 @@ class TestEmbeddingSettings:
         assert settings.codebase_embedding_provider == "sentence-transformers"
         assert settings.codebase_dimension == 384
         assert settings.codebase_batch_size == 32
+        assert settings.codebase_structural_indexing_enabled is True
+        assert settings.codebase_chunking_strategy == "tree_sitter_structural"
+        assert settings.codebase_chunk_size == 500
+        assert settings.codebase_chunk_overlap == 50
+        assert settings.codebase_embedding_extra_config == {}
         assert settings.codebase_graph_store == "sqlite"
         assert settings.semantic_similarity_threshold == 0.25
         assert settings.semantic_query_expansion_enabled is True
@@ -58,6 +63,23 @@ class TestEmbeddingSettings:
         assert settings.semantic_similarity_threshold == 0.5
         assert settings.semantic_max_query_expansions == 10
         assert settings.enable_hybrid_search is True
+
+    def test_extra_config_passthrough(self):
+        """Test provider-specific extra config is preserved."""
+        settings = EmbeddingSettings(codebase_embedding_extra_config={"table_name": "custom"})
+        assert settings.codebase_embedding_extra_config == {"table_name": "custom"}
+
+    def test_chunk_settings_validation(self):
+        """Test structural chunk configuration validation."""
+        settings = EmbeddingSettings(codebase_chunk_size=256, codebase_chunk_overlap=12)
+        assert settings.codebase_chunk_size == 256
+        assert settings.codebase_chunk_overlap == 12
+
+        with pytest.raises(ValueError, match="codebase_chunk_size must be >= 1"):
+            EmbeddingSettings(codebase_chunk_size=0)
+
+        with pytest.raises(ValueError, match="codebase_chunk_overlap must be >= 0"):
+            EmbeddingSettings(codebase_chunk_overlap=-1)
 
     def test_dimension_validation(self):
         """Test embedding dimension validation."""

@@ -7,7 +7,7 @@ This module contains settings for:
 - Hybrid search configuration
 """
 
-from typing import List, Optional
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
@@ -50,6 +50,14 @@ class EmbeddingSettings(BaseModel):
     codebase_persist_directory: Optional[str] = None  # Default: ~/.victor/embeddings/codebase
     codebase_dimension: int = 384  # Embedding dimension
     codebase_batch_size: int = 32  # Batch size for embedding generation
+    codebase_structural_indexing_enabled: bool = True
+    codebase_chunking_strategy: str = "tree_sitter_structural"
+    codebase_chunk_size: int = 500
+    codebase_chunk_overlap: int = 50
+    codebase_embedding_extra_config: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Provider-specific embedding/vector-store options forwarded to code search backends",
+    )
     codebase_graph_store: str = "sqlite"  # Graph backend (sqlite default)
     codebase_graph_path: Optional[str] = None  # Optional explicit graph db path
     core_readonly_tools: Optional[List[str]] = None  # Override/extend curated read-only tool set
@@ -119,6 +127,22 @@ class EmbeddingSettings(BaseModel):
         """
         if v < 1:
             raise ValueError("codebase_batch_size must be >= 1")
+        return v
+
+    @field_validator("codebase_chunk_size")
+    @classmethod
+    def validate_chunk_size(cls, v: int) -> int:
+        """Validate chunk size is positive."""
+        if v < 1:
+            raise ValueError("codebase_chunk_size must be >= 1")
+        return v
+
+    @field_validator("codebase_chunk_overlap")
+    @classmethod
+    def validate_chunk_overlap(cls, v: int) -> int:
+        """Validate chunk overlap is non-negative."""
+        if v < 0:
+            raise ValueError("codebase_chunk_overlap must be >= 0")
         return v
 
     @field_validator("semantic_similarity_threshold")

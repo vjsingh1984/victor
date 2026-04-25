@@ -48,6 +48,15 @@ class TestNestedAccess:
         s = Settings(codebase_dimension=768)
         assert s.search.codebase_dimension == 768
 
+    def test_nested_search_extra_config_access(self):
+        s = Settings(codebase_embedding_extra_config={"table_name": "custom"})
+        assert s.search.codebase_embedding_extra_config == {"table_name": "custom"}
+
+    def test_nested_search_chunking_access(self):
+        s = Settings(codebase_chunking_strategy="symbol_span", codebase_chunk_size=256)
+        assert s.search.codebase_chunking_strategy == "symbol_span"
+        assert s.search.codebase_chunk_size == 256
+
     def test_nested_resilience_access(self):
         s = Settings(circuit_breaker_timeout=120.0)
         assert s.resilience.circuit_breaker_timeout == 120.0
@@ -96,6 +105,11 @@ class TestNestedModelDefaults:
         ss = SearchSettings()
         assert ss.codebase_vector_store == "lancedb"
         assert ss.codebase_dimension == 384
+        assert ss.codebase_structural_indexing_enabled is True
+        assert ss.codebase_chunking_strategy == "tree_sitter_structural"
+        assert ss.codebase_chunk_size == 500
+        assert ss.codebase_chunk_overlap == 50
+        assert ss.codebase_embedding_extra_config == {}
         assert ss.semantic_similarity_threshold == 0.25
         assert ss.enable_hybrid_search is False
 

@@ -19,7 +19,11 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from victor.tools.code_search_tool import SearchFilters, code_search
+from victor.tools.code_search_tool import (
+    SearchFilters,
+    _build_codebase_embedding_config,
+    code_search,
+)
 
 
 def _settings(**overrides):
@@ -30,6 +34,34 @@ def _settings(**overrides):
     }
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
+
+
+def test_build_codebase_embedding_config_forwards_existing_search_settings(tmp_path) -> None:
+    """Embedding config should propagate dimension, batch size, and extra options."""
+    settings = _settings(
+        codebase_vector_store="lancedb",
+        codebase_embedding_provider="sentence-transformers",
+        codebase_embedding_model="BAAI/bge-small-en-v1.5",
+        codebase_dimension=768,
+        codebase_batch_size=12,
+        codebase_embedding_extra_config={"table_name": "custom_embeddings"},
+    )
+
+    config = _build_codebase_embedding_config(settings, tmp_path)
+
+    assert config["vector_store"] in {"lancedb", "victor_structural_bridge"}
+    assert config["embedding_model_type"] == "sentence-transformers"
+    assert config["embedding_model_name"] == "BAAI/bge-small-en-v1.5"
+    assert config["extra_config"]["dimension"] == 768
+    assert config["extra_config"]["batch_size"] == 12
+    assert config["extra_config"]["structural_indexing_enabled"] is True
+    assert config["extra_config"]["code_chunking_strategy"] == "tree_sitter_structural"
+    assert config["extra_config"]["chunk_size"] == 500
+    assert config["extra_config"]["chunk_overlap"] == 50
+    assert config["extra_config"]["workspace_root"] == str(tmp_path)
+    assert config["extra_config"]["table_name"] == "custom_embeddings"
+    if config["vector_store"] == "victor_structural_bridge":
+        assert config["extra_config"]["upstream_vector_store"] == "lancedb"
 
 
 @pytest.mark.asyncio
@@ -418,3 +450,130 @@ async def test_code_search_strips_vectors_and_console_only_fields(tmp_path) -> N
     assert hit["metadata"]["symbol_type"] == "function"
     assert hit["metadata"]["end_line"] == 12
     assert hit["metadata"]["language"] == "python"
+
+
+@pytest.mark.asyncio
+async def test_code_search_semantic_mode_resolves_file_backed_snippet_for_opaque_payload(
+    tmp_path,
+) -> None:
+    """Semantic hits should expose grounded code snippets even when backend content is opaque."""
+    source_dir = tmp_path / "src"
+    source_dir.mkdir()
+    target = source_dir / "parser.py"
+    target.write_text(
+        "import json\n\n"
+        "def parse_json(data):\n"
+        "    if not data:\n"
+        "        return {}\n"
+        "    return json.loads(data)\n",
+        encoding="utf-8",
+    )
+
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "src/parser.py",
+                    "content": "symbol:src/parser.py:parse_json",
+                    "score": 0.77,
+                    "line_number": 3,
+                    "metadata": {
+                        "unified_id": "symbol:src/parser.py:parse_json",
+                        "end_line": 6,
+                        "symbol_name": "parse_json",
+                    },
+                }
+            ]
+        )
+    )
+    exec_ctx = {"settings": _settings()}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ):
+        result = await code_search(
+            query="where is parse_json defined",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    hit = result["results"][0]
+    assert "def parse_json(data):" in hit["snippet"]
+    assert "return json.loads(data)" in hit["content"]
+    assert result["metadata"]["chunking_strategy"] == "tree_sitter_structural"
+    assert result["metadata"]["snippet_strategy"] == "line_window"
+    assert result["metadata"]["vector_store"] == "lancedb"
+    assert result["metadata"]["embedding_dimension"] == 384
+    assert result["metadata"]["retrieval_utility"]["strategy"] == "bounded_code_utility"
+    assert "src/parser.py" in result["formatted_results"]
+
+
+@pytest.mark.asyncio
+async def test_code_search_semantic_mode_applies_bounded_utility_reranking(tmp_path) -> None:
+    """Semantic results should lift implementation code ahead of weaker duplicate/test hits."""
+    source_dir = tmp_path / "victor"
+    tests_dir = tmp_path / "tests"
+    source_dir.mkdir()
+    tests_dir.mkdir()
+
+    (source_dir / "parser.py").write_text(
+        "def parse_json(data):\n"
+        "    return data\n\n"
+        "def parse_json_or_none(data):\n"
+        "    return data or None\n",
+        encoding="utf-8",
+    )
+    (tests_dir / "test_parser.py").write_text(
+        "def test_parse_json():\n"
+        "    assert parse_json('{}') == '{}'\n",
+        encoding="utf-8",
+    )
+
+    mock_index = SimpleNamespace(
+        semantic_search=AsyncMock(
+            return_value=[
+                {
+                    "file_path": "tests/test_parser.py",
+                    "content": "def test_parse_json(): assert parse_json('{}') == '{}'",
+                    "score": 0.92,
+                    "line_number": 1,
+                    "symbol_name": "test_parse_json",
+                },
+                {
+                    "file_path": "victor/parser.py",
+                    "content": "def parse_json(data): return data",
+                    "score": 0.89,
+                    "line_number": 1,
+                    "symbol_name": "parse_json",
+                },
+                {
+                    "file_path": "victor/parser.py",
+                    "content": "def parse_json(data): return data",
+                    "score": 0.88,
+                    "line_number": 4,
+                    "symbol_name": "parse_json_or_none",
+                },
+            ]
+        )
+    )
+    exec_ctx = {"settings": _settings()}
+
+    with patch(
+        "victor.tools.code_search_tool._get_or_build_index",
+        new=AsyncMock(return_value=(mock_index, False)),
+    ):
+        result = await code_search(
+            query="where is parse_json defined",
+            path=str(tmp_path),
+            k=3,
+            _exec_ctx=exec_ctx,
+        )
+
+    ordered_paths = [item["file_path"] for item in result["results"]]
+    assert ordered_paths[0] == "victor/parser.py"
+    assert ordered_paths.count("victor/parser.py") == 2
+    assert "tests/test_parser.py" in ordered_paths[1:]
+    assert result["metadata"]["retrieval_utility"]["repeated_file_hits"] == 1
+    assert result["metadata"]["retrieval_utility"]["file_diversity"] == 2

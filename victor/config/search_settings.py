@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,11 @@ class SearchSettings(BaseModel):
     codebase_persist_directory: Optional[str] = None
     codebase_dimension: int = 384
     codebase_batch_size: int = 32
+    codebase_structural_indexing_enabled: bool = True
+    codebase_chunking_strategy: str = "tree_sitter_structural"
+    codebase_chunk_size: int = 500
+    codebase_chunk_overlap: int = 50
+    codebase_embedding_extra_config: dict[str, Any] = Field(default_factory=dict)
     codebase_graph_store: str = "sqlite"
     codebase_graph_path: Optional[str] = None
     core_readonly_tools: Optional[List[str]] = None
