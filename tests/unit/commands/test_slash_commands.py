@@ -19,7 +19,7 @@ import io
 from pathlib import Path
 from types import SimpleNamespace
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 from rich.console import Console
 
@@ -1180,6 +1180,50 @@ class TestSessionCommands:
         meta = cmd.metadata
 
         assert meta.name == "sessions"
+
+    def test_resume_command_surfaces_resume_summary(self):
+        """Test ResumeCommand shows SessionContextLinker resume summary."""
+        from victor.agent.session_context_linker import SessionResumeContext
+        from victor.ui.slash.commands.session import ResumeCommand
+
+        stdout = io.StringIO()
+        console = Console(file=stdout, force_terminal=False)
+        settings = MagicMock()
+        agent = MagicMock()
+        agent.conversation_controller = None
+
+        persistence = MagicMock()
+        persistence.load_session.return_value = {
+            "metadata": {
+                "session_id": "test-session-123",
+                "title": "Preview Session",
+                "model": "claude-sonnet-4-20250514",
+                "provider": "anthropic",
+                "message_count": 2,
+                "created_at": "2026-03-19T10:00:00",
+            },
+            "conversation": {"messages": [{"role": "user", "content": "hello"}]},
+        }
+        linker_instance = MagicMock()
+        linker_instance.build_resume_context.return_value = SessionResumeContext(
+            resume_summary="[Resumed session. previews: app.py.]"
+        )
+
+        ctx = CommandContext(console=console, settings=settings, agent=agent, args=["test-session-123"])
+
+        with patch(
+            "victor.agent.sqlite_session_persistence.get_sqlite_session_persistence",
+            return_value=persistence,
+        ), patch(
+            "victor.agent.session_context_linker.SessionContextLinker",
+            return_value=linker_instance,
+        ):
+            ResumeCommand().execute(ctx)
+
+        output = stdout.getvalue()
+        assert "Session Resumed" in output
+        assert "Resume:" in output
+        assert "app.py" in output
 
 
 # =============================================================================

@@ -155,3 +155,27 @@ class TestSessionContextLinker:
         ctx = linker.build_resume_context("test-session-123")
 
         assert ctx.compaction_summaries == []
+
+    def test_resume_summary_includes_preview_paths(
+        self, linker, mock_persistence, sample_session_data
+    ):
+        """Resume summary should surface persisted preview sidecar files."""
+        sample_session_data["conversation"]["preview_messages"] = [
+            {
+                "role": "system",
+                "content": "FILE PREVIEW: app.py",
+                "metadata": {
+                    "preview_kind": "file_preview",
+                    "preview_path": "app.py",
+                    "preview_language": "python",
+                    "preview_body": "print('hello')\n",
+                },
+                "after_message_index": 1,
+            }
+        ]
+        mock_persistence.load_session.return_value = sample_session_data
+
+        ctx = linker.build_resume_context("test-session-123")
+
+        assert "previews:" in ctx.resume_summary.lower()
+        assert "app.py" in ctx.resume_summary

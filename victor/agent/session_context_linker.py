@@ -147,6 +147,33 @@ class SessionContextLinker:
             if tool_calls:
                 summary_parts.append(f"{tool_calls} tool calls used")
 
+        preview_messages = session_data.get("conversation", {}).get("preview_messages", [])
+        if isinstance(preview_messages, list) and preview_messages:
+            preview_paths: List[str] = []
+            seen_paths: set[str] = set()
+            for preview in preview_messages:
+                if not isinstance(preview, dict):
+                    continue
+                metadata = preview.get("metadata", {})
+                if not isinstance(metadata, dict):
+                    continue
+                preview_path = metadata.get("preview_path")
+                if not isinstance(preview_path, str) or not preview_path:
+                    continue
+                if preview_path in seen_paths:
+                    continue
+                seen_paths.add(preview_path)
+                preview_paths.append(preview_path)
+
+            if preview_paths:
+                listed_paths = ", ".join(preview_paths[:3])
+                extra_count = max(0, len(preview_paths) - 3)
+                if extra_count:
+                    listed_paths = f"{listed_paths} (+{extra_count} more)"
+                summary_parts.append(f"previews: {listed_paths}")
+            else:
+                summary_parts.append(f"{len(preview_messages)} previews available")
+
         resume_summary = ". ".join(summary_parts) + ".]"
 
         return SessionResumeContext(

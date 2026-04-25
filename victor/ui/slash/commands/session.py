@@ -452,7 +452,8 @@ class ResumeCommand(BaseSlashCommand):
                     f"[bold]Model:[/] {metadata.get('model', 'N/A')}\n"
                     f"[bold]Provider:[/] {metadata.get('provider', 'N/A')}\n"
                     f"[bold]Messages:[/] {metadata.get('message_count', 0)}\n"
-                    f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}",
+                    f"[bold]Created:[/] {metadata.get('created_at', 'N/A')}\n"
+                    f"[bold]Resume:[/] {resume_ctx.resume_summary}",
                     title="Session Resumed",
                     border_style="green",
                 )
